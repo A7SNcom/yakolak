@@ -1,44 +1,56 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Yaklak Alignment v002</title>
-<style>
-body{margin:0;min-height:100vh;background:#101410;color:#f7f2e8;font-family:Tahoma,Arial,sans-serif;display:grid;place-items:center;padding:24px}.card{width:min(720px,100%);background:#1d281f;border:1px solid #3a4b3d;border-radius:22px;padding:22px;box-shadow:0 20px 60px #0008}h1{margin:0 0 8px;font-size:24px}.note{color:#d8d0c2;margin-bottom:18px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}.cell{border:1px solid #637b69;border-radius:16px;padding:14px;background:#26342b;text-align:center}.cell b{display:block;color:#d37c00;margin-bottom:6px}pre{direction:ltr;text-align:left;white-space:pre-wrap;background:#0b0e0c;border-radius:16px;padding:16px;overflow:auto;color:#f7f2e8}.ok{color:#89A790;font-weight:bold}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ياكلك - نسخة المطور v002</title>
+  <meta name="description" content="Yakolak 3D developer build with clean one-point calibration." />
+  <link rel="stylesheet" href="./src/styles.css?v=2026.06.20.2" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
 </head>
 <body>
-<main class="card">
-<h1>Yaklak Alignment v002</h1>
-<div class="note">تم تطبيق معايرة cell1 + cell9، وبقية الخانات محسوبة تلقائياً.</div>
-<div class="grid">
-<div class="cell"><b>cell1</b>x -47.259<br>y 47.583<br>z 2.8</div>
-<div class="cell"><b>step</b>x 47.789<br>y -47.459<br>z 0</div>
-<div class="cell"><b>cell9</b>x 48.318<br>y -47.335<br>z 2.8</div>
-</div>
-<p class="ok">GitHub Pages يفتح هذا الملف مباشرة من index.html.</p>
-<pre>const YAKLAK_ALIGNMENT = {
-  "version": "yaklak_dev_alignment_v002",
-  "note": "cell1 + cell9 فقط، وبقية الخانات محسوبة تلقائياً",
-  "cell1": {
-    "x": -47.259,
-    "y": 47.583,
-    "z": 2.8
-  },
-  "cell9": {
-    "x": 48.318,
-    "y": -47.335,
-    "z": 2.8
-  },
-  "cellHalf": 30,
-  "snapZOffset": 0.42,
-  "derived": {
-    "stepX": 47.789,
-    "stepY": -47.459,
-    "stepZ": 0
-  }
-};</pre>
-</main>
+  <main id="app" data-build="yaklak-dev-calibration-v002">
+    <canvas id="gameCanvas" aria-label="Yakolak 3D board"></canvas>
+
+    <button id="settingsBtn" class="icon-btn" type="button" aria-label="الإعدادات" title="الإعدادات">⚙️</button>
+
+    <section id="devPanel" class="dev-panel" aria-label="لوحة المعايرة">
+      <header>
+        <strong>معايرة نقطة واحدة</strong>
+        <button id="closePanelBtn" class="mini-btn" type="button">×</button>
+      </header>
+
+      <p class="hint">عدّل مركز واحد فقط. كل الخانات، المسافات، والارتفاع تتبعه تلقائيًا.</p>
+
+      <div class="grid-controls">
+        <label> X <input id="originX" type="number" step="0.05" /></label>
+        <label> Y <input id="originY" type="number" step="0.05" /></label>
+        <label> Z <input id="originZ" type="number" step="0.05" /></label>
+        <label> المسافة <input id="gridStep" type="number" step="0.05" min="0.5" /></label>
+        <label> ارتفاع الحجر <input id="dropHeight" type="number" step="0.02" /></label>
+        <label> حجم الحجر <input id="pieceScale" type="number" step="0.05" min="0.2" /></label>
+        <label> بعد المخزن <input id="trayRadius" type="number" step="0.1" min="2" /></label>
+      </div>
+
+      <div class="actions">
+        <button id="copyCodeBtn" type="button">نسخ الكود</button>
+        <button id="resetCalibrationBtn" type="button">تصفير المعايرة</button>
+        <button id="resetGameBtn" type="button">إعادة اللعب</button>
+      </div>
+
+      <textarea id="calibrationOutput" spellcheck="false" readonly></textarea>
+    </section>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+  </main>
+
+  <script type="module" src="./src/main.js?v=2026.06.20.2"></script>
 </body>
 </html>
