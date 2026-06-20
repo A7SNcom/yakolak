@@ -1,6 +1,6 @@
 export const DEFAULT_ALIGNMENT = {
-  version: "yaklak_rack_alignment_v002",
-  note: "4 racks from 3.stl. Pieces are placed as 3 nested stacks.",
+  version: "yaklak_rack_alignment_v003",
+  note: "Flat trays around the board. 3.stl is the tray; pieces are 3 nested sets on each tray.",
 
   board: {
     cell1: { x: -47.259, y: 2.8, z: 47.583 },
@@ -10,31 +10,31 @@ export const DEFAULT_ALIGNMENT = {
   },
 
   models: {
-    rack: { path: "./3.stl", fit: 74, rotateXDeg: 0 },
+    rack: { path: "./3.stl", fit: 72, rotateXDeg: 90 },
     small: { path: "./s.stl", fit: 16, rotateXDeg: 90 },
     medium: { path: "./m.stl", fit: 22, rotateXDeg: 90 },
     large: { path: "./l.stl", fit: 28, rotateXDeg: 90 }
   },
 
   players: [
-    { id: 0, label: "south", color: 0x4fa57d },
-    { id: 1, label: "north", color: 0xd79a37 },
-    { id: 2, label: "west", color: 0x5a89d6 },
-    { id: 3, label: "east", color: 0xc96b6b }
+    { id: 0, label: "south", color: 0x4f7f67 },
+    { id: 1, label: "north", color: 0x8f6c2f },
+    { id: 2, label: "west", color: 0x4d668f },
+    { id: 3, label: "east", color: 0x8b5a5a }
   ],
 
   racks: [
-    { x: 0, y: 0, z: 116, rotY: 0 },
-    { x: 0, y: 0, z: -116, rotY: 180 },
-    { x: -116, y: 0, z: 0, rotY: 90 },
-    { x: 116, y: 0, z: 0, rotY: -90 }
+    { x: 0, y: 0.2, z: 96, rotY: 0 },
+    { x: 0, y: 0.2, z: -96, rotY: 180 },
+    { x: -96, y: 0.2, z: 0, rotY: 90 },
+    { x: 96, y: 0.2, z: 0, rotY: -90 }
   ],
 
   piecesOnRack: {
-    gapX: 24,
+    gapX: 23.5,
     gapZ: 2.8,
     centerZ: 0,
-    lift: 0.8,
+    lift: 0.9,
     rackLift: 0,
     sets: 3,
     sizes: ["large", "medium", "small"]
