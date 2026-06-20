@@ -1,6 +1,44 @@
-Yaklak alignment v002
-cell1 x=-47.259 y=47.583 z=2.8
-cell9 x=48.318 y=-47.335 z=2.8
-cellHalf=30
-snapZOffset=0.42
-stepX=47.789 stepY=-47.459 stepZ=0
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Yaklak Alignment v002</title>
+<style>
+body{margin:0;min-height:100vh;background:#101410;color:#f7f2e8;font-family:Tahoma,Arial,sans-serif;display:grid;place-items:center;padding:24px}.card{width:min(720px,100%);background:#1d281f;border:1px solid #3a4b3d;border-radius:22px;padding:22px;box-shadow:0 20px 60px #0008}h1{margin:0 0 8px;font-size:24px}.note{color:#d8d0c2;margin-bottom:18px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}.cell{border:1px solid #637b69;border-radius:16px;padding:14px;background:#26342b;text-align:center}.cell b{display:block;color:#d37c00;margin-bottom:6px}pre{direction:ltr;text-align:left;white-space:pre-wrap;background:#0b0e0c;border-radius:16px;padding:16px;overflow:auto;color:#f7f2e8}.ok{color:#89A790;font-weight:bold}
+</style>
+</head>
+<body>
+<main class="card">
+<h1>Yaklak Alignment v002</h1>
+<div class="note">تم تطبيق معايرة cell1 + cell9، وبقية الخانات محسوبة تلقائياً.</div>
+<div class="grid">
+<div class="cell"><b>cell1</b>x -47.259<br>y 47.583<br>z 2.8</div>
+<div class="cell"><b>step</b>x 47.789<br>y -47.459<br>z 0</div>
+<div class="cell"><b>cell9</b>x 48.318<br>y -47.335<br>z 2.8</div>
+</div>
+<p class="ok">GitHub Pages يفتح هذا الملف مباشرة من index.html.</p>
+<pre>const YAKLAK_ALIGNMENT = {
+  "version": "yaklak_dev_alignment_v002",
+  "note": "cell1 + cell9 فقط، وبقية الخانات محسوبة تلقائياً",
+  "cell1": {
+    "x": -47.259,
+    "y": 47.583,
+    "z": 2.8
+  },
+  "cell9": {
+    "x": 48.318,
+    "y": -47.335,
+    "z": 2.8
+  },
+  "cellHalf": 30,
+  "snapZOffset": 0.42,
+  "derived": {
+    "stepX": 47.789,
+    "stepY": -47.459,
+    "stepZ": 0
+  }
+};</pre>
+</main>
+</body>
+</html>
