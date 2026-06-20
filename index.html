@@ -4,78 +4,62 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>عرض ملف 9 STL</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+    }
+  }
+  </script>
   <style>
-    html, body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #111;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-    #view {
-      position: fixed;
-      inset: 0;
-    }
-    #hint {
-      position: fixed;
-      top: 14px;
-      right: 14px;
-      z-index: 10;
-      padding: 8px 12px;
-      border-radius: 12px;
-      background: rgba(0, 0, 0, .55);
-      color: #fff;
-      font-size: 13px;
-      direction: ltr;
-      user-select: none;
-    }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #111; font-family: system-ui, sans-serif; }
+    #view { position: fixed; inset: 0; }
+    #hint { position: fixed; top: 14px; right: 14px; z-index: 10; padding: 8px 12px; border-radius: 12px; background: rgba(0,0,0,.65); color: #fff; font-size: 13px; direction: ltr; }
   </style>
 </head>
 <body>
   <div id="view"></div>
-  <div id="hint">9.stl</div>
+  <div id="hint">loading 9.stl...</div>
 
   <script type="module">
-    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js';
-    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/controls/OrbitControls.js';
-    import { STLLoader } from 'https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/loaders/STLLoader.js';
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
+    const hint = document.getElementById('hint');
     const root = document.getElementById('view');
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x111111);
 
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 10000);
+    const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 100000);
     camera.position.set(160, 130, 180);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
     root.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0x333333, 2.2));
-    const keyLight = new THREE.DirectionalLight(0xffffff, 2.4);
-    keyLight.position.set(120, 180, 140);
-    scene.add(keyLight);
-
-    const grid = new THREE.GridHelper(260, 26, 0x444444, 0x252525);
-    scene.add(grid);
+    const light = new THREE.DirectionalLight(0xffffff, 2.4);
+    light.position.set(120, 180, 140);
+    scene.add(light);
+    scene.add(new THREE.GridHelper(260, 26, 0x444444, 0x252525));
 
     const loader = new STLLoader();
-    loader.load('./9.stl', (geometry) => {
+    loader.load('./9.stl?v=006', (geometry) => {
+      if (!geometry.attributes.position || geometry.attributes.position.count === 0) {
+        hint.textContent = '9.stl is empty';
+        return;
+      }
+
       geometry.computeBoundingBox();
       geometry.computeVertexNormals();
 
-      const material = new THREE.MeshStandardMaterial({
-        color: 0xd8d8d8,
-        roughness: 0.55,
-        metalness: 0.05
-      });
-
-      const mesh = new THREE.Mesh(geometry, material);
+      const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0xd8d8d8, roughness: 0.55, metalness: 0.05 }));
       scene.add(mesh);
 
       const box = new THREE.Box3().setFromObject(mesh);
@@ -91,15 +75,16 @@
       camera.updateProjectionMatrix();
       controls.target.set(0, 0, 0);
       controls.update();
+      hint.textContent = '9.stl';
     }, undefined, (error) => {
-      document.getElementById('hint').textContent = 'Failed to load 9.stl';
+      hint.textContent = 'failed loading 9.stl';
       console.error(error);
     });
 
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setSize(innerWidth, innerHeight);
     });
 
     function animate() {
