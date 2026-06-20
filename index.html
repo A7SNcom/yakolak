@@ -3,6 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <meta name="yakolak-version" content="v008-no-cache" />
   <title>عرض ملف 9 STL</title>
   <script type="importmap">
   {
@@ -46,6 +50,28 @@
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+
+    const APP_VERSION = 'v008-no-cache';
+    const assetVersion = `${APP_VERSION}-${Date.now()}`;
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg => reg.unregister())).catch(() => {});
+    }
+    if ('caches' in window) {
+      caches.keys().then(keys => keys.forEach(key => caches.delete(key))).catch(() => {});
+    }
+
+    async function checkLatestVersion() {
+      try {
+        const url = `${location.pathname || '/'}?check=${Date.now()}`;
+        const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+        const html = await res.text();
+        const match = html.match(/<meta name="yakolak-version" content="([^"]+)"/);
+        const latest = match && match[1];
+        if (latest && latest !== APP_VERSION) location.reload();
+      } catch (e) {}
+    }
+    setInterval(checkLatestVersion, 30000);
 
     const hint = document.getElementById('hint');
     const root = document.getElementById('view');
@@ -102,7 +128,7 @@
     };
 
     const loader = new STLLoader();
-    loader.load('./9.stl?v=007', (geometry) => {
+    loader.load(`./9.stl?v=${assetVersion}`, (geometry) => {
       if (!geometry.attributes.position || geometry.attributes.position.count === 0) { hint.textContent = '9.stl is empty'; return; }
       geometry.computeBoundingBox();
       geometry.computeVertexNormals();
@@ -123,7 +149,7 @@
       camera.updateProjectionMatrix();
       controls.target.set(0, 0, 0);
       controls.update();
-      hint.textContent = '9.stl';
+      hint.textContent = `9.stl ${APP_VERSION}`;
       applyRotation();
     }, undefined, (error) => { hint.textContent = 'failed loading 9.stl'; console.error(error); });
 
