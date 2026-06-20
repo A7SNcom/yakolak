@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <meta name="yakolak-version" content="v017-lms-real-height" />
+  <meta name="yakolak-version" content="v018-lms-model-height" />
   <title>Yakolak STL Viewer</title>
   <script type="importmap">
   {
@@ -21,14 +21,13 @@
   </style>
 </head>
 <body>
-  <div id="view"></div><div id="hint">loading v017...</div><button id="settingsBtn">⚙</button>
+  <div id="view"></div><div id="hint">loading v018...</div><button id="settingsBtn">⚙</button>
   <div id="panel">
-    <div class="row"><b>Transform Controls</b> <span style="font-size:12px;color:#aaa">v017</span></div>
-    <div class="note">ثوابت 9 و 3 محفوظة. l/m/s موحدة القاع. تحكم الارتفاع الآن مربوط بالمحور الحقيقي للأعلى/الأسفل.</div>
+    <div class="row"><b>Transform Controls</b> <span style="font-size:12px;color:#aaa">v018</span></div>
+    <div class="note">ثوابت 9 و 3 محفوظة. اختر LMS من قائمة الموديل لضبط الارتفاع فقط.</div>
     <div id="status" class="row">loading models...</div>
     <div class="row"><div class="label"><span>Model</span><span id="modelName">9</span></div><select id="modelSelect"></select></div>
     <div id="controlsBox"></div>
-    <div class="row"><div class="label"><span>Center l/m/s Height</span><input class="num" id="centerZNum" type="number" min="-120" max="120" step="1" value="6"></div><input id="centerZRange" type="range" min="-120" max="120" step="1" value="6"></div>
     <div class="actions"><button id="resetBtn">Reset Selected</button><button id="copyBtn">Copy All</button></div>
     <textarea id="out" readonly></textarea>
   </div>
@@ -38,7 +37,7 @@
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
-    const APP_VERSION = 'v017-lms-real-height';
+    const APP_VERSION = 'v018-lms-model-height';
     const assetVersion = `${APP_VERSION}-${Date.now()}`;
     setInterval(async () => {
       try {
@@ -56,8 +55,6 @@
     const out = document.getElementById('out');
     const modelSelect = document.getElementById('modelSelect');
     const controlsBox = document.getElementById('controlsBox');
-    const centerZNum = document.getElementById('centerZNum');
-    const centerZRange = document.getElementById('centerZRange');
 
     const modelDefs = {
       '9': { file: '9.stl', color: 0xd8d8d8, label: '9 board' },
@@ -75,8 +72,9 @@
       '3-back': { px: 0, py: 6, pz: -135, rx: -90, ry: 0, rz: -90 }
     };
 
-    const centerPieces = { px: 0, py: 6, pz: 0, rx: -90, ry: 0, rz: 0 };
+    const lmsDefault = { px: 0, py: 6, pz: 0, rx: -90, ry: 0, rz: 0 };
     const state = JSON.parse(JSON.stringify(defaultState));
+    const lmsState = { ...lmsDefault };
     const meshes = {};
     const loadStatus = {};
     Object.keys(modelDefs).forEach(id => loadStatus[id] = 'loading');
@@ -84,9 +82,10 @@
     let selected = '9';
     let centerGroup = null;
 
-    modelSelect.innerHTML = Object.entries(modelDefs).map(([id, def]) => `<option value="${id}">${def.label}</option>`).join('');
+    const selectOptions = [...Object.entries(modelDefs).map(([id, def]) => [id, def.label]), ['LMS', 'LMS']];
+    modelSelect.innerHTML = selectOptions.map(([id, label]) => `<option value="${id}">${label}</option>`).join('');
 
-    const props = [
+    const modelProps = [
       ['px', 'Move X', -300, 300, 1, 10],
       ['py', 'Move Y', -100, 150, 1, 10],
       ['pz', 'Move Z', -300, 300, 1, 10],
@@ -94,13 +93,9 @@
       ['ry', 'Rotate Y', -180, 180, 1, 15],
       ['rz', 'Rotate Z', -180, 180, 1, 15]
     ];
-
-    controlsBox.innerHTML = props.map(([p, label, min, max, step, jump]) => `
-      <div class="row">
-        <div class="label"><span>${label}</span><input class="num" id="${p}Num" type="number" min="${min}" max="${max}" step="${step}" value="0"></div>
-        <input id="${p}Range" type="range" min="${min}" max="${max}" step="${step}" value="0">
-        <div class="btns"><button class="small" data-prop="${p}" data-delta="-${jump}">-${jump}</button><button class="small" data-prop="${p}" data-delta="-1">-1</button><button class="small" data-prop="${p}" data-delta="1">+1</button><button class="small" data-prop="${p}" data-delta="${jump}">+${jump}</button></div>
-      </div>`).join('');
+    const lmsProps = [
+      ['py', 'الارتفاع', -120, 120, 1, 10]
+    ];
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x111111);
@@ -123,7 +118,6 @@
       const n = Number(v) || 0;
       return prop[0] === 'r' ? Math.max(-180, Math.min(180, n)) : Math.max(-300, Math.min(300, n));
     }
-    function clampHeight(v) { return Math.max(-120, Math.min(120, Number(v) || 0)); }
     function applyModel(id) {
       const mesh = meshes[id];
       if (!mesh) return;
@@ -131,48 +125,55 @@
       mesh.position.set(s.px, s.py, s.pz);
       mesh.rotation.set(deg(s.rx), deg(s.ry), deg(s.rz));
     }
-    function applyCenterPieces() {
+    function applyLMS() {
       if (!centerGroup) return;
-      centerGroup.position.set(centerPieces.px, centerPieces.py, centerPieces.pz);
-      centerGroup.rotation.set(deg(centerPieces.rx), deg(centerPieces.ry), deg(centerPieces.rz));
+      centerGroup.position.set(lmsState.px, lmsState.py, lmsState.pz);
+      centerGroup.rotation.set(deg(lmsState.rx), deg(lmsState.ry), deg(lmsState.rz));
     }
+    function getActiveState() { return selected === 'LMS' ? lmsState : state[selected]; }
+    function getActiveProps() { return selected === 'LMS' ? lmsProps : modelProps; }
     function outputAll() {
       return {
         approved_9_and_3: state,
-        center_lms: { ...centerPieces },
-        center_lms_height_axis: 'py is the real visible height control; pz is not height here',
-        center_lms_rule: 'l/m/s local bottoms are equalized before group transform'
+        LMS: { الارتفاع: lmsState.py, px: lmsState.px, py: lmsState.py, pz: lmsState.pz, rx: lmsState.rx, ry: lmsState.ry, rz: lmsState.rz },
+        LMS_rule: 'l/m/s local bottoms are equalized; LMS exposes height only in settings'
       };
     }
+    function renderControls() {
+      const props = getActiveProps();
+      const s = getActiveState();
+      controlsBox.innerHTML = props.map(([p, label, min, max, step, jump]) => `
+        <div class="row">
+          <div class="label"><span>${label}</span><input class="num" id="${p}Num" type="number" min="${min}" max="${max}" step="${step}" value="${s[p]}"></div>
+          <input id="${p}Range" type="range" min="${min}" max="${max}" step="${step}" value="${s[p]}">
+          <div class="btns"><button class="small" data-prop="${p}" data-delta="-${jump}">-${jump}</button><button class="small" data-prop="${p}" data-delta="-1">-1</button><button class="small" data-prop="${p}" data-delta="1">+1</button><button class="small" data-prop="${p}" data-delta="${jump}">+${jump}</button></div>
+        </div>`).join('');
+      for (const [p] of props) {
+        document.getElementById(p + 'Range').addEventListener('input', e => { s[p] = clamp(p, e.target.value); applyAll(); });
+        document.getElementById(p + 'Num').addEventListener('input', e => { s[p] = clamp(p, e.target.value); applyAll(); });
+      }
+      document.querySelectorAll('button.small').forEach(btn => btn.onclick = () => {
+        const p = btn.dataset.prop;
+        s[p] = clamp(p, s[p] + Number(btn.dataset.delta));
+        applyAll();
+      });
+    }
     function refreshUI() {
-      const s = state[selected];
       document.getElementById('modelName').textContent = selected;
       modelSelect.value = selected;
-      for (const [p] of props) {
-        document.getElementById(p + 'Range').value = s[p];
-        document.getElementById(p + 'Num').value = s[p];
-      }
-      centerZNum.value = centerPieces.py;
-      centerZRange.value = centerPieces.py;
       out.value = `const YAKOLAK_ALIGNMENT = ${JSON.stringify(outputAll(), null, 2)};`;
-      statusEl.textContent = Object.entries(loadStatus).map(([id, st]) => `${id}: ${st}`).join('\n') + `\ncenter l/m/s height(py): ${centerPieces.py}\nactive: ${selected}`;
+      statusEl.textContent = Object.entries(loadStatus).map(([id, st]) => `${id}: ${st}`).join('\n') + `\nLMS الارتفاع: ${lmsState.py}\nactive: ${selected}`;
     }
-    function applyAll() { Object.keys(state).forEach(applyModel); applyCenterPieces(); refreshUI(); }
+    function applyAll() { Object.keys(state).forEach(applyModel); applyLMS(); refreshUI(); }
+    function rebuildUI() { renderControls(); applyAll(); }
 
     document.getElementById('settingsBtn').onclick = () => panel.classList.toggle('show');
-    modelSelect.onchange = () => { selected = modelSelect.value; refreshUI(); };
-    for (const [p] of props) {
-      document.getElementById(p + 'Range').addEventListener('input', e => { state[selected][p] = clamp(p, e.target.value); applyAll(); });
-      document.getElementById(p + 'Num').addEventListener('input', e => { state[selected][p] = clamp(p, e.target.value); applyAll(); });
-    }
-    document.querySelectorAll('button.small').forEach(btn => btn.onclick = () => {
-      const p = btn.dataset.prop;
-      state[selected][p] = clamp(p, state[selected][p] + Number(btn.dataset.delta));
-      applyAll();
-    });
-    centerZRange.addEventListener('input', e => { centerPieces.py = clampHeight(e.target.value); applyAll(); });
-    centerZNum.addEventListener('input', e => { centerPieces.py = clampHeight(e.target.value); applyAll(); });
-    document.getElementById('resetBtn').onclick = () => { Object.assign(state[selected], defaultState[selected]); applyAll(); };
+    modelSelect.onchange = () => { selected = modelSelect.value; rebuildUI(); };
+    document.getElementById('resetBtn').onclick = () => {
+      if (selected === 'LMS') Object.assign(lmsState, lmsDefault);
+      else Object.assign(state[selected], defaultState[selected]);
+      rebuildUI();
+    };
     document.getElementById('copyBtn').onclick = async () => {
       await navigator.clipboard.writeText(out.value);
       hint.textContent = 'alignment copied';
@@ -232,7 +233,7 @@
     Promise.all(Object.keys(modelDefs).map(loadModel)).then(() => {
       centerGroup = new THREE.Group();
       scene.add(centerGroup);
-      applyCenterPieces();
+      applyLMS();
       return Promise.all([
         loadCenterPiece('l', 0xf2c078),
         loadCenterPiece('m', 0x8ecae6),
@@ -254,7 +255,7 @@
         controls.update();
       }
       hint.textContent = `Yakolak ${APP_VERSION}`;
-      refreshUI();
+      rebuildUI();
     });
 
     addEventListener('resize', () => {
@@ -264,7 +265,7 @@
     });
     function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); }
     animate();
-    refreshUI();
+    rebuildUI();
   </script>
 </body>
 </html>
