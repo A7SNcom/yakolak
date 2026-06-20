@@ -1,68 +1,33 @@
 # yakolak
 
-نسخة مطوّر مرتبة للعبة ياكلك 3D.
+الملف الرئيسي الآن هو `index.html` وهو نسخة مطابقة من:
 
-## الملف المعتمد الآن
+`yaklak_dev_calibration_v002.html`
 
-افتح:
+## تشغيل GitHub Pages
 
-- `index.html` ← هذا هو الملف الأساسي لصفحة GitHub Pages
-- `yaklak_dev_calibration_v002.html` ← نسخة مطابقة محفوظة باسم المطور
-
-## فكرة المعايرة الجديدة
-
-المعايرة صارت نقطة واحدة فقط:
-
-```js
-origin: { x, y, z }
-```
-
-بعدها كل أماكن الوقوف التسعة تتولد تلقائيًا من نفس النقطة باستخدام:
-
-```js
-gridStep
-```
-
-والارتفاع كله يتبع:
-
-```js
-origin.y + dropHeight
-```
-
-يعني ما عاد فيه محورين ولا معايرة مكانين.
+افتح رابط GitHub Pages مباشرة، لأنه يقرأ `index.html` من جذر الريبو.
 
 ## ترتيب الملفات
 
 ```txt
 /
-├─ index.html                         # صفحة التشغيل الأساسية الصحيحة
-├─ yaklak_dev_calibration_v002.html    # نسخة مطابقة للاندكس
-├─ src/
-│  ├─ config.js                        # إعدادات اللعبة والألوان ومسارات STL
-│  ├─ main.js                          # تشغيل اللعبة 3D والسحب والإفلات
-│  ├─ calibration.js                   # أدوات المعايرة نقطة واحدة
-│  └─ styles.css                       # تنسيق الواجهة ولوحة المطور
-├─ s.stl                               # الحجر الصغير
-├─ m.stl                               # الحجر المتوسط
-├─ l.stl                               # الحجر الكبير
-└─ README.md
+├─ index.html                         # النسخة الصحيحة المعتمدة للعرض
+├─ yaklak_dev_calibration_v002.html    # نفس نسخة المطور الأصلية من Google Drive
+├─ source_stl/
+│  ├─ 9.stl                            # البورد الرئيسي
+│  ├─ 3.stl                            # ملف STL إضافي من المصدر
+│  ├─ l.stl                            # الحجر الكبير
+│  ├─ m.stl                            # الحجر المتوسط
+│  └─ s.stl                            # الحجر الصغير
+├─ legacy/
+│  ├─ yaklak_3d.html
+│  ├─ yaklak_dev_v001.html
+│  ├─ yaklak_ref_test_tmp.html
+│  └─ yaklak_dev_calibration_v002_DO_NOT_USE_old_upload.html
+├─ README.txt                          # ملاحظة المصدر الأصلية
+├─ README.md
+└─ .nojekyll
 ```
 
-## ملاحظة مهمة لملفات STL
-
-تم ضبط اللعبة لتحمل ملفات STL محليًا من نفس الريبو:
-
-```js
-modelBaseUrl: './'
-modelFiles: {
-  small: 's.stl',
-  medium: 'm.stl',
-  large: 'l.stl'
-}
-```
-
-يعني GitHub Pages يعتمد على ملفات الريبو نفسها، وليس رابط خارجي.
-
-## ملاحظة تشغيل
-
-لو ظهر خطأ `Failed to resolve module specifier three` فافتح `index.html` الجديد؛ لأنه يحتوي `importmap` الصحيح.
+ملاحظة: نسخة `v002` الحالية تحتوي المجسمات مدمجة داخل HTML، لذلك صفحة Pages تشتغل بدون مشاكل مسارات STL. ملفات STL محفوظة ومرتبة كمصدر نظيف للرجوع لها.
