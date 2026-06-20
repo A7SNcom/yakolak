@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <meta name="yakolak-version" content="v012-four-sides-restored" />
+  <meta name="yakolak-version" content="v015-center-lms-z" />
   <title>Yakolak STL Viewer</title>
   <script type="importmap">
   {
@@ -17,16 +17,18 @@
   }
   </script>
   <style>
-    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;font-family:system-ui,sans-serif}#view{position:fixed;inset:0}#hint{position:fixed;top:14px;right:14px;z-index:10;padding:8px 12px;border-radius:12px;background:rgba(0,0,0,.65);color:#fff;font-size:13px;direction:ltr}#settingsBtn{position:fixed;top:14px;left:14px;z-index:20;width:52px;height:52px;border:0;border-radius:16px;background:rgba(0,0,0,.78);color:#fff;font-size:25px;cursor:pointer}#panel{position:fixed;top:76px;left:14px;z-index:20;width:min(430px,calc(100vw - 28px));max-height:calc(100vh - 100px);overflow:auto;padding:14px;border-radius:18px;background:rgba(0,0,0,.84);color:#fff;display:none;direction:ltr}#panel.show{display:block}.row{margin:12px 0}.label{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:6px}.num{width:86px;border:0;border-radius:10px;padding:7px 8px;background:#181818;color:#fff;text-align:center;direction:ltr}select,input[type=range]{width:100%}select{box-sizing:border-box;border:0;border-radius:12px;padding:10px;background:#181818;color:#fff}.btns{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:7px}button.small{border:0;border-radius:10px;padding:8px 0;background:#252525;color:#fff;cursor:pointer}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.actions button{border:0;border-radius:12px;padding:10px;background:#333;color:#fff;cursor:pointer}textarea{width:100%;height:160px;box-sizing:border-box;border:0;border-radius:12px;padding:10px;background:#151515;color:#fff;resize:none;direction:ltr;margin-top:10px}#status{font-size:12px;line-height:1.6;color:#ddd;background:#151515;border-radius:12px;padding:9px;white-space:pre-wrap;direction:ltr}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;font-family:system-ui,sans-serif}#view{position:fixed;inset:0}#hint{position:fixed;top:14px;right:14px;z-index:10;padding:8px 12px;border-radius:12px;background:rgba(0,0,0,.65);color:#fff;font-size:13px;direction:ltr}#settingsBtn{position:fixed;top:14px;left:14px;z-index:20;width:52px;height:52px;border:0;border-radius:16px;background:rgba(0,0,0,.78);color:#fff;font-size:25px;cursor:pointer}#panel{position:fixed;top:76px;left:14px;z-index:20;width:min(430px,calc(100vw - 28px));max-height:calc(100vh - 100px);overflow:auto;padding:14px;border-radius:18px;background:rgba(0,0,0,.84);color:#fff;display:none;direction:ltr}#panel.show{display:block}.row{margin:12px 0}.label{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:6px}.num{width:86px;border:0;border-radius:10px;padding:7px 8px;background:#181818;color:#fff;text-align:center;direction:ltr}select,input[type=range]{width:100%}select{box-sizing:border-box;border:0;border-radius:12px;padding:10px;background:#181818;color:#fff}.btns{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:7px}button.small{border:0;border-radius:10px;padding:8px 0;background:#252525;color:#fff;cursor:pointer}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.actions button{border:0;border-radius:12px;padding:10px;background:#333;color:#fff;cursor:pointer}textarea{width:100%;height:185px;box-sizing:border-box;border:0;border-radius:12px;padding:10px;background:#151515;color:#fff;resize:none;direction:ltr;margin-top:10px}#status{font-size:12px;line-height:1.6;color:#ddd;background:#151515;border-radius:12px;padding:9px;white-space:pre-wrap;direction:ltr}.note{font-size:12px;color:#bbb;line-height:1.5}
   </style>
 </head>
 <body>
-  <div id="view"></div><div id="hint">loading v012...</div><button id="settingsBtn">⚙</button>
+  <div id="view"></div><div id="hint">loading v015...</div><button id="settingsBtn">⚙</button>
   <div id="panel">
-    <div class="row"><b>Transform Controls</b> <span style="font-size:12px;color:#aaa">v012 restored</span></div>
+    <div class="row"><b>Transform Controls</b> <span style="font-size:12px;color:#aaa">v015</span></div>
+    <div class="note">ثوابت 9 و 3 محفوظة. الإضافة الجديدة فقط: l/m/s في المركز، والتحكم في Z فقط.</div>
     <div id="status" class="row">loading models...</div>
     <div class="row"><div class="label"><span>Model</span><span id="modelName">9</span></div><select id="modelSelect"></select></div>
     <div id="controlsBox"></div>
+    <div class="row"><div class="label"><span>Center l/m/s Z</span><input class="num" id="centerZNum" type="number" min="-120" max="120" step="1" value="0"></div><input id="centerZRange" type="range" min="-120" max="120" step="1" value="0"></div>
     <div class="actions"><button id="resetBtn">Reset Selected</button><button id="copyBtn">Copy All</button></div>
     <textarea id="out" readonly></textarea>
   </div>
@@ -36,7 +38,7 @@
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
-    const APP_VERSION = 'v012-four-sides-restored';
+    const APP_VERSION = 'v015-center-lms-z';
     const assetVersion = `${APP_VERSION}-${Date.now()}`;
     setInterval(async () => {
       try {
@@ -54,6 +56,8 @@
     const out = document.getElementById('out');
     const modelSelect = document.getElementById('modelSelect');
     const controlsBox = document.getElementById('controlsBox');
+    const centerZNum = document.getElementById('centerZNum');
+    const centerZRange = document.getElementById('centerZRange');
 
     const modelDefs = {
       '9': { file: '9.stl', color: 0xd8d8d8, label: '9 board' },
@@ -71,11 +75,14 @@
       '3-back': { px: 0, py: 6, pz: -135, rx: -90, ry: 0, rz: -90 }
     };
 
+    const centerPieces = { px: 0, py: 6, pz: 0, rx: -90, ry: 0, rz: 0 };
     const state = JSON.parse(JSON.stringify(defaultState));
     const meshes = {};
     const loadStatus = {};
     Object.keys(modelDefs).forEach(id => loadStatus[id] = 'loading');
+    ['l','m','s'].forEach(id => loadStatus[id] = 'loading');
     let selected = '9';
+    let centerGroup = null;
 
     modelSelect.innerHTML = Object.entries(modelDefs).map(([id, def]) => `<option value="${id}">${def.label}</option>`).join('');
 
@@ -116,12 +123,24 @@
       const n = Number(v) || 0;
       return prop[0] === 'r' ? Math.max(-180, Math.min(180, n)) : Math.max(-300, Math.min(300, n));
     }
+    function clampCenterZ(v) { return Math.max(-120, Math.min(120, Number(v) || 0)); }
     function applyModel(id) {
       const mesh = meshes[id];
       if (!mesh) return;
       const s = state[id];
       mesh.position.set(s.px, s.py, s.pz);
       mesh.rotation.set(deg(s.rx), deg(s.ry), deg(s.rz));
+    }
+    function applyCenterPieces() {
+      if (!centerGroup) return;
+      centerGroup.position.set(centerPieces.px, centerPieces.py, centerPieces.pz);
+      centerGroup.rotation.set(deg(centerPieces.rx), deg(centerPieces.ry), deg(centerPieces.rz));
+    }
+    function outputAll() {
+      return {
+        approved_9_and_3: state,
+        center_lms: { ...centerPieces }
+      };
     }
     function refreshUI() {
       const s = state[selected];
@@ -131,10 +150,12 @@
         document.getElementById(p + 'Range').value = s[p];
         document.getElementById(p + 'Num').value = s[p];
       }
-      out.value = `const MODEL_TRANSFORMS = ${JSON.stringify(state, null, 2)};`;
-      statusEl.textContent = Object.entries(loadStatus).map(([id, st]) => `${id}: ${st}`).join('\n') + `\nactive: ${selected}`;
+      centerZNum.value = centerPieces.pz;
+      centerZRange.value = centerPieces.pz;
+      out.value = `const YAKOLAK_ALIGNMENT = ${JSON.stringify(outputAll(), null, 2)};`;
+      statusEl.textContent = Object.entries(loadStatus).map(([id, st]) => `${id}: ${st}`).join('\n') + `\ncenter l/m/s z: ${centerPieces.pz}\nactive: ${selected}`;
     }
-    function applyAll() { Object.keys(state).forEach(applyModel); refreshUI(); }
+    function applyAll() { Object.keys(state).forEach(applyModel); applyCenterPieces(); refreshUI(); }
 
     document.getElementById('settingsBtn').onclick = () => panel.classList.toggle('show');
     modelSelect.onchange = () => { selected = modelSelect.value; refreshUI(); };
@@ -147,10 +168,12 @@
       state[selected][p] = clamp(p, state[selected][p] + Number(btn.dataset.delta));
       applyAll();
     });
+    centerZRange.addEventListener('input', e => { centerPieces.pz = clampCenterZ(e.target.value); applyAll(); });
+    centerZNum.addEventListener('input', e => { centerPieces.pz = clampCenterZ(e.target.value); applyAll(); });
     document.getElementById('resetBtn').onclick = () => { Object.assign(state[selected], defaultState[selected]); applyAll(); };
     document.getElementById('copyBtn').onclick = async () => {
       await navigator.clipboard.writeText(out.value);
-      hint.textContent = 'transforms copied';
+      hint.textContent = 'alignment copied';
       setTimeout(() => hint.textContent = `Yakolak ${APP_VERSION}`, 1200);
     };
 
@@ -175,19 +198,39 @@
             applyModel(id);
             loadStatus[id] = 'loaded';
           } catch (e) { loadStatus[id] = `failed: ${e.message}`; }
-          refreshUI();
-          resolve();
-        }, undefined, e => {
-          loadStatus[id] = `failed: ${e?.message || 'load error'}`;
-          refreshUI();
-          resolve();
-        });
+          refreshUI(); resolve();
+        }, undefined, e => { loadStatus[id] = `failed: ${e?.message || 'load error'}`; refreshUI(); resolve(); });
+      });
+    }
+
+    function loadCenterPiece(name, color) {
+      return new Promise(resolve => {
+        loader.load(`./${name}.stl?v=${assetVersion}-${name}`, g => {
+          try {
+            if (!g.attributes.position || g.attributes.position.count === 0) throw new Error('empty STL');
+            centerGeometry(g);
+            const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.05 }));
+            centerGroup.add(mesh);
+            loadStatus[name] = 'loaded';
+          } catch (e) { loadStatus[name] = `failed: ${e.message}`; }
+          refreshUI(); resolve();
+        }, undefined, e => { loadStatus[name] = `failed: ${e?.message || 'load error'}`; refreshUI(); resolve(); });
       });
     }
 
     Promise.all(Object.keys(modelDefs).map(loadModel)).then(() => {
+      centerGroup = new THREE.Group();
+      scene.add(centerGroup);
+      applyCenterPieces();
+      return Promise.all([
+        loadCenterPiece('l', 0xf2c078),
+        loadCenterPiece('m', 0x8ecae6),
+        loadCenterPiece('s', 0xffafcc)
+      ]);
+    }).then(() => {
       const box = new THREE.Box3();
       Object.values(meshes).forEach(m => box.expandByObject(m));
+      if (centerGroup) box.expandByObject(centerGroup);
       if (Object.keys(meshes).length) {
         const size = box.getSize(new THREE.Vector3());
         const maxAxis = Math.max(size.x, size.y, size.z) || 1;
