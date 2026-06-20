@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <meta name="yakolak-version" content="v020-guided-calibration" />
+  <meta name="yakolak-version" content="v021-lms-base-guide" />
   <title>Yakolak STL Viewer</title>
   <script type="importmap">
   {
@@ -32,7 +32,7 @@
 </head>
 <body>
   <div id="view"></div>
-  <div id="hint">loading v020...</div>
+  <div id="hint">loading v021...</div>
   <button id="settingsBtn" aria-label="settings">⚙</button>
   <div id="shade"></div>
   <div id="wizard">
@@ -52,7 +52,7 @@
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
-    const APP_VERSION = 'v020-guided-calibration';
+    const APP_VERSION = 'v021-lms-base-guide';
     const assetVersion = `${APP_VERSION}-${Date.now()}`;
     setInterval(async () => {
       try {
@@ -100,6 +100,7 @@
     Object.keys(modelDefs).forEach(id => loadStatus[id] = 'loading');
     ['l','m','s'].forEach(id => loadStatus[id] = 'loading');
     let centerGroup = null;
+    let lmsBaseGuide = null;
     let activeModel = 'LMS';
     let activeProp = 'py';
 
@@ -148,21 +149,27 @@
       centerGroup.position.set(lmsState.px, lmsState.py, lmsState.pz);
       centerGroup.rotation.set(deg(lmsState.rx), deg(lmsState.ry), deg(lmsState.rz));
     }
+    function updateBaseGuideVisibility() {
+      if (!lmsBaseGuide) return;
+      lmsBaseGuide.visible = activeModel === 'LMS' && miniCal.classList.contains('show');
+    }
     function outputAll() {
       return {
         approved_9_and_3: state,
         LMS: { الارتفاع: lmsState.py, px: lmsState.px, py: lmsState.py, pz: lmsState.pz, rx: lmsState.rx, ry: lmsState.ry, rz: lmsState.rz },
-        LMS_rule: 'l/m/s local bottoms are equalized; LMS exposes height only in guided calibration'
+        LMS_rule: 'l/m/s local bottoms are equalized; transparent base guide appears only during LMS calibration'
       };
     }
     function refreshOutput() {
       out.value = `const YAKOLAK_ALIGNMENT = ${JSON.stringify(outputAll(), null, 2)};`;
       statusEl.textContent = Object.entries(loadStatus).map(([id, st]) => `${id}: ${st}`).join('\n') + `\nLMS الارتفاع: ${lmsState.py}\nactive: ${activeModel}.${activeProp}`;
+      updateBaseGuideVisibility();
     }
     function applyAll() { Object.keys(state).forEach(applyModel); applyLMS(); refreshOutput(); updateMiniValues(); }
 
     function showWizardStep1() {
       miniCal.classList.remove('show');
+      updateBaseGuideVisibility();
       shade.classList.add('show');
       wizard.classList.add('show');
       wizardContent.innerHTML = `<div class="q">إيش تبغى تعاير؟</div><div class="sub">سؤال واحد فقط. اختر الموديل، وبعدها تظهر أداة صغيرة لا تحجب المعاينة.</div><div class="grid"><button class="choice primary" data-model="LMS">LMS</button><button class="choice" data-model="9">9 board</button><button class="choice" data-model="3-right">3 right</button><button class="choice" data-model="3-left">3 left</button><button class="choice" data-model="3-front">3 front</button><button class="choice" data-model="3-back">3 back</button></div><div class="wizardActions"><button class="ghost" id="cancelWizard">إلغاء</button><button class="ghost" id="debugBtn">Status</button></div>`;
@@ -181,11 +188,11 @@
       document.getElementById('cancelWizard').onclick = closeWizard;
     }
     function closeWizard() { wizard.classList.remove('show'); shade.classList.remove('show'); }
-    function startMiniCalibration() { closeWizard(); miniCal.classList.add('show'); updateMiniForActive(); }
+    function startMiniCalibration() { closeWizard(); miniCal.classList.add('show'); updateMiniForActive(); updateBaseGuideVisibility(); }
     function updateMiniForActive() {
       const f = fields[activeProp];
       calTitle.textContent = activeModel === 'LMS' ? 'LMS — الارتفاع' : `${getActiveLabel()} — ${f.label}`;
-      calMeta.textContent = `${activeModel}.${activeProp}`;
+      calMeta.textContent = activeModel === 'LMS' ? 'قاعدة شفافة ظاهرة' : `${activeModel}.${activeProp}`;
       calRange.min = f.min; calRange.max = f.max; calRange.step = f.step;
       calNum.min = f.min; calNum.max = f.max; calNum.step = f.step;
       updateMiniValues();
@@ -205,7 +212,7 @@
     document.getElementById('settingsBtn').onclick = showWizardStep1;
     shade.onclick = closeWizard;
     document.getElementById('changeBtn').onclick = showWizardStep1;
-    document.getElementById('closeMiniBtn').onclick = () => miniCal.classList.remove('show');
+    document.getElementById('closeMiniBtn').onclick = () => { miniCal.classList.remove('show'); updateBaseGuideVisibility(); };
     calRange.addEventListener('input', e => setActiveValue(e.target.value));
     calNum.addEventListener('input', e => setActiveValue(e.target.value));
     document.getElementById('minusBtn').onclick = () => setActiveValue(getActiveState()[activeProp] - fields[activeProp].jump);
@@ -235,6 +242,38 @@
       g.translate(-cx, -cy, -box.min.z);
       g.computeVertexNormals();
     }
+    function addLmsBaseGuide() {
+      if (!centerGroup || lmsBaseGuide) return;
+      const box = new THREE.Box3();
+      let hasPiece = false;
+      centerGroup.children.forEach(child => {
+        if (!child.userData.isLmsPiece || !child.geometry) return;
+        child.geometry.computeBoundingBox();
+        const b = child.geometry.boundingBox.clone();
+        b.translate(child.position);
+        box.union(b);
+        hasPiece = true;
+      });
+      if (!hasPiece) return;
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const pad = 10;
+      const guide = new THREE.Group();
+      const plate = new THREE.Mesh(
+        new THREE.PlaneGeometry(Math.max(size.x + pad, 12), Math.max(size.y + pad, 12)),
+        new THREE.MeshBasicMaterial({ color: 0x00ff99, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false })
+      );
+      plate.position.set(center.x, center.y, 0.04);
+      const outline = new THREE.LineSegments(
+        new THREE.EdgesGeometry(plate.geometry),
+        new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 })
+      );
+      outline.position.copy(plate.position);
+      guide.add(plate, outline);
+      guide.visible = false;
+      lmsBaseGuide = guide;
+      centerGroup.add(guide);
+    }
 
     const loader = new STLLoader();
     function loadModel(id) {
@@ -261,6 +300,7 @@
             if (!g.attributes.position || g.attributes.position.count === 0) throw new Error('empty STL');
             alignLmsGeometryBottom(g);
             const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.05 }));
+            mesh.userData.isLmsPiece = true;
             centerGroup.add(mesh);
             loadStatus[name] = 'loaded bottom-aligned';
           } catch (e) { loadStatus[name] = `failed: ${e.message}`; }
@@ -279,6 +319,7 @@
         loadCenterPiece('s', 0xffafcc)
       ]);
     }).then(() => {
+      addLmsBaseGuide();
       const box = new THREE.Box3();
       Object.values(meshes).forEach(m => box.expandByObject(m));
       if (centerGroup) box.expandByObject(centerGroup);
