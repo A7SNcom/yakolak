@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <meta name="yakolak-version" content="v021-lms-base-guide" />
+  <meta name="yakolak-version" content="v022-calibration-step-one" />
   <title>Yakolak STL Viewer</title>
   <script type="importmap">
   {
@@ -32,36 +32,25 @@
 </head>
 <body>
   <div id="view"></div>
-  <div id="hint">loading v021...</div>
+  <div id="hint">loading v022...</div>
   <button id="settingsBtn" aria-label="settings">⚙</button>
   <div id="shade"></div>
-  <div id="wizard">
-    <div class="grab"></div>
-    <div id="wizardContent"></div>
-  </div>
+  <div id="wizard"><div class="grab"></div><div id="wizardContent"></div></div>
   <div id="miniCal">
     <div class="miniTop"><div><div class="miniTitle" id="calTitle">المعايرة</div><div class="miniMeta" id="calMeta">—</div></div><button class="ghost" id="changeBtn" style="width:92px;min-height:42px">تغيير</button></div>
     <div class="miniInputRow"><button class="roundBtn" id="minusBtn">−</button><input id="calRange" type="range"><button class="roundBtn" id="plusBtn">+</button><input class="num" id="calNum" type="number"></div>
     <div class="miniBottom"><button id="resetBtn">Reset</button><button id="copyBtn">Copy</button><button id="closeMiniBtn">إخفاء</button></div>
   </div>
-  <div id="status">loading models...</div>
-  <textarea id="out" readonly></textarea>
+  <div id="status">loading models...</div><textarea id="out" readonly></textarea>
 
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
-    const APP_VERSION = 'v021-lms-base-guide';
+    const APP_VERSION = 'v022-calibration-step-one';
     const assetVersion = `${APP_VERSION}-${Date.now()}`;
-    setInterval(async () => {
-      try {
-        const res = await fetch(`${location.pathname || '/'}?check=${Date.now()}`, { cache: 'no-store' });
-        const html = await res.text();
-        const latest = (html.match(/yakolak-version" content="([^"]+)/) || [])[1];
-        if (latest && latest !== APP_VERSION) location.reload();
-      } catch (e) {}
-    }, 30000);
+    setInterval(async () => { try { const res = await fetch(`${location.pathname || '/'}?check=${Date.now()}`, { cache: 'no-store' }); const html = await res.text(); const latest = (html.match(/yakolak-version" content="([^"]+)/) || [])[1]; if (latest && latest !== APP_VERSION) location.reload(); } catch (e) {} }, 30000);
 
     const hint = document.getElementById('hint');
     const statusEl = document.getElementById('status');
@@ -83,7 +72,6 @@
       '3-front': { file: '3.stl', color: 0x89a790, label: '3 front' },
       '3-back': { file: '3.stl', color: 0x89a790, label: '3 back' }
     };
-
     const defaultState = {
       '9': { px: 0, py: 6, pz: 0, rx: -90, ry: 0, rz: 0 },
       '3-right': { px: 135, py: 6, pz: 0, rx: -90, ry: 0, rz: 0 },
@@ -91,261 +79,59 @@
       '3-front': { px: 0, py: 6, pz: 135, rx: -90, ry: 0, rz: 90 },
       '3-back': { px: 0, py: 6, pz: -135, rx: -90, ry: 0, rz: -90 }
     };
-
     const lmsDefault = { px: 0, py: 6, pz: 0, rx: -90, ry: 0, rz: 0 };
     const state = JSON.parse(JSON.stringify(defaultState));
     const lmsState = { ...lmsDefault };
-    const meshes = {};
-    const loadStatus = {};
-    Object.keys(modelDefs).forEach(id => loadStatus[id] = 'loading');
-    ['l','m','s'].forEach(id => loadStatus[id] = 'loading');
-    let centerGroup = null;
-    let lmsBaseGuide = null;
-    let activeModel = 'LMS';
-    let activeProp = 'py';
-
+    const meshes = {}, loadStatus = {};
+    Object.keys(modelDefs).forEach(id => loadStatus[id] = 'loading'); ['l','m','s'].forEach(id => loadStatus[id] = 'loading');
+    let centerGroup = null, lmsBaseGuide = null, activeModel = 'LMS', activeProp = 'py';
     const fields = {
-      px: { label: 'Move X', min: -300, max: 300, step: 1, jump: 10 },
-      py: { label: 'Move Y', min: -120, max: 150, step: 1, jump: 10 },
-      pz: { label: 'Move Z', min: -300, max: 300, step: 1, jump: 10 },
-      rx: { label: 'Rotate X', min: -180, max: 180, step: 1, jump: 15 },
-      ry: { label: 'Rotate Y', min: -180, max: 180, step: 1, jump: 15 },
-      rz: { label: 'Rotate Z', min: -180, max: 180, step: 1, jump: 15 }
+      px: { label: 'Move X', min: -300, max: 300, step: 1, jump: 1 },
+      py: { label: 'Move Y', min: -120, max: 150, step: 1, jump: 1 },
+      pz: { label: 'Move Z', min: -300, max: 300, step: 1, jump: 1 },
+      rx: { label: 'Rotate X', min: -180, max: 180, step: 1, jump: 1 },
+      ry: { label: 'Rotate Y', min: -180, max: 180, step: 1, jump: 1 },
+      rz: { label: 'Rotate Z', min: -180, max: 180, step: 1, jump: 1 }
     };
 
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x111111);
-    const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 100000);
-    camera.position.set(260, 210, 260);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    renderer.setSize(innerWidth, innerHeight);
-    root.appendChild(renderer.domElement);
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x333333, 2.2));
-    const light = new THREE.DirectionalLight(0xffffff, 2.4);
-    light.position.set(150, 220, 160);
-    scene.add(light);
-    scene.add(new THREE.GridHelper(360, 36, 0x444444, 0x252525));
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x111111);
+    const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 100000); camera.position.set(260, 210, 260);
+    const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight); root.appendChild(renderer.domElement);
+    const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x333333, 2.2)); const light = new THREE.DirectionalLight(0xffffff, 2.4); light.position.set(150, 220, 160); scene.add(light); scene.add(new THREE.GridHelper(360, 36, 0x444444, 0x252525));
 
-    function deg(v) { return THREE.MathUtils.degToRad(v); }
-    function clampValue(prop, v) {
-      const f = fields[prop];
-      const n = Number(v) || 0;
-      return Math.max(f.min, Math.min(f.max, n));
-    }
-    function getActiveState() { return activeModel === 'LMS' ? lmsState : state[activeModel]; }
-    function getActiveLabel() { return activeModel === 'LMS' ? 'LMS' : (modelDefs[activeModel]?.label || activeModel); }
-    function applyModel(id) {
-      const mesh = meshes[id];
-      if (!mesh) return;
-      const s = state[id];
-      mesh.position.set(s.px, s.py, s.pz);
-      mesh.rotation.set(deg(s.rx), deg(s.ry), deg(s.rz));
-    }
-    function applyLMS() {
-      if (!centerGroup) return;
-      centerGroup.position.set(lmsState.px, lmsState.py, lmsState.pz);
-      centerGroup.rotation.set(deg(lmsState.rx), deg(lmsState.ry), deg(lmsState.rz));
-    }
-    function updateBaseGuideVisibility() {
-      if (!lmsBaseGuide) return;
-      lmsBaseGuide.visible = activeModel === 'LMS' && miniCal.classList.contains('show');
-    }
-    function outputAll() {
-      return {
-        approved_9_and_3: state,
-        LMS: { الارتفاع: lmsState.py, px: lmsState.px, py: lmsState.py, pz: lmsState.pz, rx: lmsState.rx, ry: lmsState.ry, rz: lmsState.rz },
-        LMS_rule: 'l/m/s local bottoms are equalized; transparent base guide appears only during LMS calibration'
-      };
-    }
-    function refreshOutput() {
-      out.value = `const YAKOLAK_ALIGNMENT = ${JSON.stringify(outputAll(), null, 2)};`;
-      statusEl.textContent = Object.entries(loadStatus).map(([id, st]) => `${id}: ${st}`).join('\n') + `\nLMS الارتفاع: ${lmsState.py}\nactive: ${activeModel}.${activeProp}`;
-      updateBaseGuideVisibility();
-    }
-    function applyAll() { Object.keys(state).forEach(applyModel); applyLMS(); refreshOutput(); updateMiniValues(); }
+    function deg(v){return THREE.MathUtils.degToRad(v)}
+    function clampValue(prop,v){const f=fields[prop];const n=Number(v)||0;return Math.max(f.min,Math.min(f.max,n))}
+    function getActiveState(){return activeModel==='LMS'?lmsState:state[activeModel]}
+    function getActiveLabel(){return activeModel==='LMS'?'LMS':(modelDefs[activeModel]?.label||activeModel)}
+    function applyModel(id){const mesh=meshes[id];if(!mesh)return;const s=state[id];mesh.position.set(s.px,s.py,s.pz);mesh.rotation.set(deg(s.rx),deg(s.ry),deg(s.rz))}
+    function applyLMS(){if(!centerGroup)return;centerGroup.position.set(lmsState.px,lmsState.py,lmsState.pz);centerGroup.rotation.set(deg(lmsState.rx),deg(lmsState.ry),deg(lmsState.rz))}
+    function updateBaseGuideVisibility(){if(!lmsBaseGuide)return;lmsBaseGuide.visible=activeModel==='LMS'&&miniCal.classList.contains('show')}
+    function outputAll(){return{approved_9_and_3:state,LMS:{الارتفاع:lmsState.py,px:lmsState.px,py:lmsState.py,pz:lmsState.pz,rx:lmsState.rx,ry:lmsState.ry,rz:lmsState.rz},LMS_rule:'l/m/s local bottoms are equalized; transparent base guide appears only during LMS calibration'}}
+    function refreshOutput(){out.value=`const YAKOLAK_ALIGNMENT = ${JSON.stringify(outputAll(),null,2)};`;statusEl.textContent=Object.entries(loadStatus).map(([id,st])=>`${id}: ${st}`).join('\n')+`\nLMS الارتفاع: ${lmsState.py}\nactive: ${activeModel}.${activeProp}`;updateBaseGuideVisibility()}
+    function applyAll(){Object.keys(state).forEach(applyModel);applyLMS();refreshOutput();updateMiniValues()}
 
-    function showWizardStep1() {
-      miniCal.classList.remove('show');
-      updateBaseGuideVisibility();
-      shade.classList.add('show');
-      wizard.classList.add('show');
-      wizardContent.innerHTML = `<div class="q">إيش تبغى تعاير؟</div><div class="sub">سؤال واحد فقط. اختر الموديل، وبعدها تظهر أداة صغيرة لا تحجب المعاينة.</div><div class="grid"><button class="choice primary" data-model="LMS">LMS</button><button class="choice" data-model="9">9 board</button><button class="choice" data-model="3-right">3 right</button><button class="choice" data-model="3-left">3 left</button><button class="choice" data-model="3-front">3 front</button><button class="choice" data-model="3-back">3 back</button></div><div class="wizardActions"><button class="ghost" id="cancelWizard">إلغاء</button><button class="ghost" id="debugBtn">Status</button></div>`;
-      wizardContent.querySelectorAll('[data-model]').forEach(btn => btn.onclick = () => {
-        activeModel = btn.dataset.model;
-        if (activeModel === 'LMS') { activeProp = 'py'; startMiniCalibration(); }
-        else showWizardStep2();
-      });
-      document.getElementById('cancelWizard').onclick = closeWizard;
-      document.getElementById('debugBtn').onclick = () => document.body.classList.toggle('debug');
-    }
-    function showWizardStep2() {
-      wizardContent.innerHTML = `<div class="q">إيش الخاصية؟</div><div class="sub">الموديل: ${getActiveLabel()}</div><div class="grid"><button class="choice" data-prop="px">Move X</button><button class="choice" data-prop="py">Move Y</button><button class="choice" data-prop="pz">Move Z</button><button class="choice" data-prop="rx">Rotate X</button><button class="choice" data-prop="ry">Rotate Y</button><button class="choice" data-prop="rz">Rotate Z</button></div><div class="wizardActions"><button class="ghost" id="backWizard">رجوع</button><button class="ghost" id="cancelWizard">إلغاء</button></div>`;
-      wizardContent.querySelectorAll('[data-prop]').forEach(btn => btn.onclick = () => { activeProp = btn.dataset.prop; startMiniCalibration(); });
-      document.getElementById('backWizard').onclick = showWizardStep1;
-      document.getElementById('cancelWizard').onclick = closeWizard;
-    }
-    function closeWizard() { wizard.classList.remove('show'); shade.classList.remove('show'); }
-    function startMiniCalibration() { closeWizard(); miniCal.classList.add('show'); updateMiniForActive(); updateBaseGuideVisibility(); }
-    function updateMiniForActive() {
-      const f = fields[activeProp];
-      calTitle.textContent = activeModel === 'LMS' ? 'LMS — الارتفاع' : `${getActiveLabel()} — ${f.label}`;
-      calMeta.textContent = activeModel === 'LMS' ? 'قاعدة شفافة ظاهرة' : `${activeModel}.${activeProp}`;
-      calRange.min = f.min; calRange.max = f.max; calRange.step = f.step;
-      calNum.min = f.min; calNum.max = f.max; calNum.step = f.step;
-      updateMiniValues();
-    }
-    function updateMiniValues() {
-      if (!miniCal.classList.contains('show')) return;
-      const s = getActiveState();
-      if (!s || !(activeProp in s)) return;
-      calRange.value = s[activeProp];
-      calNum.value = s[activeProp];
-    }
-    function setActiveValue(v) {
-      const s = getActiveState();
-      s[activeProp] = clampValue(activeProp, v);
-      applyAll();
-    }
-    document.getElementById('settingsBtn').onclick = showWizardStep1;
-    shade.onclick = closeWizard;
-    document.getElementById('changeBtn').onclick = showWizardStep1;
-    document.getElementById('closeMiniBtn').onclick = () => { miniCal.classList.remove('show'); updateBaseGuideVisibility(); };
-    calRange.addEventListener('input', e => setActiveValue(e.target.value));
-    calNum.addEventListener('input', e => setActiveValue(e.target.value));
-    document.getElementById('minusBtn').onclick = () => setActiveValue(getActiveState()[activeProp] - fields[activeProp].jump);
-    document.getElementById('plusBtn').onclick = () => setActiveValue(getActiveState()[activeProp] + fields[activeProp].jump);
-    document.getElementById('resetBtn').onclick = () => {
-      if (activeModel === 'LMS') Object.assign(lmsState, lmsDefault);
-      else Object.assign(state[activeModel], defaultState[activeModel]);
-      applyAll();
-    };
-    document.getElementById('copyBtn').onclick = async () => {
-      await navigator.clipboard.writeText(out.value);
-      hint.textContent = 'alignment copied';
-      setTimeout(() => hint.textContent = `Yakolak ${APP_VERSION}`, 1200);
-    };
+    function showWizardStep1(){miniCal.classList.remove('show');updateBaseGuideVisibility();shade.classList.add('show');wizard.classList.add('show');wizardContent.innerHTML=`<div class="q">إيش تبغى تعاير؟</div><div class="sub">سؤال واحد فقط. اختر الموديل، وبعدها تظهر أداة صغيرة لا تحجب المعاينة.</div><div class="grid"><button class="choice primary" data-model="LMS">LMS</button><button class="choice" data-model="9">9 board</button><button class="choice" data-model="3-right">3 right</button><button class="choice" data-model="3-left">3 left</button><button class="choice" data-model="3-front">3 front</button><button class="choice" data-model="3-back">3 back</button></div><div class="wizardActions"><button class="ghost" id="cancelWizard">إلغاء</button><button class="ghost" id="debugBtn">Status</button></div>`;wizardContent.querySelectorAll('[data-model]').forEach(btn=>btn.onclick=()=>{activeModel=btn.dataset.model;if(activeModel==='LMS'){activeProp='py';startMiniCalibration()}else showWizardStep2()});document.getElementById('cancelWizard').onclick=closeWizard;document.getElementById('debugBtn').onclick=()=>document.body.classList.toggle('debug')}
+    function showWizardStep2(){wizardContent.innerHTML=`<div class="q">إيش الخاصية؟</div><div class="sub">الموديل: ${getActiveLabel()}</div><div class="grid"><button class="choice" data-prop="px">Move X</button><button class="choice" data-prop="py">Move Y</button><button class="choice" data-prop="pz">Move Z</button><button class="choice" data-prop="rx">Rotate X</button><button class="choice" data-prop="ry">Rotate Y</button><button class="choice" data-prop="rz">Rotate Z</button></div><div class="wizardActions"><button class="ghost" id="backWizard">رجوع</button><button class="ghost" id="cancelWizard">إلغاء</button></div>`;wizardContent.querySelectorAll('[data-prop]').forEach(btn=>btn.onclick=()=>{activeProp=btn.dataset.prop;startMiniCalibration()});document.getElementById('backWizard').onclick=showWizardStep1;document.getElementById('cancelWizard').onclick=closeWizard}
+    function closeWizard(){wizard.classList.remove('show');shade.classList.remove('show')}
+    function startMiniCalibration(){closeWizard();miniCal.classList.add('show');updateMiniForActive();updateBaseGuideVisibility()}
+    function updateMiniForActive(){const f=fields[activeProp];calTitle.textContent=activeModel==='LMS'?'LMS — الارتفاع':`${getActiveLabel()} — ${f.label}`;calMeta.textContent=activeModel==='LMS'?'قاعدة شفافة ظاهرة':`${activeModel}.${activeProp}`;calRange.min=f.min;calRange.max=f.max;calRange.step=f.step;calNum.min=f.min;calNum.max=f.max;calNum.step=f.step;updateMiniValues()}
+    function updateMiniValues(){if(!miniCal.classList.contains('show'))return;const s=getActiveState();if(!s||!(activeProp in s))return;calRange.value=s[activeProp];calNum.value=s[activeProp]}
+    function setActiveValue(v){const s=getActiveState();s[activeProp]=clampValue(activeProp,v);applyAll()}
+    document.getElementById('settingsBtn').onclick=showWizardStep1;shade.onclick=closeWizard;document.getElementById('changeBtn').onclick=showWizardStep1;document.getElementById('closeMiniBtn').onclick=()=>{miniCal.classList.remove('show');updateBaseGuideVisibility()};calRange.addEventListener('input',e=>setActiveValue(e.target.value));calNum.addEventListener('input',e=>setActiveValue(e.target.value));document.getElementById('minusBtn').onclick=()=>setActiveValue(getActiveState()[activeProp]-fields[activeProp].jump);document.getElementById('plusBtn').onclick=()=>setActiveValue(getActiveState()[activeProp]+fields[activeProp].jump);document.getElementById('resetBtn').onclick=()=>{if(activeModel==='LMS')Object.assign(lmsState,lmsDefault);else Object.assign(state[activeModel],defaultState[activeModel]);applyAll()};document.getElementById('copyBtn').onclick=async()=>{await navigator.clipboard.writeText(out.value);hint.textContent='alignment copied';setTimeout(()=>hint.textContent=`Yakolak ${APP_VERSION}`,1200)};
 
-    function centerGeometry(g) {
-      g.computeBoundingBox();
-      const c = g.boundingBox.getCenter(new THREE.Vector3());
-      g.translate(-c.x, -c.y, -c.z);
-      g.computeVertexNormals();
-    }
-    function alignLmsGeometryBottom(g) {
-      g.computeBoundingBox();
-      const box = g.boundingBox;
-      const cx = (box.min.x + box.max.x) / 2;
-      const cy = (box.min.y + box.max.y) / 2;
-      g.translate(-cx, -cy, -box.min.z);
-      g.computeVertexNormals();
-    }
-    function addLmsBaseGuide() {
-      if (!centerGroup || lmsBaseGuide) return;
-      const box = new THREE.Box3();
-      let hasPiece = false;
-      centerGroup.children.forEach(child => {
-        if (!child.userData.isLmsPiece || !child.geometry) return;
-        child.geometry.computeBoundingBox();
-        const b = child.geometry.boundingBox.clone();
-        b.translate(child.position);
-        box.union(b);
-        hasPiece = true;
-      });
-      if (!hasPiece) return;
-      const size = box.getSize(new THREE.Vector3());
-      const center = box.getCenter(new THREE.Vector3());
-      const pad = 10;
-      const guide = new THREE.Group();
-      const plate = new THREE.Mesh(
-        new THREE.PlaneGeometry(Math.max(size.x + pad, 12), Math.max(size.y + pad, 12)),
-        new THREE.MeshBasicMaterial({ color: 0x00ff99, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false })
-      );
-      plate.position.set(center.x, center.y, 0.04);
-      const outline = new THREE.LineSegments(
-        new THREE.EdgesGeometry(plate.geometry),
-        new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 })
-      );
-      outline.position.copy(plate.position);
-      guide.add(plate, outline);
-      guide.visible = false;
-      lmsBaseGuide = guide;
-      centerGroup.add(guide);
-    }
+    function centerGeometry(g){g.computeBoundingBox();const c=g.boundingBox.getCenter(new THREE.Vector3());g.translate(-c.x,-c.y,-c.z);g.computeVertexNormals()}
+    function alignLmsGeometryBottom(g){g.computeBoundingBox();const box=g.boundingBox;const cx=(box.min.x+box.max.x)/2;const cy=(box.min.y+box.max.y)/2;g.translate(-cx,-cy,-box.min.z);g.computeVertexNormals()}
+    function addLmsBaseGuide(){if(!centerGroup||lmsBaseGuide)return;const box=new THREE.Box3();let hasPiece=false;centerGroup.children.forEach(child=>{if(!child.userData.isLmsPiece||!child.geometry)return;child.geometry.computeBoundingBox();const b=child.geometry.boundingBox.clone();b.translate(child.position);box.union(b);hasPiece=true});if(!hasPiece)return;const size=box.getSize(new THREE.Vector3());const center=box.getCenter(new THREE.Vector3());const pad=10;const guide=new THREE.Group();const plate=new THREE.Mesh(new THREE.PlaneGeometry(Math.max(size.x+pad,12),Math.max(size.y+pad,12)),new THREE.MeshBasicMaterial({color:0x00ff99,transparent:true,opacity:0.28,side:THREE.DoubleSide,depthWrite:false}));plate.position.set(center.x,center.y,0.04);const outline=new THREE.LineSegments(new THREE.EdgesGeometry(plate.geometry),new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0.9}));outline.position.copy(plate.position);guide.add(plate,outline);guide.visible=false;lmsBaseGuide=guide;centerGroup.add(guide)}
 
-    const loader = new STLLoader();
-    function loadModel(id) {
-      const def = modelDefs[id];
-      return new Promise(resolve => {
-        loader.load(`./${def.file}?v=${assetVersion}-${id}`, g => {
-          try {
-            if (!g.attributes.position || g.attributes.position.count === 0) throw new Error('empty STL');
-            centerGeometry(g);
-            const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: def.color, roughness: 0.55, metalness: 0.05 }));
-            meshes[id] = mesh;
-            scene.add(mesh);
-            applyModel(id);
-            loadStatus[id] = 'loaded';
-          } catch (e) { loadStatus[id] = `failed: ${e.message}`; }
-          refreshOutput(); resolve();
-        }, undefined, e => { loadStatus[id] = `failed: ${e?.message || 'load error'}`; refreshOutput(); resolve(); });
-      });
-    }
-    function loadCenterPiece(name, color) {
-      return new Promise(resolve => {
-        loader.load(`./${name}.stl?v=${assetVersion}-${name}`, g => {
-          try {
-            if (!g.attributes.position || g.attributes.position.count === 0) throw new Error('empty STL');
-            alignLmsGeometryBottom(g);
-            const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.05 }));
-            mesh.userData.isLmsPiece = true;
-            centerGroup.add(mesh);
-            loadStatus[name] = 'loaded bottom-aligned';
-          } catch (e) { loadStatus[name] = `failed: ${e.message}`; }
-          refreshOutput(); resolve();
-        }, undefined, e => { loadStatus[name] = `failed: ${e?.message || 'load error'}`; refreshOutput(); resolve(); });
-      });
-    }
+    const loader=new STLLoader();
+    function loadModel(id){const def=modelDefs[id];return new Promise(resolve=>{loader.load(`./${def.file}?v=${assetVersion}-${id}`,g=>{try{if(!g.attributes.position||g.attributes.position.count===0)throw new Error('empty STL');centerGeometry(g);const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:def.color,roughness:0.55,metalness:0.05}));meshes[id]=mesh;scene.add(mesh);applyModel(id);loadStatus[id]='loaded'}catch(e){loadStatus[id]=`failed: ${e.message}`}refreshOutput();resolve()},undefined,e=>{loadStatus[id]=`failed: ${e?.message||'load error'}`;refreshOutput();resolve()})})}
+    function loadCenterPiece(name,color){return new Promise(resolve=>{loader.load(`./${name}.stl?v=${assetVersion}-${name}`,g=>{try{if(!g.attributes.position||g.attributes.position.count===0)throw new Error('empty STL');alignLmsGeometryBottom(g);const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color,roughness:0.55,metalness:0.05}));mesh.userData.isLmsPiece=true;centerGroup.add(mesh);loadStatus[name]='loaded bottom-aligned'}catch(e){loadStatus[name]=`failed: ${e.message}`}refreshOutput();resolve()},undefined,e=>{loadStatus[name]=`failed: ${e?.message||'load error'}`;refreshOutput();resolve()})})}
 
-    Promise.all(Object.keys(modelDefs).map(loadModel)).then(() => {
-      centerGroup = new THREE.Group();
-      scene.add(centerGroup);
-      applyLMS();
-      return Promise.all([
-        loadCenterPiece('l', 0xf2c078),
-        loadCenterPiece('m', 0x8ecae6),
-        loadCenterPiece('s', 0xffafcc)
-      ]);
-    }).then(() => {
-      addLmsBaseGuide();
-      const box = new THREE.Box3();
-      Object.values(meshes).forEach(m => box.expandByObject(m));
-      if (centerGroup) box.expandByObject(centerGroup);
-      if (Object.keys(meshes).length) {
-        const size = box.getSize(new THREE.Vector3());
-        const maxAxis = Math.max(size.x, size.y, size.z) || 1;
-        const d = maxAxis * 1.75;
-        camera.position.set(d, d * 0.82, d);
-        camera.near = Math.max(d / 1000, 0.01);
-        camera.far = d * 30;
-        camera.updateProjectionMatrix();
-        controls.target.set(0, 0, 0);
-        controls.update();
-      }
-      hint.textContent = `Yakolak ${APP_VERSION}`;
-      refreshOutput();
-    });
-
-    addEventListener('resize', () => {
-      camera.aspect = innerWidth / innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(innerWidth, innerHeight);
-    });
-    function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); }
-    animate();
-    refreshOutput();
+    Promise.all(Object.keys(modelDefs).map(loadModel)).then(()=>{centerGroup=new THREE.Group();scene.add(centerGroup);applyLMS();return Promise.all([loadCenterPiece('l',0xf2c078),loadCenterPiece('m',0x8ecae6),loadCenterPiece('s',0xffafcc)])}).then(()=>{addLmsBaseGuide();const box=new THREE.Box3();Object.values(meshes).forEach(m=>box.expandByObject(m));if(centerGroup)box.expandByObject(centerGroup);if(Object.keys(meshes).length){const size=box.getSize(new THREE.Vector3());const maxAxis=Math.max(size.x,size.y,size.z)||1;const d=maxAxis*1.75;camera.position.set(d,d*0.82,d);camera.near=Math.max(d/1000,0.01);camera.far=d*30;camera.updateProjectionMatrix();controls.target.set(0,0,0);controls.update()}hint.textContent=`Yakolak ${APP_VERSION}`;refreshOutput()});
+    addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+    function animate(){requestAnimationFrame(animate);controls.update();renderer.render(scene,camera)}
+    animate();refreshOutput();
   </script>
 </body>
 </html>
