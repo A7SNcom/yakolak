@@ -1,0 +1,15 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Node/build leftovers if used later
+node_modules/
+dist/
+build/
+.env
+.env.*
+
+# Local test files
+*.log
