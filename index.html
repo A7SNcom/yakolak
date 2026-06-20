@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <meta name="yakolak-version" content="v016-lms-bottom-aligned" />
+  <meta name="yakolak-version" content="v017-lms-real-height" />
   <title>Yakolak STL Viewer</title>
   <script type="importmap">
   {
@@ -21,14 +21,14 @@
   </style>
 </head>
 <body>
-  <div id="view"></div><div id="hint">loading v016...</div><button id="settingsBtn">⚙</button>
+  <div id="view"></div><div id="hint">loading v017...</div><button id="settingsBtn">⚙</button>
   <div id="panel">
-    <div class="row"><b>Transform Controls</b> <span style="font-size:12px;color:#aaa">v016</span></div>
-    <div class="note">ثوابت 9 و 3 محفوظة. l/m/s في المركز، وتم توحيد أدنى نقطة للثلاثة داخلياً.</div>
+    <div class="row"><b>Transform Controls</b> <span style="font-size:12px;color:#aaa">v017</span></div>
+    <div class="note">ثوابت 9 و 3 محفوظة. l/m/s موحدة القاع. تحكم الارتفاع الآن مربوط بالمحور الحقيقي للأعلى/الأسفل.</div>
     <div id="status" class="row">loading models...</div>
     <div class="row"><div class="label"><span>Model</span><span id="modelName">9</span></div><select id="modelSelect"></select></div>
     <div id="controlsBox"></div>
-    <div class="row"><div class="label"><span>Center l/m/s Z</span><input class="num" id="centerZNum" type="number" min="-120" max="120" step="1" value="0"></div><input id="centerZRange" type="range" min="-120" max="120" step="1" value="0"></div>
+    <div class="row"><div class="label"><span>Center l/m/s Height</span><input class="num" id="centerZNum" type="number" min="-120" max="120" step="1" value="6"></div><input id="centerZRange" type="range" min="-120" max="120" step="1" value="6"></div>
     <div class="actions"><button id="resetBtn">Reset Selected</button><button id="copyBtn">Copy All</button></div>
     <textarea id="out" readonly></textarea>
   </div>
@@ -38,7 +38,7 @@
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
-    const APP_VERSION = 'v016-lms-bottom-aligned';
+    const APP_VERSION = 'v017-lms-real-height';
     const assetVersion = `${APP_VERSION}-${Date.now()}`;
     setInterval(async () => {
       try {
@@ -123,7 +123,7 @@
       const n = Number(v) || 0;
       return prop[0] === 'r' ? Math.max(-180, Math.min(180, n)) : Math.max(-300, Math.min(300, n));
     }
-    function clampCenterZ(v) { return Math.max(-120, Math.min(120, Number(v) || 0)); }
+    function clampHeight(v) { return Math.max(-120, Math.min(120, Number(v) || 0)); }
     function applyModel(id) {
       const mesh = meshes[id];
       if (!mesh) return;
@@ -140,6 +140,7 @@
       return {
         approved_9_and_3: state,
         center_lms: { ...centerPieces },
+        center_lms_height_axis: 'py is the real visible height control; pz is not height here',
         center_lms_rule: 'l/m/s local bottoms are equalized before group transform'
       };
     }
@@ -151,10 +152,10 @@
         document.getElementById(p + 'Range').value = s[p];
         document.getElementById(p + 'Num').value = s[p];
       }
-      centerZNum.value = centerPieces.pz;
-      centerZRange.value = centerPieces.pz;
+      centerZNum.value = centerPieces.py;
+      centerZRange.value = centerPieces.py;
       out.value = `const YAKOLAK_ALIGNMENT = ${JSON.stringify(outputAll(), null, 2)};`;
-      statusEl.textContent = Object.entries(loadStatus).map(([id, st]) => `${id}: ${st}`).join('\n') + `\ncenter l/m/s z: ${centerPieces.pz}\nactive: ${selected}`;
+      statusEl.textContent = Object.entries(loadStatus).map(([id, st]) => `${id}: ${st}`).join('\n') + `\ncenter l/m/s height(py): ${centerPieces.py}\nactive: ${selected}`;
     }
     function applyAll() { Object.keys(state).forEach(applyModel); applyCenterPieces(); refreshUI(); }
 
@@ -169,8 +170,8 @@
       state[selected][p] = clamp(p, state[selected][p] + Number(btn.dataset.delta));
       applyAll();
     });
-    centerZRange.addEventListener('input', e => { centerPieces.pz = clampCenterZ(e.target.value); applyAll(); });
-    centerZNum.addEventListener('input', e => { centerPieces.pz = clampCenterZ(e.target.value); applyAll(); });
+    centerZRange.addEventListener('input', e => { centerPieces.py = clampHeight(e.target.value); applyAll(); });
+    centerZNum.addEventListener('input', e => { centerPieces.py = clampHeight(e.target.value); applyAll(); });
     document.getElementById('resetBtn').onclick = () => { Object.assign(state[selected], defaultState[selected]); applyAll(); };
     document.getElementById('copyBtn').onclick = async () => {
       await navigator.clipboard.writeText(out.value);
@@ -261,7 +262,7 @@
       camera.updateProjectionMatrix();
       renderer.setSize(innerWidth, innerHeight);
     });
-    function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+    function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); }
     animate();
     refreshUI();
   </script>
