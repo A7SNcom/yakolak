@@ -1,6 +1,6 @@
 export const DEFAULT_ALIGNMENT = {
-  version: "yaklak_rack_alignment_v001",
-  note: "4 player racks use 3.stl. Each player starts with 9 pieces arranged on the rack.",
+  version: "yaklak_rack_alignment_v002",
+  note: "4 racks from 3.stl. Pieces are placed as 3 nested stacks.",
 
   board: {
     cell1: { x: -47.259, y: 2.8, z: 47.583 },
@@ -10,10 +10,10 @@ export const DEFAULT_ALIGNMENT = {
   },
 
   models: {
-    rack: { path: "./3.stl", fit: 74 },
-    small: { path: "./s.stl", fit: 16 },
-    medium: { path: "./m.stl", fit: 22 },
-    large: { path: "./l.stl", fit: 28 }
+    rack: { path: "./3.stl", fit: 74, rotateXDeg: 0 },
+    small: { path: "./s.stl", fit: 16, rotateXDeg: 90 },
+    medium: { path: "./m.stl", fit: 22, rotateXDeg: 90 },
+    large: { path: "./l.stl", fit: 28, rotateXDeg: 90 }
   },
 
   players: [
@@ -31,11 +31,13 @@ export const DEFAULT_ALIGNMENT = {
   ],
 
   piecesOnRack: {
-    gapX: 18,
-    gapZ: 19,
-    lift: 1.2,
+    gapX: 24,
+    gapZ: 2.8,
+    centerZ: 0,
+    lift: 0.8,
     rackLift: 0,
-    rows: ["large", "medium", "small"]
+    sets: 3,
+    sizes: ["large", "medium", "small"]
   }
 };
 
