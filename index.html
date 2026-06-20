@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <meta name="yakolak-version" content="v015-center-lms-z" />
+  <meta name="yakolak-version" content="v016-lms-bottom-aligned" />
   <title>Yakolak STL Viewer</title>
   <script type="importmap">
   {
@@ -21,10 +21,10 @@
   </style>
 </head>
 <body>
-  <div id="view"></div><div id="hint">loading v015...</div><button id="settingsBtn">⚙</button>
+  <div id="view"></div><div id="hint">loading v016...</div><button id="settingsBtn">⚙</button>
   <div id="panel">
-    <div class="row"><b>Transform Controls</b> <span style="font-size:12px;color:#aaa">v015</span></div>
-    <div class="note">ثوابت 9 و 3 محفوظة. الإضافة الجديدة فقط: l/m/s في المركز، والتحكم في Z فقط.</div>
+    <div class="row"><b>Transform Controls</b> <span style="font-size:12px;color:#aaa">v016</span></div>
+    <div class="note">ثوابت 9 و 3 محفوظة. l/m/s في المركز، وتم توحيد أدنى نقطة للثلاثة داخلياً.</div>
     <div id="status" class="row">loading models...</div>
     <div class="row"><div class="label"><span>Model</span><span id="modelName">9</span></div><select id="modelSelect"></select></div>
     <div id="controlsBox"></div>
@@ -38,7 +38,7 @@
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
-    const APP_VERSION = 'v015-center-lms-z';
+    const APP_VERSION = 'v016-lms-bottom-aligned';
     const assetVersion = `${APP_VERSION}-${Date.now()}`;
     setInterval(async () => {
       try {
@@ -139,7 +139,8 @@
     function outputAll() {
       return {
         approved_9_and_3: state,
-        center_lms: { ...centerPieces }
+        center_lms: { ...centerPieces },
+        center_lms_rule: 'l/m/s local bottoms are equalized before group transform'
       };
     }
     function refreshUI() {
@@ -184,6 +185,15 @@
       g.computeVertexNormals();
     }
 
+    function alignLmsGeometryBottom(g) {
+      g.computeBoundingBox();
+      const box = g.boundingBox;
+      const cx = (box.min.x + box.max.x) / 2;
+      const cy = (box.min.y + box.max.y) / 2;
+      g.translate(-cx, -cy, -box.min.z);
+      g.computeVertexNormals();
+    }
+
     const loader = new STLLoader();
     function loadModel(id) {
       const def = modelDefs[id];
@@ -208,10 +218,10 @@
         loader.load(`./${name}.stl?v=${assetVersion}-${name}`, g => {
           try {
             if (!g.attributes.position || g.attributes.position.count === 0) throw new Error('empty STL');
-            centerGeometry(g);
+            alignLmsGeometryBottom(g);
             const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.05 }));
             centerGroup.add(mesh);
-            loadStatus[name] = 'loaded';
+            loadStatus[name] = 'loaded bottom-aligned';
           } catch (e) { loadStatus[name] = `failed: ${e.message}`; }
           refreshUI(); resolve();
         }, undefined, e => { loadStatus[name] = `failed: ${e?.message || 'load error'}`; refreshUI(); resolve(); });
