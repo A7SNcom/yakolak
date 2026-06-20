@@ -2,29 +2,112 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>ياكلك 3D</title>
-  <link rel="stylesheet" href="./src/styles.css?v=005" />
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>عرض ملف 9 STL</title>
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #111;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-  }
-  </script>
+    #view {
+      position: fixed;
+      inset: 0;
+    }
+    #hint {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      z-index: 10;
+      padding: 8px 12px;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, .55);
+      color: #fff;
+      font-size: 13px;
+      direction: ltr;
+      user-select: none;
+    }
+  </style>
 </head>
 <body>
-  <canvas id="game" aria-label="Yaklak 3D game"></canvas>
-  <div class="hud">
-    <button class="iconBtn" id="resetBtn" aria-label="reset">↻</button>
-    <div class="dots" id="dots"></div>
-    <button class="iconBtn" id="cameraBtn" aria-label="camera">⌖</button>
-    <button class="iconBtn" id="settingsBtn" aria-label="settings">⚙</button>
-  </div>
-  <div class="brand">ي</div>
-  <div class="loader" id="loader"><div class="spinner"></div></div>
-  <section class="calPanel" id="calPanel" aria-label="لوحة معايرة المطور"></section>
-  <script type="module" src="./src/app-v005.js?v=005"></script>
+  <div id="view"></div>
+  <div id="hint">9.stl</div>
+
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js';
+    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/controls/OrbitControls.js';
+    import { STLLoader } from 'https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/loaders/STLLoader.js';
+
+    const root = document.getElementById('view');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111111);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 10000);
+    camera.position.set(160, 130, 180);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    root.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x333333, 2.2));
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.4);
+    keyLight.position.set(120, 180, 140);
+    scene.add(keyLight);
+
+    const grid = new THREE.GridHelper(260, 26, 0x444444, 0x252525);
+    scene.add(grid);
+
+    const loader = new STLLoader();
+    loader.load('./9.stl', (geometry) => {
+      geometry.computeBoundingBox();
+      geometry.computeVertexNormals();
+
+      const material = new THREE.MeshStandardMaterial({
+        color: 0xd8d8d8,
+        roughness: 0.55,
+        metalness: 0.05
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+      scene.add(mesh);
+
+      const box = new THREE.Box3().setFromObject(mesh);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      mesh.position.sub(center);
+
+      const maxAxis = Math.max(size.x, size.y, size.z) || 1;
+      const distance = maxAxis * 1.8;
+      camera.position.set(distance, distance * 0.75, distance);
+      camera.near = Math.max(distance / 1000, 0.01);
+      camera.far = distance * 20;
+      camera.updateProjectionMatrix();
+      controls.target.set(0, 0, 0);
+      controls.update();
+    }, undefined, (error) => {
+      document.getElementById('hint').textContent = 'Failed to load 9.stl';
+      console.error(error);
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
 </body>
 </html>
