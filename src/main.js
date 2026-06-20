@@ -130,10 +130,10 @@ async function loadAndStart() {
   try {
     const { models } = state.alignment;
     await Promise.all([
-      loadModel("rack", models.rack.path, models.rack.fit),
-      loadModel("small", models.small.path, models.small.fit),
-      loadModel("medium", models.medium.path, models.medium.fit),
-      loadModel("large", models.large.path, models.large.fit)
+      loadModel("rack", models.rack),
+      loadModel("small", models.small),
+      loadModel("medium", models.medium),
+      loadModel("large", models.large)
     ]);
 
     rebuildAll();
@@ -145,11 +145,11 @@ async function loadAndStart() {
   }
 }
 
-function loadModel(key, path, fitSize) {
+function loadModel(key, model) {
   const loader = new STLLoader();
   return new Promise((resolve, reject) => {
-    loader.load(path, (geometry) => {
-      const normalized = normalizeGeometry(geometry, fitSize);
+    loader.load(model.path, (geometry) => {
+      const normalized = normalizeGeometry(geometry, model);
       state.geoms.set(key, normalized.geometry);
       state.dims.set(key, normalized.dims);
       resolve();
@@ -157,8 +157,11 @@ function loadModel(key, path, fitSize) {
   });
 }
 
-function normalizeGeometry(geometry, fitSize) {
+function normalizeGeometry(geometry, model) {
   const g = geometry.clone();
+  const rotateX = THREE.MathUtils.degToRad(model.rotateXDeg || 0);
+  if (rotateX) g.rotateX(rotateX);
+
   g.computeVertexNormals();
   g.computeBoundingBox();
 
@@ -171,7 +174,7 @@ function normalizeGeometry(geometry, fitSize) {
   const nb = g.boundingBox;
   const width = nb.max.x - nb.min.x;
   const depth = nb.max.z - nb.min.z;
-  const scale = fitSize / Math.max(width || 1, depth || 1);
+  const scale = model.fit / Math.max(width || 1, depth || 1);
 
   g.scale(scale, scale, scale);
   g.computeBoundingBox();
@@ -279,28 +282,30 @@ function buildRacksAndPieces() {
 }
 
 function createPlayerPieces(playerIndex, rackCfg) {
-  const rows = state.alignment.piecesOnRack.rows;
+  const layout = state.alignment.piecesOnRack;
+  const sizes = layout.sizes || ["large", "medium", "small"];
+  const sets = layout.sets || 3;
   const rackDims = state.dims.get("rack");
   const player = state.alignment.players[playerIndex];
 
-  rows.forEach((sizeKey, row) => {
-    for (let col = 0; col < 3; col++) {
+  for (let setIndex = 0; setIndex < sets; setIndex++) {
+    sizes.forEach((sizeKey, sizeIndex) => {
       const piece = makeMesh(sizeKey, getPlayerMaterial(playerIndex, player.color));
       piece.userData = {
         kind: "piece",
         player: playerIndex,
         size: sizeKey,
-        home: { playerIndex, row, col },
+        home: { playerIndex, setIndex, sizeIndex },
         slotIndex: null
       };
       setPieceHomePosition(piece);
       pieceGroup.add(piece);
       state.pieces.push(piece);
-    }
-  });
+    });
+  }
 
   function setPieceHomePosition(piece) {
-    const local = getRackLocalPiecePosition(piece.userData.home.row, piece.userData.home.col, rackDims.height);
+    const local = getRackLocalPiecePosition(piece.userData.home.sizeIndex, piece.userData.home.setIndex, rackDims.height);
     const world = localToRackWorld(local, rackCfg);
     piece.position.copy(world);
     piece.rotation.y = THREE.MathUtils.degToRad(rackCfg.rotY);
@@ -308,10 +313,12 @@ function createPlayerPieces(playerIndex, rackCfg) {
   }
 }
 
-function getRackLocalPiecePosition(row, col, rackHeight) {
-  const x = (col - 1) * state.alignment.piecesOnRack.gapX;
-  const z = (row - 1) * state.alignment.piecesOnRack.gapZ;
-  const y = rackHeight + state.alignment.piecesOnRack.lift;
+function getRackLocalPiecePosition(sizeIndex, setIndex, rackHeight) {
+  const layout = state.alignment.piecesOnRack;
+  const sets = layout.sets || 3;
+  const x = (setIndex - (sets - 1) / 2) * layout.gapX;
+  const z = layout.centerZ || 0;
+  const y = rackHeight + layout.lift + sizeIndex * layout.gapZ;
   return new THREE.Vector3(x, y, z);
 }
 
@@ -437,7 +444,7 @@ function snapPieceToSlot(piece, slot) {
 
 function restackSlot(slot) {
   slot.stack.forEach((piece, stackIndex) => {
-    piece.position.set(slot.position.x, slot.position.y + stackIndex * 8, slot.position.z);
+    piece.position.set(slot.position.x, slot.position.y + stackIndex * 3.2, slot.position.z);
     piece.rotation.y = 0;
   });
 }
