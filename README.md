@@ -1,33 +1,26 @@
 # yakolak
 
-الملف الرئيسي الآن هو `index.html` وهو نسخة مطابقة من:
-
-`yaklak_dev_calibration_v002.html`
+الملف الرئيسي الآن هو `index.html` وهو نسخة مطابقة من `yaklak_dev_calibration_v002.html`.
 
 ## تشغيل GitHub Pages
 
 افتح رابط GitHub Pages مباشرة، لأنه يقرأ `index.html` من جذر الريبو.
 
-## ترتيب الملفات
+## ترتيب الملفات الحالي
 
 ```txt
 /
-├─ index.html                         # النسخة الصحيحة المعتمدة للعرض
-├─ yaklak_dev_calibration_v002.html    # نفس نسخة المطور الأصلية من Google Drive
+├─ index.html
+├─ yaklak_dev_calibration_v002.html
 ├─ source_stl/
-│  ├─ 9.stl                            # البورد الرئيسي
-│  ├─ 3.stl                            # ملف STL إضافي من المصدر
-│  ├─ l.stl                            # الحجر الكبير
-│  ├─ m.stl                            # الحجر المتوسط
-│  └─ s.stl                            # الحجر الصغير
-├─ legacy/
-│  ├─ yaklak_3d.html
-│  ├─ yaklak_dev_v001.html
-│  ├─ yaklak_ref_test_tmp.html
-│  └─ yaklak_dev_calibration_v002_DO_NOT_USE_old_upload.html
-├─ README.txt                          # ملاحظة المصدر الأصلية
+│  ├─ 9.stl
+│  ├─ 3.stl
+│  ├─ l.stl
+│  ├─ m.stl
+│  └─ s.stl
+├─ README.txt
 ├─ README.md
 └─ .nojekyll
 ```
 
-ملاحظة: نسخة `v002` الحالية تحتوي المجسمات مدمجة داخل HTML، لذلك صفحة Pages تشتغل بدون مشاكل مسارات STL. ملفات STL محفوظة ومرتبة كمصدر نظيف للرجوع لها.
+`9.stl` هو البورد الرئيسي، و `l/m/s.stl` هي الأحجار. نسخة `v002` تحتوي المجسمات مدمجة داخل HTML، وملفات STL محفوظة كمصدر مرتب داخل `source_stl/`.
