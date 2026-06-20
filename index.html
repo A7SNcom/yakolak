@@ -6,8 +6,8 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <meta name="yakolak-version" content="v008-no-cache" />
-  <title>عرض ملف 9 STL</title>
+  <meta name="yakolak-version" content="v009-model-3-transform" />
+  <title>Yakolak STL Viewer</title>
   <script type="importmap">
   {
     "imports": {
@@ -21,28 +21,37 @@
     #view { position: fixed; inset: 0; }
     #hint { position: fixed; top: 14px; right: 14px; z-index: 10; padding: 8px 12px; border-radius: 12px; background: rgba(0,0,0,.65); color: #fff; font-size: 13px; direction: ltr; }
     #settingsBtn { position: fixed; top: 14px; left: 14px; z-index: 20; width: 48px; height: 48px; border: 0; border-radius: 16px; background: rgba(0,0,0,.72); color: #fff; font-size: 24px; cursor: pointer; }
-    #panel { position: fixed; top: 72px; left: 14px; z-index: 20; width: min(340px, calc(100vw - 28px)); padding: 14px; border-radius: 18px; background: rgba(0,0,0,.78); color: #fff; backdrop-filter: blur(8px); display: none; direction: ltr; }
+    #panel { position: fixed; top: 72px; left: 14px; z-index: 20; width: min(370px, calc(100vw - 28px)); max-height: calc(100vh - 96px); overflow: auto; padding: 14px; border-radius: 18px; background: rgba(0,0,0,.80); color: #fff; backdrop-filter: blur(8px); display: none; direction: ltr; }
     #panel.show { display: block; }
     .row { margin: 12px 0; }
     .label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
-    input[type="range"] { width: 100%; }
+    select, input[type="range"] { width: 100%; }
+    select { box-sizing: border-box; border: 0; border-radius: 12px; padding: 10px; background: #181818; color: #fff; }
     .btns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-top: 7px; }
     button.small { border: 0; border-radius: 10px; padding: 8px 0; background: #252525; color: #fff; cursor: pointer; }
     .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
     .actions button { border: 0; border-radius: 12px; padding: 10px; background: #333; color: #fff; cursor: pointer; }
-    textarea { width: 100%; height: 72px; box-sizing: border-box; border: 0; border-radius: 12px; padding: 10px; background: #151515; color: #fff; resize: none; direction: ltr; margin-top: 10px; }
+    textarea { width: 100%; height: 105px; box-sizing: border-box; border: 0; border-radius: 12px; padding: 10px; background: #151515; color: #fff; resize: none; direction: ltr; margin-top: 10px; }
   </style>
 </head>
 <body>
   <div id="view"></div>
-  <div id="hint">loading 9.stl...</div>
+  <div id="hint">loading...</div>
   <button id="settingsBtn" title="settings">⚙</button>
+
   <div id="panel">
-    <div class="row"><b>Rotation</b></div>
-    <div class="row" data-axis="x"><div class="label"><span>Rotate X</span><span id="xVal">0°</span></div><input id="xRange" type="range" min="-180" max="180" step="1" value="0"><div class="btns"><button class="small" data-axis="x" data-delta="-15">-15</button><button class="small" data-axis="x" data-delta="-1">-1</button><button class="small" data-axis="x" data-delta="1">+1</button><button class="small" data-axis="x" data-delta="15">+15</button></div></div>
-    <div class="row" data-axis="y"><div class="label"><span>Rotate Y</span><span id="yVal">0°</span></div><input id="yRange" type="range" min="-180" max="180" step="1" value="0"><div class="btns"><button class="small" data-axis="y" data-delta="-15">-15</button><button class="small" data-axis="y" data-delta="-1">-1</button><button class="small" data-axis="y" data-delta="1">+1</button><button class="small" data-axis="y" data-delta="15">+15</button></div></div>
-    <div class="row" data-axis="z"><div class="label"><span>Rotate Z</span><span id="zVal">0°</span></div><input id="zRange" type="range" min="-180" max="180" step="1" value="0"><div class="btns"><button class="small" data-axis="z" data-delta="-15">-15</button><button class="small" data-axis="z" data-delta="-1">-1</button><button class="small" data-axis="z" data-delta="1">+1</button><button class="small" data-axis="z" data-delta="15">+15</button></div></div>
-    <div class="actions"><button id="resetBtn">Reset</button><button id="copyBtn">Copy</button></div>
+    <div class="row"><b>Transform Controls</b></div>
+    <div class="row"><div class="label"><span>Model</span><span id="modelName">9</span></div><select id="modelSelect"><option value="9">9.stl</option><option value="3">3.stl</option></select></div>
+
+    <div class="row" data-prop="px"><div class="label"><span>Move X</span><span id="pxVal">0</span></div><input id="pxRange" type="range" min="-250" max="250" step="1" value="0"><div class="btns"><button class="small" data-prop="px" data-delta="-10">-10</button><button class="small" data-prop="px" data-delta="-1">-1</button><button class="small" data-prop="px" data-delta="1">+1</button><button class="small" data-prop="px" data-delta="10">+10</button></div></div>
+    <div class="row" data-prop="py"><div class="label"><span>Move Y</span><span id="pyVal">0</span></div><input id="pyRange" type="range" min="-250" max="250" step="1" value="0"><div class="btns"><button class="small" data-prop="py" data-delta="-10">-10</button><button class="small" data-prop="py" data-delta="-1">-1</button><button class="small" data-prop="py" data-delta="1">+1</button><button class="small" data-prop="py" data-delta="10">+10</button></div></div>
+    <div class="row" data-prop="pz"><div class="label"><span>Move Z</span><span id="pzVal">0</span></div><input id="pzRange" type="range" min="-250" max="250" step="1" value="0"><div class="btns"><button class="small" data-prop="pz" data-delta="-10">-10</button><button class="small" data-prop="pz" data-delta="-1">-1</button><button class="small" data-prop="pz" data-delta="1">+1</button><button class="small" data-prop="pz" data-delta="10">+10</button></div></div>
+
+    <div class="row" data-prop="rx"><div class="label"><span>Rotate X</span><span id="rxVal">0°</span></div><input id="rxRange" type="range" min="-180" max="180" step="1" value="0"><div class="btns"><button class="small" data-prop="rx" data-delta="-15">-15</button><button class="small" data-prop="rx" data-delta="-1">-1</button><button class="small" data-prop="rx" data-delta="1">+1</button><button class="small" data-prop="rx" data-delta="15">+15</button></div></div>
+    <div class="row" data-prop="ry"><div class="label"><span>Rotate Y</span><span id="ryVal">0°</span></div><input id="ryRange" type="range" min="-180" max="180" step="1" value="0"><div class="btns"><button class="small" data-prop="ry" data-delta="-15">-15</button><button class="small" data-prop="ry" data-delta="-1">-1</button><button class="small" data-prop="ry" data-delta="1">+1</button><button class="small" data-prop="ry" data-delta="15">+15</button></div></div>
+    <div class="row" data-prop="rz"><div class="label"><span>Rotate Z</span><span id="rzVal">0°</span></div><input id="rzRange" type="range" min="-180" max="180" step="1" value="0"><div class="btns"><button class="small" data-prop="rz" data-delta="-15">-15</button><button class="small" data-prop="rz" data-delta="-1">-1</button><button class="small" data-prop="rz" data-delta="1">+1</button><button class="small" data-prop="rz" data-delta="15">+15</button></div></div>
+
+    <div class="actions"><button id="resetBtn">Reset Selected</button><button id="copyBtn">Copy All</button></div>
     <textarea id="out" readonly></textarea>
   </div>
 
@@ -51,23 +60,16 @@
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
-    const APP_VERSION = 'v008-no-cache';
+    const APP_VERSION = 'v009-model-3-transform';
     const assetVersion = `${APP_VERSION}-${Date.now()}`;
 
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg => reg.unregister())).catch(() => {});
-    }
-    if ('caches' in window) {
-      caches.keys().then(keys => keys.forEach(key => caches.delete(key))).catch(() => {});
-    }
-
+    if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg => reg.unregister())).catch(() => {});
+    if ('caches' in window) caches.keys().then(keys => keys.forEach(key => caches.delete(key))).catch(() => {});
     async function checkLatestVersion() {
       try {
-        const url = `${location.pathname || '/'}?check=${Date.now()}`;
-        const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+        const res = await fetch(`${location.pathname || '/'}?check=${Date.now()}`, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
         const html = await res.text();
-        const match = html.match(/<meta name="yakolak-version" content="([^"]+)"/);
-        const latest = match && match[1];
+        const latest = (html.match(/<meta name="yakolak-version" content="([^"]+)"/) || [])[1];
         if (latest && latest !== APP_VERSION) location.reload();
       } catch (e) {}
     }
@@ -77,20 +79,23 @@
     const root = document.getElementById('view');
     const panel = document.getElementById('panel');
     const out = document.getElementById('out');
-    const rot = { x: 0, y: 0, z: 0 };
-    let mesh = null;
+    const modelSelect = document.getElementById('modelSelect');
+
+    const state = {
+      '9': { px: 0, py: 0, pz: 0, rx: -90, ry: 0, rz: 0 },
+      '3': { px: 0, py: 0, pz: 0, rx: 0, ry: 0, rz: 0 }
+    };
+    const meshes = {};
+    let selected = '9';
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x111111);
-
     const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 100000);
-    camera.position.set(160, 130, 180);
-
+    camera.position.set(180, 140, 220);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.setSize(innerWidth, innerHeight);
     root.appendChild(renderer.domElement);
-
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
@@ -98,67 +103,97 @@
     const light = new THREE.DirectionalLight(0xffffff, 2.4);
     light.position.set(120, 180, 140);
     scene.add(light);
-    scene.add(new THREE.GridHelper(260, 26, 0x444444, 0x252525));
+    scene.add(new THREE.GridHelper(300, 30, 0x444444, 0x252525));
 
-    function degToRad(v) { return THREE.MathUtils.degToRad(v); }
-    function clampDeg(v) { return Math.max(-180, Math.min(180, Number(v) || 0)); }
-    function applyRotation() {
-      if (mesh) mesh.rotation.set(degToRad(rot.x), degToRad(rot.y), degToRad(rot.z));
-      for (const axis of ['x','y','z']) {
-        document.getElementById(axis + 'Range').value = rot[axis];
-        document.getElementById(axis + 'Val').textContent = rot[axis] + '°';
-      }
-      out.value = `const MODEL_9_ROTATION = { x: ${rot.x}, y: ${rot.y}, z: ${rot.z} };`;
+    function deg(v) { return THREE.MathUtils.degToRad(v); }
+    function clamp(prop, v) {
+      const n = Number(v) || 0;
+      return prop[0] === 'r' ? Math.max(-180, Math.min(180, n)) : Math.max(-250, Math.min(250, n));
     }
+    function applyModel(id) {
+      const mesh = meshes[id];
+      if (!mesh) return;
+      const s = state[id];
+      mesh.position.set(s.px, s.py, s.pz);
+      mesh.rotation.set(deg(s.rx), deg(s.ry), deg(s.rz));
+    }
+    function refreshUI() {
+      const s = state[selected];
+      document.getElementById('modelName').textContent = selected;
+      for (const prop of ['px','py','pz','rx','ry','rz']) {
+        document.getElementById(prop + 'Range').value = s[prop];
+        document.getElementById(prop + 'Val').textContent = prop[0] === 'r' ? `${s[prop]}°` : s[prop];
+      }
+      out.value = `const MODEL_TRANSFORMS = ${JSON.stringify(state, null, 2)};`;
+    }
+    function applyAll() { for (const id of Object.keys(state)) applyModel(id); refreshUI(); }
 
     document.getElementById('settingsBtn').onclick = () => panel.classList.toggle('show');
-    for (const axis of ['x','y','z']) {
-      document.getElementById(axis + 'Range').addEventListener('input', e => { rot[axis] = clampDeg(e.target.value); applyRotation(); });
+    modelSelect.onchange = () => { selected = modelSelect.value; refreshUI(); };
+    for (const prop of ['px','py','pz','rx','ry','rz']) {
+      document.getElementById(prop + 'Range').addEventListener('input', e => {
+        state[selected][prop] = clamp(prop, e.target.value);
+        applyAll();
+      });
     }
     document.querySelectorAll('button.small').forEach(btn => btn.onclick = () => {
-      const axis = btn.dataset.axis;
-      rot[axis] = clampDeg(rot[axis] + Number(btn.dataset.delta));
-      applyRotation();
+      const prop = btn.dataset.prop;
+      state[selected][prop] = clamp(prop, state[selected][prop] + Number(btn.dataset.delta));
+      applyAll();
     });
-    document.getElementById('resetBtn').onclick = () => { rot.x = 0; rot.y = 0; rot.z = 0; applyRotation(); };
+    document.getElementById('resetBtn').onclick = () => {
+      Object.assign(state[selected], selected === '9' ? { px: 0, py: 0, pz: 0, rx: -90, ry: 0, rz: 0 } : { px: 0, py: 0, pz: 0, rx: 0, ry: 0, rz: 0 });
+      applyAll();
+    };
     document.getElementById('copyBtn').onclick = async () => {
       await navigator.clipboard.writeText(out.value);
-      hint.textContent = 'rotation copied';
-      setTimeout(() => hint.textContent = '9.stl', 1200);
+      hint.textContent = 'transforms copied';
+      setTimeout(() => hint.textContent = `9.stl + 3.stl ${APP_VERSION}`, 1200);
     };
 
-    const loader = new STLLoader();
-    loader.load(`./9.stl?v=${assetVersion}`, (geometry) => {
-      if (!geometry.attributes.position || geometry.attributes.position.count === 0) { hint.textContent = '9.stl is empty'; return; }
+    function centerGeometry(geometry) {
       geometry.computeBoundingBox();
+      const center = geometry.boundingBox.getCenter(new THREE.Vector3());
+      geometry.translate(-center.x, -center.y, -center.z);
       geometry.computeVertexNormals();
+    }
 
-      mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0xd8d8d8, roughness: 0.55, metalness: 0.05 }));
-      scene.add(mesh);
+    const loader = new STLLoader();
+    function loadModel(id, color) {
+      return new Promise((resolve, reject) => {
+        loader.load(`./${id}.stl?v=${assetVersion}`, (geometry) => {
+          if (!geometry.attributes.position || geometry.attributes.position.count === 0) return reject(new Error(`${id}.stl is empty`));
+          centerGeometry(geometry);
+          const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.05 }));
+          meshes[id] = mesh;
+          scene.add(mesh);
+          applyModel(id);
+          resolve(mesh);
+        }, undefined, reject);
+      });
+    }
 
-      const box = new THREE.Box3().setFromObject(mesh);
-      const center = box.getCenter(new THREE.Vector3());
+    Promise.all([loadModel('9', 0xd8d8d8), loadModel('3', 0x89a790)]).then(() => {
+      const box = new THREE.Box3();
+      Object.values(meshes).forEach(m => box.expandByObject(m));
       const size = box.getSize(new THREE.Vector3());
-      mesh.position.sub(center);
-
       const maxAxis = Math.max(size.x, size.y, size.z) || 1;
-      const distance = maxAxis * 1.8;
+      const distance = maxAxis * 2.1;
       camera.position.set(distance, distance * 0.75, distance);
       camera.near = Math.max(distance / 1000, 0.01);
       camera.far = distance * 20;
       camera.updateProjectionMatrix();
       controls.target.set(0, 0, 0);
       controls.update();
-      hint.textContent = `9.stl ${APP_VERSION}`;
-      applyRotation();
-    }, undefined, (error) => { hint.textContent = 'failed loading 9.stl'; console.error(error); });
+      hint.textContent = `9.stl + 3.stl ${APP_VERSION}`;
+      refreshUI();
+    }).catch(error => { hint.textContent = 'failed loading STL'; console.error(error); });
 
     addEventListener('resize', () => {
       camera.aspect = innerWidth / innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(innerWidth, innerHeight);
     });
-
     function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
     animate();
   </script>
