@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>ياكلك 3D</title>
-  <link rel="stylesheet" href="./src/styles.css?v=003" />
+  <link rel="stylesheet" href="./src/styles.css?v=004" />
   <script type="importmap">
   {
     "imports": {
@@ -16,80 +16,15 @@
 </head>
 <body>
   <canvas id="game" aria-label="Yaklak 3D game"></canvas>
-
   <div class="hud">
     <button class="iconBtn" id="resetBtn" aria-label="reset">↻</button>
     <div class="dots" id="dots"></div>
     <button class="iconBtn" id="cameraBtn" aria-label="camera">⌖</button>
     <button class="iconBtn" id="settingsBtn" aria-label="settings">⚙</button>
   </div>
-
   <div class="brand">ي</div>
   <div class="loader" id="loader"><div class="spinner"></div></div>
-
-  <section class="calPanel" id="calPanel" aria-label="لوحة معايرة المطور">
-    <div class="calHead">
-      <b>معايرة المطور</b>
-      <button class="calBtn" id="calCloseBtn">×</button>
-    </div>
-
-    <div class="calHint">
-      القواعد الأربع من <b>3.stl</b> حول البورد. عدّل المواقع أو ترتيب الحجار ثم انسخ الإعدادات وأرسلها لي.
-    </div>
-
-    <label class="field full">
-      <span>العنصر</span>
-      <select id="calTarget">
-        <option value="rack0">قاعدة اللاعب 1 - جنوب</option>
-        <option value="rack1">قاعدة اللاعب 2 - شمال</option>
-        <option value="rack2">قاعدة اللاعب 3 - غرب</option>
-        <option value="rack3">قاعدة اللاعب 4 - شرق</option>
-        <option value="cell1">خانة 1 في البورد</option>
-        <option value="cell9">خانة 9 في البورد</option>
-      </select>
-    </label>
-
-    <div class="calGrid">
-      <label class="field"><span>X</span><input id="calX" type="number" step="0.1" /></label>
-      <label class="field"><span>Y</span><input id="calY" type="number" step="0.1" /></label>
-      <label class="field"><span>Z</span><input id="calZ" type="number" step="0.1" /></label>
-      <label class="field"><span>RotY</span><input id="calRotY" type="number" step="0.1" /></label>
-    </div>
-
-    <div class="calRow" id="calStepBtns">
-      <button class="calBtn" data-step="0.25">0.25</button>
-      <button class="calBtn active" data-step="1">1</button>
-      <button class="calBtn" data-step="5">5</button>
-      <button class="calBtn" data-step="10">10</button>
-    </div>
-
-    <div class="calAxis">
-      <button class="calBtn" data-axis="x" data-delta="-1">X −</button>
-      <button class="calBtn" data-axis="y" data-delta="-1">Y −</button>
-      <button class="calBtn" data-axis="z" data-delta="-1">Z −</button>
-      <button class="calBtn" data-axis="x" data-delta="1">X +</button>
-      <button class="calBtn" data-axis="y" data-delta="1">Y +</button>
-      <button class="calBtn" data-axis="z" data-delta="1">Z +</button>
-    </div>
-
-    <div class="calSubTitle">ترتيب الحجار فوق القواعد</div>
-    <div class="calGrid">
-      <label class="field"><span>تباعد المجموعات</span><input id="pieceGapX" type="number" step="0.1" /></label>
-      <label class="field"><span>تداخل الأحجام</span><input id="pieceGapZ" type="number" step="0.1" /></label>
-      <label class="field"><span>رفع الحجار</span><input id="pieceLift" type="number" step="0.1" /></label>
-      <label class="field"><span>رفع القاعدة</span><input id="rackLift" type="number" step="0.1" /></label>
-    </div>
-
-    <textarea id="calOut" readonly></textarea>
-
-    <div class="calRow">
-      <button class="calBtn primary" id="copyCalBtn">نسخ الإعدادات</button>
-      <button class="calBtn danger" id="resetCalBtn">إرجاع الافتراضي</button>
-    </div>
-
-    <div class="calStatus" id="calStatus"></div>
-  </section>
-
-  <script type="module" src="./src/app-v003.js?v=003"></script>
+  <section class="calPanel" id="calPanel" aria-label="لوحة معايرة المطور"></section>
+  <script type="module" src="./src/app-v003.js?v=004"></script>
 </body>
 </html>
