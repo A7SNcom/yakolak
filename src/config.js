@@ -1,6 +1,6 @@
-export const BUILD_ID = 'yakolak-dev-one-point-v1';
+export const BUILD_ID = 'yaklak-dev-calibration-v002';
 
-export const STORAGE_KEY = 'yakolak.onePointCalibration.v1';
+export const STORAGE_KEY = 'yakolak.onePointCalibration.v2';
 
 export const DEFAULT_CALIBRATION = {
   origin: { x: 0, y: 0, z: 0 },
@@ -8,7 +8,7 @@ export const DEFAULT_CALIBRATION = {
   dropHeight: 0.18,
   pieceScale: 1,
   trayRadius: 5.7,
-  modelBaseUrl: 'https://a7sn.com/mtkyf/yakolak/',
+  modelBaseUrl: './',
   modelFiles: {
     small: 's.stl',
     medium: 'm.stl',
