@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>ياكلك 3D</title>
-  <link rel="stylesheet" href="./src/styles.css" />
+  <link rel="stylesheet" href="./src/styles.css?v=003" />
   <script type="importmap">
   {
     "imports": {
@@ -34,7 +34,7 @@
     </div>
 
     <div class="calHint">
-      القواعد الأربع مبنية من <b>3.stl</b>. عدّل موقع كل قاعدة وترتيب الحجار فوقها، ثم انسخ الكود وأرسله لي.
+      القواعد الأربع من <b>3.stl</b> حول البورد. عدّل المواقع أو ترتيب الحجار ثم انسخ الإعدادات وأرسلها لي.
     </div>
 
     <label class="field full">
@@ -74,8 +74,8 @@
 
     <div class="calSubTitle">ترتيب الحجار فوق القواعد</div>
     <div class="calGrid">
-      <label class="field"><span>تباعد X</span><input id="pieceGapX" type="number" step="0.1" /></label>
-      <label class="field"><span>تباعد Z</span><input id="pieceGapZ" type="number" step="0.1" /></label>
+      <label class="field"><span>تباعد المجموعات</span><input id="pieceGapX" type="number" step="0.1" /></label>
+      <label class="field"><span>تداخل الأحجام</span><input id="pieceGapZ" type="number" step="0.1" /></label>
       <label class="field"><span>رفع الحجار</span><input id="pieceLift" type="number" step="0.1" /></label>
       <label class="field"><span>رفع القاعدة</span><input id="rackLift" type="number" step="0.1" /></label>
     </div>
@@ -90,6 +90,6 @@
     <div class="calStatus" id="calStatus"></div>
   </section>
 
-  <script type="module" src="./src/main.js"></script>
+  <script type="module" src="./src/main.js?v=003"></script>
 </body>
 </html>
