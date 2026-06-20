@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <meta name="yakolak-version" content="v011-number-inputs" />
+  <meta name="yakolak-version" content="v012-four-sides" />
   <title>Yakolak STL Viewer</title>
   <script type="importmap">
   {
@@ -17,33 +17,15 @@
   }
   </script>
   <style>
-    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #111; font-family: system-ui, sans-serif; }
-    #view { position: fixed; inset: 0; }
-    #hint { position: fixed; top: 14px; right: 14px; z-index: 10; padding: 8px 12px; border-radius: 12px; background: rgba(0,0,0,.65); color: #fff; font-size: 13px; direction: ltr; }
-    #settingsBtn { position: fixed; top: 14px; left: 14px; z-index: 20; width: 52px; height: 52px; border: 0; border-radius: 16px; background: rgba(0,0,0,.78); color: #fff; font-size: 25px; cursor: pointer; }
-    #panel { position: fixed; top: 76px; left: 14px; z-index: 20; width: min(410px, calc(100vw - 28px)); max-height: calc(100vh - 100px); overflow: auto; padding: 14px; border-radius: 18px; background: rgba(0,0,0,.84); color: #fff; display: none; direction: ltr; }
-    #panel.show { display: block; }
-    .row { margin: 12px 0; }
-    .label { display: flex; justify-content: space-between; align-items: center; font-size: 13px; margin-bottom: 6px; }
-    .num { width: 86px; border: 0; border-radius: 10px; padding: 7px 8px; background: #181818; color: #fff; text-align: center; direction: ltr; }
-    select, input[type="range"] { width: 100%; }
-    select { box-sizing: border-box; border: 0; border-radius: 12px; padding: 10px; background: #181818; color: #fff; }
-    .btns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-top: 7px; }
-    button.small { border: 0; border-radius: 10px; padding: 8px 0; background: #252525; color: #fff; cursor: pointer; }
-    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
-    .actions button { border: 0; border-radius: 12px; padding: 10px; background: #333; color: #fff; cursor: pointer; }
-    textarea { width: 100%; height: 120px; box-sizing: border-box; border: 0; border-radius: 12px; padding: 10px; background: #151515; color: #fff; resize: none; direction: ltr; margin-top: 10px; }
-    #status { font-size: 12px; line-height: 1.6; color: #ddd; background: #151515; border-radius: 12px; padding: 9px; white-space: pre-wrap; direction: ltr; }
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;font-family:system-ui,sans-serif}#view{position:fixed;inset:0}#hint{position:fixed;top:14px;right:14px;z-index:10;padding:8px 12px;border-radius:12px;background:rgba(0,0,0,.65);color:#fff;font-size:13px;direction:ltr}#settingsBtn{position:fixed;top:14px;left:14px;z-index:20;width:52px;height:52px;border:0;border-radius:16px;background:rgba(0,0,0,.78);color:#fff;font-size:25px;cursor:pointer}#panel{position:fixed;top:76px;left:14px;z-index:20;width:min(430px,calc(100vw - 28px));max-height:calc(100vh - 100px);overflow:auto;padding:14px;border-radius:18px;background:rgba(0,0,0,.84);color:#fff;display:none;direction:ltr}#panel.show{display:block}.row{margin:12px 0}.label{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:6px}.num{width:86px;border:0;border-radius:10px;padding:7px 8px;background:#181818;color:#fff;text-align:center;direction:ltr}select,input[type=range]{width:100%}select{box-sizing:border-box;border:0;border-radius:12px;padding:10px;background:#181818;color:#fff}.btns{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:7px}button.small{border:0;border-radius:10px;padding:8px 0;background:#252525;color:#fff;cursor:pointer}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.actions button{border:0;border-radius:12px;padding:10px;background:#333;color:#fff;cursor:pointer}textarea{width:100%;height:160px;box-sizing:border-box;border:0;border-radius:12px;padding:10px;background:#151515;color:#fff;resize:none;direction:ltr;margin-top:10px}#status{font-size:12px;line-height:1.6;color:#ddd;background:#151515;border-radius:12px;padding:9px;white-space:pre-wrap;direction:ltr}
   </style>
 </head>
 <body>
-  <div id="view"></div>
-  <div id="hint">loading v011...</div>
-  <button id="settingsBtn">⚙</button>
+  <div id="view"></div><div id="hint">loading v012...</div><button id="settingsBtn">⚙</button>
   <div id="panel">
-    <div class="row"><b>Transform Controls</b> <span style="font-size:12px;color:#aaa">v011</span></div>
+    <div class="row"><b>Transform Controls</b> <span style="font-size:12px;color:#aaa">v012</span></div>
     <div id="status" class="row">loading models...</div>
-    <div class="row"><div class="label"><span>Model</span><span id="modelName">9</span></div><select id="modelSelect"><option value="9">9.stl</option><option value="3">3.stl</option></select></div>
+    <div class="row"><div class="label"><span>Model</span><span id="modelName">9</span></div><select id="modelSelect"></select></div>
     <div id="controlsBox"></div>
     <div class="actions"><button id="resetBtn">Reset Selected</button><button id="copyBtn">Copy All</button></div>
     <textarea id="out" readonly></textarea>
@@ -54,18 +36,16 @@
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
-    const APP_VERSION = 'v011-number-inputs';
+    const APP_VERSION = 'v012-four-sides';
     const assetVersion = `${APP_VERSION}-${Date.now()}`;
-
-    async function checkLatestVersion() {
+    setInterval(async () => {
       try {
         const res = await fetch(`${location.pathname || '/'}?check=${Date.now()}`, { cache: 'no-store' });
         const html = await res.text();
         const latest = (html.match(/yakolak-version" content="([^"]+)/) || [])[1];
         if (latest && latest !== APP_VERSION) location.reload();
       } catch (e) {}
-    }
-    setInterval(checkLatestVersion, 30000);
+    }, 30000);
 
     const hint = document.getElementById('hint');
     const statusEl = document.getElementById('status');
@@ -75,10 +55,34 @@
     const modelSelect = document.getElementById('modelSelect');
     const controlsBox = document.getElementById('controlsBox');
 
+    const modelDefs = {
+      '9': { file: '9.stl', color: 0xd8d8d8, label: '9 board' },
+      '3-right': { file: '3.stl', color: 0x89a790, label: '3 right' },
+      '3-left': { file: '3.stl', color: 0x89a790, label: '3 left' },
+      '3-front': { file: '3.stl', color: 0x89a790, label: '3 front' },
+      '3-back': { file: '3.stl', color: 0x89a790, label: '3 back' }
+    };
+
+    const defaultState = {
+      '9': { px: 0, py: 6, pz: 0, rx: -90, ry: 0, rz: 0 },
+      '3-right': { px: 135, py: 6, pz: 0, rx: -90, ry: 0, rz: 0 },
+      '3-left': { px: -135, py: 6, pz: 0, rx: -90, ry: 0, rz: 180 },
+      '3-front': { px: 0, py: 6, pz: 135, rx: -90, ry: 0, rz: 90 },
+      '3-back': { px: 0, py: 6, pz: -135, rx: -90, ry: 0, rz: -90 }
+    };
+
+    const state = JSON.parse(JSON.stringify(defaultState));
+    const meshes = {};
+    const loadStatus = {};
+    Object.keys(modelDefs).forEach(id => loadStatus[id] = 'loading');
+    let selected = '9';
+
+    modelSelect.innerHTML = Object.entries(modelDefs).map(([id, def]) => `<option value="${id}">${def.label}</option>`).join('');
+
     const props = [
-      ['px', 'Move X', -250, 250, 1, 10],
-      ['py', 'Move Y', -250, 250, 1, 10],
-      ['pz', 'Move Z', -250, 250, 1, 10],
+      ['px', 'Move X', -300, 300, 1, 10],
+      ['py', 'Move Y', -100, 150, 1, 10],
+      ['pz', 'Move Z', -300, 300, 1, 10],
       ['rx', 'Rotate X', -180, 180, 1, 15],
       ['ry', 'Rotate Y', -180, 180, 1, 15],
       ['rz', 'Rotate Z', -180, 180, 1, 15]
@@ -88,27 +92,13 @@
       <div class="row">
         <div class="label"><span>${label}</span><input class="num" id="${p}Num" type="number" min="${min}" max="${max}" step="${step}" value="0"></div>
         <input id="${p}Range" type="range" min="${min}" max="${max}" step="${step}" value="0">
-        <div class="btns">
-          <button class="small" data-prop="${p}" data-delta="-${jump}">-${jump}</button>
-          <button class="small" data-prop="${p}" data-delta="-1">-1</button>
-          <button class="small" data-prop="${p}" data-delta="1">+1</button>
-          <button class="small" data-prop="${p}" data-delta="${jump}">+${jump}</button>
-        </div>
-      </div>
-    `).join('');
-
-    const state = {
-      '9': { px: 0, py: 0, pz: 0, rx: -90, ry: 0, rz: 0 },
-      '3': { px: 0, py: 0, pz: 0, rx: 0, ry: 0, rz: 0 }
-    };
-    const meshes = {};
-    const loadStatus = { '9': 'loading', '3': 'loading' };
-    let selected = '9';
+        <div class="btns"><button class="small" data-prop="${p}" data-delta="-${jump}">-${jump}</button><button class="small" data-prop="${p}" data-delta="-1">-1</button><button class="small" data-prop="${p}" data-delta="1">+1</button><button class="small" data-prop="${p}" data-delta="${jump}">+${jump}</button></div>
+      </div>`).join('');
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x111111);
     const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 100000);
-    camera.position.set(180, 140, 220);
+    camera.position.set(260, 210, 260);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.setSize(innerWidth, innerHeight);
@@ -117,14 +107,14 @@
     controls.enableDamping = true;
     scene.add(new THREE.HemisphereLight(0xffffff, 0x333333, 2.2));
     const light = new THREE.DirectionalLight(0xffffff, 2.4);
-    light.position.set(120, 180, 140);
+    light.position.set(150, 220, 160);
     scene.add(light);
-    scene.add(new THREE.GridHelper(300, 30, 0x444444, 0x252525));
+    scene.add(new THREE.GridHelper(360, 36, 0x444444, 0x252525));
 
     function deg(v) { return THREE.MathUtils.degToRad(v); }
     function clamp(prop, v) {
       const n = Number(v) || 0;
-      return prop[0] === 'r' ? Math.max(-180, Math.min(180, n)) : Math.max(-250, Math.min(250, n));
+      return prop[0] === 'r' ? Math.max(-180, Math.min(180, n)) : Math.max(-300, Math.min(300, n));
     }
     function applyModel(id) {
       const mesh = meshes[id];
@@ -133,20 +123,21 @@
       mesh.position.set(s.px, s.py, s.pz);
       mesh.rotation.set(deg(s.rx), deg(s.ry), deg(s.rz));
     }
+    function outputState() {
+      return Object.fromEntries(Object.entries(state).map(([id, s]) => [id, { ...s }]));
+    }
     function refreshUI() {
       const s = state[selected];
       document.getElementById('modelName').textContent = selected;
+      modelSelect.value = selected;
       for (const [p] of props) {
         document.getElementById(p + 'Range').value = s[p];
         document.getElementById(p + 'Num').value = s[p];
       }
-      out.value = `const MODEL_TRANSFORMS = ${JSON.stringify(state, null, 2)};`;
-      statusEl.textContent = `9.stl: ${loadStatus['9']}\n3.stl: ${loadStatus['3']}\nactive: ${selected}`;
+      out.value = `const MODEL_TRANSFORMS = ${JSON.stringify(outputState(), null, 2)};`;
+      statusEl.textContent = Object.entries(loadStatus).map(([id, st]) => `${id}: ${st}`).join('\n') + `\nactive: ${selected}`;
     }
-    function applyAll() {
-      Object.keys(state).forEach(applyModel);
-      refreshUI();
-    }
+    function applyAll() { Object.keys(state).forEach(applyModel); refreshUI(); }
 
     document.getElementById('settingsBtn').onclick = () => panel.classList.toggle('show');
     modelSelect.onchange = () => { selected = modelSelect.value; refreshUI(); };
@@ -159,10 +150,7 @@
       state[selected][p] = clamp(p, state[selected][p] + Number(btn.dataset.delta));
       applyAll();
     });
-    document.getElementById('resetBtn').onclick = () => {
-      Object.assign(state[selected], selected === '9' ? { px: 0, py: 0, pz: 0, rx: -90, ry: 0, rz: 0 } : { px: 0, py: 0, pz: 0, rx: 0, ry: 0, rz: 0 });
-      applyAll();
-    };
+    document.getElementById('resetBtn').onclick = () => { Object.assign(state[selected], defaultState[selected]); applyAll(); };
     document.getElementById('copyBtn').onclick = async () => {
       await navigator.clipboard.writeText(out.value);
       hint.textContent = 'transforms copied';
@@ -175,42 +163,41 @@
       g.translate(-c.x, -c.y, -c.z);
       g.computeVertexNormals();
     }
+
     const loader = new STLLoader();
-    function loadModel(id, color) {
+    function loadModel(id) {
+      const def = modelDefs[id];
       return new Promise(resolve => {
-        loader.load(`./${id}.stl?v=${assetVersion}`, g => {
+        loader.load(`./${def.file}?v=${assetVersion}-${id}`, g => {
           try {
             if (!g.attributes.position || g.attributes.position.count === 0) throw new Error('empty STL');
             centerGeometry(g);
-            const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.05 }));
+            const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: def.color, roughness: 0.55, metalness: 0.05 }));
             meshes[id] = mesh;
             scene.add(mesh);
             applyModel(id);
             loadStatus[id] = 'loaded';
-            resolve(true);
-          } catch (e) {
-            loadStatus[id] = `failed: ${e.message}`;
-            resolve(false);
-          }
+          } catch (e) { loadStatus[id] = `failed: ${e.message}`; }
           refreshUI();
+          resolve();
         }, undefined, e => {
           loadStatus[id] = `failed: ${e?.message || 'load error'}`;
           refreshUI();
-          resolve(false);
+          resolve();
         });
       });
     }
 
-    Promise.all([loadModel('9', 0xd8d8d8), loadModel('3', 0x89a790)]).then(() => {
+    Promise.all(Object.keys(modelDefs).map(loadModel)).then(() => {
       const box = new THREE.Box3();
       Object.values(meshes).forEach(m => box.expandByObject(m));
       if (Object.keys(meshes).length) {
         const size = box.getSize(new THREE.Vector3());
         const maxAxis = Math.max(size.x, size.y, size.z) || 1;
-        const d = maxAxis * 2.1;
-        camera.position.set(d, d * 0.75, d);
+        const d = maxAxis * 1.75;
+        camera.position.set(d, d * 0.82, d);
         camera.near = Math.max(d / 1000, 0.01);
-        camera.far = d * 20;
+        camera.far = d * 30;
         camera.updateProjectionMatrix();
         controls.target.set(0, 0, 0);
         controls.update();
