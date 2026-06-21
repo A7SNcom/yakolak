@@ -1,6 +1,6 @@
 {
-  "version": "v040-auto-refresh-loader",
-  "build": 40,
+  "version": "v041-hejaz-materials",
+  "build": 41,
   "updated_at": "2026-06-21",
-  "note": "Browser checks this file with cache:no-store and reloads when build changes."
+  "note": "Hejaz material palette applied: black satin board, gray marble p, white marble, dark satin gold, metallic green, matte blue."
 }
