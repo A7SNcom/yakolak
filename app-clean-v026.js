@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
-const VERSION='v026-clean-no-remote-save';
+const VERSION='v027-clean-fixed';
 const hint=document.getElementById('hint');
 const root=document.getElementById('view');
 const out=document.getElementById('out');
@@ -12,6 +12,14 @@ const calTitle=document.getElementById('calTitle');
 const calMeta=document.getElementById('calMeta');
 const calRange=document.getElementById('calRange');
 const calNum=document.getElementById('calNum');
+const settingsBtn=document.getElementById('settingsBtn');
+const changeBtn=document.getElementById('changeBtn');
+const hideBtn=document.getElementById('hideBtn');
+const minusBtn=document.getElementById('minusBtn');
+const plusBtn=document.getElementById('plusBtn');
+const resetBtn=document.getElementById('resetBtn');
+const copyBtn=document.getElementById('copyBtn');
+const saveBtn=document.getElementById('saveBtn');
 
 const defs={
   '9':{file:'9.stl',color:0xd8d8d8,label:'9 board'},
