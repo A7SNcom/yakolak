@@ -1,1 +1,2 @@
-import './app-colors-v037.js?v=38';
+const bust = Date.now();
+import('./app-colors-v037.js?b=' + bust);
