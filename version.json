@@ -1,6 +1,6 @@
 {
-  "version": "v041-hejaz-materials",
-  "build": 41,
+  "version": "v042-hejaz-materials-strong",
+  "build": 42,
   "updated_at": "2026-06-21",
-  "note": "Hejaz material palette applied: black satin board, gray marble p, white marble, dark satin gold, metallic green, matte blue."
+  "note": "Medium gray background, stronger true blue, clearer STL-safe marble using vertex colors, stronger lighting for metal/satin shine."
 }
