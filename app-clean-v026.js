@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
-const VERSION='v030-board-nine-stones';
+const VERSION='v032-p-model-calibration';
 const hint=document.getElementById('hint');
 const root=document.getElementById('view');
 const out=document.getElementById('out');
@@ -26,7 +26,8 @@ const defs={
   '3-right':{file:'3.stl',color:0x89a790,label:'3 right'},
   '3-left':{file:'3.stl',color:0x89a790,label:'3 left'},
   '3-front':{file:'3.stl',color:0x89a790,label:'3 front'},
-  '3-back':{file:'3.stl',color:0x89a790,label:'3 back'}
+  '3-back':{file:'3.stl',color:0x89a790,label:'3 back'},
+  'p':{file:'p.stl',color:0xd37c00,label:'p.stl'}
 };
 
 const approved={
@@ -34,7 +35,8 @@ const approved={
   '3-right':{px:135,py:6,pz:0,rx:-90,ry:0,rz:0},
   '3-left':{px:-135,py:6,pz:0,rx:-90,ry:0,rz:180},
   '3-front':{px:0,py:6,pz:135,rx:-90,ry:0,rz:90},
-  '3-back':{px:0,py:6,pz:-135,rx:-90,ry:0,rz:-90}
+  '3-back':{px:0,py:6,pz:-135,rx:-90,ry:0,rz:-90},
+  'p':{px:0,py:6,pz:0,rx:-90,ry:0,rz:0}
 };
 
 const lms={px:0,py:2,pz:0,rx:-90,ry:0,rz:0};
@@ -149,7 +151,14 @@ function showGuides(){
 
 function output(){
   return {
+    version:VERSION,
+    models_alignment:state,
     approved_9_and_3:state,
+    p_model:{
+      file:'p.stl',
+      alignment:state.p,
+      note:'p.stl is a standalone calibrated model. Use px/py/pz/rx/ry/rz to describe its exact position.'
+    },
     stone_setup:{
       board_grid:'3x3',
       board_stone_sets:boardGrid.length,
@@ -220,7 +229,7 @@ function openMenu(){
   panel.classList.remove('show');
   showGuides();
   menu.style.display='block';
-  menu.innerHTML='<div style="font-weight:800;margin-bottom:10px">إيش تبغى تعاير؟</div><div class="choices"><button class="choice primary" data-special="distance">الحجر: التباعد</button><button class="choice primary" data-special="mainDirectionDeg">اتجاه الأمام والخلف</button><button class="choice primary" data-special="sideDirectionDeg">اتجاه اليمين واليسار</button><button class="choice" data-m="LMS">الحجر: الارتفاع</button><button class="choice" data-m="9">9 board</button><button class="choice" data-m="3-right">3 right</button><button class="choice" data-m="3-left">3 left</button><button class="choice" data-m="3-front">3 front</button><button class="choice" data-m="3-back">3 back</button></div>';
+  menu.innerHTML='<div style="font-weight:800;margin-bottom:10px">إيش تبغى تعاير؟</div><div class="choices"><button class="choice primary" data-special="distance">الحجر: التباعد</button><button class="choice primary" data-special="mainDirectionDeg">اتجاه الأمام والخلف</button><button class="choice primary" data-special="sideDirectionDeg">اتجاه اليمين واليسار</button><button class="choice" data-m="LMS">الحجر: الارتفاع</button><button class="choice" data-m="9">9 board</button><button class="choice" data-m="3-right">3 right</button><button class="choice" data-m="3-left">3 left</button><button class="choice" data-m="3-front">3 front</button><button class="choice" data-m="3-back">3 back</button><button class="choice primary" data-m="p">p.stl</button></div>';
   menu.querySelectorAll('[data-special]').forEach(b=>b.onclick=()=>{
     if(b.dataset.special==='distance'){
       activeModel='STONE_DISTANCE';
