@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
-const VERSION='v028-stone-distance-direction';
+const VERSION='v029-stone-side-directions';
 const hint=document.getElementById('hint');
 const root=document.getElementById('view');
 const out=document.getElementById('out');
@@ -40,16 +40,17 @@ const approved={
 const lms={px:0,py:2,pz:0,rx:-90,ry:0,rz:0};
 
 const stoneSetup={
-  distance:34,
-  directionDeg:0
+  distance:48,
+  mainDirectionDeg:0,
+  sideDirectionDeg:90
 };
 
 const basePlaces=[
-  {id:'center',px:0,pz:0},
-  {id:'right-base',px:135,pz:0},
-  {id:'left-base',px:-135,pz:0},
-  {id:'front-base',px:0,pz:135},
-  {id:'back-base',px:0,pz:-135}
+  {id:'center',px:0,pz:0,directionMode:'main'},
+  {id:'right-base',px:135,pz:0,directionMode:'side'},
+  {id:'left-base',px:-135,pz:0,directionMode:'side'},
+  {id:'front-base',px:0,pz:135,directionMode:'main'},
+  {id:'back-base',px:0,pz:-135,directionMode:'main'}
 ];
 
 const sideCopies=[
@@ -73,7 +74,8 @@ const fields={
   ry:{label:'Rotate Y',min:-180,max:180},
   rz:{label:'Rotate Z',min:-180,max:180},
   distance:{label:'Stone Distance',min:0,max:90},
-  directionDeg:{label:'Stone Direction',min:-180,max:180}
+  mainDirectionDeg:{label:'Main Direction',min:-180,max:180},
+  sideDirectionDeg:{label:'Side Direction',min:-180,max:180}
 };
 
 const scene=new THREE.Scene();
@@ -97,7 +99,7 @@ function center(g){g.computeBoundingBox();const c=g.boundingBox.getCenter(new TH
 function bottom(g){g.computeBoundingBox();const b=g.boundingBox;g.translate(-(b.min.x+b.max.x)/2,-(b.min.y+b.max.y)/2,-b.min.z);g.computeVertexNormals()}
 
 function getActiveStore(){
-  if(activeModel==='STONE_DISTANCE'||activeModel==='STONE_DIRECTION')return stoneSetup;
+  if(activeModel==='STONE_DISTANCE'||activeModel==='STONE_MAIN_DIRECTION'||activeModel==='STONE_SIDE_DIRECTION')return stoneSetup;
   if(activeModel==='LMS')return lms;
   return state[activeModel];
 }
@@ -109,8 +111,12 @@ function applyOne(id){
   m.rotation.set(deg(s.rx),deg(s.ry),deg(s.rz));
 }
 
-function stoneOffset(side){
-  const r=deg(stoneSetup.directionDeg);
+function directionForBase(base){
+  return base.directionMode==='side'?stoneSetup.sideDirectionDeg:stoneSetup.mainDirectionDeg;
+}
+
+function stoneOffset(side,base){
+  const r=deg(directionForBase(base));
   return {
     x:Math.cos(r)*stoneSetup.distance*side,
     z:Math.sin(r)*stoneSetup.distance*side
@@ -121,14 +127,14 @@ function applyStones(){
   groups.forEach(g=>{
     const b=g.userData.base;
     const s=g.userData.side;
-    const off=stoneOffset(s.side);
+    const off=stoneOffset(s.side,b);
     g.position.set(lms.px+b.px+off.x,lms.py,lms.pz+b.pz+off.z);
     g.rotation.set(deg(lms.rx),deg(lms.ry),deg(lms.rz));
   });
 }
 
 function showGuides(){
-  guides.forEach(g=>g.visible=(activeModel==='STONE_DISTANCE'||activeModel==='STONE_DIRECTION'||activeModel==='LMS')&&panel.classList.contains('show'));
+  guides.forEach(g=>g.visible=(activeModel.startsWith('STONE')||activeModel==='LMS')&&panel.classList.contains('show'));
 }
 
 function output(){
@@ -139,8 +145,9 @@ function output(){
       copies_per_base:sideCopies.length,
       total_stone_sets:basePlaces.length*sideCopies.length,
       distance:stoneSetup.distance,
-      directionDeg:stoneSetup.directionDeg,
-      note:'distance and direction are shared by all stone sets'
+      mainDirectionDeg:stoneSetup.mainDirectionDeg,
+      sideDirectionDeg:stoneSetup.sideDirectionDeg,
+      note:'distance is shared by all stone sets; right-base and left-base use sideDirectionDeg'
     },
     LMS:{
       الارتفاع:lms.py,
@@ -148,7 +155,7 @@ function output(){
       basePlacements:basePlaces,
       sideCopies:sideCopies
     },
-    LMS_rule:'Each of the 5 base stone sets has left + center + right copies. Distance and directionDeg control all copies together.'
+    LMS_rule:'5 base stone sets. Center/front/back direction 0. Right/left direction 90. Distance controls all copies together.'
   };
 }
 
@@ -179,10 +186,13 @@ function sync(){
 
   if(activeModel==='STONE_DISTANCE'){
     calTitle.textContent='الحجر — البعد';
-    calMeta.textContent='يتحكم في يمين/يسار كل الأطقم الخمسة';
-  }else if(activeModel==='STONE_DIRECTION'){
-    calTitle.textContent='الحجر — اتجاه النسخ';
-    calMeta.textContent='0 = X ، 90 = Z ، عدّل لو الاتجاه معكوس';
+    calMeta.textContent='المعتمد الآن 48، يطبق على كل الحجر';
+  }else if(activeModel==='STONE_MAIN_DIRECTION'){
+    calTitle.textContent='الحجر — اتجاه الثلاثة';
+    calMeta.textContent='الوسط + الأمام + الخلف، المعتمد 0';
+  }else if(activeModel==='STONE_SIDE_DIRECTION'){
+    calTitle.textContent='الحجر — اتجاه اليمين واليسار';
+    calMeta.textContent='اليمين + اليسار، المعتمد 90';
   }else if(activeModel==='LMS'){
     calTitle.textContent='الحجر — الارتفاع';
     calMeta.textContent='يطبق على كل أطقم الحجر';
@@ -196,14 +206,17 @@ function openMenu(){
   panel.classList.remove('show');
   showGuides();
   menu.style.display='block';
-  menu.innerHTML='<div style="font-weight:800;margin-bottom:10px">إيش تبغى تعاير؟</div><div class="choices"><button class="choice primary" data-special="distance">الحجر: البعد</button><button class="choice primary" data-special="directionDeg">الحجر: الاتجاه</button><button class="choice" data-m="LMS">الحجر: الارتفاع</button><button class="choice" data-m="9">9 board</button><button class="choice" data-m="3-right">3 right</button><button class="choice" data-m="3-left">3 left</button><button class="choice" data-m="3-front">3 front</button><button class="choice" data-m="3-back">3 back</button></div>';
+  menu.innerHTML='<div style="font-weight:800;margin-bottom:10px">إيش تبغى تعاير؟</div><div class="choices"><button class="choice primary" data-special="distance">الحجر: البعد</button><button class="choice primary" data-special="mainDirectionDeg">اتجاه 3 قواعد</button><button class="choice primary" data-special="sideDirectionDeg">اتجاه اليمين واليسار</button><button class="choice" data-m="LMS">الحجر: الارتفاع</button><button class="choice" data-m="9">9 board</button><button class="choice" data-m="3-right">3 right</button><button class="choice" data-m="3-left">3 left</button><button class="choice" data-m="3-front">3 front</button><button class="choice" data-m="3-back">3 back</button></div>';
   menu.querySelectorAll('[data-special]').forEach(b=>b.onclick=()=>{
     if(b.dataset.special==='distance'){
       activeModel='STONE_DISTANCE';
       activeProp='distance';
+    }else if(b.dataset.special==='mainDirectionDeg'){
+      activeModel='STONE_MAIN_DIRECTION';
+      activeProp='mainDirectionDeg';
     }else{
-      activeModel='STONE_DIRECTION';
-      activeProp='directionDeg';
+      activeModel='STONE_SIDE_DIRECTION';
+      activeProp='sideDirectionDeg';
     }
     openPanel();
   });
@@ -245,8 +258,9 @@ plusBtn.onclick=()=>setVal(getActiveStore()[activeProp]+1);
 calRange.oninput=e=>setVal(e.target.value);
 calNum.oninput=e=>setVal(e.target.value);
 resetBtn.onclick=()=>{
-  if(activeModel==='STONE_DISTANCE')stoneSetup.distance=34;
-  else if(activeModel==='STONE_DIRECTION')stoneSetup.directionDeg=0;
+  if(activeModel==='STONE_DISTANCE')stoneSetup.distance=48;
+  else if(activeModel==='STONE_MAIN_DIRECTION')stoneSetup.mainDirectionDeg=0;
+  else if(activeModel==='STONE_SIDE_DIRECTION')stoneSetup.sideDirectionDeg=90;
   else if(activeModel==='LMS')Object.assign(lms,{px:0,py:2,pz:0,rx:-90,ry:0,rz:0});
   else Object.assign(state[activeModel],approved[activeModel]);
   applyAll();
