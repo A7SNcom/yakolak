@@ -1,0 +1,40 @@
+{
+  "version": "v030-board-nine-stones",
+  "status": "perfect_stage",
+  "date": "2026-06-21",
+  "url": "https://a7sncom.github.io/yakolak/?v=030",
+  "stone": {
+    "distance": 48,
+    "height_py": 2,
+    "mainDirectionDeg": 0,
+    "sideDirectionDeg": 90,
+    "board_sets": 9,
+    "outer_sets": 12,
+    "total_sets": 21
+  },
+  "board_9": {
+    "px": 0,
+    "py": 6,
+    "pz": 0,
+    "rx": -90,
+    "ry": 0,
+    "rz": 0
+  },
+  "outer_3": {
+    "right": { "px": 135, "py": 6, "pz": 0, "rx": -90, "ry": 0, "rz": 0 },
+    "left": { "px": -135, "py": 6, "pz": 0, "rx": -90, "ry": 0, "rz": 180 },
+    "front": { "px": 0, "py": 6, "pz": 135, "rx": -90, "ry": 0, "rz": 90 },
+    "back": { "px": 0, "py": 6, "pz": -135, "rx": -90, "ry": 0, "rz": -90 }
+  },
+  "board_grid_formula": {
+    "x": "gx * 48",
+    "z": "gz * 48",
+    "gx_values": [-1, 0, 1],
+    "gz_values": [-1, 0, 1]
+  },
+  "outer_formula": {
+    "front_back": "x = base.px + side * 48, z = base.pz",
+    "right_left": "x = base.px, z = base.pz + side * 48",
+    "side_values": [-1, 0, 1]
+  }
+}
