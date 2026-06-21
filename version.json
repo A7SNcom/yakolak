@@ -1,0 +1,6 @@
+{
+  "version": "v040-auto-refresh-loader",
+  "build": 40,
+  "updated_at": "2026-06-21",
+  "note": "Browser checks this file with cache:no-store and reloads when build changes."
+}
