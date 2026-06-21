@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
-const VERSION='v029-stone-side-directions';
+const VERSION='v030-board-nine-stones';
 const hint=document.getElementById('hint');
 const root=document.getElementById('view');
 const out=document.getElementById('out');
@@ -45,12 +45,17 @@ const stoneSetup={
   sideDirectionDeg:90
 };
 
-const basePlaces=[
-  {id:'center',px:0,pz:0,directionMode:'main'},
+const outerBasePlaces=[
   {id:'right-base',px:135,pz:0,directionMode:'side'},
   {id:'left-base',px:-135,pz:0,directionMode:'side'},
   {id:'front-base',px:0,pz:135,directionMode:'main'},
   {id:'back-base',px:0,pz:-135,directionMode:'main'}
+];
+
+const boardGrid=[
+  {id:'board-r1-c1',gx:-1,gz:-1},{id:'board-r1-c2',gx:0,gz:-1},{id:'board-r1-c3',gx:1,gz:-1},
+  {id:'board-r2-c1',gx:-1,gz:0},{id:'board-r2-c2',gx:0,gz:0},{id:'board-r2-c3',gx:1,gz:0},
+  {id:'board-r3-c1',gx:-1,gz:1},{id:'board-r3-c2',gx:0,gz:1},{id:'board-r3-c3',gx:1,gz:1}
 ];
 
 const sideCopies=[
@@ -111,12 +116,12 @@ function applyOne(id){
   m.rotation.set(deg(s.rx),deg(s.ry),deg(s.rz));
 }
 
-function directionForBase(base){
+function directionForOuterBase(base){
   return base.directionMode==='side'?stoneSetup.sideDirectionDeg:stoneSetup.mainDirectionDeg;
 }
 
-function stoneOffset(side,base){
-  const r=deg(directionForBase(base));
+function outerOffset(side,base){
+  const r=deg(directionForOuterBase(base));
   return {
     x:Math.cos(r)*stoneSetup.distance*side,
     z:Math.sin(r)*stoneSetup.distance*side
@@ -125,10 +130,15 @@ function stoneOffset(side,base){
 
 function applyStones(){
   groups.forEach(g=>{
-    const b=g.userData.base;
-    const s=g.userData.side;
-    const off=stoneOffset(s.side,b);
-    g.position.set(lms.px+b.px+off.x,lms.py,lms.pz+b.pz+off.z);
+    if(g.userData.kind==='board'){
+      const cell=g.userData.cell;
+      g.position.set(lms.px+(cell.gx*stoneSetup.distance),lms.py,lms.pz+(cell.gz*stoneSetup.distance));
+    }else{
+      const b=g.userData.base;
+      const s=g.userData.side;
+      const off=outerOffset(s.side,b);
+      g.position.set(lms.px+b.px+off.x,lms.py,lms.pz+b.pz+off.z);
+    }
     g.rotation.set(deg(lms.rx),deg(lms.ry),deg(lms.rz));
   });
 }
@@ -141,21 +151,25 @@ function output(){
   return {
     approved_9_and_3:state,
     stone_setup:{
-      base_count:basePlaces.length,
-      copies_per_base:sideCopies.length,
-      total_stone_sets:basePlaces.length*sideCopies.length,
+      board_grid:'3x3',
+      board_stone_sets:boardGrid.length,
+      outer_base_count:outerBasePlaces.length,
+      copies_per_outer_base:sideCopies.length,
+      outer_stone_sets:outerBasePlaces.length*sideCopies.length,
+      total_stone_sets:boardGrid.length+(outerBasePlaces.length*sideCopies.length),
       distance:stoneSetup.distance,
       mainDirectionDeg:stoneSetup.mainDirectionDeg,
       sideDirectionDeg:stoneSetup.sideDirectionDeg,
-      note:'distance is shared by all stone sets; right-base and left-base use sideDirectionDeg'
+      note:'same distance controls board 3x3 grid and outer stone copies'
     },
     LMS:{
       الارتفاع:lms.py,
       px:lms.px,py:lms.py,pz:lms.pz,rx:lms.rx,ry:lms.ry,rz:lms.rz,
-      basePlacements:basePlaces,
+      boardGrid:boardGrid,
+      outerBasePlacements:outerBasePlaces,
       sideCopies:sideCopies
     },
-    LMS_rule:'5 base stone sets. Center/front/back direction 0. Right/left direction 90. Distance controls all copies together.'
+    LMS_rule:'Board has 9 stone sets using same distance. Outer four bases keep left/center/right using same distance; right/left bases use 90 degrees.'
   };
 }
 
@@ -185,17 +199,17 @@ function sync(){
   calNum.value=s[activeProp];
 
   if(activeModel==='STONE_DISTANCE'){
-    calTitle.textContent='الحجر — البعد';
-    calMeta.textContent='المعتمد الآن 48، يطبق على كل الحجر';
+    calTitle.textContent='الحجر — التباعد';
+    calMeta.textContent='نفس التباعد للجميع، المعتمد 48';
   }else if(activeModel==='STONE_MAIN_DIRECTION'){
-    calTitle.textContent='الحجر — اتجاه الثلاثة';
-    calMeta.textContent='الوسط + الأمام + الخلف، المعتمد 0';
+    calTitle.textContent='الحجر — اتجاه الأمام والخلف';
+    calMeta.textContent='الأمام + الخلف، المعتمد 0';
   }else if(activeModel==='STONE_SIDE_DIRECTION'){
     calTitle.textContent='الحجر — اتجاه اليمين واليسار';
     calMeta.textContent='اليمين + اليسار، المعتمد 90';
   }else if(activeModel==='LMS'){
     calTitle.textContent='الحجر — الارتفاع';
-    calMeta.textContent='يطبق على كل أطقم الحجر';
+    calMeta.textContent='يطبق على كل الحجر';
   }else{
     calTitle.textContent=defs[activeModel].label+' — '+f.label;
     calMeta.textContent=activeModel+'.'+activeProp;
@@ -206,7 +220,7 @@ function openMenu(){
   panel.classList.remove('show');
   showGuides();
   menu.style.display='block';
-  menu.innerHTML='<div style="font-weight:800;margin-bottom:10px">إيش تبغى تعاير؟</div><div class="choices"><button class="choice primary" data-special="distance">الحجر: البعد</button><button class="choice primary" data-special="mainDirectionDeg">اتجاه 3 قواعد</button><button class="choice primary" data-special="sideDirectionDeg">اتجاه اليمين واليسار</button><button class="choice" data-m="LMS">الحجر: الارتفاع</button><button class="choice" data-m="9">9 board</button><button class="choice" data-m="3-right">3 right</button><button class="choice" data-m="3-left">3 left</button><button class="choice" data-m="3-front">3 front</button><button class="choice" data-m="3-back">3 back</button></div>';
+  menu.innerHTML='<div style="font-weight:800;margin-bottom:10px">إيش تبغى تعاير؟</div><div class="choices"><button class="choice primary" data-special="distance">الحجر: التباعد</button><button class="choice primary" data-special="mainDirectionDeg">اتجاه الأمام والخلف</button><button class="choice primary" data-special="sideDirectionDeg">اتجاه اليمين واليسار</button><button class="choice" data-m="LMS">الحجر: الارتفاع</button><button class="choice" data-m="9">9 board</button><button class="choice" data-m="3-right">3 right</button><button class="choice" data-m="3-left">3 left</button><button class="choice" data-m="3-front">3 front</button><button class="choice" data-m="3-back">3 back</button></div>';
   menu.querySelectorAll('[data-special]').forEach(b=>b.onclick=()=>{
     if(b.dataset.special==='distance'){
       activeModel='STONE_DISTANCE';
@@ -285,15 +299,26 @@ function loadModel(id){
 function createStoneGroups(){
   const parent=new THREE.Group();
   scene.add(parent);
-  basePlaces.forEach(base=>{
+
+  boardGrid.forEach(cell=>{
+    const g=new THREE.Group();
+    g.userData.kind='board';
+    g.userData.cell=cell;
+    parent.add(g);
+    groups.push(g);
+  });
+
+  outerBasePlaces.forEach(base=>{
     sideCopies.forEach(side=>{
       const g=new THREE.Group();
+      g.userData.kind='outer';
       g.userData.base=base;
       g.userData.side=side;
       parent.add(g);
       groups.push(g);
     });
   });
+
   applyStones();
 }
 
@@ -321,7 +346,7 @@ function guidesBuild(){
     });
     const size=box.getSize(new THREE.Vector3());
     const cen=box.getCenter(new THREE.Vector3());
-    const plate=new THREE.Mesh(new THREE.PlaneGeometry(size.x+10,size.y+10),new THREE.MeshBasicMaterial({color:0x00ff99,transparent:true,opacity:.20,side:THREE.DoubleSide,depthWrite:false}));
+    const plate=new THREE.Mesh(new THREE.PlaneGeometry(size.x+10,size.y+10),new THREE.MeshBasicMaterial({color:0x00ff99,transparent:true,opacity:.18,side:THREE.DoubleSide,depthWrite:false}));
     plate.position.set(cen.x,cen.y,.04);
     plate.visible=false;
     gr.add(plate);
