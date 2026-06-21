@@ -1,1 +1,1 @@
-import './app-colors-v037.js?v=037';
+import './app-colors-v037.js?v=38';
