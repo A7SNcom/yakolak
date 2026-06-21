@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
-const VERSION='v034-one-distance-ratio-calibration';
+const VERSION='v035-p-piece-gap-only';
 const hint=document.getElementById('hint');
 const root=document.getElementById('view');
 const out=document.getElementById('out');
@@ -22,11 +22,11 @@ const copyBtn=document.getElementById('copyBtn');
 const saveBtn=document.getElementById('saveBtn');
 
 const GOLDEN_DISTANCE=48;
-const R3_RADIUS=135/GOLDEN_DISTANCE;
-const P_RADIUS=85/GOLDEN_DISTANCE;
-const P_GAP=28/GOLDEN_DISTANCE;
+const THREE_RADIUS=135;
+const P_RADIUS=85;
+const P_GAP_GOLDEN=20;
 
-const layout={distance:GOLDEN_DISTANCE};
+const layout={pPieceGap:P_GAP_GOLDEN};
 
 const defs={
   '9':{file:'9.stl',color:0xd8d8d8,label:'9 board'},
@@ -57,10 +57,10 @@ const groups=[];
 const guides=[];
 const meshes={};
 const pMeshes=[];
-let activeProp='distance';
+let activeProp='pPieceGap';
 
 const fields={
-  distance:{label:'Layout Distance',min:10,max:90}
+  pPieceGap:{label:'p.stl Piece Gap',min:6,max:48}
 };
 
 const scene=new THREE.Scene();
@@ -82,40 +82,33 @@ scene.add(new THREE.GridHelper(360,36,0x444444,0x252525));
 function deg(v){return THREE.MathUtils.degToRad(v)}
 function center(g){g.computeBoundingBox();const c=g.boundingBox.getCenter(new THREE.Vector3());g.translate(-c.x,-c.y,-c.z);g.computeVertexNormals()}
 function bottom(g){g.computeBoundingBox();const b=g.boundingBox;g.translate(-(b.min.x+b.max.x)/2,-(b.min.y+b.max.y)/2,-b.min.z);g.computeVertexNormals()}
-
-function d(){return Number(layout.distance)||GOLDEN_DISTANCE}
-function r3(){return d()*R3_RADIUS}
-function pr(){return d()*P_RADIUS}
-function pg(){return d()*P_GAP}
+function gap(){return Number(layout.pPieceGap)||P_GAP_GOLDEN}
 
 function baseAlignment(){
-  const radius=r3();
   return {
     '9':{px:0,py:6,pz:0,rx:-90,ry:0,rz:0},
-    '3-right':{px:radius,py:6,pz:0,rx:-90,ry:0,rz:0},
-    '3-left':{px:-radius,py:6,pz:0,rx:-90,ry:0,rz:180},
-    '3-front':{px:0,py:6,pz:radius,rx:-90,ry:0,rz:90},
-    '3-back':{px:0,py:6,pz:-radius,rx:-90,ry:0,rz:-90}
+    '3-right':{px:THREE_RADIUS,py:6,pz:0,rx:-90,ry:0,rz:0},
+    '3-left':{px:-THREE_RADIUS,py:6,pz:0,rx:-90,ry:0,rz:180},
+    '3-front':{px:0,py:6,pz:THREE_RADIUS,rx:-90,ry:0,rz:90},
+    '3-back':{px:0,py:6,pz:-THREE_RADIUS,rx:-90,ry:0,rz:-90}
   };
 }
 
 function pRowsAlignment(){
-  const radius=pr();
   return {
-    'p-front':{px:0,py:7,pz:radius,rx:-90,ry:0,rz:0},
-    'p-back':{px:0,py:7,pz:-radius,rx:-90,ry:0,rz:0},
-    'p-right':{px:radius,py:7,pz:0,rx:-90,ry:0,rz:90},
-    'p-left':{px:-radius,py:7,pz:0,rx:-90,ry:0,rz:90}
+    'p-front':{px:0,py:7,pz:P_RADIUS,rx:-90,ry:0,rz:0},
+    'p-back':{px:0,py:7,pz:-P_RADIUS,rx:-90,ry:0,rz:0},
+    'p-right':{px:P_RADIUS,py:7,pz:0,rx:-90,ry:0,rz:90},
+    'p-left':{px:-P_RADIUS,py:7,pz:0,rx:-90,ry:0,rz:90}
   };
 }
 
 function outerBasePlacements(){
-  const radius=r3();
   return [
-    {id:'right-base',px:radius,pz:0,directionMode:'side'},
-    {id:'left-base',px:-radius,pz:0,directionMode:'side'},
-    {id:'front-base',px:0,pz:radius,directionMode:'main'},
-    {id:'back-base',px:0,pz:-radius,directionMode:'main'}
+    {id:'right-base',px:THREE_RADIUS,pz:0,directionMode:'side'},
+    {id:'left-base',px:-THREE_RADIUS,pz:0,directionMode:'side'},
+    {id:'front-base',px:0,pz:THREE_RADIUS,directionMode:'main'},
+    {id:'back-base',px:0,pz:-THREE_RADIUS,directionMode:'main'}
   ];
 }
 
@@ -127,13 +120,11 @@ function applyOne(id){
 }
 
 function outerOffset(side,base){
-  const sideDirectionDeg=90;
-  const mainDirectionDeg=0;
-  const dir=base.directionMode==='side'?sideDirectionDeg:mainDirectionDeg;
+  const dir=base.directionMode==='side'?90:0;
   const rad=deg(dir);
   return {
-    x:Math.cos(rad)*d()*side,
-    z:Math.sin(rad)*d()*side
+    x:Math.cos(rad)*GOLDEN_DISTANCE*side,
+    z:Math.sin(rad)*GOLDEN_DISTANCE*side
   };
 }
 
@@ -142,7 +133,7 @@ function applyStones(){
   groups.forEach(g=>{
     if(g.userData.kind==='board'){
       const cell=g.userData.cell;
-      g.position.set(lms.px+(cell.gx*d()),lms.py,lms.pz+(cell.gz*d()));
+      g.position.set(lms.px+(cell.gx*GOLDEN_DISTANCE),lms.py,lms.pz+(cell.gz*GOLDEN_DISTANCE));
     }else{
       const b=bases.find(x=>x.id===g.userData.baseId);
       const s=g.userData.side;
@@ -168,9 +159,9 @@ function pInstances(){
         id:rowId+'-'+(side+4),
         row:rowId,
         side:side,
-        px:row.px+(axis==='x'?side*pg():0),
+        px:row.px+(axis==='x'?side*gap():0),
         py:row.py,
-        pz:row.pz+(axis==='z'?side*pg():0),
+        pz:row.pz+(axis==='z'?side*gap():0),
         rx:row.rx,
         ry:row.ry,
         rz:row.rz
@@ -198,20 +189,12 @@ function showGuides(){
 function output(){
   return {
     version:VERSION,
-    calibration_rule:'Only one value is calibrated: layout.distance. All 3.stl, p.stl, board cells, and outer stone places are derived from the same ratio.',
+    calibration_rule:'Only pPieceGap is calibrated now. Board, 3.stl centers, p.stl row centers, and stone distance remain fixed at the approved golden layout.',
     layout:{
-      distance:d(),
       goldenDistance:GOLDEN_DISTANCE,
-      ratios:{
-        threeRadius:R3_RADIUS,
-        pRadius:P_RADIUS,
-        pGap:P_GAP
-      },
-      derived:{
-        threeRadius:r3(),
-        pRadius:pr(),
-        pGap:pg()
-      }
+      threeRadius:THREE_RADIUS,
+      pRadius:P_RADIUS,
+      pPieceGap:gap()
     },
     models_alignment:{...baseAlignment(),...pRowsAlignment()},
     approved_9_and_3:baseAlignment(),
@@ -219,7 +202,7 @@ function output(){
       file:'p.stl',
       rows:pRowsAlignment(),
       instances:pInstances(),
-      note:'p.stl has 4 fixed derived row centers. Each row has 7 copies. No per-side calibration.'
+      note:'p.stl row centers are fixed. The only calibration is the spacing between each p piece in the same row.'
     },
     stone_setup:{
       board_grid:'3x3',
@@ -228,10 +211,10 @@ function output(){
       copies_per_outer_base:sideCopies.length,
       outer_stone_sets:outerBasePlacements().length*sideCopies.length,
       total_stone_sets:boardGrid.length+(outerBasePlacements().length*sideCopies.length),
-      distance:d(),
+      distance:GOLDEN_DISTANCE,
       mainDirectionDeg:0,
       sideDirectionDeg:90,
-      note:'same distance controls board 3x3 grid and outer stone copies'
+      note:'approved golden distance is fixed; pPieceGap is separate.'
     },
     LMS:{
       الارتفاع:lms.py,
@@ -265,34 +248,34 @@ function sync(){
   calNum.min=f.min;
   calNum.max=f.max;
   calNum.step=1;
-  calRange.value=layout.distance;
-  calNum.value=layout.distance;
-  calTitle.textContent='المعايرة الوحيدة — التباعد';
-  calMeta.textContent='خانة واحدة تضبط كل البقية بنسبة واحدة: '+layout.distance;
+  calRange.value=layout.pPieceGap;
+  calNum.value=layout.pPieceGap;
+  calTitle.textContent='المعايرة الوحيدة — تباعد القطع';
+  calMeta.textContent='هذا يقرّب/يبعّد نسخ p عن بعضها فقط: '+layout.pPieceGap;
 }
 
 function openPanel(){
   menu.style.display='none';
   panel.classList.add('show');
-  activeProp='distance';
+  activeProp='pPieceGap';
   sync();
   showGuides();
 }
 
 function setVal(v){
-  const f=fields.distance;
-  layout.distance=Math.max(f.min,Math.min(f.max,Number(v)||GOLDEN_DISTANCE));
+  const f=fields.pPieceGap;
+  layout.pPieceGap=Math.max(f.min,Math.min(f.max,Number(v)||P_GAP_GOLDEN));
   applyAll();
 }
 
 settingsBtn.onclick=openPanel;
 changeBtn.onclick=openPanel;
 hideBtn.onclick=()=>{panel.classList.remove('show');showGuides()};
-minusBtn.onclick=()=>setVal(layout.distance-1);
-plusBtn.onclick=()=>setVal(layout.distance+1);
+minusBtn.onclick=()=>setVal(layout.pPieceGap-1);
+plusBtn.onclick=()=>setVal(layout.pPieceGap+1);
 calRange.oninput=e=>setVal(e.target.value);
 calNum.oninput=e=>setVal(e.target.value);
-resetBtn.onclick=()=>{layout.distance=GOLDEN_DISTANCE;applyAll()};
+resetBtn.onclick=()=>{layout.pPieceGap=P_GAP_GOLDEN;applyAll()};
 copyBtn.onclick=async()=>{await navigator.clipboard.writeText(out.value);hint.textContent='copied'};
 saveBtn.onclick=async()=>{await navigator.clipboard.writeText(out.value);hint.textContent='saved as copied code ✅'};
 
