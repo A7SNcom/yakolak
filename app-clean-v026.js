@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
-const VERSION='v032-p-model-calibration';
+const VERSION='v033-p-seven-per-side';
 const hint=document.getElementById('hint');
 const root=document.getElementById('view');
 const out=document.getElementById('out');
@@ -26,8 +26,14 @@ const defs={
   '3-right':{file:'3.stl',color:0x89a790,label:'3 right'},
   '3-left':{file:'3.stl',color:0x89a790,label:'3 left'},
   '3-front':{file:'3.stl',color:0x89a790,label:'3 front'},
-  '3-back':{file:'3.stl',color:0x89a790,label:'3 back'},
-  'p':{file:'p.stl',color:0xd37c00,label:'p.stl'}
+  '3-back':{file:'3.stl',color:0x89a790,label:'3 back'}
+};
+
+const pLabels={
+  'p-front':'p.stl front row',
+  'p-back':'p.stl back row',
+  'p-right':'p.stl right row',
+  'p-left':'p.stl left row'
 };
 
 const approved={
@@ -36,8 +42,14 @@ const approved={
   '3-left':{px:-135,py:6,pz:0,rx:-90,ry:0,rz:180},
   '3-front':{px:0,py:6,pz:135,rx:-90,ry:0,rz:90},
   '3-back':{px:0,py:6,pz:-135,rx:-90,ry:0,rz:-90},
-  'p':{px:0,py:6,pz:0,rx:-90,ry:0,rz:0}
+  'p-front':{px:0,py:7,pz:85,rx:-90,ry:0,rz:0},
+  'p-back':{px:0,py:7,pz:-85,rx:-90,ry:0,rz:0},
+  'p-right':{px:85,py:7,pz:0,rx:-90,ry:0,rz:90},
+  'p-left':{px:-85,py:7,pz:0,rx:-90,ry:0,rz:90}
 };
+
+const baseIds=['9','3-right','3-left','3-front','3-back'];
+const pRowIds=['p-front','p-back','p-right','p-left'];
 
 const lms={px:0,py:2,pz:0,rx:-90,ry:0,rz:0};
 
@@ -45,6 +57,14 @@ const stoneSetup={
   distance:48,
   mainDirectionDeg:0,
   sideDirectionDeg:90
+};
+
+const pSetup={
+  gap:28,
+  copiesEachSide:3,
+  totalPerRow:7,
+  totalRows:4,
+  totalInstances:28
 };
 
 const outerBasePlaces=[
@@ -70,6 +90,7 @@ const state=JSON.parse(JSON.stringify(approved));
 const meshes={};
 const groups=[];
 const guides=[];
+const pMeshes=[];
 let activeModel='STONE_DISTANCE';
 let activeProp='distance';
 
@@ -82,7 +103,8 @@ const fields={
   rz:{label:'Rotate Z',min:-180,max:180},
   distance:{label:'Stone Distance',min:0,max:90},
   mainDirectionDeg:{label:'Main Direction',min:-180,max:180},
-  sideDirectionDeg:{label:'Side Direction',min:-180,max:180}
+  sideDirectionDeg:{label:'Side Direction',min:-180,max:180},
+  gap:{label:'p.stl Gap',min:0,max:80}
 };
 
 const scene=new THREE.Scene();
@@ -107,6 +129,7 @@ function bottom(g){g.computeBoundingBox();const b=g.boundingBox;g.translate(-(b.
 
 function getActiveStore(){
   if(activeModel==='STONE_DISTANCE'||activeModel==='STONE_MAIN_DIRECTION'||activeModel==='STONE_SIDE_DIRECTION')return stoneSetup;
+  if(activeModel==='P_GAP')return pSetup;
   if(activeModel==='LMS')return lms;
   return state[activeModel];
 }
@@ -145,19 +168,70 @@ function applyStones(){
   });
 }
 
+function pAxisForRow(id){
+  return (id==='p-front'||id==='p-back')?'x':'z';
+}
+
+function pInstances(){
+  const arr=[];
+  pRowIds.forEach(rowId=>{
+    const row=state[rowId];
+    const axis=pAxisForRow(rowId);
+    for(let side=-pSetup.copiesEachSide;side<=pSetup.copiesEachSide;side++){
+      arr.push({
+        id:rowId+'-'+(side+4),
+        row:rowId,
+        side:side,
+        px:row.px+(axis==='x'?side*pSetup.gap:0),
+        py:row.py,
+        pz:row.pz+(axis==='z'?side*pSetup.gap:0),
+        rx:row.rx,
+        ry:row.ry,
+        rz:row.rz
+      });
+    }
+  });
+  return arr;
+}
+
+function applyP(){
+  const arr=pInstances();
+  pMeshes.forEach((m,i)=>{
+    const p=arr[i];
+    if(!p)return;
+    m.position.set(p.px,p.py,p.pz);
+    m.rotation.set(deg(p.rx),deg(p.ry),deg(p.rz));
+    m.visible=true;
+  });
+}
+
 function showGuides(){
   guides.forEach(g=>g.visible=(activeModel.startsWith('STONE')||activeModel==='LMS')&&panel.classList.contains('show'));
+}
+
+function baseAlignment(){
+  const o={};
+  baseIds.forEach(id=>o[id]=state[id]);
+  return o;
+}
+
+function pRowsAlignment(){
+  const o={};
+  pRowIds.forEach(id=>o[id]=state[id]);
+  return o;
 }
 
 function output(){
   return {
     version:VERSION,
     models_alignment:state,
-    approved_9_and_3:state,
+    approved_9_and_3:baseAlignment(),
     p_model:{
       file:'p.stl',
-      alignment:state.p,
-      note:'p.stl is a standalone calibrated model. Use px/py/pz/rx/ry/rz to describe its exact position.'
+      rows:pRowsAlignment(),
+      setup:pSetup,
+      instances:pInstances(),
+      note:'Four calibrated p.stl row centers. Each row has center + 3 right + 3 left = 7. Total p.stl instances = 28.'
     },
     stone_setup:{
       board_grid:'3x3',
@@ -188,10 +262,17 @@ function refresh(){
 }
 
 function applyAll(){
-  Object.keys(state).forEach(applyOne);
+  baseIds.forEach(applyOne);
   applyStones();
+  applyP();
   refresh();
   sync();
+}
+
+function labelForActive(){
+  if(defs[activeModel])return defs[activeModel].label;
+  if(pLabels[activeModel])return pLabels[activeModel];
+  return activeModel;
 }
 
 function sync(){
@@ -216,11 +297,14 @@ function sync(){
   }else if(activeModel==='STONE_SIDE_DIRECTION'){
     calTitle.textContent='الحجر — اتجاه اليمين واليسار';
     calMeta.textContent='اليمين + اليسار، المعتمد 90';
+  }else if(activeModel==='P_GAP'){
+    calTitle.textContent='p.stl — تباعد النسخ';
+    calMeta.textContent='الوسط + 3 يمين + 3 يسار، الحالي '+pSetup.gap;
   }else if(activeModel==='LMS'){
     calTitle.textContent='الحجر — الارتفاع';
     calMeta.textContent='يطبق على كل الحجر';
   }else{
-    calTitle.textContent=defs[activeModel].label+' — '+f.label;
+    calTitle.textContent=labelForActive()+' — '+f.label;
     calMeta.textContent=activeModel+'.'+activeProp;
   }
 }
@@ -229,7 +313,7 @@ function openMenu(){
   panel.classList.remove('show');
   showGuides();
   menu.style.display='block';
-  menu.innerHTML='<div style="font-weight:800;margin-bottom:10px">إيش تبغى تعاير؟</div><div class="choices"><button class="choice primary" data-special="distance">الحجر: التباعد</button><button class="choice primary" data-special="mainDirectionDeg">اتجاه الأمام والخلف</button><button class="choice primary" data-special="sideDirectionDeg">اتجاه اليمين واليسار</button><button class="choice" data-m="LMS">الحجر: الارتفاع</button><button class="choice" data-m="9">9 board</button><button class="choice" data-m="3-right">3 right</button><button class="choice" data-m="3-left">3 left</button><button class="choice" data-m="3-front">3 front</button><button class="choice" data-m="3-back">3 back</button><button class="choice primary" data-m="p">p.stl</button></div>';
+  menu.innerHTML='<div style="font-weight:800;margin-bottom:10px">إيش تبغى تعاير؟</div><div class="choices"><button class="choice primary" data-special="distance">الحجر: التباعد</button><button class="choice primary" data-special="mainDirectionDeg">اتجاه الأمام والخلف</button><button class="choice primary" data-special="sideDirectionDeg">اتجاه اليمين واليسار</button><button class="choice primary" data-special="pGap">p.stl: تباعد السبعة</button><button class="choice" data-m="LMS">الحجر: الارتفاع</button><button class="choice" data-m="9">9 board</button><button class="choice" data-m="3-right">3 right</button><button class="choice" data-m="3-left">3 left</button><button class="choice" data-m="3-front">3 front</button><button class="choice" data-m="3-back">3 back</button><button class="choice primary" data-m="p-front">p أمام</button><button class="choice primary" data-m="p-back">p خلف</button><button class="choice primary" data-m="p-right">p يمين</button><button class="choice primary" data-m="p-left">p يسار</button></div>';
   menu.querySelectorAll('[data-special]').forEach(b=>b.onclick=()=>{
     if(b.dataset.special==='distance'){
       activeModel='STONE_DISTANCE';
@@ -237,9 +321,12 @@ function openMenu(){
     }else if(b.dataset.special==='mainDirectionDeg'){
       activeModel='STONE_MAIN_DIRECTION';
       activeProp='mainDirectionDeg';
-    }else{
+    }else if(b.dataset.special==='sideDirectionDeg'){
       activeModel='STONE_SIDE_DIRECTION';
       activeProp='sideDirectionDeg';
+    }else{
+      activeModel='P_GAP';
+      activeProp='gap';
     }
     openPanel();
   });
@@ -284,6 +371,7 @@ resetBtn.onclick=()=>{
   if(activeModel==='STONE_DISTANCE')stoneSetup.distance=48;
   else if(activeModel==='STONE_MAIN_DIRECTION')stoneSetup.mainDirectionDeg=0;
   else if(activeModel==='STONE_SIDE_DIRECTION')stoneSetup.sideDirectionDeg=90;
+  else if(activeModel==='P_GAP')pSetup.gap=28;
   else if(activeModel==='LMS')Object.assign(lms,{px:0,py:2,pz:0,rx:-90,ry:0,rz:0});
   else Object.assign(state[activeModel],approved[activeModel]);
   applyAll();
@@ -344,6 +432,20 @@ function loadPiece(n,c){
   },undefined,()=>res()));
 }
 
+function loadP(){
+  return new Promise(res=>loader.load('./p.stl?v='+VERSION,g=>{
+    center(g);
+    const mat=new THREE.MeshStandardMaterial({color:0xd37c00,roughness:.55,metalness:.05});
+    for(let i=0;i<pSetup.totalInstances;i++){
+      const m=new THREE.Mesh(g,mat);
+      pMeshes.push(m);
+      scene.add(m);
+    }
+    applyP();
+    res();
+  },undefined,()=>res()));
+}
+
 function guidesBuild(){
   groups.forEach(gr=>{
     const box=new THREE.Box3();
@@ -365,12 +467,13 @@ function guidesBuild(){
 
 Promise.all(Object.keys(defs).map(loadModel)).then(()=>{
   createStoneGroups();
-  return Promise.all([loadPiece('l',0xf2c078),loadPiece('m',0x8ecae6),loadPiece('s',0xffafcc)]);
+  return Promise.all([loadPiece('l',0xf2c078),loadPiece('m',0x8ecae6),loadPiece('s',0xffafcc),loadP()]);
 }).then(()=>{
   guidesBuild();
   const box=new THREE.Box3();
   Object.values(meshes).forEach(m=>box.expandByObject(m));
   groups.forEach(g=>box.expandByObject(g));
+  pMeshes.forEach(m=>box.expandByObject(m));
   const size=box.getSize(new THREE.Vector3());
   const d=(Math.max(size.x,size.y,size.z)||1)*1.75;
   camera.position.set(d,d*.82,d);
