@@ -6,277 +6,35 @@
   <meta http-equiv="Cache-Control" content="no-store,no-cache,must-revalidate,max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <meta name="yakolak-version" content="v029-stone-side-directions">
+  <meta name="yakolak-version" content="v030-board-nine-stones">
   <title>Yakolak</title>
-
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
-    }
-  }
-  </script>
-
+  <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script>
   <style>
-    :root{
-      --panel:#070707e8;
-      --card:#151515;
-      --line:#292929;
-      --text:#fff;
-      --muted:#bbb;
-      --btn:#252525;
-      --accent:#89a790;
-      --safe-bottom:env(safe-area-inset-bottom,0px);
-      --safe-top:env(safe-area-inset-top,0px);
-    }
-
-    *{
-      box-sizing:border-box;
-      -webkit-tap-highlight-color:transparent;
-    }
-
-    html,body{
-      margin:0;
-      width:100%;
-      height:100%;
-      overflow:hidden;
-      background:#111;
-      color:var(--text);
-      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-      touch-action:none;
-    }
-
-    #view{
-      position:fixed;
-      inset:0;
-      z-index:1;
-    }
-
-    #hint{
-      position:fixed;
-      top:calc(12px + var(--safe-top));
-      right:12px;
-      z-index:5;
-      background:rgba(0,0,0,.68);
-      padding:8px 12px;
-      border-radius:999px;
-      font-size:12px;
-      direction:ltr;
-      max-width:calc(100vw - 86px);
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      backdrop-filter:blur(12px);
-    }
-
-    #settingsBtn{
-      position:fixed;
-      top:calc(10px + var(--safe-top));
-      left:10px;
-      z-index:20;
-      width:58px;
-      height:58px;
-      border:0;
-      border-radius:20px;
-      background:rgba(0,0,0,.78);
-      color:white;
-      font-size:26px;
-      box-shadow:0 10px 26px rgba(0,0,0,.4);
-      backdrop-filter:blur(12px);
-      touch-action:manipulation;
-    }
-
-    #menu{
-      position:fixed;
-      left:10px;
-      right:10px;
-      bottom:calc(10px + var(--safe-bottom));
-      z-index:40;
-      background:rgba(7,7,7,.94);
-      border:1px solid var(--line);
-      border-radius:24px;
-      padding:14px;
-      display:none;
-      direction:rtl;
-      box-shadow:0 18px 48px rgba(0,0,0,.45);
-      backdrop-filter:blur(16px);
-    }
-
-    .choices{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:10px;
-    }
-
-    .choice{
-      min-height:52px;
-      border:1px solid #333;
-      border-radius:18px;
-      background:var(--card);
-      color:white;
-      font-size:15px;
-      touch-action:manipulation;
-    }
-
-    .choice.primary{
-      background:#26352b;
-      border-color:#4f705a;
-    }
-
-    #panel{
-      position:fixed;
-      left:10px;
-      right:10px;
-      bottom:calc(10px + var(--safe-bottom));
-      z-index:30;
-      background:var(--panel);
-      border:1px solid var(--line);
-      border-radius:24px;
-      padding:12px;
-      display:none;
-      direction:rtl;
-      box-shadow:0 14px 42px rgba(0,0,0,.42);
-      backdrop-filter:blur(16px);
-      touch-action:auto;
-    }
-
-    #panel.show{
-      display:block;
-    }
-
-    .top{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:8px;
-      margin-bottom:10px;
-    }
-
-    .title{
-      font-weight:800;
-      font-size:14px;
-    }
-
-    .meta{
-      font-size:12px;
-      color:var(--muted);
-      direction:ltr;
-    }
-
-    .row{
-      display:grid;
-      grid-template-columns:52px 1fr 52px 90px;
-      gap:8px;
-      align-items:center;
-    }
-
-    .btn{
-      height:46px;
-      border:0;
-      border-radius:15px;
-      background:var(--btn);
-      color:white;
-      font-size:14px;
-      touch-action:manipulation;
-    }
-
-    .round{
-      height:48px;
-      border:0;
-      border-radius:16px;
-      background:#242424;
-      color:white;
-      font-size:24px;
-      touch-action:manipulation;
-    }
-
-    .num{
-      height:48px;
-      width:100%;
-      border:1px solid #333;
-      border-radius:16px;
-      background:#101010;
-      color:white;
-      text-align:center;
-      font-size:18px;
-      direction:ltr;
-    }
-
-    input[type=range]{
-      width:100%;
-      height:44px;
-      accent-color:var(--accent);
-      touch-action:pan-x;
-    }
-
-    .grid{
-      display:grid;
-      grid-template-columns:1fr 1fr 1fr 1fr;
-      gap:8px;
-      margin-top:8px;
-    }
-
-    textarea{
-      position:fixed;
-      left:-9999px;
-      top:-9999px;
-      width:1px;
-      height:1px;
-      opacity:0;
-    }
-
-    @media(min-width:760px){
-      #panel{
-        width:560px;
-        right:auto;
-        left:16px;
-      }
-
-      #menu{
-        width:420px;
-        right:auto;
-        left:16px;
-      }
-    }
+    :root{--panel:#070707e8;--card:#151515;--line:#292929;--text:#fff;--muted:#bbb;--btn:#252525;--accent:#89a790;--safe-bottom:env(safe-area-inset-bottom,0px);--safe-top:env(safe-area-inset-top,0px)}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;touch-action:none}
+    #view{position:fixed;inset:0;z-index:1}
+    #hint{position:fixed;top:calc(12px + var(--safe-top));right:12px;z-index:5;background:rgba(0,0,0,.68);padding:8px 12px;border-radius:999px;font-size:12px;direction:ltr;max-width:calc(100vw - 86px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;backdrop-filter:blur(12px)}
+    #settingsBtn{position:fixed;top:calc(10px + var(--safe-top));left:10px;z-index:20;width:58px;height:58px;border:0;border-radius:20px;background:rgba(0,0,0,.78);color:white;font-size:26px;box-shadow:0 10px 26px rgba(0,0,0,.4);backdrop-filter:blur(12px);touch-action:manipulation}
+    #menu{position:fixed;left:10px;right:10px;bottom:calc(10px + var(--safe-bottom));z-index:40;background:rgba(7,7,7,.94);border:1px solid var(--line);border-radius:24px;padding:14px;display:none;direction:rtl;box-shadow:0 18px 48px rgba(0,0,0,.45);backdrop-filter:blur(16px)}
+    .choices{display:grid;grid-template-columns:1fr 1fr;gap:10px}.choice{min-height:52px;border:1px solid #333;border-radius:18px;background:var(--card);color:white;font-size:15px;touch-action:manipulation}.choice.primary{background:#26352b;border-color:#4f705a}
+    #panel{position:fixed;left:10px;right:10px;bottom:calc(10px + var(--safe-bottom));z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:12px;display:none;direction:rtl;box-shadow:0 14px 42px rgba(0,0,0,.42);backdrop-filter:blur(16px);touch-action:auto}#panel.show{display:block}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}.title{font-weight:800;font-size:14px}.meta{font-size:12px;color:var(--muted);direction:ltr}.row{display:grid;grid-template-columns:52px 1fr 52px 90px;gap:8px;align-items:center}
+    .btn{height:46px;border:0;border-radius:15px;background:var(--btn);color:white;font-size:14px;touch-action:manipulation}.round{height:48px;border:0;border-radius:16px;background:#242424;color:white;font-size:24px;touch-action:manipulation}.num{height:48px;width:100%;border:1px solid #333;border-radius:16px;background:#101010;color:white;text-align:center;font-size:18px;direction:ltr}input[type=range]{width:100%;height:44px;accent-color:var(--accent);touch-action:pan-x}.grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:8px}textarea{position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0}
+    @media(min-width:760px){#panel{width:560px;right:auto;left:16px}#menu{width:420px;right:auto;left:16px}}
   </style>
 </head>
-
 <body>
   <div id="view"></div>
-
-  <div id="hint">loading clean v029...</div>
-
+  <div id="hint">loading clean v030...</div>
   <button id="settingsBtn" aria-label="settings">⚙</button>
-
   <div id="menu"></div>
-
   <div id="panel">
-    <div class="top">
-      <div>
-        <div class="title" id="calTitle">المعايرة</div>
-        <div class="meta" id="calMeta">—</div>
-      </div>
-      <button class="btn" id="changeBtn">تغيير</button>
-    </div>
-
-    <div class="row">
-      <button class="round" id="minusBtn">−</button>
-      <input id="calRange" type="range">
-      <button class="round" id="plusBtn">+</button>
-      <input class="num" id="calNum" type="number">
-    </div>
-
-    <div class="grid">
-      <button class="btn" id="saveBtn">حفظ</button>
-      <button class="btn" id="resetBtn">Reset</button>
-      <button class="btn" id="copyBtn">Copy</button>
-      <button class="btn" id="hideBtn">إخفاء</button>
-    </div>
+    <div class="top"><div><div class="title" id="calTitle">المعايرة</div><div class="meta" id="calMeta">—</div></div><button class="btn" id="changeBtn">تغيير</button></div>
+    <div class="row"><button class="round" id="minusBtn">−</button><input id="calRange" type="range"><button class="round" id="plusBtn">+</button><input class="num" id="calNum" type="number"></div>
+    <div class="grid"><button class="btn" id="saveBtn">حفظ</button><button class="btn" id="resetBtn">Reset</button><button class="btn" id="copyBtn">Copy</button><button class="btn" id="hideBtn">إخفاء</button></div>
   </div>
-
   <textarea id="out" readonly></textarea>
-
-  <script type="module" src="./app-clean-v026.js?v=029-stone-side-directions"></script>
+  <script type="module" src="./app-clean-v026.js?v=030-board-nine-stones"></script>
 </body>
 </html>
