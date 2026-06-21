@@ -88,13 +88,14 @@ pRadius = 85
 pPieceGap = 11
 ```
 
-## ملفات التوثيق والأرشيف
+## ملفات التوثيق المهمة
 
 ```txt
-archive/golden-v036-p-gap-11.json
-archive/golden-v036-p-gap-11.js
+docs/COLOR_MODE_V037.md
 docs/CURRENT_GOLDEN_STATE.md
 docs/AI_AGENT_HANDOFF.md
+archive/golden-v036-p-gap-11.json
+archive/golden-v036-p-gap-11.js
 ```
 
 ## تحذير للمطور أو الوكيل الذكي
