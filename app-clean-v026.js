@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
-const VERSION='v033-p-seven-per-side';
+const VERSION='v034-one-distance-ratio-calibration';
 const hint=document.getElementById('hint');
 const root=document.getElementById('view');
 const out=document.getElementById('out');
@@ -21,6 +21,13 @@ const resetBtn=document.getElementById('resetBtn');
 const copyBtn=document.getElementById('copyBtn');
 const saveBtn=document.getElementById('saveBtn');
 
+const GOLDEN_DISTANCE=48;
+const R3_RADIUS=135/GOLDEN_DISTANCE;
+const P_RADIUS=85/GOLDEN_DISTANCE;
+const P_GAP=28/GOLDEN_DISTANCE;
+
+const layout={distance:GOLDEN_DISTANCE};
+
 const defs={
   '9':{file:'9.stl',color:0xd8d8d8,label:'9 board'},
   '3-right':{file:'3.stl',color:0x89a790,label:'3 right'},
@@ -29,50 +36,10 @@ const defs={
   '3-back':{file:'3.stl',color:0x89a790,label:'3 back'}
 };
 
-const pLabels={
-  'p-front':'p.stl front row',
-  'p-back':'p.stl back row',
-  'p-right':'p.stl right row',
-  'p-left':'p.stl left row'
-};
-
-const approved={
-  '9':{px:0,py:6,pz:0,rx:-90,ry:0,rz:0},
-  '3-right':{px:135,py:6,pz:0,rx:-90,ry:0,rz:0},
-  '3-left':{px:-135,py:6,pz:0,rx:-90,ry:0,rz:180},
-  '3-front':{px:0,py:6,pz:135,rx:-90,ry:0,rz:90},
-  '3-back':{px:0,py:6,pz:-135,rx:-90,ry:0,rz:-90},
-  'p-front':{px:0,py:7,pz:85,rx:-90,ry:0,rz:0},
-  'p-back':{px:0,py:7,pz:-85,rx:-90,ry:0,rz:0},
-  'p-right':{px:85,py:7,pz:0,rx:-90,ry:0,rz:90},
-  'p-left':{px:-85,py:7,pz:0,rx:-90,ry:0,rz:90}
-};
-
 const baseIds=['9','3-right','3-left','3-front','3-back'];
 const pRowIds=['p-front','p-back','p-right','p-left'];
 
 const lms={px:0,py:2,pz:0,rx:-90,ry:0,rz:0};
-
-const stoneSetup={
-  distance:48,
-  mainDirectionDeg:0,
-  sideDirectionDeg:90
-};
-
-const pSetup={
-  gap:28,
-  copiesEachSide:3,
-  totalPerRow:7,
-  totalRows:4,
-  totalInstances:28
-};
-
-const outerBasePlaces=[
-  {id:'right-base',px:135,pz:0,directionMode:'side'},
-  {id:'left-base',px:-135,pz:0,directionMode:'side'},
-  {id:'front-base',px:0,pz:135,directionMode:'main'},
-  {id:'back-base',px:0,pz:-135,directionMode:'main'}
-];
 
 const boardGrid=[
   {id:'board-r1-c1',gx:-1,gz:-1},{id:'board-r1-c2',gx:0,gz:-1},{id:'board-r1-c3',gx:1,gz:-1},
@@ -86,25 +53,14 @@ const sideCopies=[
   {id:'right',side:1}
 ];
 
-const state=JSON.parse(JSON.stringify(approved));
-const meshes={};
 const groups=[];
 const guides=[];
+const meshes={};
 const pMeshes=[];
-let activeModel='STONE_DISTANCE';
 let activeProp='distance';
 
 const fields={
-  px:{label:'Move X',min:-300,max:300},
-  py:{label:'Move Y',min:-120,max:150},
-  pz:{label:'Move Z',min:-300,max:300},
-  rx:{label:'Rotate X',min:-180,max:180},
-  ry:{label:'Rotate Y',min:-180,max:180},
-  rz:{label:'Rotate Z',min:-180,max:180},
-  distance:{label:'Stone Distance',min:0,max:90},
-  mainDirectionDeg:{label:'Main Direction',min:-180,max:180},
-  sideDirectionDeg:{label:'Side Direction',min:-180,max:180},
-  gap:{label:'p.stl Gap',min:0,max:80}
+  distance:{label:'Layout Distance',min:10,max:90}
 };
 
 const scene=new THREE.Scene();
@@ -127,39 +83,68 @@ function deg(v){return THREE.MathUtils.degToRad(v)}
 function center(g){g.computeBoundingBox();const c=g.boundingBox.getCenter(new THREE.Vector3());g.translate(-c.x,-c.y,-c.z);g.computeVertexNormals()}
 function bottom(g){g.computeBoundingBox();const b=g.boundingBox;g.translate(-(b.min.x+b.max.x)/2,-(b.min.y+b.max.y)/2,-b.min.z);g.computeVertexNormals()}
 
-function getActiveStore(){
-  if(activeModel==='STONE_DISTANCE'||activeModel==='STONE_MAIN_DIRECTION'||activeModel==='STONE_SIDE_DIRECTION')return stoneSetup;
-  if(activeModel==='P_GAP')return pSetup;
-  if(activeModel==='LMS')return lms;
-  return state[activeModel];
+function d(){return Number(layout.distance)||GOLDEN_DISTANCE}
+function r3(){return d()*R3_RADIUS}
+function pr(){return d()*P_RADIUS}
+function pg(){return d()*P_GAP}
+
+function baseAlignment(){
+  const radius=r3();
+  return {
+    '9':{px:0,py:6,pz:0,rx:-90,ry:0,rz:0},
+    '3-right':{px:radius,py:6,pz:0,rx:-90,ry:0,rz:0},
+    '3-left':{px:-radius,py:6,pz:0,rx:-90,ry:0,rz:180},
+    '3-front':{px:0,py:6,pz:radius,rx:-90,ry:0,rz:90},
+    '3-back':{px:0,py:6,pz:-radius,rx:-90,ry:0,rz:-90}
+  };
+}
+
+function pRowsAlignment(){
+  const radius=pr();
+  return {
+    'p-front':{px:0,py:7,pz:radius,rx:-90,ry:0,rz:0},
+    'p-back':{px:0,py:7,pz:-radius,rx:-90,ry:0,rz:0},
+    'p-right':{px:radius,py:7,pz:0,rx:-90,ry:0,rz:90},
+    'p-left':{px:-radius,py:7,pz:0,rx:-90,ry:0,rz:90}
+  };
+}
+
+function outerBasePlacements(){
+  const radius=r3();
+  return [
+    {id:'right-base',px:radius,pz:0,directionMode:'side'},
+    {id:'left-base',px:-radius,pz:0,directionMode:'side'},
+    {id:'front-base',px:0,pz:radius,directionMode:'main'},
+    {id:'back-base',px:0,pz:-radius,directionMode:'main'}
+  ];
 }
 
 function applyOne(id){
-  const m=meshes[id],s=state[id];
-  if(!m)return;
+  const m=meshes[id],s=baseAlignment()[id];
+  if(!m||!s)return;
   m.position.set(s.px,s.py,s.pz);
   m.rotation.set(deg(s.rx),deg(s.ry),deg(s.rz));
 }
 
-function directionForOuterBase(base){
-  return base.directionMode==='side'?stoneSetup.sideDirectionDeg:stoneSetup.mainDirectionDeg;
-}
-
 function outerOffset(side,base){
-  const r=deg(directionForOuterBase(base));
+  const sideDirectionDeg=90;
+  const mainDirectionDeg=0;
+  const dir=base.directionMode==='side'?sideDirectionDeg:mainDirectionDeg;
+  const rad=deg(dir);
   return {
-    x:Math.cos(r)*stoneSetup.distance*side,
-    z:Math.sin(r)*stoneSetup.distance*side
+    x:Math.cos(rad)*d()*side,
+    z:Math.sin(rad)*d()*side
   };
 }
 
 function applyStones(){
+  const bases=outerBasePlacements();
   groups.forEach(g=>{
     if(g.userData.kind==='board'){
       const cell=g.userData.cell;
-      g.position.set(lms.px+(cell.gx*stoneSetup.distance),lms.py,lms.pz+(cell.gz*stoneSetup.distance));
+      g.position.set(lms.px+(cell.gx*d()),lms.py,lms.pz+(cell.gz*d()));
     }else{
-      const b=g.userData.base;
+      const b=bases.find(x=>x.id===g.userData.baseId);
       const s=g.userData.side;
       const off=outerOffset(s.side,b);
       g.position.set(lms.px+b.px+off.x,lms.py,lms.pz+b.pz+off.z);
@@ -173,18 +158,19 @@ function pAxisForRow(id){
 }
 
 function pInstances(){
+  const rows=pRowsAlignment();
   const arr=[];
   pRowIds.forEach(rowId=>{
-    const row=state[rowId];
+    const row=rows[rowId];
     const axis=pAxisForRow(rowId);
-    for(let side=-pSetup.copiesEachSide;side<=pSetup.copiesEachSide;side++){
+    for(let side=-3;side<=3;side++){
       arr.push({
         id:rowId+'-'+(side+4),
         row:rowId,
         side:side,
-        px:row.px+(axis==='x'?side*pSetup.gap:0),
+        px:row.px+(axis==='x'?side*pg():0),
         py:row.py,
-        pz:row.pz+(axis==='z'?side*pSetup.gap:0),
+        pz:row.pz+(axis==='z'?side*pg():0),
         rx:row.rx,
         ry:row.ry,
         rz:row.rz
@@ -206,53 +192,54 @@ function applyP(){
 }
 
 function showGuides(){
-  guides.forEach(g=>g.visible=(activeModel.startsWith('STONE')||activeModel==='LMS')&&panel.classList.contains('show'));
-}
-
-function baseAlignment(){
-  const o={};
-  baseIds.forEach(id=>o[id]=state[id]);
-  return o;
-}
-
-function pRowsAlignment(){
-  const o={};
-  pRowIds.forEach(id=>o[id]=state[id]);
-  return o;
+  guides.forEach(g=>g.visible=panel.classList.contains('show'));
 }
 
 function output(){
   return {
     version:VERSION,
-    models_alignment:state,
+    calibration_rule:'Only one value is calibrated: layout.distance. All 3.stl, p.stl, board cells, and outer stone places are derived from the same ratio.',
+    layout:{
+      distance:d(),
+      goldenDistance:GOLDEN_DISTANCE,
+      ratios:{
+        threeRadius:R3_RADIUS,
+        pRadius:P_RADIUS,
+        pGap:P_GAP
+      },
+      derived:{
+        threeRadius:r3(),
+        pRadius:pr(),
+        pGap:pg()
+      }
+    },
+    models_alignment:{...baseAlignment(),...pRowsAlignment()},
     approved_9_and_3:baseAlignment(),
     p_model:{
       file:'p.stl',
       rows:pRowsAlignment(),
-      setup:pSetup,
       instances:pInstances(),
-      note:'Four calibrated p.stl row centers. Each row has center + 3 right + 3 left = 7. Total p.stl instances = 28.'
+      note:'p.stl has 4 fixed derived row centers. Each row has 7 copies. No per-side calibration.'
     },
     stone_setup:{
       board_grid:'3x3',
       board_stone_sets:boardGrid.length,
-      outer_base_count:outerBasePlaces.length,
+      outer_base_count:outerBasePlacements().length,
       copies_per_outer_base:sideCopies.length,
-      outer_stone_sets:outerBasePlaces.length*sideCopies.length,
-      total_stone_sets:boardGrid.length+(outerBasePlaces.length*sideCopies.length),
-      distance:stoneSetup.distance,
-      mainDirectionDeg:stoneSetup.mainDirectionDeg,
-      sideDirectionDeg:stoneSetup.sideDirectionDeg,
+      outer_stone_sets:outerBasePlacements().length*sideCopies.length,
+      total_stone_sets:boardGrid.length+(outerBasePlacements().length*sideCopies.length),
+      distance:d(),
+      mainDirectionDeg:0,
+      sideDirectionDeg:90,
       note:'same distance controls board 3x3 grid and outer stone copies'
     },
     LMS:{
       الارتفاع:lms.py,
       px:lms.px,py:lms.py,pz:lms.pz,rx:lms.rx,ry:lms.ry,rz:lms.rz,
       boardGrid:boardGrid,
-      outerBasePlacements:outerBasePlaces,
+      outerBasePlacements:outerBasePlacements(),
       sideCopies:sideCopies
-    },
-    LMS_rule:'Board has 9 stone sets using same distance. Outer four bases keep left/center/right using same distance; right/left bases use 90 degrees.'
+    }
   };
 }
 
@@ -269,15 +256,8 @@ function applyAll(){
   sync();
 }
 
-function labelForActive(){
-  if(defs[activeModel])return defs[activeModel].label;
-  if(pLabels[activeModel])return pLabels[activeModel];
-  return activeModel;
-}
-
 function sync(){
   if(!panel.classList.contains('show'))return;
-  const s=getActiveStore();
   const f=fields[activeProp];
   calRange.min=f.min;
   calRange.max=f.max;
@@ -285,107 +265,44 @@ function sync(){
   calNum.min=f.min;
   calNum.max=f.max;
   calNum.step=1;
-  calRange.value=s[activeProp];
-  calNum.value=s[activeProp];
-
-  if(activeModel==='STONE_DISTANCE'){
-    calTitle.textContent='الحجر — التباعد';
-    calMeta.textContent='نفس التباعد للجميع، المعتمد 48';
-  }else if(activeModel==='STONE_MAIN_DIRECTION'){
-    calTitle.textContent='الحجر — اتجاه الأمام والخلف';
-    calMeta.textContent='الأمام + الخلف، المعتمد 0';
-  }else if(activeModel==='STONE_SIDE_DIRECTION'){
-    calTitle.textContent='الحجر — اتجاه اليمين واليسار';
-    calMeta.textContent='اليمين + اليسار، المعتمد 90';
-  }else if(activeModel==='P_GAP'){
-    calTitle.textContent='p.stl — تباعد النسخ';
-    calMeta.textContent='الوسط + 3 يمين + 3 يسار، الحالي '+pSetup.gap;
-  }else if(activeModel==='LMS'){
-    calTitle.textContent='الحجر — الارتفاع';
-    calMeta.textContent='يطبق على كل الحجر';
-  }else{
-    calTitle.textContent=labelForActive()+' — '+f.label;
-    calMeta.textContent=activeModel+'.'+activeProp;
-  }
-}
-
-function openMenu(){
-  panel.classList.remove('show');
-  showGuides();
-  menu.style.display='block';
-  menu.innerHTML='<div style="font-weight:800;margin-bottom:10px">إيش تبغى تعاير؟</div><div class="choices"><button class="choice primary" data-special="distance">الحجر: التباعد</button><button class="choice primary" data-special="mainDirectionDeg">اتجاه الأمام والخلف</button><button class="choice primary" data-special="sideDirectionDeg">اتجاه اليمين واليسار</button><button class="choice primary" data-special="pGap">p.stl: تباعد السبعة</button><button class="choice" data-m="LMS">الحجر: الارتفاع</button><button class="choice" data-m="9">9 board</button><button class="choice" data-m="3-right">3 right</button><button class="choice" data-m="3-left">3 left</button><button class="choice" data-m="3-front">3 front</button><button class="choice" data-m="3-back">3 back</button><button class="choice primary" data-m="p-front">p أمام</button><button class="choice primary" data-m="p-back">p خلف</button><button class="choice primary" data-m="p-right">p يمين</button><button class="choice primary" data-m="p-left">p يسار</button></div>';
-  menu.querySelectorAll('[data-special]').forEach(b=>b.onclick=()=>{
-    if(b.dataset.special==='distance'){
-      activeModel='STONE_DISTANCE';
-      activeProp='distance';
-    }else if(b.dataset.special==='mainDirectionDeg'){
-      activeModel='STONE_MAIN_DIRECTION';
-      activeProp='mainDirectionDeg';
-    }else if(b.dataset.special==='sideDirectionDeg'){
-      activeModel='STONE_SIDE_DIRECTION';
-      activeProp='sideDirectionDeg';
-    }else{
-      activeModel='P_GAP';
-      activeProp='gap';
-    }
-    openPanel();
-  });
-  menu.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{
-    activeModel=b.dataset.m;
-    if(activeModel==='LMS'){
-      activeProp='py';
-      openPanel();
-    }else{
-      openProps();
-    }
-  });
-}
-
-function openProps(){
-  menu.innerHTML='<div style="font-weight:800;margin-bottom:10px">إيش الخاصية؟</div><div class="choices"><button class="choice" data-p="px">Move X</button><button class="choice" data-p="py">Move Y</button><button class="choice" data-p="pz">Move Z</button><button class="choice" data-p="rx">Rotate X</button><button class="choice" data-p="ry">Rotate Y</button><button class="choice" data-p="rz">Rotate Z</button></div>';
-  menu.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{activeProp=b.dataset.p;openPanel()});
+  calRange.value=layout.distance;
+  calNum.value=layout.distance;
+  calTitle.textContent='المعايرة الوحيدة — التباعد';
+  calMeta.textContent='خانة واحدة تضبط كل البقية بنسبة واحدة: '+layout.distance;
 }
 
 function openPanel(){
   menu.style.display='none';
   panel.classList.add('show');
+  activeProp='distance';
   sync();
   showGuides();
 }
 
 function setVal(v){
-  const s=getActiveStore();
-  const f=fields[activeProp];
-  s[activeProp]=Math.max(f.min,Math.min(f.max,Number(v)||0));
+  const f=fields.distance;
+  layout.distance=Math.max(f.min,Math.min(f.max,Number(v)||GOLDEN_DISTANCE));
   applyAll();
 }
 
-settingsBtn.onclick=openMenu;
-changeBtn.onclick=openMenu;
+settingsBtn.onclick=openPanel;
+changeBtn.onclick=openPanel;
 hideBtn.onclick=()=>{panel.classList.remove('show');showGuides()};
-minusBtn.onclick=()=>setVal(getActiveStore()[activeProp]-1);
-plusBtn.onclick=()=>setVal(getActiveStore()[activeProp]+1);
+minusBtn.onclick=()=>setVal(layout.distance-1);
+plusBtn.onclick=()=>setVal(layout.distance+1);
 calRange.oninput=e=>setVal(e.target.value);
 calNum.oninput=e=>setVal(e.target.value);
-resetBtn.onclick=()=>{
-  if(activeModel==='STONE_DISTANCE')stoneSetup.distance=48;
-  else if(activeModel==='STONE_MAIN_DIRECTION')stoneSetup.mainDirectionDeg=0;
-  else if(activeModel==='STONE_SIDE_DIRECTION')stoneSetup.sideDirectionDeg=90;
-  else if(activeModel==='P_GAP')pSetup.gap=28;
-  else if(activeModel==='LMS')Object.assign(lms,{px:0,py:2,pz:0,rx:-90,ry:0,rz:0});
-  else Object.assign(state[activeModel],approved[activeModel]);
-  applyAll();
-};
+resetBtn.onclick=()=>{layout.distance=GOLDEN_DISTANCE;applyAll()};
 copyBtn.onclick=async()=>{await navigator.clipboard.writeText(out.value);hint.textContent='copied'};
 saveBtn.onclick=async()=>{await navigator.clipboard.writeText(out.value);hint.textContent='saved as copied code ✅'};
 
 const loader=new STLLoader();
 
 function loadModel(id){
-  const d=defs[id];
-  return new Promise(res=>loader.load('./'+d.file+'?v='+VERSION+'-'+id,g=>{
+  const def=defs[id];
+  return new Promise(res=>loader.load('./'+def.file+'?v='+VERSION+'-'+id,g=>{
     center(g);
-    const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:d.color,roughness:.55,metalness:.05}));
+    const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:def.color,roughness:.55,metalness:.05}));
     meshes[id]=m;
     scene.add(m);
     applyOne(id);
@@ -405,11 +322,11 @@ function createStoneGroups(){
     groups.push(g);
   });
 
-  outerBasePlaces.forEach(base=>{
+  outerBasePlacements().forEach(base=>{
     sideCopies.forEach(side=>{
       const g=new THREE.Group();
       g.userData.kind='outer';
-      g.userData.base=base;
+      g.userData.baseId=base.id;
       g.userData.side=side;
       parent.add(g);
       groups.push(g);
@@ -419,10 +336,10 @@ function createStoneGroups(){
   applyStones();
 }
 
-function loadPiece(n,c){
-  return new Promise(res=>loader.load('./'+n+'.stl?v='+VERSION+'-'+n,g=>{
+function loadPiece(name,color){
+  return new Promise(res=>loader.load('./'+name+'.stl?v='+VERSION+'-'+name,g=>{
     bottom(g);
-    const mat=new THREE.MeshStandardMaterial({color:c,roughness:.55,metalness:.05});
+    const mat=new THREE.MeshStandardMaterial({color:color,roughness:.55,metalness:.05});
     groups.forEach(gr=>{
       const m=new THREE.Mesh(g,mat);
       m.userData.piece=true;
@@ -436,7 +353,7 @@ function loadP(){
   return new Promise(res=>loader.load('./p.stl?v='+VERSION,g=>{
     center(g);
     const mat=new THREE.MeshStandardMaterial({color:0xd37c00,roughness:.55,metalness:.05});
-    for(let i=0;i<pSetup.totalInstances;i++){
+    for(let i=0;i<28;i++){
       const m=new THREE.Mesh(g,mat);
       pMeshes.push(m);
       scene.add(m);
@@ -475,10 +392,10 @@ Promise.all(Object.keys(defs).map(loadModel)).then(()=>{
   groups.forEach(g=>box.expandByObject(g));
   pMeshes.forEach(m=>box.expandByObject(m));
   const size=box.getSize(new THREE.Vector3());
-  const d=(Math.max(size.x,size.y,size.z)||1)*1.75;
-  camera.position.set(d,d*.82,d);
-  camera.near=Math.max(d/1000,.01);
-  camera.far=d*30;
+  const distance=(Math.max(size.x,size.y,size.z)||1)*1.75;
+  camera.position.set(distance,distance*.82,distance);
+  camera.near=Math.max(distance/1000,.01);
+  camera.far=distance*30;
   camera.updateProjectionMatrix();
   controls.target.set(0,0,0);
   controls.update();
