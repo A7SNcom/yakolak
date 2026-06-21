@@ -1,0 +1,56 @@
+{
+  "name": "YAKOLAK_GOLDEN_STATE",
+  "version": "v036-p-gap-11",
+  "archived_at": "2026-06-21",
+  "status": "golden_locked_do_not_overwrite_without_visual_approval",
+  "summary_ar": "هذه هي النقطة الذهبية الجديدة: كل المراكز ثابتة، والمعايرة الوحيدة المسموحة هي تباعد قطع p.stl عن بعضها. القيمة الذهبية الحالية للتباعد هي 11.",
+  "hard_rule_ar": "لا تعاير كل جهة من p.stl ولا كل جهة من 3.stl. لا تحرك مراكز p ولا مراكز 3. فقط pPieceGap يضبط المسافة بين قطع p داخل الصف الواحد.",
+  "engine": {
+    "entry": "index.html -> app.js -> app-clean-v026.js",
+    "app_version": "v036-p-gap-11",
+    "cache_bust": "?v=036"
+  },
+  "fixed_layout": {
+    "stone_distance": 48,
+    "three_radius": 135,
+    "p_radius": 85,
+    "p_piece_gap": 11,
+    "p_total_instances": 28,
+    "p_rows": 4,
+    "p_instances_per_row": 7,
+    "p_instances_rule": "3 left + 1 center + 3 right per row"
+  },
+  "base_models_alignment": {
+    "9": { "px": 0, "py": 6, "pz": 0, "rx": -90, "ry": 0, "rz": 0 },
+    "3-right": { "px": 135, "py": 6, "pz": 0, "rx": -90, "ry": 0, "rz": 0 },
+    "3-left": { "px": -135, "py": 6, "pz": 0, "rx": -90, "ry": 0, "rz": 180 },
+    "3-front": { "px": 0, "py": 6, "pz": 135, "rx": -90, "ry": 0, "rz": 90 },
+    "3-back": { "px": 0, "py": 6, "pz": -135, "rx": -90, "ry": 0, "rz": -90 }
+  },
+  "p_rows_alignment": {
+    "p-front": { "px": 0, "py": 7, "pz": 85, "rx": -90, "ry": 0, "rz": 0, "spread_axis": "x" },
+    "p-back": { "px": 0, "py": 7, "pz": -85, "rx": -90, "ry": 0, "rz": 0, "spread_axis": "x" },
+    "p-right": { "px": 85, "py": 7, "pz": 0, "rx": -90, "ry": 0, "rz": 90, "spread_axis": "z" },
+    "p-left": { "px": -85, "py": 7, "pz": 0, "rx": -90, "ry": 0, "rz": 90, "spread_axis": "z" }
+  },
+  "p_instance_formula": {
+    "side_values": [-3, -2, -1, 0, 1, 2, 3],
+    "front_back_formula": "px = row.px + side * pPieceGap; pz = row.pz",
+    "right_left_formula": "px = row.px; pz = row.pz + side * pPieceGap",
+    "pPieceGap": 11
+  },
+  "lms_stones": {
+    "px": 0,
+    "py": 2,
+    "pz": 0,
+    "rx": -90,
+    "ry": 0,
+    "rz": 0
+  },
+  "files": {
+    "board": "9.stl",
+    "outer_bases": "3.stl",
+    "p_marker": "p.stl",
+    "pieces": ["l.stl", "m.stl", "s.stl"]
+  }
+}
