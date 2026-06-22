@@ -1,6 +1,6 @@
 {
-  "version": "v043-dotted-marble-blue-0c5eaf",
-  "build": 43,
+  "version": "v042-loop-stop-hold",
+  "build": 42,
   "updated_at": "2026-06-21",
-  "note": "Marble changed to dotted speckles only, no waves or lines. Blue changed to exact #0c5eaf."
+  "note": "Emergency hold: stop broken page refresh loop. Do not bump until loader is replaced safely."
 }
