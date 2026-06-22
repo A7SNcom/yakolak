@@ -1,6 +1,6 @@
 {
-  "version": "v042-hejaz-materials-strong",
-  "build": 42,
+  "version": "v043-dotted-marble-blue-0c5eaf",
+  "build": 43,
   "updated_at": "2026-06-21",
-  "note": "Medium gray background, stronger true blue, clearer STL-safe marble using vertex colors, stronger lighting for metal/satin shine."
+  "note": "Marble changed to dotted speckles only, no waves or lines. Blue changed to exact #0c5eaf."
 }
