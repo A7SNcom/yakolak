@@ -1,2 +1,2 @@
 const bust = Date.now();
-import('./app-hejaz-v042.js?b=' + bust);
+import('./app-hejaz-v043.js?b=' + bust);
