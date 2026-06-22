@@ -1,17 +1,18 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {STLLoader} from 'three/addons/loaders/STLLoader.js';
-const V='v068-golden-intro-final-frame',D=48,R3=135,PR=85,PG=11;
+const V='v069-golden-intro-randomized-stones',D=48,R3=135,PR=85,PG=11;
 const MARBLE_URL='https://i.ibb.co/B2h2tNKG/Screenshot-2026-06-22-094236.png';
 const root=document.getElementById('view'),hint=document.getElementById('hint'),panel=document.getElementById('panel'),btn=document.getElementById('settingsBtn'),out=document.getElementById('out');
 if(btn)btn.style.display='none';if(panel)panel.style.display='none';
+const replayBtn=document.createElement('button');replayBtn.textContent='تشغيل / إعادة تشغيل';Object.assign(replayBtn.style,{position:'fixed',right:'16px',bottom:'16px',zIndex:50,padding:'12px 18px',borderRadius:'16px',border:'1px solid #333',background:'#050505',color:'#fff',fontFamily:'inherit',fontWeight:'700',cursor:'pointer',boxShadow:'0 8px 22px rgba(0,0,0,.35)'});document.body.appendChild(replayBtn);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x777777);
 const camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,.01,100000);
 const renderer=new THREE.WebGLRenderer({antialias:true});renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.toneMapping=THREE.NoToneMapping;root.appendChild(renderer.domElement);
 const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;
 scene.add(new THREE.HemisphereLight(0xffffff,0x555555,2.18));const l1=new THREE.DirectionalLight(0xffffff,1.9);l1.position.set(170,260,150);scene.add(l1);const l2=new THREE.DirectionalLight(0xffffff,.7);l2.position.set(-180,140,-120);scene.add(l2);
 const loader=new STLLoader(),texLoader=new THREE.TextureLoader();texLoader.setCrossOrigin('anonymous');
-const TLINE={lidShake:450,lidLift:850,lidH:900,wallStart:180,wallDelay:520,wallShake:280,wallRaise:20,wallLift:360,wallMove:850,wallDrop:430,pieceLead:520,pieceMove:1200,pieceArc:34,pieceStagger:60,seed:4128};
+const TLINE={lidShake:450,lidLift:850,lidH:900,wallStart:180,wallDelay:520,wallShake:280,wallRaise:20,wallLift:360,wallMove:850,wallDrop:430,pieceLead:520,pieceMove:1200,pieceArc:34,pieceStagger:60,seed:4128,stoneScatter:26};
 const LID_START={px:0,py:62.5,pz:0,rx:-90,ry:180,rz:0};
 const WALL_START={right:{px:81,py:35,pz:0,rx:-90,ry:-90,rz:0},left:{px:-81,py:35,pz:0,rx:-90,ry:90,rz:180},front:{px:0,py:35,pz:81,rx:-180,ry:0,rz:90},back:{px:0,py:35,pz:-81,rx:-180,ry:180,rz:-90}};
 const ORDER=['right','left','front','back'];
@@ -34,21 +35,26 @@ function off(side,b){const r=rad(b.mode==='side'?90:0);return{x:Math.cos(r)*D*si
 function pInstances(){const rows=pRows(),a=[];Object.keys(rows).forEach(k=>{const r=rows[k];for(let s=-3;s<=3;s++)a.push({id:k+'-'+(s+4),row:k,side:s,px:r.px+(r.axis==='x'?s*PG:0),py:r.py,pz:r.pz+(r.axis==='z'?s*PG:0),rx:r.rx,ry:r.ry,rz:r.rz})});return a}
 function outerPositions(){const a=[];bases().forEach(b=>[-1,0,1].forEach(side=>{const o=off(side,b);a.push({id:b.id+'-'+side,direction:b.dir,side,px:b.px+o.x,py:2,pz:b.pz+o.z,rx:-90,ry:0,rz:0})}));return a}
 function rng(seed){let a=seed>>>0;return()=>((a=(a*1664525+1013904223)>>>0)/4294967296)}
-function startForTarget(t,i){const r=rng(TLINE.seed+i*97),ang=r()*Math.PI*2,rr=20+Math.sqrt(r())*55;return{px:Math.cos(ang)*rr,py:12+r()*16,pz:Math.sin(ang)*rr,rx:(r()<.5?0:-180)+(r()-.5)*20,ry:(r()-.5)*38,rz:r()*360}}
+function startForTarget(t,i){const r=rng(TLINE.seed+i*97),ang=r()*Math.PI*2,rr=15+Math.sqrt(r())*66;return{px:Math.cos(ang)*rr,py:10+r()*18,pz:Math.sin(ang)*rr,rx:(r()<.5?0:-180)+(r()-.5)*28,ry:(r()-.5)*46,rz:r()*360}}
+function childStart(groupIndex,type){const typeSeed={l:13,m:37,s:71}[type],r=rng(TLINE.seed+groupIndex*211+typeSeed),a=r()*Math.PI*2,rr=8+r()*TLINE.stoneScatter;return{x:Math.cos(a)*rr,y:4+r()*18,z:Math.sin(a)*rr,rx:(r()-.5)*160,ry:(r()-.5)*120,rz:(r()-.5)*220}}
 function lidAt(ms){const p={...LID_START};if(ms<TLINE.lidShake){const f=1-ms/TLINE.lidShake,w=Math.sin(ms*.12)*2.8*f;p.rx+=w*.55;p.ry+=Math.cos(ms*.09)*1.1*f;p.rz+=Math.sin(ms*.07)*1.4*f;return p}p.py+=TLINE.lidH*ease((ms-TLINE.lidShake)/TLINE.lidLift);return p}
 function wallAt(key,ms){const id='3-'+key,st=WALL_START[key],fn=baseA()[id],i=ORDER.indexOf(key),start=TLINE.lidShake+TLINE.lidLift+TLINE.wallStart+i*TLINE.wallDelay,up={...st,py:st.py+TLINE.wallRaise},upF={...fn,py:st.py+TLINE.wallRaise};let t=ms-start;if(t<=0)return st;if(t<TLINE.wallShake){const f=1-t/TLINE.wallShake,w=Math.sin(t*.06)*2.2*f;return{...st,rx:st.rx+w*.4,ry:st.ry+w*.25,rz:st.rz+w*.35}}t-=TLINE.wallShake;if(t<TLINE.wallLift)return mix(st,up,t/TLINE.wallLift);t-=TLINE.wallLift;if(t<TLINE.wallMove)return mix(up,upF,t/TLINE.wallMove);t-=TLINE.wallMove;if(t<TLINE.wallDrop)return mix(upF,fn,t/TLINE.wallDrop);return fn}
 function pieceStart(gr){const dir=gr.userData.dir,i=ORDER.indexOf(dir),drop=TLINE.lidShake+TLINE.lidLift+TLINE.wallStart+i*TLINE.wallDelay+TLINE.wallShake+TLINE.wallLift+TLINE.wallMove;return drop-TLINE.pieceLead+(gr.userData.side+1)*TLINE.pieceStagger}
+function pieceQ(gr,ms){return ease((ms-pieceStart(gr))/TLINE.pieceMove)}
 function pieceAt(gr,ms){const a=gr.userData.start,b=gr.userData.final,s=pieceStart(gr),q=ease((ms-s)/TLINE.pieceMove),m=mix(a,b,q);m.py+=Math.sin(q*Math.PI)*TLINE.pieceArc;return m}
-function apply(ms){tr(meshes['9'],baseA()['9']);if(lidMesh){tr(lidMesh,lidAt(ms));lidMesh.visible=ms<TLINE.lidShake+TLINE.lidLift}ORDER.forEach(k=>tr(meshes['3-'+k],wallAt(k,ms)));outerGroups.forEach(g=>tr(g,pieceAt(g,ms)));if(ms>=totalTime())snapFinal()}
-function snapFinal(){tr(meshes['9'],baseA()['9']);ORDER.forEach(k=>tr(meshes['3-'+k],baseA()['3-'+k]));outerGroups.forEach(g=>tr(g,g.userData.final));pInstances().forEach((p,i)=>tr(pMeshes[i],p));if(lidMesh)lidMesh.visible=false}
+function applyChildren(gr,ms){const q=pieceQ(gr,ms);gr.children.forEach(ch=>{const a=ch.userData.localStart||{x:0,y:0,z:0,rx:0,ry:0,rz:0};ch.position.set(a.x*(1-q),a.y*(1-q),a.z*(1-q));ch.rotation.set(rad(a.rx*(1-q)),rad(a.ry*(1-q)),rad(a.rz*(1-q)))})}
+function apply(ms){tr(meshes['9'],baseA()['9']);if(lidMesh){tr(lidMesh,lidAt(ms));lidMesh.visible=ms<TLINE.lidShake+TLINE.lidLift}ORDER.forEach(k=>tr(meshes['3-'+k],wallAt(k,ms)));outerGroups.forEach(g=>{tr(g,pieceAt(g,ms));applyChildren(g,ms)});if(ms>=totalTime())snapFinal()}
+function snapFinal(){tr(meshes['9'],baseA()['9']);ORDER.forEach(k=>tr(meshes['3-'+k],baseA()['3-'+k]));outerGroups.forEach(g=>{tr(g,g.userData.final);g.children.forEach(ch=>{ch.position.set(0,0,0);ch.rotation.set(0,0,0)})});pInstances().forEach((p,i)=>tr(pMeshes[i],p));if(lidMesh)lidMesh.visible=false}
 function totalTime(){return TLINE.lidShake+TLINE.lidLift+TLINE.wallStart+3*TLINE.wallDelay+TLINE.wallShake+TLINE.wallLift+TLINE.wallMove+TLINE.wallDrop+TLINE.pieceMove+500}
 function refresh(){if(!out)return;out.value='const YAKOLAK_GOLDEN_INTRO_FINAL = '+JSON.stringify({version:V,principle:'intro is animation only; final frame snaps to static golden state 100%',marbleUrl:MARBLE_URL,timeline:TLINE,locked_layout:{stoneDistance:D,threeRadius:R3,pRadius:PR,pPieceGap:PG},models_alignment:{...baseA(),...pRows()},outer_stones:{visible:true,positions:outerPositions()},p_model:{file:'p.stl',rows:pRows(),instances:pInstances()}},null,2)+';'}
+function restartIntro(){if(!loaded)return;started=performance.now();playing=true;if(lidMesh)lidMesh.visible=true;apply(0);if(hint)hint.textContent='Yakolak '+V+' — replay'}
+replayBtn.onclick=restartIntro;
 function loadBase(id){return new Promise(res=>loader.load('./'+(id==='9'?'9':'3')+'.stl?v='+V+'-'+id,g=>{center(g);const m=new THREE.Mesh(g,baseMat);meshes[id]=m;scene.add(m);tr(m,baseA()[id]);res()},undefined,()=>res()))}
 function loadLid(){return new Promise(res=>loader.load('./9.stl?v='+V+'-lid',g=>{center(g);lidMesh=new THREE.Mesh(g,baseMat);scene.add(lidMesh);tr(lidMesh,LID_START);res()},undefined,()=>res()))}
-function makeOuter(){const parent=new THREE.Group();scene.add(parent);outerPositions().forEach((p,i)=>{const gr=new THREE.Group();gr.userData={final:p,start:startForTarget(p,i),dir:p.direction,side:p.side};tr(gr,gr.userData.start);parent.add(gr);outerGroups.push(gr)})}
-function loadPiece(n){return new Promise(res=>loader.load('./'+n+'.stl?v='+V+'-'+n,g=>{bottom(g);outerGroups.forEach(gr=>gr.add(new THREE.Mesh(g.clone(),mats[gr.userData.dir])));res()},undefined,()=>res()))}
+function makeOuter(){const parent=new THREE.Group();scene.add(parent);outerPositions().forEach((p,i)=>{const gr=new THREE.Group();gr.userData={index:i,final:p,start:startForTarget(p,i),dir:p.direction,side:p.side};tr(gr,gr.userData.start);parent.add(gr);outerGroups.push(gr)})}
+function loadPiece(n){return new Promise(res=>loader.load('./'+n+'.stl?v='+V+'-'+n,g=>{bottom(g);outerGroups.forEach(gr=>{const m=new THREE.Mesh(g.clone(),mats[gr.userData.dir]);m.userData.localStart=childStart(gr.userData.index,n);gr.add(m)});res()},undefined,()=>res()))}
 function loadP(){return new Promise(res=>loader.load('./p.stl?v='+V,g=>{center(g);for(let i=0;i<28;i++){const m=new THREE.Mesh(g.clone(),pMat);pMeshes.push(m);scene.add(m)}pInstances().forEach((p,i)=>tr(pMeshes[i],p));res()},undefined,()=>res()))}
 Promise.all(['9','3-right','3-left','3-front','3-back'].map(loadBase).concat(loadLid())).then(()=>{makeOuter();return Promise.all([loadPiece('l'),loadPiece('m'),loadPiece('s'),loadP()])}).then(()=>{loadTextureTo(mats.right,'#ffffff');loadTextureTo(pMat,'#6f7378');const box=new THREE.Box3();Object.values(meshes).forEach(m=>box.expandByObject(m));outerGroups.forEach(g=>box.expandByObject(g));pMeshes.forEach(m=>box.expandByObject(m));const size=box.getSize(new THREE.Vector3()),dist=(Math.max(size.x,size.y,size.z)||1)*1.75;camera.position.set(dist,dist*.82,dist);camera.near=Math.max(dist/1000,.01);camera.far=dist*30;camera.updateProjectionMatrix();controls.target.set(0,0,0);controls.update();loaded=true;started=performance.now();playing=true;if(hint)hint.textContent='Yakolak '+V;refresh()});
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
-addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r'){started=performance.now();playing=true;if(lidMesh)lidMesh.visible=true}});
+addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r')restartIntro()});
 function animate(){requestAnimationFrame(animate);controls.update();if(loaded&&playing){const e=performance.now()-started;apply(Math.min(e,totalTime()));if(e>totalTime()){snapFinal();playing=false}}renderer.render(scene,camera)}animate();refresh();
