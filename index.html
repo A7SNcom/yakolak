@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-store,no-cache,must-revalidate,max-age=0">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="yakolak-version" content="v049-room-boot">
+<meta name="yakolak-version" content="v051-clean-reload-button">
 <title>Yakolak Live</title>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script>
 <style>
@@ -18,7 +18,8 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b0b;col
 #yakolakLoader.done{opacity:0;visibility:hidden;pointer-events:none}
 #yakolakLoader.error .loaderRing{border-top-color:#b35a5a}
 .loaderRing{width:42px;height:42px;border-radius:50%;border:3px solid rgba(255,255,255,.14);border-top-color:#fff;animation:spin .85s linear infinite}
-#clearCacheBtn{position:fixed;left:16px;bottom:16px;z-index:10000;width:46px;height:46px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.72);color:#fff;font-size:11px;font-weight:900;display:grid;place-items:center;cursor:pointer}
+#clearCacheBtn{position:fixed;left:16px;bottom:16px;z-index:10000;width:46px;height:46px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.72);color:#fff;font-size:19px;font-weight:900;display:grid;place-items:center;cursor:pointer;line-height:1}
+#clearCacheBtn[disabled]{opacity:.45;cursor:wait}
 @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
@@ -27,21 +28,27 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b0b;col
 <div id="view"></div>
 <div id="hint" aria-hidden="true"></div>
 <button id="settingsBtn" aria-hidden="true">SET</button>
-<button id="clearCacheBtn" title="Fresh reload" aria-label="Fresh reload">NEW</button>
+<button id="clearCacheBtn" type="button" title="مسح الكاش وإعادة التحميل" aria-label="مسح الكاش وإعادة التحميل">X</button>
 <div id="panel" aria-hidden="true"></div>
 <textarea id="out"></textarea>
 <script type="module">
 const KEY='yakolak_build_seen';
 const clearBtn=document.getElementById('clearCacheBtn');
-function reloadFresh(){try{localStorage.removeItem(KEY);sessionStorage.clear()}catch(e){} location.href=location.pathname+'?fresh='+Date.now()}
-if(clearBtn)clearBtn.addEventListener('click',reloadFresh);
+async function cleanReload(){
+  if(clearBtn){clearBtn.disabled=true;clearBtn.textContent='...'}
+  try{localStorage.removeItem(KEY);sessionStorage.clear()}catch(e){}
+  try{if('caches' in window){const names=await caches.keys();await Promise.all(names.map(name=>caches.delete(name)))}}catch(e){}
+  try{if('serviceWorker' in navigator){const regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.map(reg=>reg.unregister()))}}catch(e){}
+  window.location.reload();
+}
+if(clearBtn)clearBtn.addEventListener('click',cleanReload);
 async function checkVersion(){
   try{
     const r=await fetch('./version.json?ts='+Date.now(),{cache:'no-store'});
     const v=await r.json();
     const next=String(v.build);
     const old=localStorage.getItem(KEY);
-    if(old&&old!==next){localStorage.setItem(KEY,next);location.href=location.pathname+'?auto='+v.build+'&t='+Date.now();return}
+    if(old&&old!==next){localStorage.setItem(KEY,next);window.location.reload();return}
     localStorage.setItem(KEY,next);
   }catch(e){}
 }
