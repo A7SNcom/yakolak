@@ -1,6 +1,6 @@
 {
-  "version": "v042-loop-stop-hold",
+  "version": "v042-loader-hold-live-v043",
   "build": 42,
-  "updated_at": "2026-06-21",
-  "note": "Emergency hold: stop broken page refresh loop. Do not bump until loader is replaced safely."
+  "updated_at": "2026-06-23",
+  "note": "Build intentionally frozen to avoid refresh-loop risk. Current live route: index.html -> app.js -> app-hejaz-v043.js. Do not bump build until the loader is verified safe."
 }
