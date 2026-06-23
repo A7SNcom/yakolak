@@ -1,18 +1,17 @@
 import * as THREE from 'three';
-console.info('[Yakolak] ROOM BOOT v050 SAFE ROOM LOADED');
+console.info('[Yakolak] ROOM BOOT v052 BIG LOCKED ROOM LOADED');
 
 const add0=THREE.Scene.prototype.add;
 const load0=THREE.TextureLoader.prototype.load;
 const render0=THREE.WebGLRenderer.prototype.render;
 
 const B={
-  floorY:-560,
-  topY:980,
-  halfW:1450,
-  backZ:-1250,
-  frontZ:1120,
-  centerZ:-40,
-  camPad:120
+  floorY:-1050,
+  topY:1850,
+  halfW:3300,
+  backZ:-3600,
+  frontZ:3000,
+  camPad:380
 };
 
 function material(color){
@@ -28,7 +27,7 @@ function panel(scene,name,w,h,x,y,z,rx,ry,rz,mat){
   add0.call(scene,mesh);
   return mesh;
 }
-function line(scene,name,a,b,opacity=.42){
+function line(scene,name,a,b,opacity=.28){
   const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...a),new THREE.Vector3(...b)]);
   const mesh=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xd2ccc1,transparent:true,opacity,depthWrite:false}));
   mesh.name=name;
@@ -52,7 +51,7 @@ function room(scene){
   const wallMat=material(0xf4f0e8);
   const frontMat=material(0xf4f0e8);
   frontMat.transparent=true;
-  frontMat.opacity=.18;
+  frontMat.opacity=.08;
   frontMat.depthWrite=false;
 
   panel(scene,'yakolak-room-floor',w,d,0,B.floorY,cz,-Math.PI/2,0,0,floorMat);
@@ -62,16 +61,16 @@ function room(scene){
   panel(scene,'yakolak-room-right-wall',d,h,B.halfW,my,cz,0,-Math.PI/2,0,wallMat);
   panel(scene,'yakolak-room-front-wall',w,h,0,my,B.frontZ,0,Math.PI,0,frontMat);
 
-  line(scene,'yakolak-room-back-floor-line',[-B.halfW,B.floorY,B.backZ],[B.halfW,B.floorY,B.backZ],.65);
-  line(scene,'yakolak-room-front-floor-line',[-B.halfW,B.floorY,B.frontZ],[B.halfW,B.floorY,B.frontZ],.20);
-  line(scene,'yakolak-room-left-back-corner',[-B.halfW,B.floorY,B.backZ],[-B.halfW,B.topY,B.backZ],.45);
-  line(scene,'yakolak-room-right-back-corner',[B.halfW,B.floorY,B.backZ],[B.halfW,B.topY,B.backZ],.45);
-  line(scene,'yakolak-room-left-front-corner',[-B.halfW,B.floorY,B.frontZ],[-B.halfW,B.topY,B.frontZ],.18);
-  line(scene,'yakolak-room-right-front-corner',[B.halfW,B.floorY,B.frontZ],[B.halfW,B.topY,B.frontZ],.18);
-  line(scene,'yakolak-room-left-floor-line',[-B.halfW,B.floorY,B.backZ],[-B.halfW,B.floorY,B.frontZ],.32);
-  line(scene,'yakolak-room-right-floor-line',[B.halfW,B.floorY,B.backZ],[B.halfW,B.floorY,B.frontZ],.32);
+  line(scene,'yakolak-room-back-floor-line',[-B.halfW,B.floorY,B.backZ],[B.halfW,B.floorY,B.backZ],.45);
+  line(scene,'yakolak-room-front-floor-line',[-B.halfW,B.floorY,B.frontZ],[B.halfW,B.floorY,B.frontZ],.10);
+  line(scene,'yakolak-room-left-back-corner',[-B.halfW,B.floorY,B.backZ],[-B.halfW,B.topY,B.backZ],.30);
+  line(scene,'yakolak-room-right-back-corner',[B.halfW,B.floorY,B.backZ],[B.halfW,B.topY,B.backZ],.30);
+  line(scene,'yakolak-room-left-front-corner',[-B.halfW,B.floorY,B.frontZ],[-B.halfW,B.topY,B.frontZ],.10);
+  line(scene,'yakolak-room-right-front-corner',[B.halfW,B.floorY,B.frontZ],[B.halfW,B.topY,B.frontZ],.10);
+  line(scene,'yakolak-room-left-floor-line',[-B.halfW,B.floorY,B.backZ],[-B.halfW,B.floorY,B.frontZ],.20);
+  line(scene,'yakolak-room-right-floor-line',[B.halfW,B.floorY,B.backZ],[B.halfW,B.floorY,B.frontZ],.20);
 
-  console.info('[Yakolak] SAFE 4-WALL ROOM ACTIVE',{floorY:B.floorY,topY:B.topY,width:w,depth:d,backZ:B.backZ,frontZ:B.frontZ});
+  console.info('[Yakolak] BIG LOCKED 4-WALL ROOM ACTIVE',{floorY:B.floorY,topY:B.topY,width:w,depth:d,backZ:B.backZ,frontZ:B.frontZ});
 }
 function clampCamera(scene,camera){
   if(!scene||!scene.__yakolakRoomBounds||!camera||!camera.position)return;
@@ -86,10 +85,10 @@ THREE.WebGLRenderer.prototype.render=function(scene,camera){clampCamera(scene,ca
 THREE.TextureLoader.prototype.load=function(url,onLoad,onProgress,onError){
   const s=String(url||'');
   if(s.includes('Asset%201big.svg')||s.includes('Asset 1big.svg')){
-    console.info('[Yakolak] SVG background skipped; safe 4-wall room active');
+    console.info('[Yakolak] SVG background skipped; big locked 4-wall room active');
     queueMicrotask(()=>onError&&onError(new Error('svg background disabled')));
     return new THREE.Texture();
   }
   return load0.call(this,url,onLoad,onProgress,onError);
 };
-import('./app.js?boot='+Date.now()+'&room=50');
+import('./app.js?boot='+Date.now()+'&room=52');
