@@ -1,48 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="4096" height="2048" viewBox="0 0 4096 2048" preserveAspectRatio="none">
-  <defs>
-    <linearGradient id="ceiling" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#f2f2ee"/>
-    </linearGradient>
-    <linearGradient id="walls" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#fbfbf8"/>
-      <stop offset="1" stop-color="#eeeeea"/>
-    </linearGradient>
-    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f7f7f3"/>
-      <stop offset="1" stop-color="#e3e3de"/>
-    </linearGradient>
-    <radialGradient id="softLight" cx="50%" cy="34%" r="58%">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.9"/>
-      <stop offset="0.52" stop-color="#ffffff" stop-opacity="0.28"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-
   <rect width="4096" height="2048" fill="#f4f4f0"/>
-  <rect x="0" y="0" width="4096" height="620" fill="url(#ceiling)"/>
-  <rect x="0" y="620" width="4096" height="610" fill="url(#walls)"/>
-  <rect x="0" y="1230" width="4096" height="818" fill="url(#floor)"/>
-
-  <path d="M0 620H4096" stroke="#dfdfd8" stroke-width="10" opacity="0.62"/>
-  <path d="M0 1230H4096" stroke="#d8d8d1" stroke-width="12" opacity="0.72"/>
-
-  <path d="M1024 620L860 1230" stroke="#e1e1dc" stroke-width="8" opacity="0.5"/>
-  <path d="M2048 620L2048 1230" stroke="#e4e4df" stroke-width="6" opacity="0.55"/>
-  <path d="M3072 620L3236 1230" stroke="#e1e1dc" stroke-width="8" opacity="0.5"/>
-
-  <path d="M0 1230L2048 2048L4096 1230" fill="#ffffff" opacity="0.14"/>
-  <path d="M0 2048L1024 1230" stroke="#d9d9d3" stroke-width="6" opacity="0.32"/>
-  <path d="M1024 2048L1536 1230" stroke="#ddddd7" stroke-width="5" opacity="0.26"/>
-  <path d="M2048 2048L2048 1230" stroke="#ddddd7" stroke-width="5" opacity="0.22"/>
-  <path d="M3072 2048L2560 1230" stroke="#ddddd7" stroke-width="5" opacity="0.26"/>
-  <path d="M4096 2048L3072 1230" stroke="#d9d9d3" stroke-width="6" opacity="0.32"/>
-
-  <path d="M0 1510H4096" stroke="#deded8" stroke-width="5" opacity="0.28"/>
-  <path d="M0 1740H4096" stroke="#dadad4" stroke-width="5" opacity="0.22"/>
-  <path d="M0 1920H4096" stroke="#d4d4ce" stroke-width="4" opacity="0.18"/>
-
-  <ellipse cx="2048" cy="570" rx="760" ry="210" fill="url(#softLight)"/>
-  <ellipse cx="2048" cy="1380" rx="1200" ry="420" fill="#ffffff" opacity="0.18"/>
-  <rect x="0" y="0" width="4096" height="2048" fill="none" stroke="#ffffff" stroke-width="1"/>
+  <rect x="0" y="0" width="4096" height="560" fill="#ffffff"/>
+  <rect x="0" y="560" width="4096" height="690" fill="#f1f1ec"/>
+  <rect x="0" y="1250" width="4096" height="798" fill="#e4e4dc"/>
+  <path d="M0 560H4096" stroke="#cfcfc8" stroke-width="18"/>
+  <path d="M0 1250H4096" stroke="#bdbdb4" stroke-width="22"/>
+  <path d="M0 560L520 1250" stroke="#c9c9c1" stroke-width="14"/>
+  <path d="M1024 560L1180 1250" stroke="#d3d3cc" stroke-width="10"/>
+  <path d="M2048 560V1250" stroke="#d6d6d0" stroke-width="10"/>
+  <path d="M3072 560L2916 1250" stroke="#d3d3cc" stroke-width="10"/>
+  <path d="M4096 560L3576 1250" stroke="#c9c9c1" stroke-width="14"/>
+  <path d="M0 2048L520 1250" stroke="#c4c4bc" stroke-width="12"/>
+  <path d="M1024 2048L1180 1250" stroke="#ccccc4" stroke-width="9"/>
+  <path d="M2048 2048V1250" stroke="#d0d0c8" stroke-width="8"/>
+  <path d="M3072 2048L2916 1250" stroke="#ccccc4" stroke-width="9"/>
+  <path d="M4096 2048L3576 1250" stroke="#c4c4bc" stroke-width="12"/>
+  <path d="M0 1480H4096" stroke="#d1d1ca" stroke-width="8" opacity="0.75"/>
+  <path d="M0 1690H4096" stroke="#cbcbc4" stroke-width="7" opacity="0.65"/>
+  <path d="M0 1885H4096" stroke="#c5c5be" stroke-width="6" opacity="0.55"/>
+  <ellipse cx="2048" cy="480" rx="880" ry="220" fill="#ffffff" opacity="0.80"/>
+  <ellipse cx="2048" cy="1390" rx="1200" ry="340" fill="#ffffff" opacity="0.20"/>
+  <rect x="70" y="70" width="3956" height="1908" fill="none" stroke="#d0d0c8" stroke-width="8" opacity="0.22"/>
 </svg>
