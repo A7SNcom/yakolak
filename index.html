@@ -19,14 +19,13 @@ textarea{display:none}
 #yakolakLoader{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:radial-gradient(circle at center,#1b1b1b 0,#0b0b0b 58%,#050505 100%);transition:opacity .45s ease,visibility .45s ease}
 #yakolakLoader.done{opacity:0;visibility:hidden;pointer-events:none}
 #yakolakLoader.error .loaderRing{border-top-color:#b35a5a}
-.loaderBox{display:flex;flex-direction:column;align-items:center;gap:16px;transform:translateY(-8px)}
+.loaderBox{display:flex;align-items:center;justify-content:center;transform:translateY(-8px)}
 .loaderRing{width:42px;height:42px;border-radius:50%;border:3px solid rgba(255,255,255,.14);border-top-color:#fff;animation:spin .85s linear infinite;box-shadow:0 18px 60px #000}
-.loaderText{font-size:13px;color:#d7d7d7;letter-spacing:.2px}
 @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
-<div id="yakolakLoader"><div class="loaderBox"><div class="loaderRing"></div><div class="loaderText" id="yakolakLoaderText">جاري تجهيز اللعبة...</div></div></div>
+<div id="yakolakLoader"><div class="loaderBox"><div class="loaderRing"></div></div></div>
 <div id="view"></div>
 <div id="hint" aria-hidden="true"></div>
 <button id="settingsBtn" aria-hidden="true">⚙</button>
