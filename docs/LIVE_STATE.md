@@ -3,21 +3,21 @@
 ## Live source of truth
 
 ```txt
-index.html -> app.js -> app-hejaz-v043.js
+index.html -> app.js -> src/app-live.js
 ```
 
 This is the currently approved live user experience.
 
-## What must stay unchanged
+## What must stay unchanged visually
 
 ```txt
-app-hejaz-v043.js
-9.stl
-3.stl
-p.stl
-l.stl
-m.stl
-s.stl
+src/app-live.js
+src/assets/models/9.stl
+src/assets/models/3.stl
+src/assets/models/p.stl
+src/assets/models/l.stl
+src/assets/models/m.stl
+src/assets/models/s.stl
 ```
 
 The current page is already good for final browsing. Cleanup work must not change visuals, model positions, intro behavior, materials, or loading behavior unless explicitly requested.
@@ -44,7 +44,7 @@ PG = p.stl piece gap
 
 ```txt
 Load Three.js and addons through importmap
-Load STL files from repository root
+Load STL files from src/assets/models/
 Load marble texture from external URL
 Create scene, camera, renderer, lights, and orbit controls
 Build board and outer bases
@@ -63,9 +63,9 @@ The live app internal version string is not the same as README historical versio
 ## Safe future workflow
 
 ```txt
-1. Keep app-hejaz-v043.js untouched.
-2. Create a new app candidate file, for example app-hejaz-v044.js.
+1. Keep src/app-live.js stable unless a new visual state is approved.
+2. Create a new app candidate under src/, for example src/app-next.js.
 3. Test visually.
 4. Only after approval, change app.js to point to the new candidate.
-5. Keep the previous approved app file in place as rollback.
+5. Keep the previous approved app file available for rollback.
 ```
