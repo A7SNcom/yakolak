@@ -1,6 +1,6 @@
 {
-  "version": "v043-fixed-360-background-asset",
-  "build": 43,
+  "version": "v044-clean-white-room-background",
+  "build": 44,
   "updated_at": "2026-06-23",
-  "note": "Fixed empty Asset 1big.svg 360 background asset so Three.js/WebGL can load a valid 2:1 equirectangular SVG. Current live route: index.html -> app.js -> src/app-live.js."
+  "note": "Replaced 360 background with a clean white room: ceiling, walls, and floor."
 }
