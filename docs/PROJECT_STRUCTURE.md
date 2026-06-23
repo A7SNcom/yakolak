@@ -1,81 +1,80 @@
 # Yakolak Project Structure
 
+## Current clean structure
+
+```txt
+/
+├─ index.html
+├─ app.js
+├─ version.json
+├─ README.md
+├─ src/
+│  ├─ app-live.js
+│  └─ assets/
+│     └─ models/
+│        ├─ 9.stl
+│        ├─ 3.stl
+│        ├─ p.stl
+│        ├─ l.stl
+│        ├─ m.stl
+│        └─ s.stl
+├─ docs/
+├─ archive/
+└─ legacy/
+   └─ apps/
+      ├─ app-colors-v037.js
+      └─ app-clean-v026.js
+```
+
 ## Root files
 
 ```txt
 index.html
 ```
 
-GitHub Pages entry page. It prepares the DOM, importmap, cache-control tags, version check, and imports `app.js`.
+GitHub Pages entry page.
 
 ```txt
 app.js
 ```
 
-Tiny live boot file. It points to the approved live app file.
-
-```txt
-app-hejaz-v043.js
-```
-
-Current approved live app. It loads models from `assets/models/`.
+Small boot file only. It imports `src/app-live.js`.
 
 ```txt
 version.json
 ```
 
-Loader/version check file. Build is intentionally frozen for now to avoid refresh-loop risk.
+Version check file. Build is intentionally frozen for now to avoid refresh-loop risk.
 
 ```txt
 README.md
 ```
 
-Human overview of the current live project.
+Simple human overview.
 
-## Assets folder
+## Source folder
 
 ```txt
-assets/models/9.stl
-assets/models/3.stl
-assets/models/p.stl
-assets/models/l.stl
-assets/models/m.stl
-assets/models/s.stl
+src/app-live.js
 ```
 
-All STL model files are now grouped in `assets/models/`. The live app uses `MODEL_DIR='./assets/models/'` and loads models through `modelPath()`.
+Current approved live app.
+
+```txt
+src/assets/models/
+```
+
+Live STL model files used by `src/app-live.js`.
 
 ## Documentation folder
 
 ```txt
 docs/LIVE_STATE.md
-```
-
-Current approved live state.
-
-```txt
 docs/PROJECT_STRUCTURE.md
-```
-
-Repository organization and file purpose.
-
-```txt
 docs/CURRENT_GOLDEN_STATE.md
-```
-
-Golden geometry and positioning rules.
-
-```txt
 docs/AI_AGENT_HANDOFF.md
-```
-
-Rules for future AI agents or developers.
-
-```txt
 docs/COLOR_MODE_V037.md
 ```
-
-Historical color-control documentation. Useful as reference only, not the current live route.
 
 ## Archive folder
 
@@ -84,29 +83,24 @@ archive/golden-v036-p-gap-11.json
 archive/golden-v036-p-gap-11.js
 ```
 
-Golden historical reference.
+Golden historical references.
 
-## Legacy app files
-
-Some old app files may remain in root for safety and rollback history. They are not the current live route unless `app.js` points to them.
-
-## Current structure
+## Legacy folder
 
 ```txt
-/
-├─ index.html
-├─ app.js
-├─ app-hejaz-v043.js
-├─ version.json
-├─ README.md
-├─ assets/
-│  └─ models/
-│     ├─ 9.stl
-│     ├─ 3.stl
-│     ├─ p.stl
-│     ├─ l.stl
-│     ├─ m.stl
-│     └─ s.stl
-├─ docs/
-└─ archive/
+legacy/apps/app-colors-v037.js
+legacy/apps/app-clean-v026.js
+```
+
+Old app versions kept only for reference and rollback study. They are not used by the live site.
+
+## Rule for future work
+
+```txt
+Active code goes in src/
+Live model assets stay next to the live app under src/assets/models/
+Documentation goes in docs/
+Old non-live app files go in legacy/
+Golden references go in archive/
+Root stays clean
 ```
