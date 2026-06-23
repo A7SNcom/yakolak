@@ -9,7 +9,7 @@ async function bootYakolak(){
   const res = await fetch(LIVE_APP + '?b=' + bust, {cache:'no-store'});
   let code = await res.text();
 
-  // Runtime visual patch: make draggable light spheres obvious and make them actually affect lighting.
+  // Runtime visual patch: room shell + visible/effective draggable light spheres.
   code = code
     .replace("...LIGHTING_PRESETS.balanced,shadowBias:-.00008,normalBias:.018,shadowSize:1536,spotAngle:36,spotPenumbra:.48,spotTargetX:0,spotTargetY:0,spotTargetZ:0,", "...LIGHTING_PRESETS.balanced,lampOnly:false,shadowBias:-.00008,normalBias:.018,shadowSize:1536,spotAngle:36,spotPenumbra:.48,spotTargetX:0,spotTargetY:0,spotTargetZ:0,")
     .replace("{enabled:true,label:'لمبة 1',color:'#fff2d0',intensity:.65,distance:360,decay:1.55,pos:[-120,145,115]}", "{enabled:true,label:'لمبة 1',color:'#fff2d0',intensity:2.4,distance:620,decay:1.0,pos:[-105,86,95]}")
@@ -38,7 +38,33 @@ async function bootYakolak(){
     .replace("calibrationPanel.appendChild(section('كرات ضوئية قابلة للسحب'));", "calibrationPanel.appendChild(section('كرات ضوئية قابلة للسحب'));calibrationPanel.appendChild(check('لمبات فقط','lighting.lampOnly'));")
     .replace("[['قوة',`lighting.lamps.${i}.intensity`,0,3,.01]", "[['قوة',`lighting.lamps.${i}.intensity`,0,8,.01]")
     .replace("['مدى',`lighting.lamps.${i}.distance`,40,800,1]", "['مدى',`lighting.lamps.${i}.distance`,40,1400,1]")
-    .replace("['تلاشي',`lighting.lamps.${i}.decay`,.2,3,.01]", "['تلاشي',`lighting.lamps.${i}.decay`,.1,3,.01]");
+    .replace("['تلاشي',`lighting.lamps.${i}.decay`,.2,3,.01]", "['تلاشي',`lighting.lamps.${i}.decay`,.1,3,.01]")
+    .replace('async function boot(){', `let roomShell=null;
+function createRoomShell(){
+  if(roomShell)return roomShell;
+  roomShell=new THREE.Group();
+  roomShell.name='yakolak-room-shell';
+  const tableBox=tableMesh?new THREE.Box3().setFromObject(tableMesh):null;
+  const floorY=tableBox&&Number.isFinite(tableBox.min.y)?tableBox.min.y-4:-330;
+  const ceilingY=Math.max(1120,floorY+900);
+  const roomH=ceilingY-floorY;
+  const roomW=1500, roomD=1500, halfW=roomW/2, backZ=-650, frontZ=650;
+  const floorMat=new THREE.MeshStandardMaterial({color:0xe8e2d6,roughness:.96,metalness:0});
+  const wallMat=new THREE.MeshStandardMaterial({color:0xf1eee7,roughness:.98,metalness:0,side:THREE.DoubleSide});
+  const ceilMat=new THREE.MeshStandardMaterial({color:0xf7f4ee,roughness:1,metalness:0,side:THREE.DoubleSide});
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(roomW,roomD),floorMat);floor.rotation.x=-Math.PI/2;floor.position.set(0,floorY,0);floor.receiveShadow=true;roomShell.add(floor);
+  const ceiling=new THREE.Mesh(new THREE.PlaneGeometry(roomW,roomD),ceilMat);ceiling.rotation.x=Math.PI/2;ceiling.position.set(0,ceilingY,0);ceiling.receiveShadow=true;roomShell.add(ceiling);
+  const back=new THREE.Mesh(new THREE.PlaneGeometry(roomW,roomH),wallMat);back.position.set(0,floorY+roomH/2,backZ);back.receiveShadow=true;roomShell.add(back);
+  const left=new THREE.Mesh(new THREE.PlaneGeometry(roomD,roomH),wallMat);left.rotation.y=Math.PI/2;left.position.set(-halfW,floorY+roomH/2,0);left.receiveShadow=true;roomShell.add(left);
+  const right=new THREE.Mesh(new THREE.PlaneGeometry(roomD,roomH),wallMat);right.rotation.y=-Math.PI/2;right.position.set(halfW,floorY+roomH/2,0);right.receiveShadow=true;roomShell.add(right);
+  const baseLine=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(roomW,roomH,roomD)),new THREE.LineBasicMaterial({color:0xd5cec2,transparent:true,opacity:.22}));baseLine.position.set(0,floorY+roomH/2,0);roomShell.add(baseLine);
+  scene.add(roomShell);
+  scene.background=new THREE.Color(0xf1eee7);
+  log('room shell created',{floorY,ceilingY,roomW,roomD});
+  return roomShell;
+}
+async function boot(){`)
+    .replace('await loadRealTable();', 'await loadRealTable();\n    createRoomShell();');
 
   const url = URL.createObjectURL(new Blob([code], {type:'text/javascript'}));
   await import(url);
