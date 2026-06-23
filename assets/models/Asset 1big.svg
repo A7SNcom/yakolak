@@ -1,92 +1,48 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="2048" viewBox="0 0 4096 2048" preserveAspectRatio="xMidYMid slice">
+<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="2048" viewBox="0 0 4096 2048" preserveAspectRatio="none">
   <defs>
-    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#6f8fc4"/>
-      <stop offset="0.44" stop-color="#f0b778"/>
-      <stop offset="0.72" stop-color="#f4d9a7"/>
-      <stop offset="1" stop-color="#d8ad78"/>
+    <linearGradient id="ceiling" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f2f2ee"/>
     </linearGradient>
-    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#b58758"/>
-      <stop offset="1" stop-color="#6f4f36"/>
+    <linearGradient id="walls" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbfbf8"/>
+      <stop offset="1" stop-color="#eeeeea"/>
     </linearGradient>
-    <linearGradient id="wallA" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#d3a36f"/>
-      <stop offset="1" stop-color="#9d6f49"/>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7f7f3"/>
+      <stop offset="1" stop-color="#e3e3de"/>
     </linearGradient>
-    <linearGradient id="wallB" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#b98b61"/>
-      <stop offset="1" stop-color="#7e5639"/>
-    </linearGradient>
-    <g id="roshan">
-      <rect x="0" y="0" width="210" height="110" rx="8" fill="#5a3825"/>
-      <rect x="14" y="12" width="182" height="84" fill="#7b4a2f"/>
-      <path d="M25 18h22v75H25zm35 0h20v75H60zm33 0h20v75H93zm33 0h20v75h-20zm33 0h22v75h-22" fill="#3d281d" opacity=".78"/>
-      <path d="M0 110h210l-24 24H24z" fill="#3f291d"/>
-    </g>
-    <g id="archDoor">
-      <path d="M0 112c0-58 38-112 86-112s86 54 86 112v150H0z" fill="#4a2f22"/>
-      <path d="M18 116c0-45 30-86 68-86s68 41 68 86v130H18z" fill="#7a4a30"/>
-    </g>
-    <g id="lantern">
-      <circle cx="0" cy="0" r="52" fill="#ffd37a" opacity=".23"/>
-      <circle cx="0" cy="0" r="18" fill="#ffd37a" opacity=".85"/>
-      <rect x="-10" y="-24" width="20" height="48" rx="7" fill="#44291d" opacity=".68"/>
-    </g>
-    <g id="buildingA">
-      <path d="M0 760V210l55-36h330l45 36v550z" fill="url(#wallA)"/>
-      <path d="M55 174h330l45 36H0z" fill="#e0b57b"/>
-      <use href="#roshan" x="72" y="275"/>
-      <use href="#roshan" x="106" y="430" transform="scale(.82)"/>
-      <use href="#archDoor" x="132" y="500" transform="scale(.7)"/>
-      <circle cx="70" cy="540" r="9" fill="#765035" opacity=".5"/>
-      <circle cx="318" cy="365" r="8" fill="#765035" opacity=".45"/>
-      <use href="#lantern" x="338" y="512"/>
-    </g>
-    <g id="buildingB">
-      <path d="M0 800V260l42-48h280l58 48v540z" fill="url(#wallB)"/>
-      <path d="M42 212h280l58 48H0z" fill="#c99b69"/>
-      <use href="#roshan" x="48" y="336" transform="scale(.78)"/>
-      <use href="#roshan" x="122" y="490" transform="scale(.62)"/>
-      <use href="#archDoor" x="42" y="552" transform="scale(.58)"/>
-      <use href="#lantern" x="285" y="585"/>
-    </g>
-    <g id="stones">
-      <path d="M0 0h4096v730H0z" fill="url(#ground)"/>
-      <path d="M0 45c510 110 990 130 1500 52 740-113 1275-114 2596 40v593H0z" fill="#8f6848" opacity=".38"/>
-      <path d="M0 145c820 80 1260 88 2048 28 760-58 1320-40 2048 52v505H0z" fill="#6e513a" opacity=".25"/>
-      <g opacity=".38" fill="none" stroke="#5a3e2c" stroke-width="5">
-        <path d="M-50 210c600 70 980 72 1460 20s910-52 1390 20 820 74 1350 8"/>
-        <path d="M-80 380c680 82 1080 84 1620 24 650-72 1080-55 1600 28 380 60 650 70 1020 34"/>
-        <path d="M-20 560c550 58 960 70 1530 30 790-56 1380-40 2600 65"/>
-      </g>
-    </g>
+    <radialGradient id="softLight" cx="50%" cy="34%" r="58%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="0.52" stop-color="#ffffff" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-  <rect width="4096" height="2048" fill="url(#sky)"/>
-  <circle cx="2050" cy="665" r="235" fill="#fff0bf" opacity=".28"/>
-  <path d="M0 775c520-58 842-32 1280 18 610 70 960 72 1520 2 445-56 798-74 1296-8v415H0z" fill="#b17952" opacity=".22"/>
-  <g transform="translate(0 580)">
-    <use href="#buildingB" x="-60" y="56" transform="scale(1.08)"/>
-    <use href="#buildingA" x="275" y="-10"/>
-    <use href="#buildingB" x="650" y="84" transform="scale(.88)"/>
-    <use href="#buildingA" x="915" y="42" transform="scale(.95)"/>
-    <use href="#buildingB" x="1270" y="15" transform="scale(1.04)"/>
-    <use href="#buildingA" x="1615" y="72" transform="scale(.86)"/>
-    <use href="#buildingB" x="1880" y="-8" transform="scale(1.12)"/>
-    <use href="#buildingA" x="2285" y="46" transform="scale(.92)"/>
-    <use href="#buildingB" x="2630" y="72" transform="scale(.9)"/>
-    <use href="#buildingA" x="2915" y="-18" transform="scale(1.06)"/>
-    <use href="#buildingB" x="3320" y="60" transform="scale(.92)"/>
-    <use href="#buildingA" x="3638" y="-10"/>
-  </g>
-  <g transform="translate(0 1318)"><use href="#stones"/></g>
-  <rect y="1188" width="4096" height="150" fill="#6d4932" opacity=".18"/>
-  <g opacity=".32" fill="#f7d48b">
-    <circle cx="355" cy="1190" r="24"/>
-    <circle cx="986" cy="1218" r="20"/>
-    <circle cx="1560" cy="1185" r="22"/>
-    <circle cx="2188" cy="1228" r="21"/>
-    <circle cx="2810" cy="1198" r="24"/>
-    <circle cx="3740" cy="1204" r="23"/>
-  </g>
+
+  <rect width="4096" height="2048" fill="#f4f4f0"/>
+  <rect x="0" y="0" width="4096" height="620" fill="url(#ceiling)"/>
+  <rect x="0" y="620" width="4096" height="610" fill="url(#walls)"/>
+  <rect x="0" y="1230" width="4096" height="818" fill="url(#floor)"/>
+
+  <path d="M0 620H4096" stroke="#dfdfd8" stroke-width="10" opacity="0.62"/>
+  <path d="M0 1230H4096" stroke="#d8d8d1" stroke-width="12" opacity="0.72"/>
+
+  <path d="M1024 620L860 1230" stroke="#e1e1dc" stroke-width="8" opacity="0.5"/>
+  <path d="M2048 620L2048 1230" stroke="#e4e4df" stroke-width="6" opacity="0.55"/>
+  <path d="M3072 620L3236 1230" stroke="#e1e1dc" stroke-width="8" opacity="0.5"/>
+
+  <path d="M0 1230L2048 2048L4096 1230" fill="#ffffff" opacity="0.14"/>
+  <path d="M0 2048L1024 1230" stroke="#d9d9d3" stroke-width="6" opacity="0.32"/>
+  <path d="M1024 2048L1536 1230" stroke="#ddddd7" stroke-width="5" opacity="0.26"/>
+  <path d="M2048 2048L2048 1230" stroke="#ddddd7" stroke-width="5" opacity="0.22"/>
+  <path d="M3072 2048L2560 1230" stroke="#ddddd7" stroke-width="5" opacity="0.26"/>
+  <path d="M4096 2048L3072 1230" stroke="#d9d9d3" stroke-width="6" opacity="0.32"/>
+
+  <path d="M0 1510H4096" stroke="#deded8" stroke-width="5" opacity="0.28"/>
+  <path d="M0 1740H4096" stroke="#dadad4" stroke-width="5" opacity="0.22"/>
+  <path d="M0 1920H4096" stroke="#d4d4ce" stroke-width="4" opacity="0.18"/>
+
+  <ellipse cx="2048" cy="570" rx="760" ry="210" fill="url(#softLight)"/>
+  <ellipse cx="2048" cy="1380" rx="1200" ry="420" fill="#ffffff" opacity="0.18"/>
+  <rect x="0" y="0" width="4096" height="2048" fill="none" stroke="#ffffff" stroke-width="1"/>
 </svg>
