@@ -1,6 +1,6 @@
 {
-  "version": "v051-clean-reload-button",
-  "build": 51,
+  "version": "v052-big-locked-single-room",
+  "build": 52,
   "updated_at": "2026-06-23",
-  "note": "Fix the cache clear button so it clears storage, cache storage, service workers, and reloads the current page without generating a new URL."
+  "note": "Remove the duplicate smaller room from app.js, keep only the big locked 4-wall room from room-boot, and expand camera safety bounds."
 }
