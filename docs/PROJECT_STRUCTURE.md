@@ -18,7 +18,7 @@ Tiny live boot file. It points to the approved live app file.
 app-hejaz-v043.js
 ```
 
-Current approved live app. Do not edit unless explicitly requested.
+Current approved live app. It loads models from `assets/models/`.
 
 ```txt
 version.json
@@ -32,20 +32,18 @@ README.md
 
 Human overview of the current live project.
 
-## STL assets in root
-
-These files stay in the repository root because the live app loads them with relative paths:
+## Assets folder
 
 ```txt
-9.stl
-3.stl
-p.stl
-l.stl
-m.stl
-s.stl
+assets/models/9.stl
+assets/models/3.stl
+assets/models/p.stl
+assets/models/l.stl
+assets/models/m.stl
+assets/models/s.stl
 ```
 
-Do not move these files unless the app paths are updated and visually tested.
+All STL model files are now grouped in `assets/models/`. The live app uses `MODEL_DIR='./assets/models/'` and loads models through `modelPath()`.
 
 ## Documentation folder
 
@@ -86,12 +84,29 @@ archive/golden-v036-p-gap-11.json
 archive/golden-v036-p-gap-11.js
 ```
 
-Golden historical reference. Do not delete.
+Golden historical reference.
 
 ## Legacy app files
 
 Some old app files may remain in root for safety and rollback history. They are not the current live route unless `app.js` points to them.
 
-## Cleanup rule
+## Current structure
 
-The project can be made cleaner by documentation first, then moving files only after proving they are not loaded by GitHub Pages or the live app.
+```txt
+/
+├─ index.html
+├─ app.js
+├─ app-hejaz-v043.js
+├─ version.json
+├─ README.md
+├─ assets/
+│  └─ models/
+│     ├─ 9.stl
+│     ├─ 3.stl
+│     ├─ p.stl
+│     ├─ l.stl
+│     ├─ m.stl
+│     └─ s.stl
+├─ docs/
+└─ archive/
+```
