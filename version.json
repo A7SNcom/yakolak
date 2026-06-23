@@ -1,6 +1,6 @@
 {
-  "version": "v045-visible-white-room-background",
-  "build": 45,
+  "version": "v046-room-lamps-update",
+  "build": 46,
   "updated_at": "2026-06-23",
-  "note": "Made the clean white room background more visually obvious with visible ceiling, wall, and floor guide lines."
+  "note": "Update site build for the room shell and numbered lamp changes."
 }
