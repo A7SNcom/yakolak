@@ -1,6 +1,6 @@
 {
-  "version": "v049-room-boot-cache-bypass",
-  "build": 49,
+  "version": "v050-safe-four-wall-room",
+  "build": 50,
   "updated_at": "2026-06-23",
-  "note": "Use a new room boot file from index.html to bypass stale app.js cache and build the true geometry room before app-live.js starts."
+  "note": "Resize the generated room, lower the floor below the table legs, add a fourth wall, and clamp camera movement inside safe room bounds."
 }
