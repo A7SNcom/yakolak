@@ -6,7 +6,7 @@ const V='v071-golden-intro-independent-v058-spill',D=48,R3=135,PR=85,PG=11;
 const MODEL_DIR='./assets/models/';
 const MARBLE_URL='https://i.ibb.co/B2h2tNKG/Screenshot-2026-06-22-094236.png';
 const WOOD_URL='./assets/models/background.webp';
-const BIG_BACK_URL='./assets/models/big-back.webp';
+const BIG_BACK_URL='./assets/models/Asset%201big.svg';
 const TABLE_OBJ_URL='./assets/models/uploads_files_3139458_Mars+Angled+Stump+Side+Table+30x30x45.obj';
 const TABLE_ALBEDO_URL='./assets/models/Mars%20Angled%20Stump%20Side%20Table%2030x30x45_Albedo.png';
 const TABLE_NORMAL_URL='./assets/models/Mars%20Angled%20Stump%20Side%20Table%2030x30x45_Normal.png';
