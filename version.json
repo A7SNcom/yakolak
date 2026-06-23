@@ -1,6 +1,6 @@
 {
-  "version": "v050-safe-four-wall-room",
-  "build": 50,
+  "version": "v051-clean-reload-button",
+  "build": 51,
   "updated_at": "2026-06-23",
-  "note": "Resize the generated room, lower the floor below the table legs, add a fourth wall, and clamp camera movement inside safe room bounds."
+  "note": "Fix the cache clear button so it clears storage, cache storage, service workers, and reloads the current page without generating a new URL."
 }
