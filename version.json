@@ -1,6 +1,6 @@
 {
-  "version": "v046-room-lamps-update",
-  "build": 46,
+  "version": "v047-clean-scene-ownership",
+  "build": 47,
   "updated_at": "2026-06-23",
-  "note": "Update site build for the room shell and numbered lamp changes."
+  "note": "Remove forced renderer room patch so src/app-live.js is the single owner of the Three.js scene, background, lamps, and controls."
 }
