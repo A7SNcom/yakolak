@@ -4,6 +4,8 @@
 
 import * as THREE from 'three';
 
+console.info('[Yakolak] APP.JS v046 ROOM PATCH LOADED');
+
 const LIVE_APP = './src/app-live.js';
 const bust = Date.now();
 let activeScene=null, activeRenderer=null, activeCamera=null, drag=null;
