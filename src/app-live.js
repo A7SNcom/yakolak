@@ -115,7 +115,14 @@ const palette={
 };
 
 const CAL={
-  lighting:{...LIGHTING_PRESETS.balanced,shadowBias:-.00008,normalBias:.018,shadowSize:1536,spotAngle:36,spotPenumbra:.48,spotTargetX:0,spotTargetY:0,spotTargetZ:0},
+  lighting:{
+    ...LIGHTING_PRESETS.balanced,shadowBias:-.00008,normalBias:.018,shadowSize:1536,spotAngle:36,spotPenumbra:.48,spotTargetX:0,spotTargetY:0,spotTargetZ:0,
+    lamps:[
+      {enabled:true,label:'لمبة 1',color:'#fff2d0',intensity:.65,distance:360,decay:1.55,pos:[-120,145,115]},
+      {enabled:true,label:'لمبة 2',color:'#d8e6ff',intensity:.38,distance:330,decay:1.65,pos:[140,125,-120]},
+      {enabled:true,label:'لمبة 3',color:'#ffffff',intensity:.42,distance:300,decay:1.55,pos:[0,185,20]}
+    ]
+  },
   materials:{
     boardColor:'#161616',boardRough:.52,boardMetal:.06,boardEmissive:'#000000',boardEmit:0,
     marbleColor:'#ffffff',marbleRough:.92,marbleMetal:0,marbleEmit:0,marbleTexture:true,
@@ -138,9 +145,36 @@ function setShadow(o,cast=true,receive=true){
 
 function setVec(v,arr){v.set(arr[0],arr[1],arr[2])}
 function clamp(v,min,max){return Math.max(min,Math.min(max,Number(v)||0))}
+function getPath(path){return path.split('.').reduce((o,k)=>o[k],CAL)}
 function setNumber(path,val){const parts=path.split('.');let o=CAL;for(let i=0;i<parts.length-1;i++)o=o[parts[i]];o[parts.at(-1)]=Number(val)}
 function setBool(path,val){const parts=path.split('.');let o=CAL;for(let i=0;i<parts.length-1;i++)o=o[parts[i]];o[parts.at(-1)]=!!val}
 function setColor(path,val){const parts=path.split('.');let o=CAL;for(let i=0;i<parts.length-1;i++)o=o[parts[i]];o[parts.at(-1)]=val}
+
+const movableLamps=[];
+let draggingLamp=null;
+const pointer=new THREE.Vector2(),raycaster=new THREE.Raycaster(),dragPlane=new THREE.Plane(),dragHit=new THREE.Vector3();
+function createMovableLamps(){
+  const geo=new THREE.SphereGeometry(8,24,16);
+  CAL.lighting.lamps.forEach((cfg,i)=>{
+    const group=new THREE.Group();
+    const light=new THREE.PointLight(cfg.color,cfg.intensity,cfg.distance,cfg.decay);
+    const mesh=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:cfg.color,transparent:true,opacity:.88,depthTest:true}));
+    mesh.userData.lampIndex=i;
+    const halo=new THREE.Mesh(new THREE.SphereGeometry(13,24,16),new THREE.MeshBasicMaterial({color:cfg.color,transparent:true,opacity:.13,depthWrite:false}));
+    group.add(light,mesh,halo);
+    group.position.set(...cfg.pos);
+    scene.add(group);
+    movableLamps.push({group,light,mesh,halo});
+  });
+}
+function setPointer(e){const r=renderer.domElement.getBoundingClientRect();pointer.x=((e.clientX-r.left)/r.width)*2-1;pointer.y=-((e.clientY-r.top)/r.height)*2+1}
+function pickLamp(e){setPointer(e);raycaster.setFromCamera(pointer,camera);const hits=raycaster.intersectObjects(movableLamps.map(l=>l.mesh),false);return hits[0]?.object||null}
+function startLampDrag(e){const mesh=pickLamp(e);if(!mesh)return;const i=mesh.userData.lampIndex;draggingLamp=movableLamps[i];controls.enabled=false;dragPlane.set(new THREE.Vector3(0,1,0),-draggingLamp.group.position.y);renderer.domElement.style.cursor='grabbing';e.preventDefault()}
+function moveLampDrag(e){if(!draggingLamp)return;setPointer(e);raycaster.setFromCamera(pointer,camera);if(raycaster.ray.intersectPlane(dragPlane,dragHit)){const i=draggingLamp.mesh.userData.lampIndex;draggingLamp.group.position.x=dragHit.x;draggingLamp.group.position.z=dragHit.z;CAL.lighting.lamps[i].pos=[+dragHit.x.toFixed(2),+draggingLamp.group.position.y.toFixed(2),+dragHit.z.toFixed(2)];syncCalibrationInputs();refresh()}e.preventDefault()}
+function endLampDrag(){if(!draggingLamp)return;draggingLamp=null;controls.enabled=true;renderer.domElement.style.cursor=''}
+renderer.domElement.addEventListener('pointerdown',startLampDrag);
+addEventListener('pointermove',moveLampDrag);
+addEventListener('pointerup',endLampDrag);
 
 function applyLightingState(){
   const l=CAL.lighting;
@@ -152,6 +186,7 @@ function applyLightingState(){
   keyLight.shadow.bias=l.shadowBias; keyLight.shadow.normalBias=l.normalBias;
   const size=Math.round(clamp(l.shadowSize,512,4096)); keyLight.shadow.mapSize.set(size,size);
   keyLight.shadow.camera.updateProjectionMatrix();
+  l.lamps.forEach((cfg,i)=>{const lamp=movableLamps[i];if(!lamp)return;lamp.group.visible=cfg.enabled;lamp.group.position.set(...cfg.pos);lamp.light.color.set(cfg.color);lamp.light.intensity=cfg.intensity;lamp.light.distance=cfg.distance;lamp.light.decay=cfg.decay;lamp.mesh.material.color.set(cfg.color);lamp.halo.material.color.set(cfg.color);lamp.mesh.material.opacity=cfg.enabled?.88:.22;lamp.halo.material.opacity=cfg.enabled?.13:.04});
   refresh();
 }
 
@@ -170,8 +205,10 @@ function applyMaterialState(){
 
 function applyLightingPreset(name){
   const p=LIGHTING_PRESETS[name]||LIGHTING_PRESETS.balanced;
+  const oldLamps=JSON.parse(JSON.stringify(CAL.lighting.lamps));
   activeLightingPreset=LIGHTING_PRESETS[name]?name:'balanced';
   Object.assign(CAL.lighting,JSON.parse(JSON.stringify(p)));
+  CAL.lighting.lamps=oldLamps;
   if(CAL.lighting.shadowBias===undefined)CAL.lighting.shadowBias=-.00008;
   if(CAL.lighting.normalBias===undefined)CAL.lighting.normalBias=.018;
   if(CAL.lighting.shadowSize===undefined)CAL.lighting.shadowSize=1536;
@@ -184,7 +221,7 @@ function applyLightingPreset(name){
 }
 
 function calibrationSnapshot(){
-  return {version:V,createdAt:new Date().toISOString(),activeLightingPreset,lighting:CAL.lighting,materials:CAL.materials,notes:'table material unchanged; board and four bases share baseMat; stones are separately tunable'};
+  return {version:V,createdAt:new Date().toISOString(),activeLightingPreset,lighting:CAL.lighting,materials:CAL.materials,notes:'table material unchanged; board and four bases share baseMat; stones are separately tunable; three draggable light spheres included'};
 }
 
 function copyCalibration(){
@@ -196,13 +233,13 @@ function copyCalibration(){
 
 function makeButton(text){const b=document.createElement('button');b.type='button';b.textContent=text;Object.assign(b.style,{height:'32px',padding:'0 11px',borderRadius:'999px',border:'1px solid rgba(255,255,255,.18)',background:'rgba(255,255,255,.08)',color:'#fff',font:'800 12px system-ui,Arial',cursor:'pointer'});return b}
 function makeRow(label,input){const row=document.createElement('label');Object.assign(row.style,{display:'grid',gridTemplateColumns:'88px 1fr 48px',gap:'8px',alignItems:'center',font:'700 11px system-ui,Arial',color:'#eee'});const s=document.createElement('span');s.textContent=label;const v=document.createElement('span');v.textContent=input.type==='checkbox'?(input.checked?'ON':'OFF'):input.value;v.style.opacity=.72;input.addEventListener('input',()=>{v.textContent=input.type==='checkbox'?(input.checked?'ON':'OFF'):input.value});row.append(s,input,v);return row}
-function range(label,path,min,max,step){const i=document.createElement('input');i.type='range';i.min=min;i.max=max;i.step=step;i.value=path.split('.').reduce((o,k)=>o[k],CAL);i.dataset.path=path;i.addEventListener('input',()=>{setNumber(path,i.value);applyLightingState();applyMaterialState()});return makeRow(label,i)}
-function color(label,path){const i=document.createElement('input');i.type='color';i.value=path.split('.').reduce((o,k)=>o[k],CAL);i.dataset.path=path;i.addEventListener('input',()=>{setColor(path,i.value);applyMaterialState()});return makeRow(label,i)}
-function check(label,path){const i=document.createElement('input');i.type='checkbox';i.checked=path.split('.').reduce((o,k)=>o[k],CAL);i.dataset.path=path;i.addEventListener('input',()=>{setBool(path,i.checked);applyMaterialState()});return makeRow(label,i)}
+function range(label,path,min,max,step){const i=document.createElement('input');i.type='range';i.min=min;i.max=max;i.step=step;i.value=getPath(path);i.dataset.path=path;i.addEventListener('input',()=>{setNumber(path,i.value);applyLightingState();applyMaterialState()});return makeRow(label,i)}
+function color(label,path){const i=document.createElement('input');i.type='color';i.value=getPath(path);i.dataset.path=path;i.addEventListener('input',()=>{setColor(path,i.value);if(path.startsWith('lighting.'))applyLightingState();else applyMaterialState()});return makeRow(label,i)}
+function check(label,path){const i=document.createElement('input');i.type='checkbox';i.checked=getPath(path);i.dataset.path=path;i.addEventListener('input',()=>{setBool(path,i.checked);if(path.startsWith('lighting.'))applyLightingState();else applyMaterialState()});return makeRow(label,i)}
 function section(title){const h=document.createElement('div');h.textContent=title;Object.assign(h.style,{font:'900 13px system-ui,Arial',color:'#fff',padding:'12px 0 5px',borderTop:'1px solid rgba(255,255,255,.10)',marginTop:'8px'});return h}
 function syncCalibrationInputs(){
   if(!calibrationPanel)return;
-  calibrationPanel.querySelectorAll('input[data-path]').forEach(i=>{const val=i.dataset.path.split('.').reduce((o,k)=>o[k],CAL);if(i.type==='checkbox')i.checked=!!val;else i.value=val});
+  calibrationPanel.querySelectorAll('input[data-path]').forEach(i=>{const val=getPath(i.dataset.path);if(i.type==='checkbox')i.checked=!!val;else i.value=val});
   calibrationPanel.querySelectorAll('button[data-preset]').forEach(b=>{const on=b.dataset.preset===activeLightingPreset;b.style.background=on?'#fff':'rgba(255,255,255,.08)';b.style.color=on?'#111':'#fff';b.style.borderColor=on?'#fff':'rgba(255,255,255,.18)'});
 }
 
@@ -217,6 +254,14 @@ Object.assign(calibrationPanel.style,{position:'fixed',right:'16px',top:'64px',z
 const panelTitle=document.createElement('div');panelTitle.textContent='مختبر معايرة الإضاءة والخامات';Object.assign(panelTitle.style,{font:'900 15px system-ui,Arial',color:'#fff',padding:'2px 4px 8px'});calibrationPanel.appendChild(panelTitle);
 const presetsWrap=document.createElement('div');Object.assign(presetsWrap.style,{display:'flex',gap:'6px',flexWrap:'wrap'});Object.keys(LIGHTING_PRESETS).forEach(k=>{const b=makeButton(LIGHTING_PRESETS[k].label);b.dataset.preset=k;b.onclick=()=>applyLightingPreset(k);presetsWrap.appendChild(b)});calibrationPanel.appendChild(presetsWrap);
 const copyBtn=makeButton('نسخ النتيجة');copyBtn.style.width='100%';copyBtn.style.marginTop='10px';copyBtn.onclick=copyCalibration;calibrationPanel.appendChild(copyBtn);
+calibrationPanel.appendChild(section('كرات ضوئية قابلة للسحب'));
+const lampNote=document.createElement('div');lampNote.textContent='اسحب الكرة بالماوس لتحريكها يمين/يسار وأمام/خلف. الارتفاع يتغير من Height.';Object.assign(lampNote.style,{font:'700 11px system-ui,Arial',color:'#ddd',opacity:.75,lineHeight:'1.6',padding:'0 0 6px'});calibrationPanel.appendChild(lampNote);
+for(let i=0;i<3;i++){
+  calibrationPanel.appendChild(section(`لمبة ${i+1}`));
+  calibrationPanel.appendChild(check('تشغيل',`lighting.lamps.${i}.enabled`));
+  calibrationPanel.appendChild(color('لون',`lighting.lamps.${i}.color`));
+  [['قوة',`lighting.lamps.${i}.intensity`,0,3,.01],['مدى',`lighting.lamps.${i}.distance`,40,800,1],['تلاشي',`lighting.lamps.${i}.decay`,.2,3,.01],['X',`lighting.lamps.${i}.pos.0`,-260,260,1],['Height',`lighting.lamps.${i}.pos.1`,20,360,1],['Z',`lighting.lamps.${i}.pos.2`,-260,260,1]].forEach(a=>calibrationPanel.appendChild(range(...a)));
+}
 calibrationPanel.appendChild(section('إضاءة عامة ومركزة'));
 [['تعريض','lighting.exposure',.5,1.8,.01],['عام','lighting.hemi',0,1.8,.01],['رئيسي','lighting.key',0,3,.01],['تعبئة','lighting.fill',0,2,.01],['حافة','lighting.rim',0,2,.01],['علوي','lighting.top',0,2,.01],['سبوت','lighting.spot',0,2,.01],['زاوية سبوت','lighting.spotAngle',8,75,1],['نعومة سبوت','lighting.spotPenumbra',0,1,.01]].forEach(a=>calibrationPanel.appendChild(range(...a)));
 calibrationPanel.appendChild(section('موقع الضوء الرئيسي'));
@@ -232,6 +277,7 @@ calibrationPanel.appendChild(color('أخضر','materials.greenColor'));[['خشو
 calibrationPanel.appendChild(color('أزرق','materials.blueColor'));[['خشونة أزرق','materials.blueRough',0,1,.01],['معدني أزرق','materials.blueMetal',0,1,.01],['توهج أزرق','materials.blueEmit',0,.25,.001]].forEach(a=>calibrationPanel.appendChild(range(...a)));
 document.body.appendChild(calibrationPanel);
 calibrateBtn.onclick=()=>{const open=calibrationPanel.style.display==='none';calibrationPanel.style.display=open?'block':'none';calibrateBtn.textContent=open?'إغلاق':'معايرة'};
+createMovableLamps();
 
 function repeat(){return texState.textureMode==='single'?1:texState.textureRepeat}
 function applyTexSettings(t){if(!t)return;t.wrapS=t.wrapT=texState.textureMode==='single'?THREE.ClampToEdgeWrapping:THREE.RepeatWrapping;t.repeat.set(repeat(),repeat());t.offset.set(texState.offsetX,texState.offsetY);t.center.set(.5,.5);t.rotation=THREE.MathUtils.degToRad(texState.rotation);t.needsUpdate=true}
