@@ -1,6 +1,6 @@
 {
-  "version": "v044-clean-white-room-background",
-  "build": 44,
+  "version": "v045-visible-white-room-background",
+  "build": 45,
   "updated_at": "2026-06-23",
-  "note": "Replaced 360 background with a clean white room: ceiling, walls, and floor."
+  "note": "Made the clean white room background more visually obvious with visible ceiling, wall, and floor guide lines."
 }
