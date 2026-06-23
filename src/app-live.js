@@ -19,7 +19,7 @@ const renderer=new THREE.WebGLRenderer({antialias:true});renderer.outputColorSpa
 const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;
 scene.add(new THREE.HemisphereLight(0xffffff,0x555555,2.18));const l1=new THREE.DirectionalLight(0xffffff,1.9);l1.position.set(170,260,150);scene.add(l1);const l2=new THREE.DirectionalLight(0xffffff,.7);l2.position.set(-180,140,-120);scene.add(l2);
 const loader=new STLLoader(),texLoader=new THREE.TextureLoader();texLoader.setCrossOrigin('anonymous');
-const TLINE={lidShake:495,lidLift:1020,lidH:900,wallStart:0,wallDelay:520,wallShake:280,wallRaise:20,wallLift:360,wallMove:850,wallDrop:430,pieceLead:520,pieceMove:1200,pieceArc:34,pieceStagger:60};
+const TLINE={lidShake:550,lidLift:1300,lidH:900,wallStart:0,wallDelay:520,wallShake:280,wallRaise:20,wallLift:360,wallMove:850,wallDrop:430,pieceLead:520,pieceMove:1200,pieceArc:34,pieceStagger:60};
 const SPILL={seed:4128,spread:1.08,height:.82,clearance:1.32};
 const LID_START={px:0,py:62.5,pz:0,rx:-90,ry:180,rz:0};
 const WALL_START={right:{px:81,py:35,pz:0,rx:-90,ry:-90,rz:0},left:{px:-81,py:35,pz:0,rx:-90,ry:90,rz:180},front:{px:0,py:35,pz:81,rx:-180,ry:0,rz:90},back:{px:0,py:35,pz:-81,rx:-180,ry:180,rz:-90}};
