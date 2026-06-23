@@ -1,17 +1,17 @@
 import * as THREE from 'three';
-console.info('[Yakolak] ROOM BOOT v052 BIG LOCKED ROOM LOADED');
+console.info('[Yakolak] ROOM BOOT v053 CENTERED TABLE ROOM LOADED');
 
 const add0=THREE.Scene.prototype.add;
 const load0=THREE.TextureLoader.prototype.load;
 const render0=THREE.WebGLRenderer.prototype.render;
 
 const B={
-  floorY:-1050,
-  topY:1850,
-  halfW:3300,
-  backZ:-3600,
-  frontZ:3000,
-  camPad:380
+  floorY:-430,
+  topY:1180,
+  halfW:2400,
+  backZ:-2400,
+  frontZ:2400,
+  camPad:260
 };
 
 function material(color){
@@ -45,7 +45,7 @@ function room(scene){
   const d=B.frontZ-B.backZ;
   const h=B.topY-B.floorY;
   const my=B.floorY+h/2;
-  const cz=(B.frontZ+B.backZ)/2;
+  const cz=0;
   const floorMat=material(0xe9e4da);
   const ceilMat=material(0xfaf8f1);
   const wallMat=material(0xf4f0e8);
@@ -70,7 +70,7 @@ function room(scene){
   line(scene,'yakolak-room-left-floor-line',[-B.halfW,B.floorY,B.backZ],[-B.halfW,B.floorY,B.frontZ],.20);
   line(scene,'yakolak-room-right-floor-line',[B.halfW,B.floorY,B.backZ],[B.halfW,B.floorY,B.frontZ],.20);
 
-  console.info('[Yakolak] BIG LOCKED 4-WALL ROOM ACTIVE',{floorY:B.floorY,topY:B.topY,width:w,depth:d,backZ:B.backZ,frontZ:B.frontZ});
+  console.info('[Yakolak] CENTERED TABLE ROOM ACTIVE',{floorY:B.floorY,topY:B.topY,width:w,depth:d,backZ:B.backZ,frontZ:B.frontZ,center:[0,0,0]});
 }
 function clampCamera(scene,camera){
   if(!scene||!scene.__yakolakRoomBounds||!camera||!camera.position)return;
@@ -85,10 +85,10 @@ THREE.WebGLRenderer.prototype.render=function(scene,camera){clampCamera(scene,ca
 THREE.TextureLoader.prototype.load=function(url,onLoad,onProgress,onError){
   const s=String(url||'');
   if(s.includes('Asset%201big.svg')||s.includes('Asset 1big.svg')){
-    console.info('[Yakolak] SVG background skipped; big locked 4-wall room active');
+    console.info('[Yakolak] SVG background skipped; centered table room active');
     queueMicrotask(()=>onError&&onError(new Error('svg background disabled')));
     return new THREE.Texture();
   }
   return load0.call(this,url,onLoad,onProgress,onError);
 };
-import('./app.js?boot='+Date.now()+'&room=52');
+import('./app.js?boot='+Date.now()+'&room=53');
