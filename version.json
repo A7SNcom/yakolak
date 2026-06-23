@@ -1,6 +1,6 @@
 {
-  "version": "v048-true-geometry-room",
-  "build": 48,
+  "version": "v049-room-boot-cache-bypass",
+  "build": 49,
   "updated_at": "2026-06-23",
-  "note": "Build a real Three.js room from geometry and block the legacy SVG background dependency."
+  "note": "Use a new room boot file from index.html to bypass stale app.js cache and build the true geometry room before app-live.js starts."
 }
