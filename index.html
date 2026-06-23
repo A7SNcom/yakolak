@@ -6,63 +6,48 @@
 <meta http-equiv="Cache-Control" content="no-store,no-cache,must-revalidate,max-age=0">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="yakolak-version" content="live-v043-safe-loader">
+<meta name="yakolak-version" content="v049-room-boot">
 <title>Yakolak Live</title>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script>
 <style>
-:root{--safe-bottom:env(safe-area-inset-bottom,0px);--safe-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b0b;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:none}
 #view{position:fixed;inset:0;z-index:1;opacity:0;transition:opacity .55s ease}
-#hint,#settingsBtn,#panel{display:none!important}
-textarea{display:none}
-#yakolakLoader{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:radial-gradient(circle at center,#1b1b1b 0,#0b0b0b 58%,#050505 100%);transition:opacity .45s ease,visibility .45s ease}
+#hint,#settingsBtn,#panel,textarea{display:none!important}
+#yakolakLoader{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:#0b0b0b;transition:opacity .45s ease,visibility .45s ease}
 #yakolakLoader.done{opacity:0;visibility:hidden;pointer-events:none}
 #yakolakLoader.error .loaderRing{border-top-color:#b35a5a}
-.loaderBox{display:flex;align-items:center;justify-content:center;transform:translateY(-8px)}
-.loaderRing{width:42px;height:42px;border-radius:50%;border:3px solid rgba(255,255,255,.14);border-top-color:#fff;animation:spin .85s linear infinite;box-shadow:0 18px 60px #000}
-#clearCacheBtn{position:fixed;left:16px;bottom:calc(16px + var(--safe-bottom));z-index:10000;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.7);color:#fff;font-size:19px;display:grid;place-items:center;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.35);backdrop-filter:blur(12px)}
-#clearCacheBtn:active{transform:scale(.96)}
+.loaderRing{width:42px;height:42px;border-radius:50%;border:3px solid rgba(255,255,255,.14);border-top-color:#fff;animation:spin .85s linear infinite}
+#clearCacheBtn{position:fixed;left:16px;bottom:16px;z-index:10000;width:46px;height:46px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.72);color:#fff;font-size:11px;font-weight:900;display:grid;place-items:center;cursor:pointer}
 @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
-<div id="yakolakLoader"><div class="loaderBox"><div class="loaderRing"></div></div></div>
+<div id="yakolakLoader"><div class="loaderRing"></div></div>
 <div id="view"></div>
 <div id="hint" aria-hidden="true"></div>
-<button id="settingsBtn" aria-hidden="true">⚙</button>
-<button id="clearCacheBtn" title="مسح الكاش" aria-label="مسح الكاش">🗑️</button>
+<button id="settingsBtn" aria-hidden="true">SET</button>
+<button id="clearCacheBtn" title="Fresh reload" aria-label="Fresh reload">NEW</button>
 <div id="panel" aria-hidden="true"></div>
 <textarea id="out"></textarea>
 <script type="module">
 const KEY='yakolak_build_seen';
 const clearBtn=document.getElementById('clearCacheBtn');
-async function clearYakolakCache(){
-  console.info('[Yakolak] clearing cache');
-  try{localStorage.removeItem(KEY);sessionStorage.clear()}catch(e){}
-  try{if('caches' in window){const names=await caches.keys();await Promise.all(names.map(n=>caches.delete(n)))}}catch(e){console.warn('[Yakolak] cache storage clear failed',e)}
-  try{if('serviceWorker' in navigator){const regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.map(r=>r.unregister()))}}catch(e){console.warn('[Yakolak] service worker clear failed',e)}
-  location.replace(location.pathname+'?fresh='+Date.now());
-}
-if(clearBtn)clearBtn.addEventListener('click',clearYakolakCache);
+function reloadFresh(){try{localStorage.removeItem(KEY);sessionStorage.clear()}catch(e){} location.href=location.pathname+'?fresh='+Date.now()}
+if(clearBtn)clearBtn.addEventListener('click',reloadFresh);
 async function checkVersion(){
   try{
     const r=await fetch('./version.json?ts='+Date.now(),{cache:'no-store'});
     const v=await r.json();
     const next=String(v.build);
     const old=localStorage.getItem(KEY);
-    if(old && old!==next){
-      localStorage.setItem(KEY,next);
-      console.info('[Yakolak] updating to',v.version);
-      location.replace(location.pathname+'?auto='+v.build+'&t='+Date.now());
-      return;
-    }
+    if(old&&old!==next){localStorage.setItem(KEY,next);location.href=location.pathname+'?auto='+v.build+'&t='+Date.now();return}
     localStorage.setItem(KEY,next);
-  }catch(e){console.warn('[Yakolak] version check skipped',e)}
+  }catch(e){}
 }
 await checkVersion();
 setInterval(checkVersion,8000);
-import('./app.js?boot='+Date.now());
+import('./room-boot-v049.js?boot='+Date.now());
 </script>
 </body>
 </html>
