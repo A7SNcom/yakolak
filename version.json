@@ -1,6 +1,6 @@
 {
-  "version": "v052-big-locked-single-room",
-  "build": 52,
+  "version": "v053-centered-table-room",
+  "build": 53,
   "updated_at": "2026-06-23",
-  "note": "Remove the duplicate smaller room from app.js, keep only the big locked 4-wall room from room-boot, and expand camera safety bounds."
+  "note": "Center the generated room around the table at world origin, use symmetric front/back bounds, and set a closer practical floor and ceiling height."
 }
