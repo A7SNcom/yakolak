@@ -1,34 +1,95 @@
 import * as THREE from 'three';
-console.info('[Yakolak] ROOM BOOT v049 LOADED');
+console.info('[Yakolak] ROOM BOOT v050 SAFE ROOM LOADED');
+
 const add0=THREE.Scene.prototype.add;
 const load0=THREE.TextureLoader.prototype.load;
-function m(c){return new THREE.MeshStandardMaterial({color:c,roughness:1,metalness:0,side:THREE.DoubleSide})}
-function p(s,n,w,h,x,y,z,rx,ry,rz,mat){const o=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);o.name=n;o.position.set(x,y,z);o.rotation.set(rx,ry,rz);o.receiveShadow=true;add0.call(s,o)}
-function l(s,n,a,b){const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...a),new THREE.Vector3(...b)]);const o=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xd3cdc4,transparent:true,opacity:.65}));o.name=n;add0.call(s,o)}
-function room(s){
-  if(!s||s.__yakolakRoom)return;
-  s.__yakolakRoom=true;s.background=new THREE.Color(0xf6f3ed);
-  const fy=-320,ty=455,w=1320,d=1220,hw=w/2,bz=-510,fz=d/2,h=ty-fy,my=fy+h/2;
-  p(s,'yakolak-room-floor',w,d,0,fy,40,-Math.PI/2,0,0,m(0xe9e3d8));
-  p(s,'yakolak-room-ceiling',w,d,0,ty,40,Math.PI/2,0,0,m(0xfffdf8));
-  p(s,'yakolak-room-back-wall',w,h,0,my,bz,0,0,0,m(0xf6f3ed));
-  p(s,'yakolak-room-left-wall',d,h,-hw,my,40,0,Math.PI/2,0,m(0xf6f3ed));
-  p(s,'yakolak-room-right-wall',d,h,hw,my,40,0,-Math.PI/2,0,m(0xf6f3ed));
-  l(s,'yakolak-room-back-floor-line',[-hw,fy,bz],[hw,fy,bz]);
-  l(s,'yakolak-room-left-corner-line',[-hw,fy,bz],[-hw,ty,bz]);
-  l(s,'yakolak-room-right-corner-line',[hw,fy,bz],[hw,ty,bz]);
-  l(s,'yakolak-room-left-floor-line',[-hw,fy,bz],[-hw,fy,fz]);
-  l(s,'yakolak-room-right-floor-line',[hw,fy,bz],[hw,fy,fz]);
-  console.info('[Yakolak] TRUE GEOMETRY ROOM ACTIVE',{fy,ty,w,d,bz});
+const render0=THREE.WebGLRenderer.prototype.render;
+
+const B={
+  floorY:-560,
+  topY:980,
+  halfW:1450,
+  backZ:-1250,
+  frontZ:1120,
+  centerZ:-40,
+  camPad:120
+};
+
+function material(color){
+  return new THREE.MeshStandardMaterial({color,roughness:1,metalness:0,side:THREE.FrontSide});
 }
-THREE.Scene.prototype.add=function(...o){room(this);return add0.apply(this,o)};
-THREE.TextureLoader.prototype.load=function(u,onLoad,onProgress,onError){
-  const s=String(u||'');
+function panel(scene,name,w,h,x,y,z,rx,ry,rz,mat){
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);
+  mesh.name=name;
+  mesh.position.set(x,y,z);
+  mesh.rotation.set(rx,ry,rz);
+  mesh.receiveShadow=true;
+  mesh.renderOrder=-1000;
+  add0.call(scene,mesh);
+  return mesh;
+}
+function line(scene,name,a,b,opacity=.42){
+  const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...a),new THREE.Vector3(...b)]);
+  const mesh=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xd2ccc1,transparent:true,opacity,depthWrite:false}));
+  mesh.name=name;
+  mesh.renderOrder=-900;
+  add0.call(scene,mesh);
+  return mesh;
+}
+function room(scene){
+  if(!scene||scene.__yakolakRoom)return;
+  scene.__yakolakRoom=true;
+  scene.__yakolakRoomBounds=B;
+  scene.background=new THREE.Color(0xf7f4ee);
+
+  const w=B.halfW*2;
+  const d=B.frontZ-B.backZ;
+  const h=B.topY-B.floorY;
+  const my=B.floorY+h/2;
+  const cz=(B.frontZ+B.backZ)/2;
+  const floorMat=material(0xe9e4da);
+  const ceilMat=material(0xfaf8f1);
+  const wallMat=material(0xf4f0e8);
+  const frontMat=material(0xf4f0e8);
+  frontMat.transparent=true;
+  frontMat.opacity=.18;
+  frontMat.depthWrite=false;
+
+  panel(scene,'yakolak-room-floor',w,d,0,B.floorY,cz,-Math.PI/2,0,0,floorMat);
+  panel(scene,'yakolak-room-ceiling',w,d,0,B.topY,cz,Math.PI/2,0,0,ceilMat);
+  panel(scene,'yakolak-room-back-wall',w,h,0,my,B.backZ,0,0,0,wallMat);
+  panel(scene,'yakolak-room-left-wall',d,h,-B.halfW,my,cz,0,Math.PI/2,0,wallMat);
+  panel(scene,'yakolak-room-right-wall',d,h,B.halfW,my,cz,0,-Math.PI/2,0,wallMat);
+  panel(scene,'yakolak-room-front-wall',w,h,0,my,B.frontZ,0,Math.PI,0,frontMat);
+
+  line(scene,'yakolak-room-back-floor-line',[-B.halfW,B.floorY,B.backZ],[B.halfW,B.floorY,B.backZ],.65);
+  line(scene,'yakolak-room-front-floor-line',[-B.halfW,B.floorY,B.frontZ],[B.halfW,B.floorY,B.frontZ],.20);
+  line(scene,'yakolak-room-left-back-corner',[-B.halfW,B.floorY,B.backZ],[-B.halfW,B.topY,B.backZ],.45);
+  line(scene,'yakolak-room-right-back-corner',[B.halfW,B.floorY,B.backZ],[B.halfW,B.topY,B.backZ],.45);
+  line(scene,'yakolak-room-left-front-corner',[-B.halfW,B.floorY,B.frontZ],[-B.halfW,B.topY,B.frontZ],.18);
+  line(scene,'yakolak-room-right-front-corner',[B.halfW,B.floorY,B.frontZ],[B.halfW,B.topY,B.frontZ],.18);
+  line(scene,'yakolak-room-left-floor-line',[-B.halfW,B.floorY,B.backZ],[-B.halfW,B.floorY,B.frontZ],.32);
+  line(scene,'yakolak-room-right-floor-line',[B.halfW,B.floorY,B.backZ],[B.halfW,B.floorY,B.frontZ],.32);
+
+  console.info('[Yakolak] SAFE 4-WALL ROOM ACTIVE',{floorY:B.floorY,topY:B.topY,width:w,depth:d,backZ:B.backZ,frontZ:B.frontZ});
+}
+function clampCamera(scene,camera){
+  if(!scene||!scene.__yakolakRoomBounds||!camera||!camera.position)return;
+  const b=scene.__yakolakRoomBounds,p=camera.position;
+  p.x=Math.max(-b.halfW+b.camPad,Math.min(b.halfW-b.camPad,p.x));
+  p.y=Math.max(b.floorY+b.camPad,Math.min(b.topY-b.camPad,p.y));
+  p.z=Math.max(b.backZ+b.camPad,Math.min(b.frontZ-b.camPad,p.z));
+}
+
+THREE.Scene.prototype.add=function(...objects){room(this);return add0.apply(this,objects)};
+THREE.WebGLRenderer.prototype.render=function(scene,camera){clampCamera(scene,camera);return render0.call(this,scene,camera)};
+THREE.TextureLoader.prototype.load=function(url,onLoad,onProgress,onError){
+  const s=String(url||'');
   if(s.includes('Asset%201big.svg')||s.includes('Asset 1big.svg')){
-    console.info('[Yakolak] SVG background skipped; true room active');
+    console.info('[Yakolak] SVG background skipped; safe 4-wall room active');
     queueMicrotask(()=>onError&&onError(new Error('svg background disabled')));
     return new THREE.Texture();
   }
-  return load0.call(this,u,onLoad,onProgress,onError);
+  return load0.call(this,url,onLoad,onProgress,onError);
 };
-import('./app.js?boot='+Date.now()+'&room=49');
+import('./app.js?boot='+Date.now()+'&room=50');
