@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {STLLoader} from 'three/addons/loaders/STLLoader.js';
 import {OBJLoader} from 'three/addons/loaders/OBJLoader.js';
+
 const V='v071-golden-intro-independent-v058-spill',D=48,R3=135,PR=85,PG=11;
 const MODEL_DIR='./assets/models/';
 const MARBLE_URL='https://i.ibb.co/B2h2tNKG/Screenshot-2026-06-22-094236.png';
@@ -13,28 +14,160 @@ const TABLE_NORMAL_URL='./assets/models/Mars%20Angled%20Stump%20Side%20Table%203
 const TABLE_ROUGHNESS_URL='./assets/models/Mars%20Angled%20Stump%20Side%20Table%2030x30x45_Roughness.png';
 const modelPath=n=>MODEL_DIR+n+'.stl';
 const log=(...a)=>console.info('[Yakolak]',...a);
+
 const root=document.getElementById('view'),hint=document.getElementById('hint'),panel=document.getElementById('panel'),btn=document.getElementById('settingsBtn'),out=document.getElementById('out'),loaderEl=document.getElementById('yakolakLoader'),loaderText=document.getElementById('yakolakLoaderText');
-if(root)root.style.opacity='0';if(hint)hint.style.display='none';if(btn)btn.style.display='none';if(panel)panel.style.display='none';
+if(root)root.style.opacity='0';
+if(hint)hint.style.display='none';
+if(btn)btn.style.display='none';
+if(panel)panel.style.display='none';
+
 function status(t){if(loaderText)loaderText.textContent=t;log(t)}
-function reveal(){if(root)root.style.opacity='1';if(replayBtn)replayBtn.style.opacity='1';if(loaderEl){loaderEl.classList.add('done');setTimeout(()=>loaderEl.remove(),520)}}
+function reveal(){if(root)root.style.opacity='1';if(replayBtn)replayBtn.style.opacity='1';if(lightingPanel)lightingPanel.style.opacity='1';if(loaderEl){loaderEl.classList.add('done');setTimeout(()=>loaderEl.remove(),520)}}
 function fatal(e){console.error('[Yakolak] fatal load error',e);if(loaderEl)loaderEl.classList.add('error');if(loaderText)loaderText.textContent='تعذر تحميل اللعبة، حدث الصفحة';}
-const replayBtn=document.createElement('button');replayBtn.textContent='↻';replayBtn.title='إعادة التشغيل';replayBtn.setAttribute('aria-label','إعادة التشغيل');Object.assign(replayBtn.style,{position:'fixed',right:'16px',bottom:'16px',zIndex:50,width:'52px',height:'52px',borderRadius:'50%',border:'1px solid #333',background:'#050505',color:'#fff',fontSize:'26px',lineHeight:'1',fontFamily:'inherit',fontWeight:'800',cursor:'pointer',boxShadow:'0 8px 22px rgba(0,0,0,.35)',display:'grid',placeItems:'center',opacity:'0',transition:'opacity .35s ease'});document.body.appendChild(replayBtn);
-const scene=new THREE.Scene();scene.background=new THREE.Color(0x777777);
+
+const replayBtn=document.createElement('button');
+replayBtn.textContent='↻';
+replayBtn.title='إعادة التشغيل';
+replayBtn.setAttribute('aria-label','إعادة التشغيل');
+Object.assign(replayBtn.style,{position:'fixed',right:'16px',bottom:'16px',zIndex:50,width:'52px',height:'52px',borderRadius:'50%',border:'1px solid #333',background:'#050505',color:'#fff',fontSize:'26px',lineHeight:'1',fontFamily:'inherit',fontWeight:'800',cursor:'pointer',boxShadow:'0 8px 22px rgba(0,0,0,.35)',display:'grid',placeItems:'center',opacity:'0',transition:'opacity .35s ease'});
+document.body.appendChild(replayBtn);
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x777777);
+
 const camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,.01,100000);
-const renderer=new THREE.WebGLRenderer({antialias:true});renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.toneMapping=THREE.NoToneMapping;root.appendChild(renderer.domElement);
-const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;
-scene.add(new THREE.HemisphereLight(0xffffff,0x555555,2.18));const l1=new THREE.DirectionalLight(0xffffff,1.9);l1.position.set(170,260,150);scene.add(l1);const l2=new THREE.DirectionalLight(0xffffff,.7);l2.position.set(-180,140,-120);scene.add(l2);
-const loader=new STLLoader(),objLoader=new OBJLoader(),texLoader=new THREE.TextureLoader();texLoader.setCrossOrigin('anonymous');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.04;
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+root.appendChild(renderer.domElement);
+
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;
+
+const hemiLight=new THREE.HemisphereLight(0xfff5e6,0x46505f,.65);
+scene.add(hemiLight);
+
+const keyLight=new THREE.DirectionalLight(0xffe8c8,1.25);
+keyLight.position.set(180,270,160);
+keyLight.castShadow=true;
+keyLight.shadow.mapSize.set(1536,1536);
+keyLight.shadow.bias=-.00008;
+keyLight.shadow.normalBias=.018;
+Object.assign(keyLight.shadow.camera,{left:-520,right:520,top:520,bottom:-520,near:1,far:1000});
+keyLight.shadow.camera.updateProjectionMatrix();
+scene.add(keyLight);
+
+const fillLight=new THREE.DirectionalLight(0xc8d8ff,.25);
+fillLight.position.set(-230,160,-190);
+scene.add(fillLight);
+
+const rimLight=new THREE.DirectionalLight(0xffffff,.42);
+rimLight.position.set(-150,230,260);
+scene.add(rimLight);
+
+const LIGHTING_PRESETS={
+  soft:{label:'هادئة',hemi:.52,key:1.02,fill:.22,rim:.32,exposure:1.00,emissive:.015,keyPos:[150,250,160],fillPos:[-220,150,-180],rimPos:[-140,210,240]},
+  balanced:{label:'متوازنة',hemi:.62,key:1.22,fill:.28,rim:.42,exposure:1.04,emissive:.025,keyPos:[180,270,160],fillPos:[-230,160,-190],rimPos:[-150,230,260]},
+  cinematic:{label:'سينمائية',hemi:.34,key:1.38,fill:.12,rim:.62,exposure:.95,emissive:0,keyPos:[130,310,190],fillPos:[-260,110,-210],rimPos:[-190,260,300]},
+  bright:{label:'فاتحة',hemi:.82,key:1.08,fill:.42,rim:.28,exposure:1.12,emissive:.018,keyPos:[190,250,130],fillPos:[-220,180,-150],rimPos:[-110,210,230]}
+};
+let activeLightingPreset='balanced';
+
+const loader=new STLLoader(),objLoader=new OBJLoader(),texLoader=new THREE.TextureLoader();
+texLoader.setCrossOrigin('anonymous');
+
 const TLINE={lidShake:550,lidLift:1300,lidH:900,wallStart:0,wallDelay:520,wallShake:280,wallRaise:20,wallLift:360,wallMove:850,wallDrop:430,pieceLead:520,pieceMove:1200,pieceArc:34,pieceStagger:60};
 const SPILL={seed:4128,spread:1.08,height:.82,clearance:1.32};
 const LID_START={px:0,py:62.5,pz:0,rx:-90,ry:180,rz:0};
 const WALL_START={right:{px:81,py:35,pz:0,rx:-90,ry:-90,rz:0},left:{px:-81,py:35,pz:0,rx:-90,ry:90,rz:180},front:{px:0,py:35,pz:81,rx:-180,ry:0,rz:90},back:{px:0,py:35,pz:-81,rx:-180,ry:180,rz:-90}};
 const ORDER=['right','left','front','back'],TYPES=['l','m','s'],DIR_COLOR={right:'marble',left:'gold',front:'green',back:'blue'},COLOR_DIR={marble:'right',gold:'left',green:'front',blue:'back'};
-const meshes={},pMeshes=[],geos={},pieceMeshes=[],texRefs=[];let lidMesh,tableMesh,woodTexture,tableMaps={},started=performance.now(),playing=false,loaded=false;
-const palette={board:{color:'#161616',roughness:.42,metalness:.20},p:{base:'#6f7378',roughness:.82,metalness:0,visible:false},right:{base:'#ffffff',roughness:.82,metalness:0},left:{color:'#a97718',roughness:.30,metalness:.86},front:{color:'#18805f',roughness:.24,metalness:.88},back:{color:'#001d8f',roughness:.92,metalness:0},table:{color:'#c79a64',roughness:.72,metalness:0},tableSide:{color:'#7a4b27',roughness:.82,metalness:0}};
+const meshes={},pMeshes=[],geos={},pieceMeshes=[],texRefs=[];
+let lidMesh,tableMesh,woodTexture,tableMaps={},started=performance.now(),playing=false,loaded=false;
+
+const palette={
+  board:{color:'#161616',roughness:.48,metalness:.12},
+  p:{base:'#6f7378',roughness:.86,metalness:0,visible:false},
+  right:{base:'#ffffff',roughness:.88,metalness:0},
+  left:{color:'#a97718',roughness:.38,metalness:.72},
+  front:{color:'#18805f',roughness:.34,metalness:.68},
+  back:{color:'#001d8f',roughness:.92,metalness:0},
+  table:{color:'#c79a64',roughness:.72,metalness:0},
+  tableSide:{color:'#7a4b27',roughness:.82,metalness:0}
+};
+
 function std(p){return new THREE.MeshStandardMaterial({color:p.color||p.base,roughness:p.roughness,metalness:p.metalness})}
 const baseMat=std(palette.board),pMat=std(palette.p),mats={right:std(palette.right),left:std(palette.left),front:std(palette.front),back:std(palette.back)};
-const texState={textureMode:'pattern',textureRepeat:1,offsetX:0,offsetY:.15,rotation:0,power:.4};
+const texState={textureMode:'pattern',textureRepeat:1,offsetX:0,offsetY:.15,rotation:0,power:.025};
+
+function setShadow(o,cast=true,receive=true){
+  if(!o)return o;
+  if(o.isMesh){o.castShadow=cast;o.receiveShadow=receive}
+  if(o.traverse)o.traverse(ch=>{if(ch.isMesh){ch.castShadow=cast;ch.receiveShadow=receive}});
+  return o;
+}
+
+function setTexturePower(power){
+  texState.power=power;
+  [mats.right,pMat].forEach(mat=>{
+    if(!mat)return;
+    mat.emissiveIntensity=power;
+    mat.needsUpdate=true;
+  });
+}
+
+function updateLightingButtons(){
+  if(!lightingPanel)return;
+  lightingPanel.querySelectorAll('button[data-preset]').forEach(b=>{
+    const on=b.dataset.preset===activeLightingPreset;
+    b.style.background=on?'#fff':'rgba(255,255,255,.08)';
+    b.style.color=on?'#111':'#fff';
+    b.style.borderColor=on?'#fff':'rgba(255,255,255,.18)';
+  });
+}
+
+function applyLightingPreset(name){
+  const p=LIGHTING_PRESETS[name]||LIGHTING_PRESETS.balanced;
+  activeLightingPreset=LIGHTING_PRESETS[name]?name:'balanced';
+  hemiLight.intensity=p.hemi;
+  keyLight.intensity=p.key;
+  fillLight.intensity=p.fill;
+  rimLight.intensity=p.rim;
+  keyLight.position.set(...p.keyPos);
+  fillLight.position.set(...p.fillPos);
+  rimLight.position.set(...p.rimPos);
+  renderer.toneMappingExposure=p.exposure;
+  setTexturePower(p.emissive);
+  updateLightingButtons();
+  refresh();
+  log('lighting preset',activeLightingPreset,p);
+}
+
+function makeLightingPanel(){
+  const box=document.createElement('div');
+  Object.assign(box.style,{position:'fixed',right:'16px',top:'16px',zIndex:55,display:'flex',gap:'6px',alignItems:'center',padding:'8px',border:'1px solid rgba(255,255,255,.14)',borderRadius:'999px',background:'rgba(0,0,0,.42)',backdropFilter:'blur(10px)',boxShadow:'0 10px 30px rgba(0,0,0,.25)',opacity:'0',transition:'opacity .35s ease',direction:'rtl'});
+  const label=document.createElement('span');
+  label.textContent='إضاءة';
+  Object.assign(label.style,{color:'#fff',font:'700 12px system-ui,Arial',padding:'0 4px',opacity:.82});
+  box.appendChild(label);
+  Object.keys(LIGHTING_PRESETS).forEach(k=>{
+    const b=document.createElement('button');
+    b.type='button';
+    b.dataset.preset=k;
+    b.textContent=LIGHTING_PRESETS[k].label;
+    Object.assign(b.style,{height:'30px',padding:'0 10px',borderRadius:'999px',border:'1px solid rgba(255,255,255,.18)',background:'rgba(255,255,255,.08)',color:'#fff',font:'700 12px system-ui,Arial',cursor:'pointer'});
+    b.onclick=()=>applyLightingPreset(k);
+    box.appendChild(b);
+  });
+  document.body.appendChild(box);
+  return box;
+}
+const lightingPanel=makeLightingPanel();
+
 function repeat(){return texState.textureMode==='single'?1:texState.textureRepeat}
 function applyTexSettings(t){if(!t)return;t.wrapS=t.wrapT=texState.textureMode==='single'?THREE.ClampToEdgeWrapping:THREE.RepeatWrapping;t.repeat.set(repeat(),repeat());t.offset.set(texState.offsetX,texState.offsetY);t.center.set(.5,.5);t.rotation=THREE.MathUtils.degToRad(texState.rotation);t.needsUpdate=true}
 function addAutoUV(g){g.computeBoundingBox();g.computeVertexNormals();const pos=g.getAttribute('position'),nor=g.getAttribute('normal'),b=g.boundingBox,s=b.getSize(new THREE.Vector3()),uv=[];const sx=s.x||1,sy=s.y||1,sz=s.z||1;for(let i=0;i<pos.count;i++){const x=pos.getX(i)-b.min.x,y=pos.getY(i)-b.min.y,z=pos.getZ(i)-b.min.z,nx=Math.abs(nor.getX(i)),ny=Math.abs(nor.getY(i)),nz=Math.abs(nor.getZ(i));let u,v;if(nz>=nx&&nz>=ny){u=x/sx;v=y/sy}else if(nx>=ny&&nx>=nz){u=z/sz;v=y/sy}else{u=x/sx;v=z/sz}uv.push(u,v)}g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));return g}
@@ -45,12 +178,26 @@ function loadSoftTexture(url,label,isColor=false){return new Promise(res=>texLoa
 function loadTableTextures(){return Promise.all([loadSoftTexture(TABLE_ALBEDO_URL,'table albedo',true),loadSoftTexture(TABLE_NORMAL_URL,'table normal'),loadSoftTexture(TABLE_ROUGHNESS_URL,'table roughness')]).then(([albedo,normal,roughness])=>{tableMaps={albedo,normal,roughness};return tableMaps})}
 function loadWoodSurface(){return new Promise(res=>texLoader.load(WOOD_URL+'?v='+Date.now(),t=>{t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=renderer.capabilities.getMaxAnisotropy();t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(2.2,2.2);woodTexture=t;log('wood texture restored',WOOD_URL);res(t)},undefined,e=>{log('wood texture failed, fallback color used',e);woodTexture=null;res(null)}))}
 function loadSceneBackground(){return new Promise(res=>texLoader.load(BIG_BACK_URL+'?v='+Date.now(),t=>{t.colorSpace=THREE.SRGBColorSpace;t.mapping=THREE.EquirectangularReflectionMapping;scene.background=t;log('scene background restored',BIG_BACK_URL);res(t)},undefined,e=>{log('scene background failed, fallback gray used',e);res(null)}))}
-function tableMaterial(){const mat=std(palette.table);if(tableMaps.albedo){mat.map=tableMaps.albedo;mat.color.set(0xffffff)}else if(woodTexture){mat.map=woodTexture;mat.color.set(0xffffff)}if(tableMaps.normal){mat.normalMap=tableMaps.normal;mat.normalScale.set(.75,.75)}if(tableMaps.roughness){mat.roughnessMap=tableMaps.roughness;mat.roughness=.92}mat.needsUpdate=true;return mat}
+
+function tableMaterial(){
+  const mat=std(palette.table);
+  if(tableMaps.albedo){mat.map=tableMaps.albedo;mat.color.set(0xffffff)}
+  else if(woodTexture){mat.map=woodTexture;mat.color.set(0xffffff)}
+  if(tableMaps.normal){mat.normalMap=tableMaps.normal;mat.normalScale.set(.75,.75)}
+  if(tableMaps.roughness){mat.roughnessMap=tableMaps.roughness;mat.roughness=.92}
+  mat.needsUpdate=true;
+  return mat;
+}
 function fitTableObject(o){const b=new THREE.Box3().setFromObject(o),s=b.getSize(new THREE.Vector3()),maxTop=Math.max(s.x,s.z)||1,targetTop=420,scale=targetTop/maxTop;o.scale.setScalar(scale);const b2=new THREE.Box3().setFromObject(o),c=b2.getCenter(new THREE.Vector3());o.position.x-=c.x;o.position.z-=c.z;o.position.y+=-1-b2.max.y;o.rotation.y=Math.PI/4;return o}
-function createFallbackTable(){if(tableMesh)return tableMesh;const group=new THREE.Group(),topMat=tableMaterial(),sideMat=std(palette.tableSide);const top=new THREE.Mesh(new THREE.BoxGeometry(470,24,360),topMat);top.position.y=-13;group.add(top);const legGeo=new THREE.BoxGeometry(28,260,28);[[-190,-130],[190,-130],[-190,130],[190,130]].forEach(([x,z])=>{const leg=new THREE.Mesh(legGeo,sideMat);leg.position.set(x,-155,z);group.add(leg)});tableMesh=group;scene.add(group);return group}
-function loadRealTable(){return new Promise(res=>objLoader.load(TABLE_OBJ_URL+'?v='+Date.now(),o=>{const mat=tableMaterial();o.traverse(ch=>{if(ch.isMesh){ch.material=mat;ch.castShadow=false;ch.receiveShadow=false;if(ch.geometry)ch.geometry.computeVertexNormals()}});fitTableObject(o);tableMesh=o;scene.add(o);log('real table restored',TABLE_OBJ_URL);res(o)},undefined,e=>{log('real table failed, fallback table used',e);res(createFallbackTable())}))}
-function rad(v){return THREE.MathUtils.degToRad(v)}function tr(o,t){o.position.set(t.px,t.py,t.pz);o.rotation.set(rad(t.rx),rad(t.ry),rad(t.rz))}function center(g){g.computeBoundingBox();const c=g.boundingBox.getCenter(new THREE.Vector3());g.translate(-c.x,-c.y,-c.z);g.computeVertexNormals();addAutoUV(g)}function bottom(g){g.computeBoundingBox();const b=g.boundingBox;g.translate(-(b.min.x+b.max.x)/2,-(b.min.y+b.max.y)/2,-b.min.z);g.computeVertexNormals();g.computeBoundingBox();const s=g.boundingBox.getSize(new THREE.Vector3());g.userData.rad=Math.max(s.x,s.y)*.38;addAutoUV(g)}
-function ease(t){t=Math.max(0,Math.min(1,t));return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2}function mix(a,b,t){t=ease(t);return{px:a.px+(b.px-a.px)*t,py:a.py+(b.py-a.py)*t,pz:a.pz+(b.pz-a.pz)*t,rx:a.rx+(b.rx-a.rx)*t,ry:a.ry+(b.ry-a.ry)*t,rz:a.rz+(b.rz-a.rz)*t}}
+function createFallbackTable(){if(tableMesh)return tableMesh;const group=new THREE.Group(),topMat=tableMaterial(),sideMat=std(palette.tableSide);const top=new THREE.Mesh(new THREE.BoxGeometry(470,24,360),topMat);top.position.y=-13;group.add(setShadow(top,true,true));const legGeo=new THREE.BoxGeometry(28,260,28);[[-190,-130],[190,-130],[-190,130],[190,130]].forEach(([x,z])=>{const leg=new THREE.Mesh(legGeo,sideMat);leg.position.set(x,-155,z);group.add(setShadow(leg,true,true))});tableMesh=group;scene.add(group);return group}
+function loadRealTable(){return new Promise(res=>objLoader.load(TABLE_OBJ_URL+'?v='+Date.now(),o=>{const mat=tableMaterial();o.traverse(ch=>{if(ch.isMesh){ch.material=mat;if(ch.geometry)ch.geometry.computeVertexNormals()}});fitTableObject(o);setShadow(o,true,true);tableMesh=o;scene.add(o);log('real table restored',TABLE_OBJ_URL);res(o)},undefined,e=>{log('real table failed, fallback table used',e);res(createFallbackTable())}))}
+
+function rad(v){return THREE.MathUtils.degToRad(v)}
+function tr(o,t){o.position.set(t.px,t.py,t.pz);o.rotation.set(rad(t.rx),rad(t.ry),rad(t.rz))}
+function center(g){g.computeBoundingBox();const c=g.boundingBox.getCenter(new THREE.Vector3());g.translate(-c.x,-c.y,-c.z);g.computeVertexNormals();addAutoUV(g)}
+function bottom(g){g.computeBoundingBox();const b=g.boundingBox;g.translate(-(b.min.x+b.max.x)/2,-(b.min.y+b.max.y)/2,-b.min.z);g.computeVertexNormals();g.computeBoundingBox();const s=g.boundingBox.getSize(new THREE.Vector3());g.userData.rad=Math.max(s.x,s.y)*.38;addAutoUV(g)}
+function ease(t){t=Math.max(0,Math.min(1,t));return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2}
+function mix(a,b,t){t=ease(t);return{px:a.px+(b.px-a.px)*t,py:a.py+(b.py-a.py)*t,pz:a.pz+(b.pz-a.pz)*t,rx:a.rx+(b.rx-a.rx)*t,ry:a.ry+(b.ry-a.ry)*t,rz:a.rz+(b.rz-a.rz)*t}}
 function rng(seed){let a=seed>>>0;return()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
 function baseA(){return {'9':{px:0,py:6,pz:0,rx:-90,ry:0,rz:0},'3-right':{px:R3,py:6,pz:0,rx:-90,ry:0,rz:0},'3-left':{px:-R3,py:6,pz:0,rx:-90,ry:0,rz:180},'3-front':{px:0,py:6,pz:R3,rx:-90,ry:0,rz:90},'3-back':{px:0,py:6,pz:-R3,rx:-90,ry:0,rz:-90}}}
 function bases(){return [{id:'right-base',dir:'right',px:R3,pz:0,mode:'side'},{id:'left-base',dir:'left',px:-R3,pz:0,mode:'side'},{id:'front-base',dir:'front',px:0,pz:R3,mode:'main'},{id:'back-base',dir:'back',px:0,pz:-R3,mode:'main'}]}
@@ -69,15 +216,53 @@ function pieceAt(p,ms){const q=ease((ms-pieceStart(p))/TLINE.pieceMove),m=mix(p.
 function apply(ms){tr(meshes['9'],baseA()['9']);if(lidMesh){tr(lidMesh,lidAt(ms));lidMesh.visible=ms<TLINE.lidShake+TLINE.lidLift}ORDER.forEach(k=>tr(meshes['3-'+k],wallAt(k,ms)));pieceMeshes.forEach(p=>tr(p.mesh,pieceAt(p,ms)));if(ms>=totalTime())snapFinal()}
 function snapFinal(){tr(meshes['9'],baseA()['9']);ORDER.forEach(k=>tr(meshes['3-'+k],baseA()['3-'+k]));pieceMeshes.forEach(p=>tr(p.mesh,p.final));pInstances().forEach((p,i)=>tr(pMeshes[i],p));pMeshes.forEach(m=>m.visible=false);if(lidMesh)lidMesh.visible=false}
 function totalTime(){const lidDone=TLINE.lidShake+TLINE.lidLift,wallDone=TLINE.lidShake+TLINE.wallStart+3*TLINE.wallDelay+TLINE.wallShake+TLINE.wallLift+TLINE.wallMove+TLINE.wallDrop+TLINE.pieceMove;return Math.max(lidDone,wallDone)+500}
-function refresh(){if(!out)return;out.value='const YAKOLAK_GOLDEN_INTRO_FINAL = '+JSON.stringify({version:V,principle:'v058 spill preserved as independent meshes; final frame snaps to static golden state 100%',modelDir:MODEL_DIR,marbleUrl:MARBLE_URL,woodUrl:WOOD_URL,bigBackUrl:BIG_BACK_URL,tableObjUrl:TABLE_OBJ_URL,tableTextures:{albedo:TABLE_ALBEDO_URL,normal:TABLE_NORMAL_URL,roughness:TABLE_ROUGHNESS_URL},timeline:TLINE,spill:SPILL,locked_layout:{stoneDistance:D,threeRadius:R3,pRadius:PR,pPieceGap:PG},models_alignment:{...baseA(),...pRows()},table:{visible:true,type:'OBJ table model',url:TABLE_OBJ_URL,targetTop:420,topY:-1,rotationY:45},background:{visible:true,url:BIG_BACK_URL,type:'scene background'},outer_stones:{visible:true,positions:outerPositions()},p_model:{visible:false,file:modelPath('p'),material:palette.p,texture:texState,rows:pRows(),instances:pInstances()}},null,2)+';'}
+function refresh(){if(!out)return;out.value='const YAKOLAK_GOLDEN_INTRO_FINAL = '+JSON.stringify({version:V,principle:'v058 spill preserved as independent meshes; final frame snaps to static golden state 100%',modelDir:MODEL_DIR,marbleUrl:MARBLE_URL,woodUrl:WOOD_URL,bigBackUrl:BIG_BACK_URL,tableObjUrl:TABLE_OBJ_URL,tableTextures:{albedo:TABLE_ALBEDO_URL,normal:TABLE_NORMAL_URL,roughness:TABLE_ROUGHNESS_URL},lighting:{active:activeLightingPreset,presets:LIGHTING_PRESETS},timeline:TLINE,spill:SPILL,locked_layout:{stoneDistance:D,threeRadius:R3,pRadius:PR,pPieceGap:PG},models_alignment:{...baseA(),...pRows()},table:{visible:true,type:'OBJ table model',url:TABLE_OBJ_URL,targetTop:420,topY:-1,rotationY:45},background:{visible:true,url:BIG_BACK_URL,type:'scene background'},outer_stones:{visible:true,positions:outerPositions()},p_model:{visible:false,file:modelPath('p'),material:palette.p,texture:texState,rows:pRows(),instances:pInstances()}},null,2)+';'}
 function restartIntro(){if(!loaded)return;started=performance.now();playing=true;if(lidMesh)lidMesh.visible=true;apply(0);log('replay')}
 replayBtn.onclick=restartIntro;
-function loadBase(id){return new Promise((res,rej)=>loader.load(modelPath(id==='9'?'9':'3')+'?v='+V+'-'+id,g=>{center(g);const m=new THREE.Mesh(g,baseMat);meshes[id]=m;scene.add(m);tr(m,baseA()[id]);res(m)},undefined,e=>rej(new Error('model failed '+id))))}
-function loadLid(){return new Promise((res,rej)=>loader.load(modelPath('9')+'?v='+V+'-lid',g=>{center(g);lidMesh=new THREE.Mesh(g,baseMat);scene.add(lidMesh);tr(lidMesh,LID_START);res(lidMesh)},undefined,e=>rej(new Error('model failed lid'))))}
+
+function loadBase(id){return new Promise((res,rej)=>loader.load(modelPath(id==='9'?'9':'3')+'?v='+V+'-'+id,g=>{center(g);const m=setShadow(new THREE.Mesh(g,baseMat),true,true);meshes[id]=m;scene.add(m);tr(m,baseA()[id]);res(m)},undefined,e=>rej(new Error('model failed '+id))))}
+function loadLid(){return new Promise((res,rej)=>loader.load(modelPath('9')+'?v='+V+'-lid',g=>{center(g);lidMesh=setShadow(new THREE.Mesh(g,baseMat),true,true);scene.add(lidMesh);tr(lidMesh,LID_START);res(lidMesh)},undefined,e=>rej(new Error('model failed lid'))))}
 function loadPieceGeo(n){return new Promise((res,rej)=>loader.load(modelPath(n)+'?v='+V+'-'+n,g=>{bottom(g);geos[n]=g;res(g)},undefined,e=>rej(new Error('piece geometry failed '+n))))}
-function makePieces(){const starts=genSpillStarts(),buckets={};starts.forEach(s=>{const k=s.color+'-'+s.type;(buckets[k]||(buckets[k]=[])).push(s)});outerPositions().forEach(pos=>TYPES.forEach(type=>{if(!geos[type])throw new Error('missing piece geometry '+type);const color=DIR_COLOR[pos.direction],st=(buckets[color+'-'+type]||[]).shift();if(!st)return;const mesh=new THREE.Mesh(geos[type].clone(),mats[pos.direction]);const p={mesh,type,dir:pos.direction,side:pos.side,start:{px:st.px,py:st.py,pz:st.pz,rx:st.rx,ry:st.ry,rz:st.rz},final:{px:pos.px,py:pos.py,pz:pos.pz,rx:pos.rx,ry:pos.ry,rz:pos.rz}};pieceMeshes.push(p);scene.add(mesh);tr(mesh,p.start)}))}
-function loadP(){return new Promise((res,rej)=>loader.load(modelPath('p')+'?v='+V,g=>{center(g);for(let i=0;i<28;i++){const m=new THREE.Mesh(g.clone(),pMat);m.visible=false;pMeshes.push(m);scene.add(m)}pInstances().forEach((p,i)=>tr(pMeshes[i],p));res(pMeshes)},undefined,e=>rej(new Error('p model failed'))))}
-async function boot(){try{status('تحميل المجسمات...');await Promise.all(['9','3-right','3-left','3-front','3-back'].map(loadBase).concat(loadLid()).concat(TYPES.map(loadPieceGeo)).concat(loadP()));status('تجهيز المشهد...');makePieces();status('تحميل الخامات...');await Promise.all([loadTextureTo(mats.right,'#ffffff','right pieces'),loadTextureTo(pMat,'#6f7378','hidden p model'),loadWoodSurface(),loadSceneBackground(),loadTableTextures()]);status('تحميل الطاولة...');await loadRealTable();const box=new THREE.Box3();Object.values(meshes).forEach(m=>box.expandByObject(m));pieceMeshes.forEach(p=>box.expandByObject(p.mesh));const size=box.getSize(new THREE.Vector3()),dist=(Math.max(size.x,size.y,size.z)||1)*1.75;camera.position.set(dist,dist*.82,dist);camera.near=Math.max(dist/1000,.01);camera.far=dist*30;camera.updateProjectionMatrix();controls.target.set(0,0,0);controls.update();loaded=true;started=performance.now();playing=true;apply(0);refresh();status('جاهز');requestAnimationFrame(()=>requestAnimationFrame(reveal));log('loaded',V)}catch(e){fatal(e)}}
+function makePieces(){const starts=genSpillStarts(),buckets={};starts.forEach(s=>{const k=s.color+'-'+s.type;(buckets[k]||(buckets[k]=[])).push(s)});outerPositions().forEach(pos=>TYPES.forEach(type=>{if(!geos[type])throw new Error('missing piece geometry '+type);const color=DIR_COLOR[pos.direction],st=(buckets[color+'-'+type]||[]).shift();if(!st)return;const mesh=setShadow(new THREE.Mesh(geos[type].clone(),mats[pos.direction]),true,true);const p={mesh,type,dir:pos.direction,side:pos.side,start:{px:st.px,py:st.py,pz:st.pz,rx:st.rx,ry:st.ry,rz:st.rz},final:{px:pos.px,py:pos.py,pz:pos.pz,rx:pos.rx,ry:pos.ry,rz:pos.rz}};pieceMeshes.push(p);scene.add(mesh);tr(mesh,p.start)}))}
+function loadP(){return new Promise((res,rej)=>loader.load(modelPath('p')+'?v='+V,g=>{center(g);for(let i=0;i<28;i++){const m=setShadow(new THREE.Mesh(g.clone(),pMat),true,true);m.visible=false;pMeshes.push(m);scene.add(m)}pInstances().forEach((p,i)=>tr(pMeshes[i],p));res(pMeshes)},undefined,e=>rej(new Error('p model failed'))))}
+
+async function boot(){
+  try{
+    applyLightingPreset(activeLightingPreset);
+    status('تحميل المجسمات...');
+    await Promise.all(['9','3-right','3-left','3-front','3-back'].map(loadBase).concat(loadLid()).concat(TYPES.map(loadPieceGeo)).concat(loadP()));
+    status('تجهيز المشهد...');
+    makePieces();
+    status('تحميل الخامات...');
+    await Promise.all([loadTextureTo(mats.right,'#ffffff','right pieces'),loadTextureTo(pMat,'#6f7378','hidden p model'),loadWoodSurface(),loadSceneBackground(),loadTableTextures()]);
+    applyLightingPreset(activeLightingPreset);
+    status('تحميل الطاولة...');
+    await loadRealTable();
+    const box=new THREE.Box3();
+    Object.values(meshes).forEach(m=>box.expandByObject(m));
+    pieceMeshes.forEach(p=>box.expandByObject(p.mesh));
+    const size=box.getSize(new THREE.Vector3()),dist=(Math.max(size.x,size.y,size.z)||1)*1.75;
+    camera.position.set(dist,dist*.82,dist);
+    camera.near=Math.max(dist/1000,.01);
+    camera.far=dist*30;
+    camera.updateProjectionMatrix();
+    controls.target.set(0,0,0);
+    controls.update();
+    loaded=true;
+    started=performance.now();
+    playing=true;
+    apply(0);
+    refresh();
+    status('جاهز');
+    requestAnimationFrame(()=>requestAnimationFrame(reveal));
+    log('loaded',V);
+  }catch(e){fatal(e)}
+}
+
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
-addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r')restartIntro()});
-function animate(){requestAnimationFrame(animate);controls.update();if(loaded&&playing){const e=performance.now()-started;apply(Math.min(e,totalTime()));if(e>totalTime()){snapFinal();playing=false}}renderer.render(scene,camera)}animate();refresh();boot();
+addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r')restartIntro();if(['1','2','3','4'].includes(e.key)){applyLightingPreset(Object.keys(LIGHTING_PRESETS)[Number(e.key)-1])}});
+function animate(){requestAnimationFrame(animate);controls.update();if(loaded&&playing){const e=performance.now()-started;apply(Math.min(e,totalTime()));if(e>totalTime()){snapFinal();playing=false}}renderer.render(scene,camera)}
+
+animate();
+refresh();
+boot();
