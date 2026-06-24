@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="yakolak-version" content="v060-fast-cache-clear">
+<meta name="yakolak-version" content="v062-hard-clear-fixed">
 <title>Yakolak Live</title>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://i.ibb.co" crossorigin>
@@ -17,8 +17,8 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b0b;col
 #yakolakLoader.done{opacity:0;visibility:hidden;pointer-events:none}
 #yakolakLoader.error .loaderRing{border-top-color:#b35a5a}
 .loaderRing{width:42px;height:42px;border-radius:50%;border:3px solid rgba(255,255,255,.14);border-top-color:#fff;animation:spin .85s linear infinite}
-#clearCacheBtn{position:fixed;left:16px;bottom:16px;z-index:10000;width:56px;height:56px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(0,0,0,.78);color:#fff;font-size:15px;font-weight:950;display:grid;place-items:center;cursor:pointer;line-height:1;box-shadow:0 10px 30px rgba(0,0,0,.36);user-select:none}
-#clearCacheBtn[disabled]{opacity:.58;cursor:wait}
+#clearCacheBtn{position:fixed;left:16px;bottom:16px;z-index:10000;width:58px;height:58px;border-radius:50%;border:1px solid rgba(255,255,255,.24);background:rgba(0,0,0,.82);color:#fff;font-size:15px;font-weight:950;display:grid;place-items:center;cursor:pointer;line-height:1;box-shadow:0 10px 30px rgba(0,0,0,.42);user-select:none}
+#clearCacheBtn[disabled]{opacity:.62;cursor:wait}
 @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
@@ -31,14 +31,17 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b0b;col
 <div id="panel" aria-hidden="true"></div>
 <textarea id="out"></textarea>
 <script type="module">
-const BUILD='60';
+const BUILD='62';
 const KEY='yakolak_build_seen';
+const params=new URLSearchParams(location.search);
+const clearToken=params.get('clear');
+const ASSET_VERSION=clearToken||BUILD;
 const clearBtn=document.getElementById('clearCacheBtn');
-const hardReload=()=>{
+function hardReload(){
   const url=new URL(location.href);
   url.searchParams.set('clear',Date.now().toString());
   location.replace(url.toString());
-};
+}
 async function clearIndexedDB(){
   if(!('indexedDB' in window)||!indexedDB.databases)return;
   const dbs=await indexedDB.databases();
@@ -47,24 +50,25 @@ async function clearIndexedDB(){
     req.onsuccess=req.onerror=req.onblocked=()=>resolve();
   })));
 }
-async function cleanReload(){
-  if(clearBtn.disabled)return;
+async function cleanReload(e){
+  if(e)e.preventDefault();
+  if(!clearBtn||clearBtn.disabled)return;
   clearBtn.disabled=true;
-  clearBtn.textContent='...';
+  clearBtn.textContent='ينظف';
   const jobs=[];
-  try{localStorage.clear()}catch(e){}
-  try{sessionStorage.clear()}catch(e){}
-  try{if('caches' in window)jobs.push(caches.keys().then(names=>Promise.allSettled(names.map(name=>caches.delete(name)))))}catch(e){}
-  try{if('serviceWorker' in navigator)jobs.push(navigator.serviceWorker.getRegistrations().then(regs=>Promise.allSettled(regs.map(reg=>reg.unregister()))))}catch(e){}
+  try{localStorage.clear()}catch(err){}
+  try{sessionStorage.clear()}catch(err){}
+  try{if('caches' in window)jobs.push(caches.keys().then(names=>Promise.allSettled(names.map(name=>caches.delete(name)))))}catch(err){}
+  try{if('serviceWorker' in navigator)jobs.push(navigator.serviceWorker.getRegistrations().then(regs=>Promise.allSettled(regs.map(reg=>reg.unregister()))))}catch(err){}
   jobs.push(clearIndexedDB().catch(()=>{}));
   await Promise.allSettled(jobs);
-  setTimeout(()=>location.reload(),900);
+  clearBtn.textContent='تم';
   hardReload();
 }
-if(clearBtn)clearBtn.addEventListener('click',cleanReload,{passive:true});
+if(clearBtn)clearBtn.addEventListener('click',cleanReload);
 async function checkVersion(){
   try{
-    const r=await fetch('./version.json?v='+BUILD,{cache:'no-store'});
+    const r=await fetch('./version.json?v='+ASSET_VERSION,{cache:'no-store'});
     const v=await r.json();
     const next=String(v.build||BUILD);
     const old=localStorage.getItem(KEY);
@@ -73,7 +77,14 @@ async function checkVersion(){
   }catch(e){}
   return true;
 }
-if(await checkVersion())import('./room-boot-v049.js?v='+BUILD);
+if(await checkVersion()){
+  await import('./room-boot-v049.js?v='+ASSET_VERSION);
+  if(clearToken){
+    const clean=new URL(location.href);
+    clean.searchParams.delete('clear');
+    history.replaceState(null,'',clean.toString());
+  }
+}
 </script>
 </body>
 </html>
