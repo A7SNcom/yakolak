@@ -18,7 +18,17 @@ docs/plans/asset-organization.md
 ## مسار التشغيل الحالي
 
 ```txt
-index.html -> app.js -> src/app-prod-stage1.js
+index.html -> src/core/app.js -> src/app-prod-stage1.js
+```
+
+## الجذر
+
+الجذر يبقى خفيفًا قدر الإمكان:
+
+```txt
+index.html    مدخل GitHub Pages
+version.json  رقم النسخة
+README.md     وصف المشروع
 ```
 
 ## المجلدات الرئيسية
