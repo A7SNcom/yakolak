@@ -2,7 +2,7 @@
 
 Safe branch: organize-small-steps.
 
-Status: documentation-only so far.
+Status: folders created only.
 Runtime is not changed yet.
 
 ## Keep
@@ -14,14 +14,26 @@ Runtime is not changed yet.
 - src/app-prod-stage1.js
 - docs/YAKOLAK_PROJECT_RULES.md
 
+## Created folders
+
+- assets/models/game
+- assets/models/table
+- assets/textures/table
+- assets/textures/pieces
+- archive/golden
+- archive/experiments
+- archive/old-builds
+- archive/legacy-assets
+- preview
+
 ## Pending organization
 
-- game STL models -> assets/models/game
-- Mars table OBJ -> assets/models/table/mars
-- Mars table textures -> assets/textures/table/mars
-- old previews -> archive/experiments
-- old builds -> archive/old-builds
-- unused legacy assets -> archive/assets/legacy
+- move game STL models
+- move Mars table OBJ
+- move Mars table textures
+- archive old previews
+- archive old builds
+- archive unused legacy assets
 
 ## Rule
 
