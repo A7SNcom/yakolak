@@ -1,6 +1,6 @@
 {
-  "version": "v053-centered-table-room",
-  "build": 53,
-  "updated_at": "2026-06-23",
-  "note": "Center the generated room around the table at world origin, use symmetric front/back bounds, and set a closer practical floor and ceiling height."
+  "version": "v060-fast-production-cache-clear",
+  "build": 60,
+  "updated_at": "2026-06-24",
+  "note": "Fast production route with stable cache-friendly imports, strong clear button, static renderer, no heavy shadows, and geometry reuse for faster browsing."
 }
