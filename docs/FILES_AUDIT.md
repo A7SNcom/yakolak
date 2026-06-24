@@ -2,7 +2,7 @@
 
 Safe branch: organize-small-steps.
 
-Status: folders created only.
+Status: folder scaffold created.
 Runtime is not changed yet.
 
 ## Keep
@@ -25,6 +25,10 @@ Runtime is not changed yet.
 - archive/old-builds
 - archive/legacy-assets
 - preview
+
+## Created routes
+
+- preview/empty-room.html
 
 ## Pending organization
 
