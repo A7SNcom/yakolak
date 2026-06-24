@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yakolak - Soft Empty Room</title>
+  <style>
+    :root{
+      --bg:#f5f8fa;
+      --text:#1e1e1e;
+      --muted:#667085;
+      --panel:rgba(255,255,255,.78);
+      --line:rgba(30,30,30,.08);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif;color:var(--text)}
+    #app{position:fixed;inset:0}
+    .hud{
+      position:fixed;right:18px;top:18px;z-index:5;
+      width:min(360px,calc(100vw - 36px));
+      padding:14px 16px;border:1px solid var(--line);border-radius:18px;
+      background:var(--panel);backdrop-filter:blur(14px);
+      box-shadow:0 18px 50px rgba(16,24,40,.08);
+    }
+    .hud h1{margin:0 0 6px;font-size:17px;line-height:1.4}
+    .hud p{margin:0;font-size:13px;line-height:1.7;color:var(--muted)}
+    .badge{
+      display:inline-flex;gap:6px;align-items:center;margin-top:10px;
+      padding:7px 10px;border-radius:999px;background:rgba(60,163,187,.10);
+      color:#2d7f94;font-weight:700;font-size:12px;
+    }
+    .controls{
+      position:fixed;left:18px;bottom:18px;z-index:5;
+      display:flex;gap:8px;flex-wrap:wrap;
+    }
+    button{
+      border:1px solid var(--line);border-radius:999px;background:var(--panel);
+      padding:10px 13px;cursor:pointer;color:var(--text);
+      box-shadow:0 10px 30px rgba(16,24,40,.07);
+      font-weight:700;
+    }
+    button:hover{transform:translateY(-1px)}
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <section class="hud">
+    <h1>غرفة Yakolak الفاضية</h1>
+    <p>أرض + سقف + 4 جدران، بدون طاولة وبدون مجسمات. خامات بيضاء ناعمة وخفيفة مناسبة كبيئة نظيفة للعبة.</p>
+    <div class="badge">✅ Full Room Box / 6 surfaces</div>
+  </section>
+
+  <div class="controls">
+    <button id="reset">إعادة الكاميرا</button>
+    <button id="front">إظهار/إخفاء الجدار الأمامي</button>
+  </div>
+
+  <script type="module">
+    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js";
+    import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/controls/OrbitControls.js";
+
+    const app = document.getElementById("app");
+
+    const ROOM = {
+      width: 9.2,
+      depth: 10.8,
+      height: 4.8,
+      wallColor: 0xf8fafb,
+      floorColor: 0xf3f5f6,
+      ceilingColor: 0xffffff,
+      trimColor: 0xe5eaee,
+      lineColor: 0xd8dee3
+    };
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf5f8fa);
+    scene.fog = new THREE.Fog(0xf5f8fa, 14, 28);
+
+    const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 100);
+    const defaultCam = new THREE.Vector3(0, 2.05, ROOM.depth * 0.43);
+    camera.position.copy(defaultCam);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.03;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    app.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.9, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.07;
+    controls.minDistance = 1.6;
+    controls.maxDistance = 8.5;
+    controls.maxPolarAngle = Math.PI * 0.54;
+    controls.minPolarAngle = Math.PI * 0.28;
+
+    const wallMat = new THREE.MeshStandardMaterial({
+      color: ROOM.wallColor,
+      roughness: 0.92,
+      metalness: 0.0
+    });
+
+    const floorMat = new THREE.MeshStandardMaterial({
+      color: ROOM.floorColor,
+      roughness: 0.88,
+      metalness: 0.0
+    });
+
+    const ceilingMat = new THREE.MeshStandardMaterial({
+      color: ROOM.ceilingColor,
+      roughness: 0.96,
+      metalness: 0.0
+    });
+
+    const frontWallMat = new THREE.MeshStandardMaterial({
+      color: ROOM.wallColor,
+      roughness: 0.92,
+      transparent: true,
+      opacity: 0.18,
+      depthWrite: false
+    });
+
+    const trimMat = new THREE.MeshStandardMaterial({
+      color: ROOM.trimColor,
+      roughness: 0.9
+    });
+
+    const lineMat = new THREE.LineBasicMaterial({
+      color: ROOM.lineColor,
+      transparent: true,
+      opacity: 0.55
+    });
+
+    const room = new THREE.Group();
+    scene.add(room);
+
+    function plane(name, width, height, material, position, rotation) {
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
+      mesh.name = name;
+      mesh.position.set(position.x, position.y, position.z);
+      mesh.rotation.set(rotation.x, rotation.y, rotation.z);
+      mesh.receiveShadow = true;
+      room.add(mesh);
+      return mesh;
+    }
+
+    plane(
+      "floor",
+      ROOM.width,
+      ROOM.depth,
+      floorMat,
+      { x: 0, y: 0, z: 0 },
+      { x: -Math.PI / 2, y: 0, z: 0 }
+    );
+
+    plane(
+      "ceiling",
+      ROOM.width,
+      ROOM.depth,
+      ceilingMat,
+      { x: 0, y: ROOM.height, z: 0 },
+      { x: Math.PI / 2, y: 0, z: 0 }
+    );
+
+    plane(
+      "back-wall",
+      ROOM.width,
+      ROOM.height,
+      wallMat,
+      { x: 0, y: ROOM.height / 2, z: -ROOM.depth / 2 },
+      { x: 0, y: 0, z: 0 }
+    );
+
+    const frontWall = plane(
+      "front-wall",
+      ROOM.width,
+      ROOM.height,
+      frontWallMat,
+      { x: 0, y: ROOM.height / 2, z: ROOM.depth / 2 },
+      { x: 0, y: Math.PI, z: 0 }
+    );
+
+    plane(
+      "left-wall",
+      ROOM.depth,
+      ROOM.height,
+      wallMat,
+      { x: -ROOM.width / 2, y: ROOM.height / 2, z: 0 },
+      { x: 0, y: Math.PI / 2, z: 0 }
+    );
+
+    plane(
+      "right-wall",
+      ROOM.depth,
+      ROOM.height,
+      wallMat,
+      { x: ROOM.width / 2, y: ROOM.height / 2, z: 0 },
+      { x: 0, y: -Math.PI / 2, z: 0 }
+    );
+
+    function addTrim(name, size, pos) {
+      const geo = new THREE.BoxGeometry(size.x, size.y, size.z);
+      const mesh = new THREE.Mesh(geo, trimMat);
+      mesh.name = name;
+      mesh.position.set(pos.x, pos.y, pos.z);
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      room.add(mesh);
+      return mesh;
+    }
+
+    const t = 0.035;
+    const baseH = 0.09;
+
+    addTrim("base-back",  { x: ROOM.width, y: baseH, z: t }, { x: 0, y: baseH / 2, z: -ROOM.depth / 2 + t / 2 });
+    addTrim("base-front", { x: ROOM.width, y: baseH, z: t }, { x: 0, y: baseH / 2, z:  ROOM.depth / 2 - t / 2 });
+    addTrim("base-left",  { x: t, y: baseH, z: ROOM.depth }, { x: -ROOM.width / 2 + t / 2, y: baseH / 2, z: 0 });
+    addTrim("base-right", { x: t, y: baseH, z: ROOM.depth }, { x:  ROOM.width / 2 - t / 2, y: baseH / 2, z: 0 });
+
+    addTrim("ceiling-back",  { x: ROOM.width, y: t, z: t }, { x: 0, y: ROOM.height - t / 2, z: -ROOM.depth / 2 + t / 2 });
+    addTrim("ceiling-front", { x: ROOM.width, y: t, z: t }, { x: 0, y: ROOM.height - t / 2, z:  ROOM.depth / 2 - t / 2 });
+    addTrim("ceiling-left",  { x: t, y: t, z: ROOM.depth }, { x: -ROOM.width / 2 + t / 2, y: ROOM.height - t / 2, z: 0 });
+    addTrim("ceiling-right", { x: t, y: t, z: ROOM.depth }, { x:  ROOM.width / 2 - t / 2, y: ROOM.height - t / 2, z: 0 });
+
+    const edges = [
+      [[-ROOM.width/2, 0, -ROOM.depth/2], [-ROOM.width/2, ROOM.height, -ROOM.depth/2]],
+      [[ ROOM.width/2, 0, -ROOM.depth/2], [ ROOM.width/2, ROOM.height, -ROOM.depth/2]],
+      [[-ROOM.width/2, 0,  ROOM.depth/2], [-ROOM.width/2, ROOM.height,  ROOM.depth/2]],
+      [[ ROOM.width/2, 0,  ROOM.depth/2], [ ROOM.width/2, ROOM.height,  ROOM.depth/2]]
+    ];
+
+    edges.forEach((e, i) => {
+      const points = e.map(p => new THREE.Vector3(p[0], p[1], p[2]));
+      const geo = new THREE.BufferGeometry().setFromPoints(points);
+      const line = new THREE.Line(geo, lineMat);
+      line.name = "soft-corner-line-" + i;
+      room.add(line);
+    });
+
+    const hemi = new THREE.HemisphereLight(0xffffff, 0xdde5ea, 1.7);
+    scene.add(hemi);
+
+    const key = new THREE.DirectionalLight(0xffffff, 1.65);
+    key.position.set(-3.8, 6.5, 4.2);
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.camera.near = 0.5;
+    key.shadow.camera.far = 24;
+    key.shadow.camera.left = -8;
+    key.shadow.camera.right = 8;
+    key.shadow.camera.top = 8;
+    key.shadow.camera.bottom = -8;
+    scene.add(key);
+
+    const fill = new THREE.PointLight(0xffffff, 0.55, 16);
+    fill.position.set(3.5, 3.4, 2.5);
+    scene.add(fill);
+
+    const softShadow = new THREE.Mesh(
+      new THREE.CircleGeometry(2.2, 64),
+      new THREE.MeshBasicMaterial({
+        color: 0xdfe6ea,
+        transparent: true,
+        opacity: 0.22,
+        depthWrite: false
+      })
+    );
+    softShadow.rotation.x = -Math.PI / 2;
+    softShadow.position.set(0, 0.003, -0.25);
+    softShadow.scale.set(1.8, 0.7, 1);
+    room.add(softShadow);
+
+    function resetCamera() {
+      camera.position.copy(defaultCam);
+      controls.target.set(0, 1.9, 0);
+      controls.update();
+    }
+
+    document.getElementById("reset").addEventListener("click", resetCamera);
+    document.getElementById("front").addEventListener("click", () => {
+      frontWall.visible = !frontWall.visible;
+    });
+
+    addEventListener("resize", () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+    });
+
+    function animate() {
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+  </script>
+</body>
+</html>
