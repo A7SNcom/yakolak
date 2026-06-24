@@ -3,23 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Cache-Control" content="no-store,no-cache,must-revalidate,max-age=0">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-<meta name="yakolak-version" content="v051-clean-reload-button">
+<meta name="yakolak-version" content="v060-fast-cache-clear">
 <title>Yakolak Live</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://i.ibb.co" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b0b;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:none}
-#view{position:fixed;inset:0;z-index:1;opacity:0;transition:opacity .55s ease}
+#view{position:fixed;inset:0;z-index:1;opacity:0;transition:opacity .35s ease}
 #hint,#settingsBtn,#panel,textarea{display:none!important}
-#yakolakLoader{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:#0b0b0b;transition:opacity .45s ease,visibility .45s ease}
+#yakolakLoader{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:#0b0b0b;transition:opacity .35s ease,visibility .35s ease}
 #yakolakLoader.done{opacity:0;visibility:hidden;pointer-events:none}
 #yakolakLoader.error .loaderRing{border-top-color:#b35a5a}
 .loaderRing{width:42px;height:42px;border-radius:50%;border:3px solid rgba(255,255,255,.14);border-top-color:#fff;animation:spin .85s linear infinite}
-#clearCacheBtn{position:fixed;left:16px;bottom:16px;z-index:10000;width:46px;height:46px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.72);color:#fff;font-size:19px;font-weight:900;display:grid;place-items:center;cursor:pointer;line-height:1}
-#clearCacheBtn[disabled]{opacity:.45;cursor:wait}
+#clearCacheBtn{position:fixed;left:16px;bottom:16px;z-index:10000;width:56px;height:56px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(0,0,0,.78);color:#fff;font-size:15px;font-weight:950;display:grid;place-items:center;cursor:pointer;line-height:1;box-shadow:0 10px 30px rgba(0,0,0,.36);user-select:none}
+#clearCacheBtn[disabled]{opacity:.58;cursor:wait}
 @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
@@ -28,33 +27,53 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b0b;col
 <div id="view"></div>
 <div id="hint" aria-hidden="true"></div>
 <button id="settingsBtn" aria-hidden="true">SET</button>
-<button id="clearCacheBtn" type="button" title="مسح الكاش وإعادة التحميل" aria-label="مسح الكاش وإعادة التحميل">مسح</button>
+<button id="clearCacheBtn" type="button" title="مسح كامل للكاش وإعادة تحميل نظيفة" aria-label="مسح كامل للكاش وإعادة تحميل نظيفة">مسح</button>
 <div id="panel" aria-hidden="true"></div>
 <textarea id="out"></textarea>
 <script type="module">
+const BUILD='60';
 const KEY='yakolak_build_seen';
 const clearBtn=document.getElementById('clearCacheBtn');
-async function cleanReload(){
-  if(clearBtn){clearBtn.disabled=true;clearBtn.textContent='...'}
-  try{localStorage.removeItem(KEY);sessionStorage.clear()}catch(e){}
-  try{if('caches' in window){const names=await caches.keys();await Promise.all(names.map(name=>caches.delete(name)))}}catch(e){}
-  try{if('serviceWorker' in navigator){const regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.map(reg=>reg.unregister()))}}catch(e){}
-  window.location.reload();
+const hardReload=()=>{
+  const url=new URL(location.href);
+  url.searchParams.set('clear',Date.now().toString());
+  location.replace(url.toString());
+};
+async function clearIndexedDB(){
+  if(!('indexedDB' in window)||!indexedDB.databases)return;
+  const dbs=await indexedDB.databases();
+  await Promise.allSettled(dbs.filter(db=>db&&db.name).map(db=>new Promise(resolve=>{
+    const req=indexedDB.deleteDatabase(db.name);
+    req.onsuccess=req.onerror=req.onblocked=()=>resolve();
+  })));
 }
-if(clearBtn)clearBtn.addEventListener('click',cleanReload);
+async function cleanReload(){
+  if(clearBtn.disabled)return;
+  clearBtn.disabled=true;
+  clearBtn.textContent='...';
+  const jobs=[];
+  try{localStorage.clear()}catch(e){}
+  try{sessionStorage.clear()}catch(e){}
+  try{if('caches' in window)jobs.push(caches.keys().then(names=>Promise.allSettled(names.map(name=>caches.delete(name)))))}catch(e){}
+  try{if('serviceWorker' in navigator)jobs.push(navigator.serviceWorker.getRegistrations().then(regs=>Promise.allSettled(regs.map(reg=>reg.unregister()))))}catch(e){}
+  jobs.push(clearIndexedDB().catch(()=>{}));
+  await Promise.allSettled(jobs);
+  setTimeout(()=>location.reload(),900);
+  hardReload();
+}
+if(clearBtn)clearBtn.addEventListener('click',cleanReload,{passive:true});
 async function checkVersion(){
   try{
-    const r=await fetch('./version.json?ts='+Date.now(),{cache:'no-store'});
+    const r=await fetch('./version.json?v='+BUILD,{cache:'no-store'});
     const v=await r.json();
-    const next=String(v.build);
+    const next=String(v.build||BUILD);
     const old=localStorage.getItem(KEY);
-    if(old&&old!==next){localStorage.setItem(KEY,next);window.location.reload();return}
+    if(old&&old!==next){localStorage.setItem(KEY,next);hardReload();return false}
     localStorage.setItem(KEY,next);
   }catch(e){}
+  return true;
 }
-await checkVersion();
-setInterval(checkVersion,8000);
-import('./room-boot-v049.js?boot='+Date.now());
+if(await checkVersion())import('./room-boot-v049.js?v='+BUILD);
 </script>
 </body>
 </html>
