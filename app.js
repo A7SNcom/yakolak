@@ -1,7 +1,8 @@
-// Yakolak production boot bridge.
-// Fast route: index.html -> room-boot-v049.js -> app.js -> src/app-fast.js
+// Yakolak premium live boot bridge.
+// Restored route: index.html -> room-boot-v049.js -> app.js -> src/app-live.js
+// Keeps cache-friendly stable versioning and strong clear button from v060.
 
-console.info('[Yakolak] APP.JS v060 FAST PRODUCTION BRIDGE LOADED');
+console.info('[Yakolak] APP.JS v061 PREMIUM LIVE BRIDGE RESTORED');
 
-const BUILD='60';
-import('./src/app-fast.js?v='+BUILD);
+const BUILD='61';
+import('./src/app-live.js?v='+BUILD);
