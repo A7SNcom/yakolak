@@ -1,6 +1,6 @@
 {
-  "version": "v066-textured-larger-table-room",
-  "build": 66,
+  "version": "v067-original-table-texture-maps",
+  "build": 67,
   "updated_at": "2026-06-24",
-  "note": "Enlarges the original Mars OBJ table and applies a wood/table texture, with procedural fallback texture if the asset texture is unavailable."
+  "note": "Restores the original Mars table Albedo, Normal, and Roughness texture maps instead of the temporary generated wood texture, while keeping the approved table size."
 }
