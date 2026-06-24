@@ -1,6 +1,6 @@
 {
-  "version": "v063-stage1-production-renderer",
-  "build": 63,
+  "version": "v064-room-bounds",
+  "build": 64,
   "updated_at": "2026-06-24",
-  "note": "Stage 1 performance pass: production renderer with intro, room, fallback table, cached assets, no calibration panel, no continuous idle render, and no heavy shadow maps."
+  "note": "Adds the soft complete room to the live Yakolak scene, keeps the table and intro behavior, and prevents browsing/panning outside the room bounds."
 }
