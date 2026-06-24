@@ -78,7 +78,7 @@ async function checkVersion(){
   return true;
 }
 if(await checkVersion()){
-  await import('./room-boot-v049.js?v='+ASSET_VERSION);
+  await import('./app.js?v='+ASSET_VERSION);
   if(clearToken){
     const clean=new URL(location.href);
     clean.searchParams.delete('clear');
