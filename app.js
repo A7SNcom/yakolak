@@ -1,8 +1,7 @@
-// Yakolak clean boot file.
-// Live route: index.html -> room-boot-v049.js -> app.js -> src/app-live.js
-// Do not build rooms, patch renderers, or override texture loading here.
+// Yakolak production boot bridge.
+// Keep imports stable so the browser can cache heavy 3D code and assets.
 
-console.info('[Yakolak] APP.JS v052 CLEAN LIVE BRIDGE LOADED');
+console.info('[Yakolak] APP.JS v060 FAST CACHED BRIDGE LOADED');
 
-const LIVE_APP='./src/app-live.js';
-import(LIVE_APP+'?b='+Date.now());
+const BUILD='60';
+import('./src/app-live.js?v='+BUILD);
