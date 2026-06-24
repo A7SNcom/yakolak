@@ -3,11 +3,13 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {STLLoader} from 'three/addons/loaders/STLLoader.js';
 import {OBJLoader} from 'three/addons/loaders/OBJLoader.js';
 
-const BUILD='66';
+const BUILD='67';
 const MODEL_DIR='./assets/models/';
 const MARBLE_URL='https://i.ibb.co/B2h2tNKG/Screenshot-2026-06-22-094236.png';
 const TABLE_OBJ_URL=`${MODEL_DIR}uploads_files_3139458_Mars+Angled+Stump+Side+Table+30x30x45.obj?v=${BUILD}-table`;
-const TABLE_WOOD_URL=`${MODEL_DIR}background.webp?v=${BUILD}-wood`;
+const TABLE_ALBEDO_URL=`${MODEL_DIR}Mars%20Angled%20Stump%20Side%20Table%2030x30x45_Albedo.png?v=${BUILD}-albedo`;
+const TABLE_NORMAL_URL=`${MODEL_DIR}Mars%20Angled%20Stump%20Side%20Table%2030x30x45_Normal.png?v=${BUILD}-normal`;
+const TABLE_ROUGHNESS_URL=`${MODEL_DIR}Mars%20Angled%20Stump%20Side%20Table%2030x30x45_Roughness.png?v=${BUILD}-roughness`;
 const modelPath=n=>`${MODEL_DIR}${n}.stl?v=${BUILD}-${n}`;
 const root=document.getElementById('view');
 const loaderEl=document.getElementById('yakolakLoader');
@@ -99,7 +101,7 @@ const A={'9':{px:0,py:6,pz:0,rx:-90,ry:0,rz:0},'3-right':{px:R3,py:6,pz:0,rx:-90
 const LID={px:0,py:62.5,pz:0,rx:-90,ry:180,rz:0};
 const WALL={right:{px:81,py:35,pz:0,rx:-90,ry:-90,rz:0},left:{px:-81,py:35,pz:0,rx:-90,ry:90,rz:180},front:{px:0,py:35,pz:81,rx:-180,ry:0,rz:90},back:{px:0,py:35,pz:-81,rx:-180,ry:180,rz:-90}};
 const T={lidShake:420,lidLift:900,lidH:740,wallDelay:360,wallLift:260,wallMove:620,wallDrop:280,pieceLead:360,pieceMove:850,pieceArc:30,pieceStagger:42};
-let meshes={},lid,pieces=[],loaded=false,playing=false,start=0,raf=0;
+let meshes={},lid,pieces=[],loaded=false,playing=false,start=0,raf=0,tableMaps={};
 const rad=v=>THREE.MathUtils.degToRad(v);
 function set(o){o.castShadow=false;o.receiveShadow=false;return o}
 function tr(o,t){o.position.set(t.px,t.py,t.pz);o.rotation.set(rad(t.rx),rad(t.ry),rad(t.rz))}
@@ -110,14 +112,10 @@ function center(g){g.computeBoundingBox();const c=g.boundingBox.getCenter(new TH
 function bottom(g){g.computeBoundingBox();const b=g.boundingBox;g.translate(-(b.min.x+b.max.x)/2,-(b.min.y+b.max.y)/2,-b.min.z);return uv(g)}
 function load(n,prep){return new Promise((res,rej)=>stl.load(modelPath(n),g=>res(prep(g)),undefined,()=>rej(new Error(n))))}
 function loadObj(url){return new Promise((res,rej)=>objLoader.load(url,res,undefined,rej))}
-function makeWoodTexture(){
-  const c=document.createElement('canvas');c.width=c.height=512;
-  const x=c.getContext('2d');
-  const g=x.createLinearGradient(0,0,512,512);g.addColorStop(0,'#6f4a2d');g.addColorStop(.45,'#a1744b');g.addColorStop(1,'#4f321f');x.fillStyle=g;x.fillRect(0,0,512,512);
-  for(let i=0;i<80;i++){x.globalAlpha=.08+Math.random()*.08;x.strokeStyle=i%2?'#2d1c12':'#d1a06d';x.lineWidth=1+Math.random()*3;x.beginPath();const y=Math.random()*512;x.moveTo(0,y);for(let px=0;px<=512;px+=64)x.lineTo(px,y+Math.sin(px*.025+i)*8+Math.random()*10);x.stroke()}
-  x.globalAlpha=1;
-  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(2.4,2.4);return t;
-}
+function prepTableTex(t,isColor=false){if(isColor)t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=renderer.capabilities.getMaxAnisotropy();t.wrapS=t.wrapT=THREE.RepeatWrapping;t.needsUpdate=true;return t}
+function loadSoftTexture(url,label,isColor=false){return new Promise(res=>tex.load(url,t=>{prepTableTex(t,isColor);log(label,'restored');res(t)},undefined,e=>{log(label,'failed',e);res(null)}))}
+async function loadTableTextures(){const [albedo,normal,roughness]=await Promise.all([loadSoftTexture(TABLE_ALBEDO_URL,'table albedo',true),loadSoftTexture(TABLE_NORMAL_URL,'table normal'),loadSoftTexture(TABLE_ROUGHNESS_URL,'table roughness')]);tableMaps={albedo,normal,roughness};return tableMaps}
+function tableMaterial(){const mat=makeMat({color:'#c79a64',roughness:.72,metalness:0});if(tableMaps.albedo){mat.map=tableMaps.albedo;mat.color.set(0xffffff)}if(tableMaps.normal){mat.normalMap=tableMaps.normal;mat.normalScale.set(.75,.75)}if(tableMaps.roughness){mat.roughnessMap=tableMaps.roughness;mat.roughness=.92}mat.needsUpdate=true;return mat}
 function rng(seed){let a=seed>>>0;return()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
 function bases(){return [{dir:'right',x:R3,z:0,ang:90},{dir:'left',x:-R3,z:0,ang:90},{dir:'front',x:0,z:R3,ang:0},{dir:'back',x:0,z:-R3,ang:0}]}
 function finals(){const a=[];bases().forEach(b=>[-1,0,1].forEach(side=>{const r=rad(b.ang);a.push({dir:b.dir,side,px:b.x+Math.cos(r)*D*side,py:2,pz:b.z+Math.sin(r)*D*side,rx:-90,ry:0,rz:0})}));return a}
@@ -129,13 +127,12 @@ function pieceAt(p,ms){const q=ease((ms-pieceStart(p))/T.pieceMove),m=mix(p.star
 function total(){return T.lidShake+3*T.wallDelay+T.wallLift+T.wallMove+T.wallDrop+T.pieceMove+500}
 function apply(ms){tr(meshes['9'],A['9']);if(lid){tr(lid,lidAt(ms));lid.visible=ms<T.lidShake+T.lidLift}ORDER.forEach(k=>tr(meshes['3-'+k],wallAt(k,ms)));pieces.forEach(p=>tr(p.mesh,pieceAt(p,ms)));if(ms>=total())snap()}
 function snap(){tr(meshes['9'],A['9']);ORDER.forEach(k=>tr(meshes['3-'+k],A['3-'+k]));pieces.forEach(p=>tr(p.mesh,p.final));if(lid)lid.visible=false}
-function fallbackTable(){const g=new THREE.Group();g.name='yakolak-fallback-simple-table';const wood=makeWoodTexture(),topMat=makeMat({color:'#9b7047',map:wood,roughness:.82,metalness:0}),sideMat=makeMat({color:'#6f4a2d',map:wood,roughness:.86,metalness:0});const top=set(new THREE.Mesh(new THREE.BoxGeometry(680,32,540),topMat));top.position.y=TABLE_TOP_Y-16;g.add(top);const legGeo=new THREE.BoxGeometry(38,TABLE_TOP_Y-ROOM_CFG.floorY,38);[[-275,-210],[275,-210],[-275,210],[275,210]].forEach(([x,z])=>{const leg=set(new THREE.Mesh(legGeo,sideMat));leg.position.set(x,ROOM_CFG.floorY+(TABLE_TOP_Y-ROOM_CFG.floorY)/2,z);g.add(leg)});scene.add(g);return g}
+function fallbackTable(){const g=new THREE.Group();g.name='yakolak-fallback-simple-table';const topMat=tableMaterial(),sideMat=makeMat({color:'#7a4b27',roughness:.82,metalness:0});const top=set(new THREE.Mesh(new THREE.BoxGeometry(680,32,540),topMat));top.position.y=TABLE_TOP_Y-16;g.add(top);const legGeo=new THREE.BoxGeometry(38,TABLE_TOP_Y-ROOM_CFG.floorY,38);[[-275,-210],[275,-210],[-275,210],[275,210]].forEach(([x,z])=>{const leg=set(new THREE.Mesh(legGeo,sideMat));leg.position.set(x,ROOM_CFG.floorY+(TABLE_TOP_Y-ROOM_CFG.floorY)/2,z);g.add(leg)});scene.add(g);return g}
 async function realTable(){
   try{
-    const obj=await loadObj(TABLE_OBJ_URL);
+    const [obj]=await Promise.all([loadObj(TABLE_OBJ_URL),loadTableTextures()]);
     const group=new THREE.Group();group.name='yakolak-real-mars-table';
-    const tableMat=makeMat({color:'#8b6846',map:makeWoodTexture(),roughness:.84,metalness:.02});
-    tex.load(TABLE_WOOD_URL,t=>{t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(2.2,2.2);t.anisotropy=renderer.capabilities.getMaxAnisotropy();tableMat.map=t;tableMat.needsUpdate=true;render()},undefined,()=>{});
+    const tableMat=tableMaterial();
     obj.traverse(o=>{if(o.isMesh){o.material=tableMat;o.castShadow=false;o.receiveShadow=false;if(o.geometry)o.geometry.computeVertexNormals()}});
     group.add(obj);scene.add(group);
     const rawBox=new THREE.Box3().setFromObject(obj),rawSize=rawBox.getSize(new THREE.Vector3());
@@ -147,10 +144,11 @@ async function realTable(){
     obj.position.z-=((b.min.z+b.max.z)/2);
     obj.position.y+=TABLE_TOP_Y-b.max.y;
     group.rotation.y=Math.PI/4;
-    log('real table restored with wood texture and larger footprint',TABLE_OBJ_URL,TABLE_WOOD_URL);
+    log('real table restored with original texture maps',TABLE_OBJ_URL);
     return group;
   }catch(e){
     console.warn('[Yakolak] real table failed, fallback table used',e);
+    if(!tableMaps.albedo)await loadTableTextures();
     return fallbackTable();
   }
 }
@@ -158,7 +156,7 @@ function fit(objects){const box=new THREE.Box3();objects.forEach(o=>box.expandBy
 function frame(now){if(!playing)return;const e=now-start;apply(Math.min(e,total()));render();if(e<total())raf=requestAnimationFrame(frame);else{playing=false;snap();render()}}
 function replay(){if(!loaded)return;cancelAnimationFrame(raf);start=performance.now();playing=true;if(lid)lid.visible=true;apply(0);render();raf=requestAnimationFrame(frame)}
 function marble(){tex.load(MARBLE_URL,t=>{t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=renderer.capabilities.getMaxAnisotropy();mats.right.map=t;mats.right.needsUpdate=true;render()},undefined,()=>{})}
-async function boot(){try{const [g9,g3,gl,gm,gs]=await Promise.all([load('9',center),load('3',center),load('l',bottom),load('m',bottom),load('s',bottom)]);const objects=[];meshes['9']=set(new THREE.Mesh(g9,baseMat));scene.add(meshes['9']);objects.push(meshes['9']);ORDER.forEach(k=>{meshes['3-'+k]=set(new THREE.Mesh(g3,baseMat));scene.add(meshes['3-'+k]);objects.push(meshes['3-'+k])});lid=set(new THREE.Mesh(g9,baseMat));scene.add(lid);makePieces({l:gl,m:gm,s:gs});const tableObj=await realTable();objects.push(...pieces.map(p=>p.mesh),tableObj);fit(objects);loaded=true;apply(0);render();requestAnimationFrame(()=>requestAnimationFrame(done));replay();marble();log('prod stage1 ready - larger textured table inside bounded room')}catch(e){fail(e)}}
+async function boot(){try{const [g9,g3,gl,gm,gs]=await Promise.all([load('9',center),load('3',center),load('l',bottom),load('m',bottom),load('s',bottom)]);const objects=[];meshes['9']=set(new THREE.Mesh(g9,baseMat));scene.add(meshes['9']);objects.push(meshes['9']);ORDER.forEach(k=>{meshes['3-'+k]=set(new THREE.Mesh(g3,baseMat));scene.add(meshes['3-'+k]);objects.push(meshes['3-'+k])});lid=set(new THREE.Mesh(g9,baseMat));scene.add(lid);makePieces({l:gl,m:gm,s:gs});const tableObj=await realTable();objects.push(...pieces.map(p=>p.mesh),tableObj);fit(objects);loaded=true;apply(0);render();requestAnimationFrame(()=>requestAnimationFrame(done));replay();marble();log('prod stage1 ready - original table maps restored')}catch(e){fail(e)}}
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);render()},{passive:true});
 addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r')replay()});
 boot();
