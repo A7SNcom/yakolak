@@ -1,7 +1,7 @@
 // Yakolak production boot bridge.
-// Keep imports stable so the browser can cache heavy 3D code and assets.
+// Fast route: index.html -> room-boot-v049.js -> app.js -> src/app-fast.js
 
-console.info('[Yakolak] APP.JS v060 FAST CACHED BRIDGE LOADED');
+console.info('[Yakolak] APP.JS v060 FAST PRODUCTION BRIDGE LOADED');
 
 const BUILD='60';
-import('./src/app-live.js?v='+BUILD);
+import('./src/app-fast.js?v='+BUILD);
