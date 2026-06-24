@@ -1,6 +1,6 @@
 {
-  "version": "v062-hard-clear-fixed",
-  "build": 62,
+  "version": "v063-stage1-production-renderer",
+  "build": 63,
   "updated_at": "2026-06-24",
-  "note": "Fix clear button behavior by using a fresh asset version token after cleanup and loading the live app through the current versioned bridge."
+  "note": "Stage 1 performance pass: production renderer with intro, room, fallback table, cached assets, no calibration panel, no continuous idle render, and no heavy shadow maps."
 }
