@@ -3,10 +3,11 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {STLLoader} from 'three/addons/loaders/STLLoader.js';
 import {OBJLoader} from 'three/addons/loaders/OBJLoader.js';
 
-const BUILD='65';
+const BUILD='66';
 const MODEL_DIR='./assets/models/';
 const MARBLE_URL='https://i.ibb.co/B2h2tNKG/Screenshot-2026-06-22-094236.png';
 const TABLE_OBJ_URL=`${MODEL_DIR}uploads_files_3139458_Mars+Angled+Stump+Side+Table+30x30x45.obj?v=${BUILD}-table`;
+const TABLE_WOOD_URL=`${MODEL_DIR}background.webp?v=${BUILD}-wood`;
 const modelPath=n=>`${MODEL_DIR}${n}.stl?v=${BUILD}-${n}`;
 const root=document.getElementById('view');
 const loaderEl=document.getElementById('yakolakLoader');
@@ -26,7 +27,7 @@ renderer.toneMappingExposure=1.03;
 renderer.shadowMap.enabled=false;
 root.appendChild(renderer.domElement);
 
-const ROOM_CFG={floorY:-430,topY:1180,halfW:2400,backZ:-2400,frontZ:2400};
+const ROOM_CFG={floorY:-650,topY:1250,halfW:2400,backZ:-2400,frontZ:2400};
 const ROOM_LIMIT={minX:-ROOM_CFG.halfW+90,maxX:ROOM_CFG.halfW-90,minY:ROOM_CFG.floorY+80,maxY:ROOM_CFG.topY-70,minZ:ROOM_CFG.backZ+90,maxZ:ROOM_CFG.frontZ-90};
 const TABLE_TOP_Y=-16;
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
@@ -36,9 +37,9 @@ function keepInsideRoom(){
   camera.position.x=clamp(camera.position.x,ROOM_LIMIT.minX,ROOM_LIMIT.maxX);
   camera.position.y=clamp(camera.position.y,ROOM_LIMIT.minY,ROOM_LIMIT.maxY);
   camera.position.z=clamp(camera.position.z,ROOM_LIMIT.minZ,ROOM_LIMIT.maxZ);
-  controls.target.x=clamp(controls.target.x,-520,520);
+  controls.target.x=clamp(controls.target.x,-560,560);
   controls.target.y=clamp(controls.target.y,ROOM_CFG.floorY+80,ROOM_CFG.topY-170);
-  controls.target.z=clamp(controls.target.z,-520,520);
+  controls.target.z=clamp(controls.target.z,-560,560);
 }
 function render(){keepInsideRoom();renderer.render(scene,camera)}
 
@@ -109,6 +110,14 @@ function center(g){g.computeBoundingBox();const c=g.boundingBox.getCenter(new TH
 function bottom(g){g.computeBoundingBox();const b=g.boundingBox;g.translate(-(b.min.x+b.max.x)/2,-(b.min.y+b.max.y)/2,-b.min.z);return uv(g)}
 function load(n,prep){return new Promise((res,rej)=>stl.load(modelPath(n),g=>res(prep(g)),undefined,()=>rej(new Error(n))))}
 function loadObj(url){return new Promise((res,rej)=>objLoader.load(url,res,undefined,rej))}
+function makeWoodTexture(){
+  const c=document.createElement('canvas');c.width=c.height=512;
+  const x=c.getContext('2d');
+  const g=x.createLinearGradient(0,0,512,512);g.addColorStop(0,'#6f4a2d');g.addColorStop(.45,'#a1744b');g.addColorStop(1,'#4f321f');x.fillStyle=g;x.fillRect(0,0,512,512);
+  for(let i=0;i<80;i++){x.globalAlpha=.08+Math.random()*.08;x.strokeStyle=i%2?'#2d1c12':'#d1a06d';x.lineWidth=1+Math.random()*3;x.beginPath();const y=Math.random()*512;x.moveTo(0,y);for(let px=0;px<=512;px+=64)x.lineTo(px,y+Math.sin(px*.025+i)*8+Math.random()*10);x.stroke()}
+  x.globalAlpha=1;
+  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(2.4,2.4);return t;
+}
 function rng(seed){let a=seed>>>0;return()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
 function bases(){return [{dir:'right',x:R3,z:0,ang:90},{dir:'left',x:-R3,z:0,ang:90},{dir:'front',x:0,z:R3,ang:0},{dir:'back',x:0,z:-R3,ang:0}]}
 function finals(){const a=[];bases().forEach(b=>[-1,0,1].forEach(side=>{const r=rad(b.ang);a.push({dir:b.dir,side,px:b.x+Math.cos(r)*D*side,py:2,pz:b.z+Math.sin(r)*D*side,rx:-90,ry:0,rz:0})}));return a}
@@ -120,24 +129,25 @@ function pieceAt(p,ms){const q=ease((ms-pieceStart(p))/T.pieceMove),m=mix(p.star
 function total(){return T.lidShake+3*T.wallDelay+T.wallLift+T.wallMove+T.wallDrop+T.pieceMove+500}
 function apply(ms){tr(meshes['9'],A['9']);if(lid){tr(lid,lidAt(ms));lid.visible=ms<T.lidShake+T.lidLift}ORDER.forEach(k=>tr(meshes['3-'+k],wallAt(k,ms)));pieces.forEach(p=>tr(p.mesh,pieceAt(p,ms)));if(ms>=total())snap()}
 function snap(){tr(meshes['9'],A['9']);ORDER.forEach(k=>tr(meshes['3-'+k],A['3-'+k]));pieces.forEach(p=>tr(p.mesh,p.final));if(lid)lid.visible=false}
-function fallbackTable(){const g=new THREE.Group();g.name='yakolak-fallback-simple-table';const topMat=makeMat({color:'#c79a64',roughness:.82,metalness:0}),sideMat=makeMat({color:'#7a4b27',roughness:.86,metalness:0});const top=set(new THREE.Mesh(new THREE.BoxGeometry(470,24,360),topMat));top.position.y=TABLE_TOP_Y-12;g.add(top);const legGeo=new THREE.BoxGeometry(28,TABLE_TOP_Y-ROOM_CFG.floorY,28);[[-190,-130],[190,-130],[-190,130],[190,130]].forEach(([x,z])=>{const leg=set(new THREE.Mesh(legGeo,sideMat));leg.position.set(x,ROOM_CFG.floorY+(TABLE_TOP_Y-ROOM_CFG.floorY)/2,z);g.add(leg)});scene.add(g);return g}
+function fallbackTable(){const g=new THREE.Group();g.name='yakolak-fallback-simple-table';const wood=makeWoodTexture(),topMat=makeMat({color:'#9b7047',map:wood,roughness:.82,metalness:0}),sideMat=makeMat({color:'#6f4a2d',map:wood,roughness:.86,metalness:0});const top=set(new THREE.Mesh(new THREE.BoxGeometry(680,32,540),topMat));top.position.y=TABLE_TOP_Y-16;g.add(top);const legGeo=new THREE.BoxGeometry(38,TABLE_TOP_Y-ROOM_CFG.floorY,38);[[-275,-210],[275,-210],[-275,210],[275,210]].forEach(([x,z])=>{const leg=set(new THREE.Mesh(legGeo,sideMat));leg.position.set(x,ROOM_CFG.floorY+(TABLE_TOP_Y-ROOM_CFG.floorY)/2,z);g.add(leg)});scene.add(g);return g}
 async function realTable(){
   try{
     const obj=await loadObj(TABLE_OBJ_URL);
     const group=new THREE.Group();group.name='yakolak-real-mars-table';
-    const tableMat=makeMat({color:'#8b6846',roughness:.86,metalness:.02});
+    const tableMat=makeMat({color:'#8b6846',map:makeWoodTexture(),roughness:.84,metalness:.02});
+    tex.load(TABLE_WOOD_URL,t=>{t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(2.2,2.2);t.anisotropy=renderer.capabilities.getMaxAnisotropy();tableMat.map=t;tableMat.needsUpdate=true;render()},undefined,()=>{});
     obj.traverse(o=>{if(o.isMesh){o.material=tableMat;o.castShadow=false;o.receiveShadow=false;if(o.geometry)o.geometry.computeVertexNormals()}});
     group.add(obj);scene.add(group);
     const rawBox=new THREE.Box3().setFromObject(obj),rawSize=rawBox.getSize(new THREE.Vector3());
     const targetH=TABLE_TOP_Y-ROOM_CFG.floorY;
-    const s=rawSize.y?targetH/rawSize.y:920;
-    obj.scale.setScalar(s);
+    const s=rawSize.y?targetH/rawSize.y:1400;
+    obj.scale.set(s*1.35,s,s*1.35);
     let b=new THREE.Box3().setFromObject(obj);
     obj.position.x-=((b.min.x+b.max.x)/2);
     obj.position.z-=((b.min.z+b.max.z)/2);
-    obj.position.y+=ROOM_CFG.floorY-b.min.y;
+    obj.position.y+=TABLE_TOP_Y-b.max.y;
     group.rotation.y=Math.PI/4;
-    log('real table restored',TABLE_OBJ_URL);
+    log('real table restored with wood texture and larger footprint',TABLE_OBJ_URL,TABLE_WOOD_URL);
     return group;
   }catch(e){
     console.warn('[Yakolak] real table failed, fallback table used',e);
@@ -148,7 +158,7 @@ function fit(objects){const box=new THREE.Box3();objects.forEach(o=>box.expandBy
 function frame(now){if(!playing)return;const e=now-start;apply(Math.min(e,total()));render();if(e<total())raf=requestAnimationFrame(frame);else{playing=false;snap();render()}}
 function replay(){if(!loaded)return;cancelAnimationFrame(raf);start=performance.now();playing=true;if(lid)lid.visible=true;apply(0);render();raf=requestAnimationFrame(frame)}
 function marble(){tex.load(MARBLE_URL,t=>{t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=renderer.capabilities.getMaxAnisotropy();mats.right.map=t;mats.right.needsUpdate=true;render()},undefined,()=>{})}
-async function boot(){try{const [g9,g3,gl,gm,gs]=await Promise.all([load('9',center),load('3',center),load('l',bottom),load('m',bottom),load('s',bottom)]);const objects=[];meshes['9']=set(new THREE.Mesh(g9,baseMat));scene.add(meshes['9']);objects.push(meshes['9']);ORDER.forEach(k=>{meshes['3-'+k]=set(new THREE.Mesh(g3,baseMat));scene.add(meshes['3-'+k]);objects.push(meshes['3-'+k])});lid=set(new THREE.Mesh(g9,baseMat));scene.add(lid);makePieces({l:gl,m:gm,s:gs});const tableObj=await realTable();objects.push(...pieces.map(p=>p.mesh),tableObj);fit(objects);loaded=true;apply(0);render();requestAnimationFrame(()=>requestAnimationFrame(done));replay();marble();log('prod stage1 ready - real table inside bounded room')}catch(e){fail(e)}}
+async function boot(){try{const [g9,g3,gl,gm,gs]=await Promise.all([load('9',center),load('3',center),load('l',bottom),load('m',bottom),load('s',bottom)]);const objects=[];meshes['9']=set(new THREE.Mesh(g9,baseMat));scene.add(meshes['9']);objects.push(meshes['9']);ORDER.forEach(k=>{meshes['3-'+k]=set(new THREE.Mesh(g3,baseMat));scene.add(meshes['3-'+k]);objects.push(meshes['3-'+k])});lid=set(new THREE.Mesh(g9,baseMat));scene.add(lid);makePieces({l:gl,m:gm,s:gs});const tableObj=await realTable();objects.push(...pieces.map(p=>p.mesh),tableObj);fit(objects);loaded=true;apply(0);render();requestAnimationFrame(()=>requestAnimationFrame(done));replay();marble();log('prod stage1 ready - larger textured table inside bounded room')}catch(e){fail(e)}}
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);render()},{passive:true});
 addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r')replay()});
 boot();
