@@ -1,9 +1,9 @@
 # Source Structure
 
-Current runtime entry:
+Runtime route:
 
 ```txt
-src/app-prod-stage1.js
+index.html -> src/core/app.js -> src/app-prod-stage1.js
 ```
 
 Prepared folders:
@@ -15,6 +15,12 @@ loaders/    STL, OBJ, and texture loading helpers
 animation/  intro and replay animation logic
 utils/      small shared helpers
 config/     stable constants and path references
+```
+
+Current live file remains:
+
+```txt
+src/app-prod-stage1.js
 ```
 
 Rule: do not split the live file until each extracted part is tested.
