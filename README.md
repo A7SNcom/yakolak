@@ -9,6 +9,7 @@
 ```txt
 docs/YAKOLAK_PROJECT_RULES.md
 docs/FILES_AUDIT.md
+docs/reference/project-structure.md
 docs/reference/room.md
 docs/reference/table.md
 docs/plans/asset-organization.md
