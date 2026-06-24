@@ -1,8 +1,8 @@
 # FILES AUDIT
 
-Safe branch: organize-small-steps.
+Branch: الفرع-النظيف-والمرتب
 
-Status: folder scaffold created.
+Status: cleaned non-runtime files and created standard folders.
 Runtime is not changed yet.
 
 ## Keep
@@ -30,15 +30,26 @@ Runtime is not changed yet.
 
 - preview/empty-room.html
 
-## Pending organization
+## Removed from this branch
 
-- move game STL models
-- move Mars table OBJ
-- move Mars table textures
-- archive old previews
-- archive old builds
-- archive unused legacy assets
+- empty-room.html
+- src/app-live.js
+- assets/models/p.stl
+- assets/models/background.webp
+- assets/models/big-back.webp
+- assets/models/Asset 1big.svg
+- assets/models/aaaaaaaaa.svg
 
-## Rule
+## Still active in current runtime
 
-Move files only after a golden backup exists.
+- assets/models/9.stl
+- assets/models/3.stl
+- assets/models/l.stl
+- assets/models/m.stl
+- assets/models/s.stl
+- assets/models/table OBJ
+- assets/models/table texture maps
+
+## Next safe step
+
+Move active assets only after updating src/app-prod-stage1.js paths in the same tested step.
