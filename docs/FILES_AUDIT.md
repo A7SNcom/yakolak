@@ -2,7 +2,7 @@
 
 Branch: الفرع-النظيف-والمرتب
 
-Status: cleaner structure with separated docs folders.
+Status: cleaner structure with separated source, docs, assets, preview, and archive folders.
 Runtime is not changed yet.
 
 ## Runtime keep
@@ -12,30 +12,44 @@ Runtime is not changed yet.
 - version.json
 - src/app-prod-stage1.js
 
+## Source folders
+
+- src/core
+- src/scene
+- src/loaders
+- src/animation
+- src/utils
+- src/config
+- src/README.md
+
 ## Docs keep
 
 - README.md
 - docs/YAKOLAK_PROJECT_RULES.md
 - docs/FILES_AUDIT.md
+- docs/reference/project-structure.md
 - docs/reference/room.md
 - docs/reference/table.md
 - docs/plans/asset-organization.md
 - docs/logs/organization-log.md
 
-## Folders
+## Asset folders
 
+- assets/README.md
 - assets/models/game
 - assets/models/table
 - assets/textures/table
 - assets/textures/pieces
+
+## Preview and archive
+
+- preview/empty-room.html
+- preview/NOTES.md
+- archive/README.md
 - archive/golden
 - archive/experiments
 - archive/old-builds
 - archive/legacy-assets
-- preview
-- docs/reference
-- docs/plans
-- docs/logs
 
 ## Removed from this branch
 
