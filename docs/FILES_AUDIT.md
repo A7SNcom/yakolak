@@ -2,7 +2,7 @@
 
 Branch: الفرع-النظيف-والمرتب
 
-Status: root code bridge moved into src/core.
+Status: root cleaned and legacy boot archived.
 Runtime route updated.
 
 ## Root keep
@@ -45,20 +45,27 @@ Runtime route updated.
 - assets/textures/table
 - assets/textures/pieces
 
-## Preview and archive
+## Archive folders
 
-- preview/empty-room.html
-- preview/NOTES.md
 - archive/README.md
 - archive/golden
 - archive/experiments
+- archive/experiments/info.txt
 - archive/old-builds
+- archive/old-builds/NOTES.md
+- archive/old-builds/room-boot-v049.js
 - archive/legacy-assets
 
-## Removed from this branch
+## Preview folders
+
+- preview/NOTES.md
+
+## Removed from root or active folders
 
 - app.js
+- room-boot-v049.js
 - empty-room.html
+- preview/empty-room.html
 - src/app-live.js
 - docs/ROOM_NOTES.md
 - docs/TABLE_NOTES.md
