@@ -3,13 +3,13 @@
 ```txt
 root
   index.html
-  app.js
   version.json
   README.md
 
 src
   app-prod-stage1.js
   core
+    app.js
   scene
   loaders
   animation
@@ -33,4 +33,8 @@ preview
 archive
 ```
 
-Runtime is still unchanged.
+Runtime route:
+
+```txt
+index.html -> src/core/app.js -> src/app-prod-stage1.js
+```
