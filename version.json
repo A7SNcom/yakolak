@@ -1,6 +1,6 @@
 {
-  "version": "v061-premium-live-restored",
-  "build": 61,
+  "version": "v062-hard-clear-fixed",
+  "build": 62,
   "updated_at": "2026-06-24",
-  "note": "Restore the full live route with intro, real OBJ table, calibration controls, and visual assets while keeping the improved clear-cache button and stable cache-friendly boot path."
+  "note": "Fix clear button behavior by using a fresh asset version token after cleanup and loading the live app through the current versioned bridge."
 }
