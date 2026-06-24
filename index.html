@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="yakolak-version" content="v067-original-table-texture-maps">
+<meta name="yakolak-version" content="v067-clean-branch-core-bridge">
 <title>Yakolak Live</title>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://i.ibb.co" crossorigin>
@@ -78,7 +78,7 @@ async function checkVersion(){
   return true;
 }
 if(await checkVersion()){
-  await import('./app.js?v='+ASSET_VERSION);
+  await import('./src/core/app.js?v='+ASSET_VERSION);
   if(clearToken){
     const clean=new URL(location.href);
     clean.searchParams.delete('clear');
