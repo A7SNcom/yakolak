@@ -1,6 +1,6 @@
 {
-  "version": "v064-room-bounds",
-  "build": 64,
+  "version": "v065-real-table-room",
+  "build": 65,
   "updated_at": "2026-06-24",
-  "note": "Adds the soft complete room to the live Yakolak scene, keeps the table and intro behavior, and prevents browsing/panning outside the room bounds."
+  "note": "Restores the original Mars OBJ table inside the bounded soft room while preserving the intro and game layout."
 }
