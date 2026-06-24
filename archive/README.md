@@ -1,50 +1,23 @@
-# Yakolak Archive
+# Archive Structure
 
-هذا المجلد للأشياء الذهبية التي لا نريد فقدانها.
-
-## الحالة الذهبية الهندسية
-
-### `golden-v036-p-gap-11.json`
-الأرشيف الرسمي للحالة الهندسية الذهبية.
-
-### `golden-v036-p-gap-11.js`
-نفس الحالة الذهبية بصيغة JavaScript سهلة النسخ.
-
-## وضع الألوان الحالي
+هذا المجلد لحفظ الأشياء القديمة أو الذهبية بدون حذف نهائي.
 
 ```txt
-v037-color-controls-only
+golden/         approved backups
+old-builds/     old runtime files
+experiments/    standalone previews and experiments
+legacy-assets/  unused old assets
 ```
 
-راجع:
+## Important rule
+
+Archive is for preservation, not random deletion.
+
+## Golden geometry reminder
 
 ```txt
-docs/COLOR_MODE_V037.md
+D  = 48
+R3 = 135
 ```
 
-## القاعدة الذهبية الهندسية
-
-```txt
-pPieceGap = 11
-GOLDEN_DISTANCE = 48
-THREE_RADIUS = 135
-P_RADIUS = 85
-```
-
-## القاعدة الحالية للواجهة
-
-```txt
-ألوان فقط
-لا معايرات مواقع
-حجار البورد مخفية بصريًا ومواقعها محفوظة
-```
-
-## ممنوع نرجع له بدون سبب قوي
-
-```txt
-معايرة كل جهة من p.stl
-معايرة كل جهة من 3.stl
-تحريك مراكز p.stl
-تحريك مراكز 3.stl
-تغيير تباعد الحجار 48 بدون اختبار بصري
-```
+Do not change approved geometry without a direct request.
