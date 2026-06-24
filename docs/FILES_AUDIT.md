@@ -2,14 +2,19 @@
 
 Branch: الفرع-النظيف-والمرتب
 
-Status: cleaner structure with separated source, docs, assets, preview, and archive folders.
-Runtime is not changed yet.
+Status: root code bridge moved into src/core.
+Runtime route updated.
 
-## Runtime keep
+## Root keep
 
 - index.html
-- app.js
 - version.json
+- README.md
+
+## Runtime route
+
+- index.html
+- src/core/app.js
 - src/app-prod-stage1.js
 
 ## Source folders
@@ -24,7 +29,6 @@ Runtime is not changed yet.
 
 ## Docs keep
 
-- README.md
 - docs/YAKOLAK_PROJECT_RULES.md
 - docs/FILES_AUDIT.md
 - docs/reference/project-structure.md
@@ -53,6 +57,7 @@ Runtime is not changed yet.
 
 ## Removed from this branch
 
+- app.js
 - empty-room.html
 - src/app-live.js
 - docs/ROOM_NOTES.md
