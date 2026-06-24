@@ -2,19 +2,27 @@
 
 Branch: الفرع-النظيف-والمرتب
 
-Status: cleaned non-runtime files and created standard folders.
+Status: cleaner structure with separated docs folders.
 Runtime is not changed yet.
 
-## Keep
+## Runtime keep
 
 - index.html
 - app.js
 - version.json
-- README.md
 - src/app-prod-stage1.js
-- docs/YAKOLAK_PROJECT_RULES.md
 
-## Created folders
+## Docs keep
+
+- README.md
+- docs/YAKOLAK_PROJECT_RULES.md
+- docs/FILES_AUDIT.md
+- docs/reference/room.md
+- docs/reference/table.md
+- docs/plans/asset-organization.md
+- docs/logs/organization-log.md
+
+## Folders
 
 - assets/models/game
 - assets/models/table
@@ -25,15 +33,16 @@ Runtime is not changed yet.
 - archive/old-builds
 - archive/legacy-assets
 - preview
-
-## Created routes
-
-- preview/empty-room.html
+- docs/reference
+- docs/plans
+- docs/logs
 
 ## Removed from this branch
 
 - empty-room.html
 - src/app-live.js
+- docs/ROOM_NOTES.md
+- docs/TABLE_NOTES.md
 - assets/models/p.stl
 - assets/models/background.webp
 - assets/models/big-back.webp
