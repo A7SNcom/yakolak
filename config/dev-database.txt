@@ -1,0 +1,12 @@
+Public disposable Turso dev database
+
+Database name:
+database-canary-drawer
+
+Turso Cloud ID:
+019efe18-ba01-7483-8a59-b88e4a9ed006
+
+Database URL:
+libsql://database-canary-drawer-vercel-icfg-r8o7fwhpf7nh36wrug0epn3u.aws-us-east-1.turso.io
+
+Use DEV_DATABASE.md for connection notes.
