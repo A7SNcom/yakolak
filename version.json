@@ -1,6 +1,6 @@
 {
-  "version": "v069-gpt-black-room",
-  "build": 69,
+  "version": "v070-gpt-floor-ceiling-black",
+  "build": 70,
   "updated_at": "2026-06-25",
-  "note": "GPT branch preview: keeps the table alignment and applies black room surfaces through a small patch before loading the main app."
+  "note": "GPT branch preview: only the floor and ceiling are black, while the walls remain white, and the table alignment stays active."
 }
