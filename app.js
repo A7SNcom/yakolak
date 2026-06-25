@@ -1,6 +1,6 @@
-import './src/fc.js?v=70';
+import './src/fc.js?v=71';
 
-console.info('[Yakolak] APP.JS v070 LOADED');
+console.info('[Yakolak] APP.JS v071 LOADED');
 
-const BUILD='70';
+const BUILD='71';
 import('./src/app-prod-stage1.js?v='+BUILD);
