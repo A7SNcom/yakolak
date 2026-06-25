@@ -1,6 +1,6 @@
 {
-  "version": "v071-gpt-force-floor-ceiling-black",
-  "build": 71,
+  "version": "v073-gpt-light-rig",
+  "build": 73,
   "updated_at": "2026-06-25",
-  "note": "GPT branch preview: forces floor and ceiling to black and keeps the four walls white."
+  "note": "Adds three adjustable glowing orb lights with a calibration panel."
 }
