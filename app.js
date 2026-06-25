@@ -1,7 +1,7 @@
-import './src/room-black-patch.js?v=77';
-import './src/lights.js?v=77';
+import './src/room-black-patch.js?v=78';
+import './src/lights.js?v=78';
 
-console.info('[Yakolak] APP.JS v077 NUMERIC ORB LIGHT CONTROLS LOADED');
+console.info('[Yakolak] APP.JS v078 UNLIMITED LIGHT CALIBRATION LOADED');
 
-const BUILD='77';
+const BUILD='78';
 import('./src/app-prod-stage1.js?v='+BUILD);
