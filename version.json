@@ -1,6 +1,6 @@
 {
-  "version": "v074-floor-ceiling-patch",
-  "build": 74,
+  "version": "v075-orb-lights",
+  "build": 75,
   "updated_at": "2026-06-25",
-  "note": "Vercel main preview: floor and ceiling are black while the walls remain white."
+  "note": "Adds adjustable orb lights."
 }
