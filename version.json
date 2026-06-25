@@ -1,6 +1,6 @@
 {
-  "version": "v070-gpt-floor-ceiling-black",
-  "build": 70,
+  "version": "v071-gpt-force-floor-ceiling-black",
+  "build": 71,
   "updated_at": "2026-06-25",
-  "note": "GPT branch preview: only the floor and ceiling are black, while the walls remain white, and the table alignment stays active."
+  "note": "GPT branch preview: forces floor and ceiling to black and keeps the four walls white."
 }
