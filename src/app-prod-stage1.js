@@ -3,7 +3,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {STLLoader} from 'three/addons/loaders/STLLoader.js';
 import {OBJLoader} from 'three/addons/loaders/OBJLoader.js';
 
-const BUILD='67';
+const BUILD='68';
 const MODEL_DIR='./assets/models/';
 const MARBLE_URL='https://i.ibb.co/B2h2tNKG/Screenshot-2026-06-22-094236.png';
 const TABLE_OBJ_URL=`${MODEL_DIR}uploads_files_3139458_Mars+Angled+Stump+Side+Table+30x30x45.obj?v=${BUILD}-table`;
@@ -32,6 +32,7 @@ root.appendChild(renderer.domElement);
 const ROOM_CFG={floorY:-650,topY:1250,halfW:2400,backZ:-2400,frontZ:2400};
 const ROOM_LIMIT={minX:-ROOM_CFG.halfW+90,maxX:ROOM_CFG.halfW-90,minY:ROOM_CFG.floorY+80,maxY:ROOM_CFG.topY-70,minZ:ROOM_CFG.backZ+90,maxZ:ROOM_CFG.frontZ-90};
 const TABLE_TOP_Y=-16;
+const TABLE_CONTACT_EPS=.8;
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 let controls;
 function keepInsideRoom(){
@@ -92,6 +93,18 @@ function addRoom(){
 }
 addRoom();
 
+const gameGroup=new THREE.Group();gameGroup.name='yakolak-game-on-table';scene.add(gameGroup);
+function addGame(o){gameGroup.add(o);return o}
+function alignGameToTable(tableObj){
+  gameGroup.updateWorldMatrix(true,true);
+  tableObj.updateWorldMatrix(true,true);
+  const tb=new THREE.Box3().setFromObject(tableObj),gb=new THREE.Box3().setFromObject(gameGroup);
+  if(tb.isEmpty()||gb.isEmpty())return;
+  const offset=tb.max.y+TABLE_CONTACT_EPS-gb.min.y;
+  gameGroup.position.y+=offset;
+  log('game aligned to table',{tableTop:tb.max.y,gameBottom:gb.min.y,offsetY:gameGroup.position.y});
+}
+
 const stl=new STLLoader(),objLoader=new OBJLoader(),tex=new THREE.TextureLoader();tex.setCrossOrigin('anonymous');
 const makeMat=p=>new THREE.MeshStandardMaterial(p);
 const baseMat=makeMat({color:'#161616',roughness:.54,metalness:.04});
@@ -119,7 +132,7 @@ function tableMaterial(){const mat=makeMat({color:'#c79a64',roughness:.72,metaln
 function rng(seed){let a=seed>>>0;return()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
 function bases(){return [{dir:'right',x:R3,z:0,ang:90},{dir:'left',x:-R3,z:0,ang:90},{dir:'front',x:0,z:R3,ang:0},{dir:'back',x:0,z:-R3,ang:0}]}
 function finals(){const a=[];bases().forEach(b=>[-1,0,1].forEach(side=>{const r=rad(b.ang);a.push({dir:b.dir,side,px:b.x+Math.cos(r)*D*side,py:2,pz:b.z+Math.sin(r)*D*side,rx:-90,ry:0,rz:0})}));return a}
-function makePieces(geos){const rand=rng(4128),fs=finals();fs.forEach(f=>TYPES.forEach(type=>{const r=rand()*Math.PI*2,rr=rand()*78,mesh=set(new THREE.Mesh(geos[type],mats[f.dir]));const start={px:Math.cos(r)*rr,py:10+rand()*18,pz:Math.sin(r)*rr,rx:-90+(rand()*2-1)*20,ry:(rand()*2-1)*20,rz:Math.round(rand()*360)};const p={mesh,dir:f.dir,side:f.side,start,final:{...f}};pieces.push(p);scene.add(mesh);tr(mesh,start)}))}
+function makePieces(geos){const rand=rng(4128),fs=finals();fs.forEach(f=>TYPES.forEach(type=>{const r=rand()*Math.PI*2,rr=rand()*78,mesh=set(new THREE.Mesh(geos[type],mats[f.dir]));const start={px:Math.cos(r)*rr,py:10+rand()*18,pz:Math.sin(r)*rr,rx:-90+(rand()*2-1)*20,ry:(rand()*2-1)*20,rz:Math.round(rand()*360)};const p={mesh,dir:f.dir,side:f.side,start,final:{...f}};pieces.push(p);addGame(mesh);tr(mesh,start)}))}
 function lidAt(ms){const p={...LID};if(ms<T.lidShake){const f=1-ms/T.lidShake,w=Math.sin(ms*.12)*2.8*f;p.rx+=w*.45;p.rz+=Math.sin(ms*.07)*1.2*f;return p}p.py+=T.lidH*ease((ms-T.lidShake)/T.lidLift);return p}
 function wallAt(k,ms){const i=ORDER.indexOf(k),st=WALL[k],fn=A['3-'+k],start=T.lidShake+i*T.wallDelay;let t=ms-start;if(t<=0)return st;const up={...st,py:st.py+20},upF={...fn,py:st.py+20};if(t<T.wallLift)return mix(st,up,t/T.wallLift);t-=T.wallLift;if(t<T.wallMove)return mix(up,upF,t/T.wallMove);t-=T.wallMove;if(t<T.wallDrop)return mix(upF,fn,t/T.wallDrop);return fn}
 function pieceStart(p){const i=ORDER.indexOf(p.dir);return T.lidShake+i*T.wallDelay+T.wallLift+T.wallMove-T.pieceLead+(p.side+1)*T.pieceStagger}
@@ -156,7 +169,7 @@ function fit(objects){const box=new THREE.Box3();objects.forEach(o=>box.expandBy
 function frame(now){if(!playing)return;const e=now-start;apply(Math.min(e,total()));render();if(e<total())raf=requestAnimationFrame(frame);else{playing=false;snap();render()}}
 function replay(){if(!loaded)return;cancelAnimationFrame(raf);start=performance.now();playing=true;if(lid)lid.visible=true;apply(0);render();raf=requestAnimationFrame(frame)}
 function marble(){tex.load(MARBLE_URL,t=>{t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=renderer.capabilities.getMaxAnisotropy();mats.right.map=t;mats.right.needsUpdate=true;render()},undefined,()=>{})}
-async function boot(){try{const [g9,g3,gl,gm,gs]=await Promise.all([load('9',center),load('3',center),load('l',bottom),load('m',bottom),load('s',bottom)]);const objects=[];meshes['9']=set(new THREE.Mesh(g9,baseMat));scene.add(meshes['9']);objects.push(meshes['9']);ORDER.forEach(k=>{meshes['3-'+k]=set(new THREE.Mesh(g3,baseMat));scene.add(meshes['3-'+k]);objects.push(meshes['3-'+k])});lid=set(new THREE.Mesh(g9,baseMat));scene.add(lid);makePieces({l:gl,m:gm,s:gs});const tableObj=await realTable();objects.push(...pieces.map(p=>p.mesh),tableObj);fit(objects);loaded=true;apply(0);render();requestAnimationFrame(()=>requestAnimationFrame(done));replay();marble();log('prod stage1 ready - original table maps restored')}catch(e){fail(e)}}
+async function boot(){try{const [g9,g3,gl,gm,gs]=await Promise.all([load('9',center),load('3',center),load('l',bottom),load('m',bottom),load('s',bottom)]);const objects=[];meshes['9']=set(new THREE.Mesh(g9,baseMat));addGame(meshes['9']);objects.push(meshes['9']);ORDER.forEach(k=>{meshes['3-'+k]=set(new THREE.Mesh(g3,baseMat));addGame(meshes['3-'+k]);objects.push(meshes['3-'+k])});lid=set(new THREE.Mesh(g9,baseMat));addGame(lid);makePieces({l:gl,m:gm,s:gs});apply(0);const tableObj=await realTable();alignGameToTable(tableObj);objects.push(...pieces.map(p=>p.mesh),tableObj);fit(objects);loaded=true;render();requestAnimationFrame(()=>requestAnimationFrame(done));replay();marble();log('prod stage1 ready - table contact alignment active')}catch(e){fail(e)}}
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);render()},{passive:true});
 addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r')replay()});
 boot();
