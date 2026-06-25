@@ -1,5 +1,4 @@
-// Yakolak stage 1 production bridge.
-// Route: index.html -> app.js -> src/app-prod-stage1.js
+import './src/room-black-patch.js?v=69';
 
 console.info('[Yakolak] APP.JS v069 LOADED');
 
