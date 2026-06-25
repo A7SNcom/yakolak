@@ -1,6 +1,6 @@
-import './src/room-black-patch.js?v=69';
+import './src/fc.js?v=70';
 
-console.info('[Yakolak] APP.JS v069 LOADED');
+console.info('[Yakolak] APP.JS v070 LOADED');
 
-const BUILD='69';
+const BUILD='70';
 import('./src/app-prod-stage1.js?v='+BUILD);
