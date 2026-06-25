@@ -1,8 +1,6 @@
-// Yakolak stage 1 production bridge.
-// Route: index.html -> app.js -> src/app-prod-stage1.js
-// Keeps intro and visual composition while adding the bounded soft room and original Mars table texture maps.
+import './src/room-black-patch.js?v=74';
 
-console.info('[Yakolak] APP.JS v068 TABLE CONTACT ALIGNMENT LOADED');
+console.info('[Yakolak] APP.JS v074 FLOOR CEILING PATCH LOADED');
 
-const BUILD='68';
+const BUILD='74';
 import('./src/app-prod-stage1.js?v='+BUILD);
