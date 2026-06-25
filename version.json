@@ -1,6 +1,6 @@
 {
-  "version": "v067-original-table-texture-maps",
-  "build": 67,
-  "updated_at": "2026-06-24",
-  "note": "Restores the original Mars table Albedo, Normal, and Roughness texture maps instead of the temporary generated wood texture, while keeping the approved table size."
+  "version": "v068-table-contact-alignment",
+  "build": 68,
+  "updated_at": "2026-06-25",
+  "note": "Places the game in a single group and aligns its real bottom bounding box to the real table top bounding box to remove the visible air gap without changing the approved layout."
 }
