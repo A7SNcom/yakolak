@@ -1,6 +1,6 @@
 {
-  "version": "v068-table-contact-alignment",
-  "build": 68,
+  "version": "v074-floor-ceiling-patch",
+  "build": 74,
   "updated_at": "2026-06-25",
-  "note": "Places the game in a single group and aligns its real bottom bounding box to the real table top bounding box to remove the visible air gap without changing the approved layout."
+  "note": "Vercel main preview: floor and ceiling are black while the walls remain white."
 }
