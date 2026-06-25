@@ -1,3 +1,4 @@
+import './lights-calib.js?v=73';
 import * as THREE from 'three';
 const black = new Set(['room-floor','room-ceiling']);
 const white = new Set(['room-back-wall','room-left-wall','room-right-wall','room-front-wall']);
