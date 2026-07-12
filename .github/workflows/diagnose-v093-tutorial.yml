@@ -1,4 +1,5 @@
 name: Diagnose v093 tutorial sequence
+# Measures tutorial transitions after the v093 rendering performance fix.
 
 on:
   push:
