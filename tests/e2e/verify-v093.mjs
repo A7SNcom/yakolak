@@ -127,6 +127,7 @@ async function runScenario(name, viewport, mobile) {
     hasTouch: mobile,
     deviceScaleFactor: mobile ? 2 : 1,
     locale: 'ar-SA',
+    reducedMotion: 'reduce',
   });
   const page = await context.newPage();
   const pageErrors = [];

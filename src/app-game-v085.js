@@ -15,6 +15,8 @@ const modelPath=n=>`${MODEL_DIR}${n}.stl?v=${BUILD}-${n}`;
 const root=document.getElementById('view');
 const loaderEl=document.getElementById('yakolakLoader');
 const log=(...a)=>console.info('[Yakolak]',...a);
+const REDUCED_MOTION=globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches||new URLSearchParams(location.search).has('reducedMotion');
+const motionMs=ms=>REDUCED_MOTION?Math.min(ms,80):ms;
 function setLoadingProgress(value,status){
   globalThis.__yakolakLoading?.set?.(value,status);
 }
@@ -1273,6 +1275,7 @@ function setObjectOpacity(obj,opacity){
   });
 }
 async function fadeOutObjects(objects,ms=560){
+  ms=motionMs(ms);
   const targets=objects.filter(Boolean).map(obj=>({obj,scale:obj.scale.clone(),restore:cloneObjectMaterials(obj)}));
   if(!targets.length)return;
   const t0=performance.now();
@@ -1428,7 +1431,7 @@ function blinkWinEntries(entries){
   const targets=entries.map(e=>({entry:e,mesh:e.mesh,baseScale:e.mesh.scale.clone(),preset:winHighlightPreset()})).filter(t=>t.mesh);
   if(!targets.length)return Promise.resolve();
   const token=++winBlinkToken;
-  const duration=Math.max(1000,+calibration.play.winnerBlinkDuration||3000);
+  const duration=REDUCED_MOTION?120:Math.max(1000,+calibration.play.winnerBlinkDuration||3000);
   const blinks=Math.max(1,Math.round(+calibration.play.winnerBlinkCount||5));
   targets.forEach(t=>cloneBlinkMaterial(t.mesh,t.entry.color));
   const t0=performance.now();
@@ -1566,6 +1569,7 @@ function showCells(cells,color='#ffffff'){
 }
 function wait(ms){return new Promise(res=>setTimeout(res,ms))}
 function setCameraView(pos,target,ms=700){
+  ms=motionMs(ms);
   const from=camera.position.clone(),to=new THREE.Vector3(pos.x,pos.y,pos.z),tf=controls.target.clone(),tt=new THREE.Vector3(target.x,target.y,target.z);
   const t0=performance.now();
   return new Promise(res=>{
@@ -1578,6 +1582,7 @@ function setCameraView(pos,target,ms=700){
   });
 }
 function animateObjectTo(obj,pos,rot=null,ms=650,arc=22){
+  ms=motionMs(ms);
   const from=obj.position.clone(),to=new THREE.Vector3(pos.px,pos.py,pos.pz);
   const fromRot=obj.rotation.clone(),toRot=rot?new THREE.Euler(rot.x,rot.y,rot.z):obj.rotation.clone();
   const t0=performance.now();
@@ -1598,6 +1603,7 @@ function animateObjectTo(obj,pos,rot=null,ms=650,arc=22){
   });
 }
 function animateObjectsTo(items,ms=620,arc=16){
+  ms=motionMs(ms);
   if(!items.length)return Promise.resolve();
   const prepared=items.map(item=>{
     const obj=item.obj;

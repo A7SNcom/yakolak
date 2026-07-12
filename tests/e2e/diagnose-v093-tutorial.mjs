@@ -6,7 +6,7 @@ const outDir = process.env.ARTIFACT_DIR || 'artifacts/tutorial-diagnostic';
 await fs.mkdir(outDir, { recursive: true });
 
 const browser = await chromium.launch({ headless: true, args: ['--enable-unsafe-swiftshader'] });
-const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ar-SA' });
+const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ar-SA', reducedMotion: 'reduce' });
 const page = await context.newPage();
 const report = {
   ok: false,
