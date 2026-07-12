@@ -1893,7 +1893,7 @@ function maybeBotTurn(){
     const move=chooseBotMove(color);
     if(!move){gameState.locked=false;nextTurn();return}
     gameState.locked=false;
-    commitMove(move.piece,move.zone,true);
+    commitMove(move.piece,move.zone,!REDUCED_MOTION);
   },420+Math.random()*320);
 }
 function scorePointTransform(color,index){
