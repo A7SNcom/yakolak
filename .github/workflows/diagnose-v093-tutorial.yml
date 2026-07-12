@@ -36,7 +36,8 @@ jobs:
             ('function setCameraView(pos,target,ms=700){','function setCameraView(pos,target,ms=700){\n  ms=motionMs(ms);'),
             ('function animateObjectTo(obj,pos,rot=null,ms=650,arc=22){','function animateObjectTo(obj,pos,rot=null,ms=650,arc=22){\n  ms=motionMs(ms);'),
             ('function animateObjectsTo(items,ms=620,arc=16){','function animateObjectsTo(items,ms=620,arc=16){\n  ms=motionMs(ms);'),
-            ('const duration=Math.max(1000,+calibration.play.winnerBlinkDuration||3000);','const duration=REDUCED_MOTION?120:Math.max(1000,+calibration.play.winnerBlinkDuration||3000);')]
+            ('const duration=Math.max(1000,+calibration.play.winnerBlinkDuration||3000);','const duration=REDUCED_MOTION?120:Math.max(1000,+calibration.play.winnerBlinkDuration||3000);'),
+            ('commitMove(move.piece,move.zone,true);','commitMove(move.piece,move.zone,!REDUCED_MOTION);')]
           for old,new in pairs:
             if new not in s:
               if old not in s: raise SystemExit('missing '+old)
@@ -56,7 +57,7 @@ jobs:
             git config user.name yakolak-agent
             git config user.email ahmad.bn.kamal@gmail.com
             git add -A
-            git commit -m "Add reduced motion and faster low-power rendering"
+            git commit -m "Make reduced-motion bot turns immediate"
             git push origin HEAD:feature/v093-visual-mobile
           fi
       - uses: actions/setup-node@v4
