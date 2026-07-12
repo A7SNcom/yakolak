@@ -168,6 +168,11 @@ async function runScenario(name, viewport, mobile) {
   await chooseSetup(page, 'bots', 1, mobile);
   await shot(page, `${outDir}/${name}-01b-configured.png`);
 
+  await page.waitForFunction(() => {
+    const state = globalThis.__yakolakGame.state;
+    return state.tutorial || state.started;
+  }, null, { timeout: 150_000 });
+
   let tutorialPrompts = 0;
   while (await page.evaluate(() => globalThis.__yakolakGame.state.tutorial)) {
     await page.waitForFunction(() => {
