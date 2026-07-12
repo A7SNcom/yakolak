@@ -43,6 +43,17 @@ jobs:
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
 
+      - name: Fix test harness argument forwarding
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('tests/e2e/verify-v092-preview.mjs')
+          s = p.read_text()
+          s = s.replace('async function projectedPoint(page, resolver) {', 'async function projectedPoint(page, resolver, arg) {')
+          s = s.replace('const point = await page.evaluate(resolver);', 'const point = await page.evaluate(resolver, arg);')
+          p.write_text(s)
+          PY
+
       - name: Diagnose public v092 loading
         run: node tests/e2e/diagnose-v092-preview.mjs
 
