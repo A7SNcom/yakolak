@@ -12,6 +12,10 @@ function assert(value, message) {
   if (!value) throw new Error(message);
 }
 
+async function shot(page, path) {
+  await page.screenshot({ path, timeout: 120_000, animations: 'disabled' });
+}
+
 async function tap(page, point, mobile) {
   if (mobile) await page.touchscreen.tap(point.x, point.y);
   else await page.mouse.click(point.x, point.y);
@@ -152,17 +156,17 @@ async function runScenario(name, viewport, mobile) {
   assert(!initial.loader, `${name}: شاشة التحميل لم تختف`);
   assert(initial.scrollWidth <= initial.width + 2, `${name}: تمرير أفقي في الصفحة`);
   assert(initial.caption.includes('اختار'), `${name}: شاشة الاختيار لم تظهر`);
-  await page.screenshot({ path: `${outDir}/${name}-01-loaded.png`, fullPage: true });
+  await shot(page, `${outDir}/${name}-01-loaded.png`);
 
   await chooseSetup(page, 'color', 'right', mobile);
   await page.waitForFunction(() => globalThis.__yakolakGame.state.setupStep === 'bots', null, { timeout: 15_000 });
   await chooseSetup(page, 'bots', 1, mobile);
-  await page.screenshot({ path: `${outDir}/${name}-01b-configured.png`, fullPage: true });
+  await shot(page, `${outDir}/${name}-01b-configured.png`);
 
   for (let step = 0; step < 3; step += 1) {
     const button = page.locator('#yakolakTutorialDialog.open .yt-ok');
     await button.waitFor({ state: 'visible', timeout: 120_000 });
-    if (step === 0) await page.screenshot({ path: `${outDir}/${name}-02-tutorial.png`, fullPage: true });
+    if (step === 0) await shot(page, `${outDir}/${name}-02-tutorial.png`);
     await button.click();
   }
 
@@ -179,11 +183,11 @@ async function runScenario(name, viewport, mobile) {
   assert(round.players.length === 2, `${name}: إعداد اللاعبين تغير`);
   assert(round.score.includes('ث'), `${name}: المؤقت غير ظاهر`);
   assert(round.visibleZones === 9, `${name}: علامات الخانات الخافتة غير ظاهرة`);
-  await page.screenshot({ path: `${outDir}/${name}-03-round.png`, fullPage: true });
+  await shot(page, `${outDir}/${name}-03-round.png`);
 
   await openHumanTray(page, mobile);
   await page.waitForFunction(() => globalThis.__yakolakGame.gameGroup.children.filter((o) => o.name?.startsWith('yakolak-drop-zone-') && o.visible).length === 9, null, { timeout: 15_000 });
-  await page.screenshot({ path: `${outDir}/${name}-04-tray.png`, fullPage: true });
+  await shot(page, `${outDir}/${name}-04-tray.png`);
 
   const zoneId = 0;
   const point = await safeZonePoint(page, zoneId);
@@ -196,7 +200,7 @@ async function runScenario(name, viewport, mobile) {
     const g = globalThis.__yakolakGame;
     return Object.values(g.state.board || {}).some((cell) => Object.values(cell || {}).some((color) => color && color !== g.state.humanColor));
   }, null, { timeout: 20_000 });
-  await page.screenshot({ path: `${outDir}/${name}-05-moves.png`, fullPage: true });
+  await shot(page, `${outDir}/${name}-05-moves.png`);
 
   const wins = await page.evaluate(() => {
     const g = globalThis.__yakolakGame;
@@ -212,7 +216,7 @@ async function runScenario(name, viewport, mobile) {
     g.debugTriggerWin('same-size', g.state.humanColor);
   });
   await page.waitForFunction(() => Boolean(globalThis.__yakolakGame.state.winner), null, { timeout: 15_000 });
-  await page.screenshot({ path: `${outDir}/${name}-06-win.png`, fullPage: true });
+  await shot(page, `${outDir}/${name}-06-win.png`);
 
   const fatal = consoleErrors.filter((text) => /uncaught|prod stage1 error|syntaxerror|referenceerror|typeerror/i.test(text));
   assert(pageErrors.length === 0, `${name}: أخطاء صفحة: ${pageErrors.join(' | ')}`);
