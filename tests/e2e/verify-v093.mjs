@@ -59,6 +59,11 @@ async function chooseSetup(page, type, value, mobile) {
       return;
     } catch {}
   }
+  const completed = await page.evaluate((kind) => {
+    const state = globalThis.__yakolakGame.state;
+    return kind === 'color' ? state.setupStep === 'bots' : state.configured;
+  }, type);
+  if (completed) return;
   const state = await page.evaluate(() => ({ ...globalThis.__yakolakGame.state }));
   throw new Error(`لم ينجح اختيار ${type}:${value} - ${JSON.stringify(state)}`);
 }
