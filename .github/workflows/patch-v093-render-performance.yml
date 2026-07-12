@@ -1,0 +1,90 @@
+name: Patch v093 rendering performance
+
+on:
+  push:
+    branches:
+      - feature/v093-visual-mobile
+    paths:
+      - .github/workflows/patch-v093-render-performance.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v093-visual-mobile
+          fetch-depth: 0
+
+      - name: Reduce rendering cost without changing visual design
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          def replace_once(text, old, new, label):
+              count=text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected 1 match, found {count}')
+              return text.replace(old,new,1)
+
+          game_path=Path('src/app-game-v085.js')
+          game=game_path.read_text()
+          game=replace_once(game,
+            "markers:false,pixelRatio:1.4,cameraX:520",
+            "markers:false,pixelRatio:1.25,cameraX:520",
+            'default pixel ratio')
+          game=replace_once(game,
+            "const renderer=new THREE.WebGLRenderer({antialias:innerWidth>640,alpha:false,powerPreference:'high-performance'});",
+            "const renderer=new THREE.WebGLRenderer({antialias:false,alpha:false,powerPreference:'high-performance'});",
+            'antialias')
+          game=replace_once(game,
+            "const effectivePixelRatio=()=>Math.min(Math.max(devicePixelRatio||1,1),innerWidth<=640?1.35:1.6);",
+            "const effectivePixelRatio=()=>Math.min(Math.max(devicePixelRatio||1,1),innerWidth<=640?1.2:1.35);",
+            'effective pixel ratio')
+          game=replace_once(game,
+            "renderer.setPixelRatio(Math.min(Math.max(+calibration.scene.pixelRatio||1,1),innerWidth<=640?1.35:1.6));",
+            "renderer.setPixelRatio(Math.min(Math.max(+calibration.scene.pixelRatio||1,1),innerWidth<=640?1.2:1.35));",
+            'calibration pixel ratio')
+          game_path.write_text(game)
+
+          cfg_path=Path('config/calibration-v093.js')
+          cfg=cfg_path.read_text()
+          cfg=replace_once(cfg,"pixelRatio: 1.4","pixelRatio: 1.25",'server fallback pixel ratio')
+          cfg_path.write_text(cfg)
+
+          version_path=Path('version.json')
+          version=json.loads(version_path.read_text())
+          version['note']='Improves room lighting, table and board contrast, subtle playable-cell guides, and portrait mobile controls while reducing render cost for smooth animations without changing game rules.'
+          version_path.write_text(json.dumps(version,ensure_ascii=False,indent=2)+'\n')
+          PY
+
+      - name: Validate performance patch and rules
+        run: |
+          node --check src/app-game-v085.js
+          node --check config/calibration-v093.js
+          node - <<'NODE'
+          const fs=require('fs');
+          const game=fs.readFileSync('src/app-game-v085.js','utf8');
+          for(const expected of [
+            "antialias:false",
+            "innerWidth<=640?1.2:1.35",
+            "pixelRatio:1.25",
+            'const D=48,R3=135',
+            'const DEFAULT_TURN_SECONDS=18',
+            "const SIZE_TYPES=['s','m','l']",
+            'const WIN_LINES=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]]'
+          ]) if(!game.includes(expected)) throw new Error(`missing invariant: ${expected}`);
+          NODE
+
+      - name: Commit rendering performance fix
+        run: |
+          rm -f .github/workflows/patch-v093-render-performance.yml
+          git config user.name "yakolak-agent"
+          git config user.email "ahmad.bn.kamal@gmail.com"
+          git add -A
+          git commit -m "Restore smooth v093 rendering performance"
+          git push origin HEAD:feature/v093-visual-mobile
