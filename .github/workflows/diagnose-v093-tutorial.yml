@@ -24,6 +24,7 @@ jobs:
     timeout-minutes: 8
     env:
       BASE_URL: http://127.0.0.1:4173
+      ARTIFACT_DIR: artifacts/tutorial-diagnostic
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,3 +44,11 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Trace tutorial transitions
         run: node tests/e2e/diagnose-v093-tutorial.mjs
+      - name: Upload tutorial trace
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yakolak-v093-tutorial-diagnostic
+          path: artifacts/tutorial-diagnostic
+          if-no-files-found: error
+          retention-days: 7
