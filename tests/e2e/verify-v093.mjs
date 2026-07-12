@@ -24,24 +24,39 @@ async function project(page, resolver, arg) {
 }
 
 async function chooseSetup(page, type, value, mobile) {
-  const point = await project(page, ({ type, value }) => {
+  const points = await page.evaluate(({ type, value }) => {
     const g = globalThis.__yakolakGame;
     const hits = [];
     g.setupGroup.traverse((object) => {
       const action = object?.userData?.setupAction;
       if (!action || action.type !== type || String(action.value) !== String(value)) return;
-      hits.push({ object, priority: object.geometry?.type === 'PlaneGeometry' ? 0 : 1 });
+      const p = new g.THREE.Vector3();
+      object.getWorldPosition(p);
+      p.project(g.camera);
+      const rect = g.renderer.domElement.getBoundingClientRect();
+      hits.push({
+        x: rect.left + (p.x + 1) * rect.width / 2,
+        y: rect.top + (1 - p.y) * rect.height / 2,
+        priority: object.geometry?.type === 'PlaneGeometry' ? 0 : 1,
+        geometry: object.geometry?.type || '',
+      });
     });
     hits.sort((a, b) => a.priority - b.priority);
-    const object = hits[0]?.object;
-    if (!object) return null;
-    const p = new g.THREE.Vector3();
-    object.getWorldPosition(p);
-    p.project(g.camera);
-    const rect = g.renderer.domElement.getBoundingClientRect();
-    return { x: rect.left + (p.x + 1) * rect.width / 2, y: rect.top + (1 - p.y) * rect.height / 2 };
+    return hits.filter((point, index, all) => all.findIndex((other) => Math.hypot(other.x-point.x, other.y-point.y) < 3) === index);
   }, { type, value });
-  await tap(page, point, mobile);
+  assert(points.length > 0, `لا توجد أسطح للاختيار ${type}:${value}`);
+  for (const point of points) {
+    await tap(page, point, mobile);
+    try {
+      await page.waitForFunction((kind) => {
+        const state = globalThis.__yakolakGame.state;
+        return kind === 'color' ? state.setupStep === 'bots' : state.configured;
+      }, type, { timeout: 3500 });
+      return;
+    } catch {}
+  }
+  const state = await page.evaluate(() => ({ ...globalThis.__yakolakGame.state }));
+  throw new Error(`لم ينجح اختيار ${type}:${value} - ${JSON.stringify(state)}`);
 }
 
 async function openHumanTray(page, mobile) {
@@ -142,6 +157,7 @@ async function runScenario(name, viewport, mobile) {
   await chooseSetup(page, 'color', 'right', mobile);
   await page.waitForFunction(() => globalThis.__yakolakGame.state.setupStep === 'bots', null, { timeout: 15_000 });
   await chooseSetup(page, 'bots', 1, mobile);
+  await page.screenshot({ path: `${outDir}/${name}-01b-configured.png`, fullPage: true });
 
   for (let step = 0; step < 3; step += 1) {
     const button = page.locator('#yakolakTutorialDialog.open .yt-ok');
