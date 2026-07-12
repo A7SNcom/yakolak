@@ -7,6 +7,12 @@ on:
     paths:
       - tests/e2e/verify-v092-preview.mjs
       - .github/workflows/verify-v092-preview.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - tests/e2e/verify-v092-preview.mjs
+      - .github/workflows/verify-v092-preview.yml
   workflow_dispatch:
 
 permissions:
