@@ -1,0 +1,58 @@
+name: Patch v093 reduced motion support
+
+on:
+  push:
+    branches:
+      - feature/v093-visual-mobile
+    paths:
+      - .github/workflows/patch-v093-reduced-motion.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v093-visual-mobile
+          fetch-depth: 0
+      - name: Add reduced motion path
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/app-game-v085.js')
+          s=p.read_text()
+          pairs=[
+            ("const log=(...a)=>console.info('[Yakolak]',...a);", "const log=(...a)=>console.info('[Yakolak]',...a);\nconst REDUCED_MOTION=globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches||false;"),
+            ("async function fadeOutObjects(objects,ms=560){\n  const targets=objects.filter(Boolean).map(obj=>({obj,scale:obj.scale.clone(),restore:cloneObjectMaterials(obj)}));\n  if(!targets.length)return;", "async function fadeOutObjects(objects,ms=560){\n  const targets=objects.filter(Boolean).map(obj=>({obj,scale:obj.scale.clone(),restore:cloneObjectMaterials(obj)}));\n  if(!targets.length)return;\n  if(REDUCED_MOTION){targets.forEach(t=>{t.obj.visible=false;t.restore()});render();return}"),
+            ("function blinkWinEntries(entries){\n  const targets=entries.map(e=>({entry:e,mesh:e.mesh,baseScale:e.mesh.scale.clone(),preset:winHighlightPreset()})).filter(t=>t.mesh);\n  if(!targets.length)return Promise.resolve();", "function blinkWinEntries(entries){\n  const targets=entries.map(e=>({entry:e,mesh:e.mesh,baseScale:e.mesh.scale.clone(),preset:winHighlightPreset()})).filter(t=>t.mesh);\n  if(!targets.length)return Promise.resolve();\n  if(REDUCED_MOTION){render();return Promise.resolve()}"),
+            ("function setCameraView(pos,target,ms=700){\n  const from=camera.position.clone(),to=new THREE.Vector3(pos.x,pos.y,pos.z),tf=controls.target.clone(),tt=new THREE.Vector3(target.x,target.y,target.z);", "function setCameraView(pos,target,ms=700){\n  const from=camera.position.clone(),to=new THREE.Vector3(pos.x,pos.y,pos.z),tf=controls.target.clone(),tt=new THREE.Vector3(target.x,target.y,target.z);\n  if(REDUCED_MOTION){camera.position.copy(to);controls.target.copy(tt);controls.update();render();return Promise.resolve()}"),
+            ("function animateObjectTo(obj,pos,rot=null,ms=650,arc=22){\n  const from=obj.position.clone(),to=new THREE.Vector3(pos.px,pos.py,pos.pz);\n  const fromRot=obj.rotation.clone(),toRot=rot?new THREE.Euler(rot.x,rot.y,rot.z):obj.rotation.clone();", "function animateObjectTo(obj,pos,rot=null,ms=650,arc=22){\n  const from=obj.position.clone(),to=new THREE.Vector3(pos.px,pos.py,pos.pz);\n  const fromRot=obj.rotation.clone(),toRot=rot?new THREE.Euler(rot.x,rot.y,rot.z):obj.rotation.clone();\n  if(REDUCED_MOTION){obj.position.copy(to);obj.rotation.copy(toRot);render();return Promise.resolve()}"),
+            ("function animateObjectsTo(items,ms=620,arc=16){\n  if(!items.length)return Promise.resolve();", "function animateObjectsTo(items,ms=620,arc=16){\n  if(!items.length)return Promise.resolve();\n  if(REDUCED_MOTION){items.forEach(item=>{item.obj.position.set(item.pos.px,item.pos.py,item.pos.pz);if(item.rot)item.obj.rotation.set(item.rot.x,item.rot.y,item.rot.z);item.done?.()});render();return Promise.resolve()}"),
+          ]
+          for old,new in pairs:
+            if old not in s:
+              raise SystemExit('missing game patch target: '+old.splitlines()[0])
+            s=s.replace(old,new,1)
+          p.write_text(s)
+
+          for test in ['tests/e2e/verify-v093.mjs','tests/e2e/diagnose-v093-tutorial.mjs']:
+            q=Path(test); t=q.read_text()
+            old="locale: 'ar-SA',"
+            if old not in t: raise SystemExit(f'missing locale in {test}')
+            t=t.replace(old,"locale: 'ar-SA',\n    reducedMotion: 'reduce',",1)
+            q.write_text(t)
+          PY
+          node --check src/app-game-v085.js
+          node --check tests/e2e/verify-v093.mjs
+          node --check tests/e2e/diagnose-v093-tutorial.mjs
+      - name: Commit patch
+        run: |
+          rm -f .github/workflows/patch-v093-reduced-motion.yml
+          git config user.name "yakolak-agent"
+          git config user.email "ahmad.bn.kamal@gmail.com"
+          git add -A
+          git commit -m "Support reduced motion in v093 animations"
+          git push origin HEAD:feature/v093-visual-mobile
