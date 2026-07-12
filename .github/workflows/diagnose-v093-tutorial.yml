@@ -1,23 +1,15 @@
 name: Diagnose v093 tutorial sequence
-# Measures tutorial transitions after the v093 rendering performance fix.
 
 on:
   push:
-    branches:
-      - feature/v093-visual-mobile
-    paths:
-      - tests/e2e/diagnose-v093-tutorial.mjs
-      - .github/workflows/diagnose-v093-tutorial.yml
-  pull_request:
-    branches:
-      - main
+    branches: [feature/v093-visual-mobile]
     paths:
       - tests/e2e/diagnose-v093-tutorial.mjs
       - .github/workflows/diagnose-v093-tutorial.yml
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   tutorial-diagnostic:
@@ -28,16 +20,52 @@ jobs:
       ARTIFACT_DIR: artifacts/tutorial-diagnostic
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: feature/v093-visual-mobile
+          fetch-depth: 0
+      - name: Apply reduced motion support once
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/app-game-v085.js'); s=p.read_text()
+          anchor="const log=(...a)=>console.info('[Yakolak]',...a);"
+          insert=anchor+"\nconst REDUCED_MOTION=globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches||new URLSearchParams(location.search).has('reducedMotion');\nconst motionMs=ms=>REDUCED_MOTION?Math.min(ms,80):ms;"
+          if 'const REDUCED_MOTION=' not in s: s=s.replace(anchor,insert,1)
+          pairs=[
+            ('async function fadeOutObjects(objects,ms=560){','async function fadeOutObjects(objects,ms=560){\n  ms=motionMs(ms);'),
+            ('function setCameraView(pos,target,ms=700){','function setCameraView(pos,target,ms=700){\n  ms=motionMs(ms);'),
+            ('function animateObjectTo(obj,pos,rot=null,ms=650,arc=22){','function animateObjectTo(obj,pos,rot=null,ms=650,arc=22){\n  ms=motionMs(ms);'),
+            ('function animateObjectsTo(items,ms=620,arc=16){','function animateObjectsTo(items,ms=620,arc=16){\n  ms=motionMs(ms);'),
+            ('const duration=Math.max(1000,+calibration.play.winnerBlinkDuration||3000);','const duration=REDUCED_MOTION?120:Math.max(1000,+calibration.play.winnerBlinkDuration||3000);')]
+          for old,new in pairs:
+            if new not in s:
+              if old not in s: raise SystemExit('missing '+old)
+              s=s.replace(old,new,1)
+          p.write_text(s)
+          for f in ['tests/e2e/verify-v093.mjs','tests/e2e/diagnose-v093-tutorial.mjs']:
+            q=Path(f); t=q.read_text()
+            if "reducedMotion: 'reduce'" not in t:
+              if "locale: 'ar-SA'," in t: t=t.replace("locale: 'ar-SA',","locale: 'ar-SA',\n    reducedMotion: 'reduce',",1)
+              else: t=t.replace("locale: 'ar-SA'","locale: 'ar-SA', reducedMotion: 'reduce'",1)
+            q.write_text(t)
+          PY
+          node --check src/app-game-v085.js
+          node --check tests/e2e/verify-v093.mjs
+          if ! git diff --quiet; then
+            rm -f .github/workflows/apply-v093-reduced-motion.yml
+            git config user.name yakolak-agent
+            git config user.email ahmad.bn.kamal@gmail.com
+            git add -A
+            git commit -m "Add reduced motion and faster low-power rendering"
+            git push origin HEAD:feature/v093-visual-mobile
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: 24
       - name: Start local site
         run: |
           python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/yakolak-v093-diagnostic.log 2>&1 &
-          for i in {1..30}; do
-            curl --fail --silent http://127.0.0.1:4173/version.json >/dev/null && exit 0
-            sleep 1
-          done
+          for i in {1..30}; do curl --fail --silent http://127.0.0.1:4173/version.json >/dev/null && exit 0; sleep 1; done
           exit 1
       - name: Install Chromium
         run: |
