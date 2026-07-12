@@ -1,0 +1,64 @@
+name: Patch v093 tutorial state verification
+
+on:
+  push:
+    branches:
+      - feature/v093-visual-mobile
+    paths:
+      - .github/workflows/patch-v093-tutorial-test.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v093-visual-mobile
+          fetch-depth: 0
+
+      - name: Follow the real tutorial state machine
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('tests/e2e/verify-v093.mjs')
+          s=p.read_text()
+          old="""  for (let step = 0; step < 3; step += 1) {
+            const button = page.locator('#yakolakTutorialDialog.open .yt-ok');
+            await button.waitFor({ state: 'visible', timeout: 120_000 });
+            if (step === 0) await shot(page, `${outDir}/${name}-02-tutorial.png`);
+            await button.click();
+          }
+          """
+          new="""  let tutorialPrompts = 0;
+            while (await page.evaluate(() => globalThis.__yakolakGame.state.tutorial)) {
+              await page.waitForFunction(() => {
+                const g = globalThis.__yakolakGame;
+                return !g.state.tutorial || document.querySelector('#yakolakTutorialDialog.open .yt-ok');
+              }, null, { timeout: 150_000 });
+              const stillTutorial = await page.evaluate(() => globalThis.__yakolakGame.state.tutorial);
+              if (!stillTutorial) break;
+              if (tutorialPrompts === 0) await shot(page, `${outDir}/${name}-02-tutorial.png`);
+              await page.evaluate(() => document.querySelector('#yakolakTutorialDialog.open .yt-ok')?.click());
+              await page.waitForFunction(() => !document.querySelector('#yakolakTutorialDialog.open'), null, { timeout: 10_000 });
+              tutorialPrompts += 1;
+              assert(tutorialPrompts <= 3, `${name}: عدد نوافذ التعليم تجاوز المتوقع`);
+            }
+            assert(tutorialPrompts === 3, `${name}: اكتملت ${tutorialPrompts} من 3 نوافذ تعليم`);
+          """
+          if old not in s:
+              raise SystemExit('tutorial loop not found')
+          p.write_text(s.replace(old,new,1))
+          PY
+          node --check tests/e2e/verify-v093.mjs
+
+      - name: Commit tutorial test fix
+        run: |
+          rm -f .github/workflows/patch-v093-tutorial-test.yml
+          git config user.name "yakolak-agent"
+          git config user.email "ahmad.bn.kamal@gmail.com"
+          git add -A
+          git commit -m "Align v093 browser test with tutorial state"
+          git push origin HEAD:feature/v093-visual-mobile
