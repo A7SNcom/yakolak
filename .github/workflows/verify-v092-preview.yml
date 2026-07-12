@@ -1,0 +1,48 @@
+name: Verify v092 Vercel Preview
+
+on:
+  push:
+    branches:
+      - agent/recover-vercel-v092
+    paths:
+      - tests/e2e/verify-v092-preview.mjs
+      - .github/workflows/verify-v092-preview.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PREVIEW_URL: https://yakolak-git-agent-recover-vercel-v092-ahmdkcoms-projects.vercel.app/?_vercel_share=gvnXCW7r3rchC3OTSwp1YLIzpPl518ey
+      ARTIFACT_DIR: artifacts/e2e
+    steps:
+      - name: Checkout recovery branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/recover-vercel-v092
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Run desktop and mobile gameplay tests
+        run: node tests/e2e/verify-v092-preview.mjs
+
+      - name: Upload screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yakolak-v092-preview-e2e
+          path: artifacts/e2e
+          if-no-files-found: error
+          retention-days: 7
