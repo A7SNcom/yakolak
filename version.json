@@ -1,6 +1,6 @@
 {
-  "version": "v075-orb-lights",
-  "build": 75,
-  "updated_at": "2026-06-25",
-  "note": "Adds adjustable orb lights."
+  "version": "v079-online-foundation",
+  "build": 79,
+  "updated_at": "2026-07-12",
+  "note": "Unified cache version, mobile-first game shell, installable PWA foundation, and real-time room API groundwork."
 }
