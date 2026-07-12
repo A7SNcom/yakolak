@@ -1,0 +1,76 @@
+name: Verify recovered v092 gameplay
+
+on:
+  push:
+    branches:
+      - agent/recover-vercel-v092
+    paths:
+      - tests/e2e/diagnose-v092-preview.mjs
+      - tests/e2e/verify-v092-preview.mjs
+      - .github/workflows/verify-v092-preview.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - tests/e2e/diagnose-v092-preview.mjs
+      - tests/e2e/verify-v092-preview.mjs
+      - .github/workflows/verify-v092-preview.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PREVIEW_URL: https://yakolak.vercel.app
+      ARTIFACT_DIR: artifacts/e2e
+    steps:
+      - name: Checkout recovery branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/recover-vercel-v092
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify public v092 matches recovered source
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://yakolak.vercel.app'
+          mkdir -p /tmp/yakolak-public/src /tmp/yakolak-public/assets/models
+          curl --fail --location --silent --show-error "$base/index.html?e2e=${GITHUB_SHA}" -o /tmp/yakolak-public/index.html
+          curl --fail --location --silent --show-error "$base/app.js?e2e=${GITHUB_SHA}" -o /tmp/yakolak-public/app.js
+          curl --fail --location --silent --show-error "$base/version.json?e2e=${GITHUB_SHA}" -o /tmp/yakolak-public/version.json
+          curl --fail --location --silent --show-error "$base/src/app-game-v085.js?e2e=${GITHUB_SHA}" -o /tmp/yakolak-public/src/app-game-v085.js
+          curl --fail --location --silent --show-error "$base/assets/models/table.svg?e2e=${GITHUB_SHA}" -o /tmp/yakolak-public/assets/models/table.svg
+          cmp index.html /tmp/yakolak-public/index.html
+          cmp app.js /tmp/yakolak-public/app.js
+          cmp version.json /tmp/yakolak-public/version.json
+          cmp src/app-game-v085.js /tmp/yakolak-public/src/app-game-v085.js
+          cmp assets/models/table.svg /tmp/yakolak-public/assets/models/table.svg
+
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Diagnose public v092 loading
+        run: node tests/e2e/diagnose-v092-preview.mjs
+
+      - name: Run desktop and mobile gameplay tests
+        run: node tests/e2e/verify-v092-preview.mjs
+
+      - name: Upload screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yakolak-v092-gameplay-e2e
+          path: artifacts/e2e
+          if-no-files-found: error
+          retention-days: 7
