@@ -2,7 +2,7 @@ export const DEFAULT_CALIBRATION = Object.freeze({
   scene: {
     background: '#dce4ea', exposure: 1.16, fog: false, fogColor: '#dfe6eb',
     fogNear: 1800, fogFar: 6200, fov: 45, minDistance: 180, maxDistance: 1350,
-    minPolar: 32, maxPolar: 112, markers: false, pixelRatio: 1.4,
+    minPolar: 32, maxPolar: 112, markers: false, pixelRatio: 1.25,
     cameraX: 520, cameraY: 430, cameraZ: 520, targetX: 0, targetY: 0, targetZ: 0
   },
   room: {

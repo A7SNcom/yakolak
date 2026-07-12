@@ -36,7 +36,7 @@ const WIN_HIGHLIGHT_PRESETS={
 };
 
 const DEFAULT_CALIBRATION={
-  scene:{background:'#dce4ea',exposure:1.16,fog:false,fogColor:'#d9e2e8',fogNear:1800,fogFar:6200,fov:45,minDistance:180,maxDistance:1350,minPolar:32,maxPolar:112,markers:false,pixelRatio:1.4,cameraX:520,cameraY:430,cameraZ:520,targetX:0,targetY:0,targetZ:0},
+  scene:{background:'#dce4ea',exposure:1.16,fog:false,fogColor:'#d9e2e8',fogNear:1800,fogFar:6200,fov:45,minDistance:180,maxDistance:1350,minPolar:32,maxPolar:112,markers:false,pixelRatio:1.25,cameraX:520,cameraY:430,cameraZ:520,targetX:0,targetY:0,targetZ:0},
   room:{
     floor:{color:'#111820',roughness:.88,metalness:0,opacity:1,emissive:'#05080b',emissiveIntensity:.04,visible:true,wireframe:false},
     ceiling:{color:'#202830',roughness:.94,metalness:0,opacity:1,emissive:'#0a0f14',emissiveIntensity:.05,visible:true,wireframe:false},
@@ -92,9 +92,9 @@ let publishedMeta=null,savingCalibration=false;
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(calibration.scene.background);
 const camera=new THREE.PerspectiveCamera(calibration.scene.fov,innerWidth/innerHeight,.1,12000);
-const renderer=new THREE.WebGLRenderer({antialias:innerWidth>640,alpha:false,powerPreference:'high-performance'});
+const renderer=new THREE.WebGLRenderer({antialias:false,alpha:false,powerPreference:'high-performance'});
 renderer.outputColorSpace=THREE.SRGBColorSpace;
-const effectivePixelRatio=()=>Math.min(Math.max(devicePixelRatio||1,1),innerWidth<=640?1.35:1.6);
+const effectivePixelRatio=()=>Math.min(Math.max(devicePixelRatio||1,1),innerWidth<=640?1.2:1.35);
 renderer.setPixelRatio(effectivePixelRatio());
 renderer.setSize(innerWidth,innerHeight);
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
@@ -454,7 +454,7 @@ function applyRoomMaterials(){
 function applySceneSettings(){
   scene.background=new THREE.Color(calibration.scene.background);
   renderer.toneMappingExposure=+calibration.scene.exposure;
-  renderer.setPixelRatio(Math.min(Math.max(+calibration.scene.pixelRatio||1,1),innerWidth<=640?1.35:1.6));
+  renderer.setPixelRatio(Math.min(Math.max(+calibration.scene.pixelRatio||1,1),innerWidth<=640?1.2:1.35));
   scene.fog=calibration.scene.fog?new THREE.Fog(calibration.scene.fogColor,+calibration.scene.fogNear,+calibration.scene.fogFar):null;
   camera.fov=+calibration.scene.fov;camera.updateProjectionMatrix();
   controls.minDistance=+calibration.scene.minDistance;
