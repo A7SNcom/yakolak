@@ -46,7 +46,7 @@ async function chooseSetup(page, type, value, mobile) {
       });
     });
     hits.sort((a, b) => a.priority - b.priority);
-    return hits.filter((point, index, all) => all.findIndex((other) => Math.hypot(other.x-point.x, other.y-point.y) < 3) === index);
+    return hits.filter((point, index, all) => all.findIndex((other) => Math.hypot(other.x - point.x, other.y - point.y) < 3) === index);
   }, { type, value });
   assert(points.length > 0, `لا توجد أسطح للاختيار ${type}:${value}`);
   for (const point of points) {
@@ -163,12 +163,21 @@ async function runScenario(name, viewport, mobile) {
   await chooseSetup(page, 'bots', 1, mobile);
   await shot(page, `${outDir}/${name}-01b-configured.png`);
 
-  for (let step = 0; step < 3; step += 1) {
-    const button = page.locator('#yakolakTutorialDialog.open .yt-ok');
-    await button.waitFor({ state: 'visible', timeout: 120_000 });
-    if (step === 0) await shot(page, `${outDir}/${name}-02-tutorial.png`);
-    await button.click();
+  let tutorialPrompts = 0;
+  while (await page.evaluate(() => globalThis.__yakolakGame.state.tutorial)) {
+    await page.waitForFunction(() => {
+      const g = globalThis.__yakolakGame;
+      return !g.state.tutorial || document.querySelector('#yakolakTutorialDialog.open .yt-ok');
+    }, null, { timeout: 150_000 });
+    const stillTutorial = await page.evaluate(() => globalThis.__yakolakGame.state.tutorial);
+    if (!stillTutorial) break;
+    if (tutorialPrompts === 0) await shot(page, `${outDir}/${name}-02-tutorial.png`);
+    await page.evaluate(() => document.querySelector('#yakolakTutorialDialog.open .yt-ok')?.click());
+    await page.waitForFunction(() => !document.querySelector('#yakolakTutorialDialog.open'), null, { timeout: 10_000 });
+    tutorialPrompts += 1;
+    assert(tutorialPrompts <= 3, `${name}: عدد نوافذ التعليم تجاوز المتوقع`);
   }
+  assert(tutorialPrompts === 3, `${name}: اكتملت ${tutorialPrompts} من 3 نوافذ تعليم`);
 
   await page.waitForFunction(() => {
     const state = globalThis.__yakolakGame.state;
@@ -223,7 +232,7 @@ async function runScenario(name, viewport, mobile) {
   assert(fatal.length === 0, `${name}: أخطاء كونسول: ${fatal.join(' | ')}`);
 
   await context.close();
-  return { name, viewport, mobile, initial, round, wins, passed: true };
+  return { name, viewport, mobile, initial, round, tutorialPrompts, wins, passed: true };
 }
 
 try {
