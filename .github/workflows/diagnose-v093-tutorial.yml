@@ -7,6 +7,12 @@ on:
     paths:
       - tests/e2e/diagnose-v093-tutorial.mjs
       - .github/workflows/diagnose-v093-tutorial.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - tests/e2e/diagnose-v093-tutorial.mjs
+      - .github/workflows/diagnose-v093-tutorial.yml
   workflow_dispatch:
 
 permissions:
