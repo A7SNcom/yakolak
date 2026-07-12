@@ -1,0 +1,27 @@
+# Vercel v092 recovery manifest
+
+- Production source: https://yakolak.vercel.app
+- Deployment: dpl_3uSu9BkMcig1CM3TX2UDmrHGMJCY
+- Production metadata commit: a21d412642f077e7e8b25c1a04875ab0027e2656 with dirty local files
+- Recovered branch: agent/recover-vercel-v092
+- Recovered at: 2026-07-12T13:28:02Z
+
+## SHA-256 checksums
+
+```text
+0b0751338f56f5218e9851ec4832e6b1e28e25f1331fbc088d5c690d532a9bb3  index.html
+a1db8538af5a9c1a3e32149efcc18e2b2f03f4ac421671aad067190f7aca8efd  app.js
+230d4e09a106d2c06a7fc9ded32eb44959fec5c00bd6cbee29cb8ee092f8061a  version.json
+1a87521ba6bd9c21915374dfbd7279ae837717d989fe5080215047d72e79540b  src/app-game-v085.js
+f9366898cef39ae2a828bea0609981e62cbdb1c486170944c07498fc7a5812a1  assets/models/table.svg
+e906901cbdc3a15c28912b5966a12dbf75a9b85d8cbeb890585c974e0c12def4  assets/models/9.stl
+21d963e52b5bd290141080eb66f9ef8c966c62786c3a1da10c67799603a65c1a  assets/models/3.stl
+14c4a58ed5d086ce5622cf665e18f88e1390cedae7f973c2428cdca16fd99715  assets/models/l.stl
+7b2cbf4690fc0906124bd56151c4e1cd29006f58e9fed75d6e2ecc4c8bed4936  assets/models/m.stl
+48916af0357ca36737f7ec7e5de23cbe516a51b07675271c86339b9d12189cd6  assets/models/s.stl
+f0dea38e795223d32c07921f194e612ce0ff270c9190f208666caebe31b6041b  assets/models/p.stl
+f208497138564568ae688613998a1e9f4a899add478ae5babc4c022eca0e41c6  assets/fonts/expo-arabic-medium.ttf
+5259e2f4dcc5c958ca7a976006194be71b37e9d3a276614e6ea8c1e55977bec0  assets/models/Mars Angled Stump Side Table 30x30x45_Albedo.png
+fd92cf7d618572e63c69c20ea8771e693b0404692ac8f6065b5de3321bf138d0  assets/models/Mars Angled Stump Side Table 30x30x45_Normal.png
+359d93a4d4e209d52d84442f6748750355a3b24d9482f4bfd00f12af1b2d2f35  assets/models/Mars Angled Stump Side Table 30x30x45_Roughness.png
+```

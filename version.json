@@ -1,6 +1,6 @@
 {
-  "version": "v075-orb-lights",
-  "build": 75,
-  "updated_at": "2026-06-25",
-  "note": "Adds adjustable orb lights."
+  "version": "v092-calibration-tutorial-fixes",
+  "build": 92,
+  "updated_at": "2026-06-30",
+  "note": "Fixes calibration panel layering, expands calibration controls, restores full four-color intro, adds tutorial checkpoints, and replaces win highlight with blink timing."
 }

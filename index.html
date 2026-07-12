@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="yakolak-version" content="v067-original-table-texture-maps">
+<meta name="yakolak-version" content="v092-calibration-tutorial-fixes">
 <title>Yakolak Live</title>
+<link rel="icon" href="data:,">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://i.ibb.co" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script>
@@ -13,17 +14,37 @@
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b0b;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:none}
 #view{position:fixed;inset:0;z-index:1;opacity:0;transition:opacity .35s ease}
 #hint,#settingsBtn,#panel,textarea{display:none!important}
-#yakolakLoader{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:#0b0b0b;transition:opacity .35s ease,visibility .35s ease}
+#yakolakLoader{position:fixed;inset:0;z-index:20000;display:grid;place-items:center;background:radial-gradient(circle at 50% 18%,#1a2028 0,#090a0c 46%,#020203 100%);transition:opacity .42s ease,visibility .42s ease}
 #yakolakLoader.done{opacity:0;visibility:hidden;pointer-events:none}
-#yakolakLoader.error .loaderRing{border-top-color:#b35a5a}
-.loaderRing{width:42px;height:42px;border-radius:50%;border:3px solid rgba(255,255,255,.14);border-top-color:#fff;animation:spin .85s linear infinite}
+.loaderPanel{width:min(520px,calc(100vw - 40px));direction:ltr;color:#fff;text-align:center;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.loaderBrand{font-size:15px;font-weight:950;letter-spacing:.22em;margin-bottom:18px;color:#f7f7f2}
+.loaderFrame{position:relative;padding:10px;border:1px solid rgba(255,255,255,.26);background:#050608;box-shadow:0 22px 70px rgba(0,0,0,.58),inset 0 0 0 1px rgba(255,255,255,.08)}
+.loaderFrame:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.1),transparent);animation:loader-scan 1.65s linear infinite;pointer-events:none}
+#yakolakLoaderProgress{display:block;width:100%;height:22px;appearance:none;-webkit-appearance:none;border:0;background:#111820;overflow:hidden}
+#yakolakLoaderProgress::-webkit-progress-bar{background:#111820}
+#yakolakLoaderProgress::-webkit-progress-value{background:linear-gradient(90deg,#f6d069,#2dd4bf,#60a5fa);transition:width .28s ease}
+#yakolakLoaderProgress::-moz-progress-bar{background:linear-gradient(90deg,#f6d069,#2dd4bf,#60a5fa);transition:width .28s ease}
+.loaderMeta{display:flex;justify-content:space-between;align-items:center;margin-top:11px;font-size:12px;font-weight:900;color:#d7dde6;direction:rtl}
+#yakolakLoaderPercent{font-size:18px;color:#fff;direction:ltr}
+#yakolakLoader.error .loaderFrame{border-color:#ef4444}
+@keyframes loader-scan{from{transform:translateX(-105%)}to{transform:translateX(105%)}}
 #clearCacheBtn{position:fixed;left:16px;bottom:16px;z-index:10000;width:58px;height:58px;border-radius:50%;border:1px solid rgba(255,255,255,.24);background:rgba(0,0,0,.82);color:#fff;font-size:15px;font-weight:950;display:grid;place-items:center;cursor:pointer;line-height:1;box-shadow:0 10px 30px rgba(0,0,0,.42);user-select:none}
 #clearCacheBtn[disabled]{opacity:.62;cursor:wait}
-@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
-<div id="yakolakLoader"><div class="loaderRing"></div></div>
+<div id="yakolakLoader" aria-busy="true" aria-describedby="yakolakLoaderStatus">
+  <div class="loaderPanel">
+    <div class="loaderBrand">YAKOLAK</div>
+    <div class="loaderFrame">
+      <progress id="yakolakLoaderProgress" value="0" max="100" aria-label="تحميل اللعبة">0%</progress>
+    </div>
+    <div class="loaderMeta">
+      <span id="yakolakLoaderStatus">تحميل اللعبة</span>
+      <strong id="yakolakLoaderPercent">0%</strong>
+    </div>
+  </div>
+</div>
 <div id="view"></div>
 <div id="hint" aria-hidden="true"></div>
 <button id="settingsBtn" aria-hidden="true">SET</button>
@@ -31,12 +52,22 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b0b;col
 <div id="panel" aria-hidden="true"></div>
 <textarea id="out"></textarea>
 <script type="module">
-const BUILD='67';
-const KEY='yakolak_build_seen';
+const BUILD='92';
 const params=new URLSearchParams(location.search);
 const clearToken=params.get('clear');
 const ASSET_VERSION=clearToken||BUILD;
 const clearBtn=document.getElementById('clearCacheBtn');
+const progressEl=document.getElementById('yakolakLoaderProgress');
+const progressText=document.getElementById('yakolakLoaderPercent');
+const progressStatus=document.getElementById('yakolakLoaderStatus');
+function setGameProgress(value,status){
+  const pct=Math.max(0,Math.min(100,Math.round(value||0)));
+  if(progressEl){progressEl.value=pct;progressEl.textContent=pct+'%'}
+  if(progressText)progressText.textContent=pct+'%';
+  if(status&&progressStatus)progressStatus.textContent=status;
+}
+window.__yakolakLoading={set:setGameProgress};
+setGameProgress(3,'تهيئة اللعبة');
 function hardReload(){
   const url=new URL(location.href);
   url.searchParams.set('clear',Date.now().toString());
@@ -56,8 +87,6 @@ async function cleanReload(e){
   clearBtn.disabled=true;
   clearBtn.textContent='ينظف';
   const jobs=[];
-  try{localStorage.clear()}catch(err){}
-  try{sessionStorage.clear()}catch(err){}
   try{if('caches' in window)jobs.push(caches.keys().then(names=>Promise.allSettled(names.map(name=>caches.delete(name)))))}catch(err){}
   try{if('serviceWorker' in navigator)jobs.push(navigator.serviceWorker.getRegistrations().then(regs=>Promise.allSettled(regs.map(reg=>reg.unregister()))))}catch(err){}
   jobs.push(clearIndexedDB().catch(()=>{}));
@@ -71,9 +100,7 @@ async function checkVersion(){
     const r=await fetch('./version.json?v='+ASSET_VERSION,{cache:'no-store'});
     const v=await r.json();
     const next=String(v.build||BUILD);
-    const old=localStorage.getItem(KEY);
-    if(old&&old!==next){localStorage.setItem(KEY,next);hardReload();return false}
-    localStorage.setItem(KEY,next);
+    if(next!==String(BUILD)){hardReload();return false}
   }catch(e){}
   return true;
 }

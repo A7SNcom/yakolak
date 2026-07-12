@@ -1,84 +1,91 @@
 # Yakolak
 
-لعبة Yakolak ثلاثية الأبعاد على GitHub Pages.
+لعبة Yakolak ثلاثية الأبعاد للويب، منشورة عبر Vercel ومتصلة بمستودع GitHub.
 
-## مهم جدًا قبل أي تعديل
+## قبل أي تعديل
 
-اقرأ ملف القواعد أولًا:
+اقرأ أولًا:
 
 ```txt
 docs/YAKOLAK_PROJECT_RULES.md
 ```
 
-هذا الملف يوضح الثوابت، أماكن العناصر الأساسية، وممنوعات التخمين حتى لا نعيد اختراع العجلة.
+## النسخة المعتمدة
+
+```txt
+version: v092-calibration-tutorial-fixes
+build:   92
+```
+
+تم استرجاع ملفات النسخة المنشورة من Vercel إلى GitHub، وتوجد بصمات الملفات في:
+
+```txt
+docs/recovery/VERCEL_V092_RECOVERY.md
+```
 
 ## مسار التشغيل الحالي
 
 ```txt
-index.html -> app.js -> src/app-prod-stage1.js
+index.html -> app.js -> src/app-game-v085.js
 ```
 
-## شكل المشروع
+## بنية المشروع الحالية
 
 ```txt
 /
-├─ index.html
-├─ app.js
-├─ version.json
-├─ README.md
+├─ index.html                         غلاف الصفحة وشاشة التحميل والكاش
+├─ app.js                             نقطة دخول النسخة 92
+├─ version.json                       رقم النسخة ووصفها
+├─ package.json                       اعتماد خادم المعايرة
+├─ api/
+│  └─ calibration.js                 قراءة وحفظ إعدادات المعايرة
+├─ config/
+│  └─ calibration-v092.js            الإعداد الافتراضي المطابق للإنتاج
 ├─ src/
-│  ├─ app-prod-stage1.js      ملف اللعبة الحالي الفعلي
-│  └─ app-live.js             ملف قديم/مرجعي إن وجد
+│  └─ app-game-v085.js               ملف اللعبة الفعلي في النسخة 92
 ├─ assets/
+│  ├─ fonts/
+│  │  └─ expo-arabic-medium.ttf
 │  └─ models/
-│     ├─ 9.stl
-│     ├─ 3.stl
-│     ├─ l.stl
-│     ├─ m.stl
-│     ├─ s.stl
-│     ├─ uploads_files_3139458_Mars+Angled+Stump+Side+Table+30x30x45.obj
-│     ├─ Mars Angled Stump Side Table 30x30x45_Albedo.png
-│     ├─ Mars Angled Stump Side Table 30x30x45_Normal.png
-│     └─ Mars Angled Stump Side Table 30x30x45_Roughness.png
-├─ docs/
-│  └─ YAKOLAK_PROJECT_RULES.md
-├─ archive/
-└─ legacy/
+│     ├─ 9.stl                       البورد والغطاء
+│     ├─ 3.stl                       قواعد اللاعبين
+│     ├─ l.stl                       الحجر الكبير
+│     ├─ m.stl                       الحجر الوسط
+│     ├─ s.stl                       الحجر الصغير
+│     ├─ p.stl                       علامة النقاط
+│     ├─ table.svg                   شكل الطاولة الحالي
+│     └─ Mars Angled...png           خرائط لون ونورمل وخشونة الطاولة
+└─ docs/
+   ├─ YAKOLAK_PROJECT_RULES.md
+   └─ recovery/VERCEL_V092_RECOVERY.md
 ```
 
-## معنى المجلدات
+## الثوابت الذهبية
 
 ```txt
-src/      كود اللعبة الحالي
-assets/   المجسمات والخامات التي يطلبها الموقع
-docs/     التوثيق والقواعد والإرشادات
-archive/  النسخ الذهبية إن وجدت
-legacy/   الملفات القديمة إن وجدت
+D  = 48
+R3 = 135
 ```
 
-## القيم الذهبية
+لا تغيّر مواضع البورد أو ترتيب القطع أو توقيت الانترو دون طلب صريح واختبار مرئي.
 
-```txt
-D  = 48    المسافة بين القطع
-R3 = 135   نصف قطر قواعد 3
+## متغيرات الخادم
+
+```env
+TURSO_DATABASE_URL=
+TURSO_AUTH_TOKEN=
+CALIBRATION_ADMIN_TOKEN=
 ```
 
-## عناصر لا يتم استبدالها عشوائيًا
+المتغير الثالث اختياري. عند ضبطه، يتطلب حفظ المعايرة إرسال الرمز في ترويسة الطلب.
+
+## طريقة التحديث
 
 ```txt
-الطاولة الأصلية: OBJ Mars Table
-خامة الطاولة: Albedo / Normal / Roughness
-الغرفة: أرض + سقف + 4 جدران
-الانترو: يبقى كما هو إلا بطلب مباشر
-ترتيب القطع: لا يتغير إلا بطلب مباشر
-```
-
-## طريقة التحديث الصحيحة
-
-```txt
-1. عدل أصغر جزء ممكن.
-2. لا تخترع خامة أو مكان أو حجم إذا له أصل سابق.
-3. ارفع BUILD في index.html و app.js و version.json.
-4. اكتب وصف التغيير في version.json.
-5. اختبر الرابط مع ?v=BUILD.
+1. ابدأ من فرع جديد.
+2. عدّل أصغر نطاق ممكن.
+3. ارفع BUILD في index.html و app.js و version.json وملف اللعبة.
+4. حدّث وصف version.json.
+5. اختبر معاينة Vercel على الجوال والكمبيوتر.
+6. لا تدمج إلى main قبل نجاح المعاينة وواجهة /api/calibration.
 ```

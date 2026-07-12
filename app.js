@@ -1,7 +1,4 @@
-import './src/room-black-patch.js?v=78';
-import './src/lights.js?v=78';
+console.info('[Yakolak] APP.JS v092 CALIBRATION TUTORIAL FIXES LOADED');
 
-console.info('[Yakolak] APP.JS v078 UNLIMITED LIGHT CALIBRATION LOADED');
-
-const BUILD='78';
-import('./src/app-prod-stage1.js?v='+BUILD);
+const BUILD='92';
+import('./src/app-game-v085.js?v='+BUILD);
