@@ -1,4 +1,5 @@
 name: Verify v093 visual and mobile experience
+# Trusted rerun after screenshot stabilization.
 
 on:
   push:
