@@ -1,0 +1,107 @@
+name: Patch v093 setup interaction test
+
+on:
+  push:
+    branches:
+      - feature/v093-visual-mobile
+    paths:
+      - .github/workflows/patch-v093-test.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v093-visual-mobile
+          fetch-depth: 0
+
+      - name: Patch setup targeting
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('tests/e2e/verify-v093.mjs')
+          s=p.read_text()
+          old="""async function chooseSetup(page, type, value, mobile) {
+            const point = await project(page, ({ type, value }) => {
+              const g = globalThis.__yakolakGame;
+              const hits = [];
+              g.setupGroup.traverse((object) => {
+                const action = object?.userData?.setupAction;
+                if (!action || action.type !== type || String(action.value) !== String(value)) return;
+                hits.push({ object, priority: object.geometry?.type === 'PlaneGeometry' ? 0 : 1 });
+              });
+              hits.sort((a, b) => a.priority - b.priority);
+              const object = hits[0]?.object;
+              if (!object) return null;
+              const p = new g.THREE.Vector3();
+              object.getWorldPosition(p);
+              p.project(g.camera);
+              const rect = g.renderer.domElement.getBoundingClientRect();
+              return { x: rect.left + (p.x + 1) * rect.width / 2, y: rect.top + (1 - p.y) * rect.height / 2 };
+            }, { type, value });
+            await tap(page, point, mobile);
+          }"""
+          new="""async function chooseSetup(page, type, value, mobile) {
+            const points = await page.evaluate(({ type, value }) => {
+              const g = globalThis.__yakolakGame;
+              const hits = [];
+              g.setupGroup.traverse((object) => {
+                const action = object?.userData?.setupAction;
+                if (!action || action.type !== type || String(action.value) !== String(value)) return;
+                const p = new g.THREE.Vector3();
+                object.getWorldPosition(p);
+                p.project(g.camera);
+                const rect = g.renderer.domElement.getBoundingClientRect();
+                hits.push({
+                  x: rect.left + (p.x + 1) * rect.width / 2,
+                  y: rect.top + (1 - p.y) * rect.height / 2,
+                  priority: object.geometry?.type === 'PlaneGeometry' ? 0 : 1,
+                  geometry: object.geometry?.type || '',
+                });
+              });
+              hits.sort((a, b) => a.priority - b.priority);
+              return hits.filter((point, index, all) => all.findIndex((other) => Math.hypot(other.x-point.x, other.y-point.y) < 3) === index);
+            }, { type, value });
+            assert(points.length > 0, `لا توجد أسطح للاختيار ${type}:${value}`);
+            for (const point of points) {
+              await tap(page, point, mobile);
+              try {
+                await page.waitForFunction((kind) => {
+                  const state = globalThis.__yakolakGame.state;
+                  return kind === 'color' ? state.setupStep === 'bots' : state.configured;
+                }, type, { timeout: 3500 });
+                return;
+              } catch {}
+            }
+            const state = await page.evaluate(() => ({ ...globalThis.__yakolakGame.state }));
+            throw new Error(`لم ينجح اختيار ${type}:${value} - ${JSON.stringify(state)}`);
+          }"""
+          if old not in s:
+              raise SystemExit('chooseSetup block not found')
+          s=s.replace(old,new,1)
+          old2="""  await chooseSetup(page, 'bots', 1, mobile);
+
+            for (let step = 0; step < 3; step += 1) {"""
+          new2="""  await chooseSetup(page, 'bots', 1, mobile);
+            await page.screenshot({ path: `${outDir}/${name}-01b-configured.png`, fullPage: true });
+
+            for (let step = 0; step < 3; step += 1) {"""
+          if old2 not in s:
+              raise SystemExit('bots checkpoint not found')
+          s=s.replace(old2,new2,1)
+          p.write_text(s)
+          PY
+          node --check tests/e2e/verify-v093.mjs
+
+      - name: Commit hardened test
+        run: |
+          rm -f .github/workflows/patch-v093-test.yml
+          git config user.name "yakolak-agent"
+          git config user.email "ahmad.bn.kamal@gmail.com"
+          git add -A
+          git commit -m "Harden v093 setup interaction verification"
+          git push origin HEAD:feature/v093-visual-mobile
