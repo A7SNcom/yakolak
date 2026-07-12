@@ -6,6 +6,13 @@ on:
       - agent/recover-vercel-v092
     paths:
       - .github/workflows/recover-vercel-v092.yml
+  pull_request:
+    types:
+      - opened
+    branches:
+      - main
+    paths:
+      - .github/workflows/recover-vercel-v092.yml
   workflow_dispatch:
 
 permissions:
@@ -69,7 +76,7 @@ jobs:
           grep -Fq "const BUILD='92'" src/app-game-v085.js
           grep -Fq '"build": 92' version.json
           grep -Fq 'table.svg' src/app-game-v085.js
-          grep -Fq 'p.stl' <(printf '%s\n' "$(grep -o "load('p'" src/app-game-v085.js | head -n 1)")
+          grep -Fq "load('p'" src/app-game-v085.js
           test "$(wc -c < src/app-game-v085.js)" -gt 50000
           test "$(wc -c < assets/fonts/expo-arabic-medium.ttf)" -gt 10000
           test "$(wc -c < assets/models/p.stl)" -gt 1000
