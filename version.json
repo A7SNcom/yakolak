@@ -1,6 +1,6 @@
 {
-  "version": "v092-calibration-tutorial-fixes",
-  "build": 92,
-  "updated_at": "2026-06-30",
-  "note": "Fixes calibration panel layering, expands calibration controls, restores full four-color intro, adds tutorial checkpoints, and replaces win highlight with blink timing."
+  "version": "v093-visual-mobile-clarity",
+  "build": 93,
+  "updated_at": "2026-07-12",
+  "note": "Improves room lighting, restores the natural table texture, increases board and piece contrast, adds subtle playable-cell guides, and refines portrait mobile framing and controls without changing game rules."
 }

@@ -1,5 +1,5 @@
 import { createClient } from '@libsql/client';
-import { cloneDefaultCalibration } from '../config/calibration-v092.js';
+import { cloneDefaultCalibration } from '../config/calibration-v093.js';
 
 const TABLE = 'yakolak_calibration';
 const RECORD_ID = 'published';
@@ -54,8 +54,8 @@ function validCalibration(value) {
 function fallbackMeta(reason = 'database_not_configured') {
   return {
     id: RECORD_ID,
-    build: 92,
-    note: 'yakolak v092 recovered calibration fallback',
+    build: 93,
+    note: 'yakolak v093 visual mobile calibration fallback',
     updatedAt: null,
     storage: 'fallback',
     reason
@@ -149,7 +149,7 @@ export default async function handler(req, res) {
         json(res, 400, { ok: false, error: 'invalid_calibration' });
         return;
       }
-      const build = Number.isFinite(Number(body.build)) ? Math.max(1, Math.round(Number(body.build))) : 92;
+      const build = Number.isFinite(Number(body.build)) ? Math.max(1, Math.round(Number(body.build))) : 93;
       const note = String(body.note || 'yakolak published calibration').slice(0, 500);
       const meta = await writeCalibration(db, body.calibration, build, note);
       json(res, 200, { ok: true, calibration: body.calibration, meta });

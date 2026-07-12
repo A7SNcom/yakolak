@@ -1,10 +1,10 @@
-﻿import * as THREE from 'three';
+import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {STLLoader} from 'three/addons/loaders/STLLoader.js';
 import {SVGLoader} from 'three/addons/loaders/SVGLoader.js';
 import {RectAreaLightUniformsLib} from 'three/addons/lights/RectAreaLightUniformsLib.js';
 
-const BUILD='92';
+const BUILD='93';
 const MODEL_DIR='./assets/models/';
 const MARBLE_URL='https://i.ibb.co/B2h2tNKG/Screenshot-2026-06-22-094236.png';
 const TABLE_SVG_URL=`${MODEL_DIR}table.svg?v=${BUILD}-table`;
@@ -36,38 +36,38 @@ const WIN_HIGHLIGHT_PRESETS={
 };
 
 const DEFAULT_CALIBRATION={
-  scene:{background:'#e9eef2',exposure:1.03,fog:false,fogColor:'#dfe6eb',fogNear:1800,fogFar:6200,fov:45,minDistance:180,maxDistance:1350,minPolar:32,maxPolar:112,markers:false,pixelRatio:1.25,cameraX:520,cameraY:430,cameraZ:520,targetX:0,targetY:0,targetZ:0},
+  scene:{background:'#dce4ea',exposure:1.16,fog:false,fogColor:'#d9e2e8',fogNear:1800,fogFar:6200,fov:45,minDistance:180,maxDistance:1350,minPolar:32,maxPolar:112,markers:false,pixelRatio:1.4,cameraX:520,cameraY:430,cameraZ:520,targetX:0,targetY:0,targetZ:0},
   room:{
-    floor:{color:'#000000',roughness:.9,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
-    ceiling:{color:'#000000',roughness:.96,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
-    backWall:{color:'#ffffff',roughness:.94,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
-    leftWall:{color:'#ffffff',roughness:.94,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
-    rightWall:{color:'#ffffff',roughness:.94,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
-    frontWall:{color:'#ffffff',roughness:.94,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
-    trim:{color:'#d2dbe1',roughness:.9,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
-    edges:{color:'#9eacb5',opacity:.84,visible:true},
-    grid:{color:'#c9d3da',opacity:.3,visible:true}
+    floor:{color:'#111820',roughness:.88,metalness:0,opacity:1,emissive:'#05080b',emissiveIntensity:.04,visible:true,wireframe:false},
+    ceiling:{color:'#202830',roughness:.94,metalness:0,opacity:1,emissive:'#0a0f14',emissiveIntensity:.05,visible:true,wireframe:false},
+    backWall:{color:'#f4f7f9',roughness:.92,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
+    leftWall:{color:'#eef3f6',roughness:.92,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
+    rightWall:{color:'#eef3f6',roughness:.92,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
+    frontWall:{color:'#ffffff',roughness:.94,metalness:0,opacity:.08,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
+    trim:{color:'#b8c5cf',roughness:.86,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
+    edges:{color:'#71808c',opacity:.68,visible:true},
+    grid:{color:'#83909b',opacity:.22,visible:true}
   },
   game:{
-    board:{color:'#161616',roughness:.54,metalness:.04,emissive:'#000000',emissiveIntensity:0},
-    right:{color:'#ffffff',roughness:.92,metalness:0,emissive:'#000000',emissiveIntensity:0,marble:true},
-    left:{color:'#b37a18',roughness:.48,metalness:.28,emissive:'#000000',emissiveIntensity:0},
-    front:{color:'#006144',roughness:.58,metalness:.08,emissive:'#000000',emissiveIntensity:0},
-    back:{color:'#001f8f',roughness:.74,metalness:0,emissive:'#000000',emissiveIntensity:0}
+    board:{color:'#283039',roughness:.62,metalness:.02,emissive:'#0b1117',emissiveIntensity:.14},
+    right:{color:'#ffffff',roughness:.86,metalness:0,emissive:'#000000',emissiveIntensity:0,marble:true},
+    left:{color:'#c58b24',roughness:.42,metalness:.22,emissive:'#160d02',emissiveIntensity:.04},
+    front:{color:'#08765a',roughness:.5,metalness:.06,emissive:'#001b12',emissiveIntensity:.04},
+    back:{color:'#1236a6',roughness:.62,metalness:.02,emissive:'#020a25',emissiveIntensity:.06}
   },
-  table:{color:'#ffffff',roughness:.92,metalness:0,normalScale:.75,texture:true,repeatX:1,repeatY:1,opacity:1,emissive:'#000000',emissiveIntensity:0,wireframe:false},
+  table:{color:'#ffffff',roughness:.82,metalness:0,normalScale:.68,texture:true,repeatX:1,repeatY:1,opacity:1,emissive:'#0b0704',emissiveIntensity:.03,wireframe:false},
   lights:[
-    {id:'orbA',name:'A',type:'point',enabled:true,color:'#ffffff',intensity:2.7,distance:2300,decay:.25,size:30,x:-520,y:380,z:430},
-    {id:'orbB',name:'B',type:'point',enabled:true,color:'#fff2cf',intensity:1.9,distance:2200,decay:.25,size:26,x:520,y:300,z:360},
-    {id:'orbC',name:'C',type:'point',enabled:true,color:'#d8ecff',intensity:1.45,distance:2200,decay:.25,size:24,x:0,y:850,z:-360},
+    {id:'orbA',name:'A',type:'point',enabled:true,color:'#fffdf5',intensity:2.35,distance:2100,decay:.38,size:30,x:-520,y:420,z:430},
+    {id:'orbB',name:'B',type:'point',enabled:true,color:'#ffe8bd',intensity:1.65,distance:2000,decay:.4,size:26,x:520,y:360,z:360},
+    {id:'orbC',name:'C',type:'point',enabled:true,color:'#d7ebff',intensity:1.2,distance:2000,decay:.42,size:24,x:0,y:820,z:-300},
     {id:'spotKey',name:'مركزة',type:'spot',enabled:false,color:'#fff5dc',intensity:2.6,distance:2400,decay:1.3,angle:28,penumbra:.55,size:28,x:0,y:950,z:520,targetX:0,targetY:0,targetZ:0},
     {id:'lineWash',name:'خطية',type:'linear',enabled:false,color:'#dff3ff',intensity:.42,distance:1600,decay:1.35,count:7,length:1300,axis:'x',size:18,x:0,y:1040,z:-760},
     {id:'rectSoft',name:'مستطيلة',type:'rect',enabled:false,color:'#ffffff',intensity:3,width:900,height:120,size:22,x:0,y:1120,z:-900,rx:-62,ry:0,rz:0},
-    {id:'sun',name:'اتجاهية',type:'directional',enabled:false,color:'#ffffff',intensity:1.2,size:24,x:-650,y:900,z:620,targetX:0,targetY:0,targetZ:0},
-    {id:'hemi',name:'محيطية',type:'hemisphere',enabled:false,color:'#ffffff',groundColor:'#cbd8df',intensity:.45,size:20,x:0,y:1000,z:0},
-    {id:'ambient',name:'عامة',type:'ambient',enabled:false,color:'#ffffff',intensity:.24,size:18,x:0,y:850,z:0}
+    {id:'sun',name:'اتجاهية',type:'directional',enabled:true,color:'#fff7e8',intensity:.9,size:24,x:-650,y:900,z:620,targetX:0,targetY:0,targetZ:0},
+    {id:'hemi',name:'محيطية',type:'hemisphere',enabled:true,color:'#f5fbff',groundColor:'#35424c',intensity:.55,size:20,x:0,y:1000,z:0},
+    {id:'ambient',name:'عامة',type:'ambient',enabled:true,color:'#ffffff',intensity:.16,size:18,x:0,y:850,z:0}
   ],
-  play:{dragPieces:true,snapToZones:true,showZones:false,zoneSize:36,zoneColor:'#60a5fa',zoneOpacity:.22,dropRadius:42,turnSeconds:18,winnerHighlightPreset:'clean',winnerBlinkCount:5,winnerBlinkDuration:3000,winnerGlowColor:'#ffffff'}
+  play:{dragPieces:true,snapToZones:true,showZones:false,zoneSize:36,zoneColor:'#93c5fd',zoneOpacity:.28,dropRadius:42,turnSeconds:18,winnerHighlightPreset:'clean',winnerBlinkCount:5,winnerBlinkDuration:3000,winnerGlowColor:'#ffffff'}
 };
 const SURFACE_KEYS={floor:'room-floor',ceiling:'room-ceiling',backWall:'room-back-wall',leftWall:'room-left-wall',rightWall:'room-right-wall',frontWall:'room-front-wall'};
 function clone(v){return JSON.parse(JSON.stringify(v))}
@@ -92,14 +92,16 @@ let publishedMeta=null,savingCalibration=false;
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(calibration.scene.background);
 const camera=new THREE.PerspectiveCamera(calibration.scene.fov,innerWidth/innerHeight,.1,12000);
-const renderer=new THREE.WebGLRenderer({antialias:false,alpha:false,powerPreference:'high-performance'});
+const renderer=new THREE.WebGLRenderer({antialias:innerWidth>640,alpha:false,powerPreference:'high-performance'});
 renderer.outputColorSpace=THREE.SRGBColorSpace;
-renderer.setPixelRatio(Math.min(Math.max(devicePixelRatio||1,1),1.25));
+const effectivePixelRatio=()=>Math.min(Math.max(devicePixelRatio||1,1),innerWidth<=640?1.35:1.6);
+renderer.setPixelRatio(effectivePixelRatio());
 renderer.setSize(innerWidth,innerHeight);
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=calibration.scene.exposure;
 renderer.shadowMap.enabled=false;
 root.appendChild(renderer.domElement);
+renderer.domElement.style.touchAction='none';
 
 const ROOM_CFG={floorY:-650,topY:1250,halfW:2400,backZ:-2400,frontZ:2400};
 const ROOM_LIMIT={minX:-ROOM_CFG.halfW+90,maxX:ROOM_CFG.halfW-90,minY:ROOM_CFG.floorY+80,maxY:ROOM_CFG.topY-70,minZ:ROOM_CFG.backZ+90,maxZ:ROOM_CFG.frontZ-90};
@@ -121,6 +123,8 @@ function render(){keepInsideRoom();renderer.render(scene,camera)}
 controls=new OrbitControls(camera,renderer.domElement);
 controls.enableDamping=false;
 controls.enablePan=false;
+controls.rotateSpeed=.68;
+controls.zoomSpeed=.82;
 controls.minDistance=calibration.scene.minDistance;
 controls.maxDistance=calibration.scene.maxDistance;
 controls.maxPolarAngle=THREE.MathUtils.degToRad(calibration.scene.maxPolar);
@@ -196,8 +200,8 @@ loadingManager.onLoad=()=>setLoadingProgress(90,'تركيب المشهد');
 loadingManager.onError=()=>setLoadingProgress(90,'استكمال التحميل');
 const stl=new STLLoader(loadingManager),svgLoader=new SVGLoader(loadingManager),tex=new THREE.TextureLoader(loadingManager);tex.setCrossOrigin('anonymous');
 const makeMat=p=>new THREE.MeshStandardMaterial(p);
-const baseMat=makeMat({color:'#161616',roughness:.54,metalness:.04});
-const mats={right:makeMat({color:'#fff',roughness:.92,metalness:0}),left:makeMat({color:'#b37a18',roughness:.48,metalness:.28}),front:makeMat({color:'#006144',roughness:.58,metalness:.08}),back:makeMat({color:'#001f8f',roughness:.74,metalness:0})};
+const baseMat=makeMat({color:'#283039',roughness:.62,metalness:.02,emissive:'#0b1117',emissiveIntensity:.14});
+const mats={right:makeMat({color:'#fff',roughness:.86,metalness:0}),left:makeMat({color:'#c58b24',roughness:.42,metalness:.22}),front:makeMat({color:'#08765a',roughness:.5,metalness:.06}),back:makeMat({color:'#1236a6',roughness:.62,metalness:.02})};
 const D=48,R3=135,TYPES=['l','m','s'],ORDER=['right','left','front','back'];
 const A={'9':{px:0,py:6,pz:0,rx:-90,ry:0,rz:0},'3-right':{px:R3,py:6,pz:0,rx:-90,ry:0,rz:0},'3-left':{px:-R3,py:6,pz:0,rx:-90,ry:0,rz:180},'3-front':{px:0,py:6,pz:R3,rx:-90,ry:0,rz:90},'3-back':{px:0,py:6,pz:-R3,rx:-90,ry:0,rz:-90}};
 const LID={px:0,py:62.5,pz:0,rx:-90,ry:180,rz:0};
@@ -216,10 +220,10 @@ const TURN_RING=['right','back','left','front'];
 const SIZE_TYPES=['s','m','l'];
 const SIZE_LABEL={s:'صغير',m:'وسط',l:'كبير'};
 const COLOR_INFO={
-  right:{label:'الأبيض',short:'أبيض',css:'#f4f4f0',power:.74},
-  back:{label:'الأزرق',short:'أزرق',css:'#001f8f',power:.88},
-  left:{label:'الذهبي',short:'ذهبي',css:'#b37a18',power:.66},
-  front:{label:'الأخضر',short:'أخضر',css:'#006144',power:.8}
+  right:{label:'الأبيض',short:'أبيض',css:'#f7f7f2',power:.74},
+  back:{label:'الأزرق',short:'أزرق',css:'#1236a6',power:.88},
+  left:{label:'الذهبي',short:'ذهبي',css:'#c58b24',power:.66},
+  front:{label:'الأخضر',short:'أخضر',css:'#08765a',power:.8}
 };
 function cssRgb(css){
   const c=new THREE.Color(css);
@@ -450,7 +454,7 @@ function applyRoomMaterials(){
 function applySceneSettings(){
   scene.background=new THREE.Color(calibration.scene.background);
   renderer.toneMappingExposure=+calibration.scene.exposure;
-  renderer.setPixelRatio(Math.min(Math.max(+calibration.scene.pixelRatio||1,1),2));
+  renderer.setPixelRatio(Math.min(Math.max(+calibration.scene.pixelRatio||1,1),innerWidth<=640?1.35:1.6));
   scene.fog=calibration.scene.fog?new THREE.Fog(calibration.scene.fogColor,+calibration.scene.fogNear,+calibration.scene.fogFar):null;
   camera.fov=+calibration.scene.fov;camera.updateProjectionMatrix();
   controls.minDistance=+calibration.scene.minDistance;
@@ -619,7 +623,16 @@ function injectCalibrationCss(){
   .yt-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .yt-actions button{height:42px;border-radius:12px;border:1px solid rgba(255,255,255,.16);cursor:pointer;font:900 13px ExpoYakolak,system-ui}
   .yt-ok{background:#fff;color:#050505}.yt-repeat{background:rgba(255,255,255,.08);color:#fff}
-  @media (max-width:640px){.yg-card{padding:14px}.yg-title{font-size:21px}.yg-colors{grid-template-columns:repeat(2,1fr)}.yg-bots{grid-template-columns:1fr}.yg-choice{min-height:104px}.yg-caption{min-height:46px;padding:10px 12px;font-size:14px}.yg-score{top:54px;left:8px;right:8px;flex-wrap:wrap}.yg-score span{min-width:48px;padding:6px}.yt-text{font-size:16px}}`;
+  @media (max-width:640px){
+    .yg-card{padding:14px}.yg-title{font-size:21px}.yg-colors{grid-template-columns:repeat(2,1fr)}.yg-bots{grid-template-columns:1fr}.yg-choice{min-height:104px}
+    .yg-caption{min-height:52px;padding:10px 10px 9px;font-size:16px;line-height:1.45}
+    .yg-score{top:60px;left:6px;right:6px;gap:4px;flex-wrap:nowrap;justify-content:center;overflow-x:auto;padding:2px 0;scrollbar-width:none}
+    .yg-score::-webkit-scrollbar{display:none}
+    .yg-score span{min-width:0;flex:0 0 auto;white-space:nowrap;padding:6px 7px;font-size:11px;border-radius:9px}
+    #yakolakTools{right:50%;transform:translateX(50%);bottom:max(8px,env(safe-area-inset-bottom));gap:6px}
+    .yakolak-tool,#clearCacheBtn.yakolak-tool{width:48px!important;height:44px!important;font-size:11px!important}
+    .yt-box{padding:18px 14px}.yt-text{font-size:17px}.yt-actions button{height:48px;font-size:14px}
+  }`;
   document.head.appendChild(style);
 }
 function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n}
@@ -1936,26 +1949,28 @@ const rad=v=>THREE.MathUtils.degToRad(v);
 function setPointer(e){const r=renderer.domElement.getBoundingClientRect();pointer.x=((e.clientX-r.left)/r.width)*2-1;pointer.y=-((e.clientY-r.top)/r.height)*2+1}
 function occupiedZone(index,except=null){return pieces.find(p=>p!==except&&p.placed&&p.zoneIndex===index)}
 function syncZoneMarkers(force=false){
-  const visible=force||calibration.play.showZones;
+  const active=force||calibration.play.showZones||!!selectedPlayPiece;
+  const idle=gameState.configured&&!gameState.winner;
   zoneMarkers.forEach((m,i)=>{
     const busy=gameState.board[i]&&SIZE_TYPES.some(size=>gameState.board[i][size]);
-    m.visible=visible;
-    m.material.color.set(busy?0xf59e0b:calibration.play.zoneColor);
-    m.material.transparent=false;
-    m.material.opacity=1;
-    m.scale.setScalar(Math.max(8,+calibration.play.zoneSize)/36);
+    m.visible=active||idle;
+    const activeColor=COLOR_INFO[selectedPlayPiece?.dir]?.css||calibration.play.zoneColor;
+    m.material.color.set(busy?0xf59e0b:active?activeColor:0x94a3b8);
+    m.material.transparent=true;
+    m.material.opacity=busy?.32:active?.9:(+calibration.play.zoneOpacity||.28);
+    m.scale.setScalar(active?Math.max(8,+calibration.play.zoneSize)/36:.92);
   });
 }
 function createBoardZones(){
   if(zoneMarkers.length)return;
   const geo=new THREE.RingGeometry(13.5,16.5,48);
   boardZones.forEach(z=>{
-    const mat=new THREE.MeshBasicMaterial({color:calibration.play.zoneColor,side:THREE.DoubleSide,depthTest:false,depthWrite:false});
+    const mat=new THREE.MeshBasicMaterial({color:calibration.play.zoneColor,side:THREE.DoubleSide,transparent:true,opacity:.28,depthTest:true,depthWrite:false});
     const m=new THREE.Mesh(geo,mat);
     m.name=`yakolak-drop-zone-${z.id+1}`;
-    m.position.set(z.px,z.py,z.pz);
+    m.position.set(z.px,z.py+.8,z.pz);
     m.rotation.x=-Math.PI/2;
-    m.renderOrder=10001;
+    m.renderOrder=120;
     m.visible=false;
     zoneMarkers.push(m);
     gameGroup.add(m);
@@ -1993,8 +2008,8 @@ function syncPlayableZoneMarkers(piece){
     const legal=!gameState.board[i]?.[piece.type];
     m.visible=legal;
     m.material.color.set(COLOR_INFO[piece.dir]?.css||calibration.play.zoneColor);
-    m.material.transparent=false;
-    m.material.opacity=1;
+    m.material.transparent=true;
+    m.material.opacity=.92;
     m.scale.setScalar(1.04);
   });
 }
@@ -2340,7 +2355,7 @@ async function realTable(){
     return fallbackTable();
   }
 }
-function fit(objects){const box=new THREE.Box3();objects.forEach(o=>box.expandByObject(o));const s=box.getSize(new THREE.Vector3()),dist=(Math.max(s.x,s.y,s.z)||260)*1.65;camera.position.set(dist,dist*.82,dist);camera.near=Math.max(dist/1200,.1);camera.far=dist*22;camera.updateProjectionMatrix();controls.target.set(0,0,0);controls.update();keepInsideRoom()}
+function fit(objects){const box=new THREE.Box3();objects.forEach(o=>box.expandByObject(o));const s=box.getSize(new THREE.Vector3()),maxDim=Math.max(s.x,s.y,s.z)||260,portrait=innerHeight>innerWidth*1.35,dist=maxDim*(portrait?2.05:1.65);camera.position.set(dist*(portrait?.78:1),dist*(portrait?.92:.82),dist);camera.near=Math.max(dist/1200,.1);camera.far=dist*22;camera.updateProjectionMatrix();controls.target.set(0,portrait?22:0,0);controls.update();keepInsideRoom()}
 function frame(now){if(!playing)return;const e=now-start;apply(Math.min(e,total()));render();if(e<total())raf=requestAnimationFrame(frame);else{playing=false;snap();render()}}
 function replay(){if(!loaded)return;cancelAnimationFrame(raf);prepareIntroPieces();start=performance.now();playing=true;if(lid)lid.visible=true;apply(0);render();raf=requestAnimationFrame(frame)}
 function playIntroOnce(){
@@ -2365,7 +2380,7 @@ function playIntroOnce(){
   });
 }
 function marble(){tex.load(MARBLE_URL,t=>{t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=renderer.capabilities.getMaxAnisotropy();marbleTexture=t;applyCalibration();render()},undefined,()=>{})}
-async function boot(){try{setLoadingProgress(34,'تحميل المجسمات');const [g9,g3,gl,gm,gs,gp]=await Promise.all([load('9',center),load('3',center),load('l',bottom),load('m',bottom),load('s',bottom),load('p',center)]);setLoadingProgress(72,'تجميع الحجارة');loadScorePoints(gp);const objects=[];meshes['9']=set(new THREE.Mesh(g9,baseMat));addGame(meshes['9']);objects.push(meshes['9']);ORDER.forEach(k=>{meshes['3-'+k]=set(new THREE.Mesh(g3,baseMat));addGame(meshes['3-'+k]);objects.push(meshes['3-'+k])});lid=set(new THREE.Mesh(g9,baseMat));addGame(lid);makePieces({l:gl,m:gm,s:gs});createBoardZones();apply(0);setLoadingProgress(84,'تجهيز الطاولة');const tableObj=await realTable();alignGameToTable(tableObj);objects.push(...pieces.map(p=>p.mesh),tableObj.userData.fitProxy||tableObj);fit(objects);loaded=true;applyCalibration();renderSetup3D();render();setLoadingProgress(96,'إظهار اللعبة');requestAnimationFrame(()=>requestAnimationFrame(done));marble();log('game v091 ready - svg table footprint')}catch(e){fail(e)}}
+async function boot(){try{setLoadingProgress(34,'تحميل المجسمات');const [g9,g3,gl,gm,gs,gp]=await Promise.all([load('9',center),load('3',center),load('l',bottom),load('m',bottom),load('s',bottom),load('p',center)]);setLoadingProgress(72,'تجميع الحجارة');loadScorePoints(gp);const objects=[];meshes['9']=set(new THREE.Mesh(g9,baseMat));addGame(meshes['9']);objects.push(meshes['9']);ORDER.forEach(k=>{meshes['3-'+k]=set(new THREE.Mesh(g3,baseMat));addGame(meshes['3-'+k]);objects.push(meshes['3-'+k])});lid=set(new THREE.Mesh(g9,baseMat));addGame(lid);makePieces({l:gl,m:gm,s:gs});createBoardZones();apply(0);setLoadingProgress(84,'تجهيز الطاولة');const tableObj=await realTable();alignGameToTable(tableObj);objects.push(...pieces.map(p=>p.mesh),tableObj.userData.fitProxy||tableObj);fit(objects);loaded=true;applyCalibration();renderSetup3D();render();setLoadingProgress(96,'إظهار اللعبة');requestAnimationFrame(()=>requestAnimationFrame(done));marble();log('game v093 ready - brighter board and mobile framing')}catch(e){fail(e)}}
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);render()},{passive:true});
 addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r')replay()});
 renderer.domElement.addEventListener('pointerdown',beginDrag);
