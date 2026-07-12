@@ -13,7 +13,7 @@ function assert(value, message) {
 }
 
 async function shot(page, path) {
-  await page.screenshot({ path, timeout: 120_000, animations: 'disabled' });
+  await page.screenshot({ path, timeout: 120_000 });
 }
 
 async function tap(page, point, mobile) {
