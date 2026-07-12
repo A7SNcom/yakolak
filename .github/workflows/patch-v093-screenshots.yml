@@ -1,0 +1,60 @@
+name: Patch v093 screenshot stability
+
+on:
+  push:
+    branches:
+      - feature/v093-visual-mobile
+    paths:
+      - .github/workflows/patch-v093-screenshots.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v093-visual-mobile
+          fetch-depth: 0
+
+      - name: Stabilize Playwright screenshots
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('tests/e2e/verify-v093.mjs')
+          s=p.read_text()
+          anchor="""function assert(value, message) {
+            if (!value) throw new Error(message);
+          }
+          """
+          helper="""function assert(value, message) {
+            if (!value) throw new Error(message);
+          }
+
+          async function shot(page, path) {
+            await page.screenshot({ path, timeout: 120_000, animations: 'disabled' });
+          }
+          """
+          if anchor not in s:
+              raise SystemExit('assert anchor missing')
+          s=s.replace(anchor,helper,1)
+          import re
+          pattern=r"await page\.screenshot\(\{ path: (`\$\{outDir\}/\$\{name\}-[^`]+`), fullPage: true \}\);"
+          s,count=re.subn(pattern,r"await shot(page, \1);",s)
+          if count < 7:
+              raise SystemExit(f'expected at least 7 screenshot replacements, got {count}')
+          p.write_text(s)
+          print(f'replaced {count} screenshots')
+          PY
+          node --check tests/e2e/verify-v093.mjs
+
+      - name: Commit screenshot fix
+        run: |
+          rm -f .github/workflows/patch-v093-screenshots.yml
+          git config user.name "yakolak-agent"
+          git config user.email "ahmad.bn.kamal@gmail.com"
+          git add -A
+          git commit -m "Stabilize v093 browser screenshots"
+          git push origin HEAD:feature/v093-visual-mobile
