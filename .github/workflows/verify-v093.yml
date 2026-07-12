@@ -1,5 +1,5 @@
 name: Verify v093 visual and mobile experience
-# Trusted rerun after rendering performance optimization.
+# Final trusted rerun with reduced-motion performance support.
 
 on:
   push:
@@ -35,12 +35,10 @@ jobs:
     steps:
       - name: Checkout v093 branch
         uses: actions/checkout@v4
-
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
-
       - name: Verify build and gameplay invariants
         run: |
           node --check src/app-game-v085.js
@@ -55,29 +53,22 @@ jobs:
             'const D=48,R3=135',
             'const DEFAULT_TURN_SECONDS=18',
             "const SIZE_TYPES=['s','m','l']",
-            'const WIN_LINES=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]]'
-          ]) if(!game.includes(invariant)) throw new Error(`changed rule: ${invariant}`);
+            'const WIN_LINES=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]]',
+            'const REDUCED_MOTION='
+          ]) if(!game.includes(invariant)) throw new Error(`changed or missing invariant: ${invariant}`);
           NODE
-
       - name: Start local site
         run: |
           python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/yakolak-v093-server.log 2>&1 &
-          echo $! > /tmp/yakolak-v093-server.pid
-          for i in {1..30}; do
-            curl --fail --silent http://127.0.0.1:4173/version.json >/dev/null && exit 0
-            sleep 1
-          done
+          for i in {1..30}; do curl --fail --silent http://127.0.0.1:4173/version.json >/dev/null && exit 0; sleep 1; done
           cat /tmp/yakolak-v093-server.log
           exit 1
-
       - name: Install Playwright
         run: |
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
-
       - name: Run desktop and mobile gameplay test
         run: node tests/e2e/verify-v093.mjs
-
       - name: Upload screenshots and report
         if: always()
         uses: actions/upload-artifact@v4
