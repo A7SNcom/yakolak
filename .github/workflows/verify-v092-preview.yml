@@ -75,6 +75,39 @@ jobs:
             }, null, { timeout: 10_000 });
             await page.waitForTimeout(300);'''
           s = s.replace(old2, new2)
+          old3 = '''  await clickBoardZone(page, 4);
+            await page.waitForFunction(() => {
+              const g = globalThis.__yakolakGame;
+              const color = g.state.humanColor;
+              return g.state.board?.[4]?.l === color || g.state.board?.[4]?.m === color || g.state.board?.[4]?.s === color;
+            }, null, { timeout: 15_000 });'''
+          new3 = '''  const candidateZones = await page.evaluate(() => {
+              const g = globalThis.__yakolakGame;
+              const r = g.renderer.domElement.getBoundingClientRect();
+              return g.gameGroup.children
+                .filter((o) => o.name?.startsWith('yakolak-drop-zone-') && o.visible)
+                .map((o) => {
+                  const p = new g.THREE.Vector3();
+                  o.getWorldPosition(p);
+                  p.project(g.camera);
+                  return { name: o.name, x: r.left + (p.x + 1) * r.width / 2, y: r.top + (1 - p.y) * r.height / 2 };
+                });
+            });
+            let humanMovePlaced = false;
+            for (const point of candidateZones) {
+              await page.mouse.click(point.x, point.y);
+              await page.waitForTimeout(900);
+              humanMovePlaced = await page.evaluate(() => {
+                const g = globalThis.__yakolakGame;
+                return Object.values(g.state.board || {}).some((cell) => Object.values(cell || {}).some((color) => color === g.state.humanColor));
+              });
+              if (humanMovePlaced) break;
+            }
+            assert(humanMovePlaced, `${name}: no visible board zone accepted the selected piece`);
+            await page.screenshot({ path: `${outDir}/${name}-04c-human-move.png`, fullPage: true });'''
+          if old3 not in s:
+              raise SystemExit('Expected board placement block was not found')
+          s = s.replace(old3, new3)
           p.write_text(s)
           PY
 
