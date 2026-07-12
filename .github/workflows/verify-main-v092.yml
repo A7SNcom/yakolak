@@ -1,0 +1,63 @@
+name: Verify main v092 gameplay
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - tests/e2e/verify-main-v092.mjs
+      - .github/workflows/verify-main-v092.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BASE_URL: https://yakolak.vercel.app
+      ARTIFACT_DIR: artifacts/e2e
+    steps:
+      - name: Checkout validation branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify production matches main source
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://yakolak.vercel.app'
+          mkdir -p /tmp/yakolak-public/src /tmp/yakolak-public/assets/models
+          curl --fail --location --silent --show-error "$base/index.html?verify=${GITHUB_SHA}" -o /tmp/yakolak-public/index.html
+          curl --fail --location --silent --show-error "$base/app.js?verify=${GITHUB_SHA}" -o /tmp/yakolak-public/app.js
+          curl --fail --location --silent --show-error "$base/version.json?verify=${GITHUB_SHA}" -o /tmp/yakolak-public/version.json
+          curl --fail --location --silent --show-error "$base/src/app-game-v085.js?verify=${GITHUB_SHA}" -o /tmp/yakolak-public/src/app-game-v085.js
+          curl --fail --location --silent --show-error "$base/assets/models/table.svg?verify=${GITHUB_SHA}" -o /tmp/yakolak-public/assets/models/table.svg
+          cmp index.html /tmp/yakolak-public/index.html
+          cmp app.js /tmp/yakolak-public/app.js
+          cmp version.json /tmp/yakolak-public/version.json
+          cmp src/app-game-v085.js /tmp/yakolak-public/src/app-game-v085.js
+          cmp assets/models/table.svg /tmp/yakolak-public/assets/models/table.svg
+
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Run desktop and mobile gameplay verification
+        run: node tests/e2e/verify-main-v092.mjs
+
+      - name: Upload screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yakolak-main-v092-e2e
+          path: artifacts/e2e
+          if-no-files-found: error
+          retention-days: 7
