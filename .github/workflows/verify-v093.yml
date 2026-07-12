@@ -1,5 +1,5 @@
 name: Verify v093 visual and mobile experience
-# Trusted rerun after screenshot stabilization.
+# Trusted rerun with tutorial animations preserved.
 
 on:
   push:
