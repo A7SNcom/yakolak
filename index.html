@@ -2,41 +2,65 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="yakolak-version" content="v067-original-table-texture-maps">
-<title>Yakolak Live</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#090b0d">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="ياكلك — لعبة طاولة ثلاثية الأبعاد تعمل مباشرة من المتصفح على الجوال والكمبيوتر.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="yakolak-version" content="v079-online-foundation">
+<title>ياكلك</title>
+<link rel="manifest" href="./manifest.webmanifest?v=79">
+<link rel="icon" href="./assets/icon.svg?v=79" type="image/svg+xml">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://i.ibb.co" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script>
 <style>
+@font-face{font-family:YakolakArabic;src:url('./makeen-regular.otf?v=79') format('opentype');font-display:swap}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b0b;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:none}
-#view{position:fixed;inset:0;z-index:1;opacity:0;transition:opacity .35s ease}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090b0d;color:#fff;font-family:YakolakArabic,system-ui,-apple-system,"Segoe UI",sans-serif;overscroll-behavior:none}
+button,input{font:inherit}
+#view{position:fixed;inset:0;z-index:1;opacity:0;transition:opacity .35s ease;touch-action:none}
 #hint,#settingsBtn,#panel,textarea{display:none!important}
-#yakolakLoader{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:#0b0b0b;transition:opacity .35s ease,visibility .35s ease}
+#yakolakLoader{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:radial-gradient(circle at 50% 42%,#20272c 0,#0d1012 34%,#090b0d 72%);transition:opacity .35s ease,visibility .35s ease}
 #yakolakLoader.done{opacity:0;visibility:hidden;pointer-events:none}
-#yakolakLoader.error .loaderRing{border-top-color:#b35a5a}
-.loaderRing{width:42px;height:42px;border-radius:50%;border:3px solid rgba(255,255,255,.14);border-top-color:#fff;animation:spin .85s linear infinite}
-#clearCacheBtn{position:fixed;left:16px;bottom:16px;z-index:10000;width:58px;height:58px;border-radius:50%;border:1px solid rgba(255,255,255,.24);background:rgba(0,0,0,.82);color:#fff;font-size:15px;font-weight:950;display:grid;place-items:center;cursor:pointer;line-height:1;box-shadow:0 10px 30px rgba(0,0,0,.42);user-select:none}
-#clearCacheBtn[disabled]{opacity:.62;cursor:wait}
+#yakolakLoader.error .loaderRing{border-top-color:#ff7d7d}
+.loaderBox{display:grid;justify-items:center;gap:16px;text-align:center;padding:24px}
+.loaderRing{width:46px;height:46px;border-radius:50%;border:3px solid rgba(255,255,255,.13);border-top-color:#fff;animation:spin .85s linear infinite}
+.loaderTitle{font-size:20px;font-weight:900;letter-spacing:.02em}
+.loaderText{font:600 13px system-ui;opacity:.66}
+#clearCacheBtn{display:none}
+#bootError{display:none;max-width:360px;font:700 13px/1.7 system-ui;color:#ffd6d6}
+#yakolakLoader.error #bootError{display:block}
+#yakolakLoader.error .loaderText{display:none}
 @keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
 </head>
 <body>
-<div id="yakolakLoader"><div class="loaderRing"></div></div>
-<div id="view"></div>
+<div id="yakolakLoader" role="status" aria-live="polite">
+  <div class="loaderBox">
+    <div class="loaderRing" aria-hidden="true"></div>
+    <div class="loaderTitle">ياكلك</div>
+    <div class="loaderText">نجهّز الطاولة والقطع…</div>
+    <div id="bootError">تعذر تشغيل اللعبة. تحقق من الاتصال ثم استخدم «تنظيف الملفات» من قائمة المساعدة.</div>
+  </div>
+</div>
+<div id="view" aria-label="مساحة لعبة ياكلك ثلاثية الأبعاد"></div>
 <div id="hint" aria-hidden="true"></div>
 <button id="settingsBtn" aria-hidden="true">SET</button>
-<button id="clearCacheBtn" type="button" title="مسح كامل للكاش وإعادة تحميل نظيفة" aria-label="مسح كامل للكاش وإعادة تحميل نظيفة">مسح</button>
+<button id="clearCacheBtn" type="button" aria-label="تنظيف الملفات المؤقتة">تنظيف</button>
 <div id="panel" aria-hidden="true"></div>
 <textarea id="out"></textarea>
 <script type="module">
-const BUILD='67';
+const BUILD='79';
 const KEY='yakolak_build_seen';
 const params=new URLSearchParams(location.search);
 const clearToken=params.get('clear');
 const ASSET_VERSION=clearToken||BUILD;
 const clearBtn=document.getElementById('clearCacheBtn');
+const loader=document.getElementById('yakolakLoader');
 function hardReload(){
   const url=new URL(location.href);
   url.searchParams.set('clear',Date.now().toString());
@@ -50,40 +74,46 @@ async function clearIndexedDB(){
     req.onsuccess=req.onerror=req.onblocked=()=>resolve();
   })));
 }
-async function cleanReload(e){
-  if(e)e.preventDefault();
-  if(!clearBtn||clearBtn.disabled)return;
-  clearBtn.disabled=true;
-  clearBtn.textContent='ينظف';
+async function cleanReload(event){
+  event?.preventDefault();
+  if(clearBtn?.disabled)return;
+  if(clearBtn)clearBtn.disabled=true;
   const jobs=[];
-  try{localStorage.clear()}catch(err){}
-  try{sessionStorage.clear()}catch(err){}
-  try{if('caches' in window)jobs.push(caches.keys().then(names=>Promise.allSettled(names.map(name=>caches.delete(name)))))}catch(err){}
-  try{if('serviceWorker' in navigator)jobs.push(navigator.serviceWorker.getRegistrations().then(regs=>Promise.allSettled(regs.map(reg=>reg.unregister()))))}catch(err){}
+  try{localStorage.removeItem(KEY)}catch(error){}
+  try{sessionStorage.clear()}catch(error){}
+  try{if('caches' in window)jobs.push(caches.keys().then(names=>Promise.allSettled(names.map(name=>caches.delete(name)))))}catch(error){}
+  try{if('serviceWorker' in navigator)jobs.push(navigator.serviceWorker.getRegistrations().then(regs=>Promise.allSettled(regs.map(reg=>reg.unregister()))))}catch(error){}
   jobs.push(clearIndexedDB().catch(()=>{}));
   await Promise.allSettled(jobs);
-  clearBtn.textContent='تم';
   hardReload();
 }
-if(clearBtn)clearBtn.addEventListener('click',cleanReload);
+clearBtn?.addEventListener('click',cleanReload);
+window.YakolakMaintenance={cleanReload,build:BUILD};
 async function checkVersion(){
   try{
-    const r=await fetch('./version.json?v='+ASSET_VERSION,{cache:'no-store'});
-    const v=await r.json();
-    const next=String(v.build||BUILD);
+    const response=await fetch('./version.json?v='+ASSET_VERSION,{cache:'no-store'});
+    if(!response.ok)throw new Error('version '+response.status);
+    const version=await response.json();
+    const next=String(version.build||BUILD);
     const old=localStorage.getItem(KEY);
     if(old&&old!==next){localStorage.setItem(KEY,next);hardReload();return false}
     localStorage.setItem(KEY,next);
-  }catch(e){}
+  }catch(error){console.warn('[Yakolak] version check skipped',error)}
   return true;
 }
-if(await checkVersion()){
-  await import('./app.js?v='+ASSET_VERSION);
+try{
+  if(await checkVersion())await import('./app.js?v='+ASSET_VERSION);
   if(clearToken){
     const clean=new URL(location.href);
     clean.searchParams.delete('clear');
     history.replaceState(null,'',clean.toString());
   }
+  if('serviceWorker' in navigator&&location.protocol.startsWith('http')){
+    addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v='+BUILD).catch(error=>console.warn('[Yakolak] service worker',error)),{once:true});
+  }
+}catch(error){
+  console.error('[Yakolak] boot failed',error);
+  loader?.classList.add('error');
 }
 </script>
 </body>
