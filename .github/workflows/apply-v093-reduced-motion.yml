@@ -1,0 +1,65 @@
+name: Apply v093 reduced motion support
+
+on:
+  push:
+    branches: [feature/v093-visual-mobile]
+    paths: [.github/workflows/apply-v093-reduced-motion.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v093-visual-mobile
+          fetch-depth: 0
+      - name: Patch game and tests
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/app-game-v085.js')
+          s=p.read_text()
+          anchor="const log=(...a)=>console.info('[Yakolak]',...a);"
+          insert="""const log=(...a)=>console.info('[Yakolak]',...a);
+const REDUCED_MOTION=globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches||new URLSearchParams(location.search).has('reducedMotion');
+const motionMs=ms=>REDUCED_MOTION?Math.min(ms,80):ms;"""
+          if 'const REDUCED_MOTION=' not in s:
+              if anchor not in s: raise SystemExit('log anchor missing')
+              s=s.replace(anchor,insert,1)
+          replacements={
+            "async function fadeOutObjects(objects,ms=560){":"async function fadeOutObjects(objects,ms=560){\n  ms=motionMs(ms);",
+            "function setCameraView(pos,target,ms=700){":"function setCameraView(pos,target,ms=700){\n  ms=motionMs(ms);",
+            "function animateObjectTo(obj,pos,rot=null,ms=650,arc=22){":"function animateObjectTo(obj,pos,rot=null,ms=650,arc=22){\n  ms=motionMs(ms);",
+            "function animateObjectsTo(items,ms=620,arc=16){":"function animateObjectsTo(items,ms=620,arc=16){\n  ms=motionMs(ms);",
+            "const duration=Math.max(1000,+calibration.play.winnerBlinkDuration||3000);":"const duration=REDUCED_MOTION?120:Math.max(1000,+calibration.play.winnerBlinkDuration||3000);",
+          }
+          for old,new in replacements.items():
+              if new in s: continue
+              if old not in s: raise SystemExit(f'missing {old}')
+              s=s.replace(old,new,1)
+          p.write_text(s)
+
+          for file in ['tests/e2e/verify-v093.mjs','tests/e2e/diagnose-v093-tutorial.mjs']:
+              q=Path(file); t=q.read_text()
+              if "reducedMotion: 'reduce'" not in t:
+                  if "locale: 'ar-SA'," in t:
+                      t=t.replace("locale: 'ar-SA',","locale: 'ar-SA',\n    reducedMotion: 'reduce',",1)
+                  elif "locale: 'ar-SA'" in t:
+                      t=t.replace("locale: 'ar-SA'","locale: 'ar-SA', reducedMotion: 'reduce'",1)
+                  else: raise SystemExit(f'locale anchor missing in {file}')
+              q.write_text(t)
+          PY
+          node --check src/app-game-v085.js
+          node --check tests/e2e/verify-v093.mjs
+          node --check tests/e2e/diagnose-v093-tutorial.mjs
+      - name: Commit changes
+        run: |
+          rm -f .github/workflows/apply-v093-reduced-motion.yml
+          git config user.name yakolak-agent
+          git config user.email ahmad.bn.kamal@gmail.com
+          git add -A
+          git commit -m "Add reduced motion and faster low-power rendering"
+          git push origin HEAD:feature/v093-visual-mobile
