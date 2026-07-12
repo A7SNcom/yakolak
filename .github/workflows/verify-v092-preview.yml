@@ -43,7 +43,7 @@ jobs:
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
 
-      - name: Fix test harness argument forwarding
+      - name: Improve 3D test targeting
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -51,6 +51,30 @@ jobs:
           s = p.read_text()
           s = s.replace('async function projectedPoint(page, resolver) {', 'async function projectedPoint(page, resolver, arg) {')
           s = s.replace('const point = await page.evaluate(resolver);', 'const point = await page.evaluate(resolver, arg);')
+          old = '''    const z = g.boardZones.find((x) => x.id === zoneId);
+              if (!z) return null;
+              const p = new g.THREE.Vector3(z.px, z.py, z.pz);
+              g.gameGroup.localToWorld(p);'''
+          new = '''    const z = g.boardZones.find((x) => x.id === zoneId);
+              if (!z) return null;
+              const marker = g.gameGroup.getObjectByName(`yakolak-drop-zone-${zoneId + 1}`);
+              const p = new g.THREE.Vector3();
+              if (marker) marker.getWorldPosition(p);
+              else {
+                p.set(z.px, z.py, z.pz);
+                g.gameGroup.localToWorld(p);
+              }'''
+          s = s.replace(old, new)
+          old2 = '''  await clickHumanPiece(page);
+            await page.waitForTimeout(700);'''
+          new2 = '''  await clickHumanPiece(page);
+            await page.screenshot({ path: `${outDir}/${name}-04b-piece-opened.png`, fullPage: true });
+            await page.waitForFunction(() => {
+              const g = globalThis.__yakolakGame;
+              return g.gameGroup.children.some((o) => o.name?.startsWith('yakolak-drop-zone-') && o.visible);
+            }, null, { timeout: 10_000 });
+            await page.waitForTimeout(300);'''
+          s = s.replace(old2, new2)
           p.write_text(s)
           PY
 
