@@ -1,5 +1,5 @@
 name: Verify v093 visual and mobile experience
-# Final trusted rerun with reduced-motion performance support.
+# Final trusted rerun after immediate reduced-motion bot fix.
 
 on:
   push:
@@ -54,7 +54,8 @@ jobs:
             'const DEFAULT_TURN_SECONDS=18',
             "const SIZE_TYPES=['s','m','l']",
             'const WIN_LINES=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]]',
-            'const REDUCED_MOTION='
+            'const REDUCED_MOTION=',
+            'commitMove(move.piece,move.zone,!REDUCED_MOTION);'
           ]) if(!game.includes(invariant)) throw new Error(`changed or missing invariant: ${invariant}`);
           NODE
       - name: Start local site
