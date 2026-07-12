@@ -1,12 +1,12 @@
 name: Verify v093 visual and mobile experience
-# Final trusted rerun after immediate reduced-motion bot fix.
+# Fast complete verification: load, tutorial, player move, bot reply, win, desktop and mobile.
 
 on:
   push:
     branches:
       - feature/v093-visual-mobile
     paths:
-      - tests/e2e/verify-v093.mjs
+      - tests/e2e/verify-v093-speed.mjs
       - .github/workflows/verify-v093.yml
   pull_request:
     branches:
@@ -18,7 +18,7 @@ on:
       - index.html
       - app.js
       - version.json
-      - tests/e2e/verify-v093.mjs
+      - tests/e2e/verify-v093-speed.mjs
       - .github/workflows/verify-v093.yml
   workflow_dispatch:
 
@@ -28,10 +28,10 @@ permissions:
 jobs:
   browser-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     env:
       BASE_URL: http://127.0.0.1:4173
-      ARTIFACT_DIR: artifacts/v093
+      ARTIFACT_DIR: artifacts/v093-speed
     steps:
       - name: Checkout v093 branch
         uses: actions/checkout@v4
@@ -44,6 +44,7 @@ jobs:
           node --check src/app-game-v085.js
           node --check api/calibration.js
           node --check config/calibration-v093.js
+          node --check tests/e2e/verify-v093-speed.mjs
           node - <<'NODE'
           const fs=require('fs');
           const version=JSON.parse(fs.readFileSync('version.json','utf8'));
@@ -60,7 +61,7 @@ jobs:
           NODE
       - name: Start local site
         run: |
-          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/yakolak-v093-server.log 2>&1 &
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/yakolak-v093-server.log 2>&1 &
           for i in {1..30}; do curl --fail --silent http://127.0.0.1:4173/version.json >/dev/null && exit 0; sleep 1; done
           cat /tmp/yakolak-v093-server.log
           exit 1
@@ -68,13 +69,13 @@ jobs:
         run: |
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
-      - name: Run desktop and mobile gameplay test
-        run: node tests/e2e/verify-v093.mjs
+      - name: Run fast complete desktop and mobile test
+        run: node tests/e2e/verify-v093-speed.mjs
       - name: Upload screenshots and report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: yakolak-v093-e2e
-          path: artifacts/v093
+          name: yakolak-v093-speed-e2e
+          path: artifacts/v093-speed
           if-no-files-found: error
           retention-days: 7
