@@ -94,6 +94,11 @@ try {
   await choose('color', 'right');
   await choose('bots', 1);
 
+  await page.waitForFunction(() => {
+    const state = globalThis.__yakolakGame.state;
+    return state.tutorial || state.started;
+  }, null, { timeout: 150_000 });
+
   const started = Date.now();
   let lastSignature = '';
   let wasOpen = false;
