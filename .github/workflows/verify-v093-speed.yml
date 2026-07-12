@@ -1,0 +1,35 @@
+name: Verify v093 speed and playability
+
+on:
+  push:
+    branches: [feature/v093-visual-mobile]
+    paths:
+      - tests/e2e/verify-v093-speed.mjs
+      - .github/workflows/verify-v093-speed.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  speed-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE_URL: http://127.0.0.1:4173
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Start local site
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/yakolak-v093-speed.log 2>&1 &
+          for i in {1..30}; do curl --fail --silent http://127.0.0.1:4173/version.json >/dev/null && exit 0; sleep 1; done
+          exit 1
+      - name: Install Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Verify speed and playability
+        run: node tests/e2e/verify-v093-speed.mjs
