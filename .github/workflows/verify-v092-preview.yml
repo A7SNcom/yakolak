@@ -5,12 +5,14 @@ on:
     branches:
       - agent/recover-vercel-v092
     paths:
+      - tests/e2e/diagnose-v092-preview.mjs
       - tests/e2e/verify-v092-preview.mjs
       - .github/workflows/verify-v092-preview.yml
   pull_request:
     branches:
       - main
     paths:
+      - tests/e2e/diagnose-v092-preview.mjs
       - tests/e2e/verify-v092-preview.mjs
       - .github/workflows/verify-v092-preview.yml
   workflow_dispatch:
@@ -23,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      PREVIEW_URL: https://yakolak-git-agent-recover-vercel-v092-ahmdkcoms-projects.vercel.app/?_vercel_share=gvnXCW7r3rchC3OTSwp1YLIzpPl518ey
+      PREVIEW_URL: https://yakolak-git-agent-recover-vercel-v092-ahmdkcoms-projects.vercel.app/?_vercel_share=SkgfI1HXs3P7rSS75G5GlzwIaIwnVeGk
       ARTIFACT_DIR: artifacts/e2e
     steps:
       - name: Checkout recovery branch
@@ -40,6 +42,9 @@ jobs:
         run: |
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
+
+      - name: Diagnose preview access and loading
+        run: node tests/e2e/diagnose-v092-preview.mjs
 
       - name: Run desktop and mobile gameplay tests
         run: node tests/e2e/verify-v092-preview.mjs
