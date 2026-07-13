@@ -4,7 +4,6 @@ on:
   push:
     branches: [feature/v093-visual-mobile]
     paths:
-      - tests/e2e/diagnose-v093-tutorial.mjs
       - .github/workflows/diagnose-v093-tutorial.yml
   workflow_dispatch:
 
@@ -14,68 +13,31 @@ permissions:
 jobs:
   tutorial-diagnostic:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
-    env:
-      BASE_URL: http://127.0.0.1:4173
-      ARTIFACT_DIR: artifacts/tutorial-diagnostic
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
           ref: feature/v093-visual-mobile
           fetch-depth: 0
-      - name: Apply direct reduced-motion tutorial once
+      - name: Apply immediate player placement in reduced motion
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('src/app-game-v085.js'); s=p.read_text()
-          old="""async function runTutorial(){
-            gameState.tutorial=true;
-            await setCameraView({x:520,y:430,z:520},{x:0,y:0,z:0},520);
-            const color=gameState.humanColor||'right';"""
-          new="""async function runTutorial(){
-            gameState.tutorial=true;
-            await setCameraView({x:520,y:430,z:520},{x:0,y:0,z:0},520);
-            if(REDUCED_MOTION){
-              const prompts=['هل فهمت فوز ثلاث قطع من نفس الحجم؟','هل فهمت فوز الخط المتدرج؟','هل فهمت فوز نفس الخانة؟'];
-              for(const text of prompts)await tutorialCheckpoint(text,()=>Promise.resolve());
-              clearHighlights();caption('دورك: افتح طقمك، اختر الحجم، ثم اضغط خانة متاحة.');
-              gameState.tutorial=false;
-              return;
-            }
-            const color=gameState.humanColor||'right';"""
+          p=Path('src/app-game-v085.js')
+          s=p.read_text()
+          old='const ok=commitMove(piece,zone.id,true);'
+          new='const ok=commitMove(piece,zone.id,!REDUCED_MOTION);'
           if new not in s:
-              if old not in s: raise SystemExit('runTutorial anchor missing')
+              if old not in s:
+                  raise SystemExit('player placement anchor missing')
               s=s.replace(old,new,1)
           p.write_text(s)
           PY
           node --check src/app-game-v085.js
           if ! git diff --quiet; then
-            rm -f .github/workflows/apply-v093-fast-tutorial.yml
             git config user.name yakolak-agent
             git config user.email ahmad.bn.kamal@gmail.com
-            git add -A
-            git commit -m "Use direct tutorial checkpoints in reduced motion"
+            git add src/app-game-v085.js
+            git commit -m "Make reduced-motion player placement immediate"
             git push origin HEAD:feature/v093-visual-mobile
           fi
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: Start local site
-        run: |
-          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/yakolak-v093-diagnostic.log 2>&1 &
-          for i in {1..30}; do curl --fail --silent http://127.0.0.1:4173/version.json >/dev/null && exit 0; sleep 1; done
-          exit 1
-      - name: Install Chromium
-        run: |
-          npm install --no-save playwright@1.55.0
-          npx playwright install --with-deps chromium
-      - name: Trace tutorial transitions
-        run: node tests/e2e/diagnose-v093-tutorial.mjs
-      - name: Upload tutorial trace
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: yakolak-v093-tutorial-diagnostic
-          path: artifacts/tutorial-diagnostic
-          if-no-files-found: error
-          retention-days: 7
