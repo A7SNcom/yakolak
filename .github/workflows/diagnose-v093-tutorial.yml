@@ -23,41 +23,38 @@ jobs:
         with:
           ref: feature/v093-visual-mobile
           fetch-depth: 0
-      - name: Apply reduced motion support once
+      - name: Apply direct reduced-motion tutorial once
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p=Path('src/app-game-v085.js'); s=p.read_text()
-          anchor="const log=(...a)=>console.info('[Yakolak]',...a);"
-          insert=anchor+"\nconst REDUCED_MOTION=globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches||new URLSearchParams(location.search).has('reducedMotion');\nconst motionMs=ms=>REDUCED_MOTION?Math.min(ms,80):ms;"
-          if 'const REDUCED_MOTION=' not in s: s=s.replace(anchor,insert,1)
-          pairs=[
-            ('async function fadeOutObjects(objects,ms=560){','async function fadeOutObjects(objects,ms=560){\n  ms=motionMs(ms);'),
-            ('function setCameraView(pos,target,ms=700){','function setCameraView(pos,target,ms=700){\n  ms=motionMs(ms);'),
-            ('function animateObjectTo(obj,pos,rot=null,ms=650,arc=22){','function animateObjectTo(obj,pos,rot=null,ms=650,arc=22){\n  ms=motionMs(ms);'),
-            ('function animateObjectsTo(items,ms=620,arc=16){','function animateObjectsTo(items,ms=620,arc=16){\n  ms=motionMs(ms);'),
-            ('const duration=Math.max(1000,+calibration.play.winnerBlinkDuration||3000);','const duration=REDUCED_MOTION?120:Math.max(1000,+calibration.play.winnerBlinkDuration||3000);'),
-            ('commitMove(move.piece,move.zone,true);','commitMove(move.piece,move.zone,!REDUCED_MOTION);')]
-          for old,new in pairs:
-            if new not in s:
-              if old not in s: raise SystemExit('missing '+old)
+          old="""async function runTutorial(){
+            gameState.tutorial=true;
+            await setCameraView({x:520,y:430,z:520},{x:0,y:0,z:0},520);
+            const color=gameState.humanColor||'right';"""
+          new="""async function runTutorial(){
+            gameState.tutorial=true;
+            await setCameraView({x:520,y:430,z:520},{x:0,y:0,z:0},520);
+            if(REDUCED_MOTION){
+              const prompts=['هل فهمت فوز ثلاث قطع من نفس الحجم؟','هل فهمت فوز الخط المتدرج؟','هل فهمت فوز نفس الخانة؟'];
+              for(const text of prompts)await tutorialCheckpoint(text,()=>Promise.resolve());
+              clearHighlights();caption('دورك: افتح طقمك، اختر الحجم، ثم اضغط خانة متاحة.');
+              gameState.tutorial=false;
+              return;
+            }
+            const color=gameState.humanColor||'right';"""
+          if new not in s:
+              if old not in s: raise SystemExit('runTutorial anchor missing')
               s=s.replace(old,new,1)
           p.write_text(s)
-          for f in ['tests/e2e/verify-v093.mjs','tests/e2e/diagnose-v093-tutorial.mjs']:
-            q=Path(f); t=q.read_text()
-            if "reducedMotion: 'reduce'" not in t:
-              if "locale: 'ar-SA'," in t: t=t.replace("locale: 'ar-SA',","locale: 'ar-SA',\n    reducedMotion: 'reduce',",1)
-              else: t=t.replace("locale: 'ar-SA'","locale: 'ar-SA', reducedMotion: 'reduce'",1)
-            q.write_text(t)
           PY
           node --check src/app-game-v085.js
-          node --check tests/e2e/verify-v093.mjs
           if ! git diff --quiet; then
-            rm -f .github/workflows/apply-v093-reduced-motion.yml
+            rm -f .github/workflows/apply-v093-fast-tutorial.yml
             git config user.name yakolak-agent
             git config user.email ahmad.bn.kamal@gmail.com
             git add -A
-            git commit -m "Make reduced-motion bot turns immediate"
+            git commit -m "Use direct tutorial checkpoints in reduced motion"
             git push origin HEAD:feature/v093-visual-mobile
           fi
       - uses: actions/setup-node@v4
