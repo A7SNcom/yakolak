@@ -1,5 +1,5 @@
 name: Verify v093 visual and mobile experience
-# Final trusted rerun after immediate reduced-motion player placement.
+# Final clean verification after diagnostics removal.
 
 on:
   push:
