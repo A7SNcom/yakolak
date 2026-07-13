@@ -58,7 +58,6 @@ async function placeSelectedPiece(page,name,mobile){
   for(let i=0;i<points.length;i++){
     const start=Date.now();
     await tap(page,points[i],mobile);
-    await page.waitForTimeout(120);
     const placed=await page.evaluate(id=>{const g=globalThis.__yakolakGame;return Object.values(g.state.board?.[id]||{}).includes(g.state.humanColor)},points[i].zoneId);
     if(placed){const humanMoveMs=Date.now()-start;await snapshot(page,name,`zone-attempt-${i+1}-placed`,points[i]);return{humanMoveMs,point:points[i]}}
     try{
