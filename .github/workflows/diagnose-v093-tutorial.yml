@@ -19,17 +19,29 @@ jobs:
         with:
           ref: feature/v093-visual-mobile
           fetch-depth: 0
-      - name: Apply immediate player placement in reduced motion
+      - name: Prioritize selected piece placement on board zones
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p=Path('src/app-game-v085.js')
           s=p.read_text()
-          old='const ok=commitMove(piece,zone.id,true);'
-          new='const ok=commitMove(piece,zone.id,!REDUCED_MOTION);'
+          old="""function beginDrag(e){
+  const picked=pickDraggable(e);
+  if(gameState.configured&&isHumanTurn()&&selectedPlayPiece&&!picked){
+    const zone=pickBoardZoneFromPointer(e);
+    if(zone&&commitSelectedPieceToZone(zone)){e.preventDefault();return}
+  }
+  if(!picked)return;"""
+          new="""function beginDrag(e){
+  if(gameState.configured&&isHumanTurn()&&selectedPlayPiece){
+    const zone=pickBoardZoneFromPointer(e);
+    if(zone&&commitSelectedPieceToZone(zone)){e.preventDefault();return}
+  }
+  const picked=pickDraggable(e);
+  if(!picked)return;"""
           if new not in s:
               if old not in s:
-                  raise SystemExit('player placement anchor missing')
+                  raise SystemExit('beginDrag anchor missing')
               s=s.replace(old,new,1)
           p.write_text(s)
           PY
@@ -38,6 +50,6 @@ jobs:
             git config user.name yakolak-agent
             git config user.email ahmad.bn.kamal@gmail.com
             git add src/app-game-v085.js
-            git commit -m "Make reduced-motion player placement immediate"
+            git commit -m "Prioritize board zones after piece selection"
             git push origin HEAD:feature/v093-visual-mobile
           fi
