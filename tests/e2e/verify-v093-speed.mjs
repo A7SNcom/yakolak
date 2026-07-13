@@ -25,7 +25,7 @@ async function choose(page, type, value, mobile) {
   for (const point of points) {
     await tap(page, point, mobile);
     try {
-      await page.waitForFunction((kind) => kind === 'color' ? globalThis.__yakolakGame.state.setupStep === 'bots' : globalThis.__yakolakGame.state.configured, type, { timeout: 2500 });
+      await page.waitForFunction((kind) => kind === 'color' ? globalThis.__yakolakGame.state.setupStep === 'bots' : globalThis.__yakolakGame.state.configured, type, { timeout: 2500, polling: 100 });
       return;
     } catch {}
   }
@@ -41,18 +41,18 @@ async function scenario(name, viewport, mobile) {
 
   const startedAt = Date.now();
   await page.goto(`${baseUrl}/?reducedMotion=1`, { waitUntil: 'domcontentloaded', timeout: 45000 });
-  await page.waitForFunction(() => document.body.classList.contains('yakolak-ready') && globalThis.__yakolakGame?.pieces?.length === 36, null, { timeout: 45000 });
+  await page.waitForFunction(() => document.body.classList.contains('yakolak-ready') && globalThis.__yakolakGame?.pieces?.length === 36, null, { timeout: 45000, polling: 100 });
   const readyMs = Date.now() - startedAt;
   assert(readyMs < 15000, `${name}: load too slow ${readyMs}ms`);
   await page.screenshot({ path: `${outDir}/${name}-loaded.png`, timeout: 30000 });
 
   await choose(page, 'color', 'right', mobile);
   await choose(page, 'bots', 1, mobile);
-  await page.waitForFunction(() => globalThis.__yakolakGame.state.tutorial, null, { timeout: 30000 });
+  await page.waitForFunction(() => globalThis.__yakolakGame.state.tutorial, null, { timeout: 30000, polling: 100 });
   const tutorialStart = Date.now();
   let prompts = 0;
   while (await page.evaluate(() => globalThis.__yakolakGame.state.tutorial)) {
-    await page.waitForFunction(() => !globalThis.__yakolakGame.state.tutorial || document.querySelector('#yakolakTutorialDialog.open .yt-ok'), null, { timeout: 30000 });
+    await page.waitForFunction(() => !globalThis.__yakolakGame.state.tutorial || document.querySelector('#yakolakTutorialDialog.open .yt-ok'), null, { timeout: 30000, polling: 100 });
     if (!await page.evaluate(() => globalThis.__yakolakGame.state.tutorial)) break;
     const previousPrompt = await page.evaluate(() => document.querySelector('#yakolakTutorialDialog.open .yt-text')?.textContent || '');
     await page.evaluate(() => document.querySelector('#yakolakTutorialDialog.open .yt-ok')?.click());
@@ -62,12 +62,12 @@ async function scenario(name, viewport, mobile) {
       const g = globalThis.__yakolakGame;
       const text = document.querySelector('#yakolakTutorialDialog.open .yt-text')?.textContent || '';
       return !g.state.tutorial || (text && text !== before);
-    }, previousPrompt, { timeout: 30000 });
+    }, previousPrompt, { timeout: 30000, polling: 100 });
   }
   const tutorialMs = Date.now() - tutorialStart;
   assert(prompts === 3, `${name}: prompts ${prompts}`);
   assert(tutorialMs < 30000, `${name}: tutorial too slow ${tutorialMs}ms`);
-  await page.waitForFunction(() => { const s=globalThis.__yakolakGame.state; return s.started && !s.tutorial && !s.locked; }, null, { timeout: 15000 });
+  await page.waitForFunction(() => { const s=globalThis.__yakolakGame.state; return s.started && !s.tutorial && !s.locked; }, null, { timeout: 15000, polling: 100 });
 
   const playStart = Date.now();
   const piecePoint = await page.evaluate(() => {
@@ -79,7 +79,7 @@ async function scenario(name, viewport, mobile) {
     const g=globalThis.__yakolakGame; const z=g.boardZones[0]; const v=new g.THREE.Vector3(z.px-18,z.py,z.pz-18); g.gameGroup.localToWorld(v); v.project(g.camera); const r=g.renderer.domElement.getBoundingClientRect(); return {x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2};
   });
   await tap(page, zonePoint, mobile);
-  await page.waitForFunction(() => Object.values(globalThis.__yakolakGame.state.board?.[0]||{}).includes(globalThis.__yakolakGame.state.humanColor), null, { timeout: 5000 });
+  await page.waitForFunction(() => Object.values(globalThis.__yakolakGame.state.board?.[0]||{}).includes(globalThis.__yakolakGame.state.humanColor), null, { timeout: 5000, polling: 100 });
   const humanMoveMs = Date.now() - playStart;
   assert(humanMoveMs < 5000, `${name}: human move too slow ${humanMoveMs}ms`);
 
@@ -87,7 +87,7 @@ async function scenario(name, viewport, mobile) {
   await page.waitForFunction(() => {
     const g=globalThis.__yakolakGame;
     return Object.values(g.state.board||{}).some(cell => Object.values(cell||{}).some(color => color && color !== g.state.humanColor));
-  }, null, { timeout: 5000 });
+  }, null, { timeout: 5000, polling: 100 });
   const botReplyMs = Date.now() - botStart;
   assert(botReplyMs < 5000, `${name}: bot reply too slow ${botReplyMs}ms`);
 
@@ -97,7 +97,7 @@ async function scenario(name, viewport, mobile) {
   });
   assert(wins.same==='same-size' && wins.graded==='graded' && wins.cell==='cell', `${name}: win rules changed`);
   await page.evaluate(() => globalThis.__yakolakGame.debugTriggerWin('same-size',globalThis.__yakolakGame.state.humanColor));
-  await page.waitForFunction(() => Boolean(globalThis.__yakolakGame.state.winner), null, { timeout: 5000 });
+  await page.waitForFunction(() => Boolean(globalThis.__yakolakGame.state.winner), null, { timeout: 5000, polling: 100 });
   await page.screenshot({ path: `${outDir}/${name}-win.png`, timeout: 30000 });
 
   const fatal = consoleErrors.filter(t => /uncaught|syntaxerror|referenceerror|typeerror|prod stage1 error/i.test(t));
