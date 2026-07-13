@@ -1,3 +1,4 @@
+// Trusted trigger: prioritize board-zone placement after selecting a piece.
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
 
