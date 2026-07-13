@@ -3,7 +3,9 @@ name: Apply v094 tutorial source switch
 on:
   push:
     branches: [feature/v094-interactive-onboarding]
-    paths: [.github/workflows/apply-v094-tutorial-source.yml]
+    paths:
+      - tests/e2e/verify-v094-onboarding.mjs
+      - .github/workflows/apply-v094-tutorial-source.yml
   workflow_dispatch:
 
 permissions:
