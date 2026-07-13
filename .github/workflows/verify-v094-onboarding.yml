@@ -1,0 +1,69 @@
+name: Verify v094 interactive onboarding
+
+on:
+  push:
+    branches: [feature/v094-interactive-onboarding]
+    paths:
+      - src/onboarding-v094.js
+      - app.js
+      - index.html
+      - version.json
+      - tests/e2e/verify-v094-onboarding.mjs
+      - .github/workflows/verify-v094-onboarding.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - src/onboarding-v094.js
+      - app.js
+      - index.html
+      - version.json
+      - tests/e2e/verify-v094-onboarding.mjs
+      - .github/workflows/verify-v094-onboarding.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      BASE_URL: http://127.0.0.1:4173
+      ARTIFACT_DIR: artifacts/v094-onboarding
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify v094 files
+        run: |
+          node --check src/onboarding-v094.js
+          node --check tests/e2e/verify-v094-onboarding.mjs
+          node - <<'NODE'
+          const fs=require('fs');
+          const version=JSON.parse(fs.readFileSync('version.json','utf8'));
+          if(version.build!==94) throw new Error('build is not 94');
+          const app=fs.readFileSync('app.js','utf8');
+          if(!app.includes('onboarding-v094.js')) throw new Error('onboarding is not loaded');
+          NODE
+      - name: Start local site
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/yakolak-v094.log 2>&1 &
+          for i in {1..30}; do curl --fail --silent http://127.0.0.1:4173/version.json >/dev/null && exit 0; sleep 1; done
+          cat /tmp/yakolak-v094.log
+          exit 1
+      - name: Install Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Run desktop and mobile onboarding journey
+        run: node tests/e2e/verify-v094-onboarding.mjs
+      - name: Upload onboarding report and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yakolak-v094-onboarding-e2e
+          path: artifacts/v094-onboarding
+          if-no-files-found: error
+          retention-days: 7
