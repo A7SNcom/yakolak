@@ -4,6 +4,7 @@ on:
   push:
     branches: [feature/v093-visual-mobile]
     paths:
+      - tests/e2e/diagnose-v093-tutorial.mjs
       - .github/workflows/diagnose-v093-tutorial.yml
   workflow_dispatch:
 
