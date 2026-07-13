@@ -2090,7 +2090,7 @@ function commitSelectedPieceToZone(zone){
     caption('هذه الخانة فيها نفس الحجم.');
     return false;
   }
-  const ok=commitMove(piece,zone.id,true);
+  const ok=commitMove(piece,zone.id,!REDUCED_MOTION);
   if(ok)closePieceTray(piece);
   return ok;
 }
