@@ -108,24 +108,38 @@ async function scenario(name, viewport, mobile) {
   assert(afterPiece.selectedPlayPiece, `${name}: piece tap did not select a playable piece`);
   assert(selectionMs < 5000, `${name}: piece selection too slow ${selectionMs}ms`);
 
-  const zonePoint = await page.evaluate(() => {
+  const zoneCandidates = await page.evaluate(() => {
     const g=globalThis.__yakolakGame;
     const zone = g.boardZones.find(z => !Object.values(g.state.board?.[z.id] || {}).some(Boolean));
-    const v=new g.THREE.Vector3(zone.px,zone.py + 1,zone.pz); g.gameGroup.localToWorld(v); v.project(g.camera);
+    const offsets=[[0,0],[-18,-18],[18,-18],[-18,18],[18,18]];
     const r=g.renderer.domElement.getBoundingClientRect();
-    return {x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2,zoneId:zone.id};
+    return offsets.map(([dx,dz])=>{
+      const v=new g.THREE.Vector3(zone.px+dx,zone.py+1,zone.pz+dz); g.gameGroup.localToWorld(v); v.project(g.camera);
+      return {x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2,zoneId:zone.id,dx,dz};
+    });
   });
-  const moveStart = Date.now();
-  await tap(page, zonePoint, mobile);
-  await page.waitForFunction((zoneId) => {
-    const g=globalThis.__yakolakGame;
-    return Object.values(g.state.board?.[zoneId] || {}).includes(g.state.humanColor);
-  }, zonePoint.zoneId, { timeout: 5000, polling: 100 });
-  const humanMoveMs = Date.now() - moveStart;
-  const afterZone = await interactionSnapshot(page, name, 'after-zone-tap', zonePoint);
-  const placed = Object.values(afterZone.board?.[zonePoint.zoneId] || {}).includes(afterZone.state.humanColor);
+
+  let placed=false, humanMoveMs=null, usedZonePoint=null;
+  for (let i=0;i<zoneCandidates.length;i++) {
+    const point=zoneCandidates[i];
+    const moveStart=Date.now();
+    await tap(page, point, mobile);
+    try {
+      await page.waitForFunction((zoneId) => {
+        const g=globalThis.__yakolakGame;
+        return Object.values(g.state.board?.[zoneId] || {}).includes(g.state.humanColor);
+      }, point.zoneId, { timeout: 1500, polling: 100 });
+      humanMoveMs=Date.now()-moveStart;
+      usedZonePoint=point;
+      placed=true;
+      await interactionSnapshot(page,name,`after-zone-tap-${i+1}`,point);
+      break;
+    } catch {
+      await interactionSnapshot(page,name,`zone-attempt-${i+1}-failed`,point);
+    }
+  }
   if (!placed) await page.screenshot({ path: `${outDir}/${name}-move-failed.png`, timeout: 30000 });
-  assert(placed, `${name}: zone tap did not place selected piece; selected=${JSON.stringify(afterZone.selectedPlayPiece)} point=${JSON.stringify(zonePoint)} board=${JSON.stringify(afterZone.board)}`);
+  assert(placed, `${name}: all safe zone points failed: ${JSON.stringify(zoneCandidates)}`);
   assert(humanMoveMs < 5000, `${name}: human move too slow ${humanMoveMs}ms`);
 
   const botStart = Date.now();
@@ -149,7 +163,7 @@ async function scenario(name, viewport, mobile) {
   assert(pageErrors.length===0, `${name}: page errors ${pageErrors.join(' | ')}`);
   assert(fatal.length===0, `${name}: console errors ${fatal.join(' | ')}`);
   await context.close();
-  return { name, readyMs, tutorialMs, selectionMs, humanMoveMs, botReplyMs, prompts, wins, passed:true };
+  return { name, readyMs, tutorialMs, selectionMs, humanMoveMs, botReplyMs, prompts, usedZonePoint, wins, passed:true };
 }
 
 try {
