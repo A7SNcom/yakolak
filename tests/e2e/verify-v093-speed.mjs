@@ -39,11 +39,9 @@ async function selectHumanPiece(page,name,mobile){
   assert(points.length,`${name}: no visible human pieces`);
   for(let i=0;i<points.length;i++){
     await tap(page,points[i],mobile);
-    try{
-      await page.waitForFunction(()=>globalThis.__yakolakGame.pieces.some(p=>p.mesh?.userData?.traySelected),null,{timeout:1500,polling:100});
-      const state=await snapshot(page,name,`piece-attempt-${i+1}-selected`,points[i]);
-      return {point:points[i],state,observed:true};
-    }catch{await snapshot(page,name,`piece-attempt-${i+1}-failed`,points[i])}
+    await page.waitForTimeout(250);
+    const state=await snapshot(page,name,`piece-attempt-${i+1}`,points[i]);
+    if(state.selectedPlayPiece)return {point:points[i],state,observed:true};
   }
   throw new Error(`${name}: all visible piece points failed`);
 }
@@ -55,10 +53,11 @@ async function placeSelectedPiece(page,name,mobile){
   });
   for(let i=0;i<points.length;i++){
     await tap(page,points[i],mobile);
-    let placed=await page.evaluate(id=>{const g=globalThis.__yakolakGame;return Object.values(g.state.board?.[id]||{}).includes(g.state.humanColor)},points[i].zoneId);
-    if(!placed){try{await page.waitForFunction(id=>{const g=globalThis.__yakolakGame;return Object.values(g.state.board?.[id]||{}).includes(g.state.humanColor)},points[i].zoneId,{timeout:1200,polling:100});placed=true}catch{}}
-    if(placed){await snapshot(page,name,`zone-attempt-${i+1}-placed`,points[i]);return{point:points[i],observedImmediately:true}}
-    await snapshot(page,name,`zone-attempt-${i+1}-failed`,points[i]);
+    await page.waitForTimeout(350);
+    const state=await snapshot(page,name,`zone-attempt-${i+1}`,points[i]);
+    const placed=Object.values(state.board?.[points[i].zoneId]||{}).includes(state.state.humanColor);
+    if(placed)return{point:points[i],observedImmediately:true};
+    if(!state.selectedPlayPiece)break;
   }
   await page.screenshot({path:`${outDir}/${name}-move-failed.png`,timeout:30000});
   throw new Error(`${name}: all safe zone points failed`);
