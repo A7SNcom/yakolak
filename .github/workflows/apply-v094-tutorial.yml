@@ -1,0 +1,153 @@
+name: Apply v094 interactive tutorial
+
+on:
+  push:
+    branches: [feature/v093-visual-mobile]
+    paths:
+      - .github/workflows/apply-v094-tutorial.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v093-visual-mobile
+          fetch-depth: 0
+      - name: Build comprehensive lightweight tutorial
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, json
+
+          game=Path('src/app-game-v085.js')
+          s=game.read_text()
+
+          dialog=r'''let tutorialSkipped=false;
+function ensureTutorialDialog(){
+  if(document.getElementById('yakolakTutorialDialog'))return;
+  if(!document.getElementById('yakolakTutorialStyle')){
+    const style=el('style');style.id='yakolakTutorialStyle';style.textContent=`
+      #yakolakTutorialDialog{position:fixed;inset:0;z-index:12050;display:none;align-items:flex-end;justify-content:center;padding:18px;pointer-events:none;background:linear-gradient(180deg,transparent 35%,rgba(5,10,18,.42))}
+      #yakolakTutorialDialog.open{display:flex;pointer-events:auto}
+      #yakolakTutorialDialog .yt-box{width:min(680px,100%);max-height:min(78vh,720px);overflow:auto;background:rgba(13,20,30,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:24px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.38);backdrop-filter:blur(16px);direction:rtl}
+      .yt-head{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:12px}.yt-step{font-size:13px;color:#a9c7ff;background:#17243a;padding:6px 10px;border-radius:999px}.yt-title{font-size:clamp(20px,4vw,28px);font-weight:800;margin:0}.yt-text{font-size:clamp(16px,3vw,20px);line-height:1.8;color:#edf4ff;white-space:pre-line}.yt-tip{margin-top:12px;padding:12px 14px;border-radius:14px;background:#102d28;color:#c9fff1;line-height:1.7;font-size:15px}.yt-progress{height:5px;background:#273244;border-radius:99px;overflow:hidden;margin:14px 0}.yt-progress>i{display:block;height:100%;background:linear-gradient(90deg,#4cc9a4,#75a7ff);transition:width .25s}.yt-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}.yt-actions button{border:0;border-radius:13px;padding:11px 17px;font:inherit;font-weight:750;cursor:pointer}.yt-ok{background:#fff;color:#101722;flex:1}.yt-repeat{background:#26364e;color:#fff}.yt-skip{background:transparent;color:#bdc9d9;border:1px solid #3a4759!important}.yt-kbd{display:inline-block;padding:2px 7px;border-radius:7px;background:#273244;color:#fff;font-size:.9em}
+      @media(max-width:640px){#yakolakTutorialDialog{padding:10px;align-items:flex-end}.yt-box{border-radius:20px!important;padding:16px!important}.yt-actions button{min-height:46px}.yt-skip{order:3;width:100%}}
+    `;document.head.append(style);
+  }
+  const dlg=el('div');dlg.id='yakolakTutorialDialog';
+  const box=el('section','yt-box');
+  const head=el('div','yt-head');head.append(el('h2','yt-title','تعلّم ياكلك'),el('span','yt-step','1 / 10'));box.append(head);
+  box.append(el('div','yt-progress'));box.querySelector('.yt-progress').append(el('i'));
+  box.append(el('div','yt-text',''));
+  box.append(el('div','yt-tip',''));
+  const actions=el('div','yt-actions');actions.append(el('button','yt-ok','التالي'),el('button','yt-repeat','شاهد المثال مرة أخرى'),el('button','yt-skip','تخطي والعب الآن'));box.append(actions);
+  dlg.append(box);document.body.append(dlg);
+}
+function tutorialPrompt(step){
+  ensureTutorialDialog();
+  const dlg=document.getElementById('yakolakTutorialDialog');
+  const title=dlg.querySelector('.yt-title'),count=dlg.querySelector('.yt-step'),msg=dlg.querySelector('.yt-text'),tip=dlg.querySelector('.yt-tip'),bar=dlg.querySelector('.yt-progress i'),ok=dlg.querySelector('.yt-ok'),repeat=dlg.querySelector('.yt-repeat'),skip=dlg.querySelector('.yt-skip');
+  title.textContent=step.title||'تعلّم ياكلك';count.textContent=`${step.index} / ${step.total}`;msg.textContent=step.text||'';tip.textContent=step.tip||'';tip.hidden=!step.tip;bar.style.width=`${Math.round(step.index/step.total*100)}%`;ok.textContent=step.primary||'التالي';repeat.hidden=!step.repeat;
+  dlg.classList.add('open');
+  return new Promise(resolve=>{
+    const cleanup=answer=>{ok.onclick=repeat.onclick=skip.onclick=null;dlg.classList.remove('open');resolve(answer)};
+    ok.onclick=()=>cleanup('ok');repeat.onclick=()=>cleanup('repeat');skip.onclick=()=>cleanup('skip');
+  });
+}
+async function tutorialCheckpoint(step,replay=null){
+  while(true){
+    const answer=await tutorialPrompt({...step,repeat:!!replay});
+    if(answer==='skip'){tutorialSkipped=true;return false}
+    if(answer==='ok')return true;
+    if(replay)await replay();
+  }
+}'''
+
+          s,n=re.subn(r"function ensureTutorialDialog\(\)\{.*?\n\}\nasync function tutorialCheckpoint\(text,replay\)\{.*?\n\}",dialog,s,count=1,flags=re.S)
+          if n!=1: raise SystemExit('tutorial dialog block not replaced')
+
+          run=r'''async function runTutorial(){
+  gameState.tutorial=true;tutorialSkipped=false;
+  await setCameraView({x:520,y:430,z:520},{x:0,y:0,z:0},520);
+  const color=gameState.humanColor||'right';
+  const o1=TURN_RING.find(c=>c!==color)||'back';
+  const o2=TURN_RING.find(c=>c!==color&&c!==o1)||'left';
+  const total=10;
+  const finish=async skipped=>{
+    await resetTutorialPieces(false);clearHighlights();
+    caption(skipped?'بدأت التجربة مباشرة — افتح طقمك واختر حجراً.':'أنت جاهز! افتح طقمك، اختر الحجم، ثم اضغط خانة متاحة.');
+    gameState.tutorial=false;render();
+  };
+  const basic=[
+    {index:1,total,title:'أهلًا بك في ياكلك 👋',text:'هدفك بسيط: كوّن نمط فوز قبل خصومك.\nستتعلم اللعبة خطوة بخطوة، ويمكنك التخطي والبدء فورًا في أي لحظة.',tip:'لا تحتاج حفظ كل شيء الآن؛ اللعبة ستوضح القطع والخانات المتاحة أثناء دورك.'},
+    {index:2,total,title:'كيف تسير الجولة؟',text:`تلعبون بالتناوب. لونك هو ${colorName(color)}، وسيظهر دورك بوضوح. لديك 18 ثانية لكل حركة؛ إن انتهى الوقت ينتقل الدور تلقائيًا.`,tip:'راقب شريط الدور والمؤقت، وخذ قرارك مبكرًا.'},
+    {index:3,total,title:'طقمك فيه 3 أحجام',text:'كل طقم يحتوي حجراً صغيرًا ووسطًا وكبيرًا. اضغط أي حجر من لونك لفتح الطقم، ثم اختر الحجم الذي تريده.',tip:'الحجم ليس أقوى أو أضعف؛ كل حجم يفتح طريقة فوز مختلفة.'},
+    {index:4,total,title:'الخانات وكيف تضع الحجر',text:'بعد اختيار الحجر ستضيء الخانات الممكنة. اضغط خانة متاحة لوضعه.\nالخانة الواحدة تستطيع حمل صغير ووسط وكبير معًا، لكن لا تستطيع حمل حجرين من نفس الحجم.',tip:'إن لم تقبل الخانة حجرك، اختر خانة أخرى أو حجمًا مختلفًا.'},
+    {index:5,total,title:'خطتك ودفاعك',text:'في كل دور اسأل نفسك سؤالين: هل أستطيع إكمال فوز؟ وهل يجب أن أمنع خصمي؟\nراقب آخر حجارة الخصوم، خصوصًا عندما يصبح لديهم حجران من نمط واحد.',tip:'المركز والزوايا تدخل في خطوط أكثر، لكنها ليست دائمًا أفضل حركة.'}
+  ];
+  for(const step of basic)if(!await tutorialCheckpoint(step)){await finish(true);return}
+  const demos=[
+    {index:6,total,title:'الفوز الأول: نفس الحجم على خط',text:'ضع 3 حجارة من لونك وبالحجم نفسه في صف أو عمود أو قطر.',tip:'مثال: ثلاثة أحجار كبيرة على خط واحد.',run:()=>playTutorialDemo([{color,zone:0,size:'l'},{color:o1,zone:0,size:'s'},{color,zone:1,size:'l'},{color:o2,zone:1,size:'m'},{color:o1,zone:2,size:'s'},{color,zone:2,size:'l'}],[{zone:0,size:'l'},{zone:1,size:'l'},{zone:2,size:'l'}],`${colorName(color)} يبني خطًا من الأحجار الكبيرة.`,`اكتمل خط الأحجار الكبيرة.`)},
+    {index:7,total,title:'الفوز الثاني: خط متدرّج',text:'كوّن خطًا من صغير ووسط وكبير من لونك، بأي ترتيب.',tip:'يمكن أن يكون الخط أفقيًا أو عموديًا أو قطريًا.',run:()=>playTutorialDemo([{color,zone:6,size:'s'},{color:o1,zone:6,size:'l'},{color,zone:4,size:'m'},{color:o2,zone:4,size:'s'},{color:o1,zone:2,size:'m'},{color,zone:2,size:'l'}],[{zone:6,size:'s'},{zone:4,size:'m'},{zone:2,size:'l'}],`صغير ثم وسط ثم كبير على قطر واحد.`,`اكتمل الخط المتدرج.`)},
+    {index:8,total,title:'الفوز الثالث: الثلاثة في خانة واحدة',text:'اجمع الصغير والوسط والكبير من لونك داخل الخانة نفسها.',tip:'هذه الخطة قوية لكنها واضحة للخصوم؛ حاول تمويه نيتك.',run:()=>playTutorialDemo([{color,zone:4,size:'s'},{color:o1,zone:3,size:'l'},{color,zone:4,size:'m'},{color:o2,zone:5,size:'s'},{color:o1,zone:1,size:'l'},{color,zone:4,size:'l'}],[{zone:4,size:'s'},{zone:4,size:'m'},{zone:4,size:'l'}],`يجمع ${colorName(color)} الأحجام الثلاثة في المركز.`,`اكتملت الأحجام الثلاثة في خانة واحدة.`)}
+  ];
+  for(const demo of demos){
+    if(!REDUCED_MOTION)await demo.run();
+    if(!await tutorialCheckpoint({...demo,primary:'فهمت، التالي'},REDUCED_MOTION?null:demo.run)){await finish(true);return}
+  }
+  const ending=[
+    {index:9,total,title:'ماذا يحدث عند الخطأ؟',text:'لا يمكنك اللعب خارج دورك، أو استخدام حجر موضوع، أو وضع حجم فوق نفس الحجم في الخانة. اللعبة تمنع الحركة غير القانونية وتبقي دورك.',tip:'إذا لم يحدث شيء بعد الضغط، راقب الرسالة أسفل الشاشة والخانات المضيئة.'},
+    {index:10,total,title:'جاهز لأول جولة 🎯',text:'افتح طقمك، اختر الحجم، ثم اختر الخانة. راقب فرص الفوز الثلاث، وامنع الخصم عند الحاجة.\nالتجربة أفضل معلّم — ابدأ الآن!',tip:'يمكنك إعادة التعليم لاحقًا من زر إعادة اللعبة.',primary:'ابدأ اللعب'}
+  ];
+  for(const step of ending)if(!await tutorialCheckpoint(step)){await finish(true);return}
+  await finish(false);
+}'''
+          s,n=re.subn(r"async function runTutorial\(\)\{.*?\n\}\nfunction emptyBoard\(\)",run+'\nfunction emptyBoard()',s,count=1,flags=re.S)
+          if n!=1: raise SystemExit('runTutorial block not replaced')
+          s=s.replace("const BUILD='93';","const BUILD='94';",1)
+          game.write_text(s)
+
+          test=Path('tests/e2e/verify-v093-speed.mjs')
+          t=test.read_text()
+          t=t.replace("const outDir=process.env.ARTIFACT_DIR||'artifacts/v093-speed';","const outDir=process.env.ARTIFACT_DIR||'artifacts/v094-speed';")
+          t,n=re.subn(r"async function completeTutorial\(page,name\)\{.*?\n\}",'''async function completeTutorial(page,name){
+  await page.waitForFunction(()=>globalThis.__yakolakGame.state.tutorial,null,{timeout:30000,polling:100});
+  const started=Date.now(),seen=new Set();let skipAvailable=false;
+  while(Date.now()-started<90000){
+    const state=await page.evaluate(()=>({tutorial:globalThis.__yakolakGame.state.tutorial,open:Boolean(document.querySelector('#yakolakTutorialDialog.open .yt-ok')),text:document.querySelector('#yakolakTutorialDialog.open .yt-text')?.textContent||'',skip:Boolean(document.querySelector('#yakolakTutorialDialog.open .yt-skip'))}));
+    if(!state.tutorial)break;
+    if(state.skip)skipAvailable=true;
+    if(state.open&&state.text&&!seen.has(state.text)){
+      seen.add(state.text);await page.evaluate(()=>document.querySelector('#yakolakTutorialDialog.open .yt-ok')?.click());await page.waitForTimeout(120);
+    }else await page.waitForTimeout(80);
+  }
+  const tutorialMs=Date.now()-started;
+  assert(!await page.evaluate(()=>globalThis.__yakolakGame.state.tutorial),`${name}: tutorial did not finish`);
+  assert(seen.size===10,`${name}: tutorial steps ${seen.size} ${JSON.stringify([...seen])}`);
+  assert(skipAvailable,`${name}: skip button missing`);
+  assert(tutorialMs<90000,`${name}: tutorial too slow ${tutorialMs}ms`);
+  return{tutorialMs,prompts:seen.size,promptTexts:[...seen],skipAvailable};
+}''',t,count=1,flags=re.S)
+          if n!=1: raise SystemExit('test tutorial helper not replaced')
+          test.write_text(t)
+
+          Path('app.js').write_text(Path('app.js').read_text().replace("v093","v094").replace("const BUILD='93'","const BUILD='94'"))
+          idx=Path('index.html');x=idx.read_text().replace('v093','v094').replace('BUILD=93','BUILD=94').replace('v=93','v=94');idx.write_text(x)
+          version=Path('version.json');v=json.loads(version.read_text());v.update({'version':'v094-interactive-tutorial','build':94,'updated_at':'2026-07-13','note':'Comprehensive ten-step interactive tutorial with skip, replayable examples, performance safeguards, and mobile-first guidance.'});version.write_text(json.dumps(v,ensure_ascii=False,indent=2)+'\n')
+
+          wf=Path('.github/workflows/verify-v093.yml');w=wf.read_text().replace('Verify v093','Verify v094').replace('v093-speed','v094-speed').replace("version.build!==93","version.build!==94").replace("build is not 93","build is not 94");wf.write_text(w)
+          Path('.github/workflows/apply-v094-tutorial.yml').unlink()
+          PY
+          node --check src/app-game-v085.js
+          node --check tests/e2e/verify-v093-speed.mjs
+          git config user.name yakolak-agent
+          git config user.email ahmad.bn.kamal@gmail.com
+          git add -A
+          git commit -m "Build comprehensive v094 interactive tutorial"
+          git push origin HEAD:feature/v093-visual-mobile
