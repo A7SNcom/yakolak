@@ -82,8 +82,8 @@ async function scenario(name,viewport,mobile){
   }
   const tutorialMs=Date.now()-tutorialStart;assert(prompts===3,`${name}: prompts ${prompts}`);assert(tutorialMs<30000,`${name}: tutorial too slow ${tutorialMs}ms`);await page.waitForFunction(()=>{const s=globalThis.__yakolakGame.state;return s.started&&!s.tutorial&&!s.locked},null,{timeout:15000,polling:100});
   const selected=await selectHumanPiece(page,name,mobile);assert(selected.selectionMs<5000,`${name}: piece selection too slow ${selected.selectionMs}ms`);
-  const botStart=Date.now();
   const placed=await placeSelectedPiece(page,name,mobile);assert(placed.humanMoveMs<5000,`${name}: human move too slow ${placed.humanMoveMs}ms`);
+  const botStart=Date.now();
   let botPresent=await page.evaluate(()=>{const g=globalThis.__yakolakGame;return Object.values(g.state.board||{}).some(c=>Object.values(c||{}).some(color=>color&&color!==g.state.humanColor))});
   if(!botPresent){await page.waitForFunction(()=>{const g=globalThis.__yakolakGame;return Object.values(g.state.board||{}).some(c=>Object.values(c||{}).some(color=>color&&color!==g.state.humanColor))},null,{timeout:5000,polling:100});botPresent=true}
   const botReplyMs=Date.now()-botStart;assert(botPresent,`${name}: bot did not reply`);assert(botReplyMs<5000,`${name}: bot reply too slow ${botReplyMs}ms`);
