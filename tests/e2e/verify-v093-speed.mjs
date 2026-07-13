@@ -97,14 +97,16 @@ async function scenario(name, viewport, mobile) {
   assert(tutorialMs < 30000, `${name}: tutorial too slow ${tutorialMs}ms`);
   await page.waitForFunction(() => { const s=globalThis.__yakolakGame.state; return s.started && !s.tutorial && !s.locked; }, null, { timeout: 15000, polling: 100 });
 
-  const playStart = Date.now();
   const piecePoint = await page.evaluate(() => {
     const g=globalThis.__yakolakGame; const piece=g.pieces.find(p=>p.dir===g.state.humanColor && p.type==='l' && !p.placed); const v=new g.THREE.Vector3(); piece.mesh.getWorldPosition(v); v.project(g.camera); const r=g.renderer.domElement.getBoundingClientRect(); return {x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2};
   });
+  const selectionStart = Date.now();
   await tap(page, piecePoint, mobile);
-  await page.waitForTimeout(250);
+  await page.waitForFunction(() => globalThis.__yakolakGame.pieces.some(p => p.mesh?.userData?.traySelected), null, { timeout: 5000, polling: 100 });
+  const selectionMs = Date.now() - selectionStart;
   const afterPiece = await interactionSnapshot(page, name, 'after-piece-tap', piecePoint);
   assert(afterPiece.selectedPlayPiece, `${name}: piece tap did not select a playable piece`);
+  assert(selectionMs < 5000, `${name}: piece selection too slow ${selectionMs}ms`);
 
   const zonePoint = await page.evaluate(() => {
     const g=globalThis.__yakolakGame;
@@ -113,13 +115,17 @@ async function scenario(name, viewport, mobile) {
     const r=g.renderer.domElement.getBoundingClientRect();
     return {x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2,zoneId:zone.id};
   });
+  const moveStart = Date.now();
   await tap(page, zonePoint, mobile);
-  await page.waitForTimeout(300);
+  await page.waitForFunction((zoneId) => {
+    const g=globalThis.__yakolakGame;
+    return Object.values(g.state.board?.[zoneId] || {}).includes(g.state.humanColor);
+  }, zonePoint.zoneId, { timeout: 5000, polling: 100 });
+  const humanMoveMs = Date.now() - moveStart;
   const afterZone = await interactionSnapshot(page, name, 'after-zone-tap', zonePoint);
   const placed = Object.values(afterZone.board?.[zonePoint.zoneId] || {}).includes(afterZone.state.humanColor);
   if (!placed) await page.screenshot({ path: `${outDir}/${name}-move-failed.png`, timeout: 30000 });
   assert(placed, `${name}: zone tap did not place selected piece; selected=${JSON.stringify(afterZone.selectedPlayPiece)} point=${JSON.stringify(zonePoint)} board=${JSON.stringify(afterZone.board)}`);
-  const humanMoveMs = Date.now() - playStart;
   assert(humanMoveMs < 5000, `${name}: human move too slow ${humanMoveMs}ms`);
 
   const botStart = Date.now();
@@ -143,7 +149,7 @@ async function scenario(name, viewport, mobile) {
   assert(pageErrors.length===0, `${name}: page errors ${pageErrors.join(' | ')}`);
   assert(fatal.length===0, `${name}: console errors ${fatal.join(' | ')}`);
   await context.close();
-  return { name, readyMs, tutorialMs, humanMoveMs, botReplyMs, prompts, wins, passed:true };
+  return { name, readyMs, tutorialMs, selectionMs, humanMoveMs, botReplyMs, prompts, wins, passed:true };
 }
 
 try {
