@@ -1,6 +1,6 @@
 {
-  "version": "v092-calibration-tutorial-fixes",
-  "build": 92,
-  "updated_at": "2026-06-30",
-  "note": "Fixes calibration panel layering, expands calibration controls, restores full four-color intro, adds tutorial checkpoints, and replaces win highlight with blink timing."
+  "version": "v094-interactive-onboarding",
+  "build": 94,
+  "updated_at": "2026-07-13",
+  "note": "Adds a replayable interactive onboarding journey with skip, smart hints, progress memory, tutorial speed controls, and mobile-first guidance without changing game rules."
 }
