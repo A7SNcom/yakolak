@@ -1,5 +1,5 @@
 name: Verify v093 visual and mobile experience
-# Fast complete verification: load, tutorial, player move, bot reply, win, desktop and mobile.
+# Trusted final rerun after instant reduced-motion transitions.
 
 on:
   push:
