@@ -1275,6 +1275,7 @@ function setObjectOpacity(obj,opacity){
   });
 }
 async function fadeOutObjects(objects,ms=560){
+  if(REDUCED_MOTION){objects.filter(Boolean).forEach(obj=>{obj.visible=false});render();return}
   ms=motionMs(ms);
   const targets=objects.filter(Boolean).map(obj=>({obj,scale:obj.scale.clone(),restore:cloneObjectMaterials(obj)}));
   if(!targets.length)return;
@@ -1428,6 +1429,7 @@ function restoreBlinkMaterials(){
   gameHighlightGroup.traverse(o=>{if(o.isMesh)restore(o)});
 }
 function blinkWinEntries(entries){
+  if(REDUCED_MOTION){render();return Promise.resolve()}
   const targets=entries.map(e=>({entry:e,mesh:e.mesh,baseScale:e.mesh.scale.clone(),preset:winHighlightPreset()})).filter(t=>t.mesh);
   if(!targets.length)return Promise.resolve();
   const token=++winBlinkToken;
@@ -1567,8 +1569,9 @@ async function playTutorialDemo(moves,winCells,leadText,winText){
 function showCells(cells,color='#ffffff'){
   render();
 }
-function wait(ms){return new Promise(res=>setTimeout(res,ms))}
+function wait(ms){return new Promise(res=>setTimeout(res,motionMs(ms)))}
 function setCameraView(pos,target,ms=700){
+  if(REDUCED_MOTION){camera.position.set(pos.x,pos.y,pos.z);controls.target.set(target.x,target.y,target.z);controls.update();render();return Promise.resolve()}
   ms=motionMs(ms);
   const from=camera.position.clone(),to=new THREE.Vector3(pos.x,pos.y,pos.z),tf=controls.target.clone(),tt=new THREE.Vector3(target.x,target.y,target.z);
   const t0=performance.now();
@@ -1582,6 +1585,7 @@ function setCameraView(pos,target,ms=700){
   });
 }
 function animateObjectTo(obj,pos,rot=null,ms=650,arc=22){
+  if(REDUCED_MOTION){obj.position.set(pos.px,pos.py,pos.pz);if(rot)obj.rotation.set(rot.x,rot.y,rot.z);render();return Promise.resolve()}
   ms=motionMs(ms);
   const from=obj.position.clone(),to=new THREE.Vector3(pos.px,pos.py,pos.pz);
   const fromRot=obj.rotation.clone(),toRot=rot?new THREE.Euler(rot.x,rot.y,rot.z):obj.rotation.clone();
@@ -1603,6 +1607,7 @@ function animateObjectTo(obj,pos,rot=null,ms=650,arc=22){
   });
 }
 function animateObjectsTo(items,ms=620,arc=16){
+  if(REDUCED_MOTION){items.forEach(item=>{item.obj.position.set(item.pos.px,item.pos.py,item.pos.pz);if(item.rot)item.obj.rotation.set(item.rot.x,item.rot.y,item.rot.z);item.done?.()});render();return Promise.resolve()}
   ms=motionMs(ms);
   if(!items.length)return Promise.resolve();
   const prepared=items.map(item=>{
