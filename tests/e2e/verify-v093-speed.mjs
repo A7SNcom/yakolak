@@ -55,8 +55,16 @@ async function placeSelectedPiece(page,name,mobile){
     return [[0,0],[-18,-18],[18,-18],[-18,18],[18,18]].map(([dx,dz])=>{const v=new g.THREE.Vector3(z.px+dx,z.py+1,z.pz+dz);g.gameGroup.localToWorld(v);v.project(g.camera);return{x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2,zoneId:z.id,dx,dz}});
   });
   for(let i=0;i<points.length;i++){
-    const start=Date.now();await tap(page,points[i],mobile);
-    try{await page.waitForFunction(id=>{const g=globalThis.__yakolakGame;return Object.values(g.state.board?.[id]||{}).includes(g.state.humanColor)},points[i].zoneId,{timeout:1500,polling:100});await snapshot(page,name,`zone-attempt-${i+1}-placed`,points[i]);return{humanMoveMs:Date.now()-start,point:points[i]}}catch{await snapshot(page,name,`zone-attempt-${i+1}-failed`,points[i])}
+    const start=Date.now();
+    await tap(page,points[i],mobile);
+    await page.waitForTimeout(120);
+    const placed=await page.evaluate(id=>{const g=globalThis.__yakolakGame;return Object.values(g.state.board?.[id]||{}).includes(g.state.humanColor)},points[i].zoneId);
+    if(placed){await snapshot(page,name,`zone-attempt-${i+1}-placed`,points[i]);return{humanMoveMs:Date.now()-start,point:points[i]}}
+    try{
+      await page.waitForFunction(id=>{const g=globalThis.__yakolakGame;return Object.values(g.state.board?.[id]||{}).includes(g.state.humanColor)},points[i].zoneId,{timeout:1200,polling:100});
+      await snapshot(page,name,`zone-attempt-${i+1}-placed`,points[i]);
+      return{humanMoveMs:Date.now()-start,point:points[i]};
+    }catch{await snapshot(page,name,`zone-attempt-${i+1}-failed`,points[i])}
   }
   await page.screenshot({path:`${outDir}/${name}-move-failed.png`,timeout:30000});
   throw new Error(`${name}: all safe zone points failed`);
@@ -74,8 +82,11 @@ async function scenario(name,viewport,mobile){
   }
   const tutorialMs=Date.now()-tutorialStart;assert(prompts===3,`${name}: prompts ${prompts}`);assert(tutorialMs<30000,`${name}: tutorial too slow ${tutorialMs}ms`);await page.waitForFunction(()=>{const s=globalThis.__yakolakGame.state;return s.started&&!s.tutorial&&!s.locked},null,{timeout:15000,polling:100});
   const selected=await selectHumanPiece(page,name,mobile);assert(selected.selectionMs<5000,`${name}: piece selection too slow ${selected.selectionMs}ms`);
+  const botStart=Date.now();
   const placed=await placeSelectedPiece(page,name,mobile);assert(placed.humanMoveMs<5000,`${name}: human move too slow ${placed.humanMoveMs}ms`);
-  const botStart=Date.now();await page.waitForFunction(()=>{const g=globalThis.__yakolakGame;return Object.values(g.state.board||{}).some(c=>Object.values(c||{}).some(color=>color&&color!==g.state.humanColor))},null,{timeout:5000,polling:100});const botReplyMs=Date.now()-botStart;assert(botReplyMs<5000,`${name}: bot reply too slow ${botReplyMs}ms`);
+  let botPresent=await page.evaluate(()=>{const g=globalThis.__yakolakGame;return Object.values(g.state.board||{}).some(c=>Object.values(c||{}).some(color=>color&&color!==g.state.humanColor))});
+  if(!botPresent){await page.waitForFunction(()=>{const g=globalThis.__yakolakGame;return Object.values(g.state.board||{}).some(c=>Object.values(c||{}).some(color=>color&&color!==g.state.humanColor))},null,{timeout:5000,polling:100});botPresent=true}
+  const botReplyMs=Date.now()-botStart;assert(botPresent,`${name}: bot did not reply`);assert(botReplyMs<5000,`${name}: bot reply too slow ${botReplyMs}ms`);
   const wins=await page.evaluate(()=>{const g=globalThis.__yakolakGame;return{same:g.debugWin('same-size',g.state.humanColor)?.type,graded:g.debugWin('graded',g.state.humanColor)?.type,cell:g.debugWin('cell',g.state.humanColor)?.type}});assert(wins.same==='same-size'&&wins.graded==='graded'&&wins.cell==='cell',`${name}: win rules changed`);await page.evaluate(()=>globalThis.__yakolakGame.debugTriggerWin('same-size',globalThis.__yakolakGame.state.humanColor));await page.waitForFunction(()=>Boolean(globalThis.__yakolakGame.state.winner),null,{timeout:5000,polling:100});await page.screenshot({path:`${outDir}/${name}-win.png`,timeout:30000});
   const fatal=consoleErrors.filter(t=>/uncaught|syntaxerror|referenceerror|typeerror|prod stage1 error/i.test(t));assert(!pageErrors.length,`${name}: page errors ${pageErrors.join(' | ')}`);assert(!fatal.length,`${name}: console errors ${fatal.join(' | ')}`);await context.close();return{name,readyMs,tutorialMs,selectionMs:selected.selectionMs,humanMoveMs:placed.humanMoveMs,botReplyMs,prompts,wins,passed:true};
 }
