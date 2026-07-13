@@ -1676,6 +1676,13 @@ function startTurnTimer(){
 async function runTutorial(){
   gameState.tutorial=true;
   await setCameraView({x:520,y:430,z:520},{x:0,y:0,z:0},520);
+  if(REDUCED_MOTION){
+    const prompts=['هل فهمت فوز ثلاث قطع من نفس الحجم؟','هل فهمت فوز الخط المتدرج؟','هل فهمت فوز نفس الخانة؟'];
+    for(const text of prompts)await tutorialCheckpoint(text,()=>Promise.resolve());
+    clearHighlights();caption('دورك: افتح طقمك، اختر الحجم، ثم اضغط خانة متاحة.');
+    gameState.tutorial=false;
+    return;
+  }
   const color=gameState.humanColor||'right';
   const o1=TURN_RING.find(c=>c!==color)||'back';
   const o2=TURN_RING.find(c=>c!==color&&c!==o1)||'left';
