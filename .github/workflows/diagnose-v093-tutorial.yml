@@ -1,4 +1,4 @@
-name: Diagnose v093 tutorial sequence
+name: Clean temporary v093 diagnostics
 
 on:
   push:
@@ -6,51 +6,29 @@ on:
     paths:
       - tests/e2e/diagnose-v093-tutorial.mjs
       - .github/workflows/diagnose-v093-tutorial.yml
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  tutorial-diagnostic:
+  cleanup:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
           ref: feature/v093-visual-mobile
           fetch-depth: 0
-      - name: Prioritize selected piece placement on board zones
+      - name: Remove temporary diagnostics in one commit
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('src/app-game-v085.js')
-          s=p.read_text()
-          old="""function beginDrag(e){
-  const picked=pickDraggable(e);
-  if(gameState.configured&&isHumanTurn()&&selectedPlayPiece&&!picked){
-    const zone=pickBoardZoneFromPointer(e);
-    if(zone&&commitSelectedPieceToZone(zone)){e.preventDefault();return}
-  }
-  if(!picked)return;"""
-          new="""function beginDrag(e){
-  if(gameState.configured&&isHumanTurn()&&selectedPlayPiece){
-    const zone=pickBoardZoneFromPointer(e);
-    if(zone&&commitSelectedPieceToZone(zone)){e.preventDefault();return}
-  }
-  const picked=pickDraggable(e);
-  if(!picked)return;"""
-          if new not in s:
-              if old not in s:
-                  raise SystemExit('beginDrag anchor missing')
-              s=s.replace(old,new,1)
-          p.write_text(s)
-          PY
-          node --check src/app-game-v085.js
-          if ! git diff --quiet; then
-            git config user.name yakolak-agent
-            git config user.email ahmad.bn.kamal@gmail.com
-            git add src/app-game-v085.js
-            git commit -m "Prioritize board zones after piece selection"
-            git push origin HEAD:feature/v093-visual-mobile
-          fi
+          rm -f \
+            .github/workflows/diagnose-v093-tutorial.yml \
+            .github/workflows/patch-v093-reduced-motion.yml \
+            .github/workflows/patch-v093-tutorial-test.yml \
+            .github/workflows/verify-v093-speed.yml \
+            tests/e2e/diagnose-v093-tutorial.mjs \
+            tests/e2e/verify-v093.mjs
+          git config user.name yakolak-agent
+          git config user.email ahmad.bn.kamal@gmail.com
+          git add -A
+          git commit -m "chore: remove temporary diagnostics and test artifacts"
+          git push origin HEAD:feature/v093-visual-mobile
