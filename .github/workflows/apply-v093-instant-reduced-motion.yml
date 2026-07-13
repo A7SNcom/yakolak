@@ -1,0 +1,47 @@
+name: Apply instant reduced motion path
+
+on:
+  push:
+    branches: [feature/v093-visual-mobile]
+    paths: [.github/workflows/apply-v093-instant-reduced-motion.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v093-visual-mobile
+          fetch-depth: 0
+      - name: Patch reduced motion path
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/app-game-v085.js')
+          s=p.read_text()
+          replacements={
+          "function wait(ms){return new Promise(res=>setTimeout(res,ms))}":"function wait(ms){return new Promise(res=>setTimeout(res,motionMs(ms)))}",
+          "function setCameraView(pos,target,ms=700){\n  ms=motionMs(ms);":"function setCameraView(pos,target,ms=700){\n  if(REDUCED_MOTION){camera.position.set(pos.x,pos.y,pos.z);controls.target.set(target.x,target.y,target.z);controls.update();render();return Promise.resolve()}\n  ms=motionMs(ms);",
+          "function animateObjectTo(obj,pos,rot=null,ms=650,arc=22){\n  ms=motionMs(ms);":"function animateObjectTo(obj,pos,rot=null,ms=650,arc=22){\n  if(REDUCED_MOTION){obj.position.set(pos.px,pos.py,pos.pz);if(rot)obj.rotation.set(rot.x,rot.y,rot.z);render();return Promise.resolve()}\n  ms=motionMs(ms);",
+          "function animateObjectsTo(items,ms=620,arc=16){\n  ms=motionMs(ms);":"function animateObjectsTo(items,ms=620,arc=16){\n  if(REDUCED_MOTION){items.forEach(item=>{item.obj.position.set(item.pos.px,item.pos.py,item.pos.pz);if(item.rot)item.obj.rotation.set(item.rot.x,item.rot.y,item.rot.z);item.done?.()});render();return Promise.resolve()}\n  ms=motionMs(ms);",
+          "async function fadeOutObjects(objects,ms=560){\n  ms=motionMs(ms);":"async function fadeOutObjects(objects,ms=560){\n  if(REDUCED_MOTION){objects.filter(Boolean).forEach(obj=>{obj.visible=false});render();return}\n  ms=motionMs(ms);",
+          "function blinkWinEntries(entries){\n  const targets=":"function blinkWinEntries(entries){\n  if(REDUCED_MOTION){render();return Promise.resolve()}\n  const targets="
+          }
+          for old,new in replacements.items():
+              if new in s: continue
+              if old not in s: raise SystemExit('missing anchor: '+old[:80])
+              s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+          node --check src/app-game-v085.js
+      - name: Commit patch
+        run: |
+          rm -f .github/workflows/apply-v093-instant-reduced-motion.yml
+          git config user.name yakolak-agent
+          git config user.email ahmad.bn.kamal@gmail.com
+          git add -A
+          git commit -m "Make reduced motion transitions instant"
+          git push origin HEAD:feature/v093-visual-mobile
