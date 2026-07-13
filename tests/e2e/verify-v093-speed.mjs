@@ -42,8 +42,9 @@ async function selectHumanPiece(page,name,mobile){
     await tap(page,points[i],mobile);
     try{
       await page.waitForFunction(()=>globalThis.__yakolakGame.pieces.some(p=>p.mesh?.userData?.traySelected),null,{timeout:1500,polling:100});
+      const selectionMs=Date.now()-start;
       const state=await snapshot(page,name,`piece-attempt-${i+1}-selected`,points[i]);
-      return {selectionMs:Date.now()-start,point:points[i],state};
+      return {selectionMs,point:points[i],state};
     }catch{await snapshot(page,name,`piece-attempt-${i+1}-failed`,points[i])}
   }
   throw new Error(`${name}: all visible piece points failed`);
@@ -59,11 +60,12 @@ async function placeSelectedPiece(page,name,mobile){
     await tap(page,points[i],mobile);
     await page.waitForTimeout(120);
     const placed=await page.evaluate(id=>{const g=globalThis.__yakolakGame;return Object.values(g.state.board?.[id]||{}).includes(g.state.humanColor)},points[i].zoneId);
-    if(placed){await snapshot(page,name,`zone-attempt-${i+1}-placed`,points[i]);return{humanMoveMs:Date.now()-start,point:points[i]}}
+    if(placed){const humanMoveMs=Date.now()-start;await snapshot(page,name,`zone-attempt-${i+1}-placed`,points[i]);return{humanMoveMs,point:points[i]}}
     try{
       await page.waitForFunction(id=>{const g=globalThis.__yakolakGame;return Object.values(g.state.board?.[id]||{}).includes(g.state.humanColor)},points[i].zoneId,{timeout:1200,polling:100});
+      const humanMoveMs=Date.now()-start;
       await snapshot(page,name,`zone-attempt-${i+1}-placed`,points[i]);
-      return{humanMoveMs:Date.now()-start,point:points[i]};
+      return{humanMoveMs,point:points[i]};
     }catch{await snapshot(page,name,`zone-attempt-${i+1}-failed`,points[i])}
   }
   await page.screenshot({path:`${outDir}/${name}-move-failed.png`,timeout:30000});
