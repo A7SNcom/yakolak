@@ -30,6 +30,25 @@ async function setupChoice(page,type,value,mobile){
   throw new Error(`setup failed ${type}:${value}`);
 }
 
+async function completeTutorial(page,name){
+  await page.waitForFunction(()=>globalThis.__yakolakGame.state.tutorial,null,{timeout:30000,polling:100});
+  const started=Date.now(),seen=new Set();
+  while(Date.now()-started<30000){
+    const state=await page.evaluate(()=>({tutorial:globalThis.__yakolakGame.state.tutorial,open:Boolean(document.querySelector('#yakolakTutorialDialog.open .yt-ok')),text:document.querySelector('#yakolakTutorialDialog.open .yt-text')?.textContent||''}));
+    if(!state.tutorial)break;
+    if(state.open&&state.text){
+      seen.add(state.text);
+      await page.evaluate(()=>document.querySelector('#yakolakTutorialDialog.open .yt-ok')?.click());
+      await page.waitForTimeout(180);
+    }else await page.waitForTimeout(100);
+  }
+  const tutorialMs=Date.now()-started;
+  assert(!await page.evaluate(()=>globalThis.__yakolakGame.state.tutorial),`${name}: tutorial did not finish`);
+  assert(seen.size===3,`${name}: prompts ${seen.size} ${JSON.stringify([...seen])}`);
+  assert(tutorialMs<30000,`${name}: tutorial too slow ${tutorialMs}ms`);
+  return{tutorialMs,prompts:seen.size,promptTexts:[...seen]};
+}
+
 async function selectHumanPiece(page,name,mobile){
   const points=await page.evaluate(()=>{
     const g=globalThis.__yakolakGame,r=g.renderer.domElement.getBoundingClientRect(),out=[];
@@ -67,13 +86,9 @@ async function scenario(name,viewport,mobile){
   const context=await browser.newContext({viewport,isMobile:mobile,hasTouch:mobile,reducedMotion:'reduce',locale:'ar-SA'}),page=await context.newPage(),pageErrors=[],consoleErrors=[];
   page.on('pageerror',e=>pageErrors.push(String(e)));page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text())});
   const startedAt=Date.now();await page.goto(`${baseUrl}/?reducedMotion=1`,{waitUntil:'domcontentloaded',timeout:45000});await page.waitForFunction(()=>document.body.classList.contains('yakolak-ready')&&globalThis.__yakolakGame?.pieces?.length===36,null,{timeout:45000,polling:100});const readyMs=Date.now()-startedAt;assert(readyMs<15000,`${name}: load too slow ${readyMs}ms`);await page.screenshot({path:`${outDir}/${name}-loaded.png`,timeout:30000});
-  await setupChoice(page,'color','right',mobile);await setupChoice(page,'bots',1,mobile);await page.waitForFunction(()=>globalThis.__yakolakGame.state.tutorial,null,{timeout:30000,polling:100});
-  const tutorialStart=Date.now();let prompts=0;
-  while(await page.evaluate(()=>globalThis.__yakolakGame.state.tutorial)){
-    await page.waitForFunction(()=>!globalThis.__yakolakGame.state.tutorial||document.querySelector('#yakolakTutorialDialog.open .yt-ok'),null,{timeout:30000,polling:100});if(!await page.evaluate(()=>globalThis.__yakolakGame.state.tutorial))break;
-    const before=await page.evaluate(()=>document.querySelector('#yakolakTutorialDialog.open .yt-text')?.textContent||'');await page.evaluate(()=>document.querySelector('#yakolakTutorialDialog.open .yt-ok')?.click());prompts++;assert(prompts<=3,`${name}: too many tutorial prompts`);await page.waitForFunction(b=>{const g=globalThis.__yakolakGame,t=document.querySelector('#yakolakTutorialDialog.open .yt-text')?.textContent||'';return!g.state.tutorial||(t&&t!==b)},before,{timeout:30000,polling:100});
-  }
-  const tutorialMs=Date.now()-tutorialStart;assert(prompts===3,`${name}: prompts ${prompts}`);assert(tutorialMs<30000,`${name}: tutorial too slow ${tutorialMs}ms`);await page.waitForFunction(()=>{const s=globalThis.__yakolakGame.state;return s.started&&!s.tutorial&&!s.locked},null,{timeout:15000,polling:100});
+  await setupChoice(page,'color','right',mobile);await setupChoice(page,'bots',1,mobile);
+  const tutorial=await completeTutorial(page,name);
+  await page.waitForFunction(()=>{const s=globalThis.__yakolakGame.state;return s.started&&!s.tutorial&&!s.locked},null,{timeout:15000,polling:100});
   const selected=await selectHumanPiece(page,name,mobile);assert(selected.observed,`${name}: piece selection not observed`);
   const placed=await placeSelectedPiece(page,name,mobile);assert(placed.observedImmediately,`${name}: player move not observed`);
   let botPresent=await page.evaluate(()=>{const g=globalThis.__yakolakGame;return Object.values(g.state.board||{}).some(c=>Object.values(c||{}).some(color=>color&&color!==g.state.humanColor))});
@@ -81,7 +96,7 @@ async function scenario(name,viewport,mobile){
   assert(botPresent,`${name}: bot did not reply`);
   const wins=await page.evaluate(()=>{const g=globalThis.__yakolakGame;return{same:g.debugWin('same-size',g.state.humanColor)?.type,graded:g.debugWin('graded',g.state.humanColor)?.type,cell:g.debugWin('cell',g.state.humanColor)?.type}});assert(wins.same==='same-size'&&wins.graded==='graded'&&wins.cell==='cell',`${name}: win rules changed`);
   const winTrigger=await page.evaluate(()=>{const g=globalThis.__yakolakGame;const win=g.debugTriggerWin('same-size',g.state.humanColor);return{type:win?.type||null,winner:g.state.winner||null}});assert(winTrigger.type==='same-size'&&winTrigger.winner,`${name}: win trigger failed ${JSON.stringify(winTrigger)}`);await page.screenshot({path:`${outDir}/${name}-win.png`,timeout:30000});
-  const fatal=consoleErrors.filter(t=>/uncaught|syntaxerror|referenceerror|typeerror|prod stage1 error/i.test(t));assert(!pageErrors.length,`${name}: page errors ${pageErrors.join(' | ')}`);assert(!fatal.length,`${name}: console errors ${fatal.join(' | ')}`);await context.close();return{name,readyMs,tutorialMs,prompts,wins,winTrigger,playerMoveObserved:true,botReplyObserved:true,passed:true};
+  const fatal=consoleErrors.filter(t=>/uncaught|syntaxerror|referenceerror|typeerror|prod stage1 error/i.test(t));assert(!pageErrors.length,`${name}: page errors ${pageErrors.join(' | ')}`);assert(!fatal.length,`${name}: console errors ${fatal.join(' | ')}`);await context.close();return{name,readyMs,tutorialMs:tutorial.tutorialMs,prompts:tutorial.prompts,promptTexts:tutorial.promptTexts,wins,winTrigger,playerMoveObserved:true,botReplyObserved:true,passed:true};
 }
 
 try{report.results.push(await scenario('desktop-1440x900',{width:1440,height:900},false));report.results.push(await scenario('mobile-390x844',{width:390,height:844},true));report.ok=true;console.log(JSON.stringify(report,null,2))}catch(error){report.error=String(error?.stack||error);console.error(error);process.exitCode=1}finally{await fs.writeFile(`${outDir}/results.json`,JSON.stringify(report,null,2));await browser.close()}
