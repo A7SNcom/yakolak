@@ -54,10 +54,15 @@ async function scenario(name, viewport, mobile) {
   while (await page.evaluate(() => globalThis.__yakolakGame.state.tutorial)) {
     await page.waitForFunction(() => !globalThis.__yakolakGame.state.tutorial || document.querySelector('#yakolakTutorialDialog.open .yt-ok'), null, { timeout: 30000 });
     if (!await page.evaluate(() => globalThis.__yakolakGame.state.tutorial)) break;
+    const previousPrompt = await page.evaluate(() => document.querySelector('#yakolakTutorialDialog.open .yt-text')?.textContent || '');
     await page.evaluate(() => document.querySelector('#yakolakTutorialDialog.open .yt-ok')?.click());
     prompts += 1;
     assert(prompts <= 3, `${name}: too many tutorial prompts`);
-    await page.waitForFunction(() => !document.querySelector('#yakolakTutorialDialog.open'), null, { timeout: 5000 });
+    await page.waitForFunction((before) => {
+      const g = globalThis.__yakolakGame;
+      const text = document.querySelector('#yakolakTutorialDialog.open .yt-text')?.textContent || '';
+      return !g.state.tutorial || (text && text !== before);
+    }, previousPrompt, { timeout: 30000 });
   }
   const tutorialMs = Date.now() - tutorialStart;
   assert(prompts === 3, `${name}: prompts ${prompts}`);
