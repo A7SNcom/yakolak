@@ -5,7 +5,7 @@ const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:4173';
 const outDir = process.env.ARTIFACT_DIR || 'artifacts/v093-speed';
 await fs.mkdir(outDir, { recursive: true });
 const browser = await chromium.launch({ headless: true, args: ['--enable-unsafe-swiftshader'] });
-const report = { ok: false, results: [] };
+const report = { ok: false, results: [], diagnostics: [] };
 
 function assert(value, message) { if (!value) throw new Error(message); }
 async function tap(page, point, mobile) { if (mobile) await page.touchscreen.tap(point.x, point.y); else await page.mouse.click(point.x, point.y); }
@@ -30,6 +30,34 @@ async function choose(page, type, value, mobile) {
     } catch {}
   }
   assert(await page.evaluate((kind) => kind === 'color' ? globalThis.__yakolakGame.state.setupStep === 'bots' : globalThis.__yakolakGame.state.configured, type), `setup failed ${type}:${value}`);
+}
+
+async function interactionSnapshot(page, scenarioName, stage, point = null) {
+  const snapshot = await page.evaluate(({ stage, point }) => {
+    const g = globalThis.__yakolakGame;
+    const selected = g.pieces.find(p => p.mesh?.userData?.traySelected) || null;
+    const inTray = g.pieces.filter(p => p.mesh?.userData?.inTray).map(p => ({ dir:p.dir, type:p.type, side:p.side, placed:p.placed }));
+    return {
+      stage,
+      point,
+      selectedPlayPiece: selected ? { dir:selected.dir, type:selected.type, side:selected.side, placed:selected.placed, zoneIndex:selected.zoneIndex } : null,
+      inTray,
+      state: {
+        started:g.state.started,
+        locked:g.state.locked,
+        tutorial:g.state.tutorial,
+        configured:g.state.configured,
+        humanColor:g.state.humanColor,
+        turnIndex:g.state.turnIndex,
+        currentPlayer:g.state.players?.[g.state.turnIndex % Math.max(1,g.state.players?.length || 1)] || null
+      },
+      board: JSON.parse(JSON.stringify(g.state.board || {}))
+    };
+  }, { stage, point });
+  report.diagnostics.push({ scenario: scenarioName, ...snapshot });
+  console.log('[interaction]', JSON.stringify({ scenario: scenarioName, ...snapshot }));
+  await fs.writeFile(`${outDir}/interaction-diagnostics.json`, JSON.stringify(report.diagnostics, null, 2));
+  return snapshot;
 }
 
 async function scenario(name, viewport, mobile) {
@@ -74,12 +102,23 @@ async function scenario(name, viewport, mobile) {
     const g=globalThis.__yakolakGame; const piece=g.pieces.find(p=>p.dir===g.state.humanColor && p.type==='l' && !p.placed); const v=new g.THREE.Vector3(); piece.mesh.getWorldPosition(v); v.project(g.camera); const r=g.renderer.domElement.getBoundingClientRect(); return {x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2};
   });
   await tap(page, piecePoint, mobile);
-  await page.waitForTimeout(120);
+  await page.waitForTimeout(250);
+  const afterPiece = await interactionSnapshot(page, name, 'after-piece-tap', piecePoint);
+  assert(afterPiece.selectedPlayPiece, `${name}: piece tap did not select a playable piece`);
+
   const zonePoint = await page.evaluate(() => {
-    const g=globalThis.__yakolakGame; const z=g.boardZones[0]; const v=new g.THREE.Vector3(z.px-18,z.py,z.pz-18); g.gameGroup.localToWorld(v); v.project(g.camera); const r=g.renderer.domElement.getBoundingClientRect(); return {x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2};
+    const g=globalThis.__yakolakGame;
+    const zone = g.boardZones.find(z => !Object.values(g.state.board?.[z.id] || {}).some(Boolean));
+    const v=new g.THREE.Vector3(zone.px,zone.py + 1,zone.pz); g.gameGroup.localToWorld(v); v.project(g.camera);
+    const r=g.renderer.domElement.getBoundingClientRect();
+    return {x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2,zoneId:zone.id};
   });
   await tap(page, zonePoint, mobile);
-  await page.waitForFunction(() => Object.values(globalThis.__yakolakGame.state.board?.[0]||{}).includes(globalThis.__yakolakGame.state.humanColor), null, { timeout: 5000, polling: 100 });
+  await page.waitForTimeout(300);
+  const afterZone = await interactionSnapshot(page, name, 'after-zone-tap', zonePoint);
+  const placed = Object.values(afterZone.board?.[zonePoint.zoneId] || {}).includes(afterZone.state.humanColor);
+  if (!placed) await page.screenshot({ path: `${outDir}/${name}-move-failed.png`, timeout: 30000 });
+  assert(placed, `${name}: zone tap did not place selected piece; selected=${JSON.stringify(afterZone.selectedPlayPiece)} point=${JSON.stringify(zonePoint)} board=${JSON.stringify(afterZone.board)}`);
   const humanMoveMs = Date.now() - playStart;
   assert(humanMoveMs < 5000, `${name}: human move too slow ${humanMoveMs}ms`);
 
