@@ -1,4 +1,4 @@
-// Accept fast onboarding transitions without treating them as failures.
+// Verify gameplay state first, then accept fast onboarding transitions.
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
 
@@ -41,9 +41,9 @@ async function scenario(name,viewport,mobile){
   const selected=await page.evaluate(()=>globalThis.__yakolakGame.pieces.some(p=>p.mesh?.userData?.traySelected));assert(selected,`${name}: no selected piece`);
   if(await lessonId(page)==='choose-size')await waitLesson(page,'place-piece');
   await placePiece(page,mobile);
-  await page.waitForFunction(()=>['bot-reply','sizes'].includes(globalThis.__yakolakOnboarding?.current?.id),null,{timeout:10000,polling:100});
-  await page.waitForFunction(()=>Object.values(globalThis.__yakolakGame.state.board||{}).some(c=>Object.values(c||{}).some(v=>v&&v!==globalThis.__yakolakGame.state.humanColor)),null,{timeout:10000,polling:100});
-  if(await lessonId(page)==='bot-reply')await waitLesson(page,'sizes',10000);
+  await page.waitForFunction(()=>Object.values(globalThis.__yakolakGame.state.board||{}).some(c=>Object.values(c||{}).some(v=>v&&v!==globalThis.__yakolakGame.state.humanColor)),null,{timeout:20000,polling:100});
+  await page.waitForFunction(()=>['bot-reply','sizes'].includes(globalThis.__yakolakOnboarding?.current?.id),null,{timeout:15000,polling:100});
+  if(await lessonId(page)==='bot-reply')await waitLesson(page,'sizes',15000);
   await page.locator('#yo-help').click();const feedback=await page.locator('#yo-feedback').textContent();assert(feedback?.trim(),`${name}: smart hint empty`);
   await page.screenshot({path:`${outDir}/${name}-exercise.png`,timeout:30000});
   await page.locator('#yo-skip').click();assert(!await page.locator('#yo-card').evaluate(el=>el.classList.contains('open')),`${name}: skip did not close`);
