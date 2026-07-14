@@ -40,9 +40,10 @@ async function scenario(name,viewport,mobile){
   await page.waitForFunction(()=>['choose-size','place-piece'].includes(globalThis.__yakolakOnboarding?.current?.id),null,{timeout:15000,polling:100});
   const selected=await page.evaluate(()=>globalThis.__yakolakGame.pieces.some(p=>p.mesh?.userData?.traySelected));assert(selected,`${name}: no selected piece`);
   if(await lessonId(page)==='choose-size')await waitLesson(page,'place-piece');
-  await placePiece(page,mobile);await waitLesson(page,'bot-reply',10000);
+  await placePiece(page,mobile);
+  await page.waitForFunction(()=>['bot-reply','sizes'].includes(globalThis.__yakolakOnboarding?.current?.id),null,{timeout:10000,polling:100});
   await page.waitForFunction(()=>Object.values(globalThis.__yakolakGame.state.board||{}).some(c=>Object.values(c||{}).some(v=>v&&v!==globalThis.__yakolakGame.state.humanColor)),null,{timeout:10000,polling:100});
-  await waitLesson(page,'sizes',10000);
+  if(await lessonId(page)==='bot-reply')await waitLesson(page,'sizes',10000);
   await page.locator('#yo-help').click();const feedback=await page.locator('#yo-feedback').textContent();assert(feedback?.trim(),`${name}: smart hint empty`);
   await page.screenshot({path:`${outDir}/${name}-exercise.png`,timeout:30000});
   await page.locator('#yo-skip').click();assert(!await page.locator('#yo-card').evaluate(el=>el.classList.contains('open')),`${name}: skip did not close`);
