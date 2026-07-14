@@ -1,3 +1,4 @@
+// Trigger robust tray-state onboarding verification.
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
 
