@@ -1,4 +1,4 @@
-// Final trusted rerun after robust tray-state transition.
+// Accept fast onboarding transitions without treating them as failures.
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
 
@@ -36,9 +36,11 @@ async function scenario(name,viewport,mobile){
   await clickNext(page);await waitLesson(page,'goal');await clickNext(page);await waitLesson(page,'choose-color');
   await choose(page,'color','right',mobile);await waitLesson(page,'choose-rivals');
   await choose(page,'bots',1,mobile);await waitLesson(page,'open-stack',30000);
-  await openTray(page,mobile);await waitLesson(page,'choose-size');
+  await openTray(page,mobile);
+  await page.waitForFunction(()=>['choose-size','place-piece'].includes(globalThis.__yakolakOnboarding?.current?.id),null,{timeout:15000,polling:100});
   const selected=await page.evaluate(()=>globalThis.__yakolakGame.pieces.some(p=>p.mesh?.userData?.traySelected));assert(selected,`${name}: no selected piece`);
-  await waitLesson(page,'place-piece');await placePiece(page,mobile);await waitLesson(page,'bot-reply',10000);
+  if(await lessonId(page)==='choose-size')await waitLesson(page,'place-piece');
+  await placePiece(page,mobile);await waitLesson(page,'bot-reply',10000);
   await page.waitForFunction(()=>Object.values(globalThis.__yakolakGame.state.board||{}).some(c=>Object.values(c||{}).some(v=>v&&v!==globalThis.__yakolakGame.state.humanColor)),null,{timeout:10000,polling:100});
   await waitLesson(page,'sizes',10000);
   await page.locator('#yo-help').click();const feedback=await page.locator('#yo-feedback').textContent();assert(feedback?.trim(),`${name}: smart hint empty`);
