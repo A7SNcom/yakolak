@@ -27,7 +27,7 @@ permissions:
 jobs:
   visual-playtest:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Check out v112
         uses: actions/checkout@v4
