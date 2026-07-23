@@ -11,6 +11,14 @@ on:
       - src/app-game-v112.js
       - scripts/capture-v112-evidence.mjs
       - .github/workflows/capture-v112-evidence.yml
+  pull_request:
+    paths:
+      - index.html
+      - app.js
+      - version.json
+      - src/app-game-v112.js
+      - scripts/capture-v112-evidence.mjs
+      - .github/workflows/capture-v112-evidence.yml
   workflow_dispatch:
 
 permissions:
@@ -55,6 +63,7 @@ jobs:
       - name: Run desktop and mobile playtests
         run: node scripts/capture-v112-evidence.mjs
       - name: Commit visual evidence
+        if: github.event_name == 'push'
         run: |
           git checkout -- index.html package.json package-lock.json 2>/dev/null || true
           git config user.name "github-actions[bot]"
