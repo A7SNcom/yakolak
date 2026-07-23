@@ -18,6 +18,8 @@ introducing post-processing or heavy shadows.
 ## Implementation
 
 - `api/rooms.js`: durable room API.
+- `api/calibration.js` and `package.json`: fetch-only Turso serverless driver
+  on the pinned Node 22 LTS runtime.
 - `src/online-rules-v114.js`: pure authoritative rules.
 - `src/online-client-v114.js`: room UI, recovery, polling, tap input, and board
   synchronization.
@@ -41,12 +43,32 @@ introducing post-processing or heavy shadows.
 
 ## Preview verification
 
-Pending. This section must be updated only after the real Vercel Preview is
-opened on desktop and mobile and a two-client room is played.
+- Final Preview deployment `dpl_EEBBBjknvMnP77d9e7iGK8eT2j5e` reached
+  `READY` from commit `0e432eb775c3e6f11bb05324374b134a6bb694c8`.
+- Opened the immutable Preview on 390x844 portrait and 844x390 landscape.
+- Created a private room, joined from a second tab, and completed a legal move.
+- The second client received the move and the active turn within one polling
+  cycle.
+- Reload recovery and session restoration were verified on an earlier Preview
+  of the same online implementation.
+- Portrait and landscape screenshots confirmed that the board, pieces, turn
+  HUD, and online connection pill do not overlap.
+- Browser Console filtering for the final Preview origin found no warnings or
+  errors.
+- Vercel Runtime logs for the final deployment found no
+  `warning`, `error`, or `fatal` entries after the room and move test.
 
 ## Result
 
-Pending Preview evidence.
+Keep. The first online release is server-authoritative, survives function
+instance changes through Turso, rejects stale/illegal moves, and remains
+understandable on mobile. Mobile landscape now frames the board rather than the
+table body, portrait HUD collision was removed, and the database path no longer
+emits the Node 24 deprecation warning.
+
+## Preview
+
+`https://yakolak-jye7emtev-ahmdkcoms-projects.vercel.app`
 
 ## Rollback
 
