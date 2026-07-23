@@ -6,6 +6,9 @@ on:
       - "112"
     paths:
       - .github/workflows/verify-v112-desktop-3players.yml
+  pull_request:
+    paths:
+      - .github/workflows/verify-v112-desktop-3players.yml
   workflow_dispatch:
 
 permissions:
