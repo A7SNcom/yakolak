@@ -117,9 +117,7 @@ replaceRegex(
   /async function startApp\(\)\{.*?\n\}\nstartApp\(\)\.catch\(fail\);/s,
   `async function startApp(){
   setLoadingProgress(8,'تجهيز الواجهة');
-  createCalibrationChrome();
-  const tools=document.getElementById('yakolakTools');if(tools)tools.style.display='none';
-  const panel=document.getElementById('yakolakCalibrationPanel');if(panel)panel.style.display='none';
+  injectCalibrationCss();
   ensureGameChrome();
   attachGameDebug();
   applyCalibration();
@@ -127,13 +125,13 @@ replaceRegex(
   await boot();
 }
 startApp().catch(fail);`,
-  'remove runtime calibration override'
+  'remove calibration panel creation'
 );
 
 source=source.replace("lightRig.name='yakolak-calibration-light-rig';","lightRig.name='yakolak-v103-direct-motion-rig';");
 source+='\n//# sourceURL=yakolak-v103-direct-runtime.js\n';
 
-globalThis.__yakolakV103={build:103,style:'direct-motion-two-light'};
+globalThis.__yakolakV103={build:103,style:'direct-motion-two-light',fix:'no-calibration-ui'};
 const moduleUrl=URL.createObjectURL(new Blob([source],{type:'text/javascript'}));
 try{
   await import(moduleUrl);
