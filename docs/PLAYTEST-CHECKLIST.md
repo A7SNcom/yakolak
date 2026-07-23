@@ -62,3 +62,17 @@ Use identical camera/game states for:
 - Normal player mode contains no developer/maintenance controls.
 - Debug mode retains the recovery control.
 - Build/version markers agree.
+
+## v111 release verification — 2026-07-23
+
+Passed for the v111 change scope:
+
+- Desktop Chromium, real pointer input, setup through one legal player move and AI response.
+- Mobile emulation 390×844 / DPR 2, Android user agent, real touch input, setup through one legal player move and AI response.
+- No Console errors during the tested paths.
+- No mobile overflow.
+- Normal mode hides maintenance UI.
+- `?debug=1` exposes maintenance UI.
+- Visual evidence: `docs/screenshots/v111/`.
+
+Broader game regression items such as every color, all player counts, win/replay, rotation, and accessibility remain recurring release checks; they were not changed by v111 and are not claimed as newly validated by this shell-only release.

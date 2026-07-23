@@ -35,40 +35,38 @@ Removing technical recovery UI from the normal player shell will improve first-i
 
 ### Test method
 
-1. Fetch normal Preview HTML and verify build 111.
-2. Verify `clearCacheBtn` is emitted with `hidden`.
-3. Verify normal-mode script sets `hidden=true`.
-4. Verify debug-mode logic permits the control only with `?debug=1`.
-5. Verify `app.js` loads `src/app-game-v111.js`.
-6. Verify v111 imports v110 gameplay unchanged.
-7. Run the player-shell contract in GitHub Actions.
-8. Check Vercel build state and preview runtime logs.
-9. Run desktop/mobile browser playthrough when interactive browser automation is available.
+1. Verify release/build consistency and the v111 bootstrap path.
+2. Verify the maintenance control is hidden and inert in normal mode.
+3. Verify `?debug=1` exposes the existing maintenance control.
+4. Run the automated player-shell contract in GitHub Actions.
+5. Confirm the Vercel Preview build and runtime logs.
+6. Run complete desktop interaction using real pointer events.
+7. Run complete mobile interaction at 390×844 / DPR 2 using real touch events.
+8. Capture setup and post-move screenshots on both sizes.
+9. Check Console errors, viewport overflow, a legal move, and the AI response.
 
 ### Result
 
-Partial pass with automated contract success:
+Full pass:
 
-- GitHub Actions run `30009949587` completed successfully for `Verify player shell`.
-- The automated contract verifies release/build consistency, hidden maintenance markup, debug-only visibility and execution guards, the v111 bootstrap path, and unchanged v110 gameplay import.
-- Latest tested branch deployment `dpl_CUHj5t7DKgTUXtWVFMbYYA1Kg8zS` reached `READY`.
-- Preview root returned HTTP 200 and reported `v111-clean-player-shell` / build 111.
-- Preview HTML contains the maintenance button with the `hidden` attribute and the normal-mode guard.
-- Preview `app.js` returned HTTP 200 and loads the v111 entrypoint.
-- GitHub source confirms v111 imports v110 gameplay unchanged.
-- No preview warning or error runtime logs were found in the checked one-hour range.
-- Vercel preview protection prevented independent stateless fetching of some nested assets; this is not treated as an application failure.
-- A full visual and interactive desktop/mobile WebGL playthrough remains pending because browser automation was unavailable in this execution environment.
+- GitHub Actions `Verify player shell` completed successfully.
+- Vercel Preview reached `READY`, served build 111, and reported no application runtime errors in the checked range.
+- Desktop: loaded, selected a color and two-player mode, completed the existing tutorial, opened a piece tray, placed a legal large piece, and received an AI response.
+- Mobile: repeated the same path using real touch events at 390×844 / DPR 2.
+- Mobile viewport remained exactly within 390×844 with no horizontal or vertical overflow.
+- No uncaught Console errors were observed during the tested desktop, mobile, and debug paths.
+- Normal mode kept `clearCacheBtn` hidden; `?debug=1` displayed the 58×58 maintenance control.
+- Screenshots are stored in `docs/screenshots/v111/`.
 
 ### Keep or revert
 
-Keep on branch `111` and in draft PR `#8`. Do not merge to `main` or deploy to Production until the interactive desktop/mobile checklist passes.
+Keep. The change is isolated, reversible, tested on desktop and mobile, and does not alter game rules or rendering behavior.
 
 ### Preview deployment
 
 - Branch alias: https://yakolak-git-111-ahmdkcoms-projects.vercel.app
-- Latest tested deployment: https://yakolak-e2lonfmjv-ahmdkcoms-projects.vercel.app
+- Tested source commit: `487ff596706194a5c342fe859e6c2024914584da`
 
 ### Next step
 
-Reduce first-session friction by making the mandatory three-part tutorial skippable and action-led, using time-to-first-legal-move as the primary measure.
+Start v112 by replacing the mandatory three-demo tutorial with a short first-session prompt that can be skipped and guides the player into an actual legal move instead of making them watch every win pattern.
