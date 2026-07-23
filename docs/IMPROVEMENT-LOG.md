@@ -27,7 +27,10 @@ A short choice followed by guidance during the player's actual first move will r
 - `version.json`
 - `package.json`
 - `scripts/verify-tutorial-v112.mjs`
+- `scripts/capture-v112-evidence.mjs`
 - `.github/workflows/verify-tutorial-v112.yml`
+- `.github/workflows/capture-v112-evidence.yml`
+- `docs/screenshots/v112/`
 
 ### Test method
 
@@ -36,24 +39,39 @@ A short choice followed by guidance during the player's actual first move will r
 3. First-time path: choose setup, select `ابدأ اللعب`, confirm no scripted demonstrations, complete a legal move, and confirm onboarding is stored.
 4. Skip path: select `تخطي التعليم` and confirm immediate normal play.
 5. Returning path: reload with stored completion and confirm no prompt.
-6. Repeat first-time and skip paths on desktop and mobile touch.
-7. Check Console errors, viewport overflow, AI response, and unchanged visual presentation.
+6. Repeat all paths on desktop and mobile touch.
+7. Verify a legal move, AI response, Console errors, and viewport overflow.
+8. Store screenshots and machine-readable results in the repository.
 
 ### Result
 
-Pending Preview and interactive verification.
+Full pass:
+
+- GitHub Actions `Verify v112 tutorial` completed successfully.
+- GitHub Actions `Capture v112 visual evidence` completed successfully on desktop and mobile.
+- The first-time path showed one short prompt, then guided the player's actual first legal move.
+- The explicit skip path entered normal play without scripted demonstrations.
+- The returning-player path showed no tutorial prompt after completion was stored.
+- A legal human move and AI response completed on both tested profiles.
+- Desktop viewport stayed at 1440×900 with no overflow.
+- Mobile viewport stayed at 390×844 / DPR 2 with no overflow.
+- No application Console or page errors were observed.
+- Vercel Preview served `v112-action-tutorial` / build 112 and reported no warning, error, or fatal Runtime logs in the checked range.
+- Evidence is stored in `docs/screenshots/v112/`, with `results.json.ok == true`.
 
 ### Keep or revert
 
-Pending. Keep only if all three onboarding paths work on desktop and mobile without gameplay regression.
+Keep on branch `112` and in draft PR #9. The change is isolated, reversible, and passed the defined desktop/mobile onboarding paths without changing game rules or visual presentation.
 
 ### Preview deployment
 
-Pending.
+- Branch alias: https://yakolak-git-112-ahmdkcoms-projects.vercel.app
+- Verified visual source commit: `386f31b957e0861c3ec2bdca4230ec38e3d2b827`
+- Evidence commit: `a7a156fd4560b85812215a54ed7d478483cf37ca`
 
 ### Next step
 
-After validation, measure the remaining delay and friction between setup completion and the first legal move.
+Measure and reduce any remaining delay between setup completion and the first legal move, then extend the first-move guide only when the player hesitates or makes repeated invalid attempts.
 
 ---
 
