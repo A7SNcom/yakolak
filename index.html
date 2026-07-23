@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="yakolak-version" content="v105-mature-neutral">
+<meta name="yakolak-version" content="v106-unified-studio">
 <title>Yakolak Live</title>
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -21,8 +21,8 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b0b;col
 .loaderFrame:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.1),transparent);animation:loader-scan 1.65s linear infinite;pointer-events:none}
 #yakolakLoaderProgress{display:block;width:100%;height:22px;appearance:none;-webkit-appearance:none;border:0;background:#111820;overflow:hidden}
 #yakolakLoaderProgress::-webkit-progress-bar{background:#111820}
-#yakolakLoaderProgress::-webkit-progress-value{background:linear-gradient(90deg,#caa45a,#5fae90,#5f7fb7);transition:width .28s ease}
-#yakolakLoaderProgress::-moz-progress-bar{background:linear-gradient(90deg,#caa45a,#5fae90,#5f7fb7);transition:width .28s ease}
+#yakolakLoaderProgress::-webkit-progress-value{background:linear-gradient(90deg,#b2863f,#2a7d62,#315a95);transition:width .28s ease}
+#yakolakLoaderProgress::-moz-progress-bar{background:linear-gradient(90deg,#b2863f,#2a7d62,#315a95);transition:width .28s ease}
 .loaderMeta{display:flex;justify-content:space-between;align-items:center;margin-top:11px;font-size:12px;font-weight:900;color:#d7dde6;direction:rtl}
 #yakolakLoaderPercent{font-size:18px;color:#fff;direction:ltr}
 #yakolakLoader.error .loaderFrame{border-color:#ef4444}
@@ -46,7 +46,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b0b;col
 <div id="panel" aria-hidden="true"></div>
 <textarea id="out"></textarea>
 <script type="module">
-const BUILD='105';
+const BUILD='106';
 const params=new URLSearchParams(location.search);
 const clearToken=params.get('clear');
 const ASSET_VERSION=clearToken||BUILD;
