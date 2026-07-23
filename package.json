@@ -1,10 +1,10 @@
 {
   "name": "yakolak",
-  "version": "0.112.0",
+  "version": "0.113.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --check src/app-game-v112.js && node scripts/verify-tutorial-v112.mjs"
+    "test": "node --check src/app-game-v112.js && node --check src/app-game-v113.js && node scripts/verify-tutorial-v112.mjs && node scripts/verify-v113-first-move.mjs"
   },
   "engines": {
     "node": ">=20"
