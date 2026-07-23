@@ -30,13 +30,15 @@ jobs:
       - name: Install visual-test runtime
         run: |
           npm install --no-save --ignore-scripts playwright@1.54.2 three@0.165.0
-          npx playwright install --with-deps chromium
+          chrome_path="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          test -n "$chrome_path"
+          echo "CHROME_EXECUTABLE=$chrome_path" >> "$GITHUB_ENV"
       - name: Prepare deterministic visual-test page
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          path = Path('index.html')
-          text = path.read_text()
+          page_path = Path('index.html')
+          text = page_path.read_text()
           text = text.replace('https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js', './node_modules/three/build/three.module.js')
           text = text.replace('https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/', './node_modules/three/examples/jsm/')
           guard = """<script id="yakolakCiTurnGuard">
@@ -48,7 +50,15 @@ jobs:
           },100);
           </script>"""
           text = text.replace('</body>', guard + '\n</body>')
-          path.write_text(text)
+          page_path.write_text(text)
+
+          test_path = Path('scripts/verify-v112-multiplayer-restart.mjs')
+          test_text = test_path.read_text()
+          test_text = test_text.replace(
+              "const browser = await chromium.launch({ headless: true, args:",
+              "const browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE, headless: true, args:"
+          )
+          test_path.write_text(test_text)
           PY
       - name: Start local game server
         run: |
