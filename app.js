@@ -1,7 +1,7 @@
-console.info('[Yakolak] APP.JS v109 CLEAR PLAYFIELD LOADED');
+console.info('[Yakolak] APP.JS v110 READABLE CHARCOAL LOADED');
 
-const BUILD='109';
-import('./src/app-game-v109.js?v='+BUILD+'-release').catch(error=>{
-  console.error('[Yakolak] v109 bootstrap failed',error);
-  globalThis.__yakolakLoading?.set?.(100,'تعذر تحميل النسخة 109');
+const BUILD='110';
+import('./src/app-game-v110.js?v='+BUILD+'-release').catch(error=>{
+  console.error('[Yakolak] v110 bootstrap failed',error);
+  globalThis.__yakolakLoading?.set?.(100,'تعذر تحميل النسخة 110');
 });
