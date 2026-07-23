@@ -1,5 +1,62 @@
 # Yakolak Improvement Log
 
+## v112 — Short, skippable, action-led tutorial
+
+### Problem
+
+Every new match forced the player to watch three complete win demonstrations and confirm each one before making a real move.
+
+### Hypothesis
+
+A short choice followed by guidance during the player's actual first move will reduce time-to-first-action and cognitive load while preserving access for players who want help.
+
+### Smallest change
+
+- Replace the three passive demonstrations with one short prompt.
+- Provide `ابدأ اللعب` and `تخطي التعليم` choices.
+- Guide the player through a real legal first move instead of a scripted example.
+- Mark onboarding complete after that legal move.
+- Skip the prompt automatically for returning players.
+- Preserve v111 game rules, AI, rendering, controls, camera, lighting, and performance.
+
+### Files affected
+
+- `index.html`
+- `app.js`
+- `src/app-game-v112.js`
+- `version.json`
+- `package.json`
+- `scripts/verify-tutorial-v112.mjs`
+- `.github/workflows/verify-tutorial-v112.yml`
+
+### Test method
+
+1. Run the static and syntax contract in GitHub Actions.
+2. Verify Preview reaches `READY` and loads build 112.
+3. First-time path: choose setup, select `ابدأ اللعب`, confirm no scripted demonstrations, complete a legal move, and confirm onboarding is stored.
+4. Skip path: select `تخطي التعليم` and confirm immediate normal play.
+5. Returning path: reload with stored completion and confirm no prompt.
+6. Repeat first-time and skip paths on desktop and mobile touch.
+7. Check Console errors, viewport overflow, AI response, and unchanged visual presentation.
+
+### Result
+
+Pending Preview and interactive verification.
+
+### Keep or revert
+
+Pending. Keep only if all three onboarding paths work on desktop and mobile without gameplay regression.
+
+### Preview deployment
+
+Pending.
+
+### Next step
+
+After validation, measure the remaining delay and friction between setup completion and the first legal move.
+
+---
+
 ## v111 — Clean player shell
 
 ### Problem
@@ -67,7 +124,3 @@ Keep. The change is isolated, reversible, tested on desktop and mobile, and does
 - Branch alias: https://yakolak-git-111-ahmdkcoms-projects.vercel.app
 - Visually tested source commit: `487ff596706194a5c342fe859e6c2024914584da`
 - Final evidence commit: `5a9ae2b6062e38873ed02beef6aba1ec0ba65cf0`
-
-### Next step
-
-Start v112 by replacing the mandatory three-demo tutorial with a short first-session prompt that can be skipped and guides the player into an actual legal move instead of making them watch every win pattern.
