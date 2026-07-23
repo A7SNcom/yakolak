@@ -1,6 +1,6 @@
 {
-  "version": "v104-bright-neutral",
-  "build": 104,
+  "version": "v105-mature-neutral",
+  "build": 105,
   "updated_at": "2026-07-23",
-  "note": "Bright neutral art direction: cool light-gray room, solid neutral gray table without beige texture, AgX tone mapping, vivid player colors, and a stable three-light rig using hemisphere, warm key, and cool fill while preserving v103 motion performance settings."
+  "note": "Mature neutral art direction: unified gray room values, restrained cobalt blue, muted bronze-gold, deeper emerald green, neutral tone mapping, consistent interface/gameplay colors, and the proven lightweight motion rendering profile."
 }
