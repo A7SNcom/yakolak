@@ -1,6 +1,6 @@
 {
-  "version": "v092-calibration-tutorial-fixes",
-  "build": 92,
-  "updated_at": "2026-06-30",
-  "note": "Fixes calibration panel layering, expands calibration controls, restores full four-color intro, adds tutorial checkpoints, and replaces win highlight with blink timing."
+  "version": "v095-performance-mode",
+  "build": 95,
+  "updated_at": "2026-07-23",
+  "note": "Performance baseline: stops continuous setup rendering, uses a lightweight two-light rig, lowers render resolution, and disables costly table maps by default. Add ?quality-full to compare the original quality path."
 }

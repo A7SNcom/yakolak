@@ -1,10 +1,10 @@
-﻿import * as THREE from 'three';
+import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {STLLoader} from 'three/addons/loaders/STLLoader.js';
 import {SVGLoader} from 'three/addons/loaders/SVGLoader.js';
 import {RectAreaLightUniformsLib} from 'three/addons/lights/RectAreaLightUniformsLib.js';
 
-const BUILD='92';
+const BUILD='95';
 const MODEL_DIR='./assets/models/';
 const MARBLE_URL='https://i.ibb.co/B2h2tNKG/Screenshot-2026-06-22-094236.png';
 const TABLE_SVG_URL=`${MODEL_DIR}table.svg?v=${BUILD}-table`;
@@ -15,6 +15,10 @@ const modelPath=n=>`${MODEL_DIR}${n}.stl?v=${BUILD}-${n}`;
 const root=document.getElementById('view');
 const loaderEl=document.getElementById('yakolakLoader');
 const log=(...a)=>console.info('[Yakolak]',...a);
+const PERF_PARAMS=new URLSearchParams(location.search);
+const PERFORMANCE_MODE=!PERF_PARAMS.has('quality-full');
+const performancePixelRatio=()=>PERFORMANCE_MODE?(innerWidth<=900?.78:.9):Math.min(Math.max(devicePixelRatio||1,1),1.25);
+globalThis.__yakolakPerformance={enabled:PERFORMANCE_MODE,get pixelRatio(){return renderer?.getPixelRatio?.()||performancePixelRatio()}};
 function setLoadingProgress(value,status){
   globalThis.__yakolakLoading?.set?.(value,status);
 }
@@ -94,7 +98,7 @@ scene.background=new THREE.Color(calibration.scene.background);
 const camera=new THREE.PerspectiveCamera(calibration.scene.fov,innerWidth/innerHeight,.1,12000);
 const renderer=new THREE.WebGLRenderer({antialias:false,alpha:false,powerPreference:'high-performance'});
 renderer.outputColorSpace=THREE.SRGBColorSpace;
-renderer.setPixelRatio(Math.min(Math.max(devicePixelRatio||1,1),1.25));
+renderer.setPixelRatio(performancePixelRatio());
 renderer.setSize(innerWidth,innerHeight);
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=calibration.scene.exposure;
@@ -421,8 +425,8 @@ function applyTableMaterial(mat){
   mat.opacity=Number.isFinite(+cfg.opacity)?+cfg.opacity:1;
   mat.depthWrite=!(mat.transparent&&mat.opacity<1);
   mat.map=cfg.texture?tableMaps.albedo||null:null;
-  mat.normalMap=cfg.texture?tableMaps.normal||null:null;
-  mat.roughnessMap=cfg.texture?tableMaps.roughness||null:null;
+  mat.normalMap=cfg.texture&&!PERFORMANCE_MODE?tableMaps.normal||null:null;
+  mat.roughnessMap=cfg.texture&&!PERFORMANCE_MODE?tableMaps.roughness||null:null;
   [mat.map,mat.normalMap,mat.roughnessMap].filter(Boolean).forEach(t=>{
     t.repeat.set(Number.isFinite(+cfg.repeatX)?+cfg.repeatX:1,Number.isFinite(+cfg.repeatY)?+cfg.repeatY:1);
     t.needsUpdate=true;
@@ -450,7 +454,7 @@ function applyRoomMaterials(){
 function applySceneSettings(){
   scene.background=new THREE.Color(calibration.scene.background);
   renderer.toneMappingExposure=+calibration.scene.exposure;
-  renderer.setPixelRatio(Math.min(Math.max(+calibration.scene.pixelRatio||1,1),2));
+  renderer.setPixelRatio(PERFORMANCE_MODE?performancePixelRatio():Math.min(Math.max(+calibration.scene.pixelRatio||1,1),2));
   scene.fog=calibration.scene.fog?new THREE.Fog(calibration.scene.fogColor,+calibration.scene.fogNear,+calibration.scene.fogFar):null;
   camera.fov=+calibration.scene.fov;camera.updateProjectionMatrix();
   controls.minDistance=+calibration.scene.minDistance;
@@ -520,6 +524,14 @@ function addLinearLight(cfg,label,index){
 function buildLighting(){
   while(lightRig.children.length){const child=lightRig.children.pop();disposeObject(child)}
   dragLightHandles=[];
+  if(PERFORMANCE_MODE){
+    lightRig.add(new THREE.HemisphereLight(0xffffff,0x5f6972,.82));
+    const key=new THREE.DirectionalLight(0xfff7e8,1.05);
+    key.position.set(-520,760,480);
+    key.target.position.set(0,0,0);
+    lightRig.add(key,key.target);
+    return;
+  }
   calibration.lights.forEach((cfg,i)=>{
     if(!cfg.enabled)return;
     const label=cfg.name||String(i+1);
@@ -1066,6 +1078,11 @@ function addSetupLabel(text,x,z,bg='rgba(0,0,0,.48)'){
   return label;
 }
 function startSetupSpin(){
+  if(PERFORMANCE_MODE){
+    setupSpinGroups.forEach((g,i)=>{g.rotation.y=(i%4)*.14});
+    render();
+    return;
+  }
   if(setupSpinRaf)return;
   const step=()=>{
     if(!setupGroup.visible||gameState.configured){setupSpinRaf=0;return}
@@ -2244,7 +2261,7 @@ function center(g){g.computeBoundingBox();const c=g.boundingBox.getCenter(new TH
 function bottom(g){g.computeBoundingBox();const b=g.boundingBox;g.translate(-(b.min.x+b.max.x)/2,-(b.min.y+b.max.y)/2,-b.min.z);return uv(g)}
 function load(n,prep){return new Promise((res,rej)=>stl.load(modelPath(n),g=>res(prep(g)),undefined,()=>rej(new Error(n))))}
 function loadSvg(url){return new Promise((res,rej)=>svgLoader.load(url,res,undefined,rej))}
-function prepTableTex(t,isColor=false){if(isColor)t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=renderer.capabilities.getMaxAnisotropy();t.wrapS=t.wrapT=THREE.RepeatWrapping;t.needsUpdate=true;return t}
+function prepTableTex(t,isColor=false){if(isColor)t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),PERFORMANCE_MODE?2:8);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.needsUpdate=true;return t}
 function loadSoftTexture(url,label,isColor=false){return new Promise(res=>tex.load(url,t=>{prepTableTex(t,isColor);log(label,'restored');res(t)},undefined,e=>{log(label,'failed',e);res(null)}))}
 async function loadTableTextures(){const [albedo,normal,roughness]=await Promise.all([loadSoftTexture(TABLE_ALBEDO_URL,'table albedo',true),loadSoftTexture(TABLE_NORMAL_URL,'table normal'),loadSoftTexture(TABLE_ROUGHNESS_URL,'table roughness')]);tableMaps={albedo,normal,roughness};return tableMaps}
 function tableMaterial(){const mat=makeMat({color:'#c79a64',roughness:.72,metalness:0});if(tableMaps.albedo){mat.map=tableMaps.albedo;mat.color.set(0xffffff)}if(tableMaps.normal){mat.normalMap=tableMaps.normal;mat.normalScale.set(.75,.75)}if(tableMaps.roughness){mat.roughnessMap=tableMaps.roughness;mat.roughness=.92}tableMaterials.push(mat);applyTableMaterial(mat);mat.needsUpdate=true;return mat}
