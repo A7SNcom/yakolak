@@ -68,4 +68,16 @@ Local browser verification passed:
 - Mobile landscape (844x390) remained exactly within the viewport.
 - No new Console errors appeared after the corrected build loaded.
 
-Preview verification is still required before this result is accepted.
+Preview verification passed on commit
+`2ed6596904463b7bed729c53296b94af17a31d2d`:
+
+- Vercel deployment `dpl_HhESy9BESErjGv6yFFcGbQLp5oEk` reached `READY`.
+- Desktop Preview kept the first guided turn after 22 seconds, accepted a
+  legal move, and restored the normal countdown on the next human turn.
+- Preview at 390x844 and 844x390 kept the guided turn and stayed exactly
+  within the viewport.
+- The tested Preview emitted no application Console errors.
+- GitHub Actions run `30038624423` completed successfully.
+
+Result: keep the experiment. It removes an unfair first-session failure mode
+without changing rules, AI, camera, lighting, or the pace of later turns.
