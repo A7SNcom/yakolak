@@ -1,0 +1,158 @@
+{
+  "ok": true,
+  "build": 112,
+  "profile": "mobile",
+  "threePlayers": {
+    "humanMove": {
+      "id": 0,
+      "size": "l",
+      "color": "right",
+      "x": 194.99999999999991,
+      "y": 395.2860904298619
+    },
+    "players": [
+      "right",
+      "back",
+      "left"
+    ],
+    "botCount": 2,
+    "turnIndex": 0,
+    "current": "right",
+    "round": 1,
+    "locked": false,
+    "winner": null,
+    "lastMoves": {
+      "right": {
+        "color": "right",
+        "size": "l",
+        "zone": 0
+      },
+      "back": {
+        "color": "back",
+        "size": "l",
+        "zone": 4
+      },
+      "left": {
+        "color": "left",
+        "size": "m",
+        "zone": 4
+      },
+      "front": null
+    },
+    "occupied": 3,
+    "caption": "دورك",
+    "overflow": {
+      "bodyW": 390,
+      "innerW": 390,
+      "bodyH": 844,
+      "innerH": 844
+    }
+  },
+  "fourPlayers": {
+    "humanMove": {
+      "id": 0,
+      "size": "l",
+      "color": "right",
+      "x": 194.99999999999991,
+      "y": 395.2860904298619
+    },
+    "players": [
+      "right",
+      "back",
+      "left",
+      "front"
+    ],
+    "botCount": 3,
+    "turnIndex": 0,
+    "current": "right",
+    "round": 1,
+    "locked": false,
+    "winner": null,
+    "lastMoves": {
+      "right": {
+        "color": "right",
+        "size": "l",
+        "zone": 0
+      },
+      "back": {
+        "color": "back",
+        "size": "l",
+        "zone": 4
+      },
+      "left": {
+        "color": "left",
+        "size": "m",
+        "zone": 4
+      },
+      "front": {
+        "color": "front",
+        "size": "s",
+        "zone": 4
+      }
+    },
+    "occupied": 4,
+    "caption": "دورك",
+    "overflow": {
+      "bodyW": 390,
+      "innerW": 390,
+      "bodyH": 844,
+      "innerH": 844
+    }
+  },
+  "postWinRestart": {
+    "before": {
+      "round": 1,
+      "score": 0,
+      "humanColor": "right"
+    },
+    "after": {
+      "round": 2,
+      "score": 1,
+      "players": [
+        "right",
+        "back",
+        "left",
+        "front"
+      ],
+      "turnIndex": 0,
+      "winner": null,
+      "locked": false,
+      "placed": 0,
+      "lastMoves": {
+        "right": null,
+        "back": null,
+        "left": null,
+        "front": null
+      },
+      "highlights": 0,
+      "caption": "الجولة 2: دورك."
+    }
+  },
+  "reloadRestart": {
+    "fresh": {
+      "configured": false,
+      "started": false,
+      "setupStep": "color",
+      "tutorialComplete": "1",
+      "dialogOpen": false
+    },
+    "restarted": {
+      "players": [
+        "right",
+        "back",
+        "left",
+        "front"
+      ],
+      "round": 1,
+      "scores": {
+        "right": 0,
+        "back": 0,
+        "left": 0,
+        "front": 0
+      },
+      "boardEmpty": true,
+      "dialogOpen": false
+    }
+  },
+  "browserErrors": []
+}

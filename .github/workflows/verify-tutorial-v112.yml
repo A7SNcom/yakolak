@@ -1,24 +1,24 @@
-name: Verify player shell
+name: Verify v112 tutorial
 
 on:
   push:
     branches:
-      - "111"
+      - "112"
   pull_request:
     paths:
       - index.html
       - app.js
       - version.json
       - package.json
-      - src/app-game-v111.js
-      - scripts/verify-player-shell.mjs
-      - .github/workflows/verify-player-shell.yml
+      - src/app-game-v112.js
+      - scripts/verify-tutorial-v112.mjs
+      - .github/workflows/verify-tutorial-v112.yml
 
 permissions:
   contents: read
 
 jobs:
-  contract:
+  tutorial-contract:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -28,5 +28,5 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Verify v111 player shell
+      - name: Verify v112 tutorial contract
         run: npm test

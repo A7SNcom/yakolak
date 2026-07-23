@@ -1,0 +1,56 @@
+{
+  "ok": true,
+  "build": 112,
+  "desktop": {
+    "prompt": "تعلم أثناء اللعب: افتح طقمك، اختر أي حجم، ثم ضع القطعة في خانة متاحة.",
+    "caption": "خطوتك الأولى: افتح طقمك، اختر أي حجم، ثم اضغط خانة متاحة.",
+    "result": {
+      "guide": false,
+      "stored": "1",
+      "caption": "دورك",
+      "overflow": {
+        "bodyW": 1440,
+        "innerW": 1440,
+        "bodyH": 900,
+        "innerH": 900
+      }
+    },
+    "skipped": {
+      "open": false,
+      "guide": false,
+      "stored": "1"
+    },
+    "returning": {
+      "open": false,
+      "guide": false,
+      "stored": "1"
+    },
+    "errors": []
+  },
+  "mobile": {
+    "prompt": "تعلم أثناء اللعب: افتح طقمك، اختر أي حجم، ثم ضع القطعة في خانة متاحة.",
+    "caption": "خطوتك الأولى: افتح طقمك، اختر أي حجم، ثم اضغط خانة متاحة.",
+    "result": {
+      "guide": false,
+      "stored": "1",
+      "caption": "دورك",
+      "overflow": {
+        "bodyW": 390,
+        "innerW": 390,
+        "bodyH": 844,
+        "innerH": 844
+      }
+    },
+    "skipped": {
+      "open": false,
+      "guide": false,
+      "stored": "1"
+    },
+    "returning": {
+      "open": false,
+      "guide": false,
+      "stored": "1"
+    },
+    "errors": []
+  }
+}

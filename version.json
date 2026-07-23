@@ -1,6 +1,6 @@
 {
-  "version": "v111-clean-player-shell",
-  "build": 111,
+  "version": "v112-action-tutorial",
+  "build": 112,
   "updated_at": "2026-07-23",
-  "note": "Player-shell cleanup: preserves v110 gameplay, lighting, camera, rules, performance, and art direction while removing the always-visible destructive cache-maintenance control from the normal player experience. The control remains available only with ?debug=1 for maintenance and recovery testing."
+  "note": "Replaces the mandatory three-demo tutorial with a short skippable prompt that guides first-time players into their first real legal move. Returning and skipping players go straight to play while v111 rendering, controls, rules, AI, camera, lighting, and performance remain unchanged."
 }

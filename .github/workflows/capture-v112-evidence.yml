@@ -1,0 +1,102 @@
+name: Capture v112 visual evidence
+
+on:
+  push:
+    branches:
+      - "112"
+    paths:
+      - index.html
+      - app.js
+      - version.json
+      - src/app-game-v112.js
+      - scripts/capture-v112-evidence.mjs
+      - .github/workflows/capture-v112-evidence.yml
+  pull_request:
+    paths:
+      - index.html
+      - app.js
+      - version.json
+      - src/app-game-v112.js
+      - scripts/capture-v112-evidence.mjs
+      - .github/workflows/capture-v112-evidence.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  visual-playtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out v112
+        uses: actions/checkout@v4
+        with:
+          ref: "112"
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install visual-test runtime
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.54.2 three@0.165.0
+          npx playwright install --with-deps chromium
+      - name: Prepare deterministic visual-test page
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('index.html')
+          text = path.read_text()
+          text = text.replace('https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js', './node_modules/three/build/three.module.js')
+          text = text.replace('https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/', './node_modules/three/examples/jsm/')
+          guard = """<script id="yakolakCiTurnGuard">
+          setInterval(()=>{
+            const state=globalThis.__yakolakGame?.state;
+            if(!state?.started||state.winner||!state.players?.length)return;
+            const current=state.players[state.turnIndex%state.players.length];
+            if(current===state.humanColor)state.turnDeadline=Date.now()+120000;
+          },100);
+          </script>"""
+          text = text.replace('</body>', guard + '\n</body>')
+          path.write_text(text)
+          PY
+      - name: Start local game server
+        run: |
+          python3 -m http.server 8765 > /tmp/yakolak-v112-http.log 2>&1 &
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:8765/version.json && exit 0
+            sleep 1
+          done
+          cat /tmp/yakolak-v112-http.log
+          exit 1
+      - name: Run desktop and mobile onboarding playtests
+        run: |
+          set +e
+          node scripts/capture-v112-evidence.mjs > /tmp/yakolak-v112-visual.log 2>&1
+          status=$?
+          cat /tmp/yakolak-v112-visual.log
+          exit $status
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v112-visual-diagnostics
+          path: |
+            docs/screenshots/v112
+            /tmp/yakolak-v112-visual.log
+            /tmp/yakolak-v112-http.log
+          retention-days: 3
+          if-no-files-found: warn
+      - name: Commit visual evidence
+        if: success() && github.event_name == 'push'
+        run: |
+          git checkout -- index.html package.json package-lock.json 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots/v112
+          if git diff --cached --quiet; then
+            echo "Visual evidence is already current."
+          else
+            git commit -m "Refresh v112 onboarding visual evidence"
+            git push origin HEAD:112
+          fi
