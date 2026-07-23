@@ -10,6 +10,7 @@ on:
       - version.json
       - src/app-game-v112.js
       - scripts/capture-v112-evidence.mjs
+      - scripts/diagnose-v112-four-player.mjs
       - .github/workflows/capture-v112-evidence.yml
   pull_request:
     paths:
@@ -18,6 +19,7 @@ on:
       - version.json
       - src/app-game-v112.js
       - scripts/capture-v112-evidence.mjs
+      - scripts/diagnose-v112-four-player.mjs
       - .github/workflows/capture-v112-evidence.yml
   workflow_dispatch:
 
@@ -27,7 +29,7 @@ permissions:
 jobs:
   visual-playtest:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 12
     steps:
       - name: Check out v112
         uses: actions/checkout@v4
@@ -69,10 +71,10 @@ jobs:
           done
           cat /tmp/yakolak-v112-http.log
           exit 1
-      - name: Run desktop and mobile playtests
+      - name: Diagnose four-player cycle
         run: |
           set +e
-          node scripts/capture-v112-evidence.mjs > /tmp/yakolak-v112-visual.log 2>&1
+          node scripts/diagnose-v112-four-player.mjs > /tmp/yakolak-v112-visual.log 2>&1
           status=$?
           cat /tmp/yakolak-v112-visual.log
           exit $status
@@ -80,23 +82,11 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: v112-visual-diagnostics
+          name: v112-four-player-diagnostics
           path: |
-            docs/screenshots/v112
+            docs/screenshots/v112/desktop-4-players-diagnostic.png
+            /tmp/yakolak-v112-four-player-state.json
             /tmp/yakolak-v112-visual.log
             /tmp/yakolak-v112-http.log
           retention-days: 3
           if-no-files-found: warn
-      - name: Commit visual evidence
-        if: success() && github.event_name == 'push'
-        run: |
-          git checkout -- index.html package.json package-lock.json 2>/dev/null || true
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/screenshots/v112
-          if git diff --cached --quiet; then
-            echo "Visual evidence is already current."
-          else
-            git commit -m "Attach v112 visual playtest evidence"
-            git push origin HEAD:112
-          fi
