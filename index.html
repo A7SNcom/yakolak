@@ -3,11 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="yakolak-version" content="v104-bright-neutral">
+<meta name="yakolak-version" content="v105-mature-neutral">
 <title>Yakolak Live</title>
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<link rel="preconnect" href="https://i.ibb.co" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -16,14 +15,14 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b0b;col
 #hint,#settingsBtn,#panel,textarea{display:none!important}
 #yakolakLoader{position:fixed;inset:0;z-index:20000;display:grid;place-items:center;background:radial-gradient(circle at 50% 18%,#1a2028 0,#090a0c 46%,#020203 100%);transition:opacity .42s ease,visibility .42s ease}
 #yakolakLoader.done{opacity:0;visibility:hidden;pointer-events:none}
-.loaderPanel{width:min(520px,calc(100vw - 40px));direction:ltr;color:#fff;text-align:center;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.loaderPanel{width:min(520px,calc(100vw - 40px));direction:ltr;color:#fff;text-align:center}
 .loaderBrand{font-size:15px;font-weight:950;letter-spacing:.22em;margin-bottom:18px;color:#f7f7f2}
 .loaderFrame{position:relative;padding:10px;border:1px solid rgba(255,255,255,.26);background:#050608;box-shadow:0 22px 70px rgba(0,0,0,.58),inset 0 0 0 1px rgba(255,255,255,.08)}
 .loaderFrame:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.1),transparent);animation:loader-scan 1.65s linear infinite;pointer-events:none}
 #yakolakLoaderProgress{display:block;width:100%;height:22px;appearance:none;-webkit-appearance:none;border:0;background:#111820;overflow:hidden}
 #yakolakLoaderProgress::-webkit-progress-bar{background:#111820}
-#yakolakLoaderProgress::-webkit-progress-value{background:linear-gradient(90deg,#f6d069,#2dd4bf,#60a5fa);transition:width .28s ease}
-#yakolakLoaderProgress::-moz-progress-bar{background:linear-gradient(90deg,#f6d069,#2dd4bf,#60a5fa);transition:width .28s ease}
+#yakolakLoaderProgress::-webkit-progress-value{background:linear-gradient(90deg,#caa45a,#5fae90,#5f7fb7);transition:width .28s ease}
+#yakolakLoaderProgress::-moz-progress-bar{background:linear-gradient(90deg,#caa45a,#5fae90,#5f7fb7);transition:width .28s ease}
 .loaderMeta{display:flex;justify-content:space-between;align-items:center;margin-top:11px;font-size:12px;font-weight:900;color:#d7dde6;direction:rtl}
 #yakolakLoaderPercent{font-size:18px;color:#fff;direction:ltr}
 #yakolakLoader.error .loaderFrame{border-color:#ef4444}
@@ -36,13 +35,8 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b0b;col
 <div id="yakolakLoader" aria-busy="true" aria-describedby="yakolakLoaderStatus">
   <div class="loaderPanel">
     <div class="loaderBrand">YAKOLAK</div>
-    <div class="loaderFrame">
-      <progress id="yakolakLoaderProgress" value="0" max="100" aria-label="تحميل اللعبة">0%</progress>
-    </div>
-    <div class="loaderMeta">
-      <span id="yakolakLoaderStatus">تحميل اللعبة</span>
-      <strong id="yakolakLoaderPercent">0%</strong>
-    </div>
+    <div class="loaderFrame"><progress id="yakolakLoaderProgress" value="0" max="100" aria-label="تحميل اللعبة">0%</progress></div>
+    <div class="loaderMeta"><span id="yakolakLoaderStatus">تحميل اللعبة</span><strong id="yakolakLoaderPercent">0%</strong></div>
   </div>
 </div>
 <div id="view"></div>
@@ -52,7 +46,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b0b;col
 <div id="panel" aria-hidden="true"></div>
 <textarea id="out"></textarea>
 <script type="module">
-const BUILD='104';
+const BUILD='105';
 const params=new URLSearchParams(location.search);
 const clearToken=params.get('clear');
 const ASSET_VERSION=clearToken||BUILD;
@@ -68,49 +62,32 @@ function setGameProgress(value,status){
 }
 window.__yakolakLoading={set:setGameProgress};
 setGameProgress(3,'تهيئة اللعبة');
-function hardReload(){
-  const url=new URL(location.href);
-  url.searchParams.set('clear',Date.now().toString());
-  location.replace(url.toString());
-}
+function hardReload(){const url=new URL(location.href);url.searchParams.set('clear',Date.now().toString());location.replace(url.toString())}
 async function clearIndexedDB(){
   if(!('indexedDB' in window)||!indexedDB.databases)return;
   const dbs=await indexedDB.databases();
   await Promise.allSettled(dbs.filter(db=>db&&db.name).map(db=>new Promise(resolve=>{
-    const req=indexedDB.deleteDatabase(db.name);
-    req.onsuccess=req.onerror=req.onblocked=()=>resolve();
+    const req=indexedDB.deleteDatabase(db.name);req.onsuccess=req.onerror=req.onblocked=()=>resolve();
   })));
 }
 async function cleanReload(e){
   if(e)e.preventDefault();
   if(!clearBtn||clearBtn.disabled)return;
-  clearBtn.disabled=true;
-  clearBtn.textContent='ينظف';
+  clearBtn.disabled=true;clearBtn.textContent='ينظف';
   const jobs=[];
   try{if('caches' in window)jobs.push(caches.keys().then(names=>Promise.allSettled(names.map(name=>caches.delete(name)))))}catch(err){}
   try{if('serviceWorker' in navigator)jobs.push(navigator.serviceWorker.getRegistrations().then(regs=>Promise.allSettled(regs.map(reg=>reg.unregister()))))}catch(err){}
   jobs.push(clearIndexedDB().catch(()=>{}));
-  await Promise.allSettled(jobs);
-  clearBtn.textContent='تم';
-  hardReload();
+  await Promise.allSettled(jobs);clearBtn.textContent='تم';hardReload();
 }
 if(clearBtn)clearBtn.addEventListener('click',cleanReload);
 async function checkVersion(){
-  try{
-    const r=await fetch('./version.json?v='+ASSET_VERSION,{cache:'no-store'});
-    const v=await r.json();
-    const next=String(v.build||BUILD);
-    if(next!==String(BUILD)){hardReload();return false}
-  }catch(e){}
+  try{const r=await fetch('./version.json?v='+ASSET_VERSION,{cache:'no-store'});const v=await r.json();const next=String(v.build||BUILD);if(next!==String(BUILD)){hardReload();return false}}catch(e){}
   return true;
 }
 if(await checkVersion()){
   await import('./app.js?v='+ASSET_VERSION);
-  if(clearToken){
-    const clean=new URL(location.href);
-    clean.searchParams.delete('clear');
-    history.replaceState(null,'',clean.toString());
-  }
+  if(clearToken){const clean=new URL(location.href);clean.searchParams.delete('clear');history.replaceState(null,'',clean.toString())}
 }
 </script>
 </body>
