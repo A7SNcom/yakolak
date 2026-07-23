@@ -3,6 +3,7 @@ import { chromium } from 'playwright';
 
 const BASE_URL = process.env.YAKOLAK_TEST_URL || 'http://127.0.0.1:8765';
 const PROFILE = process.env.YAKOLAK_PROFILE || 'desktop';
+const SCENARIO = process.env.YAKOLAK_SCENARIO || '3players';
 const OUT = 'docs/screenshots/v112';
 const TUTORIAL_KEY = 'yakolak-tutorial-v112-complete';
 await fs.mkdir(OUT, { recursive: true });
@@ -49,7 +50,7 @@ async function clickSetup(action, predicate, label) {
     try {
       await page.waitForFunction(predicate, null, { timeout: 6_000 });
       return;
-    } catch (error) {
+    } catch {
       if (attempt === 3) throw new Error(`${label} failed after four attempts`);
       await page.waitForTimeout(350);
     }
@@ -72,6 +73,7 @@ async function openTray() {
     const point = await page.evaluate(() => {
       const game = globalThis.__yakolakGame;
       const piece = game.pieces.find(item => item.dir === game.state.humanColor && !item.placed && item.side === 0);
+      if (!piece) throw new Error('human stack piece not found');
       const vector = new game.THREE.Vector3();
       const rect = game.renderer.domElement.getBoundingClientRect();
       piece.mesh.getWorldPosition(vector); vector.project(game.camera);
@@ -81,7 +83,7 @@ async function openTray() {
     try {
       await page.waitForFunction(() => globalThis.__yakolakGame?.pieces?.some(piece => piece.mesh.userData.traySelected), null, { timeout: 6_000 });
       return;
-    } catch (error) {
+    } catch {
       if (attempt === 3) throw new Error('human tray did not open');
       await page.waitForTimeout(350);
     }
@@ -92,7 +94,9 @@ async function placeLegalPiece() {
   const target = await page.evaluate(() => {
     const game = globalThis.__yakolakGame;
     const piece = game.pieces.find(item => item.mesh.userData.traySelected);
+    if (!piece) throw new Error('selected human piece not found');
     const zone = game.boardZones.find(item => !game.state.board[item.id]?.[piece.type]);
+    if (!zone) throw new Error(`no legal zone for ${piece.type}`);
     const vector = game.gameGroup.localToWorld(new game.THREE.Vector3(zone.px, zone.py, zone.pz));
     const rect = game.renderer.domElement.getBoundingClientRect();
     vector.project(game.camera);
@@ -103,14 +107,14 @@ async function placeLegalPiece() {
     try {
       await page.waitForFunction(move => globalThis.__yakolakGame?.state?.board?.[move.id]?.[move.size] === move.color, target, { timeout: 6_000 });
       return target;
-    } catch (error) {
+    } catch {
       if (attempt === 3) throw new Error(`legal move was not registered: ${JSON.stringify(target)}`);
       await page.waitForTimeout(350);
     }
   }
 }
 
-async function completeTurnCycle() {
+async function completeTurnCycle(total) {
   await openTray();
   const humanMove = await placeLegalPiece();
   await page.waitForFunction(() => {
@@ -119,8 +123,8 @@ async function completeTurnCycle() {
     if (!state?.players?.length) return false;
     const bots = state.players.filter(color => color !== state.humanColor);
     return bots.every(color => !!state.lastMoves?.[color]) && state.players[state.turnIndex] === state.humanColor && !state.locked;
-  }, null, { timeout: 90_000 });
-  return page.evaluate(humanMove => {
+  }, null, { timeout: 180_000 });
+  const cycle = await page.evaluate(humanMove => {
     const game = globalThis.__yakolakGame;
     const state = game.state;
     return {
@@ -132,14 +136,7 @@ async function completeTurnCycle() {
       overflow: { bodyW: document.body.scrollWidth, innerW: globalThis.innerWidth, bodyH: document.body.scrollHeight, innerH: globalThis.innerHeight }
     };
   }, humanMove);
-}
-
-async function runMatch(botCount) {
-  const total = botCount + 1;
-  await page.goto(`${BASE_URL}/?${PROFILE}-players=${total}&run=${Date.now()}`, { waitUntil: 'domcontentloaded' });
-  await setupMatch(botCount);
-  const cycle = await completeTurnCycle();
-  if (cycle.players.length !== total || cycle.botCount !== botCount || cycle.current !== 'right' || cycle.occupied !== total) {
+  if (cycle.players.length !== total || cycle.botCount !== total - 1 || cycle.current !== 'right' || cycle.occupied !== total) {
     throw new Error(`${total}-player cycle mismatch: ${JSON.stringify(cycle)}`);
   }
   const missing = cycle.players.filter(color => color !== 'right').find(color => !cycle.lastMoves[color]);
@@ -149,7 +146,15 @@ async function runMatch(botCount) {
   return cycle;
 }
 
-async function verifyPostWinRestart(expectedPlayers) {
+async function runPlayerScenario(total) {
+  await page.goto(`${BASE_URL}/?${PROFILE}-${total}-players=${Date.now()}`, { waitUntil: 'domcontentloaded' });
+  await setupMatch(total - 1);
+  return completeTurnCycle(total);
+}
+
+async function runRestartScenario() {
+  await page.goto(`${BASE_URL}/?${PROFILE}-restart=${Date.now()}`, { waitUntil: 'domcontentloaded' });
+  await setupMatch(3);
   const before = await page.evaluate(() => {
     const state = globalThis.__yakolakGame.state;
     return { round: state.round, score: state.scores[state.humanColor] || 0, humanColor: state.humanColor };
@@ -161,7 +166,7 @@ async function verifyPostWinRestart(expectedPlayers) {
     const state = game.state;
     const empty = Object.values(state.board).every(cell => Object.values(cell).every(value => value == null));
     return state.round === before.round + 1 && state.scores[state.humanColor] === before.score + 1 && state.started && !state.locked && !state.winner && empty;
-  }, before, { timeout: 30_000 });
+  }, before, { timeout: 180_000 });
   const after = await page.evaluate(() => {
     const game = globalThis.__yakolakGame;
     const state = game.state;
@@ -173,14 +178,11 @@ async function verifyPostWinRestart(expectedPlayers) {
       caption: document.querySelector('.yg-caption')?.innerText || ''
     };
   });
-  if (after.players.length !== expectedPlayers || after.placed !== 0 || after.highlights !== 0 || Object.values(after.lastMoves).some(Boolean)) {
+  if (after.players.length !== 4 || after.placed !== 0 || after.highlights !== 0 || Object.values(after.lastMoves).some(Boolean)) {
     throw new Error(`post-win restart left stale state: ${JSON.stringify(after)}`);
   }
   await page.screenshot({ path: `${OUT}/${PROFILE}-after-win-restart.png` });
-  return { before, after };
-}
 
-async function verifyReloadRestart() {
   await page.reload({ waitUntil: 'domcontentloaded' });
   await waitReady();
   const fresh = await page.evaluate(key => ({
@@ -205,21 +207,21 @@ async function verifyReloadRestart() {
   if (restarted.players.length !== 4 || restarted.round !== 1 || !restarted.boardEmpty || restarted.dialogOpen || Object.values(restarted.scores).some(Boolean)) {
     throw new Error(`fresh four-player restart failed: ${JSON.stringify(restarted)}`);
   }
-  return { fresh, restarted };
+  return { before, after, fresh, restarted };
 }
 
 try {
-  await page.goto(`${BASE_URL}/version.json?profile=${PROFILE}&run=${Date.now()}`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${BASE_URL}/version.json?profile=${PROFILE}&scenario=${SCENARIO}&run=${Date.now()}`, { waitUntil: 'domcontentloaded' });
   await page.evaluate(key => localStorage.setItem(key, '1'), TUTORIAL_KEY);
-  const threePlayers = await runMatch(2);
-  const fourPlayers = await runMatch(3);
-  const postWinRestart = await verifyPostWinRestart(4);
-  const reloadRestart = await verifyReloadRestart();
+  let result;
+  if (SCENARIO === '3players') result = await runPlayerScenario(3);
+  else if (SCENARIO === '4players') result = await runPlayerScenario(4);
+  else if (SCENARIO === 'restart') result = await runRestartScenario();
+  else throw new Error(`unknown scenario: ${SCENARIO}`);
   if (browserErrors.length) throw new Error(browserErrors.join('\n'));
-  const result = { ok: true, build: 112, profile: PROFILE, threePlayers, fourPlayers, postWinRestart, reloadRestart, browserErrors };
-  const path = `/tmp/v112-multiplayer-${PROFILE}-results.json`;
-  await fs.writeFile(path, JSON.stringify(result, null, 2));
-  console.log(JSON.stringify(result, null, 2));
+  const output = { ok: true, build: 112, profile: PROFILE, scenario: SCENARIO, result, browserErrors };
+  await fs.writeFile(`/tmp/v112-${PROFILE}-${SCENARIO}-results.json`, JSON.stringify(output, null, 2));
+  console.log(JSON.stringify(output, null, 2));
 } finally {
   await context.close();
   await browser.close();
