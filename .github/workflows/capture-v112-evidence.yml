@@ -41,7 +41,7 @@ jobs:
         run: |
           npm install --no-save --ignore-scripts playwright@1.54.2 three@0.165.0
           npx playwright install --with-deps chromium
-      - name: Use the production Three.js version locally
+      - name: Prepare deterministic visual-test page
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -49,6 +49,15 @@ jobs:
           text = path.read_text()
           text = text.replace('https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js', './node_modules/three/build/three.module.js')
           text = text.replace('https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/', './node_modules/three/examples/jsm/')
+          guard = """<script id="yakolakCiTurnGuard">
+          setInterval(()=>{
+            const state=globalThis.__yakolakGame?.state;
+            if(!state?.started||state.winner||!state.players?.length)return;
+            const current=state.players[state.turnIndex%state.players.length];
+            if(current===state.humanColor)state.turnDeadline=Date.now()+120000;
+          },100);
+          </script>"""
+          text = text.replace('</body>', guard + '\n</body>')
           path.write_text(text)
           PY
       - name: Start local game server
