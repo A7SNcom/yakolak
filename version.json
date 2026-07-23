@@ -1,6 +1,6 @@
 {
-  "version": "v110-readable-charcoal",
-  "build": 110,
+  "version": "v111-clean-player-shell",
+  "build": 111,
   "updated_at": "2026-07-23",
-  "note": "Readable charcoal refinement: preserves the v109 room, lighting, pieces, performance, and motion while lifting only the board and player bases from near-black to a controlled medium charcoal with slightly lower roughness and restrained emissive support, so grooves, rings, edges, and surface depth remain visible without turning the board gray or flat."
+  "note": "Player-shell cleanup: preserves v110 gameplay, lighting, camera, rules, performance, and art direction while removing the always-visible destructive cache-maintenance control from the normal player experience. The control remains available only with ?debug=1 for maintenance and recovery testing."
 }

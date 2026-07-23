@@ -1,8 +1,11 @@
 {
   "name": "yakolak",
-  "version": "0.101.0",
+  "version": "0.111.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "test": "node scripts/verify-player-shell.mjs"
+  },
   "engines": {
     "node": ">=20"
   },
