@@ -5,9 +5,11 @@ on:
     branches:
       - "112"
     paths:
+      - scripts/verify-v112-multiplayer-restart.mjs
       - .github/workflows/verify-v112-desktop-3players.yml
   pull_request:
     paths:
+      - scripts/verify-v112-multiplayer-restart.mjs
       - .github/workflows/verify-v112-desktop-3players.yml
   workflow_dispatch:
 
@@ -51,18 +53,6 @@ jobs:
           </script>"""
           text = text.replace('</body>', guard + '\n</body>')
           page_path.write_text(text)
-
-          test_path = Path('scripts/verify-v112-multiplayer-restart.mjs')
-          test_text = test_path.read_text()
-          test_text = test_text.replace(
-              "const browser = await chromium.launch({ headless: true, args:",
-              "const browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE, headless: true, args:"
-          )
-          test_text = test_text.replace(
-              "await page.evaluate(key => localStorage.setItem(key, '1'), TUTORIAL_KEY);\n  let result;",
-              "await page.evaluate(key => localStorage.setItem(key, '1'), TUTORIAL_KEY);\n  await page.waitForTimeout(250);\n  browserErrors.length = 0;\n  let result;"
-          )
-          test_path.write_text(test_text)
           PY
       - name: Start local game server
         run: |
