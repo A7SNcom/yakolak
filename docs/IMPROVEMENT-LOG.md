@@ -1,5 +1,55 @@
 # Yakolak Improvement Log
 
+## v114 — Authoritative online rooms and mobile framing
+
+### Problem
+
+Production v113 supported only local seats/bots. Mobile portrait spent too much
+of the viewport on the table body, compact landscape made the board too small,
+and the initial online status pill collided with the turn HUD.
+
+### Hypothesis
+
+A two-player server-authoritative room using durable state and a small
+tap-piece/tap-cell interaction can provide a reliable first online experience.
+Device-specific overview framing and restrained board/table contrast should
+improve mobile readability without expensive post-processing.
+
+### Smallest changes
+
+- Add private six-character rooms with bearer tokens stored only in each tab.
+- Validate every move and turn on the server with versioned compare-and-swap.
+- Poll only while needed, with abort, backoff, hidden-tab throttling, and
+  reconnect recovery.
+- Reframe portrait and compact landscape separately.
+- Bound mobile pixel ratio and separate the cool board from the warm table.
+- Move the mobile connection pill below the turn HUD.
+- Use the official fetch-only Turso serverless driver on Node 22 LTS.
+
+### Test method
+
+1. Run syntax and authoritative-rule contracts.
+2. Verify direct, graded, and same-cell wins plus wrong-turn, occupied-slot,
+   stale-version, rematch, token, safe-area, touch-threshold, and DPR cases.
+3. Open a real Vercel Preview at 390x844 and 844x390.
+4. Create a room, join from a second tab, place a legal move, and verify the
+   other client receives the move and turn.
+5. Reload a connected client and verify session recovery.
+6. Inspect browser Console, build output, and Vercel Runtime logs.
+
+### Result
+
+Keep. Final Preview `dpl_EEBBBjknvMnP77d9e7iGK8eT2j5e` reached `READY`.
+The two-client room and move path passed, portrait/landscape framing remained
+readable, no final-origin Console issues were found, and Vercel returned no
+Runtime warning/error/fatal entries after the acceptance playtest.
+
+### Preview
+
+https://yakolak-jye7emtev-ahmdkcoms-projects.vercel.app
+
+---
+
 ## v112 — Short, skippable, action-led tutorial
 
 ### Problem

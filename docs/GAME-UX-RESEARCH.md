@@ -40,3 +40,13 @@ The project should add privacy-preserving local measurements before external ana
 - Completed round and replay action.
 
 No personal identifiers or unnecessary external tracking should be added.
+
+## Applied in v114 — online rooms and mobile framing
+
+| Principle | Observed problem | v114 application | Measurement | Source |
+|---|---|---|---|---|
+| Server authority | Two clients could otherwise disagree about turns, occupied slots, or wins. | The server validates the move against a versioned room state; stale writes are rejected. | Two simultaneous requests cannot both update the same version. | Vercel realtime guidance and established optimistic-concurrency practice — https://vercel.com/kb/guide/real-time-chat-websockets |
+| Minimize shared mutable infrastructure | Permanent sockets still require durable cross-instance state on Vercel. | Use bounded HTTP polling with the existing Turso database for the first turn-based release. | Room survives Function instance changes and client reloads. | Vercel WebSocket durability guidance — https://vercel.com/kb/guide/do-vercel-serverless-functions-support-websocket-connections |
+| Error recovery | Mobile networks pause, resume, and reorder requests. | Request timeout, exponential retry, visibility-aware polling, and room versions. | A stale client reloads state and never duplicates a move. | Nielsen Norman Group, error recovery — https://www.nngroup.com/articles/ten-usability-heuristics/ |
+| Fitts's Law and drag alternative | Small pieces and camera dragging share the mobile canvas. | Online play uses tap-piece then tap-zone with a 9px tap/drag threshold and enlarged legal rings. | Camera drag is not submitted as a move; every move is possible without dragging. | WCAG 2.2, 2.5.7 — https://www.w3.org/TR/WCAG22/ |
+| Visual hierarchy | The phone framed table legs and gray surfaces more strongly than the pieces. | Use a portrait overview aimed at the play surface, warmer table value, cooler board value, and a bounded DPR increase. | Board and pieces occupy more of 390x844 without body overflow or a major GPU-cost increase. | Apple HIG, designing for games — https://developer.apple.com/design/human-interface-guidelines/designing-for-games/ |
