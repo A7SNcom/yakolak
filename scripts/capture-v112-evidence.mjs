@@ -71,18 +71,63 @@ async function zonePoint(page, id = 0) {
   }, id);
 }
 
+async function openHumanTray(page, tap) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await tap(await piecePoint(page));
+    try {
+      await page.waitForFunction(() => {
+        const game = globalThis.__yakolakGame;
+        return game?.pieces?.some(piece => piece.dir === game.state.humanColor && !piece.placed && piece.mesh.userData.traySelected);
+      }, null, { timeout: 5_000 });
+      return;
+    } catch (error) {
+      if (attempt === 2) throw new Error(`human tray did not open after ${attempt + 1} pointer attempts`);
+      await page.waitForTimeout(350);
+    }
+  }
+}
+
+async function legalZonePoint(page) {
+  return page.evaluate(() => {
+    const game = globalThis.__yakolakGame;
+    const piece = game.pieces.find(item => item.dir === game.state.humanColor && !item.placed && item.mesh.userData.traySelected);
+    if (!piece) throw new Error('selected human tray piece not found');
+    const zone = game.boardZones.find(item => !game.state.board[item.id]?.[piece.type]);
+    if (!zone) throw new Error(`no legal zone for ${piece.type}`);
+    const rect = game.renderer.domElement.getBoundingClientRect();
+    const point = game.gameGroup.localToWorld(new game.THREE.Vector3(zone.px, zone.py, zone.pz));
+    point.project(game.camera);
+    return {
+      id: zone.id,
+      size: piece.type,
+      color: piece.dir,
+      x: rect.left + (point.x + 1) * rect.width / 2,
+      y: rect.top + (1 - point.y) * rect.height / 2
+    };
+  });
+}
+
+async function placeSelectedPiece(page, tap) {
+  const target = await legalZonePoint(page);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await tap(target);
+    try {
+      await page.waitForFunction(({ id, size, color }) => globalThis.__yakolakGame?.state?.board?.[id]?.[size] === color, target, { timeout: 6_000 });
+      return target;
+    } catch (error) {
+      if (attempt === 2) throw new Error(`legal ${target.size} placement at zone ${target.id} was not registered after ${attempt + 1} pointer attempts`);
+      await page.waitForTimeout(350);
+    }
+  }
+}
+
 async function completeLegalMove(page, tap) {
   await page.waitForFunction(() => {
     const state = globalThis.__yakolakGame?.state;
     return state?.started && !state.tutorial && !state.locked && state.players[state.turnIndex % state.players.length] === state.humanColor;
   }, null, { timeout: 30_000 });
-  await tap(await piecePoint(page));
-  await page.waitForTimeout(600);
-  await tap(await zonePoint(page));
-  await page.waitForFunction(() => {
-    const game = globalThis.__yakolakGame;
-    return Object.values(game.state.board[0]).includes(game.state.humanColor);
-  }, null, { timeout: 10_000 });
+  await openHumanTray(page, tap);
+  const humanMove = await placeSelectedPiece(page, tap);
   await page.waitForFunction(() => {
     const game = globalThis.__yakolakGame;
     const state = game?.state;
@@ -90,7 +135,7 @@ async function completeLegalMove(page, tap) {
     const bots = state.players.filter(color => color !== state.humanColor);
     return bots.every(color => !!state.lastMoves?.[color]) && !state.locked && state.players[state.turnIndex % state.players.length] === state.humanColor;
   }, null, { timeout: 120_000 });
-  return page.evaluate(() => {
+  return page.evaluate(humanMove => {
     const game = globalThis.__yakolakGame;
     const state = game.state;
     return {
@@ -99,11 +144,12 @@ async function completeLegalMove(page, tap) {
       turnIndex: state.turnIndex,
       round: state.round,
       humanColor: state.humanColor,
+      humanMove,
       lastMoves: structuredClone(state.lastMoves),
       occupied: Object.values(state.board).reduce((sum, cell) => sum + Object.values(cell).filter(Boolean).length, 0),
       caption: document.querySelector('.yg-caption')?.innerText || ''
     };
-  });
+  }, humanMove);
 }
 
 async function verifyStartPath(page, tap, prefix) {
