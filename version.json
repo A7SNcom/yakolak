@@ -1,6 +1,6 @@
 {
-  "version": "v109-clear-playfield",
-  "build": 109,
+  "version": "v110-readable-charcoal",
+  "build": 110,
   "updated_at": "2026-07-23",
-  "note": "Clear playfield refinement: keeps the v108 room unchanged while lifting only the interactive scene with a brighter three-light rig, a readable charcoal board, restrained material emissive support, and slightly brighter mature piece colors so grooves, silhouettes, rules, and edges remain visible without shadows, environment maps, or post-processing."
+  "note": "Readable charcoal refinement: preserves the v109 room, lighting, pieces, performance, and motion while lifting only the board and player bases from near-black to a controlled medium charcoal with slightly lower roughness and restrained emissive support, so grooves, rings, edges, and surface depth remain visible without turning the board gray or flat."
 }
