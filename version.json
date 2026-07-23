@@ -1,6 +1,6 @@
 {
-  "version": "v102-balanced-studio",
-  "build": 102,
+  "version": "v103-motion-optimized-studio",
+  "build": 103,
   "updated_at": "2026-07-23",
-  "note": "Balanced studio correction: darker warm-neutral room, lower exposure and environment intensity, static setup presentation, reduced adaptive pixel ratio, and all dynamic shadow rendering disabled while preserving PBR reflections and antialiasing."
+  "note": "Motion-first correction: replaces both RectAreaLights with a single cheap directional key, removes two extra lights, coalesces repeated render calls during intro/tutorial/game animations, lowers adaptive pixel ratio modestly, and keeps the darker v102 art direction with lightweight PBR environment reflections."
 }
