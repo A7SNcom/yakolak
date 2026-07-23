@@ -9,12 +9,14 @@ const TUTORIAL_KEY = 'yakolak-tutorial-v112-complete';
 await fs.mkdir(OUT, { recursive: true });
 
 const mobile = PROFILE === 'mobile';
-const browser = await chromium.launch({ headless: true, args: ['--enable-webgl', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'] });
+const executablePath = process.env.CHROME_EXECUTABLE || undefined;
+const browser = await chromium.launch({ executablePath, headless: true, args: ['--enable-webgl', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'] });
 const context = await browser.newContext(mobile ? {
   viewport: { width: 390, height: 844 }, screen: { width: 390, height: 844 },
   deviceScaleFactor: 2, isMobile: true, hasTouch: true,
   userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 Chrome/144 Mobile Safari/537.36'
 } : { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+await context.addInitScript(key => localStorage.setItem(key, '1'), TUTORIAL_KEY);
 const page = await context.newPage();
 const browserErrors = [];
 page.on('pageerror', error => browserErrors.push(`pageerror: ${error.message}`));
@@ -211,8 +213,6 @@ async function runRestartScenario() {
 }
 
 try {
-  await page.goto(`${BASE_URL}/version.json?profile=${PROFILE}&scenario=${SCENARIO}&run=${Date.now()}`, { waitUntil: 'domcontentloaded' });
-  await page.evaluate(key => localStorage.setItem(key, '1'), TUTORIAL_KEY);
   let result;
   if (SCENARIO === '3players') result = await runPlayerScenario(3);
   else if (SCENARIO === '4players') result = await runPlayerScenario(4);
