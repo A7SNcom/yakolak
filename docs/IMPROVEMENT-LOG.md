@@ -36,23 +36,33 @@ Removing technical recovery UI from the normal player shell will improve first-i
 1. Fetch normal Preview HTML and verify build 111.
 2. Verify `clearCacheBtn` is emitted with `hidden`.
 3. Verify normal-mode script sets `hidden=true`.
-4. Fetch `?debug=1` and verify debug-mode logic permits the control.
+4. Verify debug-mode logic permits the control only with `?debug=1`.
 5. Verify `app.js` loads `src/app-game-v111.js`.
 6. Verify v111 imports v110 gameplay unchanged.
-7. Check Vercel build state and runtime errors.
-8. Run desktop/mobile browser playthrough when browser automation is available.
+7. Check Vercel build state and preview runtime logs.
+8. Run desktop/mobile browser playthrough when interactive browser automation is available.
 
 ### Result
 
-Pending Preview deployment verification.
+Partial pass:
+
+- Latest branch deployment `dpl_6jiFeeyFQ71N946Mg28fQN2P1hRS` reached `READY`.
+- Preview root returned HTTP 200 and reported `v111-clean-player-shell` / build 111.
+- Preview HTML contains the maintenance button with the `hidden` attribute and the normal-mode guard.
+- Preview `app.js` returned HTTP 200 and loads the v111 entrypoint.
+- GitHub source confirms v111 imports v110 gameplay unchanged.
+- No preview warning or error runtime logs were found in the checked one-hour range.
+- Vercel preview protection prevented independent stateless fetching of some nested assets; this is not treated as an application failure.
+- A full visual and interactive desktop/mobile WebGL playthrough remains pending because browser automation was unavailable in this execution environment.
 
 ### Keep or revert
 
-Pending. Keep only after Preview build and source checks pass.
+Keep on branch `111` and in the draft PR. Do not merge to `main` or deploy to Production until the interactive desktop/mobile checklist passes.
 
 ### Preview deployment
 
-Pending.
+- Branch alias: https://yakolak-git-111-ahmdkcoms-projects.vercel.app
+- Verified deployment: https://yakolak-bglciswx3-ahmdkcoms-projects.vercel.app
 
 ### Next step
 
