@@ -20,7 +20,7 @@ permissions:
 jobs:
   contract:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -30,6 +30,8 @@ jobs:
           node-version: 20
       - name: Verify v111 player shell
         run: npm test
+      - name: Vendor the production Three.js version for offline visual testing
+        run: npm install --no-save --ignore-scripts three@0.165.0
       - name: Package exact tested source
         run: |
           zip -r yakolak-v111-tested-source.zip . \
