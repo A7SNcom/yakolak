@@ -29,6 +29,8 @@ Removing technical recovery UI from the normal player shell will improve first-i
 - `app.js`
 - `src/app-game-v111.js`
 - `version.json`
+- `scripts/verify-player-shell.mjs`
+- `.github/workflows/verify-player-shell.yml`
 - documentation under `docs/`
 
 ### Test method
@@ -39,14 +41,17 @@ Removing technical recovery UI from the normal player shell will improve first-i
 4. Verify debug-mode logic permits the control only with `?debug=1`.
 5. Verify `app.js` loads `src/app-game-v111.js`.
 6. Verify v111 imports v110 gameplay unchanged.
-7. Check Vercel build state and preview runtime logs.
-8. Run desktop/mobile browser playthrough when interactive browser automation is available.
+7. Run the player-shell contract in GitHub Actions.
+8. Check Vercel build state and preview runtime logs.
+9. Run desktop/mobile browser playthrough when interactive browser automation is available.
 
 ### Result
 
-Partial pass:
+Partial pass with automated contract success:
 
-- Latest branch deployment `dpl_6jiFeeyFQ71N946Mg28fQN2P1hRS` reached `READY`.
+- GitHub Actions run `30009949587` completed successfully for `Verify player shell`.
+- The automated contract verifies release/build consistency, hidden maintenance markup, debug-only visibility and execution guards, the v111 bootstrap path, and unchanged v110 gameplay import.
+- Latest tested branch deployment `dpl_CUHj5t7DKgTUXtWVFMbYYA1Kg8zS` reached `READY`.
 - Preview root returned HTTP 200 and reported `v111-clean-player-shell` / build 111.
 - Preview HTML contains the maintenance button with the `hidden` attribute and the normal-mode guard.
 - Preview `app.js` returned HTTP 200 and loads the v111 entrypoint.
@@ -57,12 +62,12 @@ Partial pass:
 
 ### Keep or revert
 
-Keep on branch `111` and in the draft PR. Do not merge to `main` or deploy to Production until the interactive desktop/mobile checklist passes.
+Keep on branch `111` and in draft PR `#8`. Do not merge to `main` or deploy to Production until the interactive desktop/mobile checklist passes.
 
 ### Preview deployment
 
 - Branch alias: https://yakolak-git-111-ahmdkcoms-projects.vercel.app
-- Verified deployment: https://yakolak-bglciswx3-ahmdkcoms-projects.vercel.app
+- Latest tested deployment: https://yakolak-e2lonfmjv-ahmdkcoms-projects.vercel.app
 
 ### Next step
 
