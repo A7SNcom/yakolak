@@ -4,7 +4,7 @@ import {STLLoader} from 'three/addons/loaders/STLLoader.js';
 import {SVGLoader} from 'three/addons/loaders/SVGLoader.js';
 import {RectAreaLightUniformsLib} from 'three/addons/lights/RectAreaLightUniformsLib.js';
 
-const BUILD='96';
+const BUILD='97';
 const MODEL_DIR='./assets/models/';
 const MARBLE_URL='https://i.ibb.co/B2h2tNKG/Screenshot-2026-06-22-094236.png';
 const TABLE_SVG_URL=`${MODEL_DIR}table.svg?v=${BUILD}-table`;
@@ -17,8 +17,19 @@ const loaderEl=document.getElementById('yakolakLoader');
 const log=(...a)=>console.info('[Yakolak]',...a);
 const PERF_PARAMS=new URLSearchParams(location.search);
 const PERFORMANCE_MODE=!PERF_PARAMS.has('quality-full');
-const performancePixelRatio=()=>PERFORMANCE_MODE?(innerWidth<=900?Math.min(Math.max(devicePixelRatio||1,1),1.1):.9):Math.min(Math.max(devicePixelRatio||1,1),1.25);
-globalThis.__yakolakPerformance={enabled:PERFORMANCE_MODE,get pixelRatio(){return renderer?.getPixelRatio?.()||performancePixelRatio()}};
+const MOBILE_VIEW=innerWidth<=900;
+const DEVICE_MEMORY=Number(navigator.deviceMemory||4);
+const CPU_CORES=Number(navigator.hardwareConcurrency||4);
+const MOBILE_HIGH_QUALITY=MOBILE_VIEW&&DEVICE_MEMORY>=4&&CPU_CORES>=6;
+const performancePixelRatio=()=>{
+  const dpr=Math.max(devicePixelRatio||1,1);
+  if(!PERFORMANCE_MODE)return Math.min(dpr,1.5);
+  if(!MOBILE_VIEW)return .9;
+  if(MOBILE_HIGH_QUALITY)return Math.min(dpr,1.4);
+  if(DEVICE_MEMORY>=4||CPU_CORES>=6)return Math.min(dpr,1.25);
+  return Math.min(dpr,1.1);
+};
+globalThis.__yakolakPerformance={enabled:PERFORMANCE_MODE,mobileHighQuality:MOBILE_HIGH_QUALITY,get pixelRatio(){return renderer?.getPixelRatio?.()||performancePixelRatio()}};
 function setLoadingProgress(value,status){
   globalThis.__yakolakLoading?.set?.(value,status);
 }
@@ -96,7 +107,7 @@ let publishedMeta=null,savingCalibration=false;
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(calibration.scene.background);
 const camera=new THREE.PerspectiveCamera(calibration.scene.fov,innerWidth/innerHeight,.1,12000);
-const renderer=new THREE.WebGLRenderer({antialias:false,alpha:false,powerPreference:'high-performance'});
+const renderer=new THREE.WebGLRenderer({antialias:MOBILE_HIGH_QUALITY,alpha:false,powerPreference:'high-performance'});
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.setPixelRatio(performancePixelRatio());
 renderer.setSize(innerWidth,innerHeight);
@@ -2383,7 +2394,7 @@ function playIntroOnce(){
 }
 function marble(){tex.load(MARBLE_URL,t=>{t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=renderer.capabilities.getMaxAnisotropy();marbleTexture=t;applyCalibration();render()},undefined,()=>{})}
 async function boot(){try{setLoadingProgress(34,'تحميل المجسمات');const [g9,g3,gl,gm,gs,gp]=await Promise.all([load('9',center),load('3',center),load('l',bottom),load('m',bottom),load('s',bottom),load('p',center)]);setLoadingProgress(72,'تجميع الحجارة');loadScorePoints(gp);const objects=[];meshes['9']=set(new THREE.Mesh(g9,baseMat));addGame(meshes['9']);objects.push(meshes['9']);ORDER.forEach(k=>{meshes['3-'+k]=set(new THREE.Mesh(g3,baseMat));addGame(meshes['3-'+k]);objects.push(meshes['3-'+k])});lid=set(new THREE.Mesh(g9,baseMat));addGame(lid);makePieces({l:gl,m:gm,s:gs});createBoardZones();apply(0);setLoadingProgress(84,'تجهيز الطاولة');const tableObj=await realTable();alignGameToTable(tableObj);objects.push(...pieces.map(p=>p.mesh),tableObj.userData.fitProxy||tableObj);fit(objects);loaded=true;applyCalibration();renderSetup3D();render();setLoadingProgress(96,'إظهار اللعبة');requestAnimationFrame(()=>requestAnimationFrame(done));marble();log('game v091 ready - svg table footprint')}catch(e){fail(e)}}
-addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);render()},{passive:true});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(performancePixelRatio());renderer.setSize(innerWidth,innerHeight);render()},{passive:true});
 addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r')replay()});
 renderer.domElement.addEventListener('pointerdown',beginDrag);
 addEventListener('pointermove',moveDrag,{passive:false});
