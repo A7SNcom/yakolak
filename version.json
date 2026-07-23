@@ -1,6 +1,6 @@
 {
-  "version": "v112-action-tutorial",
-  "build": 112,
+  "version": "v113-first-move-breathing-room",
+  "build": 113,
   "updated_at": "2026-07-23",
-  "note": "Replaces the mandatory three-demo tutorial with a short skippable prompt that guides first-time players into their first real legal move. Returning and skipping players go straight to play while v111 rendering, controls, rules, AI, camera, lighting, and performance remain unchanged."
+  "note": "Pauses the turn deadline only while a new player is completing the first guided legal move, then restores the normal turn timer immediately afterward. Rendering, controls, rules, AI, camera, lighting, and performance remain unchanged."
 }

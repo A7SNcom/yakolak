@@ -1,7 +1,7 @@
-console.info('[Yakolak] APP.JS v112 ACTION TUTORIAL LOADED');
+console.info('[Yakolak] APP.JS v113 FIRST-MOVE BREATHING ROOM LOADED');
 
-const BUILD='112';
-import('./src/app-game-v112.js?v='+BUILD+'-release').catch(error=>{
-  console.error('[Yakolak] v112 bootstrap failed',error);
-  globalThis.__yakolakLoading?.set?.(100,'تعذر تحميل النسخة 112');
+const BUILD='113';
+import('./src/app-game-v113.js?v='+BUILD+'-release').catch(error=>{
+  console.error('[Yakolak] v113 bootstrap failed',error);
+  globalThis.__yakolakLoading?.set?.(100,'تعذر تحميل النسخة 113');
 });
