@@ -18,6 +18,11 @@ function replaceRegex(pattern,replacement,label){
 
 replaceExact("import {RectAreaLightUniformsLib} from 'three/addons/lights/RectAreaLightUniformsLib.js';\n",'', 'remove RectAreaLight import');
 replaceExact("const BUILD='97';","const BUILD='108';",'build number');
+replaceExact(
+  "const camera=new THREE.PerspectiveCamera(calibration.scene.fov,innerWidth/innerHeight,.1,12000);",
+  "const camera=new THREE.PerspectiveCamera(calibration.scene.fov,innerWidth/innerHeight,.1,12000);\nscene.add(camera);",
+  'attach camera light carrier'
+);
 
 replaceRegex(
   /const PERF_PARAMS=.*?globalThis\.__yakolakPerformance=.*?;\n/s,
