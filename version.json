@@ -1,6 +1,6 @@
 {
-  "version": "v101-studio-art-direction",
-  "build": 101,
+  "version": "v102-balanced-studio",
+  "build": 102,
   "updated_at": "2026-07-23",
-  "note": "New fixed art direction with PBR environment reflections, quality-first adaptive resolution, warm studio key, cool fill, rim separation, one soft shadow light, corrected player colors, neutral textured table, and no runtime calibration override."
+  "note": "Balanced studio correction: darker warm-neutral room, lower exposure and environment intensity, static setup presentation, reduced adaptive pixel ratio, and all dynamic shadow rendering disabled while preserving PBR reflections and antialiasing."
 }
