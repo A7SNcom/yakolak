@@ -23,11 +23,11 @@ const CPU_CORES=Number(navigator.hardwareConcurrency||4);
 const MOBILE_HIGH_QUALITY=MOBILE_VIEW&&DEVICE_MEMORY>=4&&CPU_CORES>=6;
 const performancePixelRatio=()=>{
   const dpr=Math.max(devicePixelRatio||1,1);
-  if(!PERFORMANCE_MODE)return Math.min(dpr,1.5);
-  if(!MOBILE_VIEW)return .9;
-  if(MOBILE_HIGH_QUALITY)return Math.min(dpr,1.4);
-  if(DEVICE_MEMORY>=4||CPU_CORES>=6)return Math.min(dpr,1.25);
-  return Math.min(dpr,1.1);
+  if(!PERFORMANCE_MODE)return Math.min(dpr,1.6);
+  if(!MOBILE_VIEW)return 1.0;
+  if(MOBILE_HIGH_QUALITY)return Math.min(dpr,1.5);
+  if(DEVICE_MEMORY>=4||CPU_CORES>=6)return Math.min(dpr,1.35);
+  return Math.min(dpr,1.2);
 };
 globalThis.__yakolakPerformance={enabled:PERFORMANCE_MODE,mobileHighQuality:MOBILE_HIGH_QUALITY,get pixelRatio(){return renderer?.getPixelRatio?.()||performancePixelRatio()}};
 function setLoadingProgress(value,status){
@@ -51,36 +51,36 @@ const WIN_HIGHLIGHT_PRESETS={
 };
 
 const DEFAULT_CALIBRATION={
-  scene:{background:'#e9eef2',exposure:1.03,fog:false,fogColor:'#dfe6eb',fogNear:1800,fogFar:6200,fov:45,minDistance:180,maxDistance:1350,minPolar:32,maxPolar:112,markers:false,pixelRatio:1.25,cameraX:520,cameraY:430,cameraZ:520,targetX:0,targetY:0,targetZ:0},
+  scene:{background:'#e8edf2',exposure:1.08,fog:false,fogColor:'#dfe6eb',fogNear:1800,fogFar:6200,fov:45,minDistance:180,maxDistance:1350,minPolar:32,maxPolar:112,markers:false,pixelRatio:1.25,cameraX:520,cameraY:430,cameraZ:520,targetX:0,targetY:0,targetZ:0},
   room:{
-    floor:{color:'#000000',roughness:.9,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
-    ceiling:{color:'#000000',roughness:.96,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
-    backWall:{color:'#ffffff',roughness:.94,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
-    leftWall:{color:'#ffffff',roughness:.94,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
-    rightWall:{color:'#ffffff',roughness:.94,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
-    frontWall:{color:'#ffffff',roughness:.94,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
-    trim:{color:'#d2dbe1',roughness:.9,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
-    edges:{color:'#9eacb5',opacity:.84,visible:true},
-    grid:{color:'#c9d3da',opacity:.3,visible:true}
+    floor:{color:'#050505',roughness:.88,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
+    ceiling:{color:'#030303',roughness:.94,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
+    backWall:{color:'#f8fafb',roughness:.92,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
+    leftWall:{color:'#f8fafb',roughness:.92,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
+    rightWall:{color:'#f8fafb',roughness:.92,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
+    frontWall:{color:'#f8fafb',roughness:.92,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
+    trim:{color:'#d8e0e6',roughness:.88,metalness:0,opacity:1,emissive:'#000000',emissiveIntensity:0,visible:true,wireframe:false},
+    edges:{color:'#a5b0b8',opacity:.78,visible:true},
+    grid:{color:'#c0cbd4',opacity:.28,visible:true}
   },
   game:{
-    board:{color:'#161616',roughness:.54,metalness:.04,emissive:'#000000',emissiveIntensity:0},
-    right:{color:'#ffffff',roughness:.92,metalness:0,emissive:'#000000',emissiveIntensity:0,marble:true},
-    left:{color:'#b37a18',roughness:.48,metalness:.28,emissive:'#000000',emissiveIntensity:0},
-    front:{color:'#006144',roughness:.58,metalness:.08,emissive:'#000000',emissiveIntensity:0},
-    back:{color:'#001f8f',roughness:.74,metalness:0,emissive:'#000000',emissiveIntensity:0}
+    board:{color:'#121212',roughness:.52,metalness:.06,emissive:'#000000',emissiveIntensity:0},
+    right:{color:'#ffffff',roughness:.90,metalness:0,emissive:'#000000',emissiveIntensity:0,marble:true},
+    left:{color:'#b37a18',roughness:.46,metalness:.32,emissive:'#000000',emissiveIntensity:0},
+    front:{color:'#006144',roughness:.56,metalness:.10,emissive:'#000000',emissiveIntensity:0},
+    back:{color:'#001f8f',roughness:.72,metalness:0,emissive:'#000000',emissiveIntensity:0}
   },
-  table:{color:'#ffffff',roughness:.92,metalness:0,normalScale:.75,texture:true,repeatX:1,repeatY:1,opacity:1,emissive:'#000000',emissiveIntensity:0,wireframe:false},
+  table:{color:'#f5f5f0',roughness:.88,metalness:0,normalScale:.70,texture:true,repeatX:1,repeatY:1,opacity:1,emissive:'#000000',emissiveIntensity:0,wireframe:false},
   lights:[
-    {id:'orbA',name:'A',type:'point',enabled:true,color:'#ffffff',intensity:2.7,distance:2300,decay:.25,size:30,x:-520,y:380,z:430},
-    {id:'orbB',name:'B',type:'point',enabled:true,color:'#fff2cf',intensity:1.9,distance:2200,decay:.25,size:26,x:520,y:300,z:360},
-    {id:'orbC',name:'C',type:'point',enabled:true,color:'#d8ecff',intensity:1.45,distance:2200,decay:.25,size:24,x:0,y:850,z:-360},
-    {id:'spotKey',name:'مركزة',type:'spot',enabled:false,color:'#fff5dc',intensity:2.6,distance:2400,decay:1.3,angle:28,penumbra:.55,size:28,x:0,y:950,z:520,targetX:0,targetY:0,targetZ:0},
-    {id:'lineWash',name:'خطية',type:'linear',enabled:false,color:'#dff3ff',intensity:.42,distance:1600,decay:1.35,count:7,length:1300,axis:'x',size:18,x:0,y:1040,z:-760},
-    {id:'rectSoft',name:'مستطيلة',type:'rect',enabled:false,color:'#ffffff',intensity:3,width:900,height:120,size:22,x:0,y:1120,z:-900,rx:-62,ry:0,rz:0},
-    {id:'sun',name:'اتجاهية',type:'directional',enabled:false,color:'#ffffff',intensity:1.2,size:24,x:-650,y:900,z:620,targetX:0,targetY:0,targetZ:0},
-    {id:'hemi',name:'محيطية',type:'hemisphere',enabled:false,color:'#ffffff',groundColor:'#cbd8df',intensity:.45,size:20,x:0,y:1000,z:0},
-    {id:'ambient',name:'عامة',type:'ambient',enabled:false,color:'#ffffff',intensity:.24,size:18,x:0,y:850,z:0}
+    {id:'orbA',name:'A',type:'point',enabled:true,color:'#ffffff',intensity:2.85,distance:2400,decay:.22,size:32,x:-520,y:420,z:430},
+    {id:'orbB',name:'B',type:'point',enabled:true,color:'#fff2cf',intensity:1.75,distance:2300,decay:.22,size:28,x:520,y:340,z:360},
+    {id:'orbC',name:'C',type:'point',enabled:true,color:'#d8ecff',intensity:1.15,distance:2300,decay:.22,size:26,x:0,y:880,z:-360},
+    {id:'spotKey',name:'مركزة',type:'spot',enabled:false,color:'#fff5dc',intensity:2.8,distance:2500,decay:1.2,angle:32,penumbra:.62,size:30,x:0,y:920,z:540,targetX:0,targetY:0,targetZ:0},
+    {id:'lineWash',name:'خطية',type:'linear',enabled:false,color:'#e8f4ff',intensity:.48,distance:1700,decay:1.25,count:7,length:1400,axis:'x',size:20,x:0,y:1060,z:-780},
+    {id:'rectSoft',name:'مستطيلة',type:'rect',enabled:false,color:'#ffffff',intensity:3.6,width:950,height:140,size:24,x:0,y:1100,z:-880,rx:-58,ry:0,rz:0},
+    {id:'sun',name:'اتجاهية',type:'directional',enabled:false,color:'#fff8f0',intensity:1.35,size:26,x:-680,y:920,z:640,targetX:0,targetY:0,targetZ:0},
+    {id:'hemi',name:'محيطية',type:'hemisphere',enabled:false,color:'#ffffff',groundColor:'#c5d4de',intensity:.52,size:22,x:0,y:1020,z:0},
+    {id:'ambient',name:'عامة',type:'ambient',enabled:false,color:'#f0f4f8',intensity:.28,size:20,x:0,y:850,z:0}
   ],
   play:{dragPieces:true,snapToZones:true,showZones:false,zoneSize:36,zoneColor:'#60a5fa',zoneOpacity:.22,dropRadius:42,turnSeconds:18,winnerHighlightPreset:'clean',winnerBlinkCount:5,winnerBlinkDuration:3000,winnerGlowColor:'#ffffff'}
 };
@@ -107,13 +107,14 @@ let publishedMeta=null,savingCalibration=false;
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(calibration.scene.background);
 const camera=new THREE.PerspectiveCamera(calibration.scene.fov,innerWidth/innerHeight,.1,12000);
-const renderer=new THREE.WebGLRenderer({antialias:MOBILE_HIGH_QUALITY,alpha:false,powerPreference:'high-performance'});
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.setPixelRatio(performancePixelRatio());
 renderer.setSize(innerWidth,innerHeight);
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=calibration.scene.exposure;
 renderer.shadowMap.enabled=false;
+renderer.physicallyCorrectLights=true;
 root.appendChild(renderer.domElement);
 
 const ROOM_CFG={floorY:-650,topY:1250,halfW:2400,backZ:-2400,frontZ:2400};
@@ -787,15 +788,15 @@ function applyLightingPreset(name){
   const set=(id,values)=>{const light=calibration.lights.find(l=>l.id===id);if(light)Object.assign(light,values)};
   calibration.lights.forEach(l=>l.enabled=false);
   if(name==='balanced'){
-    set('orbA',{enabled:true,intensity:2.35,x:-520,y:380,z:430,color:'#ffffff'});
-    set('orbB',{enabled:true,intensity:1.65,x:520,y:300,z:360,color:'#fff2cf'});
-    set('orbC',{enabled:true,intensity:1.05,x:0,y:850,z:-360,color:'#d8ecff'});
+    set('orbA',{enabled:true,intensity:2.55,x:-520,y:420,z:430,color:'#ffffff'});
+    set('orbB',{enabled:true,intensity:1.85,x:520,y:340,z:360,color:'#fff2cf'});
+    set('orbC',{enabled:true,intensity:1.25,x:0,y:880,z:-360,color:'#d8ecff'});
   }else if(name==='focus'){
-    set('spotKey',{enabled:true,intensity:2.7,x:0,y:880,z:520,targetX:0,targetY:0,targetZ:0,angle:30,penumbra:.58,color:'#fff5dc'});
-    set('ambient',{enabled:true,intensity:.08,color:'#ffffff'});
+    set('spotKey',{enabled:true,intensity:2.9,x:0,y:900,z:540,targetX:0,targetY:0,targetZ:0,angle:34,penumbra:.65,color:'#fff7e0'});
+    set('ambient',{enabled:true,intensity:.10,color:'#f5f8fa'});
   }else if(name==='soft'){
-    set('rectSoft',{enabled:true,intensity:3.4,width:1000,height:170,x:0,y:1040,z:-860,rx:-62,ry:0,rz:0,color:'#ffffff'});
-    set('hemi',{enabled:true,intensity:.32,color:'#ffffff',groundColor:'#ccd6df'});
+    set('rectSoft',{enabled:true,intensity:3.8,width:1050,height:160,x:0,y:1080,z:-860,rx:-55,ry:0,rz:0,color:'#ffffff'});
+    set('hemi',{enabled:true,intensity:.38,color:'#ffffff',groundColor:'#c5d0d8'});
   }else if(name==='off'){
     calibration.lights.forEach(l=>l.enabled=false);
   }
