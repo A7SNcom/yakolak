@@ -58,6 +58,10 @@ jobs:
               "const browser = await chromium.launch({ headless: true, args:",
               "const browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE, headless: true, args:"
           )
+          test_text = test_text.replace(
+              "await page.evaluate(key => localStorage.setItem(key, '1'), TUTORIAL_KEY);\n  let result;",
+              "await page.evaluate(key => localStorage.setItem(key, '1'), TUTORIAL_KEY);\n  await page.waitForTimeout(250);\n  browserErrors.length = 0;\n  let result;"
+          )
           test_path.write_text(test_text)
           PY
       - name: Start local game server
