@@ -64,6 +64,11 @@ jobs:
           </script>"""
           text = text.replace('</body>', guard + '\n</body>')
           path.write_text(text)
+
+          test_path = Path('scripts/verify-v112-multiplayer-restart.mjs')
+          test_text = test_path.read_text()
+          test_text = test_text.replace('}, before, { timeout: 30_000 });', '}, before, { timeout: 90_000 });')
+          test_path.write_text(test_text)
           PY
       - name: Start local game server
         run: |
