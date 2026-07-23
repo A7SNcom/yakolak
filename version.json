@@ -1,6 +1,6 @@
 {
-  "version": "v107-balanced-contrast",
-  "build": 107,
+  "version": "v108-viewer-light",
+  "build": 108,
   "updated_at": "2026-07-23",
-  "note": "Balanced contrast refinement: slightly deeper uniform unlit walls, subtly separated floor, ceiling, and neutral table, a deeper board, mature unified player colors, restrained active and win shifts, and a lightweight three-light NeutralToneMapping rig while preserving the v106 performance profile."
+  "note": "Viewer-light refinement: preserves the v107 room and materials while replacing the weak opposite fill with a restrained warm directional light attached to the camera, so the board, rules, and pieces remain clearly shaped and comfortably visible from the player's viewpoint without changing performance, motion, shadows, or post-processing."
 }
