@@ -75,7 +75,7 @@ const releasePatch = [
   '  const compactLandscape=!portrait&&(innerWidth<=900||innerHeight<=600);',
   '  camera.fov=portrait?49:compactLandscape?45:43;',
   '  if(portrait)camera.position.set(420,670,570);',
-  '  else if(compactLandscape)camera.position.set(360,470,430);',
+  '  else if(compactLandscape)camera.position.set(245,325,285);',
   '  else camera.position.set(520,430,520);',
   '  camera.near=.5;camera.far=12000;',
   '  camera.updateProjectionMatrix();',
