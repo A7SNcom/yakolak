@@ -10,6 +10,6 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@libsql/client": "^0.15.15"
+    "@libsql/client": "^0.17.4"
   }
 }
