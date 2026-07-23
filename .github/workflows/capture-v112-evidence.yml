@@ -61,9 +61,25 @@ jobs:
           cat /tmp/yakolak-v112-http.log
           exit 1
       - name: Run desktop and mobile playtests
-        run: node scripts/capture-v112-evidence.mjs
+        run: |
+          set +e
+          node scripts/capture-v112-evidence.mjs > /tmp/yakolak-v112-visual.log 2>&1
+          status=$?
+          cat /tmp/yakolak-v112-visual.log
+          exit $status
+      - name: Upload visual diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v112-visual-diagnostics
+          path: |
+            docs/screenshots/v112
+            /tmp/yakolak-v112-visual.log
+            /tmp/yakolak-v112-http.log
+          retention-days: 3
+          if-no-files-found: warn
       - name: Commit visual evidence
-        if: github.event_name == 'push'
+        if: success() && github.event_name == 'push'
         run: |
           git checkout -- index.html package.json package-lock.json 2>/dev/null || true
           git config user.name "github-actions[bot]"
