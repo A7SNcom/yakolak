@@ -46,7 +46,9 @@ jobs:
       - name: Install visual-test runtime
         run: |
           npm install --no-save --ignore-scripts playwright@1.54.2 three@0.165.0
-          npx playwright install --with-deps chromium
+          chrome_path="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          test -n "$chrome_path"
+          echo "CHROME_EXECUTABLE=$chrome_path" >> "$GITHUB_ENV"
       - name: Prepare deterministic visual-test page
         run: |
           python3 - <<'PY'
