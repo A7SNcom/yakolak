@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { createClient } from '@libsql/client';
+import { createClient } from '@tursodatabase/serverless/compat';
 import {
   applyOnlineMove,
   createOnlineState,
