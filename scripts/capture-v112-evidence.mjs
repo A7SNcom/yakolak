@@ -138,15 +138,14 @@ async function verifySkipAndReturn(page, tap) {
 
 async function runProfile(browser, profile) {
   const context = await browser.newContext(profile.context);
-  await context.addInitScript(key => {
-    try { localStorage.removeItem(key); } catch {}
-  }, TUTORIAL_KEY);
   const page = await context.newPage();
   const errors = [];
   collectErrors(page, errors);
   const tap = profile.touch
     ? point => page.touchscreen.tap(point.x, point.y)
     : point => page.mouse.click(point.x, point.y);
+  await page.goto(`${BASE_URL}/version.json?reset=${Date.now()}`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(key => localStorage.removeItem(key), TUTORIAL_KEY);
   await page.goto(`${BASE_URL}/?visual-start=${profile.name}-${Date.now()}`, { waitUntil: 'domcontentloaded' });
   const started = await verifyStartPath(page, tap, profile.name);
   const paths = await verifySkipAndReturn(page, tap);
