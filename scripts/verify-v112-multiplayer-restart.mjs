@@ -129,7 +129,7 @@ async function completeTurnCycle() {
       lastMoves: structuredClone(state.lastMoves),
       occupied: Object.values(state.board).reduce((sum, cell) => sum + Object.values(cell).filter(Boolean).length, 0),
       caption: document.querySelector('.yg-caption')?.innerText || '',
-      overflow: { bodyW: document.body.scrollWidth, innerW, bodyH: document.body.scrollHeight, innerH }
+      overflow: { bodyW: document.body.scrollWidth, innerW: globalThis.innerWidth, bodyH: document.body.scrollHeight, innerH: globalThis.innerHeight }
     };
   }, humanMove);
 }
