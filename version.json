@@ -1,6 +1,6 @@
 {
-  "version": "v113-first-move-breathing-room",
-  "build": 113,
-  "updated_at": "2026-07-23",
-  "note": "Pauses the turn deadline only while a new player is completing the first guided legal move, then restores the normal turn timer immediately afterward. Rendering, controls, rules, AI, camera, lighting, and performance remain unchanged."
+  "version": "v114-online-mobile-foundation",
+  "build": 114,
+  "updated_at": "2026-07-24",
+  "note": "Adds conflict-safe two-player online rooms with reconnection and rematches, plus responsive mobile framing, warmer table contrast, and a bounded mobile pixel-ratio improvement."
 }
