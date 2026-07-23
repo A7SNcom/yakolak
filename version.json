@@ -1,6 +1,6 @@
 {
-  "version": "v106-unified-studio",
-  "build": 106,
+  "version": "v107-balanced-contrast",
+  "build": 107,
   "updated_at": "2026-07-23",
-  "note": "Unified studio art direction: all visible walls use one identical unlit neutral gray backdrop, the front wall is removed, lighting is centered over the game instead of the room, active colors are restrained, and the lightweight motion rendering profile is preserved."
+  "note": "Balanced contrast refinement: slightly deeper uniform unlit walls, subtly separated floor, ceiling, and neutral table, a deeper board, mature unified player colors, restrained active and win shifts, and a lightweight three-light NeutralToneMapping rig while preserving the v106 performance profile."
 }
