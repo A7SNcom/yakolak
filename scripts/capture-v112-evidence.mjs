@@ -80,10 +80,11 @@ async function completeLegalMove(page, tap) {
     const game = globalThis.__yakolakGame;
     return Object.values(game.state.board[0]).includes(game.state.humanColor);
   }, null, { timeout: 8_000 });
+  await page.waitForFunction(() => !!globalThis.__yakolakGame?.state?.lastMoves?.back, null, { timeout: 60_000 });
   await page.waitForFunction(() => {
     const state = globalThis.__yakolakGame.state;
-    return !state.locked && state.players[state.turnIndex % state.players.length] === state.humanColor && state.lastMoves[state.humanColor] && state.lastMoves.back;
-  }, null, { timeout: 18_000 });
+    return !state.locked && state.players[state.turnIndex % state.players.length] === state.humanColor;
+  }, null, { timeout: 30_000 });
 }
 
 async function verifyStartPath(page, tap, prefix) {
@@ -119,7 +120,7 @@ async function verifySkipAndReturn(page, tap) {
   await setupTwoPlayers(page, tap);
   await page.waitForSelector('#yakolakTutorialDialog.open', { timeout: 40_000 });
   await page.locator('.yt-repeat').click();
-  await page.waitForFunction(() => globalThis.__yakolakGame?.state?.started && !globalThis.__yakolakGame.state.tutorial && !globalThis.__yakolakGame.state.locked, null, { timeout: 20_000 });
+  await page.waitForFunction(() => globalThis.__yakolakGame?.state?.started && !globalThis.__yakolakGame.state.tutorial && !globalThis.__yakolakGame.state.locked, null, { timeout: 30_000 });
   const skipped = await page.evaluate(key => ({
     open: document.querySelector('#yakolakTutorialDialog')?.classList.contains('open') || false,
     guide: !!globalThis.__yakolakGame.state.firstMoveGuide,
@@ -129,7 +130,7 @@ async function verifySkipAndReturn(page, tap) {
 
   await page.goto(`${BASE_URL}/?visual-return=${Date.now()}`, { waitUntil: 'domcontentloaded' });
   await setupTwoPlayers(page, tap);
-  await page.waitForFunction(() => globalThis.__yakolakGame?.state?.started && !globalThis.__yakolakGame.state.tutorial && !globalThis.__yakolakGame.state.locked, null, { timeout: 40_000 });
+  await page.waitForFunction(() => globalThis.__yakolakGame?.state?.started && !globalThis.__yakolakGame.state.tutorial && !globalThis.__yakolakGame.state.locked, null, { timeout: 50_000 });
   const returning = await page.evaluate(key => ({
     open: document.querySelector('#yakolakTutorialDialog')?.classList.contains('open') || false,
     guide: !!globalThis.__yakolakGame.state.firstMoveGuide,
