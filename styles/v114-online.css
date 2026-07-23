@@ -91,7 +91,7 @@
   .yo-title{font-size:20px}
   .yo-actions{grid-template-columns:1fr}
   .yo-colors{grid-template-columns:repeat(2,1fr)}
-  #yakolakOnlinePill{top:max(52px,env(safe-area-inset-top))}
+  #yakolakOnlinePill{top:max(94px,calc(env(safe-area-inset-top) + 58px))}
 }
 @media (prefers-reduced-motion:reduce){
   #yakolakOnlineDialog{backdrop-filter:none}
