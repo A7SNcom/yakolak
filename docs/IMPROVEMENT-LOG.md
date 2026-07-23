@@ -65,7 +65,8 @@ Keep. The change is isolated, reversible, tested on desktop and mobile, and does
 ### Preview deployment
 
 - Branch alias: https://yakolak-git-111-ahmdkcoms-projects.vercel.app
-- Tested source commit: `487ff596706194a5c342fe859e6c2024914584da`
+- Visually tested source commit: `487ff596706194a5c342fe859e6c2024914584da`
+- Final evidence commit: `5a9ae2b6062e38873ed02beef6aba1ec0ba65cf0`
 
 ### Next step
 
