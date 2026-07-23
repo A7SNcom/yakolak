@@ -4,7 +4,7 @@ import {STLLoader} from 'three/addons/loaders/STLLoader.js';
 import {SVGLoader} from 'three/addons/loaders/SVGLoader.js';
 import {RectAreaLightUniformsLib} from 'three/addons/lights/RectAreaLightUniformsLib.js';
 
-const BUILD='95';
+const BUILD='96';
 const MODEL_DIR='./assets/models/';
 const MARBLE_URL='https://i.ibb.co/B2h2tNKG/Screenshot-2026-06-22-094236.png';
 const TABLE_SVG_URL=`${MODEL_DIR}table.svg?v=${BUILD}-table`;
@@ -17,7 +17,7 @@ const loaderEl=document.getElementById('yakolakLoader');
 const log=(...a)=>console.info('[Yakolak]',...a);
 const PERF_PARAMS=new URLSearchParams(location.search);
 const PERFORMANCE_MODE=!PERF_PARAMS.has('quality-full');
-const performancePixelRatio=()=>PERFORMANCE_MODE?(innerWidth<=900?.78:.9):Math.min(Math.max(devicePixelRatio||1,1),1.25);
+const performancePixelRatio=()=>PERFORMANCE_MODE?(innerWidth<=900?Math.min(Math.max(devicePixelRatio||1,1),1.1):.9):Math.min(Math.max(devicePixelRatio||1,1),1.25);
 globalThis.__yakolakPerformance={enabled:PERFORMANCE_MODE,get pixelRatio(){return renderer?.getPixelRatio?.()||performancePixelRatio()}};
 function setLoadingProgress(value,status){
   globalThis.__yakolakLoading?.set?.(value,status);

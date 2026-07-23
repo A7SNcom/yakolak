@@ -1,6 +1,6 @@
 {
-  "version": "v095-performance-mode",
-  "build": 95,
+  "version": "v096-mobile-clarity",
+  "build": 96,
   "updated_at": "2026-07-23",
-  "note": "Performance baseline: stops continuous setup rendering, uses a lightweight two-light rig, lowers render resolution, and disables costly table maps by default. Add ?quality-full to compare the original quality path."
+  "note": "Raises mobile render resolution from 0.78 to an adaptive maximum of 1.1 while preserving the low-overhead lighting and event-driven rendering optimizations."
 }

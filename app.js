@@ -1,4 +1,4 @@
-console.info('[Yakolak] APP.JS v095 PERFORMANCE MODE LOADED');
+console.info('[Yakolak] APP.JS v096 MOBILE CLARITY LOADED');
 
-const BUILD='95';
+const BUILD='96';
 import('./src/app-game-v085.js?v='+BUILD);
