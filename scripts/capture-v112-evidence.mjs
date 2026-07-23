@@ -95,9 +95,12 @@ async function verifyStartPath(page, tap, prefix) {
   if (start !== 'ابدأ اللعب' || skip !== 'تخطي التعليم') throw new Error(`unexpected tutorial actions: ${start} / ${skip}`);
   await page.screenshot({ path: `${OUT}/${prefix}-first-prompt.png` });
   await page.locator('.yt-ok').click();
-  await page.waitForFunction(() => globalThis.__yakolakGame?.state?.firstMoveGuide === true, null, { timeout: 20_000 });
+  await page.waitForFunction(() => {
+    const state = globalThis.__yakolakGame?.state;
+    const caption = document.querySelector('.yg-caption')?.innerText || '';
+    return state?.started && !state.tutorial && !state.locked && state.firstMoveGuide === true && caption.includes('خطوتك الأولى');
+  }, null, { timeout: 30_000 });
   const caption = await page.locator('.yg-caption').innerText();
-  if (!caption.includes('خطوتك الأولى')) throw new Error(`first move guide missing: ${caption}`);
   await completeLegalMove(page, tap);
   const result = await page.evaluate(key => ({
     guide: globalThis.__yakolakGame.state.firstMoveGuide,
@@ -107,7 +110,7 @@ async function verifyStartPath(page, tap, prefix) {
   }), TUTORIAL_KEY);
   if (result.guide || result.stored !== '1') throw new Error(`tutorial did not complete: ${JSON.stringify(result)}`);
   await page.screenshot({ path: `${OUT}/${prefix}-after-first-move.png` });
-  return { prompt, result };
+  return { prompt, caption, result };
 }
 
 async function verifySkipAndReturn(page, tap) {
