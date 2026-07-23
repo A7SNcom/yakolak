@@ -1,4 +1,4 @@
-import { createClient } from '@libsql/client';
+import { createClient } from '@tursodatabase/serverless/compat';
 import { cloneDefaultCalibration } from '../config/calibration-v092.js';
 
 const TABLE = 'yakolak_calibration';
