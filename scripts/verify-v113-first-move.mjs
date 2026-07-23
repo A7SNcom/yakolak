@@ -18,7 +18,8 @@ assert.equal(pkg.version, '0.113.0');
 
 assert.match(runtime, /firstGuidedTurn=gameState\.firstMoveGuide&&currentPlayer\(\)===gameState\.humanColor/);
 assert.match(runtime, /gameState\.turnDeadline=0/);
-assert.match(runtime, /' · تعلّم'/);
+assert.match(runtime, /تعلّم/);
+assert.match(runtime, /label the untimed guided turn/);
 assert.match(runtime, /first-guided-turn-has-no-deadline/);
 assert.match(runtime, /app-game-v112\.js\?v=113-first-move-breathing-room-wrapper/);
 assert.match(runtime, /app-game-v085\.js\?v=113-first-move-breathing-room-source/);
