@@ -96,7 +96,7 @@ const releasePatch = [
   'replaceExact(',
   '  "addEventListener(\'resize\',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(performancePixelRatio());renderer.setSize(innerWidth,innerHeight);render()},{passive:true});",',
   '  "addEventListener(\'resize\',()=>{camera.aspect=innerWidth/innerHeight;renderer.setPixelRatio(performancePixelRatio());renderer.setSize(innerWidth,innerHeight);if(gameState.configured)setResponsiveOverview();else{camera.updateProjectionMatrix();render()}},{passive:true});",',
-  "  'keep setup framing until the game is configured'"
+  "  'keep setup framing until the game is configured'",
   ');',
   'replaceExact(',
   '  "globalThis.__yakolakGame={state:gameState,pieces,boardZones,camera,renderer,gameGroup,setupGroup,gameHighlightGroup,THREE};",',
