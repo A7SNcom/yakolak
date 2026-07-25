@@ -1,0 +1,47 @@
+name: Verify v120 production online
+
+on:
+  push:
+    branches:
+      - verify-v120-production-online
+    paths:
+      - '.github/workflows/verify-v120-production-online.yml'
+  workflow_dispatch:
+
+jobs:
+  production-online-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out production verification branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Chromium runtime
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Verify Build 120 on production
+        run: |
+          curl -fsS https://yakolak.vercel.app/version.json | tee /tmp/version.json
+          grep -q '"build": 120' /tmp/version.json
+          grep -q 'v120-mobile-board-separation' /tmp/version.json
+
+      - name: Play production online match on desktop and mobile
+        env:
+          APP_URL: 'https://yakolak.vercel.app'
+          V120_COMMIT: '30da92d2b53e29256dc02b0afdb4d1a0264802a2'
+        run: node scripts/run-v120-online-all-colors-fixed.mjs
+
+      - name: Upload production evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v120-production-online
+          path: artifacts/v120-online-all-colors
+          if-no-files-found: warn
