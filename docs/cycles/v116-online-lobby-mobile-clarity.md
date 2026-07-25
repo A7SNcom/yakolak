@@ -61,8 +61,41 @@ decisions and read the mobile board more easily.
 
 ## Result
 
-Pending Preview and production verification.
+Keep.
+
+- Final Preview `dpl_AQa7mMJ2KgaSAd95hEEnqoqjJMZN` reached `READY` from
+  commit `5606f8ed601a2aa6e91391738f72e8c77c71aa3b`.
+- A direct invitation opened at available-color selection; it did not repeat
+  the room-code form.
+- A two-player room started at 2/2. A real pointer-selected move changed the
+  turn and board state on both clients.
+- A three-player room stayed waiting at 2/3, started at 3/3, and advanced the
+  first move from player one to player two on all three clients.
+- A four-player room exposed only the remaining color on the final invitation,
+  started at 4/4, and rendered the four-player roster without clipping.
+- Portrait 390×844 and landscape 844×390 kept the caption, four-player roster,
+  board, pieces, and connection control visible.
+- The connection control opened a room-status view with a clear exit warning.
+  Leaving cancelled the active round for the other clients; “return to start”
+  cleared the stale room session.
+- Four browser clients reported no application console errors or warnings.
+- Vercel reported no warning, error, or fatal runtime logs during the tested
+  Preview window.
+- The rule contract passed inventory exhaustion, explicit draw, win, rematch,
+  waiting-room leave, and 2–4 player state tests.
+
+One failed Preview was intentionally rejected before testing because the first
+GitHub transfer of the large client source was truncated. The transfer was
+replaced with verified chunked bytes; the final Git blob SHA matched the local
+source and the later Preview passed. This is why `READY` alone is not treated
+as acceptance evidence.
 
 ## Keep or revert
 
-Pending Preview verification.
+Keep. Roll back to production commit
+`aab40c7a0ab0806a71aa9c0381e766a4a53f80f6` if post-deployment verification
+does not match the tested Preview.
+
+## Preview
+
+`https://yakolak-ltzs3cgi3-ahmdkcoms-projects.vercel.app`

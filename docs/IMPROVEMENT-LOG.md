@@ -137,6 +137,51 @@ Measure and reduce any remaining delay between setup completion and the first le
 
 ---
 
+## v116 — Clear online lobby and mobile playfield
+
+### Problem
+
+Invite links repeated information, rooms silently assumed two players, guests
+could not choose their colors, waiting had no roster, and the mobile board was
+small beneath scattered status elements. Server rules also lacked physical
+piece-inventory and draw enforcement.
+
+### Hypothesis
+
+Capacity-first creation, invite-aware color choice, a visible roster, automatic
+start at the declared capacity, and one compact mobile hierarchy will reduce
+multiplayer setup confusion and make the board easier to read.
+
+### Change
+
+- Added authoritative 2–4 player rooms with compare-and-swap joins.
+- Added direct invite previews, unique color selection, roster/capacity, and
+  automatic start.
+- Enforced three pieces per size, legal-turn advancement, and draws.
+- Added compact in-game roster, mobile camera framing, bounded render scale,
+  and an interactive room-status/exit control.
+- Designed the flow first in `docs/design/v116-online-flow-mobile.svg` and
+  `docs/design/v116-online-game-mobile.svg`.
+
+### Verification
+
+- Two clients: automatic start and synchronized legal move.
+- Three clients: waiting at 2/3, start at 3/3, synchronized turn advance.
+- Four clients: unique colors, start at 4/4, portrait and landscape framing.
+- Active-room exit: cancellation propagated and recovery cleared stale state.
+- No application console errors/warnings across four clients.
+- No Vercel runtime warning/error/fatal logs on final Preview.
+
+### Result
+
+Keep.
+
+### Preview
+
+`https://yakolak-ltzs3cgi3-ahmdkcoms-projects.vercel.app`
+
+---
+
 ## v111 — Clean player shell
 
 ### Problem
