@@ -1,6 +1,6 @@
 {
-  "version": "v120-mobile-board-separation",
-  "build": 120,
-  "updated_at": "2026-07-25",
-  "note": "Improves mobile board and blue-piece separation with a mobile-only material value adjustment, without changing DPR, shadows, lights, draw calls, or desktop rendering."
+  "version": "v121-mobile-piece-normals",
+  "build": 121,
+  "updated_at": "2026-07-26",
+  "note": "Smooths mobile piece lighting with creased normals while preserving hard edges, geometry counts, materials, draw calls, and desktop rendering."
 }
