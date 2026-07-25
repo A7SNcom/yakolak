@@ -1,5 +1,5 @@
-const response = await fetch('./src/app-game-v112.js?v=117-online-native-gameplay-wrapper', { cache: 'no-store' });
-if (!response.ok) throw new Error(`v117 wrapper load failed: ${response.status}`);
+const response = await fetch('./src/app-game-v112.js?v=120-mobile-board-separation-wrapper', { cache: 'no-store' });
+if (!response.ok) throw new Error(`v120 wrapper load failed: ${response.status}`);
 let wrapper = await response.text();
 
 function replaceExact(oldValue, newValue, label) {
@@ -10,10 +10,10 @@ function replaceExact(oldValue, newValue, label) {
 
 replaceExact(
   "const response=await fetch('./src/app-game-v085.js?v=112-action-tutorial-source',{cache:'no-store'});",
-  "const response=await fetch('./src/app-game-v085.js?v=117-online-native-gameplay-source',{cache:'no-store'});",
-  'v117 source marker'
+  "const response=await fetch('./src/app-game-v085.js?v=120-mobile-board-separation-source',{cache:'no-store'});",
+  'v120 source marker'
 );
-replaceExact("const BUILD='112';", "const BUILD='117';", 'v117 build number');
+replaceExact("const BUILD='112';", "const BUILD='120';", 'v120 build number');
 
 const releasePatch = [
   'replaceRegex(',
@@ -68,6 +68,16 @@ const releasePatch = [
   '  "const baseMat=makeMat({color:\'#4a5562\',roughness:.48,metalness:0,emissive:\'#25313d\',emissiveIntensity:.2});",',
   "  'restore the established live board material'",
   ');',
+  'replaceExact(',
+  '  "function applyGameMaterials(){\\n  const game=calibration.game;",',
+  '  "function applyGameMaterials(){\\n  const game=calibration.game;\\n  const board=globalThis.__yakolakMobileClarityV120?.boardStyleFor?.(game.board,MOBILE_VIEW)||game.board;",',
+  "  'resolve mobile-only board separation'",
+  ');',
+  'replaceExact(',
+  '  "baseMat.color.set(game.board.color);baseMat.roughness=+game.board.roughness;baseMat.metalness=+game.board.metalness;\\n  if(baseMat.emissive&&game.board.emissive)baseMat.emissive.set(game.board.emissive);\\n  if(\'emissiveIntensity\' in baseMat)baseMat.emissiveIntensity=+game.board.emissiveIntensity||0;",',
+  '  "baseMat.color.set(board.color);baseMat.roughness=+board.roughness;baseMat.metalness=+board.metalness;\\n  if(baseMat.emissive&&board.emissive)baseMat.emissive.set(board.emissive);\\n  if(\'emissiveIntensity\' in baseMat)baseMat.emissiveIntensity=+board.emissiveIntensity||0;",',
+  "  'apply mobile board style without extra render work'",
+  ');',
   'replaceRegex(',
   '  /function fit\\(objects\\)\\{.*?\\}\\nfunction frame\\(now\\)/s,',
   '  `function setResponsiveOverview(){',
@@ -108,19 +118,19 @@ const releasePatch = [
 
 replaceExact(
   "source+='\\n//# sourceURL=yakolak-v112-action-tutorial-runtime.js\\n';",
-  releasePatch + "\nsource+='\\n//# sourceURL=yakolak-v117-online-native-gameplay-runtime.js\\n';",
-  'inject v117 policies'
+  releasePatch + "\nsource+='\\n//# sourceURL=yakolak-v120-mobile-board-separation-runtime.js\\n';",
+  'inject v120 policies'
 );
 replaceExact(
   "globalThis.__yakolakV112={build:112,base:110,tutorial:'short-skippable-action-led'};",
-  "globalThis.__yakolakV117={build:117,base:116,change:'reuse-native-setup-tray-and-table-online'};",
-  'v117 runtime marker'
+  "globalThis.__yakolakV117={build:117,base:116,change:'reuse-native-setup-tray-and-table-online'};globalThis.__yakolakV120={build:120,base:119,change:'mobile-only-board-separation'};",
+  'v120 runtime marker'
 );
 
 const moduleUrl = URL.createObjectURL(new Blob([wrapper], { type: 'text/javascript' }));
 try {
   await import(moduleUrl);
-  await import('./online-client-v114.js?v=117-online-native-gameplay-client');
+  await import('./online-client-v114.js?v=120-mobile-board-separation-client');
 } finally {
   setTimeout(() => URL.revokeObjectURL(moduleUrl), 15000);
 }
