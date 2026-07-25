@@ -1,5 +1,6 @@
 export const ONLINE_COLORS = ['right', 'back', 'left', 'front'];
 export const ONLINE_SIZES = ['s', 'm', 'l'];
+export const ONLINE_PLAYER_COUNTS = [2, 3, 4];
 export const ONLINE_LINES = [
   [0, 1, 2],
   [3, 4, 5],
@@ -25,8 +26,17 @@ export function nextOnlineColor(color) {
   return ONLINE_COLORS[(at < 0 ? 0 : at + 1) % ONLINE_COLORS.length];
 }
 
+export function validOnlinePlayerCount(value) {
+  return ONLINE_PLAYER_COUNTS.includes(Number(value));
+}
+
 export function validOnlineColor(color) {
   return ONLINE_COLORS.includes(color);
+}
+
+export function availableOnlineColors(state) {
+  const used = new Set((state?.players || []).map(player => player.color));
+  return ONLINE_COLORS.filter(color => !used.has(color));
 }
 
 export function validOnlineMove(move) {
@@ -36,6 +46,19 @@ export function validOnlineMove(move) {
     move.zone >= 0 &&
     move.zone < 9 &&
     ONLINE_SIZES.includes(move.size)
+  );
+}
+
+export function onlinePiecesUsed(board, color, size) {
+  if (!board || !validOnlineColor(color) || !ONLINE_SIZES.includes(size)) return 0;
+  return Object.values(board).filter(slot => slot?.[size] === color).length;
+}
+
+export function hasOnlineLegalMove(board, color) {
+  if (!board || !validOnlineColor(color)) return false;
+  return ONLINE_SIZES.some(size =>
+    onlinePiecesUsed(board, color, size) < 3 &&
+    Object.values(board).some(slot => !slot?.[size])
   );
 }
 
@@ -73,36 +96,42 @@ export function onlineWinner(board, color) {
   return null;
 }
 
-export function createOnlineState(hostColor) {
+export function createOnlineState(hostColor, targetPlayers = 2) {
   if (!validOnlineColor(hostColor)) throw new Error('invalid_color');
+  if (!validOnlinePlayerCount(targetPlayers)) throw new Error('invalid_player_count');
   return {
-    protocol: 1,
+    protocol: 2,
     status: 'waiting',
-    players: [{ seat: 'host', color: hostColor }],
+    targetPlayers: Number(targetPlayers),
+    players: [{ seat: 'p1', color: hostColor }],
     turnIndex: 0,
     board: emptyOnlineBoard(),
     round: 1,
     winner: null,
+    draw: false,
     lastMove: null,
     moveNumber: 0,
-    rematch: { host: false, guest: false }
+    rematch: { p1: false }
   };
 }
 
-export function joinOnlineState(state, guestColor) {
-  if (!state || state.status !== 'waiting' || !validOnlineColor(guestColor)) {
-    throw new Error('room_not_joinable');
-  }
+export function joinOnlineState(state, seat, color) {
+  if (!state || state.status !== 'waiting') throw new Error('room_not_joinable');
+  if (!/^p[2-4]$/.test(String(seat || ''))) throw new Error('invalid_seat');
+  if (!validOnlineColor(color)) throw new Error('invalid_color');
+  if (state.players.length >= state.targetPlayers) throw new Error('room_full');
+  if (state.players.some(player => player.seat === seat)) throw new Error('seat_taken');
+  if (!availableOnlineColors(state).includes(color)) throw new Error('color_taken');
+  const players = [...state.players, { seat, color }];
+  const rematch = Object.fromEntries(players.map(player => [player.seat, false]));
   return {
     ...state,
-    status: 'playing',
-    players: [
-      state.players[0],
-      { seat: 'guest', color: guestColor }
-    ],
+    status: players.length === state.targetPlayers ? 'playing' : 'waiting',
+    players,
     turnIndex: 0,
     winner: null,
-    rematch: { host: false, guest: false }
+    draw: false,
+    rematch
   };
 }
 
@@ -111,18 +140,33 @@ export function applyOnlineMove(state, seat, move) {
   if (!validOnlineMove(move)) throw new Error('invalid_move');
   const current = state.players[state.turnIndex % state.players.length];
   if (!current || current.seat !== seat) throw new Error('not_your_turn');
+  if (onlinePiecesUsed(state.board, current.color, move.size) >= 3) {
+    throw new Error('no_piece_remaining');
+  }
   const slot = state.board[String(move.zone)]?.[move.size];
   if (slot) throw new Error('occupied_slot');
 
   const board = structuredClone(state.board);
   board[String(move.zone)][move.size] = current.color;
   const winner = onlineWinner(board, current.color);
+  let nextTurnIndex = state.turnIndex;
+  if (!winner) {
+    for (let offset = 1; offset <= state.players.length; offset += 1) {
+      const candidate = (state.turnIndex + offset) % state.players.length;
+      if (hasOnlineLegalMove(board, state.players[candidate].color)) {
+        nextTurnIndex = candidate;
+        break;
+      }
+    }
+  }
+  const draw = !winner && !state.players.some(player => hasOnlineLegalMove(board, player.color));
   return {
     ...state,
     board,
     winner,
-    status: winner ? 'finished' : 'playing',
-    turnIndex: winner ? state.turnIndex : (state.turnIndex + 1) % state.players.length,
+    draw,
+    status: winner || draw ? 'finished' : 'playing',
+    turnIndex: winner || draw ? state.turnIndex : nextTurnIndex,
     lastMove: {
       color: current.color,
       size: move.size,
@@ -130,15 +174,15 @@ export function applyOnlineMove(state, seat, move) {
       seat
     },
     moveNumber: state.moveNumber + 1,
-    rematch: { host: false, guest: false }
+    rematch: Object.fromEntries(state.players.map(player => [player.seat, false]))
   };
 }
 
 export function requestOnlineRematch(state, seat) {
   if (!state || state.status !== 'finished') throw new Error('round_not_finished');
-  if (seat !== 'host' && seat !== 'guest') throw new Error('invalid_seat');
+  if (!state.players.some(player => player.seat === seat)) throw new Error('invalid_seat');
   const rematch = { ...state.rematch, [seat]: true };
-  if (!rematch.host || !rematch.guest) return { ...state, rematch };
+  if (!state.players.every(player => rematch[player.seat])) return { ...state, rematch };
   return {
     ...state,
     status: 'playing',
@@ -146,7 +190,21 @@ export function requestOnlineRematch(state, seat) {
     board: emptyOnlineBoard(),
     round: (state.round || 1) + 1,
     winner: null,
+    draw: false,
     lastMove: null,
-    rematch: { host: false, guest: false }
+    rematch: Object.fromEntries(state.players.map(player => [player.seat, false]))
+  };
+}
+
+export function leaveOnlineState(state, seat) {
+  if (!state?.players?.some(player => player.seat === seat)) throw new Error('invalid_seat');
+  if (seat === 'p1' || state.status !== 'waiting') {
+    return { ...state, status: 'cancelled', cancelledBy: seat };
+  }
+  const players = state.players.filter(player => player.seat !== seat);
+  return {
+    ...state,
+    players,
+    rematch: Object.fromEntries(players.map(player => [player.seat, false]))
   };
 }
