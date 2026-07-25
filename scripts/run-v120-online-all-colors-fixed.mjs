@@ -15,6 +15,11 @@ const fetchAfter = "    const targetUrl = new URL(ROOMS_URL);\n    targetUrl.sea
 if (!source.includes(fetchBefore)) throw new Error('online_proxy_patch_target_missing');
 source = source.replace(fetchBefore, fetchAfter);
 
+const closeBefore = "  await desktopContext?.close();\n  await mobileContext?.close();\n  await browser.close();";
+const closeAfter = "  if (desktopContext) await desktopContext.close().catch(() => {});\n  if (mobileContext) await mobileContext.close().catch(() => {});\n  await browser.close().catch(() => {});";
+if (!source.includes(closeBefore)) throw new Error('online_cleanup_patch_target_missing');
+source = source.replace(closeBefore, closeAfter);
+
 await writeFile(fixedUrl, source);
 try {
   await import(fixedUrl.href + `?run=${Date.now()}`);
