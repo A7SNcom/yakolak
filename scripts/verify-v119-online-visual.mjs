@@ -88,6 +88,21 @@ async function markerMetrics(page) {
   });
 }
 
+async function capture(page, name) {
+  await page.evaluate(() => document.querySelector('vercel-live-feedback')?.remove());
+  const session = await page.context().newCDPSession(page);
+  try {
+    const shot = await session.send('Page.captureScreenshot', {
+      format: 'png',
+      fromSurface: true,
+      captureBeyondViewport: false
+    });
+    await writeFile(outputPath(name), Buffer.from(shot.data, 'base64'));
+  } finally {
+    await session.detach();
+  }
+}
+
 async function move(page, token, code, state, zone, size) {
   const result = await api(page, {
     action: 'move',
@@ -171,8 +186,8 @@ try {
     assert.equal(metrics.depthWrite, false);
   }
 
-  await desktop.screenshot({ path: outputPath('desktop-playing.png'), fullPage: false });
-  await mobile.screenshot({ path: outputPath('mobile-playing.png'), fullPage: false });
+  await capture(desktop, 'desktop-playing.png');
+  await capture(mobile, 'mobile-playing.png');
 
   state = await move(mobile, joined.token, code, state, 3, 'l');
   state = await move(desktop, created.token, code, state, 1, 'l');
@@ -201,8 +216,8 @@ try {
     assert.equal(metrics.depthTest, true);
   }
 
-  await desktop.screenshot({ path: outputPath('desktop-finished.png'), fullPage: false });
-  await mobile.screenshot({ path: outputPath('mobile-finished.png'), fullPage: false });
+  await capture(desktop, 'desktop-finished.png');
+  await capture(mobile, 'mobile-finished.png');
 
   const result = {
     ok: true,
