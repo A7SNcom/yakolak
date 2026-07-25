@@ -41,6 +41,8 @@ assert.match(client, /authorization: `Bearer/);
 assert.match(client, /prepareInvite/);
 assert.match(client, /renderPlayerCountChoice/);
 assert.match(client, /targetPlayers/);
+assert.match(client, /renderPlayingRoom/);
+assert.match(client, /مغادرة المباراة/);
 assert.match(api, /version = version \+ 1/);
 assert.match(api, /WHERE room_code = \? AND version = \?/);
 assert.match(api, /createHash\('sha256'\)/);

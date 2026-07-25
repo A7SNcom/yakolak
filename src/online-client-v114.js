@@ -650,6 +650,39 @@ function renderFinished() {
   body.append(actions, node('div', 'yo-status', rematchText()));
 }
 
+function renderPlayingRoom() {
+  const body = document.querySelector('#yakolakOnlineDialog .yo-body');
+  if (!body || !room) return;
+  const current = room.players[room.turnIndex];
+  body.replaceChildren(
+    choiceHeading(
+      `الغرفة ${room.code}`,
+      current?.seat === identity?.seat ? 'دورك الآن.' : `الدور عند ${colorLabel(current?.color)}.`
+    )
+  );
+  const roster = node('div', 'yo-lobby-roster');
+  room.players.forEach((player, index) => {
+    const item = node('div', `yo-lobby-player${index === room.turnIndex ? ' active' : ''}`);
+    const dot = node('i');
+    dot.style.background = COLOR_LABELS[player.color]?.[1] || '#fff';
+    item.append(
+      dot,
+      node('b', '', player.seat === identity?.seat ? 'أنت' : `لاعب ${index + 1}`),
+      node('small', '', index === room.turnIndex ? 'الدور الآن' : colorLabel(player.color))
+    );
+    roster.append(item);
+  });
+  const leave = node('button', 'yo-button secondary', 'مغادرة المباراة');
+  leave.type = 'button';
+  leave.addEventListener('click', leaveOnline);
+  body.append(
+    roster,
+    node('p', 'yo-caution', 'مغادرة مباراة بدأت ستنهي هذه الجولة لجميع اللاعبين.'),
+    leave,
+    node('div', 'yo-status')
+  );
+}
+
 function rematchText() {
   if (!room?.rematch) return '';
   const mine = room.rematch[identity?.seat];
@@ -886,9 +919,18 @@ function buildUi() {
   card.append(head, node('div', 'yo-body'));
   dialog.append(card);
 
-  const pill = node('div');
+  const pill = node('button');
   pill.id = 'yakolakOnlinePill';
+  pill.type = 'button';
+  pill.setAttribute('aria-label', 'حالة غرفة الأونلاين');
   pill.setAttribute('aria-live', 'polite');
+  pill.addEventListener('click', () => {
+    if (room?.status === 'waiting') renderWaiting();
+    else if (room?.status === 'finished') renderFinished();
+    else if (room?.status === 'playing') renderPlayingRoom();
+    else return;
+    openDialog();
+  });
   document.body.append(entry, dialog, pill);
 }
 

@@ -81,7 +81,7 @@
   display:none;align-items:center;gap:7px;min-height:36px;padding:7px 11px;border:1px solid rgba(255,255,255,.18);
   border-radius:999px;background:rgba(12,18,23,.9);color:#fff;font:800 12px/1 system-ui;pointer-events:none
 }
-#yakolakOnlinePill.show{display:flex}
+#yakolakOnlinePill.show{display:flex;cursor:pointer;border:1px solid rgba(255,255,255,.16)}
 #yakolakOnlinePill::before{content:"";width:8px;height:8px;border-radius:50%;background:#f59e0b}
 #yakolakOnlinePill.online::before{background:#34d399}
 #yakolakOnlinePill.offline::before{background:#f87171}
@@ -117,6 +117,8 @@
 .yo-lobby-player i{width:13px;height:13px;border-radius:50%;box-shadow:0 0 0 2px rgba(255,255,255,.15)}
 .yo-lobby-player b{font-size:14px}.yo-lobby-player small{color:#b9c9d0}
 .yo-lobby-player.empty{display:flex;color:#8fa2ab;border-style:dashed}
+.yo-lobby-player.active{border-color:rgba(92,225,173,.78)}
+.yo-caution{margin:4px 0 12px;color:#e7c987;font-size:12px;line-height:1.65}
 .yo-loader{text-align:center;font-size:28px;letter-spacing:.4em;color:#a8bdc7;padding:24px}
 .yg-score.yo-roster{
   position:fixed;left:10px;right:10px;top:58px;z-index:10055;
