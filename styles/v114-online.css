@@ -159,3 +159,42 @@
   .yg-score.yo-roster span b{font-size:11px}
   .yg-score.yo-roster span small{font-size:9px}
 }
+
+/* v117: keep the real table and native readiness positions visible while waiting. */
+body.yakolak-online-waiting #yakolakOnlineDialog{
+  place-items:end center;
+  padding:12px max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
+  background:transparent;
+  backdrop-filter:none;
+  pointer-events:none;
+}
+body.yakolak-online-waiting #yakolakOnlineDialog .yo-card{
+  width:min(680px,100%);
+  max-height:min(46dvh,410px);
+  padding:14px 16px;
+  border-radius:18px;
+  background:rgba(15,23,29,.94);
+  pointer-events:auto;
+}
+body.yakolak-online-waiting .yo-head{margin-bottom:8px}
+body.yakolak-online-waiting .yo-title{font-size:17px}
+body.yakolak-online-waiting .yo-step-title{font-size:17px}
+body.yakolak-online-waiting .yo-note{margin-bottom:8px}
+body.yakolak-online-waiting .yo-code{margin:6px 0 10px;padding:9px;font-size:24px}
+body.yakolak-online-waiting .yo-lobby-roster{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:6px;
+  margin:8px 0 10px;
+}
+body.yakolak-online-waiting .yo-lobby-player{min-height:42px;padding:6px 9px}
+body.yakolak-online-native-setup #yakolakOnlineEntry{
+  min-width:150px;
+  background:rgba(83,32,32,.92);
+}
+@media (max-width:520px){
+  body.yakolak-online-waiting #yakolakOnlineDialog .yo-card{
+    max-height:48dvh;
+    border-radius:20px;
+  }
+  body.yakolak-online-waiting .yo-head{display:none}
+}
