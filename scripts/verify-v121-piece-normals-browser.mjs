@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const APP_URL = process.env.APP_URL || 'http://127.0.0.1:4175';
 const outputDir = new URL('../artifacts/v121-piece-normals/', import.meta.url);
+const outputPath = name => fileURLToPath(new URL(name, outputDir));
 await mkdir(outputDir, { recursive: true });
 
 const browser = await chromium.launch({
@@ -65,7 +67,7 @@ async function inspect(page, label) {
     };
   });
 
-  await page.screenshot({ path: new URL(`${label}.png`, outputDir), fullPage: false });
+  await page.screenshot({ path: outputPath(`${label}.png`), fullPage: false });
   return metrics;
 }
 
