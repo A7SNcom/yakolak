@@ -81,7 +81,7 @@
   display:none;align-items:center;gap:7px;min-height:36px;padding:7px 11px;border:1px solid rgba(255,255,255,.18);
   border-radius:999px;background:rgba(12,18,23,.9);color:#fff;font:800 12px/1 system-ui;pointer-events:none
 }
-#yakolakOnlinePill.show{display:flex;cursor:pointer;border:1px solid rgba(255,255,255,.16)}
+#yakolakOnlinePill.show{display:flex;cursor:pointer;pointer-events:auto;border:1px solid rgba(255,255,255,.16)}
 #yakolakOnlinePill::before{content:"";width:8px;height:8px;border-radius:50%;background:#f59e0b}
 #yakolakOnlinePill.online::before{background:#34d399}
 #yakolakOnlinePill.offline::before{background:#f87171}

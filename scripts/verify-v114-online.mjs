@@ -54,6 +54,7 @@ assert.match(css, /safe-area-inset-bottom/);
 assert.match(css, /min-height:48px/);
 assert.match(css, /yo-counts/);
 assert.match(css, /yg-score\.yo-roster/);
+assert.match(css, /pointer-events:auto/);
 
 let state = createOnlineState('right', 3);
 assert.equal(state.status, 'waiting');
