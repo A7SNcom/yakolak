@@ -1,5 +1,5 @@
-const response = await fetch('./src/app-game-v112.js?v=116-online-lobby-mobile-clarity-wrapper', { cache: 'no-store' });
-if (!response.ok) throw new Error(`v116 wrapper load failed: ${response.status}`);
+const response = await fetch('./src/app-game-v112.js?v=117-online-native-gameplay-wrapper', { cache: 'no-store' });
+if (!response.ok) throw new Error(`v117 wrapper load failed: ${response.status}`);
 let wrapper = await response.text();
 
 function replaceExact(oldValue, newValue, label) {
@@ -10,10 +10,10 @@ function replaceExact(oldValue, newValue, label) {
 
 replaceExact(
   "const response=await fetch('./src/app-game-v085.js?v=112-action-tutorial-source',{cache:'no-store'});",
-  "const response=await fetch('./src/app-game-v085.js?v=116-online-lobby-mobile-clarity-source',{cache:'no-store'});",
-  'v116 source marker'
+  "const response=await fetch('./src/app-game-v085.js?v=117-online-native-gameplay-source',{cache:'no-store'});",
+  'v117 source marker'
 );
-replaceExact("const BUILD='112';", "const BUILD='116';", 'v116 build number');
+replaceExact("const BUILD='112';", "const BUILD='117';", 'v117 build number');
 
 const releasePatch = [
   'replaceRegex(',
@@ -55,18 +55,18 @@ const releasePatch = [
   ');',
   'replaceExact(',
   '  "board:{color:\'#4a5562\',roughness:.48,metalness:0,emissive:\'#25313d\',emissiveIntensity:.2}",',
-  '  "board:{color:\'#354958\',roughness:.54,metalness:0,emissive:\'#182832\',emissiveIntensity:.16}",',
-  "  'increase board and piece separation'",
+  '  "board:{color:\'#4a5562\',roughness:.48,metalness:0,emissive:\'#25313d\',emissiveIntensity:.2}",',
+  "  'restore the established board material'",
   ');',
   'replaceExact(',
   '  "table:{color:\'#aeb2b6\',roughness:.71,metalness:0,normalScale:.12,texture:false,repeatX:1,repeatY:1,opacity:1,emissive:\'#000000\',emissiveIntensity:0,wireframe:false}",',
-  '  "table:{color:\'#766b61\',roughness:.78,metalness:0,normalScale:.1,texture:false,repeatX:1,repeatY:1,opacity:1,emissive:\'#160f0a\',emissiveIntensity:.035,wireframe:false}",',
-  "  'replace flat gray table with restrained warm contrast'",
+  '  "table:{color:\'#aeb2b6\',roughness:.71,metalness:0,normalScale:.12,texture:false,repeatX:1,repeatY:1,opacity:1,emissive:\'#000000\',emissiveIntensity:0,wireframe:false}",',
+  "  'restore the established neutral table'",
   ');',
   'replaceExact(',
   '  "const baseMat=makeMat({color:\'#4a5562\',roughness:.48,metalness:0,emissive:\'#25313d\',emissiveIntensity:.2});",',
-  '  "const baseMat=makeMat({color:\'#354958\',roughness:.54,metalness:0,emissive:\'#182832\',emissiveIntensity:.16});",',
-  "  'match live board material'",
+  '  "const baseMat=makeMat({color:\'#4a5562\',roughness:.48,metalness:0,emissive:\'#25313d\',emissiveIntensity:.2});",',
+  "  'restore the established live board material'",
   ');',
   'replaceRegex(',
   '  /function fit\\(objects\\)\\{.*?\\}\\nfunction frame\\(now\\)/s,',
@@ -101,26 +101,26 @@ const releasePatch = [
   ');',
   'replaceExact(',
   '  "globalThis.__yakolakGame={state:gameState,pieces,boardZones,camera,renderer,gameGroup,setupGroup,gameHighlightGroup,THREE};",',
-  '  "globalThis.__yakolakGame={state:gameState,pieces,boardZones,camera,renderer,gameGroup,setupGroup,gameHighlightGroup,THREE,meshes,render,clearHighlights,showWinHighlight,syncZoneMarkers,setResponsiveOverview};",',
-  "  'expose narrow online rendering hooks'",
+  '  "globalThis.__yakolakGame={state:gameState,pieces,boardZones,camera,renderer,gameGroup,setupGroup,gameHighlightGroup,THREE,meshes,render,clearHighlights,showWinHighlight,syncZoneMarkers,setResponsiveOverview,renderSetup3D,closePieceTray,updateTurnGlow,syncActiveReadinessBases};",',
+  "  'expose the native setup and piece-selection bridge'",
   ');'
 ].join('\n');
 
 replaceExact(
   "source+='\\n//# sourceURL=yakolak-v112-action-tutorial-runtime.js\\n';",
-  releasePatch + "\nsource+='\\n//# sourceURL=yakolak-v116-online-lobby-mobile-clarity-runtime.js\\n';",
-  'inject v116 policies'
+  releasePatch + "\nsource+='\\n//# sourceURL=yakolak-v117-online-native-gameplay-runtime.js\\n';",
+  'inject v117 policies'
 );
 replaceExact(
   "globalThis.__yakolakV112={build:112,base:110,tutorial:'short-skippable-action-led'};",
-  "globalThis.__yakolakV116={build:116,base:115,change:'clear-multiplayer-lobbies-and-mobile-clarity'};",
-  'v116 runtime marker'
+  "globalThis.__yakolakV117={build:117,base:116,change:'reuse-native-setup-tray-and-table-online'};",
+  'v117 runtime marker'
 );
 
 const moduleUrl = URL.createObjectURL(new Blob([wrapper], { type: 'text/javascript' }));
 try {
   await import(moduleUrl);
-  await import('./online-client-v114.js?v=116-online-lobby-mobile-clarity-client');
+  await import('./online-client-v114.js?v=117-online-native-gameplay-client');
 } finally {
   setTimeout(() => URL.revokeObjectURL(moduleUrl), 15000);
 }
