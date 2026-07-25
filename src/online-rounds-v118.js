@@ -70,6 +70,7 @@ function addStyles() {
 function showRoundChoice(details) {
   pendingCreate = details;
   selectedTargetRounds = null;
+  previewRounds = null;
   document.getElementById('yakolakRoundChoice')?.remove();
   const overlay = document.createElement('div');
   overlay.id = 'yakolakRoundChoice';
@@ -142,16 +143,24 @@ function ensureSummary(body) {
   return summary;
 }
 
+function isJoinChoice(body) {
+  const title = body.querySelector('.yo-step-title, h2')?.textContent || '';
+  return title.includes('للإنضمام') || title.includes('للانضمام');
+}
+
 function syncRoundUi() {
   const room = globalThis.__yakolakOnlineV114?.room;
   const body = document.querySelector('#yakolakOnlineDialog .yo-body');
   if (!body) return;
 
   if (!room?.targetRounds) {
-    if (previewRounds) {
+    const existing = body.querySelector('.yo-round-summary');
+    if (previewRounds && isJoinChoice(body)) {
       const summary = ensureSummary(body);
       const next = `<b>${previewRounds} جولات</b><span>عدد الجولات اختاره منشئ الغرفة</span>`;
       if (summary.innerHTML !== next) summary.innerHTML = next;
+    } else {
+      existing?.remove();
     }
     return;
   }
