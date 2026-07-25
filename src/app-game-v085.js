@@ -1116,7 +1116,10 @@ function renderSetup3D(){
   syncZoneMarkers(false);
   if(gameState.setupStep==='color'){
     caption('اختار لونك المفضل');
-    TURN_RING.forEach(color=>{
+    const onlineColors=globalThis.__yakolakOnlineSetupBridge?.active
+      ?globalThis.__yakolakOnlineSetupBridge.availableColors
+      :null;
+    TURN_RING.filter(color=>!onlineColors||onlineColors.includes(color)).forEach(color=>{
       const pos=setupStationPosition(color),action={type:'color',value:color};
       const plate=new THREE.Mesh(new THREE.CircleGeometry(42,48),hiddenPickMaterial());
       plate.position.set(pos.x,SETUP_CHOICE_Y-.8,pos.z);plate.rotation.x=-Math.PI/2;plate.renderOrder=10018;addSetupPickable(plate,action);setupGroup.add(plate);
@@ -1190,6 +1193,29 @@ function renderSetupStep(){
 }
 function handleSetupPick(action){
   if(!action||gameState.configured||setupTransitioning)return;
+  const onlineSetup=globalThis.__yakolakOnlineSetupBridge;
+  if(onlineSetup?.active){
+    if(action.type==='color'){
+      animateSetupExit(()=>{
+        gameState.humanColor=action.value;
+        onlineSetup.color=action.value;
+        if(onlineSetup.mode==='join'){
+          onlineSetup.join?.(action.value);
+          return;
+        }
+        gameState.setupStep='bots';
+        renderSetupStep();renderSetup3D();
+      });
+      return;
+    }
+    if(action.type==='bots'){
+      animateSetupExit(()=>onlineSetup.create?.({
+        color:onlineSetup.color||gameState.humanColor,
+        targetPlayers:action.value+1
+      }));
+      return;
+    }
+  }
   if(action.type==='color'){
     animateSetupExit(()=>{
       gameState.humanColor=action.value;
@@ -1833,6 +1859,13 @@ function finishMove(piece,zoneId){
 }
 function commitMove(piece,zoneId,animate=true){
   if(!gameState.board[zoneId]||gameState.board[zoneId][piece.type])return false;
+  const onlineGameplay=globalThis.__yakolakOnlineGameplayBridge;
+  if(onlineGameplay?.active){
+    closePieceTray();
+    gameState.locked=true;
+    onlineGameplay.submit?.({zone:zoneId,size:piece.type,color:piece.dir});
+    return true;
+  }
   piece.placed=true;piece.zoneIndex=zoneId;piece.slotSize=piece.type;
   gameState.board[zoneId][piece.type]=piece.dir;
   const rot={x:rad(piece.final.rx),y:rad(piece.final.ry),z:rad(piece.final.rz)};
@@ -2413,4 +2446,3 @@ async function startApp(){
   await boot();
 }
 startApp().catch(fail);
-

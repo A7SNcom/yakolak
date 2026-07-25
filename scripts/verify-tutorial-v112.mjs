@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
+import { readFileSync } from 'node:fs';
 
-const read = path => fs.readFileSync(path, 'utf8');
-const runtime = read('src/app-game-v112.js');
+const runtime = readFileSync(new URL('../src/app-game-v112.js', import.meta.url), 'utf8');
 
 assert.match(runtime, /const BUILD='112'/);
 assert.match(runtime, /تخطي التعليم/);

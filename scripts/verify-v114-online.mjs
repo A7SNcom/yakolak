@@ -13,27 +13,32 @@ import {
   requestOnlineRematch
 } from '../src/online-rules-v114.js';
 
-const [index, app, wrapper, client, api, css, version] = await Promise.all([
+const [index, app, wrapper, baseGame, client, api, css, version] = await Promise.all([
   readFile(new URL('../index.html', import.meta.url), 'utf8'),
   readFile(new URL('../app.js', import.meta.url), 'utf8'),
   readFile(new URL('../src/app-game-v114.js', import.meta.url), 'utf8'),
+  readFile(new URL('../src/app-game-v085.js', import.meta.url), 'utf8'),
   readFile(new URL('../src/online-client-v114.js', import.meta.url), 'utf8'),
   readFile(new URL('../api/rooms.js', import.meta.url), 'utf8'),
   readFile(new URL('../styles/v114-online.css', import.meta.url), 'utf8'),
   readFile(new URL('../version.json', import.meta.url), 'utf8').then(JSON.parse)
 ]);
 
-assert.match(index, /yakolak-version" content="v116-online-lobby-mobile-clarity"/);
+assert.match(index, /yakolak-version" content="v117-online-native-gameplay"/);
 assert.match(index, /styles\/v114-online\.css/);
 assert.match(app, /app-game-v114\.js/);
-assert.equal(version.build, 116);
-assert.equal(version.version, 'v116-online-lobby-mobile-clarity');
+assert.equal(version.build, 117);
+assert.equal(version.version, 'v117-online-native-gameplay');
 assert.match(wrapper, /setResponsiveOverview/);
 assert.match(wrapper, /function fit\(objects\)\{const box=new THREE\.Box3/);
 assert.match(wrapper, /switch to play framing only after setup is confirmed/);
 assert.match(wrapper, /if\(gameState\.configured\)setResponsiveOverview\(\);else/);
 assert.match(wrapper, /raise bounded mobile clarity for simple board geometry/);
-assert.match(wrapper, /expose narrow online rendering hooks/);
+assert.match(wrapper, /expose the native setup and piece-selection bridge/);
+assert.match(wrapper, /restore the established neutral table/);
+assert.match(baseGame, /__yakolakOnlineSetupBridge/);
+assert.match(baseGame, /__yakolakOnlineGameplayBridge/);
+assert.match(baseGame, /onlineSetup\.mode==='join'/);
 assert.match(client, /POLL_BASE_MS = 900/);
 assert.match(client, /sessionStorage/);
 assert.match(client, /moved > 9/);
@@ -42,6 +47,9 @@ assert.match(client, /prepareInvite/);
 assert.match(client, /renderPlayerCountChoice/);
 assert.match(client, /targetPlayers/);
 assert.match(client, /renderPlayingRoom/);
+assert.match(client, /beginNativeOnlineSetup/);
+assert.match(client, /game\.syncActiveReadinessBases/);
+assert.match(client, /__yakolakOnlineGameplayBridge\.active = true/);
 assert.match(client, /مغادرة المباراة/);
 assert.match(api, /version = version \+ 1/);
 assert.match(api, /WHERE room_code = \? AND version = \?/);
@@ -55,6 +63,7 @@ assert.match(css, /min-height:48px/);
 assert.match(css, /yo-counts/);
 assert.match(css, /yg-score\.yo-roster/);
 assert.match(css, /pointer-events:auto/);
+assert.match(css, /yakolak-online-waiting/);
 
 let state = createOnlineState('right', 3);
 assert.equal(state.status, 'waiting');
@@ -148,4 +157,4 @@ cell['5'].s = cell['5'].m = cell['5'].l = 'left';
 assert.equal(onlineWinner(cell, 'left')?.type, 'cell');
 assert.equal(onlineWinner(cell, 'right'), null);
 
-console.log('v116 lobby/mobile contracts and authoritative rules passed');
+console.log('v117 native online interaction and authoritative rules passed');
