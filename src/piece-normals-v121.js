@@ -46,6 +46,7 @@ async function applyMobilePieceNormals() {
   }
 
   const { game, geometries } = await waitForPieces();
+  game.render?.();
   const rendererBefore = game.renderer?.info?.render ? { ...game.renderer.info.render } : null;
 
   for (const geometry of geometries) {
