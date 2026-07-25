@@ -1,0 +1,62 @@
+name: Verify v118 round selection
+
+on:
+  pull_request:
+    paths:
+      - 'src/online-rounds-v118.js'
+      - 'src/online-rules-v118.js'
+      - 'api/rooms-v118.js'
+      - 'scripts/v118-rounds-harness.html'
+      - 'scripts/verify-v118-rounds.mjs'
+      - 'scripts/verify-v118-rounds-browser.mjs'
+      - 'app.js'
+      - 'index.html'
+      - 'package.json'
+      - 'version.json'
+      - '.github/workflows/verify-v118-round-selection.yml'
+  workflow_dispatch:
+
+jobs:
+  rounds-contract-and-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install project dependencies
+        run: npm install
+
+      - name: Run repository tests
+        run: npm test
+
+      - name: Install browser runtime
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Start deterministic test server
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/yakolak-v118-server.log 2>&1 &
+          for attempt in {1..30}; do
+            curl -fsS http://127.0.0.1:4173/scripts/v118-rounds-harness.html >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/yakolak-v118-server.log
+          exit 1
+
+      - name: Verify mandatory 3 or 5 round selection
+        run: node scripts/verify-v118-rounds-browser.mjs
+
+      - name: Upload v118 visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v118-round-selection-evidence
+          path: artifacts/v118-rounds
+          if-no-files-found: warn
