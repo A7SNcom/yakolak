@@ -1,7 +1,9 @@
-console.info('[Yakolak] APP.JS v117 ONLINE NATIVE GAMEPLAY LOADED');
+console.info('[Yakolak] APP.JS v118 ONLINE ROUND SELECTION LOADED');
 
-const BUILD='117';
-import('./src/app-game-v114.js?v='+BUILD+'-release').catch(error=>{
-  console.error('[Yakolak] v117 bootstrap failed',error);
-  globalThis.__yakolakLoading?.set?.(100,'تعذر تحميل النسخة 117');
-});
+const BUILD='118';
+import('./src/app-game-v114.js?v='+BUILD+'-release')
+  .then(()=>import('./src/online-rounds-v118.js?v='+BUILD+'-rounds'))
+  .catch(error=>{
+    console.error('[Yakolak] v118 bootstrap failed',error);
+    globalThis.__yakolakLoading?.set?.(100,'تعذر تحميل النسخة 118');
+  });
