@@ -88,10 +88,10 @@ async function markerMetrics(page) {
   });
 }
 
-async function move(page, token, state, zone, size) {
+async function move(page, token, code, state, zone, size) {
   const result = await api(page, {
     action: 'move',
-    code: state.code,
+    code,
     version: state.version,
     zone,
     size
@@ -153,7 +153,8 @@ try {
   ]);
 
   let state = joined.room;
-  state = await move(desktop, created.token, state, 0, 'l');
+  state = await move(desktop, created.token, code, state, 0, 'l');
+  const moveResponseOmittedCode = !state.code;
   await Promise.all([
     waitForRoom(desktop, () => globalThis.__yakolakOnlineV114?.room?.moveNumber >= 1),
     waitForRoom(mobile, () => globalThis.__yakolakOnlineV114?.room?.moveNumber >= 1)
@@ -173,10 +174,10 @@ try {
   await desktop.screenshot({ path: outputPath('desktop-playing.png'), fullPage: false });
   await mobile.screenshot({ path: outputPath('mobile-playing.png'), fullPage: false });
 
-  state = await move(mobile, joined.token, state, 3, 'l');
-  state = await move(desktop, created.token, state, 1, 'l');
-  state = await move(mobile, joined.token, state, 4, 'l');
-  state = await move(desktop, created.token, state, 2, 'l');
+  state = await move(mobile, joined.token, code, state, 3, 'l');
+  state = await move(desktop, created.token, code, state, 1, 'l');
+  state = await move(mobile, joined.token, code, state, 4, 'l');
+  state = await move(desktop, created.token, code, state, 2, 'l');
   assert.equal(state.status, 'finished');
   assert.equal(state.winner?.color, 'right');
 
@@ -207,6 +208,7 @@ try {
     ok: true,
     preview: new URL(previewUrl).origin,
     roomCode: code,
+    moveResponseOmittedCode,
     viewports: {
       desktop: { width: 1440, height: 900 },
       mobile: { width: 390, height: 844, deviceScaleFactor: 2 }
