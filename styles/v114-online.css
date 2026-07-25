@@ -170,13 +170,13 @@ body.yakolak-online-waiting #yakolakOnlineDialog{
 }
 body.yakolak-online-waiting #yakolakOnlineDialog .yo-card{
   width:min(680px,100%);
-  max-height:min(46dvh,410px);
-  padding:14px 16px;
+  max-height:min(42dvh,320px);
+  padding:12px 14px;
   border-radius:18px;
   background:rgba(15,23,29,.94);
   pointer-events:auto;
 }
-body.yakolak-online-waiting .yo-head{margin-bottom:8px}
+body.yakolak-online-waiting .yo-head{display:none}
 body.yakolak-online-waiting .yo-title{font-size:17px}
 body.yakolak-online-waiting .yo-step-title{font-size:17px}
 body.yakolak-online-waiting .yo-note{margin-bottom:8px}
@@ -187,14 +187,14 @@ body.yakolak-online-waiting .yo-lobby-roster{
   margin:8px 0 10px;
 }
 body.yakolak-online-waiting .yo-lobby-player{min-height:42px;padding:6px 9px}
+body.yakolak-online-waiting .yo-status{display:none}
 body.yakolak-online-native-setup #yakolakOnlineEntry{
   min-width:150px;
   background:rgba(83,32,32,.92);
 }
 @media (max-width:520px){
   body.yakolak-online-waiting #yakolakOnlineDialog .yo-card{
-    max-height:48dvh;
+    max-height:42dvh;
     border-radius:20px;
   }
-  body.yakolak-online-waiting .yo-head{display:none}
 }
