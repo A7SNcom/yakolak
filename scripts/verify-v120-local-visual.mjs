@@ -59,6 +59,7 @@ async function prepareScene(page, version) {
     document.getElementById('yakolakTutorialDialog')?.classList.remove('open');
     document.getElementById('yakolakOnlineDialog')?.classList.remove('open');
     if (game.setupGroup) game.setupGroup.visible = false;
+    if (game.meshes?.['9']) game.meshes['9'].visible = true;
     game.debugTriggerWin?.('same-size', 'back');
   });
   await page.waitForTimeout(180);
@@ -68,6 +69,7 @@ async function prepareScene(page, version) {
     game.state.winner = null;
     game.state.locked = false;
     if (game.setupGroup) game.setupGroup.visible = false;
+    if (game.meshes?.['9']) game.meshes['9'].visible = true;
     document.getElementById('yakolakGameSetup')?.classList.add('hidden');
     document.getElementById('yakolakOnlineDialog')?.classList.remove('open');
     game.setResponsiveOverview?.();
@@ -97,7 +99,8 @@ async function measure(page) {
     const renderer = game.renderer;
     const gl = renderer.getContext();
     const scene = game.gameGroup.parent;
-    const board = game.meshes['9'].material;
+    const boardMesh = game.meshes['9'];
+    const board = boardMesh.material;
     const sample = [];
 
     for (let i = 0; i < 8; i += 1) {
@@ -148,6 +151,7 @@ async function measure(page) {
         p95: round(percentile(sample, 0.95))
       },
       board: {
+        visible: boardMesh.visible,
         color: `#${board.color.getHexString()}`,
         emissive: `#${board.emissive.getHexString()}`,
         emissiveIntensity: board.emissiveIntensity,
@@ -190,6 +194,10 @@ try {
 
   assertCostEqual(v119Desktop, v120Desktop, 'desktop');
   assertCostEqual(v119Mobile, v120Mobile, 'mobile');
+  assert.equal(v119Desktop.board.visible, true);
+  assert.equal(v120Desktop.board.visible, true);
+  assert.equal(v119Mobile.board.visible, true);
+  assert.equal(v120Mobile.board.visible, true);
   assert.deepEqual(v120Desktop.board, v119Desktop.board, 'desktop board material changed');
   assert.equal(v120Mobile.board.color, '#5b6875');
   assert.equal(v120Mobile.board.emissive, '#1f2b36');
