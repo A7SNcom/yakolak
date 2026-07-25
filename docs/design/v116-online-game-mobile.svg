@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="760" viewBox="0 0 900 760">
+  <defs>
+    <linearGradient id="room" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#e8eef0"/>
+      <stop offset="1" stop-color="#cbd6d9"/>
+    </linearGradient>
+    <filter id="s" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="16" stdDeviation="16" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <rect width="900" height="760" fill="#edf2f4"/>
+  <text x="450" y="48" text-anchor="middle" font-family="Arial" font-size="29" font-weight="700" fill="#14232c">تكوين اللعب على الجوال — قبل التنفيذ</text>
+  <text x="450" y="78" text-anchor="middle" font-family="Arial" font-size="16" fill="#52636d">معلومة واحدة في الأعلى، لوحة أكبر، وحالة الاتصال داخل شريط اللاعبين</text>
+
+  <g transform="translate(270 104)" filter="url(#s)">
+    <rect width="360" height="620" rx="38" fill="#071015"/>
+    <clipPath id="phone"><rect x="12" y="12" width="336" height="596" rx="28"/></clipPath>
+    <g clip-path="url(#phone)">
+      <rect x="12" y="12" width="336" height="596" fill="url(#room)"/>
+      <rect x="12" y="12" width="336" height="52" fill="#143d59"/>
+      <text x="180" y="44" text-anchor="middle" font-family="Arial" font-size="16" font-weight="700" fill="white">دورك: اختر قطعة</text>
+
+      <rect x="24" y="76" width="312" height="58" rx="16" fill="#13222b" opacity=".96"/>
+      <circle cx="308" cy="105" r="9" fill="#2f856a"/>
+      <text x="290" y="101" text-anchor="end" font-family="Arial" font-size="13" font-weight="700" fill="white">أنت · الأخضر</text>
+      <text x="290" y="120" text-anchor="end" font-family="Arial" font-size="11" fill="#75e1b7">دورك الآن</text>
+      <circle cx="92" cy="105" r="9" fill="#f1eee6"/>
+      <text x="76" y="101" text-anchor="end" font-family="Arial" font-size="13" font-weight="700" fill="white">صديقك</text>
+      <text x="76" y="120" text-anchor="end" font-family="Arial" font-size="11" fill="#aec0c8">متصل</text>
+
+      <!-- table top -->
+      <ellipse cx="180" cy="416" rx="236" ry="218" fill="#54463a"/>
+      <ellipse cx="180" cy="397" rx="218" ry="194" fill="#6f6257"/>
+
+      <!-- board -->
+      <g transform="translate(76 220)">
+        <path d="M28 8h152l28 26v152l-28 26H28L0 186V34z" fill="#173646" stroke="#0c2734" stroke-width="6"/>
+        <g fill="none" stroke="#7193a1" stroke-width="2.5" opacity=".9">
+          <circle cx="58" cy="66" r="23"/><circle cx="104" cy="66" r="23"/><circle cx="150" cy="66" r="23"/>
+          <circle cx="58" cy="112" r="23"/><circle cx="104" cy="112" r="23"/><circle cx="150" cy="112" r="23"/>
+          <circle cx="58" cy="158" r="23"/><circle cx="104" cy="158" r="23"/><circle cx="150" cy="158" r="23"/>
+        </g>
+      </g>
+
+      <!-- pieces -->
+      <g fill="#2f856a" stroke="#1d654f" stroke-width="2">
+        <circle cx="48" cy="340" r="18"/><circle cx="48" cy="390" r="18"/><circle cx="48" cy="440" r="18"/>
+      </g>
+      <g fill="#f1eee6" stroke="#b9b5ae" stroke-width="2">
+        <circle cx="312" cy="340" r="18"/><circle cx="312" cy="390" r="18"/><circle cx="312" cy="440" r="18"/>
+      </g>
+      <rect x="104" y="564" width="152" height="30" rx="15" fill="#0e1b22" opacity=".86"/>
+      <circle cx="237" cy="579" r="5" fill="#48d597"/>
+      <text x="222" y="584" text-anchor="end" font-family="Arial" font-size="11" font-weight="700" fill="white">الغرفة A7SN24</text>
+    </g>
+  </g>
+
+  <g font-family="Arial" font-size="16" fill="#243842">
+    <circle cx="170" cy="220" r="6" fill="#2f856a"/><text x="152" y="226" text-anchor="end">لا بطاقات متفرقة</text>
+    <circle cx="730" cy="326" r="6" fill="#2f856a"/><text x="748" y="332">اللوحة هي الأكبر</text>
+    <circle cx="170" cy="554" r="6" fill="#2f856a"/><text x="152" y="560" text-anchor="end">جسم طاولة أقل</text>
+    <circle cx="730" cy="650" r="6" fill="#2f856a"/><text x="748" y="656">اتصال هادئ بالأسفل</text>
+  </g>
+</svg>

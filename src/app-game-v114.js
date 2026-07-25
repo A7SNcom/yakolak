@@ -1,5 +1,5 @@
-const response = await fetch('./src/app-game-v112.js?v=114-online-mobile-foundation-wrapper', { cache: 'no-store' });
-if (!response.ok) throw new Error(`v114 wrapper load failed: ${response.status}`);
+const response = await fetch('./src/app-game-v112.js?v=116-online-lobby-mobile-clarity-wrapper', { cache: 'no-store' });
+if (!response.ok) throw new Error(`v116 wrapper load failed: ${response.status}`);
 let wrapper = await response.text();
 
 function replaceExact(oldValue, newValue, label) {
@@ -10,10 +10,10 @@ function replaceExact(oldValue, newValue, label) {
 
 replaceExact(
   "const response=await fetch('./src/app-game-v085.js?v=112-action-tutorial-source',{cache:'no-store'});",
-  "const response=await fetch('./src/app-game-v085.js?v=114-online-mobile-foundation-source',{cache:'no-store'});",
-  'v114 source marker'
+  "const response=await fetch('./src/app-game-v085.js?v=116-online-lobby-mobile-clarity-source',{cache:'no-store'});",
+  'v116 source marker'
 );
-replaceExact("const BUILD='112';", "const BUILD='114';", 'v114 build number');
+replaceExact("const BUILD='112';", "const BUILD='116';", 'v116 build number');
 
 const releasePatch = [
   'replaceRegex(',
@@ -50,8 +50,8 @@ const releasePatch = [
   ');',
   'replaceExact(',
   '  "if(MOBILE_HIGH_QUALITY)return Math.min(dpr,1.15);\\n  if(DEVICE_MEMORY>=4||CPU_CORES>=6)return Math.min(dpr,1.05);\\n  return Math.min(dpr,.9);",',
-  '  "if(MOBILE_HIGH_QUALITY)return Math.min(dpr,1.3);\\n  if(DEVICE_MEMORY>=4||CPU_CORES>=6)return Math.min(dpr,1.15);\\n  return Math.min(dpr,1);",',
-  "  'sharpen mobile rendering without uncapped DPR'",
+  '  "if(MOBILE_HIGH_QUALITY)return Math.min(dpr,1.5);\\n  if(DEVICE_MEMORY>=4||CPU_CORES>=6)return Math.min(dpr,1.35);\\n  return Math.min(dpr,1.15);",',
+  "  'raise bounded mobile clarity for simple board geometry'",
   ');',
   'replaceExact(',
   '  "board:{color:\'#4a5562\',roughness:.48,metalness:0,emissive:\'#25313d\',emissiveIntensity:.2}",',
@@ -73,14 +73,15 @@ const releasePatch = [
   '  `function setResponsiveOverview(){',
   '  const portrait=innerHeight>innerWidth*1.18;',
   '  const compactLandscape=!portrait&&(innerWidth<=900||innerHeight<=600);',
-  '  camera.fov=portrait?49:compactLandscape?45:43;',
-  '  if(portrait)camera.position.set(420,670,570);',
+  '  const crowded=(gameState.players?.length||2)>2;',
+  '  camera.fov=portrait?(crowded?48:46):compactLandscape?45:43;',
+  '  if(portrait)camera.position.set(crowded?380:330,crowded?620:560,crowded?510:455);',
   '  else if(compactLandscape)camera.position.set(245,325,285);',
   '  else camera.position.set(520,430,520);',
   '  camera.near=.5;camera.far=12000;',
   '  camera.updateProjectionMatrix();',
-  '  controls.target.set(0,portrait?6:0,0);',
-  '  controls.minDistance=portrait?560:compactLandscape?430:420;',
+  '  controls.target.set(0,portrait?18:0,0);',
+  '  controls.minDistance=portrait?(crowded?540:500):compactLandscape?430:420;',
   '  controls.maxDistance=portrait?1080:compactLandscape?980:1350;',
   '  controls.update();keepInsideRoom();render();',
   '}',
@@ -107,19 +108,19 @@ const releasePatch = [
 
 replaceExact(
   "source+='\\n//# sourceURL=yakolak-v112-action-tutorial-runtime.js\\n';",
-  releasePatch + "\nsource+='\\n//# sourceURL=yakolak-v114-online-mobile-foundation-runtime.js\\n';",
-  'inject v114 policies'
+  releasePatch + "\nsource+='\\n//# sourceURL=yakolak-v116-online-lobby-mobile-clarity-runtime.js\\n';",
+  'inject v116 policies'
 );
 replaceExact(
   "globalThis.__yakolakV112={build:112,base:110,tutorial:'short-skippable-action-led'};",
-  "globalThis.__yakolakV114={build:114,base:113,change:'authoritative-online-and-mobile-framing'};",
-  'v114 runtime marker'
+  "globalThis.__yakolakV116={build:116,base:115,change:'clear-multiplayer-lobbies-and-mobile-clarity'};",
+  'v116 runtime marker'
 );
 
 const moduleUrl = URL.createObjectURL(new Blob([wrapper], { type: 'text/javascript' }));
 try {
   await import(moduleUrl);
-  await import('./online-client-v114.js?v=114-online-mobile-foundation-client');
+  await import('./online-client-v114.js?v=116-online-lobby-mobile-clarity-client');
 } finally {
   setTimeout(() => URL.revokeObjectURL(moduleUrl), 15000);
 }

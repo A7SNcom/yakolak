@@ -1,6 +1,6 @@
 {
-  "version": "v114-online-mobile-foundation",
-  "build": 114,
-  "updated_at": "2026-07-24",
-  "note": "Adds conflict-safe two-player online rooms with reconnection and rematches, plus responsive mobile framing, warmer table contrast, and a bounded mobile pixel-ratio improvement."
+  "version": "v116-online-lobby-mobile-clarity",
+  "build": 116,
+  "updated_at": "2026-07-25",
+  "note": "Adds clear 2-4 player online lobbies, invite-aware color selection, automatic start at the chosen capacity, compact mobile HUD, and sharper bounded mobile rendering."
 }

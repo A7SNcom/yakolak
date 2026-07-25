@@ -100,14 +100,20 @@ function showOnlineLastMove(lastMove) {
 function syncOnlineScore() {
   const score = document.getElementById('yakolakGameScore');
   if (!score || !room) return;
+  score.classList.add('yo-roster');
   score.replaceChildren();
   room.players.forEach((player, index) => {
     const mine = player.seat === identity?.seat;
     const active = room.status === 'playing' && index === room.turnIndex;
     const item = document.createElement('span');
-    item.textContent = `${mine ? 'أنت' : 'الخصم'} · ${colorLabel(player.color)}${active ? ' · الدور' : ''}`;
-    item.style.borderColor = COLOR_LABELS[player.color]?.[1] || '#ffffff';
-    if (active) item.style.outline = '2px solid rgba(255,255,255,.7)';
+    item.className = `${mine ? 'mine' : ''} ${active ? 'active' : ''}`.trim();
+    const dot = document.createElement('i');
+    dot.style.background = COLOR_LABELS[player.color]?.[1] || '#ffffff';
+    const label = document.createElement('b');
+    label.textContent = mine ? 'أنت' : `لاعب ${index + 1}`;
+    const detail = document.createElement('small');
+    detail.textContent = active ? 'الدور الآن' : colorLabel(player.color);
+    item.append(dot, label, detail);
     score.append(item);
   });
 }
@@ -153,7 +159,12 @@ function resetOnlinePieces(remote) {
 function updateOnlineCaption() {
   if (!room) return;
   if (room.status === 'finished') {
-    captionGame(room.winner?.color === onlineHumanColor ? 'فزت بالجولة!' : `فاز ${colorLabel(room.winner?.color)}.`);
+    if (room.draw) captionGame('تعادل — انتهت الحركات القانونية.');
+    else captionGame(room.winner?.color === onlineHumanColor ? 'فزت بالجولة!' : `فاز ${colorLabel(room.winner?.color)}.`);
+    return;
+  }
+  if (room.status === 'cancelled') {
+    captionGame('انتهت الغرفة لأن أحد اللاعبين غادر.');
     return;
   }
   const current = room.players[room.turnIndex];
@@ -315,10 +326,11 @@ const hooks = {
 };
 
 const API = '/api/rooms';
-const POLL_BASE_MS = 1200;
+const POLL_BASE_MS = 900;
 const POLL_MAX_MS = 8000;
 const REQUEST_TIMEOUT_MS = 6500;
 const CODE_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/;
+const PLAYER_COUNTS = [2, 3, 4];
 const COLOR_LABELS = {
   right: ['الأبيض', '#f1eee6'],
   back: ['الأزرق', '#3769a5'],
@@ -333,6 +345,8 @@ let pollDelay = POLL_BASE_MS;
 let started = false;
 let stopped = false;
 let requestPending = false;
+let selectedPlayerCount = 2;
+let invitePreview = null;
 
 function node(tag, className = '', text = '') {
   const element = document.createElement(tag);
@@ -350,7 +364,7 @@ function roomParam() {
 }
 
 function identityKey(code) {
-  return `yakolak-online-v114:${code}`;
+  return `yakolak-online-v116:${code}`;
 }
 
 function loadIdentity(code) {
@@ -385,9 +399,13 @@ function errorMessage(code) {
   return {
     invalid_room_code: 'تأكد من كتابة رمز الغرفة المكوّن من 6 خانات.',
     room_not_found: 'الغرفة غير موجودة أو انتهت صلاحيتها.',
-    room_full: 'دخل اللاعب الآخر إلى هذه الغرفة بالفعل.',
+    room_full: 'اكتمل عدد اللاعبين في هذه الغرفة.',
+    color_taken: 'اختار لاعب آخر هذا اللون. اختر لونًا متاحًا.',
+    invalid_player_count: 'اختر عدد لاعبين بين 2 و4.',
+    room_cancelled: 'أُغلقت هذه الغرفة.',
     not_your_turn: 'انتظر دورك؛ تم تحديث اللوحة.',
     occupied_slot: 'هذا الحجم موجود في الخانة بالفعل.',
+    no_piece_remaining: 'استخدمت قطعك الثلاث من هذا الحجم. اختر حجمًا آخر.',
     version_conflict: 'وصلت حركة أخرى أولًا؛ تم تحديث اللوحة.',
     online_unavailable: 'اللعب الأونلاين غير متاح مؤقتًا.',
     online_server_error: 'تعذر مزامنة الغرفة الآن. سنحاول مجددًا.',
@@ -455,7 +473,6 @@ function openDialog() {
 }
 
 function closeDialog() {
-  if (room?.status === 'waiting') return;
   document.getElementById('yakolakOnlineDialog')?.classList.remove('open');
 }
 
@@ -464,11 +481,11 @@ function renderHome(message = '') {
   if (!body) return;
   body.replaceChildren();
   body.append(
-    node('p', 'yo-note', 'أنشئ غرفة وشارك الرابط، أو أدخل رمز غرفة أرسله لك صديق. المباراة بين لاعبين في هذا الإصدار.')
+    node('p', 'yo-note', 'ابدأ غرفة خاصة، أو انضم برمز أرسله لك صديق.')
   );
   const create = node('button', 'yo-button', 'إنشاء غرفة');
   create.type = 'button';
-  create.addEventListener('click', renderColorChoice);
+  create.addEventListener('click', renderPlayerCountChoice);
   const join = node('button', 'yo-button secondary', 'دخول برمز');
   join.type = 'button';
   const actions = node('div', 'yo-actions');
@@ -488,29 +505,80 @@ function renderHome(message = '') {
   input.addEventListener('input', () => { input.value = normalizeCode(input.value); });
   field.append(label, input);
   body.append(divider, field);
-  join.addEventListener('click', () => joinRoom(input.value));
+  join.addEventListener('click', () => prepareInvite(input.value));
   input.addEventListener('keydown', event => {
-    if (event.key === 'Enter') joinRoom(input.value);
+    if (event.key === 'Enter') prepareInvite(input.value);
   });
   const status = node('div', 'yo-status', message);
   body.append(status);
 }
 
-function renderColorChoice() {
+function choiceHeading(title, note) {
+  const fragment = document.createDocumentFragment();
+  fragment.append(node('h2', 'yo-step-title', title), node('p', 'yo-note', note));
+  return fragment;
+}
+
+function renderPlayerCountChoice() {
   const body = document.querySelector('#yakolakOnlineDialog .yo-body');
   if (!body) return;
-  body.replaceChildren(
-    node('p', 'yo-note', 'اختر لونك. سيحصل صديقك على اللون التالي تلقائيًا كي تبدأ المباراة فور دخوله.')
-  );
-  const colors = node('div', 'yo-colors');
+  body.replaceChildren(choiceHeading('كم لاعبًا؟', 'تبدأ المباراة تلقائيًا عندما يكتمل العدد.'));
+  const counts = node('div', 'yo-counts');
+  PLAYER_COUNTS.forEach(count => {
+    const button = node('button', `yo-count${count === selectedPlayerCount ? ' selected' : ''}`, String(count));
+    button.type = 'button';
+    button.setAttribute('aria-pressed', String(count === selectedPlayerCount));
+    button.addEventListener('click', () => {
+      selectedPlayerCount = count;
+      renderPlayerCountChoice();
+    });
+    counts.append(button);
+  });
+  const next = node('button', 'yo-button', 'اختيار اللون');
+  next.type = 'button';
+  next.addEventListener('click', () => renderColorChoice('create'));
+  const back = node('button', 'yo-button secondary', 'رجوع');
+  back.type = 'button';
+  back.addEventListener('click', () => renderHome());
+  const actions = node('div', 'yo-actions');
+  actions.append(next, back);
+  body.append(counts, actions, node('div', 'yo-status'));
+}
+
+function renderColorButtons(availableColors, onChoose) {
+  const grid = node('div', 'yo-colors');
   Object.entries(COLOR_LABELS).forEach(([color, [label, css]]) => {
     const button = node('button', 'yo-color', label);
     button.type = 'button';
     button.style.setProperty('--yo-color', css);
-    button.addEventListener('click', () => createRoom(color));
-    colors.append(button);
+    const enabled = availableColors.includes(color);
+    button.disabled = !enabled;
+    if (!enabled) button.setAttribute('aria-label', `${label} محجوز`);
+    button.addEventListener('click', () => enabled && onChoose(color));
+    grid.append(button);
   });
-  body.append(colors, node('div', 'yo-status'));
+  return grid;
+}
+
+function renderColorChoice(mode = 'create') {
+  const body = document.querySelector('#yakolakOnlineDialog .yo-body');
+  if (!body) return;
+  const joining = mode === 'join';
+  const available = joining ? (invitePreview?.availableColors || []) : Object.keys(COLOR_LABELS);
+  body.replaceChildren(choiceHeading(
+    joining ? 'اختر لونك للانضمام' : 'اختر لونك',
+    joining
+      ? `الغرفة ${invitePreview?.code || roomParam()} · ${invitePreview?.players?.length || 0}/${invitePreview?.targetPlayers || '?'} لاعبين`
+      : `غرفة من ${selectedPlayerCount} لاعبين`
+  ));
+  body.append(renderColorButtons(
+    available,
+    color => joining ? joinRoom(invitePreview?.code || roomParam(), color) : createRoom(color, selectedPlayerCount)
+  ));
+  const back = node('button', 'yo-button secondary yo-back', 'رجوع');
+  back.type = 'button';
+  back.addEventListener('click', joining ? () => leaveInvite() : renderPlayerCountChoice);
+  body.append(back, node('div', 'yo-status'));
 }
 
 function inviteUrl(code) {
@@ -523,9 +591,21 @@ function renderWaiting() {
   const body = document.querySelector('#yakolakOnlineDialog .yo-body');
   if (!body || !room) return;
   body.replaceChildren(
-    node('p', 'yo-note', 'الغرفة جاهزة. أرسل الرابط لصديقك واترك هذه الصفحة مفتوحة.')
+    choiceHeading('الغرفة جاهزة', `انضم ${room.players.length} من ${room.targetPlayers} لاعبين`)
   );
   body.append(node('strong', 'yo-code', room.code));
+  const roster = node('div', 'yo-lobby-roster');
+  room.players.forEach(player => {
+    const item = node('div', 'yo-lobby-player');
+    const dot = node('i');
+    dot.style.background = COLOR_LABELS[player.color]?.[1] || '#fff';
+    item.append(dot, node('b', '', player.seat === identity?.seat ? 'أنت' : `لاعب ${room.players.indexOf(player) + 1}`), node('small', '', colorLabel(player.color)));
+    roster.append(item);
+  });
+  for (let index = room.players.length; index < room.targetPlayers; index += 1) {
+    roster.append(node('div', 'yo-lobby-player empty', 'بانتظار لاعب…'));
+  }
+  body.append(roster);
   const copy = node('button', 'yo-button', 'نسخ رابط الدعوة');
   copy.type = 'button';
   copy.addEventListener('click', async () => {
@@ -536,12 +616,12 @@ function renderWaiting() {
       setStatus(`شارك الرمز ${room.code} مع صديقك.`, 'online');
     }
   });
-  const leave = node('button', 'yo-button secondary', 'إلغاء الغرفة');
+  const leave = node('button', 'yo-button secondary', identity?.seat === 'p1' ? 'إلغاء الغرفة' : 'مغادرة الغرفة');
   leave.type = 'button';
   leave.addEventListener('click', leaveOnline);
   const actions = node('div', 'yo-actions');
   actions.append(copy, leave);
-  body.append(actions, node('div', 'yo-status', 'بانتظار اللاعب الآخر…'));
+  body.append(actions, node('div', 'yo-status', `بانتظار ${room.targetPlayers - room.players.length} لاعب…`));
 }
 
 function renderFinished() {
@@ -549,7 +629,15 @@ function renderFinished() {
   if (!body || !room) return;
   const humanWon = room.winner?.color === hooks.state().humanColor;
   body.replaceChildren(
-    node('p', 'yo-note', humanWon ? 'أحسنت! اكتمل نمط الفوز.' : 'انتهت الجولة. يمكنكما بدء جولة جديدة مع بقاء الغرفة نفسها.')
+    node(
+      'p',
+      'yo-note',
+      room.draw
+        ? 'تعادل: لم تعد هناك حركة قانونية. يمكنكم بدء جولة جديدة في الغرفة نفسها.'
+        : humanWon
+          ? 'أحسنت! اكتمل نمط الفوز.'
+          : 'انتهت الجولة. يمكنكم بدء جولة جديدة مع بقاء الغرفة نفسها.'
+    )
   );
   const rematch = node('button', 'yo-button', 'جولة أخرى');
   rematch.type = 'button';
@@ -562,13 +650,45 @@ function renderFinished() {
   body.append(actions, node('div', 'yo-status', rematchText()));
 }
 
+function renderPlayingRoom() {
+  const body = document.querySelector('#yakolakOnlineDialog .yo-body');
+  if (!body || !room) return;
+  const current = room.players[room.turnIndex];
+  body.replaceChildren(
+    choiceHeading(
+      `الغرفة ${room.code}`,
+      current?.seat === identity?.seat ? 'دورك الآن.' : `الدور عند ${colorLabel(current?.color)}.`
+    )
+  );
+  const roster = node('div', 'yo-lobby-roster');
+  room.players.forEach((player, index) => {
+    const item = node('div', `yo-lobby-player${index === room.turnIndex ? ' active' : ''}`);
+    const dot = node('i');
+    dot.style.background = COLOR_LABELS[player.color]?.[1] || '#fff';
+    item.append(
+      dot,
+      node('b', '', player.seat === identity?.seat ? 'أنت' : `لاعب ${index + 1}`),
+      node('small', '', index === room.turnIndex ? 'الدور الآن' : colorLabel(player.color))
+    );
+    roster.append(item);
+  });
+  const leave = node('button', 'yo-button secondary', 'مغادرة المباراة');
+  leave.type = 'button';
+  leave.addEventListener('click', leaveOnline);
+  body.append(
+    roster,
+    node('p', 'yo-caution', 'مغادرة مباراة بدأت ستنهي هذه الجولة لجميع اللاعبين.'),
+    leave,
+    node('div', 'yo-status')
+  );
+}
+
 function rematchText() {
   if (!room?.rematch) return '';
   const mine = room.rematch[identity?.seat];
-  const otherSeat = identity?.seat === 'host' ? 'guest' : 'host';
-  const other = room.rematch[otherSeat];
-  if (mine && !other) return 'جاهز. بانتظار موافقة اللاعب الآخر…';
-  if (!mine && other) return 'اللاعب الآخر جاهز لجولة جديدة.';
+  const ready = room.players.filter(player => room.rematch[player.seat]).length;
+  if (mine && ready < room.players.length) return `جاهز. بانتظار ${room.players.length - ready} لاعب…`;
+  if (!mine && ready > 0) return `${ready} من ${room.players.length} جاهزون لجولة جديدة.`;
   return '';
 }
 
@@ -581,6 +701,20 @@ async function applyRoom(nextRoom) {
     renderWaiting();
     openDialog();
     setStatus('بانتظار اللاعب الآخر…', 'online');
+    return;
+  }
+  if (room.status === 'cancelled') {
+    stopped = true;
+    clearTimeout(pollTimer);
+    const body = document.querySelector('#yakolakOnlineDialog .yo-body');
+    body?.replaceChildren(
+      choiceHeading('انتهت الغرفة', 'غادر أحد اللاعبين. يمكنك العودة وإنشاء غرفة جديدة.'),
+      node('button', 'yo-button', 'العودة للبداية')
+    );
+    const back = body?.querySelector('button');
+    back?.addEventListener('click', leaveOnline);
+    openDialog();
+    setStatus('انتهت الغرفة', 'offline');
     return;
   }
   if (!started) {
@@ -606,11 +740,11 @@ async function applyRoom(nextRoom) {
   }
 }
 
-async function createRoom(color) {
+async function createRoom(color, targetPlayers) {
   setButtonsDisabled(true);
   setStatus('ننشئ الغرفة…');
   try {
-    const payload = await post('create', { color });
+    const payload = await post('create', { color, targetPlayers });
     saveIdentity({
       code: payload.room.code,
       token: payload.token,
@@ -626,7 +760,29 @@ async function createRoom(color) {
   }
 }
 
-async function joinRoom(value) {
+async function prepareInvite(value) {
+  const code = normalizeCode(value);
+  if (!CODE_PATTERN.test(code)) {
+    setStatus(errorMessage('invalid_room_code'), 'error');
+    return;
+  }
+  setButtonsDisabled(true);
+  setStatus('نتحقق من الدعوة…');
+  try {
+    const payload = await post('preview', { code });
+    if (payload.room.status !== 'waiting') throw new Error(payload.room.status === 'cancelled' ? 'room_cancelled' : 'room_full');
+    invitePreview = payload.room;
+    renderColorChoice('join');
+  } catch (error) {
+    renderHome(errorMessage(error.message));
+    const input = document.getElementById('yakolakRoomCode');
+    if (input) input.value = code;
+  } finally {
+    setButtonsDisabled(false);
+  }
+}
+
+async function joinRoom(value, color) {
   const code = normalizeCode(value);
   if (!CODE_PATTERN.test(code)) {
     setStatus(errorMessage('invalid_room_code'), 'error');
@@ -635,13 +791,18 @@ async function joinRoom(value) {
   setButtonsDisabled(true);
   setStatus('ندخل الغرفة…');
   try {
-    const payload = await post('join', { code });
+    const payload = await post('join', { code, color });
     saveIdentity({ code, token: payload.token, seat: payload.seat });
     setRoomUrl(code);
     await applyRoom(payload.room);
     schedulePoll(0);
   } catch (error) {
-    setStatus(errorMessage(error.message), 'error');
+    if (error.message === 'color_taken' || error.message === 'version_conflict') {
+      await prepareInvite(code);
+      setStatus(errorMessage(error.message), 'error');
+    } else {
+      setStatus(errorMessage(error.message), 'error');
+    }
   } finally {
     setButtonsDisabled(false);
   }
@@ -710,9 +871,20 @@ function schedulePoll(delay) {
   if (!stopped) pollTimer = setTimeout(poll, delay);
 }
 
-function leaveOnline() {
+function leaveInvite() {
+  clearRoomUrl();
+  invitePreview = null;
+  renderHome();
+}
+
+async function leaveOnline() {
   stopped = true;
   clearTimeout(pollTimer);
+  if (identity && room && room.status !== 'cancelled') {
+    try {
+      await post('leave', { code: identity.code, version: room.version });
+    } catch {}
+  }
   if (identity) {
     try { sessionStorage.removeItem(identityKey(identity.code)); } catch {}
   }
@@ -725,7 +897,9 @@ function buildUi() {
   entry.id = 'yakolakOnlineEntry';
   entry.type = 'button';
   entry.addEventListener('click', () => {
-    renderHome();
+    if (room?.status === 'waiting') renderWaiting();
+    else if (invitePreview) renderColorChoice('join');
+    else renderHome();
     openDialog();
   });
 
@@ -745,9 +919,18 @@ function buildUi() {
   card.append(head, node('div', 'yo-body'));
   dialog.append(card);
 
-  const pill = node('div');
+  const pill = node('button');
   pill.id = 'yakolakOnlinePill';
+  pill.type = 'button';
+  pill.setAttribute('aria-label', 'حالة غرفة الأونلاين');
   pill.setAttribute('aria-live', 'polite');
+  pill.addEventListener('click', () => {
+    if (room?.status === 'waiting') renderWaiting();
+    else if (room?.status === 'finished') renderFinished();
+    else if (room?.status === 'playing') renderPlayingRoom();
+    else return;
+    openDialog();
+  });
   document.body.append(entry, dialog, pill);
 }
 
@@ -755,12 +938,15 @@ async function restoreInvite() {
   const code = roomParam();
   if (!CODE_PATTERN.test(code)) return;
   const saved = loadIdentity(code);
-  renderHome();
   openDialog();
   if (!saved) {
-    const input = document.getElementById('yakolakRoomCode');
-    if (input) input.value = code;
-    setStatus('رمز الدعوة جاهز. اضغط «دخول برمز».');
+    const body = document.querySelector('#yakolakOnlineDialog .yo-body');
+    body?.replaceChildren(
+      choiceHeading('دعوة للعب', 'نجهز الغرفة ونقرأ الألوان المتاحة…'),
+      node('div', 'yo-loader', '•••'),
+      node('div', 'yo-status', 'جارٍ التحقق من الدعوة…')
+    );
+    await prepareInvite(code);
     return;
   }
   identity = saved;
