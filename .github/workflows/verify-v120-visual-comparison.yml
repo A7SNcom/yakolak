@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 20
     env:
       V119_URL: 'https://yakolak-jwtqngovr-ahmdkcoms-projects.vercel.app/?_vercel_share=tCQKZTHQwhxBBcd57LFOjpML2Dtoxmpv'
-      V120_URL: 'https://yakolak-32ztc6rrb-ahmdkcoms-projects.vercel.app/?_vercel_share=eIj3ljirFmQnIlPb8rJRdfp585LALShU'
+      V120_URL: 'https://yakolak-2vyaqsin2-ahmdkcoms-projects.vercel.app/?_vercel_share=obqVJKwOzDnyK4mMx1ze920O002xWVEN'
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
