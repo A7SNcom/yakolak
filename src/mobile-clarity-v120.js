@@ -1,7 +1,7 @@
 export const MOBILE_BOARD_STYLE = Object.freeze({
-  color: '#5b6875',
-  emissive: '#1f2b36',
-  emissiveIntensity: 0.08
+  color: '#706b64',
+  emissive: '#24211e',
+  emissiveIntensity: 0.04
 });
 
 export function boardStyleFor(baseStyle, mobileView) {
@@ -11,7 +11,7 @@ export function boardStyleFor(baseStyle, mobileView) {
 
 globalThis.__yakolakMobileClarityV120 = Object.freeze({
   version: 120,
-  change: 'mobile-only-board-separation',
+  change: 'mobile-only-neutral-board-separation',
   boardStyleFor,
   mobileStyle: MOBILE_BOARD_STYLE,
   renderCost: Object.freeze({
