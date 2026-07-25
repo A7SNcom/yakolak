@@ -5,14 +5,14 @@ on:
     paths:
       - 'src/mobile-clarity-v120.js'
       - 'src/app-game-v114.js'
-      - 'scripts/verify-v120-visual-comparison.mjs'
+      - 'scripts/verify-v120-visual-comparison-fast.mjs'
       - '.github/workflows/verify-v120-visual-comparison.yml'
   workflow_dispatch:
 
 jobs:
   compare-v119-v120:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     env:
       V119_URL: 'https://yakolak-jwtqngovr-ahmdkcoms-projects.vercel.app/?_vercel_share=tCQKZTHQwhxBBcd57LFOjpML2Dtoxmpv'
       V120_URL: 'https://yakolak-32ztc6rrb-ahmdkcoms-projects.vercel.app/?_vercel_share=eIj3ljirFmQnIlPb8rJRdfp585LALShU'
@@ -31,7 +31,7 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Compare v119 and v120 visually and structurally
-        run: node scripts/verify-v120-visual-comparison.mjs
+        run: node scripts/verify-v120-visual-comparison-fast.mjs
 
       - name: Upload comparison evidence
         if: always()
