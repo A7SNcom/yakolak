@@ -1,6 +1,6 @@
 {
-  "version": "v116-online-lobby-mobile-clarity",
-  "build": 116,
+  "version": "v117-online-native-gameplay",
+  "build": 117,
   "updated_at": "2026-07-25",
-  "note": "Adds clear 2-4 player online lobbies, invite-aware color selection, automatic start at the chosen capacity, compact mobile HUD, and sharper bounded mobile rendering."
+  "note": "Restores the established neutral table and makes online setup and piece-size selection reuse the game's native 3D interaction."
 }
