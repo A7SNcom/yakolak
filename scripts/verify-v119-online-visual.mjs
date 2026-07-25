@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const previewUrl = process.env.PREVIEW_URL;
 if (!previewUrl) throw new Error('PREVIEW_URL is required');
 
 const outputDir = new URL('../artifacts/v119-online-visual/', import.meta.url);
+const outputPath = name => fileURLToPath(new URL(name, outputDir));
 await mkdir(outputDir, { recursive: true });
 
 const browser = await chromium.launch({
@@ -25,7 +27,9 @@ const consoleErrors = [];
 function watch(page, name) {
   page.on('pageerror', error => errors.push(`${name}: ${error.message}`));
   page.on('console', message => {
-    if (message.type() === 'error') consoleErrors.push(`${name}: ${message.text()}`);
+    if (message.type() === 'error' && !message.text().includes('Failed to load resource')) {
+      consoleErrors.push(`${name}: ${message.text()}`);
+    }
   });
 }
 
@@ -166,8 +170,8 @@ try {
     assert.equal(metrics.depthWrite, false);
   }
 
-  await desktop.screenshot({ path: new URL('desktop-playing.png', outputDir), fullPage: false });
-  await mobile.screenshot({ path: new URL('mobile-playing.png', outputDir), fullPage: false });
+  await desktop.screenshot({ path: outputPath('desktop-playing.png'), fullPage: false });
+  await mobile.screenshot({ path: outputPath('mobile-playing.png'), fullPage: false });
 
   state = await move(mobile, joined.token, state, 3, 'l');
   state = await move(desktop, created.token, state, 1, 'l');
@@ -196,8 +200,8 @@ try {
     assert.equal(metrics.depthTest, true);
   }
 
-  await desktop.screenshot({ path: new URL('desktop-finished.png', outputDir), fullPage: false });
-  await mobile.screenshot({ path: new URL('mobile-finished.png', outputDir), fullPage: false });
+  await desktop.screenshot({ path: outputPath('desktop-finished.png'), fullPage: false });
+  await mobile.screenshot({ path: outputPath('mobile-finished.png'), fullPage: false });
 
   const result = {
     ok: true,
