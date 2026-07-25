@@ -282,11 +282,32 @@ const hooks = {
   state() {
     return { ...game.state, humanColor: onlineHumanColor };
   },
+  async wait(remote, session) {
+    await waitForGameReady();
+    onlineHumanColor = session.color;
+    game.state.humanColor = onlineHumanColor;
+    game.state.players = remote.players.map(player => player.color);
+    game.state.botCount = 0;
+    game.state.configured = true;
+    game.state.started = false;
+    game.state.tutorial = false;
+    game.state.locked = true;
+    game.state.winner = null;
+    game.state.board = structuredClone(remote.board);
+    game.setupGroup.visible = false;
+    document.getElementById('yakolakGameSetup')?.classList.add('hidden');
+    if (game.meshes['9']) game.meshes['9'].visible = true;
+    resetOnlinePieces(remote);
+    game.syncActiveReadinessBases();
+    game.setResponsiveOverview();
+    captionGame(`الغرفة ${remote.code}: ${remote.players.length} من ${remote.targetPlayers} جاهزون.`);
+    renderGame();
+  },
   async start(remote, session) {
     await waitForGameReady();
     onlineHumanColor = session.color;
     onlineSubmitMove = session.submitMove;
-    game.state.humanColor = '__online__';
+    game.state.humanColor = onlineHumanColor;
     game.state.players = remote.players.map(player => player.color);
     game.state.botCount = 0;
     game.state.configured = true;
@@ -302,11 +323,12 @@ const hooks = {
         game.meshes[`3-${color}`].visible = game.state.players.includes(color);
       }
     }
-    installOnlineInput();
+    globalThis.__yakolakOnlineGameplayBridge.active = true;
     game.setResponsiveOverview();
     await this.apply(remote, false);
   },
   async apply(remote) {
+    game.closePieceTray();
     selectedOnlineSize = null;
     clearOnlineMarkers();
     game.clearHighlights();
@@ -315,11 +337,13 @@ const hooks = {
     game.state.round = remote.round;
     game.state.board = structuredClone(remote.board);
     game.state.winner = remote.winner?.color || null;
-    game.state.locked = remote.status !== 'playing';
+    game.state.locked = remote.status !== 'playing' || requestPending;
     resetOnlinePieces(remote);
+    game.syncActiveReadinessBases();
     showOnlineLastMove(remote.lastMove);
     syncOnlineScore();
     updateOnlineCaption();
+    game.updateTurnGlow();
     renderGame();
     if (remote.winner) void game.showWinHighlight(remote.winner);
   }
@@ -348,6 +372,28 @@ let requestPending = false;
 let selectedPlayerCount = 2;
 let invitePreview = null;
 
+const onlineSetupBridge = {
+  active: false,
+  mode: 'create',
+  color: null,
+  availableColors: null,
+  create({ color, targetPlayers }) {
+    this.active = false;
+    void createRoom(color, targetPlayers);
+  },
+  join(color) {
+    this.active = false;
+    void joinRoom(invitePreview?.code || roomParam(), color);
+  }
+};
+globalThis.__yakolakOnlineSetupBridge = onlineSetupBridge;
+globalThis.__yakolakOnlineGameplayBridge = {
+  active: false,
+  submit(move) {
+    void submitMove(move);
+  }
+};
+
 function node(tag, className = '', text = '') {
   const element = document.createElement(tag);
   if (className) element.className = className;
@@ -364,7 +410,7 @@ function roomParam() {
 }
 
 function identityKey(code) {
-  return `yakolak-online-v116:${code}`;
+  return `yakolak-online-v117:${code}`;
 }
 
 function loadIdentity(code) {
@@ -476,6 +522,25 @@ function closeDialog() {
   document.getElementById('yakolakOnlineDialog')?.classList.remove('open');
 }
 
+function beginNativeOnlineSetup(mode, availableColors = null) {
+  onlineSetupBridge.active = true;
+  onlineSetupBridge.mode = mode;
+  onlineSetupBridge.color = null;
+  onlineSetupBridge.availableColors = availableColors;
+  globalThis.__yakolakOnlineGameplayBridge.active = false;
+  game.state.configured = false;
+  game.state.started = false;
+  game.state.locked = false;
+  game.state.humanColor = null;
+  game.state.players = [];
+  game.state.setupStep = 'color';
+  closeDialog();
+  document.body.classList.add('yakolak-online-native-setup');
+  const entry = document.getElementById('yakolakOnlineEntry');
+  if (entry) entry.textContent = 'إلغاء الأونلاين';
+  game.renderSetup3D();
+}
+
 function renderHome(message = '') {
   const body = document.querySelector('#yakolakOnlineDialog .yo-body');
   if (!body) return;
@@ -485,7 +550,7 @@ function renderHome(message = '') {
   );
   const create = node('button', 'yo-button', 'إنشاء غرفة');
   create.type = 'button';
-  create.addEventListener('click', renderPlayerCountChoice);
+  create.addEventListener('click', () => beginNativeOnlineSetup('create'));
   const join = node('button', 'yo-button secondary', 'دخول برمز');
   join.type = 'button';
   const actions = node('div', 'yo-actions');
@@ -698,6 +763,16 @@ async function applyRoom(nextRoom) {
   room = nextRoom;
   pollDelay = POLL_BASE_MS;
   if (room.status === 'waiting') {
+    const player = room.players.find(item => item.seat === identity?.seat);
+    if (player) await hooks.wait(room, { color: player.color });
+    onlineSetupBridge.active = false;
+    document.body.classList.remove('yakolak-online-native-setup');
+    document.body.classList.add('yakolak-online-waiting');
+    const entry = document.getElementById('yakolakOnlineEntry');
+    if (entry) {
+      entry.hidden = true;
+      entry.textContent = 'لعب أونلاين';
+    }
     renderWaiting();
     openDialog();
     setStatus('بانتظار اللاعب الآخر…', 'online');
@@ -726,6 +801,7 @@ async function applyRoom(nextRoom) {
       submitMove
     });
     started = true;
+    document.body.classList.remove('yakolak-online-waiting', 'yakolak-online-native-setup');
     document.getElementById('yakolakOnlineEntry').hidden = true;
   } else {
     await hooks.apply(room, room.moveNumber > previousMove);
@@ -772,7 +848,7 @@ async function prepareInvite(value) {
     const payload = await post('preview', { code });
     if (payload.room.status !== 'waiting') throw new Error(payload.room.status === 'cancelled' ? 'room_cancelled' : 'room_full');
     invitePreview = payload.room;
-    renderColorChoice('join');
+    beginNativeOnlineSetup('join', invitePreview.availableColors || []);
   } catch (error) {
     renderHome(errorMessage(error.message));
     const input = document.getElementById('yakolakRoomCode');
@@ -811,6 +887,7 @@ async function joinRoom(value, color) {
 async function submitMove(move) {
   if (!identity || !room || requestPending || room.status !== 'playing') return false;
   requestPending = true;
+  game.state.locked = true;
   setStatus('نثبت الحركة…');
   try {
     const payload = await post('move', {
@@ -828,6 +905,10 @@ async function submitMove(move) {
     return false;
   } finally {
     requestPending = false;
+    if (room?.status === 'playing') {
+      game.state.locked = false;
+      game.updateTurnGlow();
+    }
   }
 }
 
@@ -897,6 +978,16 @@ function buildUi() {
   entry.id = 'yakolakOnlineEntry';
   entry.type = 'button';
   entry.addEventListener('click', () => {
+    if (onlineSetupBridge.active) {
+      onlineSetupBridge.active = false;
+      onlineSetupBridge.availableColors = null;
+      document.body.classList.remove('yakolak-online-native-setup');
+      entry.textContent = 'لعب أونلاين';
+      game.state.humanColor = null;
+      game.state.setupStep = 'color';
+      game.renderSetup3D();
+      return;
+    }
     if (room?.status === 'waiting') renderWaiting();
     else if (invitePreview) renderColorChoice('join');
     else renderHome();
