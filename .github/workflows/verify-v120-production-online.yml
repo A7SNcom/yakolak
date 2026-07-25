@@ -1,6 +1,9 @@
 name: Verify v120 production online
 
 on:
+  pull_request:
+    paths:
+      - '.github/workflows/verify-v120-production-online.yml'
   push:
     branches:
       - verify-v120-production-online
