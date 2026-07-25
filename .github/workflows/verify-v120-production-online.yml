@@ -4,11 +4,13 @@ on:
   pull_request:
     paths:
       - '.github/workflows/verify-v120-production-online.yml'
+      - 'scripts/run-v120-online-all-colors-fixed.mjs'
   push:
     branches:
       - verify-v120-production-online
     paths:
       - '.github/workflows/verify-v120-production-online.yml'
+      - 'scripts/run-v120-online-all-colors-fixed.mjs'
   workflow_dispatch:
 
 jobs:
