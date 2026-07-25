@@ -1,6 +1,6 @@
 {
-  "version": "v118-online-round-selection",
-  "build": 118,
+  "version": "v119-subtle-last-move-marker",
+  "build": 119,
   "updated_at": "2026-07-25",
-  "note": "Requires the online host to choose 3 or 5 rounds, keeps authoritative per-player scores, and ends the match when the selected round count is complete."
+  "note": "Reduces the online last-move ring size and opacity, and lets board depth occlude it naturally while preserving clear move location feedback."
 }
