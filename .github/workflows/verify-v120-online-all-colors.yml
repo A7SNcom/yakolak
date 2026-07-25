@@ -6,6 +6,7 @@ on:
       - 'src/mobile-clarity-v120.js'
       - 'src/app-game-v114.js'
       - 'scripts/verify-v120-online-all-colors.mjs'
+      - 'scripts/run-v120-online-all-colors-fixed.mjs'
       - '.github/workflows/verify-v120-online-all-colors.yml'
   workflow_dispatch:
 
@@ -41,7 +42,7 @@ jobs:
         env:
           APP_URL: 'http://127.0.0.1:4174'
           V120_COMMIT: '${{ github.event.pull_request.head.sha }}'
-        run: node scripts/verify-v120-online-all-colors.mjs
+        run: node scripts/run-v120-online-all-colors-fixed.mjs
 
       - name: Upload online all-color evidence
         if: always()
