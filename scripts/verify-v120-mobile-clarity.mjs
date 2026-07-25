@@ -65,10 +65,10 @@ assert.match(wrapper, /if\(MOBILE_HIGH_QUALITY\)return Math\.min\(dpr,1\.5\)/);
 assert.match(wrapper, /return Math\.min\(dpr,1\.15\)/);
 assert.doesNotMatch(wrapper, /shadowMap\.enabled=true|EffectComposer|postProcessingAdded:\s*1/i);
 assert.match(app, /mobile-clarity-v120\.js/);
-assert.match(index, /yakolak-version" content="v120-mobile-board-separation"/);
-assert.match(index, /const BUILD='120'/);
-assert.equal(version.build, 120);
-assert.equal(version.version, 'v120-mobile-board-separation');
+assert.ok(Number(version.build) >= 120, 'current release must include v120 or later');
+assert.equal(typeof version.version, 'string');
+assert.match(index, new RegExp(`yakolak-version" content="${version.version}"`));
+assert.match(index, new RegExp(`const BUILD='${version.build}'`));
 
 assert.deepEqual(globalThis.__yakolakMobileClarityV120.renderCost, {
   pixelRatioChange: 0,
@@ -78,4 +78,4 @@ assert.deepEqual(globalThis.__yakolakMobileClarityV120.renderCost, {
   postProcessingAdded: 0
 });
 
-console.log('v120 neutral mobile board candidate passed static zero-cost contracts');
+console.log('v120 neutral mobile board regression passed static zero-cost contracts');
