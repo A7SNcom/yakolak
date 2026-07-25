@@ -25,9 +25,9 @@ assert.equal(desktop, base, 'desktop must keep the exact established material ob
 
 const mobile = boardStyleFor(base, true);
 assert.notEqual(mobile, base);
-assert.equal(mobile.color, '#5b6875');
-assert.equal(mobile.emissive, '#1f2b36');
-assert.equal(mobile.emissiveIntensity, 0.08);
+assert.equal(mobile.color, '#706b64');
+assert.equal(mobile.emissive, '#24211e');
+assert.equal(mobile.emissiveIntensity, 0.04);
 assert.equal(mobile.roughness, base.roughness);
 assert.equal(mobile.metalness, base.metalness);
 
@@ -45,10 +45,19 @@ function contrast(a, b) {
   return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
 }
 
+function blueBias(hex) {
+  const [r, g, b] = [1, 3, 5].map(index => Number.parseInt(hex.slice(index, index + 2), 16));
+  return b - (r + g) / 2;
+}
+
 const bluePiece = '#001f8f';
 assert.ok(
-  contrast(MOBILE_BOARD_STYLE.color, bluePiece) > contrast(base.color, bluePiece) * 1.25,
-  'mobile board must improve blue-piece separation by at least 25%'
+  contrast(MOBILE_BOARD_STYLE.color, bluePiece) >= contrast(base.color, bluePiece) * 1.35,
+  'neutral candidate must keep at least 35% theoretical contrast headroom before rendered testing'
+);
+assert.ok(
+  blueBias(MOBILE_BOARD_STYLE.color) < blueBias(base.color),
+  'mobile board must be less blue than the established material'
 );
 
 assert.match(wrapper, /__yakolakMobileClarityV120\?\.boardStyleFor/);
@@ -69,4 +78,4 @@ assert.deepEqual(globalThis.__yakolakMobileClarityV120.renderCost, {
   postProcessingAdded: 0
 });
 
-console.log('v120 mobile-only board separation passed without added render cost');
+console.log('v120 neutral mobile board candidate passed static zero-cost contracts');
