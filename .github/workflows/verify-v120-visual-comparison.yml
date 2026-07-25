@@ -1,0 +1,64 @@
+name: Verify v120 visual comparison
+
+on:
+  pull_request:
+    paths:
+      - 'src/mobile-clarity-v120.js'
+      - 'src/app-game-v114.js'
+      - 'scripts/verify-v120-perceptual-contrast.mjs'
+      - '.github/workflows/verify-v120-visual-comparison.yml'
+  workflow_dispatch:
+
+jobs:
+  compare-v119-v120:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out v119 main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: v119
+
+      - name: Check out v120 PR head
+        uses: actions/checkout@v4
+        with:
+          path: v120
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install browser runtime
+        working-directory: v120
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Start identical static servers
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory v119 > /tmp/v119-server.log 2>&1 &
+          python3 -m http.server 4174 --bind 127.0.0.1 --directory v120 > /tmp/v120-server.log 2>&1 &
+          for attempt in {1..20}; do
+            curl -fsS http://127.0.0.1:4173/version.json >/dev/null && curl -fsS http://127.0.0.1:4174/version.json >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/v119-server.log /tmp/v120-server.log
+          exit 1
+
+      - name: Compare rendered perceptual contrast and full WebGL frame cost
+        working-directory: v120
+        env:
+          V119_URL: 'http://127.0.0.1:4173'
+          V120_URL: 'http://127.0.0.1:4174'
+          V120_COMMIT: '${{ github.event.pull_request.head.sha }}'
+        run: node scripts/verify-v120-perceptual-contrast.mjs
+
+      - name: Upload comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v120-visual-comparison
+          path: v120/artifacts/v120-visual-comparison
+          if-no-files-found: warn

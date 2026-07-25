@@ -1,6 +1,6 @@
 {
-  "version": "v119-subtle-last-move-marker",
-  "build": 119,
+  "version": "v120-mobile-board-separation",
+  "build": 120,
   "updated_at": "2026-07-25",
-  "note": "Reduces the online last-move ring size and opacity, and lets board depth occlude it naturally while preserving clear move location feedback."
+  "note": "Improves mobile board and blue-piece separation with a mobile-only material value adjustment, without changing DPR, shadows, lights, draw calls, or desktop rendering."
 }
