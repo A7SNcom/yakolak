@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>v118 rounds harness</title>
+  <style>
+    html,body{margin:0;min-height:100%;background:#0b1117;color:#fff;font-family:system-ui}
+    #yakolakOnlineDialog{display:block;width:min(440px,calc(100% - 28px));margin:24px auto;padding:16px;border-radius:18px;background:#132330}
+    .yo-body{min-height:180px}.yo-step-title{margin:0 0 12px}.yo-actions{display:flex;gap:10px}.yo-button{padding:12px 18px}
+  </style>
+</head>
+<body>
+  <div id="yakolakOnlineDialog"><div class="yo-body"><h2 class="yo-step-title">اللعب أونلاين</h2></div></div>
+  <script>
+    window.__v118Requests=[];
+    const networkFetch=window.fetch.bind(window);
+    window.fetch=async(input,init={})=>{
+      const url=String(input);
+      if(url.includes('/api/rooms-v118')){
+        const payload=JSON.parse(init.body||'{}');
+        window.__v118Requests.push({url,payload});
+        if(payload.action==='preview'){
+          return new Response(JSON.stringify({ok:true,room:{code:'ABC234',status:'waiting',targetPlayers:2,targetRounds:5,players:[],availableColors:['right','back']}}),{status:200,headers:{'content-type':'application/json'}});
+        }
+        return new Response(JSON.stringify({ok:true,token:'test',seat:'p1',room:{code:'ABC234',version:1,status:'waiting',targetPlayers:payload.targetPlayers,targetRounds:payload.targetRounds,players:[{seat:'p1',color:payload.color}],round:1,scores:{p1:0},rematch:{p1:false}}}),{status:201,headers:{'content-type':'application/json'}});
+      }
+      return networkFetch(input,init);
+    };
+    window.__yakolakOnlineSetupBridge={
+      active:true,
+      create(details){
+        window.__v118OriginalCreate=details;
+        return fetch('/api/rooms',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'create',...details})});
+      }
+    };
+    window.__yakolakOnlineV114={identity:{seat:'p1'},room:null};
+  </script>
+  <script type="module" src="../src/online-rounds-v118.js"></script>
+</body>
+</html>
