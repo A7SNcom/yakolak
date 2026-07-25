@@ -1,6 +1,6 @@
 {
-  "version": "v117-online-native-gameplay",
-  "build": 117,
+  "version": "v118-online-round-selection",
+  "build": 118,
   "updated_at": "2026-07-25",
-  "note": "Restores the established neutral table and makes online setup and piece-size selection reuse the game's native 3D interaction."
+  "note": "Requires the online host to choose 3 or 5 rounds, keeps authoritative per-player scores, and ends the match when the selected round count is complete."
 }
