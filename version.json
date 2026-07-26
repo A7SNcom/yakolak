@@ -1,6 +1,6 @@
 {
-  "version": "v123-tabletop-setup-stage2",
-  "build": 123,
+  "version": "v124-room-services-stage3",
+  "build": 124,
   "updated_at": "2026-07-26",
-  "note": "Stage 2 moves color and player-count setup into the Three.js table scene with a physical instruction panel and lock marker, while hiding the separate HTML setup card."
+  "note": "Stage 3 moves online room creation, room-code entry, waiting-lobby status, and the three win explanations into interactive Three.js displays inside the room."
 }
