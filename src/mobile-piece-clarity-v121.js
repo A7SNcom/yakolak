@@ -1,26 +1,32 @@
-const MOBILE_ROUGHNESS_CAPS = Object.freeze({
-  right: 0.34,
-  back: 0.30,
-  front: 0.32,
-  left: 0.32
+const MOBILE_EMISSIVE_INTENSITY_CAPS = Object.freeze({
+  right: 0.04,
+  back: 0.06,
+  front: 0.055,
+  left: 0.06
 });
-
-function cloneStyle(style) {
-  return style && typeof style === 'object' ? { ...style } : style;
-}
 
 function pieceStyleFor(style, color, mobile) {
   if (!style || !mobile) return style;
-  const cap = MOBILE_ROUGHNESS_CAPS[color];
+  const cap = MOBILE_EMISSIVE_INTENSITY_CAPS[color];
   if (!Number.isFinite(cap)) return style;
-  const roughness = Number(style.roughness);
-  if (!Number.isFinite(roughness) || roughness <= cap) return style;
-  return { ...cloneStyle(style), roughness: cap };
+  const emissiveIntensity = Number(style.emissiveIntensity);
+  if (!Number.isFinite(emissiveIntensity) || emissiveIntensity <= cap) return style;
+  return { ...style, emissiveIntensity: cap };
 }
 
 globalThis.__yakolakMobilePieceClarityV121 = {
   version: 121,
-  change: 'mobile-only-piece-roughness-cap',
-  caps: MOBILE_ROUGHNESS_CAPS,
+  change: 'mobile-only-piece-emissive-fill-cap',
+  caps: MOBILE_EMISSIVE_INTENSITY_CAPS,
+  renderCost: Object.freeze({
+    pixelRatioChange: 0,
+    geometryAdded: 0,
+    materialsAdded: 0,
+    shadersAdded: 0,
+    lightsAdded: 0,
+    shadowsAdded: 0,
+    drawCallsAdded: 0,
+    postProcessingAdded: 0
+  }),
   pieceStyleFor
 };
