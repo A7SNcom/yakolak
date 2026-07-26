@@ -7,7 +7,7 @@ function waitForGame(timeoutMs=55000){
   return new Promise((resolve,reject)=>{
     const check=()=>{
       const game=globalThis.__yakolakGame;
-      if(game?.pieces?.length&&game?.renderer)return resolve(game);
+      if(document.body.classList.contains('yakolak-ready')&&game?.pieces?.length&&game?.renderer)return resolve(game);
       if(performance.now()-started>=timeoutMs)return reject(new Error('v121 game bridge timeout'));
       setTimeout(check,25);
     };
