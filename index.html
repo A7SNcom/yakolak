@@ -3,32 +3,33 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="yakolak-version" content="v124-room-services-stage3">
+<meta name="yakolak-version" content="v125-white-wall-continuity">
 <title>Yakolak Live</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="./styles/v114-online.css?v=124">
+<link rel="stylesheet" href="./styles/v114-online.css?v=125">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script>
 <style>
+:root{--yakolak-wall:#f7f7f4;--yakolak-ink:#242421;--yakolak-muted:#77736c;--yakolak-line:#cbc7bf}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b0b;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:none}
-#view{position:fixed;inset:0;z-index:1;opacity:0;transition:opacity .35s ease}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--yakolak-wall);color:var(--yakolak-ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:none}
+#view{position:fixed;inset:0;z-index:1;opacity:0;background:var(--yakolak-wall);transition:opacity .25s ease}
 #hint,#settingsBtn,#panel,textarea{display:none!important}
-#yakolakLoader{position:fixed;inset:0;z-index:20000;display:grid;place-items:center;background:radial-gradient(circle at 50% 18%,#1a2028 0,#090a0c 46%,#020203 100%);transition:opacity .42s ease,visibility .42s ease}
-#yakolakLoader.done{opacity:0;visibility:hidden;pointer-events:none}
-.loaderPanel{width:min(520px,calc(100vw - 40px));direction:ltr;color:#fff;text-align:center}
-.loaderBrand{font-size:15px;font-weight:950;letter-spacing:.22em;margin-bottom:18px;color:#f7f7f2}
-.loaderFrame{position:relative;padding:10px;border:1px solid rgba(255,255,255,.26);background:#050608;box-shadow:0 22px 70px rgba(0,0,0,.58),inset 0 0 0 1px rgba(255,255,255,.08)}
-.loaderFrame:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.1),transparent);animation:loader-scan 1.65s linear infinite;pointer-events:none}
-#yakolakLoaderProgress{display:block;width:100%;height:22px;appearance:none;-webkit-appearance:none;border:0;background:#111820;overflow:hidden}
-#yakolakLoaderProgress::-webkit-progress-bar{background:#111820}
-#yakolakLoaderProgress::-webkit-progress-value{background:linear-gradient(90deg,#b78a44,#2f856a,#3769a5);transition:width .28s ease}
-#yakolakLoaderProgress::-moz-progress-bar{background:linear-gradient(90deg,#b78a44,#2f856a,#3769a5);transition:width .28s ease}
-.loaderMeta{display:flex;justify-content:space-between;align-items:center;margin-top:11px;font-size:12px;font-weight:900;color:#d7dde6;direction:rtl}
-#yakolakLoaderPercent{font-size:18px;color:#fff;direction:ltr}
-#yakolakLoader.error .loaderFrame{border-color:#ef4444}
-@keyframes loader-scan{from{transform:translateX(-105%)}to{transform:translateX(105%)}}
-#clearCacheBtn{position:fixed;left:16px;bottom:16px;z-index:10000;width:58px;height:58px;border-radius:50%;border:1px solid rgba(255,255,255,.24);background:rgba(0,0,0,.82);color:#fff;font-size:15px;font-weight:950;display:grid;place-items:center;cursor:pointer;line-height:1;box-shadow:0 10px 30px rgba(0,0,0,.42);user-select:none}
+#yakolakLoader{position:fixed;inset:0;z-index:20000;display:grid;place-items:center;background:var(--yakolak-wall);transition:opacity .42s ease,visibility .42s ease}
+#yakolakLoader.done.wall-ready{opacity:0;visibility:hidden;pointer-events:none}
+.loaderPanel{width:min(520px,calc(100vw - 48px));direction:rtl;color:var(--yakolak-ink);text-align:center}
+.loaderKicker{font-size:12px;font-weight:800;letter-spacing:.22em;color:var(--yakolak-muted);direction:ltr;margin-bottom:14px}
+.loaderBrand{font-size:54px;font-weight:950;line-height:1;margin-bottom:34px;color:var(--yakolak-ink)}
+.loaderFrame{position:relative;width:100%;padding:0;background:transparent}
+#yakolakLoaderProgress{display:block;width:100%;height:4px;appearance:none;-webkit-appearance:none;border:0;border-radius:999px;background:#dedbd4;overflow:hidden}
+#yakolakLoaderProgress::-webkit-progress-bar{background:#dedbd4;border-radius:999px}
+#yakolakLoaderProgress::-webkit-progress-value{background:var(--yakolak-ink);border-radius:999px;transition:width .24s ease}
+#yakolakLoaderProgress::-moz-progress-bar{background:var(--yakolak-ink);border-radius:999px;transition:width .24s ease}
+.loaderMeta{display:flex;justify-content:space-between;align-items:center;margin-top:13px;font-size:12px;font-weight:700;color:var(--yakolak-muted);direction:rtl}
+#yakolakLoaderPercent{font-size:13px;color:var(--yakolak-ink);direction:ltr}
+#yakolakLoader.error #yakolakLoaderProgress::-webkit-progress-value{background:#8f3b34}
+#yakolakLoader.error #yakolakLoaderProgress::-moz-progress-bar{background:#8f3b34}
+#clearCacheBtn{position:fixed;left:16px;bottom:16px;z-index:10000;width:58px;height:58px;border-radius:50%;border:1px solid rgba(36,36,33,.18);background:rgba(247,247,244,.92);color:var(--yakolak-ink);font-size:15px;font-weight:950;display:grid;place-items:center;cursor:pointer;line-height:1;box-shadow:0 10px 30px rgba(35,33,29,.12);user-select:none}
 #clearCacheBtn[hidden]{display:none!important}
 #clearCacheBtn[disabled]{opacity:.62;cursor:wait}
 </style>
@@ -36,7 +37,8 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b0b;col
 <body>
 <div id="yakolakLoader" aria-busy="true" aria-describedby="yakolakLoaderStatus">
   <div class="loaderPanel">
-    <div class="loaderBrand">YAKOLAK</div>
+    <div class="loaderKicker">YAKOLAK</div>
+    <div class="loaderBrand">ياكلك</div>
     <div class="loaderFrame"><progress id="yakolakLoaderProgress" value="0" max="100" aria-label="تحميل اللعبة">0%</progress></div>
     <div class="loaderMeta"><span id="yakolakLoaderStatus">تحميل اللعبة</span><strong id="yakolakLoaderPercent">0%</strong></div>
   </div>
@@ -48,16 +50,32 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b0b;col
 <div id="panel" aria-hidden="true"></div>
 <textarea id="out"></textarea>
 <script type="module">
-const BUILD='124';
+const BUILD='125';
 const params=new URLSearchParams(location.search);
 const clearToken=params.get('clear');
 const debugMode=params.get('debug')==='1';
 const ASSET_VERSION=clearToken||BUILD;
 const clearBtn=document.getElementById('clearCacheBtn');
+const loaderEl=document.getElementById('yakolakLoader');
 if(clearBtn)clearBtn.hidden=!debugMode;
 const progressEl=document.getElementById('yakolakLoaderProgress');
 const progressText=document.getElementById('yakolakLoaderPercent');
 const progressStatus=document.getElementById('yakolakLoaderStatus');
+const removeLoaderNow=()=>{if(loaderEl?.parentNode)loaderEl.parentNode.removeChild(loaderEl)};
+if(loaderEl){
+  loaderEl.remove=()=>{
+    if(loaderEl.classList.contains('wall-ready'))removeLoaderNow();
+    else loaderEl.dataset.removePending='1';
+  };
+}
+window.__yakolakReleaseWallLoader=()=>{
+  if(!loaderEl?.isConnected)return;
+  requestAnimationFrame(()=>{
+    loaderEl.classList.add('wall-ready');
+    loaderEl.setAttribute('aria-busy','false');
+    setTimeout(removeLoaderNow,480);
+  });
+};
 function setGameProgress(value,status){
   const pct=Math.max(0,Math.min(100,Math.round(value||0)));
   if(progressEl){progressEl.value=pct;progressEl.textContent=pct+'%'}
