@@ -148,8 +148,8 @@ replaceExact(
   'append v121 entry patch'
 );
 replaceExact(
-  "source+='\\n//# sourceURL=yakolak-v120-mobile-board-separation-runtime.js\\n';",
-  "source+='\\n//# sourceURL=yakolak-v121-entry-journey-runtime.js\\n';",
+  'yakolak-v120-mobile-board-separation-runtime.js',
+  'yakolak-v121-entry-journey-runtime.js',
   'v121 source url'
 );
 replaceExact(
