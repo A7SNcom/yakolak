@@ -1,4 +1,4 @@
-const MOBILE_ACTIVE_EMISSIVE_INTENSITY_CAP = 0.18;
+const MOBILE_ACTIVE_EMISSIVE_INTENSITY_CAP = 0.28;
 
 function pieceStyleFor(style, color, mobile, state='normal') {
   if (!style || !mobile || state !== 'active') return style;
