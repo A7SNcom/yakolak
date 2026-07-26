@@ -1,30 +1,35 @@
-console.info('[Yakolak] APP.JS v124 BLOB IMPORT RUNTIME FIX LOADED');
+console.info('[Yakolak] APP.JS v125 WHITE WALL CONTINUITY LOADED');
 
-const BUILD='124';
+const BUILD='125';
 
-async function installVisualConnectionHotfix(){
-  for(let i=0;i<420;i++){
+async function installRoomConnections(){
+  globalThis.__yakolakLoading?.set?.(100,'تجهيز الجدار');
+  for(let i=0;i<520;i++){
     const game=globalThis.__yakolakGame;
     const entry=globalThis.__yakolakV121Entry;
     const wall=globalThis.__yakolakV122RoomMenu;
     const services=globalThis.__yakolakV124RoomServices;
-    if(game?.render&&entry?.choose&&wall?.group&&services?.serviceGroup){
-      const exposeProjection=(object,axis,value)=>{
+    const whiteWall=globalThis.__yakolakV125WhiteWall;
+    if(game?.render&&entry?.choose&&wall?.group&&services?.serviceGroup&&whiteWall?.group){
+      const exposeService=(object,axis,value)=>{
         object.position[axis]=value;
-        object.visible=true;
         object.traverse?.(child=>{
           child.frustumCulled=false;
           const materials=Array.isArray(child.material)?child.material:[child.material];
           materials.filter(Boolean).forEach(material=>{
             material.depthTest=false;
             material.depthWrite=false;
+            if(!material.map){
+              material.color?.set?.('#b9b5ad');
+              if('blending' in material)material.blending=game.THREE.NormalBlending;
+            }
             material.needsUpdate=true;
           });
         });
       };
 
-      exposeProjection(wall.group,'z',-2360);
-      exposeProjection(services.serviceGroup,'x',2360);
+      wall.group.visible=false;
+      exposeService(services.serviceGroup,'x',2360);
       services.learnScreen?.traverse?.(child=>{child.frustumCulled=false});
       services.lobbyScreen?.traverse?.(child=>{child.frustumCulled=false});
 
@@ -35,45 +40,34 @@ async function installVisualConnectionHotfix(){
         return previousChoose(mode);
       };
 
-      document.addEventListener('click',event=>{
-        const choice=event.target?.closest?.('#yakolakEntry .ye-choice');
-        const mode=choice?.dataset?.mode;
-        if(mode!=='online'&&mode!=='learn')return;
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-        document.getElementById('yakolakEntry')?.setAttribute('hidden','');
-        document.body.classList.remove('yakolak-entry-open');
-        document.body.classList.add('yakolak-entry-complete');
-        if(mode==='online')void services.showOnlineService();
-        else void services.showLearn();
-      },true);
-
       const style=document.createElement('style');
-      style.id='yakolakV124LegacyUiKillSwitch';
+      style.id='yakolakV125LegacyUiKillSwitch';
       style.textContent=`
         #yakolakEntry,#yakolakOnlineDialog,#yakolakHowTo{display:none!important;visibility:hidden!important;pointer-events:none!important}
         body.yakolak-room-service-active #yakolakGameHud,
         body.yakolak-room-service-active #yakolakGameScore,
         body.yakolak-room-howto-active #yakolakGameHud,
         body.yakolak-room-howto-active #yakolakGameScore{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
+        body.yakolak-v125-white-wall #view canvas{background:#f7f7f4}
       `;
       document.head.append(style);
+      whiteWall.finalize();
       game.render();
-      console.info('[Yakolak] v124 visual connection hotfix active');
+      console.info('[Yakolak] v125 room connections active');
       return;
     }
     await new Promise(resolve=>setTimeout(resolve,25));
   }
-  throw new Error('v124 visual connection hotfix could not find the room stages');
+  throw new Error('v125 room connections could not find all stages');
 }
 
 import('./src/mobile-clarity-v120.js?v='+BUILD+'-policy')
-  .then(()=>import('./src/app-game-v124.js?v='+BUILD+'-room-services-stage3-blob-runtime-fix-3'))
-  .then(()=>installVisualConnectionHotfix())
+  .then(()=>import('./src/app-game-v125.js?v='+BUILD+'-white-wall-continuity-1'))
+  .then(()=>installRoomConnections())
   .then(()=>import('./src/online-rounds-v118.js?v='+BUILD+'-rounds'))
   .then(()=>import('./src/online-last-move-v119.js?v='+BUILD+'-marker'))
   .catch(error=>{
-    console.error('[Yakolak] v124 bootstrap failed',error);
-    globalThis.__yakolakLoading?.set?.(100,'تعذر تحميل النسخة 124');
+    console.error('[Yakolak] v125 bootstrap failed',error);
+    globalThis.__yakolakLoading?.set?.(100,'تعذر تجهيز الجدار');
+    document.getElementById('yakolakLoader')?.classList.add('error');
   });
