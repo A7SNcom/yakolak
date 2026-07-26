@@ -1,4 +1,4 @@
-console.info('[Yakolak] APP.JS v124 VISUAL CONNECTION HOTFIX LOADED');
+console.info('[Yakolak] APP.JS v124 BLOB IMPORT RUNTIME FIX LOADED');
 
 const BUILD='124';
 
@@ -69,7 +69,7 @@ async function installVisualConnectionHotfix(){
 }
 
 import('./src/mobile-clarity-v120.js?v='+BUILD+'-policy')
-  .then(()=>import('./src/app-game-v124.js?v='+BUILD+'-room-services-stage3-visual-hotfix-2'))
+  .then(()=>import('./src/app-game-v124.js?v='+BUILD+'-room-services-stage3-blob-runtime-fix-3'))
   .then(()=>installVisualConnectionHotfix())
   .then(()=>import('./src/online-rounds-v118.js?v='+BUILD+'-rounds'))
   .then(()=>import('./src/online-last-move-v119.js?v='+BUILD+'-marker'))
