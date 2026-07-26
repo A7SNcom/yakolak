@@ -1,8 +1,8 @@
 const MOBILE_ROUGHNESS_CAPS = Object.freeze({
-  right: 0.72,
-  back: 0.60,
-  front: 0.54,
-  left: 0.48
+  right: 0.34,
+  back: 0.30,
+  front: 0.32,
+  left: 0.32
 });
 
 function cloneStyle(style) {
