@@ -11,7 +11,7 @@ const pieceStateReplacement=`function applyMobilePieceClarityMaterial(mat,color,
     roughness:Number(mat.roughness),
     metalness:Number(mat.metalness),
     emissiveIntensity:Number(mat.emissiveIntensity||0)
-  },color,MOBILE_VIEW);
+  },color,MOBILE_VIEW,state);
   if(Number.isFinite(Number(style?.emissiveIntensity)))mat.emissiveIntensity=Number(style.emissiveIntensity);
   mat.needsUpdate=true;
   return mat;
@@ -34,7 +34,7 @@ const releasePatchItems=[
   'replaceRegex(',
   "  /function pieceStateMaterial\\(color,state='normal'\\)\\{.*?\\n\\}\\nfunction setPieceVisual/s,",
   `  \`${pieceStateReplacement}\`,`,
-  "  'apply v121 mobile clarity to normal and active piece states'",
+  "  'apply v121 mobile clarity to active piece state'",
   ');'
 ];
 const releasePatchTarget="\n].join('\\n');";
@@ -71,7 +71,7 @@ const game=await waitForGame();
 const policy=globalThis.__yakolakMobilePieceClarityV121;
 if(!policy?.pieceStyleFor)throw new Error('v121 piece clarity policy missing');
 
-function applyMobilePieceClarity(){
+function collectPieceMaterials(){
   const seen=new Set();
   const materials={};
   for(const piece of game.pieces){
@@ -83,7 +83,7 @@ function applyMobilePieceClarity(){
       metalness:Number(material.metalness),
       emissiveIntensity:Number(material.emissiveIntensity||0)
     };
-    const style=policy.pieceStyleFor(before,piece.dir,MOBILE_VIEW)||before;
+    const style=policy.pieceStyleFor(before,piece.dir,MOBILE_VIEW,'normal')||before;
     if(Number.isFinite(Number(style.emissiveIntensity)))material.emissiveIntensity=Number(style.emissiveIntensity);
     material.needsUpdate=true;
     materials[piece.dir]={
@@ -98,14 +98,14 @@ function applyMobilePieceClarity(){
   return materials;
 }
 
-const materials=applyMobilePieceClarity();
+const materials=collectPieceMaterials();
 globalThis.__yakolakPieceClarityV121={
   mobile:MOBILE_VIEW,
-  apply:applyMobilePieceClarity,
+  collect:collectPieceMaterials,
   materials
 };
 globalThis.__yakolakV121={
   build:121,
   base:120,
-  change:'mobile-piece-emissive-shaping-across-runtime-states'
+  change:'mobile-active-piece-emissive-shaping-without-render-cost'
 };
