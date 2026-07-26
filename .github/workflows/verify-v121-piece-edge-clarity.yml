@@ -9,6 +9,7 @@ on:
       - 'src/mobile-piece-clarity-v121.js'
       - 'src/app-game-v121.js'
       - 'scripts/verify-v121-piece-edge-visual.mjs'
+      - 'scripts/run-v121-piece-edge-fixed.mjs'
       - '.github/workflows/verify-v121-piece-edge-clarity.yml'
   pull_request:
     paths:
@@ -16,6 +17,7 @@ on:
       - 'src/mobile-piece-clarity-v121.js'
       - 'src/app-game-v121.js'
       - 'scripts/verify-v121-piece-edge-visual.mjs'
+      - 'scripts/run-v121-piece-edge-fixed.mjs'
       - '.github/workflows/verify-v121-piece-edge-clarity.yml'
   workflow_dispatch:
 
@@ -62,7 +64,7 @@ jobs:
           V120_URL: 'http://127.0.0.1:4173'
           V121_URL: 'http://127.0.0.1:4174'
           V121_COMMIT: '${{ github.sha }}'
-        run: node scripts/verify-v121-piece-edge-visual.mjs
+        run: node scripts/run-v121-piece-edge-fixed.mjs
 
       - name: Upload v121 comparison evidence
         if: always()
