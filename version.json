@@ -1,6 +1,6 @@
 {
-  "version": "v120-mobile-board-separation",
-  "build": 120,
-  "updated_at": "2026-07-25",
-  "note": "Improves mobile board and blue-piece separation with a mobile-only material value adjustment, without changing DPR, shadows, lights, draw calls, or desktop rendering."
+  "version": "v121-wall-entry-journey",
+  "build": 121,
+  "updated_at": "2026-07-26",
+  "note": "Adds an Arabic-first wall-mounted mode chooser before the game intro, a polished camera pull-back transition that reveals the table, and a floating settings button while preserving the existing online and computer game systems."
 }
