@@ -1,0 +1,73 @@
+name: Verify v121 piece edge clarity
+
+on:
+  push:
+    branches:
+      - v121-mobile-piece-edge-clarity
+    paths:
+      - 'app.js'
+      - 'src/mobile-piece-clarity-v121.js'
+      - 'src/app-game-v121.js'
+      - 'scripts/verify-v121-piece-edge-visual.mjs'
+      - '.github/workflows/verify-v121-piece-edge-clarity.yml'
+  pull_request:
+    paths:
+      - 'app.js'
+      - 'src/mobile-piece-clarity-v121.js'
+      - 'src/app-game-v121.js'
+      - 'scripts/verify-v121-piece-edge-visual.mjs'
+      - '.github/workflows/verify-v121-piece-edge-clarity.yml'
+  workflow_dispatch:
+
+jobs:
+  deterministic-piece-edge-comparison:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out v121
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Chromium runtime
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Prepare v120 baseline
+        run: |
+          mkdir -p /tmp/yakolak-v120
+          git archive 30da92d2b53e29256dc02b0afdb4d1a0264802a2 | tar -x -C /tmp/yakolak-v120
+
+      - name: Start v120 and v121 servers
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory /tmp/yakolak-v120 > /tmp/v120-server.log 2>&1 &
+          python3 -m http.server 4174 --bind 127.0.0.1 > /tmp/v121-server.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/version.json >/dev/null && curl -fsS http://127.0.0.1:4174/app.js >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/v120-server.log /tmp/v121-server.log
+          exit 1
+
+      - name: Compare edge clarity and render cost
+        env:
+          V120_URL: 'http://127.0.0.1:4173'
+          V121_URL: 'http://127.0.0.1:4174'
+          V121_COMMIT: '${{ github.sha }}'
+        run: node scripts/verify-v121-piece-edge-visual.mjs
+
+      - name: Upload v121 comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v121-piece-edge-comparison
+          path: artifacts/v121-piece-edge-comparison
+          if-no-files-found: warn
