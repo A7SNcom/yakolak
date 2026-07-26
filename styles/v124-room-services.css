@@ -1,0 +1,16 @@
+body.yakolak-stage3-room-services #yakolakOnlineDialog,
+body.yakolak-stage3-room-services #yakolakHowTo,
+body.yakolak-stage3-room-services #yakolakOnlinePill{
+  display:none!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+}
+body.yakolak-room-service-active #yakolakGameHud,
+body.yakolak-room-howto-active #yakolakGameHud{
+  opacity:0!important;
+  pointer-events:none!important;
+}
+body.yakolak-room-service-active #yakolakFloatingSettings,
+body.yakolak-room-howto-active #yakolakFloatingSettings{
+  opacity:.45;
+}
