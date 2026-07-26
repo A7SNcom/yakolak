@@ -1,8 +1,8 @@
-console.info('[Yakolak] APP.JS v124 ROOM SERVICES STAGE 3 LOADED');
+console.info('[Yakolak] APP.JS v124 ROOM SERVICES STAGE 3 PRODUCTION LOADED');
 
 const BUILD='124';
 import('./src/mobile-clarity-v120.js?v='+BUILD+'-policy')
-  .then(()=>import('./src/app-game-v124.js?v='+BUILD+'-room-services-stage3'))
+  .then(()=>import('./src/app-game-v124.js?v='+BUILD+'-room-services-stage3-production-1'))
   .then(()=>import('./src/online-rounds-v118.js?v='+BUILD+'-rounds'))
   .then(()=>import('./src/online-last-move-v119.js?v='+BUILD+'-marker'))
   .catch(error=>{
