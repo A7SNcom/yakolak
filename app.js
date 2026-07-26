@@ -3,7 +3,7 @@ console.info('[Yakolak] APP.JS v125 WHITE WALL CONTINUITY LOADED');
 const BUILD='125';
 
 async function installRoomConnections(){
-  globalThis.__yakolakLoading?.set?.(96,'تجهيز الجدار');
+  globalThis.__yakolakLoading?.set?.(100,'تجهيز الجدار');
   for(let i=0;i<520;i++){
     const game=globalThis.__yakolakGame;
     const entry=globalThis.__yakolakV121Entry;
