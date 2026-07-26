@@ -26,13 +26,19 @@ function applyMobilePieceClarity(){
     const material=piece?.mesh?.material;
     if(!material||seen.has(material))continue;
     seen.add(material);
-    const before={roughness:Number(material.roughness),metalness:Number(material.metalness)};
+    const before={
+      roughness:Number(material.roughness),
+      metalness:Number(material.metalness),
+      emissiveIntensity:Number(material.emissiveIntensity||0)
+    };
     const style=policy.pieceStyleFor(before,piece.dir,MOBILE_VIEW)||before;
-    if(Number.isFinite(Number(style.roughness)))material.roughness=Number(style.roughness);
+    if(Number.isFinite(Number(style.emissiveIntensity)))material.emissiveIntensity=Number(style.emissiveIntensity);
     material.needsUpdate=true;
     materials[piece.dir]={
       roughness:material.roughness,
       metalness:material.metalness,
+      emissive:material.emissive?`#${material.emissive.getHexString()}`:null,
+      emissiveIntensity:Number(material.emissiveIntensity||0),
       color:material.color?`#${material.color.getHexString()}`:null
     };
   }
@@ -49,5 +55,5 @@ globalThis.__yakolakPieceClarityV121={
 globalThis.__yakolakV121={
   build:121,
   base:120,
-  change:'mobile-piece-edge-clarity-without-render-cost'
+  change:'mobile-piece-emissive-shaping-without-render-cost'
 };
