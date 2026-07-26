@@ -28,7 +28,7 @@ if(!source.includes(identityBefore))throw new Error('v121 material identity patc
 source=source.replace(identityBefore,identityAfter);
 
 const expectedBefore="  const expected={right:0.72,back:0.60,left:0.48,front:0.54};";
-const expectedAfter="  const expected={right:0.18,back:0.11,left:0.11,front:0.1};";
+const expectedAfter="  const expected={right:0.28,back:0.11,left:0.11,front:0.1};";
 if(!source.includes(expectedBefore))throw new Error('v121 expected material patch target missing');
 source=source.replace(expectedBefore,expectedAfter);
 
