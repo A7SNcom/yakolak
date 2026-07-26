@@ -3,6 +3,7 @@ console.info('[Yakolak] APP GAME v121 ENTRY JOURNEY WRAPPER LOADED');
 const response = await fetch('./src/app-game-v114.js?v=121-entry-journey-wrapper', { cache: 'no-store' });
 if (!response.ok) throw new Error(`v121 wrapper load failed: ${response.status}`);
 let wrapper = await response.text();
+const onlineClientUrl = new URL('./online-client-v114.js?v=121-entry-journey-client-runtime-fix', import.meta.url).href;
 
 function replaceExact(oldValue, newValue, label) {
   const count = wrapper.split(oldValue).length - 1;
@@ -159,8 +160,8 @@ replaceExact(
 );
 replaceExact(
   "await import('./online-client-v114.js?v=120-mobile-board-separation-client');",
-  "await import('./online-client-v114.js?v=121-entry-journey-client');",
-  'v121 online client cache key'
+  `await import(${JSON.stringify(onlineClientUrl)});`,
+  'v121 online client absolute url'
 );
 
 const moduleUrl = URL.createObjectURL(new Blob([wrapper], { type: 'text/javascript' }));
