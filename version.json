@@ -1,6 +1,6 @@
 {
-  "version": "v124-room-services-stage3",
-  "build": 124,
+  "version": "v125-white-wall-continuity",
+  "build": 125,
   "updated_at": "2026-07-26",
-  "note": "Stage 3 moves online room creation, room-code entry, waiting-lobby status, and the three win explanations into interactive Three.js displays inside the room."
+  "note": "Unifies the first loading view and main menu as one neutral white wall, removes the blue futuristic projection style, and reveals the table only after the player chooses a path."
 }
