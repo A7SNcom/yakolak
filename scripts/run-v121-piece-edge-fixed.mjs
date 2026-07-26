@@ -14,6 +14,11 @@ const browserAfter="  await Promise.race([browser.close().catch(()=>{}),new Prom
 if(!source.includes(browserBefore))throw new Error('v121 browser close patch target missing');
 source=source.replace(browserBefore,browserAfter);
 
+const expectedBefore="  const expected={right:0.72,back:0.60,left:0.48,front:0.54};";
+const expectedAfter="  const expected={right:0.34,back:0.30,left:0.32,front:0.32};";
+if(!source.includes(expectedBefore))throw new Error('v121 expected roughness patch target missing');
+source=source.replace(expectedBefore,expectedAfter);
+
 await writeFile(fixedUrl,source);
 try{
   await import(fixedUrl.href+`?run=${Date.now()}`);
