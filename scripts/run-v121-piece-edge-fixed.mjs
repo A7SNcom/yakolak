@@ -14,10 +14,33 @@ const browserAfter="  await Promise.race([browser.close().catch(()=>{}),new Prom
 if(!source.includes(browserBefore))throw new Error('v121 browser close patch target missing');
 source=source.replace(browserBefore,browserAfter);
 
+const identityBefore=`function assertMaterialIdentityExceptRoughness(before,after,color,label){
+  for(const key of ['color','metalness','emissive','emissiveIntensity']){
+    assert.deepEqual(after.materials[color][key],before.materials[color][key],\`${'${label}'}: ${'${color}'} ${'${key}'} changed\`);
+  }
+}`;
+const identityAfter=`function assertMaterialIdentityExceptEmissiveIntensity(before,after,color,label){
+  for(const key of ['color','roughness','metalness','emissive']){
+    assert.deepEqual(after.materials[color][key],before.materials[color][key],\`${'${label}'}: ${'${color}'} ${'${key}'} changed\`);
+  }
+}`;
+if(!source.includes(identityBefore))throw new Error('v121 material identity patch target missing');
+source=source.replace(identityBefore,identityAfter);
+
 const expectedBefore="  const expected={right:0.72,back:0.60,left:0.48,front:0.54};";
-const expectedAfter="  const expected={right:0.34,back:0.30,left:0.32,front:0.32};";
-if(!source.includes(expectedBefore))throw new Error('v121 expected roughness patch target missing');
+const expectedAfter="  const expected={right:0.04,back:0.06,left:0.06,front:0.055};";
+if(!source.includes(expectedBefore))throw new Error('v121 expected material patch target missing');
 source=source.replace(expectedBefore,expectedAfter);
+
+const callBefore="    assertMaterialIdentityExceptRoughness(v120Mobile,v121Mobile,color,'mobile');";
+const callAfter="    assertMaterialIdentityExceptEmissiveIntensity(v120Mobile,v121Mobile,color,'mobile');";
+if(!source.includes(callBefore))throw new Error('v121 material assertion call patch target missing');
+source=source.replace(callBefore,callAfter);
+
+const valueBefore="    assert.equal(v121Mobile.materials[color].roughness,expected[color],`mobile: ${color} roughness mismatch`);";
+const valueAfter="    assert.equal(v121Mobile.materials[color].emissiveIntensity,expected[color],`mobile: ${color} emissive intensity mismatch`);";
+if(!source.includes(valueBefore))throw new Error('v121 emissive assertion patch target missing');
+source=source.replace(valueBefore,valueAfter);
 
 await writeFile(fixedUrl,source);
 try{
