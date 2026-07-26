@@ -1,10 +1,10 @@
 {
   "name": "yakolak",
-  "version": "0.120.0",
+  "version": "0.121.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --check src/app-game-v114.js && node --check src/mobile-clarity-v120.js && node --check src/online-client-v114.js && node --check src/online-rules-v114.js && node --check src/online-rules-v118.js && node --check src/online-rounds-v118.js && node --check src/online-last-move-v119.js && node --check api/rooms.js && node --check api/rooms-v118.js && node scripts/verify-v120-mobile-clarity.mjs && node scripts/verify-tutorial-v112.mjs"
+    "test": "node --check src/app-game-v121.js && node --check src/app-game-v114.js && node --check src/mobile-clarity-v120.js && node --check src/online-client-v114.js && node --check src/online-rules-v114.js && node --check src/online-rules-v118.js && node --check src/online-rounds-v118.js && node --check src/online-last-move-v119.js && node --check api/rooms.js && node --check api/rooms-v118.js && node scripts/verify-v121-entry-flow.mjs && node scripts/verify-v120-mobile-clarity.mjs && node scripts/verify-tutorial-v112.mjs"
   },
   "engines": {
     "node": "22.x"
