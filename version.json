@@ -1,6 +1,6 @@
 {
-  "version": "v122-diegetic-wall-menu-stage1",
-  "build": 122,
+  "version": "v123-tabletop-setup-stage2",
+  "build": 123,
   "updated_at": "2026-07-26",
-  "note": "Stage 1 moves the main menu into the Three.js room as an interactive wall projection, starts on the locked table, turns the camera to the wall, and returns to the table before the projection fades."
+  "note": "Stage 2 moves color and player-count setup into the Three.js table scene with a physical instruction panel and lock marker, while hiding the separate HTML setup card."
 }
