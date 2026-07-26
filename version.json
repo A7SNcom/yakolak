@@ -1,6 +1,6 @@
 {
-  "version": "v121-wall-entry-journey",
-  "build": 121,
+  "version": "v122-diegetic-wall-menu-stage1",
+  "build": 122,
   "updated_at": "2026-07-26",
-  "note": "Adds an Arabic-first wall-mounted mode chooser before the game intro, a polished camera pull-back transition that reveals the table, and a floating settings button while preserving the existing online and computer game systems."
+  "note": "Stage 1 moves the main menu into the Three.js room as an interactive wall projection, starts on the locked table, turns the camera to the wall, and returns to the table before the projection fades."
 }
