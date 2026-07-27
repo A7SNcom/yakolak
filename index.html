@@ -1,458 +1,134 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="yakolak-version" content="v130-room-reveal">
-  <title>Yakolak</title>
-  <link rel="icon" href="data:,">
-  <style>
-    :root {
-      color-scheme: light;
-      --wall: #fbfbfa;
-      --wall-side: #f5f5f2;
-      --floor: #ecece8;
-      --line: rgba(44, 44, 42, .11);
-      --ink: #3f3f3f;
-      --shadow: #000000;
-      --loader-cycle: 820ms;
-      --journey: 5000ms;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html,
-    body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      overflow: hidden;
-      background: #ffffff;
-      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    }
-
-    body {
-      position: relative;
-    }
-
-    .viewport {
-      position: fixed;
-      inset: 0;
-      overflow: hidden;
-      perspective: 1200px;
-      perspective-origin: 50% 50%;
-      background: #ffffff;
-    }
-
-    .world {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 1400px;
-      height: 900px;
-      transform-style: preserve-3d;
-      transform-origin: 50% 50% 0;
-      transform: translate(-50%, -50%) translateZ(1030px);
-      will-change: transform;
-    }
-
-    body.is-loaded .world {
-      animation: cameraJourney var(--journey) forwards;
-    }
-
-    .surface {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      backface-visibility: hidden;
-      transform-style: preserve-3d;
-    }
-
-    .wall {
-      height: 900px;
-      border: 1px solid var(--line);
-      background:
-        radial-gradient(circle at 50% 45%, rgba(255, 255, 255, .94), rgba(255, 255, 255, 0) 48%),
-        linear-gradient(180deg, #ffffff 0%, var(--wall) 100%);
-    }
-
-    .wallBack {
-      width: 1400px;
-      transform: translate(-50%, -50%) translateZ(-600px);
-    }
-
-    .wallRight {
-      width: 1200px;
-      background:
-        radial-gradient(circle at 50% 48%, rgba(255, 255, 255, .96), rgba(255, 255, 255, 0) 52%),
-        linear-gradient(180deg, #ffffff 0%, var(--wall-side) 100%);
-      transform: translate(-50%, -50%) translateX(700px) rotateY(-90deg);
-    }
-
-    .wallLeft {
-      width: 1200px;
-      background: linear-gradient(180deg, #fafaf8 0%, #f0f0ec 100%);
-      transform: translate(-50%, -50%) translateX(-700px) rotateY(90deg);
-    }
-
-    .floor {
-      width: 1400px;
-      height: 1200px;
-      border: 1px solid var(--line);
-      background:
-        radial-gradient(ellipse at 50% 55%, rgba(255, 255, 255, .82), rgba(255, 255, 255, 0) 58%),
-        linear-gradient(180deg, #f2f2ef 0%, var(--floor) 100%);
-      transform: translate(-50%, -50%) translateY(450px) rotateX(90deg);
-    }
-
-    .ceiling {
-      width: 1400px;
-      height: 1200px;
-      border: 1px solid rgba(44, 44, 42, .06);
-      background: #ffffff;
-      transform: translate(-50%, -50%) translateY(-450px) rotateX(-90deg);
-    }
-
-    .roomGlow {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 940px;
-      height: 540px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, .68);
-      filter: blur(72px);
-      transform: translate(-50%, -50%) translateY(-260px) translateZ(40px) rotateX(90deg);
-      pointer-events: none;
-    }
-
-    .loaderProjection {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 96px;
-      height: 132px;
-      transform: translate(-50%, -50%) translateZ(2px);
-      transform-origin: 50% 55%;
-      will-change: opacity, transform;
-    }
-
-    body.is-loaded .loaderProjection {
-      animation: finishLoader 620ms cubic-bezier(.4, 0, .2, 1) forwards;
-    }
-
-    body.is-loaded .starBounce,
-    body.is-loaded .loadingStar,
-    body.is-loaded .loadingShadow {
-      animation-play-state: paused;
-    }
-
-    .starBounce {
-      position: absolute;
-      top: 0;
-      left: 4px;
-      width: 88px;
-      height: 88px;
-      transform-origin: 50% 100%;
-      animation: bounce var(--loader-cycle) infinite;
-      will-change: transform;
-    }
-
-    .loadingStar {
-      display: block;
-      width: 100%;
-      height: 100%;
-      overflow: visible;
-      transform-box: fill-box;
-      transform-origin: center;
-      animation: turn var(--loader-cycle) linear infinite;
-      will-change: transform;
-    }
-
-    .loadingStar path {
-      fill: var(--ink);
-    }
-
-    .loadingShadow {
-      position: absolute;
-      top: 123px;
-      left: 13px;
-      width: 70px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--shadow);
-      opacity: .075;
-      filter: blur(.6px);
-      transform-origin: center;
-      animation: loaderShadow var(--loader-cycle) infinite;
-      will-change: transform, opacity;
-    }
-
-    .table {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 430px;
-      height: 330px;
-      transform-style: preserve-3d;
-      transform: translate(-50%, -50%) translateY(245px) translateZ(-30px);
-    }
-
-    .tableShadow {
-      position: absolute;
-      left: 50%;
-      top: 265px;
-      width: 330px;
-      height: 86px;
-      border-radius: 50%;
-      background: rgba(30, 30, 28, .11);
-      filter: blur(17px);
-      transform: translateX(-50%) rotateX(72deg) translateZ(-34px);
-    }
-
-    .tableTop {
-      position: absolute;
-      left: 50%;
-      top: 22px;
-      width: 430px;
-      height: 245px;
-      border: 1px solid rgba(40, 40, 37, .16);
-      border-radius: 48%;
-      background:
-        radial-gradient(ellipse at 42% 30%, #ffffff 0%, #f3f3f0 55%, #ddddda 100%);
-      box-shadow: 0 24px 42px rgba(35, 35, 32, .13);
-      transform: translateX(-50%) rotateX(72deg);
-      transform-origin: center;
-    }
-
-    .tableEdge {
-      position: absolute;
-      left: 50%;
-      top: 142px;
-      width: 360px;
-      height: 34px;
-      border-radius: 0 0 50% 50%;
-      background: linear-gradient(180deg, #d9d9d5 0%, #c5c5c0 100%);
-      transform: translateX(-50%) translateZ(-5px);
-    }
-
-    .pedestal {
-      position: absolute;
-      left: 50%;
-      top: 150px;
-      width: 72px;
-      height: 145px;
-      border-radius: 18px 18px 30px 30px;
-      background: linear-gradient(90deg, #c8c8c3 0%, #f3f3f0 46%, #bdbdb8 100%);
-      box-shadow: 0 18px 24px rgba(30, 30, 28, .12);
-      transform: translateX(-50%) translateZ(-14px);
-    }
-
-    .tableBase {
-      position: absolute;
-      left: 50%;
-      top: 274px;
-      width: 205px;
-      height: 72px;
-      border-radius: 50%;
-      background: linear-gradient(180deg, #deded9 0%, #bdbdb8 100%);
-      transform: translateX(-50%) rotateX(72deg) translateZ(-18px);
-    }
-
-    .sampleText {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      margin: 0;
-      color: #3d3d3a;
-      font-size: 64px;
-      font-weight: 500;
-      letter-spacing: 0;
-      white-space: nowrap;
-      opacity: 0;
-      transform: translate(-50%, -50%) translateZ(3px);
-      transition: opacity 900ms ease 4050ms;
-    }
-
-    body.is-loaded .sampleText {
-      opacity: 1;
-    }
-
-    @keyframes cameraJourney {
-      0% {
-        transform: translate(-50%, -50%) translateZ(1030px) rotateX(0deg) rotateY(0deg);
-        animation-timing-function: cubic-bezier(.52, .06, .28, .97);
-      }
-      39% {
-        transform: translate(-50%, -50%) translateY(-34px) translateZ(125px) rotateX(-6deg) rotateY(0deg);
-        animation-timing-function: cubic-bezier(.24, .71, .2, 1);
-      }
-      54% {
-        transform: translate(-50%, -50%) translateY(-34px) translateZ(92px) rotateX(-6deg) rotateY(0deg);
-        animation-timing-function: cubic-bezier(.48, .03, .18, 1);
-      }
-      100% {
-        transform: translate(-50%, -50%) translateY(-8px) translateZ(715px) rotateX(-1deg) rotateY(90deg);
-      }
-    }
-
-    @keyframes finishLoader {
-      0% {
-        opacity: 1;
-        transform: translate(-50%, -50%) translateZ(2px) scale(1);
-      }
-      35% {
-        opacity: .82;
-        transform: translate(-50%, -50%) translateZ(2px) scale(1.04, .92);
-      }
-      100% {
-        opacity: 0;
-        transform: translate(-50%, -50%) translateZ(2px) scale(.72);
-      }
-    }
-
-    @keyframes bounce {
-      0% {
-        transform: translateY(0) scale(1, 1);
-        animation-timing-function: cubic-bezier(.55, .08, .68, .19);
-      }
-      43% {
-        transform: translateY(33px) scale(1.01, .99);
-        animation-timing-function: cubic-bezier(.2, .8, .3, 1);
-      }
-      50% {
-        transform: translateY(36px) scale(1.17, .72);
-        animation-timing-function: cubic-bezier(.15, .75, .2, 1);
-      }
-      58% {
-        transform: translateY(30px) scale(.94, 1.09);
-        animation-timing-function: cubic-bezier(.22, .61, .36, 1);
-      }
-      78% {
-        transform: translateY(5px) scale(1.01, .99);
-        animation-timing-function: cubic-bezier(.25, .1, .25, 1);
-      }
-      100% {
-        transform: translateY(0) scale(1, 1);
-      }
-    }
-
-    @keyframes turn {
-      0% { transform: rotate(0deg); }
-      43% { transform: rotate(10deg); }
-      50% { transform: rotate(12deg); }
-      58% { transform: rotate(14deg); }
-      78% { transform: rotate(20deg); }
-      100% { transform: rotate(24deg); }
-    }
-
-    @keyframes loaderShadow {
-      0%,
-      100% {
-        transform: scale(.66, .72);
-        opacity: .055;
-        animation-timing-function: cubic-bezier(.55, .08, .68, .19);
-      }
-      43% {
-        transform: scale(1.02, .95);
-        opacity: .105;
-      }
-      50% {
-        transform: scale(1.28, 1);
-        opacity: .14;
-        animation-timing-function: cubic-bezier(.15, .75, .2, 1);
-      }
-      58% {
-        transform: scale(1.04, .94);
-        opacity: .105;
-      }
-      78% {
-        transform: scale(.72, .76);
-        opacity: .065;
-      }
-    }
-
-    @media (max-width: 700px) {
-      .viewport {
-        perspective: 980px;
-      }
-
-      .sampleText {
-        font-size: 52px;
-      }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      :root {
-        --loader-cycle: 1100ms;
-        --journey: 1600ms;
-      }
-
-      .world {
-        transform: translate(-50%, -50%) translateY(-8px) translateZ(715px) rotateX(-1deg) rotateY(90deg);
-      }
-
-      body.is-loaded .world {
-        animation: none;
-      }
-
-      .sampleText {
-        transition-delay: 250ms;
-      }
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="yakolak-version" content="v130-room-reveal">
+<title>Yakolak</title>
+<link rel="icon" href="data:,">
+<style>
+:root{
+  color-scheme:light;
+  --wall:#fbfbfa;
+  --wall-side:#f5f5f2;
+  --floor:#ecece8;
+  --line:rgba(44,44,42,.11);
+  --ink:#3f3f3f;
+  --loader-cycle:820ms;
+  --journey:5000ms;
+}
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#fff;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+body{position:relative}
+.viewport{position:fixed;inset:0;overflow:hidden;perspective:1200px;perspective-origin:50% 50%;background:#fff}
+.world{
+  position:absolute;left:50%;top:50%;width:1400px;height:900px;
+  transform-style:preserve-3d;transform-origin:50% 50% 0;
+  transform:translate(-50%,-50%) translateZ(1030px);will-change:transform
+}
+body.is-loaded .world{animation:cameraJourney var(--journey) forwards}
+.surface{position:absolute;left:50%;top:50%;backface-visibility:hidden;transform-style:preserve-3d}
+.wall{height:900px;border:1px solid var(--line);background:radial-gradient(circle at 50% 45%,rgba(255,255,255,.94),rgba(255,255,255,0) 48%),linear-gradient(180deg,#fff 0%,var(--wall) 100%)}
+.wallBack{width:1400px;transform:translate(-50%,-50%) translateZ(-600px)}
+.wallRight{width:1200px;background:radial-gradient(circle at 50% 48%,rgba(255,255,255,.96),rgba(255,255,255,0) 52%),linear-gradient(180deg,#fff 0%,var(--wall-side) 100%);transform:translate(-50%,-50%) translateX(700px) rotateY(-90deg)}
+.wallLeft{width:1200px;background:linear-gradient(180deg,#fafaf8 0%,#f0f0ec 100%);transform:translate(-50%,-50%) translateX(-700px) rotateY(90deg)}
+.floor{width:1400px;height:1200px;border:1px solid var(--line);background:radial-gradient(ellipse at 50% 55%,rgba(255,255,255,.82),rgba(255,255,255,0) 58%),linear-gradient(180deg,#f2f2ef 0%,var(--floor) 100%);transform:translate(-50%,-50%) translateY(450px) rotateX(90deg)}
+.ceiling{width:1400px;height:1200px;border:1px solid rgba(44,44,42,.06);background:#fff;transform:translate(-50%,-50%) translateY(-450px) rotateX(-90deg)}
+.roomGlow{position:absolute;left:50%;top:50%;width:940px;height:540px;border-radius:50%;background:rgba(255,255,255,.68);filter:blur(72px);transform:translate(-50%,-50%) translateY(-260px) translateZ(40px) rotateX(90deg);pointer-events:none}
+.wallRight,.wallLeft,.floor,.ceiling,.roomGlow,.table{opacity:0}
+body.is-loaded .wallRight,body.is-loaded .wallLeft,body.is-loaded .floor,body.is-loaded .ceiling,body.is-loaded .roomGlow,body.is-loaded .table{animation:geometryIn 900ms 170ms ease-out both}
+.loaderProjection{position:absolute;left:50%;top:50%;width:96px;height:132px;transform:translate(-50%,-50%) translateZ(2px);transform-origin:50% 55%;will-change:opacity,transform}
+body.is-loaded .loaderProjection{animation:finishLoader 620ms cubic-bezier(.4,0,.2,1) forwards}
+body.is-loaded .starBounce,body.is-loaded .loadingStar,body.is-loaded .loadingShadow{animation-play-state:paused}
+.starBounce{position:absolute;top:0;left:4px;width:88px;height:88px;transform-origin:50% 100%;animation:bounce var(--loader-cycle) infinite;will-change:transform}
+.loadingStar{display:block;width:100%;height:100%;overflow:visible;transform-box:fill-box;transform-origin:center;animation:turn var(--loader-cycle) linear infinite;will-change:transform}
+.loadingStar path{fill:var(--ink)}
+.loadingShadow{position:absolute;top:123px;left:13px;width:70px;height:8px;border-radius:50%;background:#000;opacity:.075;filter:blur(.6px);transform-origin:center;animation:loaderShadow var(--loader-cycle) infinite;will-change:transform,opacity}
+.table{position:absolute;left:50%;top:50%;width:430px;height:330px;transform-style:preserve-3d;transform:translate(-50%,-50%) translateY(245px) translateZ(-30px)}
+.tableShadow{position:absolute;left:50%;top:265px;width:330px;height:86px;border-radius:50%;background:rgba(30,30,28,.11);filter:blur(17px);transform:translateX(-50%) rotateX(72deg) translateZ(-34px)}
+.tableTop{position:absolute;left:50%;top:22px;width:430px;height:245px;border:1px solid rgba(40,40,37,.16);border-radius:48%;background:radial-gradient(ellipse at 42% 30%,#fff 0%,#f3f3f0 55%,#ddddda 100%);box-shadow:0 24px 42px rgba(35,35,32,.13);transform:translateX(-50%) rotateX(72deg);transform-origin:center}
+.tableEdge{position:absolute;left:50%;top:142px;width:360px;height:34px;border-radius:0 0 50% 50%;background:linear-gradient(180deg,#d9d9d5 0%,#c5c5c0 100%);transform:translateX(-50%) translateZ(-5px)}
+.pedestal{position:absolute;left:50%;top:150px;width:72px;height:145px;border-radius:18px 18px 30px 30px;background:linear-gradient(90deg,#c8c8c3 0%,#f3f3f0 46%,#bdbdb8 100%);box-shadow:0 18px 24px rgba(30,30,28,.12);transform:translateX(-50%) translateZ(-14px)}
+.tableBase{position:absolute;left:50%;top:274px;width:205px;height:72px;border-radius:50%;background:linear-gradient(180deg,#deded9 0%,#bdbdb8 100%);transform:translateX(-50%) rotateX(72deg) translateZ(-18px)}
+.sampleText{position:absolute;left:50%;top:50%;margin:0;color:#3d3d3a;font-size:64px;font-weight:500;white-space:nowrap;opacity:0;transform:translate(-50%,-50%) translateZ(3px);transition:opacity 900ms ease 4050ms}
+body.is-loaded .sampleText{opacity:1}
+@keyframes geometryIn{from{opacity:0}to{opacity:1}}
+@keyframes cameraJourney{
+  0%{transform:translate(-50%,-50%) translateZ(1030px) rotateX(0) rotateY(0);animation-timing-function:cubic-bezier(.52,.06,.28,.97)}
+  39%{transform:translate(-50%,-50%) translateY(-34px) translateZ(125px) rotateX(-6deg) rotateY(0);animation-timing-function:cubic-bezier(.24,.71,.2,1)}
+  54%{transform:translate(-50%,-50%) translateY(-34px) translateZ(92px) rotateX(-6deg) rotateY(0);animation-timing-function:cubic-bezier(.48,.03,.18,1)}
+  100%{transform:translate(-50%,-50%) translateY(-8px) translateZ(715px) rotateX(-1deg) rotateY(90deg)}
+}
+@keyframes finishLoader{
+  0%{opacity:1;transform:translate(-50%,-50%) translateZ(2px) scale(1)}
+  35%{opacity:.82;transform:translate(-50%,-50%) translateZ(2px) scale(1.04,.92)}
+  100%{opacity:0;transform:translate(-50%,-50%) translateZ(2px) scale(.72)}
+}
+@keyframes bounce{
+  0%{transform:translateY(0) scale(1);animation-timing-function:cubic-bezier(.55,.08,.68,.19)}
+  43%{transform:translateY(33px) scale(1.01,.99);animation-timing-function:cubic-bezier(.2,.8,.3,1)}
+  50%{transform:translateY(36px) scale(1.17,.72);animation-timing-function:cubic-bezier(.15,.75,.2,1)}
+  58%{transform:translateY(30px) scale(.94,1.09);animation-timing-function:cubic-bezier(.22,.61,.36,1)}
+  78%{transform:translateY(5px) scale(1.01,.99);animation-timing-function:cubic-bezier(.25,.1,.25,1)}
+  100%{transform:translateY(0) scale(1)}
+}
+@keyframes turn{0%{transform:rotate(0)}43%{transform:rotate(10deg)}50%{transform:rotate(12deg)}58%{transform:rotate(14deg)}78%{transform:rotate(20deg)}100%{transform:rotate(24deg)}}
+@keyframes loaderShadow{
+  0%,100%{transform:scale(.66,.72);opacity:.055;animation-timing-function:cubic-bezier(.55,.08,.68,.19)}
+  43%{transform:scale(1.02,.95);opacity:.105}
+  50%{transform:scale(1.28,1);opacity:.14;animation-timing-function:cubic-bezier(.15,.75,.2,1)}
+  58%{transform:scale(1.04,.94);opacity:.105}
+  78%{transform:scale(.72,.76);opacity:.065}
+}
+@media(max-width:700px){.viewport{perspective:980px}.sampleText{font-size:52px}}
+@media(prefers-reduced-motion:reduce){
+  :root{--loader-cycle:1100ms;--journey:1600ms}
+  .world{transform:translate(-50%,-50%) translateY(-8px) translateZ(715px) rotateX(-1deg) rotateY(90deg)}
+  body.is-loaded .world{animation:none}
+  .sampleText{transition-delay:250ms}
+}
+</style>
 </head>
 <body data-phase="loading">
-  <main class="viewport" aria-label="مشهد لعبة ياكلك">
-    <section class="world" aria-hidden="true">
-      <div class="surface wall wallBack">
-        <div class="loaderProjection">
-          <div class="starBounce">
-            <svg class="loadingStar" viewBox="0 0 802 798" xmlns="http://www.w3.org/2000/svg">
-              <g transform="matrix(4.166667,0,0,4.166667,484.7475,797.470417)">
-                <path d="M0,-191.393L-20.116,-183.832L-40.232,-191.393L-55.534,-176.304L-76.986,-175.028L-84.828,-155.02L-103.907,-145.13L-102.932,-123.662L-116.339,-106.867L-106.717,-87.651L-112.134,-66.855L-95.528,-53.214L-92.018,-32.013L-71.299,-26.306L-59.469,-8.364L-38.22,-11.578L-20.116,0L-2.012,-11.578L19.237,-8.364L31.067,-26.306L51.786,-32.013L55.296,-53.214L71.902,-66.855L66.486,-87.651L76.108,-106.867L62.7,-123.662L63.675,-145.13L44.596,-155.02L36.754,-175.028L15.302,-176.304L0,-191.393Z"/>
-              </g>
-            </svg>
-          </div>
-          <div class="loadingShadow"></div>
+<main class="viewport" aria-label="مشهد لعبة ياكلك">
+  <section class="world" aria-hidden="true">
+    <div class="surface wall wallBack">
+      <div class="loaderProjection">
+        <div class="starBounce">
+          <svg class="loadingStar" viewBox="0 0 802 798" xmlns="http://www.w3.org/2000/svg">
+            <g transform="matrix(4.166667,0,0,4.166667,484.7475,797.470417)">
+              <path d="M0,-191.393L-20.116,-183.832L-40.232,-191.393L-55.534,-176.304L-76.986,-175.028L-84.828,-155.02L-103.907,-145.13L-102.932,-123.662L-116.339,-106.867L-106.717,-87.651L-112.134,-66.855L-95.528,-53.214L-92.018,-32.013L-71.299,-26.306L-59.469,-8.364L-38.22,-11.578L-20.116,0L-2.012,-11.578L19.237,-8.364L31.067,-26.306L51.786,-32.013L55.296,-53.214L71.902,-66.855L66.486,-87.651L76.108,-106.867L62.7,-123.662L63.675,-145.13L44.596,-155.02L36.754,-175.028L15.302,-176.304L0,-191.393Z"/>
+            </g>
+          </svg>
         </div>
+        <div class="loadingShadow"></div>
       </div>
-
-      <div class="surface wall wallRight">
-        <p class="sampleText">نص تجريبي</p>
-      </div>
-      <div class="surface wall wallLeft"></div>
-      <div class="surface floor"></div>
-      <div class="surface ceiling"></div>
-      <div class="roomGlow"></div>
-
-      <div class="table">
-        <div class="tableShadow"></div>
-        <div class="tableBase"></div>
-        <div class="pedestal"></div>
-        <div class="tableEdge"></div>
-        <div class="tableTop"></div>
-      </div>
-    </section>
-  </main>
-
-  <script>
-    (() => {
-      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const loadingDuration = reducedMotion ? 1100 : 2460;
-      const journeyDuration = reducedMotion ? 1600 : 5000;
-
-      window.setTimeout(() => {
-        document.body.dataset.phase = 'room-reveal';
-        document.body.classList.add('is-loaded');
-
-        window.setTimeout(() => {
-          document.body.dataset.phase = 'sample-wall';
-        }, journeyDuration);
-      }, loadingDuration);
-    })();
-  </script>
+    </div>
+    <div class="surface wall wallRight"><p class="sampleText">نص تجريبي</p></div>
+    <div class="surface wall wallLeft"></div>
+    <div class="surface floor"></div>
+    <div class="surface ceiling"></div>
+    <div class="roomGlow"></div>
+    <div class="table">
+      <div class="tableShadow"></div>
+      <div class="tableBase"></div>
+      <div class="pedestal"></div>
+      <div class="tableEdge"></div>
+      <div class="tableTop"></div>
+    </div>
+  </section>
+</main>
+<script>
+(()=>{
+  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const loadingDuration=reduced?1100:2460;
+  const journeyDuration=reduced?1600:5000;
+  setTimeout(()=>{
+    document.body.dataset.phase='room-reveal';
+    document.body.classList.add('is-loaded');
+    setTimeout(()=>document.body.dataset.phase='sample-wall',journeyDuration);
+  },loadingDuration);
+})();
+</script>
 </body>
 </html>
