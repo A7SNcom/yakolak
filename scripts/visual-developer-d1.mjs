@@ -10,17 +10,20 @@ const sceneIds=['loading-star','empty-table','logo-wall','board-bases','clean-en
 const failures=[];
 const results=[];
 
-async function waitSceneReady(page,timeout=90000){
+async function waitSceneReady(page,timeout=120000){
   await page.waitForFunction(()=>document.body.dataset.sceneReady==='true'||Boolean(document.body.dataset.sceneError),null,{timeout});
-  const state=await page.evaluate(()=>({
-    scene:document.body.dataset.developerScene||'',
-    ready:document.body.dataset.sceneReady||'',
-    error:document.body.dataset.sceneError||'',
-    preview:document.body.dataset.preview||''
-  }));
-  if(state.error)throw new Error(`${state.scene} failed: ${state.error}`);
-  if(state.ready!=='true')throw new Error(`${state.scene} never became ready`);
+  const state=await page.evaluate(()=>({...document.body.dataset}));
+  if(state.sceneError)throw new Error(`${state.developerScene} failed: ${state.sceneError}`);
+  if(state.sceneReady!=='true')throw new Error(`${state.developerScene} never became ready`);
   return state;
+}
+
+async function waitCardPreview(card,timeout=120000){
+  await card.scrollIntoViewIfNeeded();
+  await card.locator('iframe').waitFor({state:'attached'});
+  await card.page().waitForFunction(element=>element.classList.contains('preview-ready')||element.classList.contains('preview-error'),await card.elementHandle(),{timeout});
+  const state=await card.getAttribute('data-preview-state');
+  if(state!=='ready')throw new Error(`preview ${await card.getAttribute('data-scene')} failed`);
 }
 
 async function checkGallery(browser,name,contextOptions){
@@ -32,6 +35,8 @@ async function checkGallery(browser,name,contextOptions){
   await page.waitForFunction(()=>document.body.dataset.developerBuild==='D1');
   const cards=page.locator('.scene-card');
   if(await cards.count()!==6)throw new Error(`${name}: expected 6 scene cards`);
+  for(let index=0;index<6;index++)await waitCardPreview(cards.nth(index));
+  await page.locator('.scene-card').first().scrollIntoViewIfNeeded();
   await page.screenshot({path:path.join(output,`${name}-01-gallery.png`),fullPage:true});
 
   await page.getByRole('button',{name:'مشهد واحد'}).click();
@@ -40,17 +45,44 @@ async function checkGallery(browser,name,contextOptions){
   if(await page.locator('.scene-card:visible').count()!==2)throw new Error(`${name}: sequence filter did not show 2 cards`);
   await page.getByRole('button',{name:'كل المشاهد'}).click();
 
-  await page.locator('[data-scene="loading-star"] .scene-open').click();
+  await page.locator('[data-scene="unboxing-intro"] .scene-open').click();
   await page.locator('#devStage.open').waitFor();
   const frame=page.frameLocator('#devStageFrame');
-  await frame.locator('body[data-scene-ready="true"]').waitFor({timeout:45000});
+  await frame.locator('body[data-scene-ready="true"]').waitFor({timeout:120000});
+  const setupHidden=await frame.locator('body').getAttribute('data-setup-hidden');
+  if(setupHidden!=='true')throw new Error(`${name}: unboxing stage was not isolated`);
   await page.screenshot({path:path.join(output,`${name}-02-open-scene.png`)});
   await page.getByRole('button',{name:/العودة للمعرض/}).click();
   await page.locator('#devStage').waitFor({state:'hidden'});
 
   if(pageErrors.length)throw new Error(`${name}: page errors\n${pageErrors.join('\n')}`);
   await context.close();
-  return{name,cards:6,single:4,sequence:2,back:true};
+  return{name,cards:6,previews:6,single:4,sequence:2,back:true};
+}
+
+async function assertScene(page,id,state){
+  const runtime=await page.evaluate(()=>{
+    const game=globalThis.__yakolakGame;
+    const scene=game?.gameGroup?.parent;
+    const logoWall=scene?.getObjectByName?.('yakolak-developer-d1-logo-wall');
+    const named=['9','3-right','3-left','3-front','3-back'];
+    return{
+      gameGroupVisible:game?.gameGroup?.visible,
+      setupVisible:game?.setupGroup?.visible,
+      visibleBases:named.filter(name=>game?.meshes?.[name]?.visible).length,
+      logoChildren:logoWall?.children?.length||0,
+      logoMaps:logoWall?.children?.filter?.(child=>Boolean(child.material?.map)).length||0,
+      setupDomVisible:[...document.querySelectorAll('#yakolakGameSetup,#yakolakGameHud,#yakolakGameScore')].some(element=>getComputedStyle(element).display!=='none')
+    };
+  });
+  if(id==='empty-table'&&runtime.gameGroupVisible!==false)throw new Error('empty-table: game objects are visible');
+  if(id==='board-bases'&&(state.visibleObjects!=='5'||runtime.visibleBases!==5))throw new Error(`board-bases: expected five named objects, got ${state.visibleObjects}/${runtime.visibleBases}`);
+  if(id==='logo-wall'&&(state.logoRendering!=='svg-texture'||runtime.logoChildren!==2||runtime.logoMaps!==2))throw new Error(`logo-wall: two-tone texture rendering is incomplete ${JSON.stringify(runtime)}`);
+  if(id==='unboxing-intro'&&(state.setupHidden!=='true'||runtime.setupVisible!==false||runtime.setupDomVisible))throw new Error(`unboxing-intro: setup leaked into intro ${JSON.stringify(runtime)}`);
+  if(id==='clean-entry'){
+    const complete=await page.evaluate(()=>globalThis.__yakolakV126Entry?.phase==='complete');
+    if(!complete)throw new Error('clean-entry: sequence did not complete');
+  }
 }
 
 async function checkScenes(browser){
@@ -62,10 +94,10 @@ async function checkScenes(browser){
     page.on('pageerror',error=>pageErrors.push(String(error?.stack||error)));
     await page.goto(`${BASE_URL}/developer-scene.html?scene=${id}&d=D1`,{waitUntil:'domcontentloaded',timeout:60000});
     const state=await waitSceneReady(page);
+    if(id==='unboxing-intro')await page.waitForTimeout(1600);
     if(pageErrors.length)throw new Error(`${id}: page errors\n${pageErrors.join('\n')}`);
-    if(['loading-star','board-bases','clean-entry','unboxing-intro'].includes(id)){
-      await page.screenshot({path:path.join(output,`scene-${id}.png`)});
-    }
+    await assertScene(page,id,state);
+    await page.screenshot({path:path.join(output,`scene-${id}.png`)});
     results.push(state);
   }
   await context.close();
@@ -85,4 +117,4 @@ try{
 
 fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({build:'D1',url:BASE_URL,results,failures},null,2));
 if(failures.length)throw new Error(`Developer D1 visual failures: ${JSON.stringify(failures)}`);
-console.log('Developer D1 gallery and all six scenes passed');
+console.log('Developer D1 gallery and all six isolated scenes passed');
