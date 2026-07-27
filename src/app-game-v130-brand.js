@@ -37,10 +37,13 @@ async function installSecondWallBranding(){
   const {THREE}=game;
   const scene=game.gameGroup.parent;
   if(scene.getObjectByName('yakolak-v130-brand-wall'))return;
+  const portrait=innerHeight>innerWidth*1.18;
+  const gameLogoSize=portrait?[600,342]:[820,467];
+  const companyLogoSize=portrait?[340,161]:[430,204];
 
   const group=new THREE.Group();
   group.name='yakolak-v130-brand-wall';
-  group.position.set(2354,260,0);
+  group.position.set(2354,portrait?275:260,0);
   group.rotation.y=-Math.PI/2;
 
   const gameLogoMaterial=new THREE.MeshBasicMaterial({
@@ -51,9 +54,9 @@ async function installSecondWallBranding(){
     toneMapped:false,
     side:THREE.DoubleSide
   });
-  const gameLogo=new THREE.Mesh(new THREE.PlaneGeometry(820,467),gameLogoMaterial);
+  const gameLogo=new THREE.Mesh(new THREE.PlaneGeometry(...gameLogoSize),gameLogoMaterial);
   gameLogo.name='yakolak-v130-game-logo';
-  gameLogo.position.set(0,105,2);
+  gameLogo.position.set(0,portrait?105:105,2);
   gameLogo.renderOrder=12020;
 
   const companyLogoMaterial=new THREE.MeshBasicMaterial({
@@ -64,9 +67,9 @@ async function installSecondWallBranding(){
     toneMapped:false,
     side:THREE.DoubleSide
   });
-  const companyLogo=new THREE.Mesh(new THREE.PlaneGeometry(430,204),companyLogoMaterial);
+  const companyLogo=new THREE.Mesh(new THREE.PlaneGeometry(...companyLogoSize),companyLogoMaterial);
   companyLogo.name='yakolak-v130-company-logo';
-  companyLogo.position.set(0,-245,2);
+  companyLogo.position.set(0,portrait?-190:-245,2);
   companyLogo.renderOrder=12021;
 
   group.add(gameLogo,companyLogo);
@@ -85,6 +88,7 @@ async function installSecondWallBranding(){
     companyLogo,
     gameLogoAsset:GAME_LOGO_URL,
     companyLogoAsset:COMPANY_LOGO_URL,
+    responsiveLayout:portrait?'portrait':'landscape',
     presentBeforeSecondWall:true
   };
 }
