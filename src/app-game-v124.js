@@ -1,6 +1,6 @@
 console.info('[Yakolak] APP GAME v124 ROOM SERVICES STAGE 3 LOADED');
 
-await import('./app-game-v123.js?v=124-stage3-base');
+await import('./app-game-v123.js?v=126-unified-gameplay-stage3');
 
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));

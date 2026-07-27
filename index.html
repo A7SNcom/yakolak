@@ -3,10 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="yakolak-version" content="v125-white-wall-continuity">
+<meta name="yakolak-version" content="v126-unified-gameplay">
 <title>Yakolak Live</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="./styles/v114-online.css?v=125">
+<link rel="stylesheet" href="./styles/v114-online.css?v=126">
+<link rel="stylesheet" href="./styles/v126-rooms.css?v=126">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script>
 <style>
@@ -50,7 +51,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--yakol
 <div id="panel" aria-hidden="true"></div>
 <textarea id="out"></textarea>
 <script type="module">
-const BUILD='125';
+const BUILD='126';
 const params=new URLSearchParams(location.search);
 const clearToken=params.get('clear');
 const debugMode=params.get('debug')==='1';

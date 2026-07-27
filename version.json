@@ -1,6 +1,6 @@
 {
-  "version": "v125-white-wall-continuity",
-  "build": 125,
+  "version": "v126-unified-gameplay",
+  "build": 126,
   "updated_at": "2026-07-26",
-  "note": "Unifies the first loading view and main menu as one neutral white wall, removes the blue futuristic projection style, and reveals the table only after the player chooses a path."
+  "note": "Replaces manual room codes with a named room browser, remembers room-name suggestions locally, restores visible two-player round and rematch flows, shares gameplay rules across online and offline, and centers the camera for each player's side."
 }

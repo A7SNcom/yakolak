@@ -1,6 +1,6 @@
 console.info('[Yakolak] APP GAME v123 TABLETOP SETUP STAGE 2 LOADED');
 
-await import('./app-game-v122.js?v=123-stage2-base');
+await import('./app-game-v122.js?v=126-unified-gameplay-stage2');
 
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));

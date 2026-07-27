@@ -3,10 +3,6 @@ if (!game?.state || !game?.renderer || !game?.camera) throw new Error('v114 onli
 
 let onlineHumanColor = null;
 let onlineSubmitMove = null;
-let onlineInputInstalled = false;
-let selectedOnlineSize = null;
-let onlinePointerStart = null;
-let onlineZoneMarkers = [];
 let onlineLastMoveMarker = null;
 
 function captionGame(text) {
@@ -34,15 +30,6 @@ function renderGame() {
   game.render();
 }
 
-function clearOnlineMarkers() {
-  onlineZoneMarkers.forEach(marker => {
-    marker.parent?.remove(marker);
-    marker.geometry?.dispose?.();
-    marker.material?.dispose?.();
-  });
-  onlineZoneMarkers = [];
-}
-
 function clearLastMoveMarker() {
   if (!onlineLastMoveMarker) return;
   onlineLastMoveMarker.parent?.remove(onlineLastMoveMarker);
@@ -68,20 +55,6 @@ function makeRing(zone, color, inner = 23, outer = 30) {
   marker.renderOrder = 10040;
   game.gameGroup.add(marker);
   return marker;
-}
-
-function showLegalZones(size) {
-  clearOnlineMarkers();
-  if (!size || !room || room.status !== 'playing') {
-    renderGame();
-    return;
-  }
-  game.boardZones.forEach(zone => {
-    if (!room.board[String(zone.id)]?.[size]) {
-      onlineZoneMarkers.push(makeRing(zone, '#d9edf7'));
-    }
-  });
-  renderGame();
 }
 
 function showOnlineLastMove(lastMove) {
@@ -169,7 +142,7 @@ function updateOnlineCaption() {
   }
   const current = room.players[room.turnIndex];
   if (current?.seat === identity?.seat) {
-    captionGame(selectedOnlineSize ? 'اختر خانة مضيئة لوضع القطعة.' : 'دورك: اختر قطعة، ثم اختر خانة متاحة.');
+    captionGame('دورك: افتح طقمك، اختر الحجم، ثم اختر خانة متاحة.');
   } else {
     captionGame('دور الخصم — ستتحدث اللوحة تلقائيًا.');
   }
@@ -186,104 +159,13 @@ async function waitForGameReady() {
   if (!game.pieces.length) throw new Error('online_game_not_ready');
 }
 
-function rayFromPointer(event) {
-  const rect = game.renderer.domElement.getBoundingClientRect();
-  const pointer = new game.THREE.Vector2(
-    ((event.clientX - rect.left) / rect.width) * 2 - 1,
-    -((event.clientY - rect.top) / rect.height) * 2 + 1
-  );
-  const raycaster = new game.THREE.Raycaster();
-  raycaster.setFromCamera(pointer, game.camera);
-  return raycaster;
-}
-
-function pieceFromTap(event) {
-  const raycaster = rayFromPointer(event);
-  const available = game.pieces.filter(piece =>
-    piece.dir === onlineHumanColor &&
-    !piece.placed &&
-    piece.mesh.visible
-  );
-  const hit = raycaster.intersectObjects(available.map(piece => piece.mesh), false)[0];
-  return hit ? available.find(piece => piece.mesh === hit.object) || null : null;
-}
-
-function zoneFromTap(event) {
-  const raycaster = rayFromPointer(event);
-  const worldY = game.gameGroup.localToWorld(new game.THREE.Vector3(0, 2, 0)).y;
-  const plane = new game.THREE.Plane(new game.THREE.Vector3(0, 1, 0), -worldY);
-  const world = new game.THREE.Vector3();
-  if (!raycaster.ray.intersectPlane(plane, world)) return null;
-  const local = game.gameGroup.worldToLocal(world);
-  let best = null;
-  let distance = Infinity;
-  game.boardZones.forEach(zone => {
-    const next = Math.hypot(local.x - zone.px, local.z - zone.pz);
-    if (next < distance) {
-      best = zone;
-      distance = next;
-    }
-  });
-  return distance <= 42 ? best : null;
-}
-
-async function handleOnlineTap(event) {
-  if (!room || room.status !== 'playing') return;
-  const current = room.players[room.turnIndex];
-  if (current?.seat !== identity?.seat || requestPending) return;
-  const piece = pieceFromTap(event);
-  if (piece) {
-    selectedOnlineSize = piece.type;
-    showLegalZones(selectedOnlineSize);
-    updateOnlineCaption();
-    return;
-  }
-  const zone = zoneFromTap(event);
-  if (!zone) return;
-  if (!selectedOnlineSize) {
-    captionGame('اختر قطعة أولًا.');
-    return;
-  }
-  if (room.board[String(zone.id)]?.[selectedOnlineSize]) {
-    captionGame('هذا الحجم موجود في الخانة. اختر دائرة مضيئة.');
-    return;
-  }
-  clearOnlineMarkers();
-  const ok = await onlineSubmitMove?.({ zone: zone.id, size: selectedOnlineSize });
-  if (!ok) showLegalZones(selectedOnlineSize);
-  else selectedOnlineSize = null;
-}
-
-function installOnlineInput() {
-  if (onlineInputInstalled) return;
-  onlineInputInstalled = true;
-  const canvas = game.renderer.domElement;
-  canvas.addEventListener('pointerdown', event => {
-    if (!started) return;
-    onlinePointerStart = {
-      id: event.pointerId,
-      x: event.clientX,
-      y: event.clientY,
-      at: performance.now()
-    };
-  }, { passive: true });
-  canvas.addEventListener('pointerup', event => {
-    const start = onlinePointerStart;
-    onlinePointerStart = null;
-    if (!started || !start || start.id !== event.pointerId) return;
-    const moved = Math.hypot(event.clientX - start.x, event.clientY - start.y);
-    if (moved > 9 || performance.now() - start.at > 650) return;
-    void handleOnlineTap(event);
-  }, { passive: true });
-  canvas.addEventListener('pointercancel', () => { onlinePointerStart = null; }, { passive: true });
-}
-
 const hooks = {
   state() {
     return { ...game.state, humanColor: onlineHumanColor };
   },
   async wait(remote, session) {
     await waitForGameReady();
+    globalThis.__yakolakV125WhiteWall?.deactivate?.();
     onlineHumanColor = session.color;
     game.state.humanColor = onlineHumanColor;
     game.state.players = remote.players.map(player => player.color);
@@ -299,12 +181,13 @@ const hooks = {
     if (game.meshes['9']) game.meshes['9'].visible = true;
     resetOnlinePieces(remote);
     game.syncActiveReadinessBases();
-    game.setResponsiveOverview();
+    game.setPlayerView(onlineHumanColor);
     captionGame(`الغرفة ${remote.code}: ${remote.players.length} من ${remote.targetPlayers} جاهزون.`);
     renderGame();
   },
   async start(remote, session) {
     await waitForGameReady();
+    globalThis.__yakolakV125WhiteWall?.deactivate?.();
     onlineHumanColor = session.color;
     onlineSubmitMove = session.submitMove;
     game.state.humanColor = onlineHumanColor;
@@ -324,13 +207,11 @@ const hooks = {
       }
     }
     globalThis.__yakolakOnlineGameplayBridge.active = true;
-    game.setResponsiveOverview();
+    game.setPlayerView(onlineHumanColor);
     await this.apply(remote, false);
   },
   async apply(remote) {
     game.closePieceTray();
-    selectedOnlineSize = null;
-    clearOnlineMarkers();
     game.clearHighlights();
     game.state.players = remote.players.map(player => player.color);
     game.state.turnIndex = remote.turnIndex;
@@ -349,7 +230,7 @@ const hooks = {
   }
 };
 
-const API = '/api/rooms';
+const API = '/api/rooms-v126';
 const POLL_BASE_MS = 900;
 const POLL_MAX_MS = 8000;
 const REQUEST_TIMEOUT_MS = 6500;
@@ -377,13 +258,13 @@ const onlineSetupBridge = {
   mode: 'create',
   color: null,
   availableColors: null,
-  create({ color, targetPlayers }) {
+  create({ color, targetPlayers, targetRounds = 3, roomName = 'غرفة جديدة' }) {
     this.active = false;
-    void createRoom(color, targetPlayers);
+    void createRoom(color, targetPlayers, targetRounds, roomName).catch(() => {});
   },
   join(color) {
     this.active = false;
-    void joinRoom(invitePreview?.code || roomParam(), color);
+    void joinRoom(invitePreview?.code || roomParam(), color).catch(() => {});
   }
 };
 globalThis.__yakolakOnlineSetupBridge = onlineSetupBridge;
@@ -448,6 +329,8 @@ function errorMessage(code) {
     room_full: 'اكتمل عدد اللاعبين في هذه الغرفة.',
     color_taken: 'اختار لاعب آخر هذا اللون. اختر لونًا متاحًا.',
     invalid_player_count: 'اختر عدد لاعبين بين 2 و4.',
+    invalid_round_count: 'اختر 3 أو 5 جولات.',
+    invalid_room_name: 'اكتب اسمًا واضحًا للغرفة من حرفين إلى 32 حرفًا.',
     room_cancelled: 'أُغلقت هذه الغرفة.',
     not_your_turn: 'انتظر دورك؛ تم تحديث اللوحة.',
     occupied_slot: 'هذا الحجم موجود في الخانة بالفعل.',
@@ -494,6 +377,24 @@ function post(action, payload = {}) {
     method: 'POST',
     body: JSON.stringify({ action, ...payload })
   });
+}
+
+async function listRooms() {
+  const payload = await post('list');
+  return Array.isArray(payload.rooms) ? payload.rooms : [];
+}
+
+async function previewRoom(value) {
+  const code = normalizeCode(value);
+  if (!CODE_PATTERN.test(code)) throw new Error('invalid_room_code');
+  const payload = await post('preview', { code });
+  return payload.room;
+}
+
+function publishRoom() {
+  dispatchEvent(new CustomEvent('yakolak:online-room', {
+    detail: { room: room ? structuredClone(room) : null }
+  }));
 }
 
 function setStatus(text, mode = 'idle') {
@@ -545,35 +446,11 @@ function renderHome(message = '') {
   const body = document.querySelector('#yakolakOnlineDialog .yo-body');
   if (!body) return;
   body.replaceChildren();
-  body.append(
-    node('p', 'yo-note', 'ابدأ غرفة خاصة، أو انضم برمز أرسله لك صديق.')
-  );
-  const create = node('button', 'yo-button', 'إنشاء غرفة');
-  create.type = 'button';
-  create.addEventListener('click', () => beginNativeOnlineSetup('create'));
-  const join = node('button', 'yo-button secondary', 'دخول برمز');
-  join.type = 'button';
-  const actions = node('div', 'yo-actions');
-  actions.append(create, join);
-  body.append(actions);
-
-  const divider = node('div', 'yo-divider');
-  const field = node('div', 'yo-field');
-  const label = node('label', '', 'رمز الغرفة');
-  const input = document.createElement('input');
-  input.id = 'yakolakRoomCode';
-  input.inputMode = 'text';
-  input.autocomplete = 'one-time-code';
-  input.maxLength = 6;
-  input.value = roomParam();
-  input.setAttribute('aria-label', 'رمز الغرفة');
-  input.addEventListener('input', () => { input.value = normalizeCode(input.value); });
-  field.append(label, input);
-  body.append(divider, field);
-  join.addEventListener('click', () => prepareInvite(input.value));
-  input.addEventListener('keydown', event => {
-    if (event.key === 'Enter') prepareInvite(input.value);
-  });
+  body.append(node('p', 'yo-note', 'تصفح الغرف المفتوحة أو أنشئ غرفة باسم تتذكره اللعبة لك.'));
+  const browse = node('button', 'yo-button', 'تصفح الغرف');
+  browse.type = 'button';
+  browse.addEventListener('click', () => dispatchEvent(new CustomEvent('yakolak:open-room-browser')));
+  body.append(browse);
   const status = node('div', 'yo-status', message);
   body.append(status);
 }
@@ -638,7 +515,9 @@ function renderColorChoice(mode = 'create') {
   ));
   body.append(renderColorButtons(
     available,
-    color => joining ? joinRoom(invitePreview?.code || roomParam(), color) : createRoom(color, selectedPlayerCount)
+    color => void (joining
+      ? joinRoom(invitePreview?.code || roomParam(), color)
+      : createRoom(color, selectedPlayerCount, 3, 'غرفة جديدة')).catch(() => {})
   ));
   const back = node('button', 'yo-button secondary yo-back', 'رجوع');
   back.type = 'button';
@@ -776,6 +655,7 @@ async function applyRoom(nextRoom) {
     renderWaiting();
     openDialog();
     setStatus('بانتظار اللاعب الآخر…', 'online');
+    publishRoom();
     return;
   }
   if (room.status === 'cancelled') {
@@ -790,6 +670,7 @@ async function applyRoom(nextRoom) {
     back?.addEventListener('click', leaveOnline);
     openDialog();
     setStatus('انتهت الغرفة', 'offline');
+    publishRoom();
     return;
   }
   if (!started) {
@@ -814,13 +695,14 @@ async function applyRoom(nextRoom) {
     closeDialog();
     setStatus(room.turnIndex != null && room.players[room.turnIndex]?.seat === identity.seat ? 'دورك الآن' : 'متصل · دور الخصم', 'online');
   }
+  publishRoom();
 }
 
-async function createRoom(color, targetPlayers) {
+async function createRoom(color, targetPlayers, targetRounds = 3, roomName = '') {
   setButtonsDisabled(true);
   setStatus('ننشئ الغرفة…');
   try {
-    const payload = await post('create', { color, targetPlayers });
+    const payload = await post('create', { color, targetPlayers, targetRounds, roomName });
     saveIdentity({
       code: payload.room.code,
       token: payload.token,
@@ -829,8 +711,10 @@ async function createRoom(color, targetPlayers) {
     setRoomUrl(payload.room.code);
     await applyRoom(payload.room);
     schedulePoll(0);
+    return payload.room;
   } catch (error) {
     renderHome(errorMessage(error.message));
+    throw error;
   } finally {
     setButtonsDisabled(false);
   }
@@ -845,9 +729,8 @@ async function prepareInvite(value) {
   setButtonsDisabled(true);
   setStatus('نتحقق من الدعوة…');
   try {
-    const payload = await post('preview', { code });
-    if (payload.room.status !== 'waiting') throw new Error(payload.room.status === 'cancelled' ? 'room_cancelled' : 'room_full');
-    invitePreview = payload.room;
+    invitePreview = await previewRoom(code);
+    if (invitePreview.status !== 'waiting') throw new Error(invitePreview.status === 'cancelled' ? 'room_cancelled' : 'room_full');
     beginNativeOnlineSetup('join', invitePreview.availableColors || []);
   } catch (error) {
     renderHome(errorMessage(error.message));
@@ -872,6 +755,7 @@ async function joinRoom(value, color) {
     setRoomUrl(code);
     await applyRoom(payload.room);
     schedulePoll(0);
+    return payload.room;
   } catch (error) {
     if (error.message === 'color_taken' || error.message === 'version_conflict') {
       await prepareInvite(code);
@@ -879,6 +763,7 @@ async function joinRoom(value, color) {
     } else {
       setStatus(errorMessage(error.message), 'error');
     }
+    throw error;
   } finally {
     setButtonsDisabled(false);
   }
@@ -922,9 +807,11 @@ async function requestRematch() {
       version: room.version
     });
     await applyRoom(payload.room);
+    return payload.room;
   } catch (error) {
     if (error.payload?.room) await applyRoom(error.payload.room);
     else setStatus(errorMessage(error.message), 'error');
+    throw error;
   } finally {
     requestPending = false;
     setButtonsDisabled(false);
@@ -1053,10 +940,19 @@ addEventListener('online', () => { if (identity) schedulePoll(0); });
 addEventListener('offline', () => setStatus('لا يوجد اتصال بالإنترنت', 'offline'));
 restoreInvite();
 
-globalThis.__yakolakOnlineV114 = {
+const onlineApi = {
+  protocol: 4,
   get identity() { return identity ? { code: identity.code, seat: identity.seat } : null; },
   get room() { return room ? structuredClone(room) : null; },
+  list: listRooms,
+  preview: previewRoom,
   create: createRoom,
   join: joinRoom,
-  poll
+  rematch: requestRematch,
+  leave: leaveOnline,
+  poll,
+  errorMessage,
+  recenter() { game.setPlayerView(onlineHumanColor || game.state.humanColor); }
 };
+globalThis.__yakolakOnlineV114 = onlineApi;
+globalThis.__yakolakOnlineV126 = onlineApi;

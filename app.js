@@ -1,6 +1,6 @@
-console.info('[Yakolak] APP.JS v125 WHITE WALL CONTINUITY LOADED');
+console.info('[Yakolak] APP.JS v126 UNIFIED GAMEPLAY LOADED');
 
-const BUILD='125';
+const BUILD='126';
 
 async function installRoomConnections(){
   globalThis.__yakolakLoading?.set?.(100,'تجهيز الجدار');
@@ -58,16 +58,18 @@ async function installRoomConnections(){
     }
     await new Promise(resolve=>setTimeout(resolve,25));
   }
-  throw new Error('v125 room connections could not find all stages');
+  throw new Error('v126 room connections could not find all stages');
 }
 
-import('./src/mobile-clarity-v120.js?v='+BUILD+'-policy')
-  .then(()=>import('./src/app-game-v125.js?v='+BUILD+'-white-wall-continuity-1'))
+import('./src/game-rules-v126.js?v='+BUILD+'-shared-rules')
+  .then(rules=>{globalThis.__yakolakRulesV126=rules})
+  .then(()=>import('./src/mobile-clarity-v120.js?v='+BUILD+'-policy'))
+  .then(()=>import('./src/app-game-v126.js?v='+BUILD+'-unified-gameplay'))
   .then(()=>installRoomConnections())
-  .then(()=>import('./src/online-rounds-v118.js?v='+BUILD+'-rounds'))
   .then(()=>import('./src/online-last-move-v119.js?v='+BUILD+'-marker'))
+  .then(()=>import('./src/room-browser-v126.js?v='+BUILD+'-named-rooms'))
   .catch(error=>{
-    console.error('[Yakolak] v125 bootstrap failed',error);
-    globalThis.__yakolakLoading?.set?.(100,'تعذر تجهيز الجدار');
+    console.error('[Yakolak] v126 bootstrap failed',error);
+    globalThis.__yakolakLoading?.set?.(100,'تعذر تجهيز اللعبة');
     document.getElementById('yakolakLoader')?.classList.add('error');
   });

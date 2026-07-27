@@ -1,24 +1,26 @@
-export const ONLINE_COLORS = ['right', 'back', 'left', 'front'];
-export const ONLINE_SIZES = ['s', 'm', 'l'];
-export const ONLINE_PLAYER_COUNTS = [2, 3, 4];
-export const ONLINE_LINES = [
-  [0, 1, 2],
-  [3, 4, 5],
-  [6, 7, 8],
-  [0, 3, 6],
-  [1, 4, 7],
-  [2, 5, 8],
-  [0, 4, 8],
-  [2, 4, 6]
-];
+import {
+  GAME_COLORS,
+  GAME_LINES,
+  GAME_PLAYER_COUNTS,
+  GAME_SIZES,
+  applyBoardMove,
+  createEmptyBoard,
+  hasLegalMove,
+  isGameColor,
+  isGameMove,
+  isPlayerCount,
+  nextPlayableTurn,
+  piecesUsed,
+  winnerForBoard
+} from './game-rules-v126.js';
+
+export const ONLINE_COLORS = GAME_COLORS;
+export const ONLINE_SIZES = GAME_SIZES;
+export const ONLINE_PLAYER_COUNTS = GAME_PLAYER_COUNTS;
+export const ONLINE_LINES = GAME_LINES;
 
 export function emptyOnlineBoard() {
-  return Object.fromEntries(
-    Array.from({ length: 9 }, (_, zone) => [
-      String(zone),
-      { s: null, m: null, l: null }
-    ])
-  );
+  return createEmptyBoard();
 }
 
 export function nextOnlineColor(color) {
@@ -27,11 +29,11 @@ export function nextOnlineColor(color) {
 }
 
 export function validOnlinePlayerCount(value) {
-  return ONLINE_PLAYER_COUNTS.includes(Number(value));
+  return isPlayerCount(value);
 }
 
 export function validOnlineColor(color) {
-  return ONLINE_COLORS.includes(color);
+  return isGameColor(color);
 }
 
 export function availableOnlineColors(state) {
@@ -40,60 +42,19 @@ export function availableOnlineColors(state) {
 }
 
 export function validOnlineMove(move) {
-  return Boolean(
-    move &&
-    Number.isInteger(move.zone) &&
-    move.zone >= 0 &&
-    move.zone < 9 &&
-    ONLINE_SIZES.includes(move.size)
-  );
+  return isGameMove(move);
 }
 
 export function onlinePiecesUsed(board, color, size) {
-  if (!board || !validOnlineColor(color) || !ONLINE_SIZES.includes(size)) return 0;
-  return Object.values(board).filter(slot => slot?.[size] === color).length;
+  return piecesUsed(board, color, size);
 }
 
 export function hasOnlineLegalMove(board, color) {
-  if (!board || !validOnlineColor(color)) return false;
-  return ONLINE_SIZES.some(size =>
-    onlinePiecesUsed(board, color, size) < 3 &&
-    Object.values(board).some(slot => !slot?.[size])
-  );
+  return hasLegalMove(board, color);
 }
 
 export function onlineWinner(board, color) {
-  if (!validOnlineColor(color) || !board) return null;
-  for (const line of ONLINE_LINES) {
-    for (const size of ONLINE_SIZES) {
-      if (line.every(zone => board[String(zone)]?.[size] === color)) {
-        return {
-          color,
-          type: 'same-size',
-          cells: line.map(zone => ({ zone, size }))
-        };
-      }
-    }
-    for (const sequence of [['s', 'm', 'l'], ['l', 'm', 's']]) {
-      if (sequence.every((size, index) => board[String(line[index])]?.[size] === color)) {
-        return {
-          color,
-          type: 'graded',
-          cells: line.map((zone, index) => ({ zone, size: sequence[index] }))
-        };
-      }
-    }
-  }
-  for (let zone = 0; zone < 9; zone += 1) {
-    if (ONLINE_SIZES.every(size => board[String(zone)]?.[size] === color)) {
-      return {
-        color,
-        type: 'cell',
-        cells: ONLINE_SIZES.map(size => ({ zone, size }))
-      };
-    }
-  }
-  return null;
+  return winnerForBoard(board, color);
 }
 
 export function createOnlineState(hostColor, targetPlayers = 2) {
@@ -146,27 +107,17 @@ export function applyOnlineMove(state, seat, move) {
   const slot = state.board[String(move.zone)]?.[move.size];
   if (slot) throw new Error('occupied_slot');
 
-  const board = structuredClone(state.board);
-  board[String(move.zone)][move.size] = current.color;
+  const board = applyBoardMove(state.board, current.color, move);
   const winner = onlineWinner(board, current.color);
-  let nextTurnIndex = state.turnIndex;
-  if (!winner) {
-    for (let offset = 1; offset <= state.players.length; offset += 1) {
-      const candidate = (state.turnIndex + offset) % state.players.length;
-      if (hasOnlineLegalMove(board, state.players[candidate].color)) {
-        nextTurnIndex = candidate;
-        break;
-      }
-    }
-  }
-  const draw = !winner && !state.players.some(player => hasOnlineLegalMove(board, player.color));
+  const playableTurn = winner ? state.turnIndex : nextPlayableTurn(state.players, state.turnIndex, board);
+  const draw = !winner && playableTurn == null;
   return {
     ...state,
     board,
     winner,
     draw,
     status: winner || draw ? 'finished' : 'playing',
-    turnIndex: winner || draw ? state.turnIndex : nextTurnIndex,
+    turnIndex: winner || draw ? state.turnIndex : playableTurn,
     lastMove: {
       color: current.color,
       size: move.size,

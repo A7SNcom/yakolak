@@ -1,0 +1,31 @@
+name: Verify v126 gameplay
+
+on:
+  pull_request:
+    paths:
+      - 'api/rooms-v126.js'
+      - 'app.js'
+      - 'index.html'
+      - 'package.json'
+      - 'version.json'
+      - 'src/**'
+      - 'styles/v126-rooms.css'
+      - 'tests/**'
+      - 'scripts/verify-v126-gameplay.mjs'
+      - '.github/workflows/verify-v126-gameplay.yml'
+  workflow_dispatch:
+
+jobs:
+  unified-gameplay:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --ignore-scripts --no-package-lock
+      - name: Verify Build 126 gameplay and room contracts
+        run: npm test

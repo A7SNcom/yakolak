@@ -1,9 +1,9 @@
 console.info('[Yakolak] APP GAME v121 ENTRY JOURNEY WRAPPER LOADED');
 
-const response = await fetch('./src/app-game-v114.js?v=121-entry-journey-wrapper', { cache: 'no-store' });
+const response = await fetch('./src/app-game-v114.js?v=126-unified-gameplay-wrapper', { cache: 'no-store' });
 if (!response.ok) throw new Error(`v121 wrapper load failed: ${response.status}`);
 let wrapper = await response.text();
-const onlineClientUrl = new URL('./online-client-v114.js?v=121-entry-journey-client-runtime-fix', import.meta.url).href;
+const onlineClientUrl = new URL('./online-client-v114.js?v=126-unified-room-browser-client', import.meta.url).href;
 
 function replaceExact(oldValue, newValue, label) {
   const count = wrapper.split(oldValue).length - 1;
@@ -144,8 +144,8 @@ replaceExact(
   'v121 runtime build'
 );
 replaceExact(
-  "  ');'\n].join('\\n');",
-  `  ');',\n  ${JSON.stringify(entryPatch)}\n].join('\\n');`,
+  "  \"  'share canonical winner resolution'\",\n  ');'\n].join('\\n');",
+  `  \"  'share canonical winner resolution'\",\n  ');',\n  ${JSON.stringify(entryPatch)}\n].join('\\n');`,
   'append v121 entry patch'
 );
 replaceExact(

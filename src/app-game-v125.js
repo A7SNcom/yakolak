@@ -1,6 +1,6 @@
 console.info('[Yakolak] APP GAME v125 WHITE WALL CONTINUITY LOADED');
 
-await import('./app-game-v124.js?v=125-white-wall-base');
+await import('./app-game-v124.js?v=126-unified-gameplay-base');
 
 const WALL_COLOR='#f7f7f4';
 const INK='#242421';
@@ -90,7 +90,7 @@ async function initWhiteWall(){
   roomMenu.group.visible=false;
 
   const rows=[
-    {mode:'online',mark:'01',title:'ألعب أونلاين',note:'أنشئ غرفة أو ادخل برمز صديقك',y:575},
+    {mode:'online',mark:'01',title:'ألعب أونلاين',note:'تصفح الغرف المفتوحة أو أنشئ غرفة باسمك',y:575},
     {mode:'computer',mark:'02',title:'مع الكمبيوتر',note:'ابدأ مباراة سريعة ضد الكمبيوتر',y:805},
     {mode:'learn',mark:'03',title:'اشرحلي اللعبة',note:'تعلم طرق الفوز ثم جرّب بنفسك',y:1035}
   ];
@@ -295,9 +295,26 @@ async function initWhiteWall(){
     build:125,
     group,
     choose,
+    deactivate(){
+      active=false;
+      choosing=false;
+      hover='';
+      selected='';
+      group.visible=false;
+      setOpacity(0);
+      renderer.domElement.style.cursor='';
+    },
     finalize(){
       roomMenu.group.visible=false;
       applyWhiteRoom(scene);
+      if(globalThis.__yakolakOnlineGameplayBridge?.active||globalThis.__yakolakOnlineV126?.room){
+        this.deactivate();
+        game.setPlayerView(game.state.humanColor);
+        globalThis.__yakolakLoading?.set?.(100,'جاهز');
+        globalThis.__yakolakReleaseWallLoader?.();
+        console.info('[Yakolak] v125 white wall skipped for restored online room');
+        return;
+      }
       const next=wallPose();
       camera.position.set(...next.pos);
       camera.fov=next.fov;

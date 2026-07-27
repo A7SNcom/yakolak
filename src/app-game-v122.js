@@ -1,6 +1,6 @@
 console.info('[Yakolak] APP GAME v122 DIEGETIC WALL MENU STAGE 1 LOADED');
 
-await import('./app-game-v121.js?v=122-stage1-base');
+await import('./app-game-v121.js?v=126-unified-gameplay-stage1');
 
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
