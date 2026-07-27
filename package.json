@@ -1,10 +1,10 @@
 {
   "name": "yakolak",
-  "version": "0.126.0",
+  "version": "0.130.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --check app.js && node --check src/app-game-v126.js && node --check src/app-game-v125.js && node --check src/app-game-v124.js && node --check src/app-game-v123.js && node --check src/app-game-v122.js && node --check src/app-game-v121.js && node --check src/app-game-v114.js && node --check src/game-rules-v126.js && node --check src/room-name-v126.js && node --check src/room-browser-v126.js && node --check src/online-client-v114.js && node --check src/online-rules-v114.js && node --check src/online-rules-v118.js && node --check src/online-last-move-v119.js && node --check api/rooms-v126.js && node --test tests/*.test.mjs && node scripts/verify-v126-gameplay.mjs"
+    "test": "node --check app.js && node --check src/app-game-v130.js && node --check src/app-game-v126.js && node --check src/app-game-v125.js && node --check src/app-game-v124.js && node --check src/app-game-v123.js && node --check src/app-game-v122.js && node --check src/app-game-v121.js && node --check src/app-game-v114.js && node --check src/game-rules-v126.js && node --check src/room-name-v126.js && node --check src/room-browser-v126.js && node --check src/online-client-v114.js && node --check src/online-rules-v114.js && node --check src/online-rules-v118.js && node --check src/online-last-move-v119.js && node --check api/rooms-v126.js && node --test tests/*.test.mjs && node scripts/verify-v126-gameplay.mjs"
   },
   "engines": {
     "node": "22.x"
