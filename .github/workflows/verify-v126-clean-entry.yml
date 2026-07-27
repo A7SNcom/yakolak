@@ -1,0 +1,25 @@
+name: Verify Build 126 Clean Entry
+
+on:
+  push:
+    branches:
+      - agent/v126-clean-entry-journey
+  pull_request:
+    paths:
+      - app.js
+      - index.html
+      - src/entry-v126.js
+      - scripts/verify-v126-clean-entry.mjs
+      - package.json
+      - version.json
+      - .github/workflows/verify-v126-clean-entry.yml
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
