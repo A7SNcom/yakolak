@@ -142,36 +142,29 @@ function projectLoaderAnchor(camera,THREE,worldPoint){
   const x=(point.x*.5+.5)*innerWidth;
   const y=(-point.y*.5+.5)*innerHeight;
   loader.anchor(x,y);
-  return x>-90&&x<innerWidth+90&&y>-90&&y<innerHeight+90&&point.z>-1&&point.z<1;
+  return x>-90&&x<innerWidth+90&&y>-110&&y<innerHeight+110&&point.z>-1&&point.z<1;
 }
 
-function createJourneyCurves(THREE,start,end,portrait){
-  const cameraPoints=portrait?[
-    new THREE.Vector3(...start.position),
-    new THREE.Vector3(0,430,-650),
-    new THREE.Vector3(0,1250,-300),
-    new THREE.Vector3(450,1150,850),
-    new THREE.Vector3(950,520,420),
-    new THREE.Vector3(...end.position)
-  ]:[
-    new THREE.Vector3(...start.position),
-    new THREE.Vector3(0,360,-800),
-    new THREE.Vector3(0,760,-250),
-    new THREE.Vector3(380,760,650),
-    new THREE.Vector3(850,450,350),
-    new THREE.Vector3(...end.position)
-  ];
-  const targetPoints=[
-    new THREE.Vector3(...start.target),
-    new THREE.Vector3(0,170,-1500),
-    new THREE.Vector3(300,70,-100),
-    new THREE.Vector3(800,100,100),
-    new THREE.Vector3(1600,190,0),
-    new THREE.Vector3(...end.target)
-  ];
+function lookQuaternion(THREE,position,target){
+  const helper=new THREE.Object3D();
+  helper.position.set(...position);
+  helper.lookAt(new THREE.Vector3(...target));
+  return helper.quaternion.clone();
+}
+
+function createStableJourney(THREE,start,end,portrait){
+  const startPosition=new THREE.Vector3(...start.position);
+  const endPosition=new THREE.Vector3(...end.position);
+  const controlA=portrait
+    ?new THREE.Vector3(0,285,-500)
+    :new THREE.Vector3(0,280,-760);
+  const controlB=portrait
+    ?new THREE.Vector3(900,285,-420)
+    :new THREE.Vector3(760,280,-560);
   return{
-    cameraCurve:new THREE.CatmullRomCurve3(cameraPoints,false,'centripetal',.5),
-    targetCurve:new THREE.CatmullRomCurve3(targetPoints,false,'centripetal',.5)
+    positionCurve:new THREE.CubicBezierCurve3(startPosition,controlA,controlB,endPosition),
+    startQuaternion:lookQuaternion(THREE,start.position,start.target),
+    endQuaternion:lookQuaternion(THREE,end.position,end.target)
   };
 }
 
@@ -191,20 +184,17 @@ async function runJourney(game){
   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   globalThis.__yakolakEntryLoader?.handoff?.();
 
-  const duration=reduced?1200:3000;
-  const {cameraCurve,targetCurve}=createJourneyCurves(THREE,poses.start,poses.end,poses.portrait);
+  const duration=reduced?1150:2650;
+  const {positionCurve,startQuaternion,endQuaternion}=createStableJourney(THREE,poses.start,poses.end,poses.portrait);
   const started=performance.now();
   await new Promise(resolve=>{
     const frame=now=>{
       const raw=clamp((now-started)/duration,0,1);
       const t=smoother(raw);
-      const position=cameraCurve.getPoint(t);
-      const target=targetCurve.getPoint(t);
-      camera.position.copy(position);
-      const baseFov=poses.start.fov+(poses.end.fov-poses.start.fov)*t;
-      camera.fov=baseFov+(poses.portrait?9:4)*Math.sin(Math.PI*t);
+      camera.position.copy(positionCurve.getPoint(t));
+      camera.quaternion.slerpQuaternions(startQuaternion,endQuaternion,t);
+      camera.fov=poses.start.fov+(poses.end.fov-poses.start.fov)*t;
       camera.updateProjectionMatrix();
-      camera.lookAt(target);
       projectLoaderAnchor(camera,THREE,wallAnchor);
       render();
       if(raw<1)requestAnimationFrame(frame);else resolve();
@@ -231,6 +221,7 @@ async function runJourney(game){
     source:'v120-stable-room-table',
     logos,
     logoInk:INK,
+    cameraMotion:'single-cubic-slerp',
     gameGroupHidden:!gameGroup.visible
   };
   console.info('[Yakolak] v126 clean entry journey complete');
