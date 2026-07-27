@@ -1,12 +1,12 @@
 console.info('[Yakolak] DEVELOPER D1 GALLERY LOADED');
 
 const scenes=[
-  {id:'loading-star',title:'مشهد التحميل',description:'النجمة المعتمدة بحركة الارتداد والانضغاط والظل.',type:'single',label:'مشهد واحد'},
-  {id:'empty-table',title:'الغرفة والطاولة الفارغة',description:'المشهد الأساسي للغرفة مع الطاولة دون عناصر اللعب.',type:'single',label:'مشهد واحد'},
-  {id:'logo-wall',title:'جدار الشعارات',description:'الجدار النهائي الذي يعرض شعاري ياكلك ومتكيّف.',type:'single',label:'مشهد واحد'},
-  {id:'board-bases',title:'القاعدة والأربع قواعد',description:'تكوين ثابت للقاعدة الرئيسية والقواعد الأربع حولها.',type:'single',label:'مشهد واحد'},
-  {id:'clean-entry',title:'رحلة الدخول النظيفة',description:'انتقال كامل من جدار التحميل إلى جدار الشعارات مرورًا بالطاولة.',type:'sequence',label:'مجموعة مشاهد'},
-  {id:'unboxing-intro',title:'إنترو فك العلبة',description:'المشهد الحركي الكامل لفك العلبة وتجميع عناصر اللعبة.',type:'sequence',label:'مجموعة مشاهد'}
+  {id:'loading-star',title:'مشهد التحميل',description:'النجمة المعتمدة بحركة الارتداد والانضغاط والظل.',type:'single',label:'مشهد واحد',mark:'✦'},
+  {id:'empty-table',title:'الغرفة والطاولة الفارغة',description:'المشهد الأساسي للغرفة مع الطاولة دون عناصر اللعب.',type:'single',label:'مشهد واحد',mark:'□'},
+  {id:'logo-wall',title:'جدار الشعارات',description:'الجدار النهائي بالشعارين الأصليين بالأسود والأبيض.',type:'single',label:'مشهد واحد',mark:'Y'},
+  {id:'board-bases',title:'القاعدة والأربع قواعد',description:'القاعدة الرئيسية والقواعد الأربع فقط بتكوين ثابت.',type:'single',label:'مشهد واحد',mark:'＋'},
+  {id:'clean-entry',title:'رحلة الدخول النظيفة',description:'انتقال كامل من جدار التحميل إلى جدار الشعارات مرورًا بالطاولة.',type:'sequence',label:'مجموعة مشاهد',mark:'→'},
+  {id:'unboxing-intro',title:'إنترو فك العلبة',description:'فك العلبة وتجميع عناصر اللعبة فقط، دون اختيار لون أو لاعبين.',type:'sequence',label:'مجموعة مشاهد',mark:'↥'}
 ];
 
 const tabs=[
@@ -31,10 +31,11 @@ const previewObserver=new IntersectionObserver(entries=>{
     if(iframe&&!iframe.src.includes('developer-scene.html')){
       iframe.src=iframe.dataset.src;
       delete iframe.dataset.src;
+      entry.target.dataset.previewState='loading';
     }
     previewObserver.unobserve(entry.target);
   });
-},{rootMargin:'160px 0px',threshold:.08});
+},{rootMargin:'180px 0px',threshold:.06});
 
 function sceneUrl(scene,preview=false){
   const url=new URL('./developer-scene.html',location.href);
@@ -43,6 +44,28 @@ function sceneUrl(scene,preview=false){
   url.searchParams.set('d','D1');
   return url.toString();
 }
+
+function cardFromMessage(event){
+  return [...grid.querySelectorAll('.scene-card')].find(card=>card.querySelector('iframe')?.contentWindow===event.source)||null;
+}
+
+addEventListener('message',event=>{
+  const data=event.data||{};
+  if(!String(data.type||'').startsWith('yakolak-developer-scene-'))return;
+  const card=cardFromMessage(event);
+  if(!card)return;
+  const state=card.querySelector('.scene-preview-state span');
+  if(data.type==='yakolak-developer-scene-ready'){
+    card.classList.remove('preview-error');
+    card.classList.add('preview-ready');
+    card.dataset.previewState='ready';
+    if(state)state.textContent='المشهد جاهز';
+  }else{
+    card.classList.add('preview-error');
+    card.dataset.previewState='error';
+    if(state)state.textContent='تعذر تحميل المعاينة';
+  }
+});
 
 function renderTabs(){
   tabsRoot.innerHTML='';
@@ -67,6 +90,7 @@ function cardFor(scene){
   article.className='scene-card';
   article.dataset.type=scene.type;
   article.dataset.scene=scene.id;
+  article.dataset.previewState='idle';
 
   const preview=document.createElement('div');
   preview.className='scene-preview';
@@ -76,7 +100,10 @@ function cardFor(scene){
   iframe.src='about:blank';
   iframe.dataset.src=sceneUrl(scene,true);
   iframe.setAttribute('tabindex','-1');
-  preview.append(iframe);
+  const previewState=document.createElement('div');
+  previewState.className='scene-preview-state';
+  previewState.innerHTML=`<div class="scene-preview-mark">${scene.mark}</div><strong>${scene.title}</strong><span>جارٍ تجهيز المعاينة</span>`;
+  preview.append(iframe,previewState);
 
   const meta=document.createElement('div');
   meta.className='scene-meta';
@@ -120,7 +147,7 @@ function applyFilter(){
   grid.querySelectorAll('.scene-card').forEach(card=>{
     const show=activeFilter==='all'||card.dataset.type===activeFilter;
     card.hidden=!show;
-    if(show){visible++;previewObserver.observe(card)}
+    if(show){visible++;if(card.dataset.previewState==='idle')previewObserver.observe(card)}
   });
   count.textContent=`${visible} ${visible===1?'مشهد':'مشاهد'}`;
 }
