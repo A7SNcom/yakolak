@@ -23,9 +23,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-save playwright
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/visual-v126.mjs
+      - name: Install browser quietly
+        run: |
+          npm install --no-save --silent playwright >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+      - name: Run focused visual diagnosis
+        run: node scripts/visual-v126.mjs
       - if: always()
         uses: actions/upload-artifact@v4
         with:
