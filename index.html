@@ -1,117 +1,118 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="yakolak-version" content="v126-unified-gameplay">
-<title>Yakolak Live</title>
-<link rel="icon" href="data:,">
-<link rel="stylesheet" href="./styles/v114-online.css?v=126">
-<link rel="stylesheet" href="./styles/v126-rooms.css?v=126">
-<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script>
-<style>
-:root{--yakolak-wall:#f7f7f4;--yakolak-ink:#242421;--yakolak-muted:#77736c;--yakolak-line:#cbc7bf}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--yakolak-wall);color:var(--yakolak-ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:none}
-#view{position:fixed;inset:0;z-index:1;opacity:0;background:var(--yakolak-wall);transition:opacity .25s ease}
-#hint,#settingsBtn,#panel,textarea{display:none!important}
-#yakolakLoader{position:fixed;inset:0;z-index:20000;display:grid;place-items:center;background:var(--yakolak-wall);transition:opacity .42s ease,visibility .42s ease}
-#yakolakLoader.done.wall-ready{opacity:0;visibility:hidden;pointer-events:none}
-.loaderPanel{width:min(520px,calc(100vw - 48px));direction:rtl;color:var(--yakolak-ink);text-align:center}
-.loaderKicker{font-size:12px;font-weight:800;letter-spacing:.22em;color:var(--yakolak-muted);direction:ltr;margin-bottom:14px}
-.loaderBrand{font-size:54px;font-weight:950;line-height:1;margin-bottom:34px;color:var(--yakolak-ink)}
-.loaderFrame{position:relative;width:100%;padding:0;background:transparent}
-#yakolakLoaderProgress{display:block;width:100%;height:4px;appearance:none;-webkit-appearance:none;border:0;border-radius:999px;background:#dedbd4;overflow:hidden}
-#yakolakLoaderProgress::-webkit-progress-bar{background:#dedbd4;border-radius:999px}
-#yakolakLoaderProgress::-webkit-progress-value{background:var(--yakolak-ink);border-radius:999px;transition:width .24s ease}
-#yakolakLoaderProgress::-moz-progress-bar{background:var(--yakolak-ink);border-radius:999px;transition:width .24s ease}
-.loaderMeta{display:flex;justify-content:space-between;align-items:center;margin-top:13px;font-size:12px;font-weight:700;color:var(--yakolak-muted);direction:rtl}
-#yakolakLoaderPercent{font-size:13px;color:var(--yakolak-ink);direction:ltr}
-#yakolakLoader.error #yakolakLoaderProgress::-webkit-progress-value{background:#8f3b34}
-#yakolakLoader.error #yakolakLoaderProgress::-moz-progress-bar{background:#8f3b34}
-#clearCacheBtn{position:fixed;left:16px;bottom:16px;z-index:10000;width:58px;height:58px;border-radius:50%;border:1px solid rgba(36,36,33,.18);background:rgba(247,247,244,.92);color:var(--yakolak-ink);font-size:15px;font-weight:950;display:grid;place-items:center;cursor:pointer;line-height:1;box-shadow:0 10px 30px rgba(35,33,29,.12);user-select:none}
-#clearCacheBtn[hidden]{display:none!important}
-#clearCacheBtn[disabled]{opacity:.62;cursor:wait}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="yakolak-version" content="v128-loading-star">
+  <title>Yakolak</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      color-scheme: light;
+      --loading-background: #ffffff;
+      --loading-star: #3f3f3f;
+      --loading-shadow: #000000;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--loading-background);
+    }
+
+    body {
+      position: relative;
+    }
+
+    .boxLoading {
+      position: absolute;
+      inset: 0;
+      width: 50px;
+      height: 50px;
+      margin: auto;
+    }
+
+    .boxLoading::before {
+      content: "";
+      position: absolute;
+      top: 59px;
+      left: 0;
+      width: 50px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--loading-shadow);
+      opacity: 0.1;
+      animation: shadow 0.5s linear infinite;
+    }
+
+    .loadingStar {
+      display: block;
+      width: 50px;
+      height: 50px;
+      overflow: visible;
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: animate 0.5s linear infinite;
+      will-change: transform;
+    }
+
+    .loadingStar path {
+      fill: var(--loading-star);
+    }
+
+    @keyframes animate {
+      0% {
+        transform: translateY(0) rotate(0deg);
+      }
+      25% {
+        transform: translateY(9px) rotate(22.5deg);
+      }
+      50% {
+        transform: translateY(18px) scale(1, 0.9) rotate(45deg);
+      }
+      75% {
+        transform: translateY(9px) rotate(67.5deg);
+      }
+      100% {
+        transform: translateY(0) rotate(90deg);
+      }
+    }
+
+    @keyframes shadow {
+      0%,
+      100% {
+        transform: scale(1, 1);
+      }
+      50% {
+        transform: scale(1.2, 1);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .loadingStar {
+        animation-duration: 1.2s;
+      }
+
+      .boxLoading::before {
+        animation-duration: 1.2s;
+      }
+    }
+  </style>
 </head>
 <body>
-<div id="yakolakLoader" aria-busy="true" aria-describedby="yakolakLoaderStatus">
-  <div class="loaderPanel">
-    <div class="loaderKicker">YAKOLAK</div>
-    <div class="loaderBrand">ياكلك</div>
-    <div class="loaderFrame"><progress id="yakolakLoaderProgress" value="0" max="100" aria-label="تحميل اللعبة">0%</progress></div>
-    <div class="loaderMeta"><span id="yakolakLoaderStatus">تحميل اللعبة</span><strong id="yakolakLoaderPercent">0%</strong></div>
+  <div class="boxLoading" aria-hidden="true">
+    <svg class="loadingStar" viewBox="0 0 802 798" xmlns="http://www.w3.org/2000/svg">
+      <g transform="matrix(4.166667,0,0,4.166667,484.7475,797.470417)">
+        <path d="M0,-191.393L-20.116,-183.832L-40.232,-191.393L-55.534,-176.304L-76.986,-175.028L-84.828,-155.02L-103.907,-145.13L-102.932,-123.662L-116.339,-106.867L-106.717,-87.651L-112.134,-66.855L-95.528,-53.214L-92.018,-32.013L-71.299,-26.306L-59.469,-8.364L-38.22,-11.578L-20.116,0L-2.012,-11.578L19.237,-8.364L31.067,-26.306L51.786,-32.013L55.296,-53.214L71.902,-66.855L66.486,-87.651L76.108,-106.867L62.7,-123.662L63.675,-145.13L44.596,-155.02L36.754,-175.028L15.302,-176.304L0,-191.393Z"/>
+      </g>
+    </svg>
   </div>
-</div>
-<div id="view"></div>
-<div id="hint" aria-hidden="true"></div>
-<button id="settingsBtn" aria-hidden="true">SET</button>
-<button id="clearCacheBtn" type="button" title="مسح كامل للكاش وإعادة تحميل نظيفة" aria-label="مسح كامل للكاش وإعادة تحميل نظيفة" hidden>مسح</button>
-<div id="panel" aria-hidden="true"></div>
-<textarea id="out"></textarea>
-<script type="module">
-const BUILD='126';
-const params=new URLSearchParams(location.search);
-const clearToken=params.get('clear');
-const debugMode=params.get('debug')==='1';
-const ASSET_VERSION=clearToken||BUILD;
-const clearBtn=document.getElementById('clearCacheBtn');
-const loaderEl=document.getElementById('yakolakLoader');
-if(clearBtn)clearBtn.hidden=!debugMode;
-const progressEl=document.getElementById('yakolakLoaderProgress');
-const progressText=document.getElementById('yakolakLoaderPercent');
-const progressStatus=document.getElementById('yakolakLoaderStatus');
-const removeLoaderNow=()=>{if(loaderEl?.parentNode)loaderEl.parentNode.removeChild(loaderEl)};
-if(loaderEl){
-  loaderEl.remove=()=>{
-    if(loaderEl.classList.contains('wall-ready'))removeLoaderNow();
-    else loaderEl.dataset.removePending='1';
-  };
-}
-window.__yakolakReleaseWallLoader=()=>{
-  if(!loaderEl?.isConnected)return;
-  requestAnimationFrame(()=>{
-    loaderEl.classList.add('wall-ready');
-    loaderEl.setAttribute('aria-busy','false');
-    setTimeout(removeLoaderNow,480);
-  });
-};
-function setGameProgress(value,status){
-  const pct=Math.max(0,Math.min(100,Math.round(value||0)));
-  if(progressEl){progressEl.value=pct;progressEl.textContent=pct+'%'}
-  if(progressText)progressText.textContent=pct+'%';
-  if(status&&progressStatus)progressStatus.textContent=status;
-}
-window.__yakolakLoading={set:setGameProgress};
-setGameProgress(3,'تهيئة اللعبة');
-function hardReload(){const url=new URL(location.href);url.searchParams.set('clear',Date.now().toString());location.replace(url.toString())}
-async function clearIndexedDB(){
-  if(!('indexedDB' in window)||!indexedDB.databases)return;
-  const dbs=await indexedDB.databases();
-  await Promise.allSettled(dbs.filter(db=>db&&db.name).map(db=>new Promise(resolve=>{
-    const req=indexedDB.deleteDatabase(db.name);req.onsuccess=req.onerror=req.onblocked=()=>resolve();
-  })));
-}
-async function cleanReload(e){
-  if(e)e.preventDefault();
-  if(!debugMode||!clearBtn||clearBtn.disabled)return;
-  clearBtn.disabled=true;clearBtn.textContent='ينظف';
-  const jobs=[];
-  try{if('caches' in window)jobs.push(caches.keys().then(names=>Promise.allSettled(names.map(name=>caches.delete(name)))))}catch(err){}
-  try{if('serviceWorker' in navigator)jobs.push(navigator.serviceWorker.getRegistrations().then(regs=>Promise.allSettled(regs.map(reg=>reg.unregister()))))}catch(err){}
-  jobs.push(clearIndexedDB().catch(()=>{}));
-  await Promise.allSettled(jobs);clearBtn.textContent='تم';hardReload();
-}
-if(clearBtn)clearBtn.addEventListener('click',cleanReload);
-async function checkVersion(){
-  try{const r=await fetch('./version.json?v='+ASSET_VERSION,{cache:'no-store'});const v=await r.json();const next=String(v.build||BUILD);if(next!==String(BUILD)){hardReload();return false}}catch(e){}
-  return true;
-}
-if(await checkVersion()){
-  await import('./app.js?v='+ASSET_VERSION);
-  if(clearToken){const clean=new URL(location.href);clean.searchParams.delete('clear');history.replaceState(null,'',clean.toString())}
-}
-</script>
 </body>
 </html>
