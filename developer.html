@@ -25,9 +25,16 @@ h1{margin:0;font-size:clamp(30px,4vw,54px);line-height:1}
 .scene-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
 .scene-card{position:relative;min-width:0;border:1px solid var(--line);border-radius:24px;background:var(--card);overflow:hidden;box-shadow:0 14px 40px rgba(42,39,33,.07);transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
 .scene-card:hover{transform:translateY(-3px);border-color:#b9b5ad;box-shadow:0 20px 54px rgba(42,39,33,.11)}
-.scene-preview{position:relative;aspect-ratio:16/10;background:#ecebe6;overflow:hidden}
-.scene-preview iframe{position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none;background:#fff}
-.scene-preview::after{content:"";position:absolute;inset:0;box-shadow:inset 0 -50px 70px rgba(0,0,0,.05);pointer-events:none}
+.scene-preview{position:relative;aspect-ratio:16/10;background:linear-gradient(145deg,#f1f0ec,#e5e3dd);overflow:hidden}
+.scene-preview iframe{position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none;background:#fff;opacity:0;transition:opacity .28s ease}
+.scene-card.preview-ready .scene-preview iframe{opacity:1}
+.scene-preview-state{position:absolute;inset:0;z-index:2;display:grid;place-content:center;gap:7px;text-align:center;padding:20px;color:#77736c;transition:opacity .25s ease,visibility .25s ease;pointer-events:none}
+.scene-preview-state strong{color:#343330;font-size:15px}
+.scene-preview-state span{font-size:11px;font-weight:800}
+.scene-preview-mark{width:44px;height:44px;margin:auto;border:1px solid rgba(32,32,30,.16);border-radius:14px;display:grid;place-items:center;background:rgba(255,255,255,.58);font-size:18px;font-weight:950;direction:ltr}
+.scene-card.preview-ready .scene-preview-state{opacity:0;visibility:hidden}
+.scene-card.preview-error .scene-preview-state span{color:#8f3b34}
+.scene-preview::after{content:"";position:absolute;inset:0;box-shadow:inset 0 -50px 70px rgba(0,0,0,.05);pointer-events:none;z-index:3}
 .scene-meta{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:17px}
 .scene-copy{min-width:0}
 .scene-type{display:inline-flex;margin-bottom:8px;padding:5px 8px;border-radius:999px;background:#efeee9;color:#69655e;font-size:11px;font-weight:900}
@@ -63,6 +70,6 @@ h1{margin:0;font-size:clamp(30px,4vw,54px);line-height:1}
   <div id="devStageTitle" class="dev-stage-title">المشهد</div>
   <iframe id="devStageFrame" title="مشهد المطور" allow="fullscreen"></iframe>
 </section>
-<script type="module" src="./src/developer-d1.js?v=D1"></script>
+<script type="module" src="./src/developer-d1.js?v=D1-fix1"></script>
 </body>
 </html>
