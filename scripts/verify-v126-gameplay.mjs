@@ -33,8 +33,8 @@ const checks = [
   ['approved room reused', stage.includes("roomSource:'approved-v125-room'") && stage.includes("tableSource:'established-neutral-table'")],
   ['no replacement CSS room or table', !index.includes('class="world"') && !index.includes('.tableTop') && !index.includes('.wallBack')],
   ['star remains on the physical first wall', stage.includes('scene.add(group)') && stage.includes('starLeavesViewBeforeHide:true') && stage.indexOf('await moveCamera(game,current.second') < stage.indexOf('starParts.group.visible=false')],
-  ['official logos occupy the second wall', branding.includes('./assets/YAKOLAK.svg') && branding.includes('./assets/MTKYF.svg') && branding.includes("group.name='yakolak-v130-brand-wall'")],
-  ['legacy sample text is suppressed', branding.includes("sample.visible=false")]
+  ['official logos occupy the second wall', branding.includes('/assets/YAKOLAK.svg') && branding.includes('/assets/MTKYF.svg') && branding.includes("group.name='yakolak-v130-brand-wall'")],
+  ['legacy sample text is suppressed', branding.includes('sample.visible=false')]
 ];
 
 let failed = false;
