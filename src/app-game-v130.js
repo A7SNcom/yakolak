@@ -19,6 +19,7 @@ async function waitForApprovedRoom(){
 }
 
 function hideLegacyPresentation(wall){
+  wall.deactivate?.();
   wall.group.visible=false;
   const known=[
     globalThis.__yakolakV122RoomMenu?.group,
