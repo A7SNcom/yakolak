@@ -46,7 +46,7 @@ async function checkGallery(browser,name,contextOptions){
   await frame.locator('body[data-scene-ready="true"]').waitFor({timeout:45000});
   await page.screenshot({path:path.join(output,`${name}-02-open-scene.png`)});
   await page.getByRole('button',{name:/العودة للمعرض/}).click();
-  await page.locator('#devStage:not(.open)').waitFor();
+  await page.locator('#devStage').waitFor({state:'hidden'});
 
   if(pageErrors.length)throw new Error(`${name}: page errors\n${pageErrors.join('\n')}`);
   await context.close();
