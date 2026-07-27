@@ -51,6 +51,7 @@ async function checkGallery(browser,name,contextOptions){
   await frame.locator('body[data-scene-ready="true"]').waitFor({timeout:120000});
   const setupHidden=await frame.locator('body').getAttribute('data-setup-hidden');
   if(setupHidden!=='true')throw new Error(`${name}: unboxing stage was not isolated`);
+  await page.waitForTimeout(1300);
   await page.screenshot({path:path.join(output,`${name}-02-open-scene.png`)});
   await page.getByRole('button',{name:/العودة للمعرض/}).click();
   await page.locator('#devStage').waitFor({state:'hidden'});
@@ -66,18 +67,37 @@ async function assertScene(page,id,state){
     const scene=game?.gameGroup?.parent;
     const logoWall=scene?.getObjectByName?.('yakolak-developer-d1-logo-wall');
     const named=['9','3-right','3-left','3-front','3-back'];
+    const logoColors=[];
+    let logoMeshes=0;
+    logoWall?.traverse?.(object=>{
+      if(!object.isMesh||!object.material)return;
+      logoMeshes++;
+      const materials=Array.isArray(object.material)?object.material:[object.material];
+      materials.forEach(material=>{if(material.color)logoColors.push(`#${material.color.getHexString()}`)});
+    });
+    const table=scene?.getObjectByName?.('yakolak-svg-table')||scene?.getObjectByName?.('yakolak-fallback-simple-table');
+    const tableBox=table?new game.THREE.Box3().setFromObject(table):null;
+    const projected=tableBox?[
+      tableBox.min.clone().project(game.camera),tableBox.max.clone().project(game.camera)
+    ]:[];
     return{
       gameGroupVisible:game?.gameGroup?.visible,
       setupVisible:game?.setupGroup?.visible,
       visibleBases:named.filter(name=>game?.meshes?.[name]?.visible).length,
       logoChildren:logoWall?.children?.length||0,
-      logoMaps:logoWall?.children?.filter?.(child=>Boolean(child.material?.map)).length||0,
+      logoMeshes,
+      distinctLogoColors:[...new Set(logoColors)].length,
+      tableProjection:projected.map(point=>({x:point.x,y:point.y,z:point.z})),
       setupDomVisible:[...document.querySelectorAll('#yakolakGameSetup,#yakolakGameHud,#yakolakGameScore')].some(element=>getComputedStyle(element).display!=='none')
     };
   });
-  if(id==='empty-table'&&runtime.gameGroupVisible!==false)throw new Error('empty-table: game objects are visible');
+  if(id==='empty-table'){
+    if(runtime.gameGroupVisible!==false)throw new Error('empty-table: game objects are visible');
+    const points=runtime.tableProjection;
+    if(points.length===2&&points.some(point=>Math.abs(point.x)>1.25||Math.abs(point.y)>1.25))throw new Error(`empty-table: table is badly cropped ${JSON.stringify(points)}`);
+  }
   if(id==='board-bases'&&(state.visibleObjects!=='5'||runtime.visibleBases!==5))throw new Error(`board-bases: expected five named objects, got ${state.visibleObjects}/${runtime.visibleBases}`);
-  if(id==='logo-wall'&&(state.logoRendering!=='svg-texture'||runtime.logoChildren!==2||runtime.logoMaps!==2))throw new Error(`logo-wall: two-tone texture rendering is incomplete ${JSON.stringify(runtime)}`);
+  if(id==='logo-wall'&&(state.logoRendering!=='svg-geometry-two-tone'||runtime.logoChildren!==2||runtime.logoMeshes<2||runtime.distinctLogoColors<2))throw new Error(`logo-wall: approved two-tone geometry is incomplete ${JSON.stringify(runtime)}`);
   if(id==='unboxing-intro'&&(state.setupHidden!=='true'||runtime.setupVisible!==false||runtime.setupDomVisible))throw new Error(`unboxing-intro: setup leaked into intro ${JSON.stringify(runtime)}`);
   if(id==='clean-entry'){
     const complete=await page.evaluate(()=>globalThis.__yakolakV126Entry?.phase==='complete');
