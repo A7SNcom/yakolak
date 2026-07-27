@@ -1,6 +1,6 @@
 {
-  "version": "v125-white-wall-continuity",
-  "build": 125,
-  "updated_at": "2026-07-26",
-  "note": "Unifies the first loading view and main menu as one neutral white wall, removes the blue futuristic projection style, and reveals the table only after the player chooses a path."
+  "version": "v126-clean-entry-journey",
+  "build": 126,
+  "updated_at": "2026-07-27",
+  "note": "Rebuilds the opening journey from the stable v120 room and table, keeps the loading star anchored to the first white wall until it naturally leaves view, hides all board and play elements, and moves continuously to the official YAKOLAK and MTKYF logo wall."
 }
