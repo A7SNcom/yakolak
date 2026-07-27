@@ -32,8 +32,10 @@ requireText(runner,"sceneId==='clean-entry'",'entry sequence');
 requireText(runner,'configureUnboxing','unboxing sequence');
 requireText(runner,"sceneReady:'true'",'scene readiness marker');
 requireText(runner,"composition:'unboxing-only'",'intro-only isolation');
-requireText(runner,"logoRendering:'svg-texture'",'two-tone logo rendering');
-requireText(runner,"visibleObjects:String(visible)",'named board objects');
+requireText(runner,"logoRendering:'svg-geometry-two-tone'",'two-tone logo rendering');
+requireText(runner,"visibleObjects:String(selected.length)",'named board objects');
+requireText(runner,"framing:'object-fit'",'table object-fit framing');
+requireText(runner,'triggerIntroReplay','runtime intro replay');
 
 rejectText(html,'./app.js','client bootstrap isolation');
 rejectText(sceneHtml,'./app.js','client bootstrap isolation');
