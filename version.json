@@ -1,6 +1,6 @@
 {
-  "version": "v126-unified-gameplay",
-  "build": 126,
-  "updated_at": "2026-07-26",
-  "note": "Replaces manual room codes with a named room browser, remembers room-name suggestions locally, restores visible two-player round and rematch flows, shares gameplay rules across online and offline, and centers the camera for each player's side."
+  "version": "v130-approved-room-continuity",
+  "build": 130,
+  "updated_at": "2026-07-27",
+  "note": "Restores the approved v125 room and established light neutral table, keeps the loading star physically on the first wall until it leaves the camera view, and places the sample text on the second wall before the camera turns toward it."
 }
