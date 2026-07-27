@@ -76,20 +76,21 @@ function loadOfficialSvg(url){
 
 function officialLogo(THREE,svgData,width,name){
   const raw=new THREE.Group();
-  const material=new THREE.MeshBasicMaterial({
-    color:INK,
-    transparent:false,
-    depthTest:true,
-    depthWrite:false,
-    toneMapped:false,
-    side:THREE.DoubleSide
-  });
-  svgData.paths.forEach(path=>{
+  svgData.paths.forEach((path,pathIndex)=>{
+    const material=new THREE.MeshBasicMaterial({
+      color:path.color||INK,
+      transparent:false,
+      depthTest:false,
+      depthWrite:false,
+      toneMapped:false,
+      side:THREE.DoubleSide
+    });
     SVGLoader.createShapes(path).forEach(shape=>{
       const geometry=new THREE.ShapeGeometry(shape,18);
       geometry.scale(1,-1,1);
       const mesh=new THREE.Mesh(geometry,material);
-      mesh.renderOrder=9000;
+      mesh.position.z=pathIndex*.02;
+      mesh.renderOrder=9000+pathIndex;
       raw.add(mesh);
     });
   });
@@ -146,32 +147,25 @@ function projectLoaderAnchor(camera,THREE,worldPoint){
 function createJourneyCurves(THREE,start,end,portrait){
   const cameraPoints=portrait?[
     new THREE.Vector3(...start.position),
-    new THREE.Vector3(0,330,-470),
-    new THREE.Vector3(-70,470,40),
-    new THREE.Vector3(190,500,560),
-    new THREE.Vector3(760,380,340),
+    new THREE.Vector3(0,340,-450),
+    new THREE.Vector3(0,520,-40),
+    new THREE.Vector3(250,520,500),
+    new THREE.Vector3(800,390,300),
     new THREE.Vector3(...end.position)
   ]:[
     new THREE.Vector3(...start.position),
-    new THREE.Vector3(0,320,-700),
-    new THREE.Vector3(-120,420,-100),
-    new THREE.Vector3(220,430,520),
-    new THREE.Vector3(720,340,330),
+    new THREE.Vector3(0,320,-650),
+    new THREE.Vector3(0,430,-80),
+    new THREE.Vector3(300,430,500),
+    new THREE.Vector3(780,340,300),
     new THREE.Vector3(...end.position)
   ];
-  const targetPoints=portrait?[
+  const targetPoints=[
     new THREE.Vector3(...start.target),
-    new THREE.Vector3(0,190,-1350),
-    new THREE.Vector3(0,55,-320),
+    new THREE.Vector3(0,160,-1200),
     new THREE.Vector3(0,-15,0),
-    new THREE.Vector3(1050,130,0),
-    new THREE.Vector3(...end.target)
-  ]:[
-    new THREE.Vector3(...start.target),
-    new THREE.Vector3(0,190,-1500),
-    new THREE.Vector3(0,50,-380),
     new THREE.Vector3(0,-15,0),
-    new THREE.Vector3(980,125,0),
+    new THREE.Vector3(1000,120,0),
     new THREE.Vector3(...end.target)
   ];
   return{
