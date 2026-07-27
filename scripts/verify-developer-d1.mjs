@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 
+// Developer D1 verification contract.
 const read=path=>fs.readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 const html=read('developer.html');
 const sceneHtml=read('developer-scene.html');
