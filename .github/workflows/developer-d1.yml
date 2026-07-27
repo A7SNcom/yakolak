@@ -1,0 +1,45 @@
+name: Verify Developer D1
+
+on:
+  push:
+    branches:
+      - agent/developer-d1-scene-gallery
+  pull_request:
+    paths:
+      - developer.html
+      - developer-scene.html
+      - src/developer-d1.js
+      - src/developer-scene-d1.js
+      - scripts/verify-developer-d1.mjs
+      - scripts/visual-developer-d1.mjs
+      - .github/workflows/developer-d1.yml
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify D1 structure
+        run: node scripts/verify-developer-d1.mjs
+      - name: Install Chromium quietly
+        run: |
+          npm install --no-save --silent playwright >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+      - name: Start Developer D1 locally
+        run: |
+          python3 -m http.server 4173 > /tmp/developer-d1-server.log 2>&1 &
+          for i in {1..30}; do curl -fsS http://127.0.0.1:4173/developer.html >/dev/null && exit 0; sleep 1; done
+          cat /tmp/developer-d1-server.log
+          exit 1
+      - name: Verify gallery and scenes
+        run: node scripts/visual-developer-d1.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: developer-d1-visuals
+          path: artifacts/developer-d1
+          if-no-files-found: warn
