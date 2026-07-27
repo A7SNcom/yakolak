@@ -1,3 +1,5 @@
+import {SVGLoader} from 'three/addons/loaders/SVGLoader.js';
+
 console.info('[Yakolak] ENTRY v126 CLEAN WALL-TO-WALL JOURNEY LOADED');
 
 const BUILD=126;
@@ -68,52 +70,55 @@ function applyPose(camera,THREE,pose){
   camera.lookAt(new THREE.Vector3(...pose.target));
 }
 
-function loadTexture(THREE,url){
-  return new Promise((resolve,reject)=>{
-    new THREE.TextureLoader().load(url,texture=>{
-      texture.colorSpace=THREE.SRGBColorSpace;
-      texture.minFilter=THREE.LinearFilter;
-      texture.magFilter=THREE.LinearFilter;
-      texture.generateMipmaps=false;
-      texture.needsUpdate=true;
-      resolve(texture);
-    },undefined,reject);
-  });
+function loadOfficialSvg(url){
+  return new Promise((resolve,reject)=>new SVGLoader().load(url,resolve,undefined,reject));
 }
 
-function logoPlane(THREE,texture,width,name){
-  const image=texture.image;
-  const aspect=(image?.naturalWidth||image?.width||1)/(image?.naturalHeight||image?.height||1);
-  const height=width/Math.max(.2,aspect);
+function officialLogo(THREE,svgData,width,name){
+  const raw=new THREE.Group();
   const material=new THREE.MeshBasicMaterial({
-    map:texture,
     color:INK,
-    transparent:true,
-    alphaTest:.01,
+    transparent:false,
     depthTest:true,
     depthWrite:false,
     toneMapped:false,
     side:THREE.DoubleSide
   });
-  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(width,height),material);
-  mesh.name=name;
-  mesh.renderOrder=9000;
-  return mesh;
+  svgData.paths.forEach(path=>{
+    SVGLoader.createShapes(path).forEach(shape=>{
+      const geometry=new THREE.ShapeGeometry(shape,18);
+      geometry.scale(1,-1,1);
+      const mesh=new THREE.Mesh(geometry,material);
+      mesh.renderOrder=9000;
+      raw.add(mesh);
+    });
+  });
+  if(!raw.children.length)throw new Error(`${name} has no drawable SVG shapes`);
+  raw.updateMatrixWorld(true);
+  const box=new THREE.Box3().setFromObject(raw);
+  const size=box.getSize(new THREE.Vector3());
+  const center=box.getCenter(new THREE.Vector3());
+  raw.position.set(-center.x,-center.y,0);
+  const wrapper=new THREE.Group();
+  wrapper.name=name;
+  wrapper.scale.setScalar(width/Math.max(1,size.x));
+  wrapper.add(raw);
+  return wrapper;
 }
 
 async function createOfficialLogoWall(scene,THREE,render){
-  const [yakolakTexture,mtkyfTexture]=await Promise.all([
-    loadTexture(THREE,`./assets/YAKOLAK.svg?v=${BUILD}`),
-    loadTexture(THREE,`./assets/MTKYF.svg?v=${BUILD}`)
+  const [yakolakSvg,mtkyfSvg]=await Promise.all([
+    loadOfficialSvg(`./assets/YAKOLAK.svg?v=${BUILD}`),
+    loadOfficialSvg(`./assets/MTKYF.svg?v=${BUILD}`)
   ]);
   const group=new THREE.Group();
   group.name='yakolak-v126-official-logo-wall';
   group.position.set(2374,265,0);
   group.rotation.y=-Math.PI/2;
 
-  const yakolak=logoPlane(THREE,yakolakTexture,650,'yakolak-v126-logo-yakolak');
+  const yakolak=officialLogo(THREE,yakolakSvg,650,'yakolak-v126-logo-yakolak');
   yakolak.position.set(0,220,0);
-  const mtkyf=logoPlane(THREE,mtkyfTexture,520,'yakolak-v126-logo-mtkyf');
+  const mtkyf=officialLogo(THREE,mtkyfSvg,520,'yakolak-v126-logo-mtkyf');
   mtkyf.position.set(0,-220,0);
   group.add(yakolak,mtkyf);
   scene.add(group);
@@ -198,8 +203,8 @@ async function runJourney(game){
     const frame=now=>{
       const raw=clamp((now-started)/duration,0,1);
       const t=smoother(raw);
-      const position=cameraCurve.getPointAt(t);
-      const target=targetCurve.getPointAt(t);
+      const position=cameraCurve.getPoint(t);
+      const target=targetCurve.getPoint(t);
       camera.position.copy(position);
       camera.fov=poses.start.fov+(poses.end.fov-poses.start.fov)*t;
       camera.updateProjectionMatrix();
