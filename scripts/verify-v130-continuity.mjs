@@ -54,6 +54,7 @@ try {
         facingX: direction?.x,
         roomSource: stage?.roomSource,
         tableSource: stage?.tableSource,
+        responsiveLayout: branding?.responsiveLayout,
         brandAssets: branding ? [branding.gameLogoAsset, branding.companyLogoAsset] : []
       };
     });
@@ -95,6 +96,7 @@ try {
     assert.ok(finalState.facingX > .9, `${current.name}: camera is not facing the second wall`);
     assert.equal(finalState.roomSource, 'approved-v125-room', `${current.name}: wrong room source`);
     assert.equal(finalState.tableSource, 'established-neutral-table', `${current.name}: wrong table source`);
+    assert.equal(finalState.responsiveLayout, current.name==='mobile'?'portrait':'landscape', `${current.name}: wrong responsive logo layout`);
     assert.deepEqual(finalState.brandAssets, [
       'https://raw.githubusercontent.com/A7SNcom/yakolak/main/assets/YAKOLAK.svg',
       'https://raw.githubusercontent.com/A7SNcom/yakolak/main/assets/MTKYF.svg'
