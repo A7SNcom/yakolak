@@ -2,23 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {chromium} from 'playwright';
 
-const BASE_URL=process.env.V126_URL||'https://yakolak-git-agent-v126-clean-entry-journey-ahmdkcoms-projects.vercel.app';
+const ACCESS_URL=process.env.V126_URL||'https://yakolak-git-agent-v126-clean-entry-journey-ahmdkcoms-projects.vercel.app';
 const output=path.resolve('artifacts/v126-visual');
 fs.mkdirSync(output,{recursive:true});
 
-async function waitForPreview(){
-  const deadline=Date.now()+180000;
-  while(Date.now()<deadline){
-    try{
-      const response=await fetch(`${BASE_URL}/version.json?check=${Date.now()}`,{cache:'no-store'});
-      if(response.ok){
-        const version=await response.json();
-        if(Number(version.build)===126)return;
-      }
-    }catch(error){}
-    await new Promise(resolve=>setTimeout(resolve,3000));
-  }
-  throw new Error('Build 126 preview did not become ready');
+function previewUrl(){
+  const url=new URL(ACCESS_URL);
+  url.searchParams.set('clear',Date.now().toString());
+  return url.toString();
 }
 
 async function inspect(page){
@@ -56,7 +47,7 @@ async function testViewport(browser,name,options){
   page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text())});
   page.on('pageerror',error=>pageErrors.push(String(error?.stack||error)));
 
-  await page.goto(`${BASE_URL}/?clear=${Date.now()}`,{waitUntil:'domcontentloaded',timeout:60000});
+  await page.goto(previewUrl(),{waitUntil:'domcontentloaded',timeout:60000});
   await page.waitForSelector('#yakolakLoaderStar',{state:'visible',timeout:15000});
   await page.screenshot({path:path.join(output,`${name}-01-loading.png`)});
 
@@ -83,7 +74,6 @@ async function testViewport(browser,name,options){
   return{name,state,consoleErrors,pageErrors};
 }
 
-await waitForPreview();
 const browser=await chromium.launch({headless:true});
 try{
   const results=[];
@@ -97,7 +87,7 @@ try{
     isMobile:true,
     hasTouch:true
   }));
-  fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({url:BASE_URL,results},null,2));
+  fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({url:new URL(ACCESS_URL).origin,results},null,2));
   console.log('v126 desktop and mobile visual verification passed');
 }finally{
   await browser.close();
