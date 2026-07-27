@@ -18,6 +18,8 @@ requireText(app,"./src/entry-v126.js?v='",'clean entry import');
 ['app-game-v121','app-game-v122','app-game-v123','app-game-v124','app-game-v125'].forEach(value=>rejectText(app,value,'app bootstrap'));
 
 requireText(html,'id="yakolakLoaderStar"','star-only loader');
+requireText(html,'M0,-191.393L-20.116','approved loading star geometry');
+requireText(html,'@keyframes bounce','approved loading star motion');
 rejectText(html,'yakolakLoaderProgress','legacy progress bar');
 requireText(html,'loaderEl.classList.add(\'handoff\')','transparent loader handoff');
 
@@ -25,7 +27,9 @@ requireText(entry,"source:'v120-stable-room-table'",'stable source marker');
 requireText(entry,'gameGroup.visible=false','empty table requirement');
 requireText(entry,'./assets/YAKOLAK.svg','official Yakolak logo');
 requireText(entry,'./assets/MTKYF.svg','official MTKYF logo');
-requireText(entry,'CatmullRomCurve3','single smooth camera journey');
+requireText(entry,'CubicBezierCurve3','single stable camera path');
+requireText(entry,'slerpQuaternions','stable camera rotation');
+requireText(entry,"cameraMotion:'single-cubic-slerp'",'stable motion marker');
 requireText(entry,'projectLoaderAnchor','world-anchored loading star');
 requireText(entry,"phase:'complete'",'runtime completion marker');
 
