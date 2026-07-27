@@ -1,0 +1,32 @@
+name: Visual Build 126 Clean Entry
+
+on:
+  push:
+    branches:
+      - agent/v126-clean-entry-journey
+  pull_request:
+    paths:
+      - app.js
+      - index.html
+      - src/entry-v126.js
+      - scripts/visual-v126.mjs
+      - .github/workflows/visual-v126-clean-entry.yml
+
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save playwright
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/visual-v126.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v126-desktop-mobile-visuals
+          path: artifacts/v126-visual
+          if-no-files-found: warn
