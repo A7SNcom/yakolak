@@ -108,6 +108,7 @@ function officialLogo(THREE,svgData,width,name){
 }
 
 async function createOfficialLogoWall(scene,THREE,render){
+  const portrait=innerHeight>innerWidth*1.18;
   const [yakolakSvg,mtkyfSvg]=await Promise.all([
     loadOfficialSvg(`./assets/YAKOLAK.svg?v=${BUILD}`),
     loadOfficialSvg(`./assets/MTKYF.svg?v=${BUILD}`)
@@ -117,10 +118,10 @@ async function createOfficialLogoWall(scene,THREE,render){
   group.position.set(2374,265,0);
   group.rotation.y=-Math.PI/2;
 
-  const yakolak=officialLogo(THREE,yakolakSvg,650,'yakolak-v126-logo-yakolak');
-  yakolak.position.set(0,220,0);
-  const mtkyf=officialLogo(THREE,mtkyfSvg,520,'yakolak-v126-logo-mtkyf');
-  mtkyf.position.set(0,-220,0);
+  const yakolak=officialLogo(THREE,yakolakSvg,portrait?340:650,'yakolak-v126-logo-yakolak');
+  yakolak.position.set(0,portrait?145:220,0);
+  const mtkyf=officialLogo(THREE,mtkyfSvg,portrait?280:520,'yakolak-v126-logo-mtkyf');
+  mtkyf.position.set(0,portrait?-145:-220,0);
   group.add(yakolak,mtkyf);
   scene.add(group);
   render();
@@ -147,25 +148,25 @@ function projectLoaderAnchor(camera,THREE,worldPoint){
 function createJourneyCurves(THREE,start,end,portrait){
   const cameraPoints=portrait?[
     new THREE.Vector3(...start.position),
-    new THREE.Vector3(0,340,-450),
-    new THREE.Vector3(0,520,-40),
-    new THREE.Vector3(250,520,500),
-    new THREE.Vector3(800,390,300),
+    new THREE.Vector3(0,430,-650),
+    new THREE.Vector3(0,1250,-300),
+    new THREE.Vector3(450,1150,850),
+    new THREE.Vector3(950,520,420),
     new THREE.Vector3(...end.position)
   ]:[
     new THREE.Vector3(...start.position),
-    new THREE.Vector3(0,320,-650),
-    new THREE.Vector3(0,430,-80),
-    new THREE.Vector3(300,430,500),
-    new THREE.Vector3(780,340,300),
+    new THREE.Vector3(0,360,-800),
+    new THREE.Vector3(0,760,-250),
+    new THREE.Vector3(380,760,650),
+    new THREE.Vector3(850,450,350),
     new THREE.Vector3(...end.position)
   ];
   const targetPoints=[
     new THREE.Vector3(...start.target),
-    new THREE.Vector3(0,160,-1200),
+    new THREE.Vector3(0,120,-1400),
     new THREE.Vector3(0,-15,0),
-    new THREE.Vector3(0,-15,0),
-    new THREE.Vector3(1000,120,0),
+    new THREE.Vector3(120,-15,40),
+    new THREE.Vector3(1150,140,0),
     new THREE.Vector3(...end.target)
   ];
   return{
@@ -200,7 +201,8 @@ async function runJourney(game){
       const position=cameraCurve.getPoint(t);
       const target=targetCurve.getPoint(t);
       camera.position.copy(position);
-      camera.fov=poses.start.fov+(poses.end.fov-poses.start.fov)*t;
+      const baseFov=poses.start.fov+(poses.end.fov-poses.start.fov)*t;
+      camera.fov=baseFov+(poses.portrait?9:4)*Math.sin(Math.PI*t);
       camera.updateProjectionMatrix();
       camera.lookAt(target);
       projectLoaderAnchor(camera,THREE,wallAnchor);
