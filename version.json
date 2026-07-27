@@ -1,6 +1,6 @@
 {
-  "version": "v130-approved-room-continuity",
+  "version": "v130-approved-room-brand-wall",
   "build": 130,
   "updated_at": "2026-07-27",
-  "note": "Restores the approved v125 room and established light neutral table, keeps the loading star physically on the first wall until it leaves the camera view, and places the sample text on the second wall before the camera turns toward it."
+  "note": "Restores the approved v125 room and established light neutral table, keeps the loading star physically on the first wall until it leaves the camera view, and places the official YAKOLAK and MTKYF SVG logos on the second wall before the camera turns toward it."
 }
