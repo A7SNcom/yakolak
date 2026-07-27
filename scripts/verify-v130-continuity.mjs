@@ -14,6 +14,7 @@ const browser = await chromium.launch({ headless: true });
 try {
   for (const current of cases) {
     const page = await browser.newPage({ viewport: current.viewport, deviceScaleFactor: current.deviceScaleFactor });
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
     const pageErrors = [];
     const ignoredNetworkErrors = [];
     page.on('pageerror', error => pageErrors.push(String(error?.stack || error)));
