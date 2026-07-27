@@ -1,75 +1,19 @@
-console.info('[Yakolak] APP.JS v126 UNIFIED GAMEPLAY LOADED');
+console.info('[Yakolak] APP.JS v130 APPROVED ROOM CONTINUITY LOADED');
 
-const BUILD='126';
+const BUILD='130';
 
-async function installRoomConnections(){
-  globalThis.__yakolakLoading?.set?.(100,'تجهيز الجدار');
-  for(let i=0;i<520;i++){
-    const game=globalThis.__yakolakGame;
-    const entry=globalThis.__yakolakV121Entry;
-    const wall=globalThis.__yakolakV122RoomMenu;
-    const services=globalThis.__yakolakV124RoomServices;
-    const whiteWall=globalThis.__yakolakV125WhiteWall;
-    if(game?.render&&entry?.choose&&wall?.group&&services?.serviceGroup&&whiteWall?.group){
-      const exposeService=(object,axis,value)=>{
-        object.position[axis]=value;
-        object.traverse?.(child=>{
-          child.frustumCulled=false;
-          const materials=Array.isArray(child.material)?child.material:[child.material];
-          materials.filter(Boolean).forEach(material=>{
-            material.depthTest=false;
-            material.depthWrite=false;
-            if(!material.map){
-              material.color?.set?.('#b9b5ad');
-              if('blending' in material)material.blending=game.THREE.NormalBlending;
-            }
-            material.needsUpdate=true;
-          });
-        });
-      };
-
-      wall.group.visible=false;
-      exposeService(services.serviceGroup,'x',2360);
-      services.learnScreen?.traverse?.(child=>{child.frustumCulled=false});
-      services.lobbyScreen?.traverse?.(child=>{child.frustumCulled=false});
-
-      const previousChoose=entry.choose.bind(entry);
-      entry.choose=mode=>{
-        if(mode==='online')return services.showOnlineService();
-        if(mode==='learn')return services.showLearn();
-        return previousChoose(mode);
-      };
-
-      const style=document.createElement('style');
-      style.id='yakolakV125LegacyUiKillSwitch';
-      style.textContent=`
-        #yakolakEntry,#yakolakOnlineDialog,#yakolakHowTo{display:none!important;visibility:hidden!important;pointer-events:none!important}
-        body.yakolak-room-service-active #yakolakGameHud,
-        body.yakolak-room-service-active #yakolakGameScore,
-        body.yakolak-room-howto-active #yakolakGameHud,
-        body.yakolak-room-howto-active #yakolakGameScore{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
-        body.yakolak-v125-white-wall #view canvas{background:#f7f7f4}
-      `;
-      document.head.append(style);
-      whiteWall.finalize();
-      game.render();
-      console.info('[Yakolak] v125 room connections active');
-      return;
-    }
-    await new Promise(resolve=>setTimeout(resolve,25));
-  }
-  throw new Error('v126 room connections could not find all stages');
-}
+globalThis.__yakolakLoading?.set?.(8,'تجهيز اللعبة');
 
 import('./src/game-rules-v126.js?v='+BUILD+'-shared-rules')
   .then(rules=>{globalThis.__yakolakRulesV126=rules})
   .then(()=>import('./src/mobile-clarity-v120.js?v='+BUILD+'-policy'))
-  .then(()=>import('./src/app-game-v126.js?v='+BUILD+'-unified-gameplay'))
-  .then(()=>installRoomConnections())
-  .then(()=>import('./src/online-last-move-v119.js?v='+BUILD+'-marker'))
-  .then(()=>import('./src/room-browser-v126.js?v='+BUILD+'-named-rooms'))
+  .then(()=>import('./src/app-game-v130.js?v='+BUILD+'-approved-room-continuity'))
+  .then(()=>Promise.allSettled([
+    import('./src/online-last-move-v119.js?v='+BUILD+'-marker'),
+    import('./src/room-browser-v126.js?v='+BUILD+'-named-rooms')
+  ]))
   .catch(error=>{
-    console.error('[Yakolak] v126 bootstrap failed',error);
+    console.error('[Yakolak] v130 bootstrap failed',error);
     globalThis.__yakolakLoading?.set?.(100,'تعذر تجهيز اللعبة');
-    document.getElementById('yakolakLoader')?.classList.add('error');
+    document.body.dataset.phase='error';
   });
