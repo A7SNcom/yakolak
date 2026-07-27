@@ -20,15 +20,10 @@ try {
       if (message.type() === 'error') pageErrors.push(`console: ${message.text()}`);
     });
 
-    await page.goto(`http://127.0.0.1:4173/?clear=${Date.now()}-${current.name}`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
-    await page.waitForTimeout(300);
-    await page.screenshot({ path: new URL(`${current.name}-00-loading.png`, outputDir).pathname });
-
-    await page.waitForFunction(() => document.body.dataset.phase === 'room-reveal', null, { timeout: 45_000 });
-    await page.waitForTimeout(900);
-    const revealState = await page.evaluate(() => {
+    const readDiagnostic = () => page.evaluate(() => {
       const game = globalThis.__yakolakGame;
       const scene = game?.gameGroup?.parent;
+      const stage = globalThis.__yakolakV130;
       return {
         phase: document.body.dataset.phase,
         loaderPresent: Boolean(document.getElementById('yakolakLoader')),
@@ -37,9 +32,27 @@ try {
         starVisible: scene?.getObjectByName('yakolak-v130-loading-star-on-approved-wall')?.visible === true,
         sampleTextPresent: Boolean(scene?.getObjectByName('yakolak-v130-sample-text-existing-on-second-wall')),
         sampleTextVisible: scene?.getObjectByName('yakolak-v130-sample-text-existing-on-second-wall')?.visible !== false,
-        fakeCssRoom: Boolean(document.querySelector('.world,.tableTop,.wallBack'))
+        fakeCssRoom: Boolean(document.querySelector('.world,.tableTop,.wallBack')),
+        target: game?.controls?.target ? { x: game.controls.target.x, y: game.controls.target.y, z: game.controls.target.z } : null,
+        camera: game?.camera?.position ? { x: game.camera.position.x, y: game.camera.position.y, z: game.camera.position.z } : null,
+        stage: stage ? {
+          roomSource: stage.roomSource,
+          tableSource: stage.tableSource,
+          textBeforeTurn: stage.sampleTextPresentBeforeCameraTurn,
+          starAfterView: stage.starLeavesViewBeforeHide
+        } : null
       };
     });
+
+    await page.goto(`http://127.0.0.1:4173/?clear=${Date.now()}-${current.name}`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: new URL(`${current.name}-00-loading.png`, outputDir).pathname });
+
+    await page.waitForFunction(() => document.body.dataset.phase === 'room-reveal', null, { timeout: 45_000 });
+    await page.waitForTimeout(900);
+    const revealState = await readDiagnostic();
+    console.log(`${current.name} reveal state:`, JSON.stringify(revealState));
+    await page.screenshot({ path: new URL(`${current.name}-01-room-reveal.png`, outputDir).pathname });
     assert.equal(revealState.loaderPresent, false, `${current.name}: loader overlay should hand off to the wall star`);
     assert.equal(revealState.approvedRoom, true, `${current.name}: approved room missing`);
     assert.equal(revealState.realTable, true, `${current.name}: established table missing`);
@@ -47,33 +60,27 @@ try {
     assert.equal(revealState.sampleTextPresent, true, `${current.name}: sample text was not already on the second wall`);
     assert.equal(revealState.sampleTextVisible, true, `${current.name}: sample text starts hidden`);
     assert.equal(revealState.fakeCssRoom, false, `${current.name}: replacement CSS room/table still exists`);
-    await page.screenshot({ path: new URL(`${current.name}-01-room-reveal.png`, outputDir).pathname });
 
-    await page.waitForFunction(() => document.body.dataset.phase === 'sample-wall', null, { timeout: 20_000 });
-    const finalState = await page.evaluate(() => {
-      const game = globalThis.__yakolakGame;
-      const scene = game?.gameGroup?.parent;
-      const stage = globalThis.__yakolakV130;
-      return {
-        phase: document.body.dataset.phase,
-        starVisible: scene?.getObjectByName('yakolak-v130-loading-star-on-approved-wall')?.visible === true,
-        sampleTextVisible: scene?.getObjectByName('yakolak-v130-sample-text-existing-on-second-wall')?.visible !== false,
-        targetX: game?.controls?.target?.x,
-        roomSource: stage?.roomSource,
-        tableSource: stage?.tableSource,
-        textBeforeTurn: stage?.sampleTextPresentBeforeCameraTurn,
-        starAfterView: stage?.starLeavesViewBeforeHide
-      };
-    });
+    try {
+      await page.waitForFunction(() => document.body.dataset.phase === 'sample-wall', null, { timeout: 20_000 });
+    } catch (error) {
+      const stuckState = await readDiagnostic();
+      console.error(`${current.name} phase wait failed:`, JSON.stringify(stuckState), '\nBrowser errors:', pageErrors.join('\n'));
+      await page.screenshot({ path: new URL(`${current.name}-99-stuck.png`, outputDir).pathname });
+      throw error;
+    }
+
+    const finalState = await readDiagnostic();
+    console.log(`${current.name} final state:`, JSON.stringify(finalState));
+    await page.screenshot({ path: new URL(`${current.name}-02-sample-wall.png`, outputDir).pathname });
     assert.equal(finalState.phase, 'sample-wall', `${current.name}: did not finish at second wall`);
     assert.equal(finalState.starVisible, false, `${current.name}: first-wall star was not retired after leaving view`);
     assert.equal(finalState.sampleTextVisible, true, `${current.name}: sample text vanished`);
-    assert.ok(finalState.targetX > 2200, `${current.name}: camera is not facing the second wall`);
-    assert.equal(finalState.roomSource, 'approved-v125-room', `${current.name}: wrong room source`);
-    assert.equal(finalState.tableSource, 'established-neutral-table', `${current.name}: wrong table source`);
-    assert.equal(finalState.textBeforeTurn, true, `${current.name}: text continuity contract missing`);
-    assert.equal(finalState.starAfterView, true, `${current.name}: star continuity contract missing`);
-    await page.screenshot({ path: new URL(`${current.name}-02-sample-wall.png`, outputDir).pathname });
+    assert.ok(finalState.target?.x > 2200, `${current.name}: camera is not facing the second wall`);
+    assert.equal(finalState.stage?.roomSource, 'approved-v125-room', `${current.name}: wrong room source`);
+    assert.equal(finalState.stage?.tableSource, 'established-neutral-table', `${current.name}: wrong table source`);
+    assert.equal(finalState.stage?.textBeforeTurn, true, `${current.name}: text continuity contract missing`);
+    assert.equal(finalState.stage?.starAfterView, true, `${current.name}: star continuity contract missing`);
 
     assert.deepEqual(pageErrors, [], `${current.name}: browser errors\n${pageErrors.join('\n')}`);
     await page.close();
