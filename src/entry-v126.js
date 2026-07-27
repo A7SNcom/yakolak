@@ -163,10 +163,10 @@ function createJourneyCurves(THREE,start,end,portrait){
   ];
   const targetPoints=[
     new THREE.Vector3(...start.target),
-    new THREE.Vector3(0,120,-1400),
-    new THREE.Vector3(0,-15,0),
-    new THREE.Vector3(120,-15,40),
-    new THREE.Vector3(1150,140,0),
+    new THREE.Vector3(0,170,-1500),
+    new THREE.Vector3(300,70,-100),
+    new THREE.Vector3(800,100,100),
+    new THREE.Vector3(1600,190,0),
     new THREE.Vector3(...end.target)
   ];
   return{
