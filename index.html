@@ -3,87 +3,72 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="yakolak-version" content="v125-white-wall-continuity">
+<meta name="yakolak-version" content="v126-clean-entry-journey">
 <title>Yakolak Live</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="./styles/v114-online.css?v=125">
+<link rel="stylesheet" href="./styles/v114-online.css?v=126">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script>
 <style>
-:root{--yakolak-wall:#f7f7f4;--yakolak-ink:#242421;--yakolak-muted:#77736c;--yakolak-line:#cbc7bf}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--yakolak-wall);color:var(--yakolak-ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:none}
-#view{position:fixed;inset:0;z-index:1;opacity:0;background:var(--yakolak-wall);transition:opacity .25s ease}
-#hint,#settingsBtn,#panel,textarea{display:none!important}
-#yakolakLoader{position:fixed;inset:0;z-index:20000;display:grid;place-items:center;background:var(--yakolak-wall);transition:opacity .42s ease,visibility .42s ease}
-#yakolakLoader.done.wall-ready{opacity:0;visibility:hidden;pointer-events:none}
-.loaderPanel{width:min(520px,calc(100vw - 48px));direction:rtl;color:var(--yakolak-ink);text-align:center}
-.loaderKicker{font-size:12px;font-weight:800;letter-spacing:.22em;color:var(--yakolak-muted);direction:ltr;margin-bottom:14px}
-.loaderBrand{font-size:54px;font-weight:950;line-height:1;margin-bottom:34px;color:var(--yakolak-ink)}
-.loaderFrame{position:relative;width:100%;padding:0;background:transparent}
-#yakolakLoaderProgress{display:block;width:100%;height:4px;appearance:none;-webkit-appearance:none;border:0;border-radius:999px;background:#dedbd4;overflow:hidden}
-#yakolakLoaderProgress::-webkit-progress-bar{background:#dedbd4;border-radius:999px}
-#yakolakLoaderProgress::-webkit-progress-value{background:var(--yakolak-ink);border-radius:999px;transition:width .24s ease}
-#yakolakLoaderProgress::-moz-progress-bar{background:var(--yakolak-ink);border-radius:999px;transition:width .24s ease}
-.loaderMeta{display:flex;justify-content:space-between;align-items:center;margin-top:13px;font-size:12px;font-weight:700;color:var(--yakolak-muted);direction:rtl}
-#yakolakLoaderPercent{font-size:13px;color:var(--yakolak-ink);direction:ltr}
-#yakolakLoader.error #yakolakLoaderProgress::-webkit-progress-value{background:#8f3b34}
-#yakolakLoader.error #yakolakLoaderProgress::-moz-progress-bar{background:#8f3b34}
-#clearCacheBtn{position:fixed;left:16px;bottom:16px;z-index:10000;width:58px;height:58px;border-radius:50%;border:1px solid rgba(36,36,33,.18);background:rgba(247,247,244,.92);color:var(--yakolak-ink);font-size:15px;font-weight:950;display:grid;place-items:center;cursor:pointer;line-height:1;box-shadow:0 10px 30px rgba(35,33,29,.12);user-select:none}
-#clearCacheBtn[hidden]{display:none!important}
-#clearCacheBtn[disabled]{opacity:.62;cursor:wait}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff;color:#20201e;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:none}
+#view{position:fixed;inset:0;z-index:1;opacity:0;background:#fff}
+#hint,#settingsBtn,#panel,textarea,#clearCacheBtn{display:none!important}
+#yakolakLoader{position:fixed;inset:0;z-index:20000;overflow:hidden;background:#fff;pointer-events:auto}
+#yakolakLoader.handoff{background:transparent;pointer-events:none}
+#yakolakLoaderAnchor{position:absolute;left:50%;top:50%;width:72px;height:72px;transform:translate3d(-50%,-50%,0);will-change:left,top}
+#yakolakLoaderStar{display:block;width:72px;height:72px;animation:yakolak-star-spin 1.15s linear infinite;transform-origin:50% 50%;will-change:transform}
+#yakolakLoaderStar path{fill:#242421}
+#yakolakLoader.error #yakolakLoaderStar path{fill:#8f3b34}
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+@keyframes yakolak-star-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+#yakolakGameHud,#yakolakGameScore,#yakolakGameSetup,#yakolakTools,#yakolakCalibrationPanel,#yakolakOnlineDialog,#yakolakTutorialDialog,#yakolakOnlineEntry,#yakolakHowTo,#yakolakEntry,#yakolakFloatingSettings,#yakolakEntrySettings{display:none!important;visibility:hidden!important;pointer-events:none!important}
+@media (max-width:700px){#yakolakLoaderAnchor,#yakolakLoaderStar{width:62px;height:62px}}
+@media (prefers-reduced-motion:reduce){#yakolakLoaderStar{animation-duration:1.8s}}
 </style>
 </head>
 <body>
 <div id="yakolakLoader" aria-busy="true" aria-describedby="yakolakLoaderStatus">
-  <div class="loaderPanel">
-    <div class="loaderKicker">YAKOLAK</div>
-    <div class="loaderBrand">ياكلك</div>
-    <div class="loaderFrame"><progress id="yakolakLoaderProgress" value="0" max="100" aria-label="تحميل اللعبة">0%</progress></div>
-    <div class="loaderMeta"><span id="yakolakLoaderStatus">تحميل اللعبة</span><strong id="yakolakLoaderPercent">0%</strong></div>
+  <div id="yakolakLoaderAnchor" aria-hidden="true">
+    <svg id="yakolakLoaderStar" viewBox="0 0 100 100" focusable="false">
+      <path d="M50 2 59.8 34.1 86 14 65.9 40.2 98 50 65.9 59.8 86 86 59.8 65.9 50 98 40.2 65.9 14 86 34.1 59.8 2 50 34.1 40.2 14 14 40.2 34.1Z"/>
+    </svg>
   </div>
+  <span id="yakolakLoaderStatus" class="sr-only">تحميل اللعبة</span>
 </div>
 <div id="view"></div>
 <div id="hint" aria-hidden="true"></div>
 <button id="settingsBtn" aria-hidden="true">SET</button>
-<button id="clearCacheBtn" type="button" title="مسح كامل للكاش وإعادة تحميل نظيفة" aria-label="مسح كامل للكاش وإعادة تحميل نظيفة" hidden>مسح</button>
+<button id="clearCacheBtn" type="button" hidden>مسح</button>
 <div id="panel" aria-hidden="true"></div>
 <textarea id="out"></textarea>
 <script type="module">
-const BUILD='125';
+const BUILD='126';
 const params=new URLSearchParams(location.search);
 const clearToken=params.get('clear');
-const debugMode=params.get('debug')==='1';
 const ASSET_VERSION=clearToken||BUILD;
-const clearBtn=document.getElementById('clearCacheBtn');
 const loaderEl=document.getElementById('yakolakLoader');
-if(clearBtn)clearBtn.hidden=!debugMode;
-const progressEl=document.getElementById('yakolakLoaderProgress');
-const progressText=document.getElementById('yakolakLoaderPercent');
-const progressStatus=document.getElementById('yakolakLoaderStatus');
+const loaderAnchor=document.getElementById('yakolakLoaderAnchor');
+const loaderStatus=document.getElementById('yakolakLoaderStatus');
 const removeLoaderNow=()=>{if(loaderEl?.parentNode)loaderEl.parentNode.removeChild(loaderEl)};
-if(loaderEl){
-  loaderEl.remove=()=>{
-    if(loaderEl.classList.contains('wall-ready'))removeLoaderNow();
-    else loaderEl.dataset.removePending='1';
-  };
-}
-window.__yakolakReleaseWallLoader=()=>{
-  if(!loaderEl?.isConnected)return;
-  requestAnimationFrame(()=>{
-    loaderEl.classList.add('wall-ready');
+if(loaderEl)loaderEl.remove=()=>{loaderEl.dataset.removePending='1'};
+window.__yakolakEntryLoader={
+  anchor(x,y){
+    if(!loaderAnchor?.isConnected)return;
+    loaderAnchor.style.left=`${Math.round(x)}px`;
+    loaderAnchor.style.top=`${Math.round(y)}px`;
+  },
+  handoff(){
+    if(!loaderEl?.isConnected)return;
+    loaderEl.classList.add('handoff');
     loaderEl.setAttribute('aria-busy','false');
-    setTimeout(removeLoaderNow,480);
-  });
+  },
+  finish(){
+    if(!loaderEl?.isConnected)return;
+    removeLoaderNow();
+  }
 };
-function setGameProgress(value,status){
-  const pct=Math.max(0,Math.min(100,Math.round(value||0)));
-  if(progressEl){progressEl.value=pct;progressEl.textContent=pct+'%'}
-  if(progressText)progressText.textContent=pct+'%';
-  if(status&&progressStatus)progressStatus.textContent=status;
-}
-window.__yakolakLoading={set:setGameProgress};
-setGameProgress(3,'تهيئة اللعبة');
+window.__yakolakLoading={set(value,status){if(status&&loaderStatus)loaderStatus.textContent=status}};
 function hardReload(){const url=new URL(location.href);url.searchParams.set('clear',Date.now().toString());location.replace(url.toString())}
 async function clearIndexedDB(){
   if(!('indexedDB' in window)||!indexedDB.databases)return;
@@ -92,19 +77,20 @@ async function clearIndexedDB(){
     const req=indexedDB.deleteDatabase(db.name);req.onsuccess=req.onerror=req.onblocked=()=>resolve();
   })));
 }
-async function cleanReload(e){
-  if(e)e.preventDefault();
-  if(!debugMode||!clearBtn||clearBtn.disabled)return;
-  clearBtn.disabled=true;clearBtn.textContent='ينظف';
+async function cleanReload(){
   const jobs=[];
-  try{if('caches' in window)jobs.push(caches.keys().then(names=>Promise.allSettled(names.map(name=>caches.delete(name)))))}catch(err){}
-  try{if('serviceWorker' in navigator)jobs.push(navigator.serviceWorker.getRegistrations().then(regs=>Promise.allSettled(regs.map(reg=>reg.unregister()))))}catch(err){}
+  try{if('caches' in window)jobs.push(caches.keys().then(names=>Promise.allSettled(names.map(name=>caches.delete(name)))))}catch(error){}
+  try{if('serviceWorker' in navigator)jobs.push(navigator.serviceWorker.getRegistrations().then(regs=>Promise.allSettled(regs.map(reg=>reg.unregister()))))}catch(error){}
   jobs.push(clearIndexedDB().catch(()=>{}));
-  await Promise.allSettled(jobs);clearBtn.textContent='تم';hardReload();
+  await Promise.allSettled(jobs);hardReload();
 }
-if(clearBtn)clearBtn.addEventListener('click',cleanReload);
+window.__yakolakCleanReload=cleanReload;
 async function checkVersion(){
-  try{const r=await fetch('./version.json?v='+ASSET_VERSION,{cache:'no-store'});const v=await r.json();const next=String(v.build||BUILD);if(next!==String(BUILD)){hardReload();return false}}catch(e){}
+  try{
+    const response=await fetch('./version.json?v='+ASSET_VERSION,{cache:'no-store'});
+    const version=await response.json();
+    if(String(version.build||BUILD)!==BUILD){hardReload();return false}
+  }catch(error){}
   return true;
 }
 if(await checkVersion()){
