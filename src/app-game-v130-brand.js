@@ -1,9 +1,13 @@
 console.info('[Yakolak] APP GAME v130 SECOND-WALL BRANDING LOADED');
 
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const GAME_LOGO_URL='https://raw.githubusercontent.com/A7SNcom/yakolak/main/assets/YAKOLAK.svg';
+const COMPANY_LOGO_URL='https://raw.githubusercontent.com/A7SNcom/yakolak/main/assets/MTKYF.svg';
 
 function loadTexture(THREE,url){
-  const texture=new THREE.TextureLoader().load(
+  const loader=new THREE.TextureLoader();
+  loader.setCrossOrigin('anonymous');
+  const texture=loader.load(
     url,
     loaded=>{
       loaded.colorSpace=THREE.SRGBColorSpace;
@@ -40,7 +44,7 @@ async function installSecondWallBranding(){
   group.rotation.y=-Math.PI/2;
 
   const gameLogoMaterial=new THREE.MeshBasicMaterial({
-    map:loadTexture(THREE,'./assets/YAKOLAK.svg?v=130-brand-wall'),
+    map:loadTexture(THREE,GAME_LOGO_URL),
     transparent:true,
     depthTest:true,
     depthWrite:false,
@@ -53,7 +57,7 @@ async function installSecondWallBranding(){
   gameLogo.renderOrder=12020;
 
   const companyLogoMaterial=new THREE.MeshBasicMaterial({
-    map:loadTexture(THREE,'./assets/MTKYF.svg?v=130-brand-wall'),
+    map:loadTexture(THREE,COMPANY_LOGO_URL),
     transparent:true,
     depthTest:true,
     depthWrite:false,
@@ -79,8 +83,8 @@ async function installSecondWallBranding(){
     group,
     gameLogo,
     companyLogo,
-    gameLogoAsset:'assets/YAKOLAK.svg',
-    companyLogoAsset:'assets/MTKYF.svg',
+    gameLogoAsset:GAME_LOGO_URL,
+    companyLogoAsset:COMPANY_LOGO_URL,
     presentBeforeSecondWall:true
   };
 }
