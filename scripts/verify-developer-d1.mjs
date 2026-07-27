@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 
-// Developer D1 verification contract.
 const read=path=>fs.readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 const html=read('developer.html');
 const sceneHtml=read('developer-scene.html');
@@ -14,6 +13,7 @@ requireText(html,'D1 · DEVELOPMENT','D1 identity');
 requireText(html,'id="sceneTabs"','scene filters');
 requireText(html,'id="devBack"','floating return button');
 requireText(html,'id="devStageFrame"','isolated stage');
+requireText(html,'scene-preview-state','preview readiness state');
 requireText(sceneHtml,'loaderProjection','approved loading star');
 requireText(sceneHtml,'@keyframes bounce','approved loading motion');
 
@@ -22,6 +22,7 @@ requireText(sceneHtml,'@keyframes bounce','approved loading motion');
 requireText(gallery,'IntersectionObserver','lazy preview loading');
 requireText(gallery,"stage.classList.add('open')",'scene open flow');
 requireText(gallery,"stageFrame.src='about:blank'",'scene close cleanup');
+requireText(gallery,'yakolak-developer-scene-ready','preview readiness bridge');
 
 requireText(runner,"sceneId==='loading-star'",'loading scene');
 requireText(runner,'configureEmptyTable','empty table scene');
@@ -29,8 +30,11 @@ requireText(runner,'configureBoardBases','board bases scene');
 requireText(runner,'configureLogoWall','logo wall scene');
 requireText(runner,"sceneId==='clean-entry'",'entry sequence');
 requireText(runner,'configureUnboxing','unboxing sequence');
-requireText(runner,"document.body.dataset.sceneReady='true'",'scene readiness marker');
+requireText(runner,"sceneReady:'true'",'scene readiness marker');
+requireText(runner,"composition:'unboxing-only'",'intro-only isolation');
+requireText(runner,"logoRendering:'svg-texture'",'two-tone logo rendering');
+requireText(runner,"visibleObjects:String(visible)",'named board objects');
 
 rejectText(html,'./app.js','client bootstrap isolation');
 rejectText(sceneHtml,'./app.js','client bootstrap isolation');
-console.log('Developer D1 static verification passed');
+console.log('Developer D1 isolated scene verification passed');
