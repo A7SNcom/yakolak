@@ -1,0 +1,36 @@
+{
+  "name": "yakolak-vnext",
+  "phase": "foundation",
+  "runtimeEnabled": false,
+  "basedOn": {
+    "build": 126,
+    "commit": "263bedf3c7942cd80e3b614e42e72b377e5afa6e"
+  },
+  "status": {
+    "architecture": "documented",
+    "experienceInventory": "documented",
+    "stateMachine": "documented",
+    "motionCatalog": "documented",
+    "legacyMap": "documented",
+    "migrationPlan": "documented",
+    "implementation": "not-started"
+  },
+  "modules": [
+    "core",
+    "experience",
+    "game",
+    "network",
+    "tests"
+  ],
+  "constraints": [
+    "no-production-change",
+    "no-runtime-import",
+    "no-global-bridges",
+    "no-string-runtime-patching",
+    "shared-game-rules",
+    "single-camera-director",
+    "single-app-state-machine",
+    "mobile-first",
+    "reduced-motion-required"
+  ]
+}
