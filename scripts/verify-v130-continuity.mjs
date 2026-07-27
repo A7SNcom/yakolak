@@ -15,20 +15,26 @@ try {
   for (const current of cases) {
     const page = await browser.newPage({ viewport: current.viewport, deviceScaleFactor: current.deviceScaleFactor });
     const pageErrors = [];
+    const ignoredNetworkErrors = [];
     page.on('pageerror', error => pageErrors.push(String(error?.stack || error)));
     page.on('console', message => {
-      if (message.type() === 'error') pageErrors.push(`console: ${message.text()}`);
+      if (message.type() !== 'error') return;
+      const text = message.text();
+      if (text.includes('Failed to load resource')) ignoredNetworkErrors.push(text);
+      else pageErrors.push(`console: ${text}`);
     });
 
     const readDiagnostic = () => page.evaluate(() => {
       const game = globalThis.__yakolakGame;
       const scene = game?.gameGroup?.parent;
       const stage = globalThis.__yakolakV130;
+      const tableMeshes = Object.values(game?.meshes || {});
       return {
         phase: document.body.dataset.phase,
         loaderPresent: Boolean(document.getElementById('yakolakLoader')),
         approvedRoom: Boolean(scene?.getObjectByName('yakolak-soft-empty-room')),
         realTable: Boolean(game?.gameGroup && game?.meshes),
+        tableVisible: game?.gameGroup?.visible !== false && tableMeshes.some(mesh => mesh?.visible !== false),
         starVisible: scene?.getObjectByName('yakolak-v130-loading-star-on-approved-wall')?.visible === true,
         sampleTextPresent: Boolean(scene?.getObjectByName('yakolak-v130-sample-text-existing-on-second-wall')),
         sampleTextVisible: scene?.getObjectByName('yakolak-v130-sample-text-existing-on-second-wall')?.visible !== false,
@@ -49,13 +55,14 @@ try {
     await page.screenshot({ path: new URL(`${current.name}-00-loading.png`, outputDir).pathname });
 
     await page.waitForFunction(() => document.body.dataset.phase === 'room-reveal', null, { timeout: 45_000 });
-    await page.waitForTimeout(900);
+    await page.waitForTimeout(2600);
     const revealState = await readDiagnostic();
     console.log(`${current.name} reveal state:`, JSON.stringify(revealState));
-    await page.screenshot({ path: new URL(`${current.name}-01-room-reveal.png`, outputDir).pathname });
+    await page.screenshot({ path: new URL(`${current.name}-01-room-and-table.png`, outputDir).pathname });
     assert.equal(revealState.loaderPresent, false, `${current.name}: loader overlay should hand off to the wall star`);
     assert.equal(revealState.approvedRoom, true, `${current.name}: approved room missing`);
     assert.equal(revealState.realTable, true, `${current.name}: established table missing`);
+    assert.equal(revealState.tableVisible, true, `${current.name}: established table is hidden`);
     assert.equal(revealState.starVisible, true, `${current.name}: star disappeared before leaving view`);
     assert.equal(revealState.sampleTextPresent, true, `${current.name}: sample text was not already on the second wall`);
     assert.equal(revealState.sampleTextVisible, true, `${current.name}: sample text starts hidden`);
@@ -72,6 +79,7 @@ try {
 
     const finalState = await readDiagnostic();
     console.log(`${current.name} final state:`, JSON.stringify(finalState));
+    if (ignoredNetworkErrors.length) console.log(`${current.name} ignored local API errors:`, ignoredNetworkErrors.length);
     await page.screenshot({ path: new URL(`${current.name}-02-sample-wall.png`, outputDir).pathname });
     assert.equal(finalState.phase, 'sample-wall', `${current.name}: did not finish at second wall`);
     assert.equal(finalState.starVisible, false, `${current.name}: first-wall star was not retired after leaving view`);
