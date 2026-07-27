@@ -10,8 +10,8 @@ fs.writeFileSync(diagnosticPath,`start ${new Date().toISOString()}\naccess ${new
 const note=text=>{fs.appendFileSync(diagnosticPath,`${new Date().toISOString()} ${text}\n`);console.log(text)};
 
 function previewUrl(){
-  const url=new URL(ACCESS_URL);
-  url.pathname='/';
+  const access=new URL(ACCESS_URL);
+  const url=new URL('/',access.origin);
   url.searchParams.set('clear',Date.now().toString());
   return url.toString();
 }
@@ -46,6 +46,15 @@ async function inspect(page){
   });
 }
 
+async function authenticatePreview(page,name){
+  const safe=ACCESS_URL.replace(/_vercel_share=[^&]+/,'_vercel_share=REDACTED');
+  note(`${name} authenticate ${safe}`);
+  await page.goto(ACCESS_URL,{waitUntil:'domcontentloaded',timeout:60000});
+  await page.waitForTimeout(1000);
+  note(`${name} auth landed ${page.url()} title=${await page.title()}`);
+  if((await page.title()).includes('Login'))throw new Error(`${name} Vercel share authentication did not establish access`);
+}
+
 async function testViewport(browser,name,options){
   const context=await browser.newContext(options);
   const page=await context.newPage();
@@ -54,8 +63,11 @@ async function testViewport(browser,name,options){
   page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text())});
   page.on('pageerror',error=>pageErrors.push(String(error?.stack||error)));
   try{
+    await authenticatePreview(page,name);
+    consoleErrors.length=0;
+    pageErrors.length=0;
     const url=previewUrl();
-    note(`${name} goto ${url.replace(/_vercel_share=[^&]+/,'_vercel_share=REDACTED')}`);
+    note(`${name} goto ${url}`);
     await page.goto(url,{waitUntil:'domcontentloaded',timeout:60000});
     note(`${name} domcontentloaded ${await page.title()}`);
     await page.waitForSelector('#yakolakLoaderStar',{state:'visible',timeout:15000});
