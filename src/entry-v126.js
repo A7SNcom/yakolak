@@ -2,6 +2,7 @@ console.info('[Yakolak] ENTRY v126 CLEAN WALL-TO-WALL JOURNEY LOADED');
 
 const BUILD=126;
 const WHITE='#ffffff';
+const INK='#242421';
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
@@ -16,12 +17,12 @@ async function waitForStableRoom(){
   throw new Error('v126 could not find the stable v120 room and table');
 }
 
-function setSolidWhite(object){
+function setSolidColor(object,color){
   if(!object)return;
   object.visible=true;
   const materials=Array.isArray(object.material)?object.material:[object.material];
   materials.filter(Boolean).forEach(material=>{
-    material.color?.set?.(WHITE);
+    material.color?.set?.(color);
     material.emissive?.set?.('#000000');
     if('emissiveIntensity' in material)material.emissiveIntensity=0;
     material.opacity=1;
@@ -33,9 +34,13 @@ function setSolidWhite(object){
 
 function cleanStableRoom(scene,gameGroup){
   scene.background?.set?.(WHITE);
-  setSolidWhite(scene.getObjectByName('room-back-wall'));
-  setSolidWhite(scene.getObjectByName('room-left-wall'));
-  setSolidWhite(scene.getObjectByName('room-right-wall'));
+  setSolidColor(scene.getObjectByName('room-back-wall'),WHITE);
+  setSolidColor(scene.getObjectByName('room-left-wall'),WHITE);
+  setSolidColor(scene.getObjectByName('room-right-wall'),WHITE);
+  setSolidColor(scene.getObjectByName('room-ceiling'),WHITE);
+  setSolidColor(scene.getObjectByName('room-floor'),'#deddd7');
+  const front=scene.getObjectByName('room-front-wall');
+  if(front)front.visible=false;
   gameGroup.visible=false;
   document.body.classList.add('yakolak-v126-entry');
 }
@@ -82,6 +87,7 @@ function logoPlane(THREE,texture,width,name){
   const height=width/Math.max(.2,aspect);
   const material=new THREE.MeshBasicMaterial({
     map:texture,
+    color:INK,
     transparent:true,
     alphaTest:.01,
     depthTest:true,
@@ -105,10 +111,10 @@ async function createOfficialLogoWall(scene,THREE,render){
   group.position.set(2374,265,0);
   group.rotation.y=-Math.PI/2;
 
-  const yakolak=logoPlane(THREE,yakolakTexture,720,'yakolak-v126-logo-yakolak');
-  yakolak.position.set(0,245,0);
-  const mtkyf=logoPlane(THREE,mtkyfTexture,620,'yakolak-v126-logo-mtkyf');
-  mtkyf.position.set(0,-245,0);
+  const yakolak=logoPlane(THREE,yakolakTexture,650,'yakolak-v126-logo-yakolak');
+  yakolak.position.set(0,220,0);
+  const mtkyf=logoPlane(THREE,mtkyfTexture,520,'yakolak-v126-logo-mtkyf');
+  mtkyf.position.set(0,-220,0);
   group.add(yakolak,mtkyf);
   scene.add(group);
   render();
@@ -132,22 +138,41 @@ function projectLoaderAnchor(camera,THREE,worldPoint){
   return x>-90&&x<innerWidth+90&&y>-90&&y<innerHeight+90&&point.z>-1&&point.z<1;
 }
 
-function createJourneyCurves(THREE,start,end){
-  const cameraCurve=new THREE.CatmullRomCurve3([
+function createJourneyCurves(THREE,start,end,portrait){
+  const cameraPoints=portrait?[
     new THREE.Vector3(...start.position),
-    new THREE.Vector3(0,390,-650),
-    new THREE.Vector3(180,500,-180),
-    new THREE.Vector3(700,390,0),
+    new THREE.Vector3(0,330,-470),
+    new THREE.Vector3(-70,470,40),
+    new THREE.Vector3(190,500,560),
+    new THREE.Vector3(760,380,340),
     new THREE.Vector3(...end.position)
-  ],false,'centripetal',.5);
-  const targetCurve=new THREE.CatmullRomCurve3([
+  ]:[
+    new THREE.Vector3(...start.position),
+    new THREE.Vector3(0,320,-700),
+    new THREE.Vector3(-120,420,-100),
+    new THREE.Vector3(220,430,520),
+    new THREE.Vector3(720,340,330),
+    new THREE.Vector3(...end.position)
+  ];
+  const targetPoints=portrait?[
     new THREE.Vector3(...start.target),
-    new THREE.Vector3(0,170,-980),
-    new THREE.Vector3(330,70,-220),
-    new THREE.Vector3(1450,220,0),
+    new THREE.Vector3(0,190,-1350),
+    new THREE.Vector3(0,55,-320),
+    new THREE.Vector3(0,-15,0),
+    new THREE.Vector3(1050,130,0),
     new THREE.Vector3(...end.target)
-  ],false,'centripetal',.5);
-  return{cameraCurve,targetCurve};
+  ]:[
+    new THREE.Vector3(...start.target),
+    new THREE.Vector3(0,190,-1500),
+    new THREE.Vector3(0,50,-380),
+    new THREE.Vector3(0,-15,0),
+    new THREE.Vector3(980,125,0),
+    new THREE.Vector3(...end.target)
+  ];
+  return{
+    cameraCurve:new THREE.CatmullRomCurve3(cameraPoints,false,'centripetal',.5),
+    targetCurve:new THREE.CatmullRomCurve3(targetPoints,false,'centripetal',.5)
+  };
 }
 
 async function runJourney(game){
@@ -166,8 +191,8 @@ async function runJourney(game){
   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   globalThis.__yakolakEntryLoader?.handoff?.();
 
-  const duration=reduced?1100:2850;
-  const {cameraCurve,targetCurve}=createJourneyCurves(THREE,poses.start,poses.end);
+  const duration=reduced?1200:3000;
+  const {cameraCurve,targetCurve}=createJourneyCurves(THREE,poses.start,poses.end,poses.portrait);
   const started=performance.now();
   await new Promise(resolve=>{
     const frame=now=>{
@@ -204,6 +229,7 @@ async function runJourney(game){
     phase:'complete',
     source:'v120-stable-room-table',
     logos,
+    logoInk:INK,
     gameGroupHidden:!gameGroup.visible
   };
   console.info('[Yakolak] v126 clean entry journey complete');
