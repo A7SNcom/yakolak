@@ -10,29 +10,54 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script>
 <style>
+:root{--yakolak-wall:#fff;--yakolak-ink:#3f3f3f;--loader-cycle:820ms}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff;color:#20201e;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:none}
 #view{position:fixed;inset:0;z-index:1;opacity:0;background:#fff}
 #hint,#settingsBtn,#panel,textarea,#clearCacheBtn{display:none!important}
 #yakolakLoader{position:fixed;inset:0;z-index:20000;overflow:hidden;background:#fff;pointer-events:auto}
 #yakolakLoader.handoff{background:transparent;pointer-events:none}
-#yakolakLoaderAnchor{position:absolute;left:50%;top:50%;width:72px;height:72px;transform:translate3d(-50%,-50%,0);will-change:left,top}
-#yakolakLoaderStar{display:block;width:72px;height:72px;animation:yakolak-star-spin 1.15s linear infinite;transform-origin:50% 50%;will-change:transform}
-#yakolakLoaderStar path{fill:#242421}
+#yakolakLoaderAnchor{position:absolute;left:50%;top:50%;width:96px;height:132px;transform:translate3d(-50%,-50%,0);will-change:left,top}
+.loaderProjection{position:relative;width:96px;height:132px;transform-origin:50% 55%;will-change:transform}
+.starBounce{position:absolute;top:0;left:4px;width:88px;height:88px;transform-origin:50% 100%;animation:bounce var(--loader-cycle) infinite;will-change:transform}
+#yakolakLoaderStar{display:block;width:100%;height:100%;overflow:visible;transform-box:fill-box;transform-origin:center;animation:turn var(--loader-cycle) linear infinite;will-change:transform}
+#yakolakLoaderStar path{fill:var(--yakolak-ink)}
 #yakolakLoader.error #yakolakLoaderStar path{fill:#8f3b34}
+.loadingShadow{position:absolute;top:123px;left:13px;width:70px;height:8px;border-radius:50%;background:#000;opacity:.075;filter:blur(.6px);transform-origin:center;animation:loaderShadow var(--loader-cycle) infinite;will-change:transform,opacity}
 .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
-@keyframes yakolak-star-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes bounce{
+  0%{transform:translateY(0) scale(1);animation-timing-function:cubic-bezier(.55,.08,.68,.19)}
+  43%{transform:translateY(33px) scale(1.01,.99);animation-timing-function:cubic-bezier(.2,.8,.3,1)}
+  50%{transform:translateY(36px) scale(1.17,.72);animation-timing-function:cubic-bezier(.15,.75,.2,1)}
+  58%{transform:translateY(30px) scale(.94,1.09);animation-timing-function:cubic-bezier(.22,.61,.36,1)}
+  78%{transform:translateY(5px) scale(1.01,.99);animation-timing-function:cubic-bezier(.25,.1,.25,1)}
+  100%{transform:translateY(0) scale(1)}
+}
+@keyframes turn{0%{transform:rotate(0)}43%{transform:rotate(10deg)}50%{transform:rotate(12deg)}58%{transform:rotate(14deg)}78%{transform:rotate(20deg)}100%{transform:rotate(24deg)}}
+@keyframes loaderShadow{
+  0%,100%{transform:scale(.66,.72);opacity:.055;animation-timing-function:cubic-bezier(.55,.08,.68,.19)}
+  43%{transform:scale(1.02,.95);opacity:.105}
+  50%{transform:scale(1.28,1);opacity:.14;animation-timing-function:cubic-bezier(.15,.75,.2,1)}
+  58%{transform:scale(1.04,.94);opacity:.105}
+  78%{transform:scale(.72,.76);opacity:.065}
+}
 #yakolakGameHud,#yakolakGameScore,#yakolakGameSetup,#yakolakTools,#yakolakCalibrationPanel,#yakolakOnlineDialog,#yakolakTutorialDialog,#yakolakOnlineEntry,#yakolakHowTo,#yakolakEntry,#yakolakFloatingSettings,#yakolakEntrySettings{display:none!important;visibility:hidden!important;pointer-events:none!important}
-@media (max-width:700px){#yakolakLoaderAnchor,#yakolakLoaderStar{width:62px;height:62px}}
-@media (prefers-reduced-motion:reduce){#yakolakLoaderStar{animation-duration:1.8s}}
+@media(prefers-reduced-motion:reduce){:root{--loader-cycle:1100ms}}
 </style>
 </head>
 <body>
 <div id="yakolakLoader" aria-busy="true" aria-describedby="yakolakLoaderStatus">
   <div id="yakolakLoaderAnchor" aria-hidden="true">
-    <svg id="yakolakLoaderStar" viewBox="0 0 100 100" focusable="false">
-      <path d="M50 2 59.8 34.1 86 14 65.9 40.2 98 50 65.9 59.8 86 86 59.8 65.9 50 98 40.2 65.9 14 86 34.1 59.8 2 50 34.1 40.2 14 14 40.2 34.1Z"/>
-    </svg>
+    <div class="loaderProjection">
+      <div class="starBounce">
+        <svg id="yakolakLoaderStar" viewBox="0 0 802 798" xmlns="http://www.w3.org/2000/svg" focusable="false">
+          <g transform="matrix(4.166667,0,0,4.166667,484.7475,797.470417)">
+            <path d="M0,-191.393L-20.116,-183.832L-40.232,-191.393L-55.534,-176.304L-76.986,-175.028L-84.828,-155.02L-103.907,-145.13L-102.932,-123.662L-116.339,-106.867L-106.717,-87.651L-112.134,-66.855L-95.528,-53.214L-92.018,-32.013L-71.299,-26.306L-59.469,-8.364L-38.22,-11.578L-20.116,0L-2.012,-11.578L19.237,-8.364L31.067,-26.306L51.786,-32.013L55.296,-53.214L71.902,-66.855L66.486,-87.651L76.108,-106.867L62.7,-123.662L63.675,-145.13L44.596,-155.02L36.754,-175.028L15.302,-176.304L0,-191.393Z"/>
+          </g>
+        </svg>
+      </div>
+      <div class="loadingShadow"></div>
+    </div>
   </div>
   <span id="yakolakLoaderStatus" class="sr-only">تحميل اللعبة</span>
 </div>
