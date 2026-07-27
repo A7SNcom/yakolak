@@ -24,6 +24,18 @@ const stageTitle=document.getElementById('devStageTitle');
 const back=document.getElementById('devBack');
 let activeFilter='all';
 
+const previewObserver=new IntersectionObserver(entries=>{
+  entries.forEach(entry=>{
+    if(!entry.isIntersecting)return;
+    const iframe=entry.target.querySelector('iframe[data-src]');
+    if(iframe&&!iframe.src.includes('developer-scene.html')){
+      iframe.src=iframe.dataset.src;
+      delete iframe.dataset.src;
+    }
+    previewObserver.unobserve(entry.target);
+  });
+},{rootMargin:'160px 0px',threshold:.08});
+
 function sceneUrl(scene,preview=false){
   const url=new URL('./developer-scene.html',location.href);
   url.searchParams.set('scene',scene.id);
@@ -61,7 +73,8 @@ function cardFor(scene){
   const iframe=document.createElement('iframe');
   iframe.title=`معاينة ${scene.title}`;
   iframe.loading='lazy';
-  iframe.src=sceneUrl(scene,true);
+  iframe.src='about:blank';
+  iframe.dataset.src=sceneUrl(scene,true);
   iframe.setAttribute('tabindex','-1');
   preview.append(iframe);
 
@@ -91,10 +104,12 @@ function cardFor(scene){
   article.onclick=()=>openScene(scene);
   article.tabIndex=0;
   article.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openScene(scene)}};
+  previewObserver.observe(article);
   return article;
 }
 
 function renderCards(){
+  previewObserver.disconnect();
   grid.innerHTML='';
   scenes.forEach(scene=>grid.append(cardFor(scene)));
   applyFilter();
@@ -105,7 +120,7 @@ function applyFilter(){
   grid.querySelectorAll('.scene-card').forEach(card=>{
     const show=activeFilter==='all'||card.dataset.type===activeFilter;
     card.hidden=!show;
-    if(show)visible++;
+    if(show){visible++;previewObserver.observe(card)}
   });
   count.textContent=`${visible} ${visible===1?'مشهد':'مشاهد'}`;
 }
