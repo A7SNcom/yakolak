@@ -7,6 +7,7 @@ globalThis.__yakolakLoading?.set?.(8,'تجهيز اللعبة');
 import('./src/game-rules-v126.js?v='+BUILD+'-shared-rules')
   .then(rules=>{globalThis.__yakolakRulesV126=rules})
   .then(()=>import('./src/mobile-clarity-v120.js?v='+BUILD+'-policy'))
+  .then(()=>import('./src/app-game-v130-brand.js?v='+BUILD+'-official-brand-wall'))
   .then(()=>import('./src/app-game-v130.js?v='+BUILD+'-approved-room-continuity'))
   .then(()=>Promise.allSettled([
     import('./src/online-last-move-v119.js?v='+BUILD+'-marker'),
