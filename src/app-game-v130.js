@@ -75,14 +75,14 @@ function createWallStar(game,scene){
   group.position.set(0,250,-2354);
 
   const starMaterial=new THREE.MeshBasicMaterial({
-    map:createStarTexture(THREE),transparent:true,depthTest:false,depthWrite:false,toneMapped:false,side:THREE.DoubleSide
+    map:createStarTexture(THREE),transparent:true,depthTest:true,depthWrite:false,toneMapped:false,side:THREE.DoubleSide
   });
   const star=new THREE.Mesh(new THREE.PlaneGeometry(100,100),starMaterial);
   star.position.set(0,18,2);
   star.renderOrder=12020;
 
   const shadowMaterial=new THREE.MeshBasicMaterial({
-    map:createShadowTexture(THREE),transparent:true,opacity:.075,depthTest:false,depthWrite:false,toneMapped:false,side:THREE.DoubleSide
+    map:createShadowTexture(THREE),transparent:true,opacity:.075,depthTest:true,depthWrite:false,toneMapped:false,side:THREE.DoubleSide
   });
   const shadow=new THREE.Mesh(new THREE.PlaneGeometry(72,18),shadowMaterial);
   shadow.position.set(0,-53,1);
@@ -106,7 +106,7 @@ function createSampleWallText(game,scene){
   texture.colorSpace=THREE.SRGBColorSpace;
   texture.minFilter=THREE.LinearFilter;
   texture.magFilter=THREE.LinearFilter;
-  const material=new THREE.MeshBasicMaterial({map:texture,transparent:true,depthTest:false,depthWrite:false,toneMapped:false,side:THREE.DoubleSide});
+  const material=new THREE.MeshBasicMaterial({map:texture,transparent:true,depthTest:true,depthWrite:false,toneMapped:false,side:THREE.DoubleSide});
   const mesh=new THREE.Mesh(new THREE.PlaneGeometry(900,450),material);
   mesh.name='yakolak-v130-sample-text-existing-on-second-wall';
   mesh.position.set(2354,260,0);
