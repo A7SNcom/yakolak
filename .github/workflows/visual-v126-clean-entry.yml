@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      V126_URL: https://yakolak-git-agent-v126-clean-entry-journey-ahmdkcoms-projects.vercel.app/?_vercel_share=wEox2RlIIASJDkyIklulszqnj67Efqll
+      V126_URL: https://yakolak-git-agent-v126-clean-entry-journey-ahmdkcoms-projects.vercel.app/?_vercel_share=Xp7Wlz935qgP52xvdskQOgJrrLSFStf2
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
