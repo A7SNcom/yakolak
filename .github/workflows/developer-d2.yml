@@ -31,16 +31,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Verify D2 structure and syntax
+      - name: Check D2 application syntax
+        run: |
+          node --check src/developer-d2-registry.js
+          node --check src/developer-d2.js
+      - name: Check compatible APIs and scene runtime
         run: |
           node --check api/developer-d1.js
           node --check api/developer-d1-workspace.js
           node --check api/developer-d1-comparisons.js
-          node --check src/developer-d2-registry.js
-          node --check src/developer-d2.js
           node --check src/developer-scene-d1.js
           node --check src/developer-scene-d1-router.js
-          node scripts/verify-developer-d2-workbench.mjs
+      - name: Verify D2 workbench structure
+        run: node scripts/verify-developer-d2-workbench.mjs
       - name: Install Chromium quietly
         run: |
           npm install --no-save --silent playwright >/dev/null 2>&1
