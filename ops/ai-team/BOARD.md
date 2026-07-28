@@ -2,79 +2,62 @@
 
 ## Active cycle
 
-- Cycle: `003-architecture-reset`
-- Status: `PROCESS_FREEZE_UNTIL_NEXT_MANAGER_CYCLE`
+- Cycle: `004-canonical-entry-contract`
+- Status: `ACTIVE`
 - Manager: Rashed
 - Auditor: Hakam
-- Integration branch: `agent/yakolak-team-os`
-- Product release branch: `main` (human gate)
-- Previous source branch: `agent/developer-d2-workbench`
-- Snapshot time: `2026-07-28T20:14+03:00`
-- Current bottleneck: stop structural debt growth and establish a canonical migration path before more legacy/D4 feature work.
+- Integration branch/head: `agent/yakolak-team-os` @ `326c1548011bdc90717e25ee22c66187abdafbc8`
+- Source PR #35 head: verify fresh before acting; human-gated
+- President Portal PR #38 head: `dae593e6d5fb458295ee91f46722655f8a1d7f1e` — `HOLD`, not merged, channel inactive
+- Snapshot time: `2026-07-28T21:01+03:00`
+- Current bottleneck: establish the first deterministic Boot -> Entry -> Mode-selection contract without DOM, Three.js, network, or legacy wrappers.
 
-## Critical diagnosis
+## Fresh evidence
 
-The repeated defects are not isolated mistakes. The accepted runtime still combines many responsibilities in `src/app-game-v085.js`, while later builds fetch old JavaScript as text, replace exact strings/regular expressions, execute Blob modules, expose private state through globals, and mutate runtime state from preview layers.
+- PR #36: open, draft, mergeable, unmerged; integration head above.
+- PR #38: open, draft, mergeable, unmerged.
+- PR #38 exact-head checks at snapshot: Architecture Guardrails, AI Team OS, Build 126, v112, and v125 passed; President Portal, v118, and D3 were still running; D1 failed on the known baseline regression.
+- Vercel branch alias was READY only for older commit `07d61c82c9d876fd1942e9c9e4ac14aa02cb7257`, not PR #38 head; therefore no Preview PASS.
+- President API is not an active source of truth until PR #38 is merged. No directives, messages, or decisions were reconciled this cycle.
 
-The clean vNext architecture existed in draft PR #29 but was isolated and non-enforced. Active work continued repairing layers instead of migrating the source of truth.
+## Assignments and locks
 
-## Architecture reset completed
+| Employee | Task | Status | Lock / role |
+|---|---|---|---|
+| Noor | `YAK-004-01` first canonical entry contracts + reducer tests | `READY` | new `src/core/` contract/reducer files and one focused Node test |
+| Sami | `YAK-004-02` independent review of Noor artifact | `READY` after artifact | read-only reviewer |
+| Lina | — | `NO_TASK` | no legacy wrapper work |
+| Mazen | — | `NO_TASK` | no parallel state model |
+| Nada | `YAK-004-03` Architecture Steward for Noor | `READY` after artifact | read-only `ARCH_OK/HOLD/REJECT` |
+| Omar | — | `NO_TASK` | no lineage busywork |
+| Sara | `YAK-004-04` verify PR #38 exact-head CI/Preview evidence | `READY` | read-only; no portal activation or merge |
+| Hakam | `YAK-004-05` final cycle audit | `READY` | read-only final verdict |
 
-- Canonical architecture: `docs/architecture/GAME_ARCHITECTURE.md`
-- Incremental roadmap: `docs/architecture/MIGRATION_ROADMAP.md`
-- Structural debt register: `docs/architecture/DEBT_REGISTER.md`
-- Prompt standard: `ops/ai-team/PROMPT_STANDARD.md`
-- Automated guard: `scripts/verify-architecture-guardrails.mjs`
-- CI workflow: `.github/workflows/architecture-guardrails.yml`
-- Root agent contract updated to forbid new version layers, source patching, Blob bootstrap, hidden global contracts, and duplicate state/rules.
+## Capacity
 
-## Freeze
+- Implementation writers: **1 / 2 maximum**.
+- Implementation effort: **3 / 5 points maximum**.
+- No second implementation until Noor produces a reviewable artifact.
+- New behavior must remain canonical; no legacy-debt increase is authorized.
 
-All prior cycle-002 assignments are `STALE/HOLD`. No employee may execute them from old worker files during this freeze.
+## Cycle acceptance gates
 
-Until Rashed publishes a fresh cycle from the latest head:
+### `YAK-004-01`
+- Named contracts for `Action`, `AppState`, `Effect`, and `RenderSnapshot` exist without browser/runtime dependencies.
+- A deterministic transition function covers Boot -> Entry -> Mode selection and rejects/ignores invalid transitions explicitly.
+- Node-only tests prove initial state, allowed transitions, and at least two invalid-event cases.
+- No DOM, Three.js, network, storage, timer, Blob, global, or source-patching dependency.
+- Reviewer `PASS`, Nada `ARCH_OK`, architecture guard green, then Hakam `MERGE_OK` before manager merge.
 
-| Employee | Status | Action |
-|---|---|---|
-| Noor | `NO_TASK` | no branch or code change |
-| Sami | `NO_TASK` | no review without a fresh artifact |
-| Lina | `NO_TASK` | no legacy wrapper repair from stale premise |
-| Mazen | `NO_TASK` | no state/preview mutation work |
-| Nada | `NO_TASK` | no research busywork |
-| Omar | `NO_TASK` | no repeated lineage report |
-| Sara | `NO_TASK` | no test review without an artifact |
-| Hakam | `NO_CHANGE` | verify freeze/guard evidence only |
+### PR #38
+- Keep `HOLD` until checks complete on exact head, Vercel Preview matches exact head, desktop/mobile evidence is independently inspected, and Hakam issues `MERGE_OK`.
+- Do not treat `/api/developer-president` as active before merge.
 
-The board overrides stale `READY` task blocks until the next manager cycle replaces them.
+## Deltas
 
-## Capacity for next cycle
-
-- Default maximum: **2 implementation workers / 5 points**.
-- Remaining employees receive only necessary review/steward/test work or `NO_TASK`.
-- Architecture Steward required for runtime/state/rules/network/bootstrap/dependency changes.
-- No four-writer cycle until canonical core plus replay/parity harness are proven.
-
-## Next-cycle priority
-
-Rashed must choose one bottleneck and assign only ready work. Preferred sequence:
-
-1. validate architecture guard on the latest PR head;
-2. establish Slice 1 contracts/state machine without DOM or Three.js;
-3. extract one pure game-rule contract with headless tests;
-4. build deterministic replay/parity before more visual/online feature states;
-5. perform only essential legacy maintenance needed to preserve current behavior or unblock migration.
-
-## Release and merge gates
-
-- [ ] Architecture guard passes on current integration PR.
-- [ ] No new version runtime/source patch/Blob/global/state duplication.
-- [ ] Reviewer PASS for each implementation.
-- [ ] `ARCH_OK` for runtime-boundary work.
-- [ ] Hakam `MERGE_OK`.
-- [ ] Relevant deterministic/regression/browser/online evidence.
-- [ ] `legacy-debt delta` and `migration-gate delta` recorded.
-- [ ] User explicitly authorizes PR #35/main/Production actions.
+- Expected `legacy-debt delta`: `unchanged`.
+- Expected `migration-gate delta`: Slice 1 moves from documentation to first executable deterministic contract.
 
 ## Human gates
 
-No PR #35 merge, `main` write/merge, Production deployment, rule change, secrets/schema/authentication/destructive operation, or major deletion without explicit user authorization.
+No PR #35 merge, `main` write/merge, Production deployment, game-rule change, secrets/schema/authentication/destructive operation, or major deletion without Ahmad's explicit authorization for that exact action.
