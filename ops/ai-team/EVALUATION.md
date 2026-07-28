@@ -2,131 +2,101 @@
 
 ## Purpose
 
-Measure verified engineering value, architecture safety, and migration progress—not message length, confidence, scheduled activity, or commit count.
+Measure verified engineering value, responsiveness to the President, visual-documentation integrity, architecture safety, and migration progress—not scheduled activity or commit count.
 
-**Hakam** is the independent final auditor. Hakam is read-only, cannot implement or merge, and may reject the manager's assignments, prompts, architecture decisions, or completion claims.
+Hakam is independent/read-only and may reject manager assignments, prompts, blueprint handling, architecture decisions, or completion claims.
 
 ## Worker score (100)
 
 - Correctness and acceptance criteria: 25
-- Evidence quality and traceability: 15
-- Scope/budget/ownership discipline: 15
-- Architecture alignment and debt impact: 20
-- Validation depth appropriate to risk: 20
+- Blueprint/prompt alignment and President-direction fidelity: 15
+- Evidence and traceability: 15
+- Scope/budget/ownership discipline: 10
+- Architecture alignment and debt impact: 15
+- Validation depth appropriate to risk: 15
 - Honest uncertainty and handoff: 5
 
-Verdict:
-
-- `PASS`: 85–100 and no tripwire.
-- `CONDITIONAL`: 70–84; bounded correction or stronger evidence required.
-- `FAIL`: below 70 or any tripwire.
-- `NO_TASK`: not scored; correct when no ready valuable work exists.
-- `NO_CHANGE`: not scored; valid for an auditor/reviewer when no new artifact exists.
+Verdicts: `PASS` 85–100 with no tripwire; `CONDITIONAL` 70–84; `FAIL` below 70/tripwire; `NO_TASK` and `NO_CHANGE` are not scored.
 
 ## Manager score (100)
 
-- Freshness of repository/CI/architecture snapshot: 15
-- Bottleneck and migration-gate judgment: 20
-- Task fit to capability and hourly effort: 15
-- Non-overlap, locks, reviewer/steward independence: 15
+- Lightweight President checkpoint and unread-input reconciliation: 15
+- Blueprint quality, revision control, and visible progress: 15
+- Fresh repository/CI/Preview/architecture snapshot: 10
+- President/bottleneck/migration judgment: 15
+- Task fit to capability/effort: 10
+- Non-overlap and reviewer/steward independence: 10
 - Prompt precision and anti-hallucination quality: 10
 - Review/merge judgment: 10
-- Verified product/debt/migration progress: 10
-- Concise accurate communication: 5
+- Verified product/debt/migration progress: 5
 
-A manager cycle below 85 cannot merge worker PRs. The next cycle becomes process repair only.
+A manager score below 85 blocks merges and makes the next cycle process repair. A cycle that ignores unread President input, manufactures busywork, or advances no documented gate cannot score above 69.
 
-A cycle that manufactures work for idle employees, advances no bottleneck/gate, or reports activity as progress cannot score above 69.
+## Architecture Steward
 
-## Architecture Steward verdict
+For boundary changes, check canonical dependency direction, single ownership, absence of new version layers/source patches/Blob/globals/duplicate state, architecture guard, blueprint alignment, and debt/migration deltas.
 
-For runtime-boundary changes, the named read-only steward checks:
-
-- canonical dependency direction;
-- single ownership of lifecycle, rules, camera, input, network, render, and UI;
-- absence of new version layers, source patching, Blob bootstraps, hidden global contracts, or duplicate state/rules;
-- architecture guardrail status;
-- registered debt and migration deltas.
-
-Verdicts:
-
-- `ARCH_OK`
-- `ARCH_HOLD`
-- `ARCH_REJECT`
-
-`ARCH_REJECT` blocks merge regardless of functional CI.
+Verdicts: `ARCH_OK`, `ARCH_HOLD`, `ARCH_REJECT`. `ARCH_REJECT` blocks merge.
 
 ## Automatic tripwires
 
-Any one is an automatic `FAIL`:
+Any one is automatic `FAIL`:
 
-- stale-base writing after a material head move;
-- editing outside allowed scope or budget;
-- disabling, skipping, weakening, deleting, or bypassing regression/architecture checks;
-- fabricated tests, screenshots, identifiers, commits, results, or manual verification;
+- coding without a valid canonical `blueprintNodeId` and `blueprintRevision`;
+- coding from a node not `ready`/`in_progress`;
+- continuing affected work after an unread/unreconciled President blueprint edit;
+- silently overwriting or reinterpreting President direction;
+- marking a node `review` without an artifact or `completed` without gates;
+- stale-base writing or scope/budget violation;
+- weakening/bypassing tests or architecture checks;
+- fabricated testing, screenshots, IDs, commits, results, or manual verification;
 - self-approval or merge without independent review;
-- fake preview state replacing available native runtime behavior;
-- direct `main` write, Production deployment, secrets/schema/destructive action, or rule change without user approval;
+- fake preview state replacing native runtime behavior;
+- unauthorized `main`, Production, rules, secrets, schema/auth, destructive action, or major deletion;
 - hidden critical conflict/error or misleading status;
-- adding another `app-game-vNNN.js` or suffixed version-layer runtime;
-- adding source-text runtime replacement, Blob module bootstrap, or hidden `globalThis.__yakolak*` contract;
-- creating a second source of truth for rules, turn, state, camera, online lifecycle, or rendering;
-- implementing rules in UI/preview/network code instead of the shared game core;
-- unregistered structural-debt increase;
-- using vague or invented premises after tools return insufficient evidence.
+- new `app-game-vNNN.js`, wrapper/source replacement, Blob bootstrap, hidden `globalThis.__yakolak*`, duplicate state/rules, or rules in UI/preview/network;
+- unregistered structural debt increase;
+- vague/invented premise after insufficient evidence.
 
 ## Capability ledger
 
-Hakam maintains evidence by worker and domain:
+Statuses: `PROVEN` (two recent PASS at risk/effort), `TRIAL`, `REDUCE`, `PAUSE`.
 
-- `PROVEN`: two recent PASS results at the same effort/risk;
-- `TRIAL`: insufficient evidence;
-- `REDUCE`: conditional/failure requires smaller next work;
-- `PAUSE`: repeated failure/tripwire; no implementation until two successful read-only tasks.
+Domains: repository/CI; JavaScript/runtime; game core/state machine; Three.js/input/camera/UI; online/network; testing/replay/evidence; architecture/review; visual planning/blueprint discipline.
 
-Domains:
-
-- repository/CI;
-- JavaScript/runtime;
-- game core/state machine;
-- Three.js/input/camera/UI;
-- online lifecycle/network;
-- testing/replay/evidence;
-- architecture/review.
-
-Names never create specialties; the ledger matches demonstrated capability to current risk.
+Names do not create specialties. Evidence matches capability to risk.
 
 ## Effort adaptation
 
-- PASS >=92: same or one higher class next cycle.
-- PASS 85–91: keep maximum effort.
-- CONDITIONAL: reduce one class and make acceptance checks explicit.
-- FAIL: read-only diagnosis or XS correction reviewed by another worker.
-- NO_ARTIFACT: retry at same/smaller effort or replace; never call partial completion.
-- Never assign `L`; split contracts and slices first.
+- PASS >=92: same or one higher class
+- PASS 85–91: same maximum
+- CONDITIONAL: reduce one class
+- FAIL: read-only diagnosis or XS correction
+- NO_ARTIFACT: retry same/smaller or replace
+- `L` is never assigned
 
-## Debt and migration accounting
+## Required accounting
 
-Every implementation/review report records:
+Every implementation/review records:
 
+- `blueprintNodeId` and `blueprintRevision`;
+- `blueprint delta`: unchanged / updated status / revised intent;
 - affected debt IDs;
-- `legacy-debt delta`: increased / unchanged / reduced;
-- `migration-gate delta`: none or exact roadmap gate advanced.
-
-Legacy-only activity with unchanged/increased debt may still be necessary for a production defect, but it must not be scored as migration progress.
+- `legacy-debt delta`;
+- `migration-gate delta`.
 
 ## Merge verdict
 
-For each implementation PR, Hakam records:
+For every implementation PR Hakam records:
 
-- task/prompt valid: yes/no;
-- premise fresh: yes/no;
-- diff within scope/budget: yes/no;
-- independent reviewer verdict;
+- President checkpoint current: yes/no;
+- blueprint node/revision valid and current: yes/no;
+- task/prompt valid and premise fresh: yes/no;
+- diff inside scope/budget: yes/no;
+- reviewer verdict;
 - Architecture Steward verdict when required;
-- architecture guardrail status;
-- CI/evidence sufficient for risk: yes/no;
-- debt/migration delta honest: yes/no;
+- architecture guard and CI/evidence sufficient: yes/no;
+- blueprint/debt/migration deltas honest: yes/no;
 - audit verdict: `MERGE_OK | HOLD | REJECT`.
 
-Only `MERGE_OK` permits Rashed to merge into `agent/yakolak-team-os`. Human gates still override all automation.
+Only `MERGE_OK` permits Rashed to merge into `agent/yakolak-team-os`. President human gates override all automation.
