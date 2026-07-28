@@ -91,6 +91,7 @@ async function galleryCheck(browser,label,options){
   const sceneName=`إنترو العلبة ${label}`,sceneNote=`${label} · افصل الإنترو عن إعداد اللاعبين`;
   const frame=await openEntity(page,'[data-scene="unboxing-intro"]');
   if(await frame.locator('body').getAttribute('data-setup-hidden')!=='true')throw new Error(`${label}: intro setup leaked`);
+  if(await frame.locator('body').getAttribute('data-large-base-visible')!=='true')throw new Error(`${label}: intro main play field missing`);
   await openEditor(page);
   if(await page.locator('#devCodeKey').textContent()!=='scene.unboxing-intro')throw new Error(`${label}: scene code key`);
   await saveEditor(page,sceneName,sceneNote);
@@ -109,7 +110,7 @@ async function galleryCheck(browser,label,options){
   await page.getByRole('button',{name:'إغلاق المحرر'}).click();
 
   await page.getByRole('button',{name:'العناصر'}).click();
-  const elementName=`القاعدة الأم ${label}`,elementNote=`${label} · الاسم الجديد للقاعدة الكبيرة`,base=page.locator('[data-element="base-large"]');
+  const elementName=`ميدان اللعب ${label}`,elementNote=`${label} · الاسم الجديد لميدان اللعب`,base=page.locator('[data-element="base-large"]');
   await base.locator('.scene-edit').click();
   await openEditor(page,false);
   if(await page.locator('#devCodeKey').textContent()!=='meshes["9"]')throw new Error(`${label}: element code key`);
@@ -130,33 +131,89 @@ async function galleryCheck(browser,label,options){
 
 async function sceneRuntime(page,id,state){
   const runtime=await page.evaluate(()=>{
-    const game=globalThis.__yakolakGame,scene=game?.gameGroup?.parent,wall=scene?.getObjectByName?.('yakolak-developer-d1-logo-wall');
-    const colors=[];let logoMeshes=0;
-    wall?.traverse?.(o=>{if(o.isMesh&&o.material){logoMeshes++;(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.color&&colors.push(m.color.getHexString()))}});
-    return{gameVisible:game?.gameGroup?.visible,setupVisible:game?.setupGroup?.visible,visibleBases:['9','3-right','3-left','3-front','3-back'].filter(k=>game?.meshes?.[k]?.visible).length,logoChildren:wall?.children?.length||0,logoMeshes,logoColors:new Set(colors).size,setupDom:[...document.querySelectorAll('#yakolakGameSetup,#yakolakGameHud,#yakolakGameScore')].some(e=>getComputedStyle(e).display!=='none')};
+    const game=globalThis.__yakolakGame;
+    const scene=game?.gameGroup?.parent;
+    const room=scene?.getObjectByName?.('yakolak-soft-empty-room');
+    const wall=scene?.getObjectByName?.('yakolak-developer-d1-logo-wall');
+    const table=scene?.getObjectByName?.('yakolak-svg-table')||scene?.getObjectByName?.('yakolak-fallback-simple-table');
+    const colors=[];
+    const logoDepthTests=[];
+    let logoMeshes=0;
+    wall?.traverse?.(object=>{
+      if(!object.isMesh||!object.material)return;
+      logoMeshes++;
+      (Array.isArray(object.material)?object.material:[object.material]).forEach(material=>{
+        if(material.color)colors.push(material.color.getHexString());
+        logoDepthTests.push(material.depthTest===true);
+      });
+    });
+    let tableColor='';
+    table?.traverse?.(object=>{
+      if(tableColor||!object.isMesh||!object.material)return;
+      const material=Array.isArray(object.material)?object.material[0]:object.material;
+      if(material?.color)tableColor=material.color.getHexString();
+    });
+    return{
+      gameVisible:game?.gameGroup?.visible,
+      setupVisible:game?.setupGroup?.visible,
+      visibleBases:['9','3-right','3-left','3-front','3-back'].filter(key=>game?.meshes?.[key]?.visible).length,
+      mainBaseVisible:Boolean(game?.meshes?.['9']?.visible),
+      logoChildren:wall?.children?.length||0,
+      logoMeshes,
+      logoColors:new Set(colors).size,
+      logoDepthSafe:logoDepthTests.length>0&&logoDepthTests.every(Boolean),
+      setupDom:[...document.querySelectorAll('#yakolakGameSetup,#yakolakGameHud,#yakolakGameScore')].some(element=>getComputedStyle(element).display!=='none'),
+      visibleRoomLines:room?.children?.filter(object=>object.isLine&&object.visible).length||0,
+      tableColor,
+      controlsTarget:game?.controls?{x:game.controls.target.x,y:game.controls.target.y,z:game.controls.target.z}:null,
+      entry:globalThis.__yakolakV126Entry||null
+    };
   });
-  if(id==='empty-table'&&runtime.gameVisible!==false)throw new Error('empty table leaked game');
+  if(id==='empty-table'){
+    if(runtime.gameVisible!==false)throw new Error('empty table leaked game');
+    if(state.tableColor!=='#c2c3bf'||runtime.tableColor!=='c2c3bf')throw new Error(`empty table color is not balanced ${state.tableColor}/${runtime.tableColor}`);
+    if(state.roomOutlineLines!=='12'||runtime.visibleRoomLines!==12)throw new Error(`room outlines incomplete ${state.roomOutlineLines}/${runtime.visibleRoomLines}`);
+  }
   if(id==='board-bases'&&(state.visibleObjects!=='5'||runtime.visibleBases!==5))throw new Error('board bases not five');
-  if(id==='logo-wall'&&(state.logoRendering!=='svg-geometry-two-tone'||runtime.logoChildren!==2||runtime.logoMeshes<2||runtime.logoColors<2))throw new Error('logo wall not two-tone');
-  if(id==='unboxing-intro'&&(state.setupHidden!=='true'||runtime.setupVisible!==false||runtime.setupDom))throw new Error('intro setup leaked');
-  if(id==='clean-entry'&&!await page.evaluate(()=>globalThis.__yakolakV126Entry?.phase==='complete'))throw new Error('clean entry incomplete');
+  if(id==='logo-wall'){
+    if(state.logoRendering!=='svg-geometry-two-tone'||runtime.logoChildren!==2||runtime.logoMeshes<2||runtime.logoColors<2)throw new Error('logo wall not two-tone');
+    if(state.zoomContinuity!=='stable-controls-target'||!runtime.controlsTarget||runtime.controlsTarget.x<2200)throw new Error(`logo wall controls target unstable ${JSON.stringify(runtime.controlsTarget)}`);
+    if(!runtime.logoDepthSafe)throw new Error('logo wall ignores room depth');
+  }
+  if(id==='unboxing-intro'){
+    if(state.setupHidden!=='true'||runtime.setupVisible!==false||runtime.setupDom)throw new Error('intro setup leaked');
+    if(state.largeBaseVisible!=='true'||!runtime.mainBaseVisible)throw new Error('intro main play field missing');
+  }
+  if(id==='clean-entry'){
+    if(runtime.entry?.phase!=='complete')throw new Error('clean entry incomplete');
+    if(state.cameraMotion!=='single-position-target-bezier'||state.continuity!=='no-cuts'||runtime.entry?.continuity!=='no-cuts')throw new Error(`clean entry motion contract failed ${JSON.stringify({state,entry:runtime.entry})}`);
+  }
 }
 
 async function catalogCheck(browser){
   const context=await browser.newContext({viewport:{width:1100,height:760},deviceScaleFactor:1}),page=await context.newPage();
   for(const id of scenes){
-    const errors=[];page.removeAllListeners('pageerror');page.on('pageerror',e=>errors.push(String(e)));
+    const errors=[];
+    page.removeAllListeners('pageerror');
+    page.on('pageerror',error=>errors.push(String(error)));
     await page.goto(`${BASE_URL}/developer-scene.html?scene=${id}&d=D1`,{waitUntil:'domcontentloaded',timeout:60000});
-    const state=await waitReady(page);if(id==='unboxing-intro')await page.waitForTimeout(1600);if(errors.length)throw new Error(`${id}: ${errors.join('\n')}`);
-    await sceneRuntime(page,id,state);await page.screenshot({path:path.join(output,`scene-${id}.png`)});results.push(state);
+    const state=await waitReady(page);
+    if(id==='unboxing-intro')await page.waitForTimeout(1600);
+    if(errors.length)throw new Error(`${id}: ${errors.join('\n')}`);
+    await sceneRuntime(page,id,state);
+    await page.screenshot({path:path.join(output,`scene-${id}.png`)});
+    results.push(state);
   }
   for(const id of elements){
-    const errors=[];page.removeAllListeners('pageerror');page.on('pageerror',e=>errors.push(String(e)));
+    const errors=[];
+    page.removeAllListeners('pageerror');
+    page.on('pageerror',error=>errors.push(String(error)));
     await page.goto(`${BASE_URL}/developer-scene.html?element=${id}&d=D1`,{waitUntil:'domcontentloaded',timeout:60000});
     const state=await waitReady(page);
     if(state.developerEntityKind!=='element'||state.developerElement!==id)throw new Error(`${id}: identity`);
     if(id!=='loading-star-element'&&state.mode!=='element')throw new Error(`${id}: mode`);
     if(!['loading-star-element','table'].includes(id)&&state.tableHidden!=='true')throw new Error(`${id}: table backdrop visible`);
+    if(id==='table'&&state.tableColor!=='#c2c3bf')throw new Error(`${id}: reviewed table color missing`);
     if(errors.length)throw new Error(`${id}: ${errors.join('\n')}`);
     if(['base-large','stone-large','table','logo-yakolak'].includes(id))await page.screenshot({path:path.join(output,`element-${id}.png`)});
     results.push(state);
@@ -172,4 +229,4 @@ try{
 }finally{await browser.close()}
 fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({build:'D1',url:BASE_URL,results,failures},null,2));
 if(failures.length)throw new Error(`Developer D1 visual failures: ${JSON.stringify(failures)}`);
-console.log('Developer D1 shared notes, renaming, scenes, and isolated elements passed');
+console.log('Developer D1 all review notes, shared notes, renaming, scenes, and isolated elements passed');
