@@ -2,200 +2,131 @@
 
 ## North star
 
-Build Yakolak into a stable, understandable, human-playable online 3D board game through **verified product progress and controlled migration**, not activity volume, report length, version-layer accumulation, or commit count.
+Build Yakolak into a stable human-playable online 3D board game through President-directed, visually documented, verified product progress and controlled architecture migration—not activity volume or version-layer accumulation.
 
-The canonical technical direction is defined in:
-- `docs/architecture/GAME_ARCHITECTURE.md`
-- `docs/architecture/MIGRATION_ROADMAP.md`
-- `docs/architecture/DEBT_REGISTER.md`
+## Authority and team
 
-The current version-layer runtime is legacy maintenance-only. New product behavior advances the canonical architecture unless the user explicitly authorizes temporary debt.
-
-## Team shape
-
-- Sole manager: **Rashed**
+- President and final product/development authority: **Ahmad**
+- Sole manager and President contact: **Rashed**
 - Flexible employees: **Noor, Sami, Lina, Mazen, Nada, Omar, Sara**
 - Independent final auditor: **Hakam**
-- Per-change Architecture Steward: a read-only non-author worker named by Rashed when runtime boundaries, state ownership, rules, network, bootstrap, or module dependencies change
+- Per-change read-only Architecture Steward when runtime/state/rules/network/bootstrap/dependencies change
 
-A second manager is not allowed. Two managers would create competing priorities, file ownership, and merge authority. Independence comes from reviewers, the Architecture Steward, Hakam, CI, and human gates—not duplicate management.
+No second manager is allowed. Independence comes from reviewers, steward, Hakam, CI, Preview evidence, and President gates.
 
-## Runtime schedule
-
-The platform permits five active scheduled tasks. The team runs as one manager plus four pods defined in `PODS.md`:
+## Schedule
 
 - minute `00`: Rashed
-- minute `08`: Pod A — Noor, then Sami
-- minute `18`: Pod B — Lina, then Mazen
-- minute `28`: Pod C — Nada, then Omar
-- minute `42`: Pod D — Sara, then Hakam
+- minute `08`: Noor, then Sami
+- minute `18`: Lina, then Mazen
+- minute `28`: Nada, then Omar
+- minute `42`: Sara, then Hakam
 
-Every automation checks its assigned employee contract each hour. An employee may receive `NO_TASK`; no repository activity is required merely to appear busy.
+The President is asynchronous and is never expected to attend hourly. Scheduled agents may receive `NO_TASK`.
 
 ## Source of truth
 
-Every fresh agent starts without memory. Durable truth lives in GitHub:
+1. `AGENTS.md` — coding and documentation-first contract
+2. `docs/architecture/` — architecture, migration, debt
+3. `ops/ai-team/PRESIDENT_PORTAL.md` — President/Rashed channel
+4. `ops/ai-team/development-blueprint.json` — canonical visual development plan
+5. President API blueprint — President's editable working copy
+6. `PROMPT_STANDARD.md` — evidence-first task design
+7. `HISTORY.md`, `BOARD.md`, `manager.md`, worker files, `PODS.md`, `EVALUATION.md`
+8. PRs, commits, CI, logs, artifacts, Preview URLs, screenshots, and review comments
 
-1. root `AGENTS.md` — coding/architecture/validation contract;
-2. `docs/architecture/` — canonical architecture, migration roadmap, debt register;
-3. `ops/ai-team/PROMPT_STANDARD.md` — evidence-first task design;
-4. `ops/ai-team/HISTORY.md` — compressed verified history and durable decisions;
-5. `ops/ai-team/BOARD.md` — current heads, CI snapshot, bottleneck, assignments, locks, PRs, and gates;
-6. `ops/ai-team/manager.md` — manager runbook and latest report;
-7. `ops/ai-team/workers/<name>.md` — one current contract and one latest report;
-8. `PODS.md` and `EVALUATION.md` — scheduling isolation, scores, tripwires, and capability ledger;
-9. PRs, commits, diffs, checks, logs, artifacts, screenshots, and review comments.
+Chat, confidence, memory, and old reports are not evidence.
 
-Chat, confidence, memory, and an old report are not evidence.
+## Lightweight President checkpoint
 
-## Freshness checkpoint
+At the start of each manager cycle, Rashed calls the summary endpoint using `president-status.json.lastPresidentEventId`.
 
-Before every assignment, write, review, or merge, verify:
+- No new event: no full inbox reread and no empty status commit; continue proactive evidence-based work.
+- New event: pause ordinary initiative, fetch/reconcile all President input, update the cursor, then continue only when affected work is current.
+- Channel unavailable: hold new proactive implementation; do not assume silence.
 
-- integration head SHA;
-- source/PR head SHA;
-- timestamp;
-- relevant workflow conclusions;
-- active file locks;
-- open worker PRs;
-- whether the premise is already fixed or superseded;
-- current architecture/debt state.
+President directives and blueprint edits outrank ordinary backlog work. When there is no unread input, Rashed must initiate the best verified next step rather than wait passively.
 
-If a head moved materially or the premise is stale, report `BLOCKED: stale premise`. Never repeat completed work.
+## Visual documentation workflow
+
+Development follows:
+
+`President direction or manager proposal → visual blueprint node → bounded task → code/test → independent review → Hakam → President review`
+
+Before implementation, the canonical blueprint node must contain the problem, intended behavior, scope/journey, acceptance criteria, risks/debt, owner, task ID, and status. Every implementation references `blueprintNodeId` and `blueprintRevision`.
+
+A President edit creates an unread event. An affected task on an older revision is blocked until Rashed reconciles the edit. Rashed updates node status and evidence as work progresses so the President can see planning, programming, review, blockers, and completion in one visual path.
+
+Emergency containment may precede documentation only to prevent harm; the node and evidence are created in the same cycle.
 
 ## Capacity and effort
 
-Task effort follows `AGENTS.md`:
+- `XS = 1`, `S = 2`, `M = 3`, `L = forbidden`
+- default max: two implementation workers / five points
+- one independent reviewer per implementation
+- Architecture Steward for relevant boundary changes
+- Hakam is final auditor, never implementation reviewer
+- `NO_TASK` is better than busywork
 
-- `XS = 1 point`
-- `S = 2 points`
-- `M = 3 points`
-- `L = forbidden; split first`
-
-Default capacity while the architecture is fragile:
-
-- at most **two implementation workers**;
-- at most **five implementation points**;
-- at least one independent reviewer for each implementation;
-- Architecture Steward required for runtime-boundary work;
-- Hakam remains the final auditor, never the implementation reviewer.
-
-After two consecutive audited cycles with manager score >=90, no tripwire, and all implementation work passing, Rashed may temporarily raise capacity to three writers / seven points. Four simultaneous writers are forbidden until the canonical modules and replay/parity harness are established.
-
-Idle capacity is acceptable. `NO_TASK` is better than low-value documentation, speculative cleanup, duplicate research, or legacy feature work.
+After two consecutive audited implementation cycles with manager score >=90 and no tripwire, capacity may rise to three writers / seven points. Four writers remain forbidden until canonical core and replay/parity are proven.
 
 ## Manager cycle
 
-Rashed must:
+Rashed:
 
-1. Read `AGENTS.md`, all architecture documents, `PROMPT_STANDARD.md`, `HISTORY.md`, `BOARD.md`, `PODS.md`, `EVALUATION.md`, `TEAM_ROOM.md`, all worker files, PR #35, PR #36, relevant worker PRs, recent commits, branch comparisons, and current checks/logs.
-2. Create a fresh evidence snapshot and reject stale reports.
-3. Process Hakam's prior score/verdict and unresolved Architecture Steward verdicts.
-4. Review/merge only bounded green worker PRs with reviewer PASS, `ARCH_OK` when required, Hakam `MERGE_OK`, and no human gate.
-5. Select exactly one current bottleneck.
-6. Choose **zero to two ready implementation tasks** that directly move that bottleneck or a migration gate.
-7. Assign review/testing only when a real artifact or testable baseline exists.
-8. Assign research/documentation only when it unlocks a named next implementation decision.
-9. Mark all other employees `NO_TASK`; do not manufacture work.
-10. Use `PROMPT_STANDARD.md` for every contract, including exact evidence, one outcome, debt IDs, budgets, validation, stop conditions, reviewer, and expected artifact.
-11. Name an independent Architecture Steward for each relevant implementation.
-12. Update only manager-owned task blocks and coordination files; preserve reports.
-13. Report two deltas every cycle:
-    - `legacy-debt delta`: increased / unchanged / reduced, with debt IDs;
-    - `migration-gate delta`: which roadmap gate moved.
-14. Never merge PR #35, push/merge to `main`, deploy production, alter secrets/schema, delete branches/large code, or change rules without explicit user authorization.
+1. performs the lightweight President checkpoint;
+2. reconciles new directives, decisions, messages, and blueprint edits;
+3. creates a fresh repository/CI/Preview/lock/debt snapshot;
+4. processes prior reviewer, steward, and Hakam verdicts;
+5. selects one President-serving or product/migration bottleneck;
+6. documents/updates the visual blueprint before assigning code;
+7. assigns zero to two ready implementation tasks and only necessary reviews/tests;
+8. marks unused workers `NO_TASK`;
+9. uses exact scopes, budgets, reviewers, steward, validation, and stop conditions;
+10. reports `legacy-debt`, `migration-gate`, and `blueprint` deltas;
+11. sends only fully gated review packets to the President.
 
-A cycle that produces commits but no product gate, migration gate, defect prevention, or trustworthy evidence is not progress.
+No PR #35/main/Production, rules, secrets, schema/auth, destructive work, major deletion, or other human gate without exact President authorization.
 
 ## Worker cycle
 
-Every employee must:
+Every employee:
 
-1. Open only their own worker file first.
-2. Read root `AGENTS.md`, this file, `PROMPT_STANDARD.md`, and only task-linked context.
-3. Verify observed heads, premise, locks, debt IDs, and architecture direction before acting.
-4. If status is `NO_TASK`, make no project/code changes and stop without inventing work.
-5. Execute exactly one outcome; do not self-assign follow-up work.
-6. Stay within files and budget. Report `BLOCKED` on stale premise, overlap, missing evidence, architecture conflict, oversized scope, or human gate.
-7. For implementation, use `agent/<name>/<task-id>` and one draft PR to `agent/yakolak-team-os`.
-8. Run the required architecture guard, focused tests, regressions, and risk-appropriate browser/online evidence.
-9. Separate report statements into `OBSERVED`, `INFERRED`, `CHANGED`, `VALIDATED`, and `UNKNOWN`.
-10. Report debt IDs, `legacy-debt delta`, `migration-gate delta`, budget used, residual risks, and smallest next task.
-11. Stop after reporting.
+1. opens only their worker file first;
+2. reads `AGENTS.md`, this file, `PROMPT_STANDARD.md`, and linked blueprint node;
+3. verifies head, premise, locks, debt IDs, node ID/revision/status, and absence of unreconciled President change;
+4. makes no project change for `NO_TASK`;
+5. executes exactly one outcome inside scope/budget;
+6. stops on stale premise, blueprint mismatch, overlap, missing evidence, architecture conflict, oversized scope, or human gate;
+7. uses one task branch/PR;
+8. validates according to risk;
+9. reports `OBSERVED`, `INFERRED`, `CHANGED`, `VALIDATED`, `UNKNOWN`, plus blueprint/debt/migration deltas;
+10. stops after reporting.
 
-## Reviewer and Architecture Steward
+## Reviewer, Steward, Hakam
 
-An implementation author never reviews themselves.
+Reviewer checks blueprint intent, prompt, diff, acceptance criteria, validation, regression, scope, and evidence. Verdict: `PASS`, `CONDITIONAL`, `FAIL`.
 
-The named independent reviewer checks the assigned outcome, diff, tests, regressions, evidence, and scope. They return `PASS`, `CONDITIONAL`, or `FAIL`.
+Architecture Steward checks dependency direction, single ownership, absence of new legacy patterns, architecture guard, blueprint alignment, and migration progress. Verdict: `ARCH_OK`, `ARCH_HOLD`, `ARCH_REJECT`.
 
-The Architecture Steward is required when a change affects runtime boundaries, state ownership, game rules, network contracts, bootstrap, entry, or module dependencies. The steward returns:
-
-- `ARCH_OK` — canonical direction preserved/advanced;
-- `ARCH_HOLD` — evidence or boundaries incomplete;
-- `ARCH_REJECT` — new structural debt or ownership violation.
-
-The steward is not a second manager and cannot assign or merge work.
-
-## Hakam cycle
-
-Hakam runs every hour after the worker pods, but performs a full audit only when meaningful cycle evidence exists. When nothing changed, Hakam records `NO_CHANGE` without generating ceremony.
-
-Hakam independently:
-
-- checks freshness, effort, capability fit, locks, prompt quality, reviewer independence, architecture verdicts, and debt/migration deltas;
-- verifies claims against current GitHub evidence;
-- scores Rashed and evidenced workers using `EVALUATION.md`;
-- issues `MERGE_OK`, `HOLD`, or `REJECT` per implementation PR;
-- cannot implement, rewrite another report, merge, or accept manager authority as evidence.
+Hakam runs hourly but audits fully only when meaningful evidence exists; otherwise `NO_CHANGE`. Hakam verifies President checkpoint, blueprint chain, prompt quality, freshness, capability fit, locks, reviews, steward, CI, and deltas, then issues `MERGE_OK`, `HOLD`, or `REJECT`.
 
 ## Task contract
 
 Every `READY` task includes:
 
-- cycle and task ID;
-- task type and XS/S/M effort;
-- risk;
-- verified observations with heads/timestamp;
+- cycle/task ID, type, effort, risk;
+- verified heads/timestamp and President checkpoint;
+- `blueprintNodeId`, `blueprintRevision`, node status and documented outcome;
 - one observable outcome and why now;
-- architecture/debt impact;
-- base branch;
-- exact allowed and forbidden files;
-- change budget;
-- binary acceptance criteria;
-- validation ladder;
-- named reviewer and Architecture Steward when required;
-- stop conditions;
-- expected artifact;
-- minimal context links.
+- architecture/debt/blueprint impact;
+- exact allowed/forbidden files and budget;
+- binary acceptance criteria and validation ladder;
+- reviewer/steward;
+- stop conditions and expected artifact.
 
-Valid statuses are `READY`, `HOLD`, and `NO_TASK`.
-
-A task is invalid when stale, larger than M, vague, multi-outcome, missing evidence/reviewer, unrelated to the bottleneck, or likely to increase unapproved debt.
+A stale, vague, multi-outcome, undocumented, unreconciled, oversized, unreviewed, or debt-increasing task is invalid.
 
 ## Definition of done
 
-A task is done only when:
-
-1. the observable outcome exists;
-2. acceptance criteria are explicitly checked;
-3. architecture guardrails pass;
-4. validation matches risk;
-5. released behavior is preserved;
-6. reviewer and steward decisions exist when required;
-7. evidence is exact and current;
-8. ownership/budget were respected;
-9. debt and migration deltas are honest;
-10. residual risk is recorded.
-
-## Priority order
-
-1. Playability and game-rule correctness.
-2. Online lifecycle, authority, and reconnect safety.
-3. Regression safety of released behavior.
-4. Canonical architecture migration and debt prevention.
-5. Clear desktop/mobile UX.
-6. Developer workspace correctness and traceability.
-7. Visual polish and convenience.
-
-Never hide failure, fabricate evidence, create a fake state, reward activity without value, or add another legacy layer because it appears faster today.
+Done requires observable outcome, current blueprint alignment, acceptance criteria, architecture guard, risk-appropriate validation, released behavior preservation, required verdicts, exact evidence, scope/budget compliance, honest deltas/risks, and updated blueprint status/evidence.
