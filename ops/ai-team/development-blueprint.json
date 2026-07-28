@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "revision": 3,
+  "updatedAt": "2026-07-28T21:55:00+03:00",
+  "updatedBy": "Rashed",
+  "title": "مسار تطوير ياكلك",
+  "nodes": [
+    {
+      "id": "goal-online-yakolak",
+      "type": "goal",
+      "title": "ياكلك لعبة بشرية قابلة للعب أونلاين",
+      "body": "الهدف الأعلى الذي يقرره الرئيس: تجربة واضحة ومستقرة على الجوال والكمبيوتر، بقواعد مشتركة، جلسات قابلة للاستعادة، ومراجعة بشرية قبل النشر.",
+      "status": "documented",
+      "owner": "President",
+      "taskId": "",
+      "evidenceUrl": "",
+      "x": 980,
+      "y": 60,
+      "revision": 1
+    },
+    {
+      "id": "leadership-delegated-rashed",
+      "type": "decision",
+      "title": "راشد نائب الرئيس وقائد التطوير المفوض",
+      "body": "في غياب أي إشارة جديدة من الرئيس، يقود راشد الاستراتيجية والمبادرات والتخطيط والتفويض والمراجعة والدمج داخل الصلاحيات القابلة للرجوع. راشد لا ينفذ كود المنتج بنفسه؛ الفريق ينفذ وهو يقود ويقرر.",
+      "status": "documented",
+      "owner": "Rashed",
+      "taskId": "leadership-standing-mandate",
+      "evidenceUrl": "",
+      "x": 980,
+      "y": 260,
+      "revision": 1
+    },
+    {
+      "id": "track-canonical-architecture",
+      "type": "decision",
+      "title": "الهجرة إلى معمارية نظيفة بلا طبقات ترقيع جديدة",
+      "body": "أول شريحة تنفيذية للهجرة: تعريف Action وAppState وEffect وRenderSnapshot مع انتقال حتمي Boot → Entry → Mode واختبارات Node، بلا DOM أو Three.js أو شبكة أو wrappers.",
+      "status": "in_progress",
+      "owner": "Noor",
+      "taskId": "YAK-004-01",
+      "evidenceUrl": "",
+      "x": 300,
+      "y": 520,
+      "revision": 2
+    },
+    {
+      "id": "track-visual-development",
+      "type": "scene",
+      "title": "واجهة الرئيس ومسار التطوير البصري",
+      "body": "كل هدف أو مبادرة أو قرار يوثق بصريًا أولًا، ويبقى قابلًا لتعديل الرئيس، ثم يرتبط بمهام الفريق والمراجعات والأدلة والتاريخ.",
+      "status": "in_progress",
+      "owner": "Rashed",
+      "taskId": "president-portal",
+      "evidenceUrl": "",
+      "x": 980,
+      "y": 520,
+      "revision": 2
+    },
+    {
+      "id": "initiative-president-signal-cursor",
+      "type": "task",
+      "title": "فحص خفيف لمعرفة هل لدى الرئيس جديد",
+      "body": "ينفذه الفريق لاحقًا: cursor/summary يتيح لراشد معرفة وجود تعليمات أو تعقيبات أو قرارات جديدة دون إعادة قراءة القناة كاملة. عند وجود جديد يصالحه؛ وعند عدم وجوده يكمل القيادة.",
+      "status": "documented",
+      "owner": "Rashed",
+      "taskId": "future-president-signal-summary",
+      "evidenceUrl": "",
+      "x": 720,
+      "y": 780,
+      "revision": 1
+    },
+    {
+      "id": "initiative-editable-visual-blueprint",
+      "type": "task",
+      "title": "وايت بورد مرجعي قابل لتعديل الرئيس",
+      "body": "ينفذه الفريق لاحقًا: عرض الرؤية والمبادرات والمشاهد والمهام والقرارات والمخاطر والأدلة كمسار واحد؛ كل تعديل من الرئيس يصبح amendment يصالحه راشد قبل استمرار العمل المتأثر.",
+      "status": "documented",
+      "owner": "Rashed",
+      "taskId": "future-editable-blueprint",
+      "evidenceUrl": "",
+      "x": 1240,
+      "y": 780,
+      "revision": 1
+    },
+    {
+      "id": "initiative-president-return-brief",
+      "type": "task",
+      "title": "ملخص عودة الرئيس وميزانية انتباهه",
+      "body": "ينفذه الفريق لاحقًا: يعرض ما تحقق، قرارات راشد، تغييرات المسار، المخاطر، وثلاثة عناصر كحد أقصى تحتاج مراجعة أو قرارًا، مع توصية راشد الواضحة.",
+      "status": "documented",
+      "owner": "Rashed",
+      "taskId": "future-president-return-brief",
+      "evidenceUrl": "",
+      "x": 1760,
+      "y": 780,
+      "revision": 1
+    },
+    {
+      "id": "track-online-session",
+      "type": "task",
+      "title": "جلسة أونلاين موثوقة وقابلة للاستعادة",
+      "body": "توحيد سلطة الخادم، الدور، إعادة الاتصال، الجولات وإعادة اللعب عبر نفس Game Core، مع اختبار عميلين فعليين قبل الاعتماد.",
+      "status": "documented",
+      "owner": "Rashed",
+      "taskId": "future-online-slice",
+      "evidenceUrl": "",
+      "x": 300,
+      "y": 1040,
+      "revision": 1
+    }
+  ],
+  "edges": [
+    {"id": "edge-goal-leadership", "from": "goal-online-yakolak", "to": "leadership-delegated-rashed", "label": "يضمن استمرار القيادة"},
+    {"id": "edge-leadership-architecture", "from": "leadership-delegated-rashed", "to": "track-canonical-architecture", "label": "يقود"},
+    {"id": "edge-leadership-visual", "from": "leadership-delegated-rashed", "to": "track-visual-development", "label": "يوثق ويوجه"},
+    {"id": "edge-visual-cursor", "from": "track-visual-development", "to": "initiative-president-signal-cursor", "label": "يرصد الإشارات"},
+    {"id": "edge-visual-blueprint", "from": "track-visual-development", "to": "initiative-editable-visual-blueprint", "label": "يعرض المسار"},
+    {"id": "edge-visual-return", "from": "track-visual-development", "to": "initiative-president-return-brief", "label": "يلخص للرئيس"},
+    {"id": "edge-architecture-online", "from": "track-canonical-architecture", "to": "track-online-session", "label": "يمكّن"}
+  ]
+}
