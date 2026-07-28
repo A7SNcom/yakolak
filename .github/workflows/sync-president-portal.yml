@@ -1,0 +1,28 @@
+name: Sync President Portal Branch
+
+on:
+  push:
+    branches:
+      - agent/president-portal
+    paths:
+      - '.github/workflows/sync-president-portal.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/president-portal
+          fetch-depth: 0
+      - name: Merge latest team OS without discarding portal resolutions
+        run: |
+          git config user.name "Yakolak Branch Sync"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin agent/yakolak-team-os
+          git merge --no-ff -X ours origin/agent/yakolak-team-os -m "chore: sync latest team OS into President portal"
+          git push origin HEAD:agent/president-portal
