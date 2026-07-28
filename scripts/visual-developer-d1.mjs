@@ -9,6 +9,22 @@ const scenes=['loading-star','empty-table','logo-wall','board-bases','clean-entr
 const elements=['base-large','base-small','stone-large','stone-medium','stone-small','loading-star-element','table','logo-yakolak','logo-mtkyf'];
 const results=[],failures=[];
 
+async function capture(page,fileName,options={}){
+  let lastError;
+  for(let attempt=0;attempt<3;attempt++){
+    try{
+      await page.bringToFront();
+      await page.waitForTimeout(180+attempt*180);
+      await page.screenshot({path:path.join(output,fileName),...options});
+      return;
+    }catch(error){
+      lastError=error;
+      await page.waitForTimeout(300+attempt*300);
+    }
+  }
+  throw lastError;
+}
+
 async function mockStore(context){
   const store=new Map();
   await context.route('**/api/developer-d1',async route=>{
@@ -76,7 +92,7 @@ async function galleryCheck(browser,label,options){
   if(await page.locator('.scene-card:visible').count()!==6)throw new Error(`${label}: expected 6 scenes`);
   await waitPreview(page.locator('[data-scene="loading-star"]'));
   await waitPreview(page.locator('[data-scene="unboxing-intro"]'));
-  await page.screenshot({path:path.join(output,`${label}-01-scenes.png`),fullPage:true});
+  await capture(page,`${label}-01-scenes.png`,{fullPage:true});
   await page.getByRole('button',{name:'مشهد واحد'}).click();
   if(await page.locator('.scene-card:visible').count()!==4)throw new Error(`${label}: single filter`);
   await page.getByRole('button',{name:'مجموعة مشاهد'}).click();
@@ -85,7 +101,7 @@ async function galleryCheck(browser,label,options){
   if(await page.locator('.scene-card:visible').count()!==9)throw new Error(`${label}: elements filter`);
   await waitPreview(page.locator('[data-element="base-large"]'));
   await waitPreview(page.locator('[data-element="loading-star-element"]'));
-  await page.screenshot({path:path.join(output,`${label}-02-elements.png`),fullPage:true});
+  await capture(page,`${label}-02-elements.png`,{fullPage:true});
   await page.getByRole('button',{name:'كل المشاهد'}).click();
 
   const sceneName=`إنترو العلبة ${label}`,sceneNote=`${label} · افصل الإنترو عن إعداد اللاعبين`;
@@ -95,7 +111,7 @@ async function galleryCheck(browser,label,options){
   await openEditor(page);
   if(await page.locator('#devCodeKey').textContent()!=='scene.unboxing-intro')throw new Error(`${label}: scene code key`);
   await saveEditor(page,sceneName,sceneNote);
-  await page.screenshot({path:path.join(output,`${label}-03-shared-editor.png`)});
+  await capture(page,`${label}-03-shared-editor.png`);
   await page.getByRole('button',{name:'إغلاق المحرر'}).click();
   await closeEntity(page);
   if(await page.locator('[data-scene="unboxing-intro"] .scene-title').textContent()!==sceneName)throw new Error(`${label}: renamed scene did not update`);
@@ -191,32 +207,38 @@ async function sceneRuntime(page,id,state){
 }
 
 async function catalogCheck(browser){
-  const context=await browser.newContext({viewport:{width:1100,height:760},deviceScaleFactor:1}),page=await context.newPage();
+  const context=await browser.newContext({viewport:{width:1100,height:760},deviceScaleFactor:1});
   for(const id of scenes){
-    const errors=[];
-    page.removeAllListeners('pageerror');
+    const page=await context.newPage(),errors=[];
     page.on('pageerror',error=>errors.push(String(error)));
-    await page.goto(`${BASE_URL}/developer-scene.html?scene=${id}&d=D1`,{waitUntil:'domcontentloaded',timeout:60000});
-    const state=await waitReady(page);
-    if(id==='unboxing-intro')await page.waitForTimeout(1600);
-    if(errors.length)throw new Error(`${id}: ${errors.join('\n')}`);
-    await sceneRuntime(page,id,state);
-    await page.screenshot({path:path.join(output,`scene-${id}.png`)});
-    results.push(state);
+    try{
+      await page.goto(`${BASE_URL}/developer-scene.html?scene=${id}&d=D1`,{waitUntil:'domcontentloaded',timeout:60000});
+      const state=await waitReady(page);
+      if(id==='unboxing-intro')await page.waitForTimeout(1600);
+      if(errors.length)throw new Error(`${id}: ${errors.join('\n')}`);
+      await sceneRuntime(page,id,state);
+      await capture(page,`scene-${id}.png`);
+      results.push(state);
+    }finally{
+      await page.close();
+    }
   }
   for(const id of elements){
-    const errors=[];
-    page.removeAllListeners('pageerror');
+    const page=await context.newPage(),errors=[];
     page.on('pageerror',error=>errors.push(String(error)));
-    await page.goto(`${BASE_URL}/developer-scene.html?element=${id}&d=D1`,{waitUntil:'domcontentloaded',timeout:60000});
-    const state=await waitReady(page);
-    if(state.developerEntityKind!=='element'||state.developerElement!==id)throw new Error(`${id}: identity`);
-    if(id!=='loading-star-element'&&state.mode!=='element')throw new Error(`${id}: mode`);
-    if(!['loading-star-element','table'].includes(id)&&state.tableHidden!=='true')throw new Error(`${id}: table backdrop visible`);
-    if(id==='table'&&state.tableColor!=='#c2c3bf')throw new Error(`${id}: reviewed table color missing`);
-    if(errors.length)throw new Error(`${id}: ${errors.join('\n')}`);
-    if(['base-large','stone-large','table','logo-yakolak'].includes(id))await page.screenshot({path:path.join(output,`element-${id}.png`)});
-    results.push(state);
+    try{
+      await page.goto(`${BASE_URL}/developer-scene.html?element=${id}&d=D1`,{waitUntil:'domcontentloaded',timeout:60000});
+      const state=await waitReady(page);
+      if(state.developerEntityKind!=='element'||state.developerElement!==id)throw new Error(`${id}: identity`);
+      if(id!=='loading-star-element'&&state.mode!=='element')throw new Error(`${id}: mode`);
+      if(!['loading-star-element','table'].includes(id)&&state.tableHidden!=='true')throw new Error(`${id}: table backdrop visible`);
+      if(id==='table'&&state.tableColor!=='#c2c3bf')throw new Error(`${id}: reviewed table color missing`);
+      if(errors.length)throw new Error(`${id}: ${errors.join('\n')}`);
+      if(['base-large','stone-large','table','logo-yakolak'].includes(id))await capture(page,`element-${id}.png`);
+      results.push(state);
+    }finally{
+      await page.close();
+    }
   }
   await context.close();
 }
