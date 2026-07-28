@@ -7,98 +7,156 @@ const output=path.resolve('artifacts/developer-d1');
 fs.mkdirSync(output,{recursive:true});
 
 const sceneIds=['loading-star','empty-table','logo-wall','board-bases','clean-entry','unboxing-intro'];
+const elementIds=['base-large','base-small','stone-large','stone-medium','stone-small','loading-star-element','table','logo-yakolak','logo-mtkyf'];
 const failures=[];
 const results=[];
+
+async function installStoreMock(context){
+  const store=new Map();
+  await context.route('**/api/developer-d1',async route=>{
+    const request=route.request();
+    if(request.method()==='GET'){
+      await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,entities:[...store.values()]})});
+      return;
+    }
+    if(request.method()==='POST'){
+      const body=request.postDataJSON();
+      const key=`${body.entityType}:${body.entityId}`;
+      const previous=store.get(key);
+      const entity={
+        entityType:body.entityType,
+        entityId:body.entityId,
+        sourceKey:body.sourceKey||'',
+        displayName:body.displayName||'',
+        notes:body.notes||'',
+        version:(previous?.version||0)+1,
+        createdAt:previous?.createdAt||new Date().toISOString(),
+        updatedAt:new Date().toISOString()
+      };
+      store.set(key,entity);
+      await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,entity})});
+      return;
+    }
+    await route.fulfill({status:405,contentType:'application/json',body:JSON.stringify({ok:false,error:'method_not_allowed'})});
+  });
+  return store;
+}
 
 async function waitSceneReady(page,timeout=120000){
   await page.waitForFunction(()=>document.body.dataset.sceneReady==='true'||Boolean(document.body.dataset.sceneError),null,{timeout});
   const state=await page.evaluate(()=>({...document.body.dataset}));
-  if(state.sceneError)throw new Error(`${state.developerScene} failed: ${state.sceneError}`);
-  if(state.sceneReady!=='true')throw new Error(`${state.developerScene} never became ready`);
+  if(state.sceneError)throw new Error(`${state.developerEntity||state.developerScene} failed: ${state.sceneError}`);
+  if(state.sceneReady!=='true')throw new Error(`${state.developerEntity||state.developerScene} never became ready`);
   return state;
 }
 
 async function waitCardPreview(card,timeout=120000){
   await card.scrollIntoViewIfNeeded();
   await card.locator('iframe').waitFor({state:'attached'});
-  await card.page().waitForFunction(element=>element.classList.contains('preview-ready')||element.classList.contains('preview-error'),await card.elementHandle(),{timeout});
+  const handle=await card.elementHandle();
+  await card.page().waitForFunction(element=>element.classList.contains('preview-ready')||element.classList.contains('preview-error'),handle,{timeout});
   const state=await card.getAttribute('data-preview-state');
-  if(state!=='ready')throw new Error(`preview ${await card.getAttribute('data-scene')} failed`);
+  if(state!=='ready')throw new Error(`preview ${await card.getAttribute('data-entity-id')} failed`);
 }
 
-async function openGalleryScene(page,id){
-  await page.locator(`[data-scene="${id}"] .scene-open`).click();
+async function openGalleryEntity(page,selector){
+  await page.locator(`${selector} .scene-open`).click();
   await page.locator('#devStage.open').waitFor();
   const frame=page.frameLocator('#devStageFrame');
   await frame.locator('body[data-scene-ready="true"]').waitFor({timeout:120000});
   return frame;
 }
 
-async function closeGalleryScene(page){
+async function closeGalleryEntity(page){
   await page.getByRole('button',{name:/العودة للمعرض/}).click();
   await page.locator('#devStage').waitFor({state:'hidden'});
-  await page.waitForFunction(()=>!location.hash.startsWith('#scene='));
 }
 
-async function writeSceneNote(page,text){
-  await page.getByRole('button',{name:'فتح الملاحظات'}).click();
-  await page.locator('#devNotesPanel.open').waitFor();
-  await page.locator('#devNotesInput').fill(text);
-  await page.waitForFunction(()=>document.getElementById('devNotesStatus')?.textContent==='تم الحفظ');
+async function openEditorFromStage(page){
+  await page.getByRole('button',{name:'فتح الملاحظات والتسمية'}).click();
+  await page.locator('#devEditor.open').waitFor();
+}
+
+async function saveEditor(page,name,note){
+  await page.locator('#devNameInput').fill(name);
+  await page.locator('#devNotesInput').fill(note);
+  await page.locator('#devSave').click();
+  await page.waitForFunction(()=>document.getElementById('devEditorStatus')?.textContent==='تم الحفظ في المخزن المشترك');
 }
 
 async function checkGallery(browser,name,contextOptions){
   const context=await browser.newContext(contextOptions);
+  const store=await installStoreMock(context);
   const page=await context.newPage();
   const pageErrors=[];
   page.on('pageerror',error=>pageErrors.push(String(error?.stack||error)));
   await page.goto(`${BASE_URL}/developer.html`,{waitUntil:'domcontentloaded',timeout:60000});
-  await page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('yakolak:developer-d1:scene-note:')).forEach(key=>localStorage.removeItem(key)));
+  await page.evaluate(()=>localStorage.removeItem('yakolak:developer-d1:shared-review:v1'));
   await page.reload({waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>document.body.dataset.developerBuild==='D1');
+  await page.waitForFunction(()=>document.body.dataset.developerBuild==='D1'&&document.body.dataset.developerSharedReady==='true');
+
   const cards=page.locator('.scene-card');
-  if(await cards.count()!==6)throw new Error(`${name}: expected 6 scene cards`);
-  for(let index=0;index<6;index++)await waitCardPreview(cards.nth(index));
-  await page.locator('.scene-card').first().scrollIntoViewIfNeeded();
-  await page.screenshot({path:path.join(output,`${name}-01-gallery.png`),fullPage:true});
+  if(await cards.count()!==15)throw new Error(`${name}: expected 15 total scene and element cards`);
+  if(await page.locator('.scene-card:visible').count()!==6)throw new Error(`${name}: all-scenes tab did not show 6 cards`);
+  for(const id of sceneIds)await waitCardPreview(page.locator(`[data-scene="${id}"]`));
+  await page.locator('.scene-card:visible').first().scrollIntoViewIfNeeded();
+  await page.screenshot({path:path.join(output,`${name}-01-scenes.png`),fullPage:true});
 
   await page.getByRole('button',{name:'مشهد واحد'}).click();
   if(await page.locator('.scene-card:visible').count()!==4)throw new Error(`${name}: single filter did not show 4 cards`);
   await page.getByRole('button',{name:'مجموعة مشاهد'}).click();
   if(await page.locator('.scene-card:visible').count()!==2)throw new Error(`${name}: sequence filter did not show 2 cards`);
+  await page.getByRole('button',{name:'العناصر'}).click();
+  if(await page.locator('.scene-card:visible').count()!==9)throw new Error(`${name}: elements filter did not show 9 cards`);
+  await waitCardPreview(page.locator('[data-element="base-large"]'));
+  await waitCardPreview(page.locator('[data-element="loading-star-element"]'));
+  await page.screenshot({path:path.join(output,`${name}-02-elements.png`),fullPage:true});
   await page.getByRole('button',{name:'كل المشاهد'}).click();
 
-  const unboxingNote=`${name} · ملاحظة إنترو فك العلبة`;
-  const loadingNote=`${name} · ملاحظة مشهد التحميل`;
-  const frame=await openGalleryScene(page,'unboxing-intro');
-  const setupHidden=await frame.locator('body').getAttribute('data-setup-hidden');
-  if(setupHidden!=='true')throw new Error(`${name}: unboxing stage was not isolated`);
-  await writeSceneNote(page,unboxingNote);
-  await page.waitForTimeout(300);
-  await page.screenshot({path:path.join(output,`${name}-02-notes-panel.png`)});
-  await page.getByRole('button',{name:'إغلاق الملاحظات'}).click();
-  await closeGalleryScene(page);
+  const renamedScene=`إنترو العلبة ${name}`;
+  const sceneNote=`${name} · افصل الإنترو عن إعداد اللاعبين`;
+  const frame=await openGalleryEntity(page,'[data-scene="unboxing-intro"]');
+  if(await frame.locator('body').getAttribute('data-setup-hidden')!=='true')throw new Error(`${name}: unboxing stage was not isolated`);
+  await openEditorFromStage(page);
+  if(await page.locator('#devCodeKey').textContent()!=='scene.unboxing-intro')throw new Error(`${name}: scene code mapping missing`);
+  await saveEditor(page,renamedScene,sceneNote);
+  await page.screenshot({path:path.join(output,`${name}-03-shared-editor.png`)});
+  await page.getByRole('button',{name:'إغلاق المحرر'}).click();
+  await closeGalleryEntity(page);
   const unboxingCard=page.locator('[data-scene="unboxing-intro"]');
-  if(!await unboxingCard.evaluate(element=>element.classList.contains('has-note')))throw new Error(`${name}: unboxing note indicator missing`);
+  if((await unboxingCard.locator('.scene-title').textContent())!==renamedScene)throw new Error(`${name}: renamed scene did not update card`);
+  if(!await unboxingCard.evaluate(element=>element.classList.contains('has-note')))throw new Error(`${name}: scene note indicator missing`);
 
-  await openGalleryScene(page,'loading-star');
-  await page.getByRole('button',{name:'فتح الملاحظات'}).click();
-  if(await page.locator('#devNotesInput').inputValue()!=='')throw new Error(`${name}: notes leaked between scenes`);
-  await page.locator('#devNotesInput').fill(loadingNote);
-  await page.waitForFunction(()=>document.getElementById('devNotesStatus')?.textContent==='تم الحفظ');
-  await page.getByRole('button',{name:'إغلاق الملاحظات'}).click();
-  await closeGalleryScene(page);
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>document.body.dataset.developerSharedReady==='true');
+  const restoredScene=page.locator('[data-scene="unboxing-intro"]');
+  if((await restoredScene.locator('.scene-title').textContent())!==renamedScene)throw new Error(`${name}: shared scene name was not restored`);
+  await restoredScene.locator('.scene-edit').click();
+  await page.locator('#devEditor.open').waitFor();
+  if(await page.locator('#devNotesInput').inputValue()!==sceneNote)throw new Error(`${name}: shared scene note was not restored`);
+  await page.getByRole('button',{name:'إغلاق المحرر'}).click();
 
-  await openGalleryScene(page,'unboxing-intro');
-  await page.getByRole('button',{name:'فتح الملاحظات'}).click();
-  const restored=await page.locator('#devNotesInput').inputValue();
-  if(restored!==unboxingNote)throw new Error(`${name}: unboxing note was not restored`);
-  await page.getByRole('button',{name:'إغلاق الملاحظات'}).click();
-  await closeGalleryScene(page);
+  await page.getByRole('button',{name:'العناصر'}).click();
+  const renamedElement=`القاعدة الأم ${name}`;
+  const elementNote=`${name} · الاسم الجديد للقاعدة الكبيرة`;
+  const baseCard=page.locator('[data-element="base-large"]');
+  await baseCard.locator('.scene-edit').click();
+  await page.locator('#devEditor.open').waitFor();
+  if(await page.locator('#devCodeKey').textContent()!=='meshes["9"]')throw new Error(`${name}: element code mapping missing`);
+  await saveEditor(page,renamedElement,elementNote);
+  await page.getByRole('button',{name:'إغلاق المحرر'}).click();
+  if((await baseCard.locator('.scene-title').textContent())!==renamedElement)throw new Error(`${name}: renamed element did not update card`);
+  const elementFrame=await openGalleryEntity(page,'[data-element="base-large"]');
+  if(await elementFrame.locator('body').getAttribute('data-developer-element')!=='base-large')throw new Error(`${name}: base element route failed`);
+  await openEditorFromStage(page);
+  if(await page.locator('#devNotesInput').inputValue()!==elementNote)throw new Error(`${name}: element note did not persist`);
+  await page.getByRole('button',{name:'إغلاق المحرر'}).click();
+  await closeGalleryEntity(page);
 
+  if(store.size!==2)throw new Error(`${name}: expected two shared entities, got ${store.size}`);
   if(pageErrors.length)throw new Error(`${name}: page errors\n${pageErrors.join('\n')}`);
   await context.close();
-  return{name,cards:6,previews:6,single:4,sequence:2,back:true,notes:true,notesIsolated:true};
+  return{name,totalCards:15,scenes:6,elements:9,sharedEntities:2,renaming:true,notes:true};
 }
 
 async function assertScene(page,id,state){
@@ -117,9 +175,7 @@ async function assertScene(page,id,state){
     });
     const table=scene?.getObjectByName?.('yakolak-svg-table')||scene?.getObjectByName?.('yakolak-fallback-simple-table');
     const tableBox=table?new game.THREE.Box3().setFromObject(table):null;
-    const projected=tableBox?[
-      tableBox.min.clone().project(game.camera),tableBox.max.clone().project(game.camera)
-    ]:[];
+    const projected=tableBox?[tableBox.min.clone().project(game.camera),tableBox.max.clone().project(game.camera)]:[];
     return{
       gameGroupVisible:game?.gameGroup?.visible,
       setupVisible:game?.setupGroup?.visible,
@@ -163,6 +219,24 @@ async function checkScenes(browser){
   await context.close();
 }
 
+async function checkElements(browser){
+  const context=await browser.newContext({viewport:{width:1100,height:760},deviceScaleFactor:1});
+  const page=await context.newPage();
+  for(const id of elementIds){
+    const pageErrors=[];
+    page.removeAllListeners('pageerror');
+    page.on('pageerror',error=>pageErrors.push(String(error?.stack||error)));
+    await page.goto(`${BASE_URL}/developer-scene.html?element=${id}&d=D1`,{waitUntil:'domcontentloaded',timeout:60000});
+    const state=await waitSceneReady(page);
+    if(state.developerEntityKind!=='element'||state.developerElement!==id)throw new Error(`${id}: element identity missing`);
+    if(id!=='loading-star-element'&&state.mode!=='element')throw new Error(`${id}: element mode missing`);
+    if(pageErrors.length)throw new Error(`${id}: page errors\n${pageErrors.join('\n')}`);
+    if(['base-large','stone-large','table','logo-yakolak'].includes(id))await page.screenshot({path:path.join(output,`element-${id}.png`)});
+    results.push(state);
+  }
+  await context.close();
+}
+
 const browser=await chromium.launch({headless:true});
 try{
   try{results.push(await checkGallery(browser,'desktop',{viewport:{width:1440,height:900},deviceScaleFactor:1}))}
@@ -171,10 +245,12 @@ try{
   catch(error){failures.push({scope:'mobile-gallery',error:String(error?.stack||error)})}
   try{await checkScenes(browser)}
   catch(error){failures.push({scope:'scene-catalog',error:String(error?.stack||error)})}
+  try{await checkElements(browser)}
+  catch(error){failures.push({scope:'element-catalog',error:String(error?.stack||error)})}
 }finally{
   await browser.close();
 }
 
 fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({build:'D1',url:BASE_URL,results,failures},null,2));
 if(failures.length)throw new Error(`Developer D1 visual failures: ${JSON.stringify(failures)}`);
-console.log('Developer D1 gallery, isolated scenes, and per-scene notes passed');
+console.log('Developer D1 shared notes, renaming, scenes, and elements passed');
