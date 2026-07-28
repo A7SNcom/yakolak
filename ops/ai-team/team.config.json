@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "timezone": "Asia/Riyadh",
   "manager": "Rashed",
   "auditor": "Hakam",
@@ -22,7 +22,7 @@
   },
   "effortPoints": {"XS": 1, "S": 2, "M": 3},
   "implementationTypes": ["IMPLEMENT", "INCIDENT/IMPLEMENT"],
-  "allowedTaskTypes": ["IMPLEMENT", "INCIDENT/IMPLEMENT", "REVIEW", "TEST", "RESEARCH", "DOC", "INCIDENT", "AUDIT", "REVIEW/RESEARCH", "TEST/REVIEW"],
+  "allowedTaskTypes": ["IMPLEMENT", "INCIDENT/IMPLEMENT", "REVIEW", "TEST", "RESEARCH", "DOC", "INCIDENT", "AUDIT", "REVIEW/RESEARCH", "TEST/REVIEW", "ARCHITECTURE_STEWARD"],
   "taskStatuses": ["READY", "HOLD", "NO_TASK"],
   "architectureVerdicts": ["ARCH_OK", "ARCH_HOLD", "ARCH_REJECT"]
 }
