@@ -7,23 +7,23 @@ You are permanently read-only. You must not implement code, open an implementati
 
 <!-- MANAGER TASK:START -->
 ## Manager task
-- Cycle: `005-evidence-reconciliation`
-- Task ID: `YAK-005-04`
+- Cycle: `006-correction-closure`
+- Task ID: `YAK-006-06`
 - Status: `READY_AFTER_REPORTS`
 - Task type: `AUDIT`
 - Effort: `M (3 points)`
 - Risk: `high-process-architecture`
-- Single outcome: audit the refreshed cycle and issue exact verdicts for PR #41, PR #43, and Rashed's process recovery.
-- Required evidence: current integration/PR heads and checks; Sami PASS; Nada exact-head Architecture Steward verdict; Omar verifier diagnosis; Sara exact-head PR #43 evidence; task/report freshness and scope.
+- Single outcome: audit the two bounded corrections and issue exact verdicts for PR #41, Lina's verifier PR, PR #43, and Rashed's cycle-006 management.
+- Required evidence: current integration/PR heads and checks; Noor correction; Sami renewed review; Nada renewed architecture verdict; Lina verifier diff/fixtures; Omar renewed review; current PR #43 CI/Preview state.
 - Acceptance criteria:
-  1. Score Rashed and every evidenced worker; do not score `NO_TASK` as success.
-  2. For PR #41, verify exact head, reviewer PASS, Nada verdict, focused tests, architecture guard, budget, debt/migration deltas, and issue `MERGE_OK | HOLD | REJECT`.
-  3. For PR #43, keep HOLD unless AI Team OS is green, exact-head Preview/evidence exists, independent reviewer PASS exists, and no trust-boundary or human-gate defect remains.
-  4. Verify no product implementation was performed by Rashed and no verifier was weakened.
-  5. Keep PR #35/main/Production and other human gates protected.
-- Forbidden scope: no implementation, merge, coordination edits, acceptance from manager assertion, or substitution of stale evidence.
-- Stop conditions: any required worker report remains pending, head moved materially, or evidence is unavailable.
-- Expected artifact: scores, capability updates, tripwires, required correction, and per-PR verdicts.
+  1. Score Rashed and every evidenced worker; do not reward `NO_TASK` or mere commits.
+  2. PR #41 receives `MERGE_OK` only if external mutability is closed, focused tests/guard pass, Sami PASS, and Nada ARCH_OK.
+  3. Verifier PR receives `MERGE_OK` only if semantic normalization accepts canonical labels, negative fixture proves missing invariants still fail, and Omar PASS exists.
+  4. PR #43 remains HOLD unless exact-head required CI, matching READY Preview, independent reviewer PASS, Sara evidence, and Rashed personal PASS all exist.
+  5. Verify Rashed implemented no product code and crossed no human gate.
+- Forbidden scope: no implementation, merge, coordination edits, stale evidence substitution, or acceptance by manager assertion.
+- Stop conditions: required artifact/report missing, materially moved head, or evidence unavailable.
+- Expected artifact: scores, capability updates, tripwires, per-PR `MERGE_OK | HOLD | REJECT`, and one smallest next correction if needed.
 <!-- MANAGER TASK:END -->
 
 <!-- WORKER REPORT:START -->
