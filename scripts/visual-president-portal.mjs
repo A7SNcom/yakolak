@@ -35,7 +35,7 @@ async function mock(page){
 
 async function verify(viewport,name){
   const browser=await chromium.launch({headless:true});
-  const page=await browser.newPage({viewportSize:viewport});
+  const page=await browser.newPage({viewport});
   await mock(page);
   const errors=[];
   page.on('pageerror',error=>errors.push(String(error)));
@@ -53,7 +53,7 @@ async function verify(viewport,name){
   await page.getByText('رحلة دخول جاهزة للقرار').waitFor();
   if(await page.getByText('يجب ألا تظهر').count())throw new Error(`${name}: invalid review was exposed`);
   if(await page.locator('#presidentReviewCount').textContent()!=='1')throw new Error(`${name}: review gate count is not 1`);
-  await page.screenshot({path:path.join(artifacts,`${name}-reviews.png`),fullPage:true});
+  await page.screenshot({path:path.join(artifacts,`${name}-reviews.png`)});
   await page.getByRole('button',{name:/تعليماتي لراشد/}).click();
   await page.getByText('تطوير مشهد البداية').waitFor();
   await page.getByText('استلم راشد التكليف').waitFor();
@@ -63,7 +63,7 @@ async function verify(viewport,name){
   await page.getByText('اختبار تكليف الرئيس').waitFor();
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
   if(overflow>2)throw new Error(`${name}: horizontal overflow ${overflow}px`);
-  await page.screenshot({path:path.join(artifacts,`${name}-directives.png`),fullPage:true});
+  await page.screenshot({path:path.join(artifacts,`${name}-directives.png`)});
   if(errors.length)throw new Error(`${name}: page errors: ${errors.join(' | ')}`);
   await browser.close();
 }
