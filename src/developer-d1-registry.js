@@ -1,3 +1,5 @@
+import './developer-d1-before-after.js?v=D1-before-after';
+
 export const sceneDefinitions=[
   {id:'loading-star',kind:'scene',type:'single',defaultName:'مشهد التحميل',description:'النجمة المعتمدة بحركة الارتداد والانضغاط والظل.',label:'مشهد واحد',mark:'✦',sourceKey:'scene.loading-star'},
   {id:'empty-table',kind:'scene',type:'single',defaultName:'الغرفة والطاولة',description:'الغرفة المتوازنة مع الطاولة المتوسطة وحدود موحدة على جميع الجدران.',label:'مشهد واحد',mark:'□',sourceKey:'scene.empty-table'},
