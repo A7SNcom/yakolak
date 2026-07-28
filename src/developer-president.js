@@ -46,6 +46,25 @@ function labelStatus(status){
     cancelled:'ملغاة',approved:'معتمدة',needs_changes:'تحتاج تعديل',rejected:'مرفوضة',ready:'بانتظار قرارك'
   })[status]||status;
 }
+function openPortalFor(tab='reviews'){
+  activeTab=tab;
+  openPortal();
+  setTab(tab);
+}
+function wireSingleChannel(){
+  for(const id of['#d4OpenQueue','#d4NewRequest']){
+    const node=$(id);if(node){node.hidden=true;node.setAttribute('aria-hidden','true')}
+  }
+  const task=$('#d4StartTask');
+  if(task){task.innerHTML='<span>كلّف راشد</span><small>تعليمات مرتبطة بالمشهد المفتوح</small>';task.onclick=()=>openPortalFor('directives')}
+  const review=$('#d4ReviewOpen');
+  if(review){review.querySelector('span').textContent='مراجعات راشد';review.onclick=()=>openPortalFor('reviews')}
+  const brief=$('#d4BriefOpen');if(brief){brief.hidden=true;brief.setAttribute('aria-hidden','true')}
+  for(const tab of document.querySelectorAll('[data-drawer-tab="task"],[data-drawer-tab="brief"]')){tab.hidden=true;tab.setAttribute('aria-hidden','true')}
+  const mobileWork=document.querySelector('.d4-mobile-nav [data-mobile-view="work"]');
+  if(mobileWork)mobileWork.onclick=event=>{event.preventDefault();openPortalFor('reviews')};
+  const context=$('#d4ContextTitle');if(context)context.textContent='تواصل مع راشد من قناة واحدة';
+}
 function inject(){
   if($('#presidentPortal'))return;
   document.title='ياكلك · واجهة الرئيس';
@@ -59,6 +78,7 @@ function inject(){
   button.id='d4PresidentOpen';button.className='d4-button ghost president-button';button.type='button';
   button.innerHTML='مكتب الرئيس <b id="d4PresidentCount" class="d4-count" hidden>0</b>';
   actions?.prepend(button);
+  wireSingleChannel();
   document.body.insertAdjacentHTML('beforeend',`
   <section id="presidentPortal" class="president-overlay" aria-hidden="true">
     <header class="president-bar">
@@ -79,7 +99,7 @@ function inject(){
       </main>
     </div>
   </section>`);
-  button.onclick=openPortal;
+  button.onclick=()=>openPortalFor('reviews');
   $('#presidentClose').onclick=closePortal;
   $('#presidentRefresh').onclick=load;
   document.querySelectorAll('[data-president-tab]').forEach(tab=>tab.onclick=()=>setTab(tab.dataset.presidentTab));
@@ -107,6 +127,7 @@ function renderCounts(){
   $('#presidentDirectiveCount').textContent=active;
   $('#d4PresidentCount').textContent=pending;
   $('#d4PresidentCount').hidden=!pending;
+  const hint=$('#d4ReviewHint');if(hint)hint.textContent=pending?`${pending} مراجعة مكتملة من راشد`:'لا توجد نتيجة مكتملة من راشد';
   $('#presidentSummary').innerHTML=`
     <article class="president-stat"><strong>${pending}</strong><span>مراجعات نهائية تنتظر قرارك</span></article>
     <article class="president-stat"><strong>${active}</strong><span>تعليمات مفتوحة عند راشد</span></article>
@@ -255,7 +276,9 @@ function render(){
 async function load(){
   $('#presidentSync').textContent='جارٍ المزامنة';
   try{
-    const [channel,outbox,status]=await Promise.all([json(API),json(OUTBOX),json(MANAGER_STATUS)]);
+    const [channel,outbox,status]=await Promise.all([
+      json(API),json(OUTBOX),json(MANAGER_STATUS)
+    ]);
     state.directives=channel.directives||[];
     state.messages=channel.messages||[];
     state.decisions=channel.decisions||[];
