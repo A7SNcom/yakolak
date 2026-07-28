@@ -79,7 +79,7 @@ async function run(browser,label,options){
     await page.locator('#d3DrawerClose').click();await page.waitForTimeout(260);await page.keyboard.press('Control+K');if(!await page.locator('#d3Search').evaluate(node=>node===document.activeElement))throw new Error('desktop: Ctrl+K did not focus search');
   }else{
     await page.getByRole('button',{name:'العمل'}).click();await page.waitForTimeout(260);const drawer=await page.locator('#d3Drawer').boundingBox();if(!drawer||drawer.x!==0||drawer.width<389||drawer.y>59)throw new Error(`mobile: work drawer is not full and stable ${JSON.stringify(drawer)}`);await page.screenshot({path:path.join(output,'mobile-work.png'),fullPage:true});
-    await page.locator('#d3DrawerClose').click();await page.waitForTimeout(260);await page.getByRole('button',{name:'المحتوى'}).click();await page.waitForTimeout(100);if(!await page.locator('#d3Navigator').isVisible())throw new Error('mobile: content screen unavailable');await page.screenshot({path:path.join(output,'mobile-content.png'),fullPage:true});
+    await page.locator('#d3DrawerClose').click();await page.waitForTimeout(260);await page.locator('.d3-mobile-nav [data-mobile-view="content"]').click();await page.waitForTimeout(100);if(!await page.locator('#d3Navigator').isVisible())throw new Error('mobile: content screen unavailable');await page.screenshot({path:path.join(output,'mobile-content.png'),fullPage:true});
   }
   await context.close();return result;
 }
