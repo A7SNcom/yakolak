@@ -1,9 +1,9 @@
-name: Verify Developer D1
+name: Verify Developer D2
 
 on:
   push:
     branches:
-      - agent/developer-d1-scene-gallery
+      - agent/developer-d2-workbench
   pull_request:
     paths:
       - developer.html
@@ -11,58 +11,51 @@ on:
       - package.json
       - api/developer-d1.js
       - api/developer-d1-workspace.js
-      - src/developer-d1.js
-      - src/developer-d1-workspace.js
-      - src/developer-d1-registry.js
+      - api/developer-d1-comparisons.js
+      - src/developer-d2.js
+      - src/developer-d2.css
+      - src/developer-d2-registry.js
       - src/developer-scene-d1.js
       - src/developer-scene-d1-router.js
-      - src/developer-scene-d1-logo-helper.js
-      - src/app-game-developer-d1.js
-      - scripts/verify-developer-d1.mjs
-      - scripts/verify-developer-d1-workspace.mjs
-      - scripts/visual-developer-d1.mjs
-      - scripts/visual-developer-d1-workspace.mjs
+      - docs/design/developer-d2-**
+      - scripts/verify-developer-d2-workbench.mjs
+      - scripts/visual-developer-d2.mjs
       - .github/workflows/developer-d1.yml
 
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Verify D1 structure and syntax
+      - name: Verify D2 structure and syntax
         run: |
           node --check api/developer-d1.js
           node --check api/developer-d1-workspace.js
-          node --check src/developer-d1-registry.js
-          node --check src/developer-d1.js
-          node --check src/developer-d1-workspace.js
+          node --check api/developer-d1-comparisons.js
+          node --check src/developer-d2-registry.js
+          node --check src/developer-d2.js
           node --check src/developer-scene-d1.js
           node --check src/developer-scene-d1-router.js
-          node --check src/developer-scene-d1-logo-helper.js
-          node --check src/app-game-developer-d1.js
-          node scripts/verify-developer-d1.mjs
-          node scripts/verify-developer-d1-workspace.mjs
+          node scripts/verify-developer-d2-workbench.mjs
       - name: Install Chromium quietly
         run: |
           npm install --no-save --silent playwright >/dev/null 2>&1
           npx playwright install --with-deps chromium >/dev/null 2>&1
-      - name: Start Developer D1 locally
+      - name: Start Developer D2 locally
         run: |
-          python3 -m http.server 4173 > /tmp/developer-d1-server.log 2>&1 &
+          python3 -m http.server 4173 > /tmp/developer-d2-server.log 2>&1 &
           for i in {1..30}; do curl -fsS http://127.0.0.1:4173/developer.html >/dev/null && exit 0; sleep 1; done
-          cat /tmp/developer-d1-server.log
+          cat /tmp/developer-d2-server.log
           exit 1
-      - name: Verify central reviews scenes elements and persisted statuses
-        run: node scripts/visual-developer-d1.mjs
-      - name: Verify requests no-auto-board whiteboard replay and published preview
-        run: node scripts/visual-developer-d1-workspace.mjs
+      - name: Verify desktop mobile compare queue and preview
+        run: node scripts/visual-developer-d2.mjs
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: developer-d1-visuals
-          path: artifacts/developer-d1
+          name: developer-d2-visuals
+          path: artifacts/developer-d2
           if-no-files-found: warn
