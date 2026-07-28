@@ -47,4 +47,10 @@ export const MODE = Object.freeze({
   TUTORIAL: 'tutorial',
 });
 
-export const VALID_MODES = Object.freeze(new Set(Object.values(MODE)));
+const acceptedModes = new Set(Object.values(MODE));
+
+export const VALID_MODES = Object.freeze({
+  has(mode){
+    return acceptedModes.has(mode);
+  },
+});
