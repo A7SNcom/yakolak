@@ -3,83 +3,112 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="yakolak-version" content="developer-d2-workbench">
+<meta name="yakolak-version" content="developer-d3-task-workspace">
 <title>ياكلك · مساحة التطوير</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="./src/developer-d2.css?v=D2-workbench">
-<script defer src="https://unpkg.com/lucide@1.27.0/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="./src/developer-d3.css?v=D3-task-workspace">
 </head>
 <body>
-<div id="d2App" class="d2-app" data-mobile-view="preview">
-  <header class="d2-topbar">
-    <button id="d2NavToggle" class="d2-icon-button d2-mobile-only" type="button" aria-label="فتح قائمة المحتوى"><i data-lucide="panel-right-open"></i></button>
-    <div class="d2-brand"><strong>ياكلك</strong><span>مساحة التطوير</span></div>
-    <div class="d2-top-actions">
-      <button id="d2NewRequest" class="d2-button subtle" type="button"><i data-lucide="plus"></i><span>طلب جديد</span></button>
-      <button id="d2FlowOpen" class="d2-button subtle" type="button"><i data-lucide="workflow"></i><span>مخطط الرحلة</span></button>
-      <button id="d2GameOpen" class="d2-button dark" type="button"><i data-lucide="play"></i><span>اللعبة المنشورة</span></button>
+<div id="d3App" class="d3-app" data-mobile-view="preview">
+  <header class="d3-header">
+    <button id="d3MobileContent" class="d3-icon-button d3-mobile-only" type="button" aria-label="فتح المحتوى">☰</button>
+    <a class="d3-brand" href="./developer.html" aria-label="مساحة تطوير ياكلك"><strong>ياكلك</strong><span>مساحة التطوير</span></a>
+    <div class="d3-header-state"><span id="d3SyncDot" class="d3-sync-dot"></span><span id="d3SyncText">جارٍ المزامنة</span></div>
+    <div class="d3-header-actions">
+      <button id="d3OpenQueue" class="d3-button ghost" type="button"><span>المراجعات</span><b id="d3QueueCount" class="d3-count" hidden>0</b></button>
+      <button id="d3NewRequest" class="d3-button primary" type="button">＋ طلب جديد</button>
     </div>
   </header>
 
-  <main class="d2-workbench">
-    <aside id="d2Navigator" class="d2-navigator" aria-label="محتوى التطوير">
-      <div class="d2-nav-head">
-        <div class="d2-segmented" role="tablist" aria-label="نوع المحتوى">
-          <button class="active" type="button" role="tab" aria-selected="true" data-nav-mode="content">المحتوى</button>
-          <button type="button" role="tab" aria-selected="false" data-nav-mode="queue">المراجعات <span id="d2QueueCount" class="d2-count">0</span></button>
+  <main class="d3-layout">
+    <aside id="d3Navigator" class="d3-navigator" aria-label="محتوى التطوير">
+      <header class="d3-nav-header">
+        <div class="d3-nav-title"><strong>المحتوى</strong><span id="d3NavCount">0 عنصر</span></div>
+        <label class="d3-search"><span aria-hidden="true">⌕</span><input id="d3Search" type="search" placeholder="ابحث باسم المشهد أو العنصر" autocomplete="off"></label>
+        <div class="d3-filter-row" role="tablist" aria-label="تصفية المحتوى">
+          <button class="active" type="button" role="tab" aria-selected="true" data-filter="all">الكل</button>
+          <button type="button" role="tab" aria-selected="false" data-filter="scene">المشاهد</button>
+          <button type="button" role="tab" aria-selected="false" data-filter="element">العناصر</button>
+          <button type="button" role="tab" aria-selected="false" data-filter="queue">المطلوب</button>
         </div>
-        <label class="d2-search"><i data-lucide="search"></i><input id="d2Search" type="search" placeholder="ابحث عن مشهد أو عنصر" autocomplete="off"></label>
-      </div>
-      <div id="d2NavList" class="d2-nav-list" aria-live="polite"></div>
-      <div class="d2-nav-footer"><span id="d2SyncState" class="d2-sync">جارٍ المزامنة…</span><button id="d2Refresh" class="d2-icon-button" type="button" aria-label="تحديث البيانات"><i data-lucide="refresh-cw"></i></button></div>
+      </header>
+      <div id="d3NavList" class="d3-nav-list" aria-live="polite"></div>
+      <footer class="d3-nav-footer">
+        <button id="d3FlowOpen" class="d3-link-button" type="button">مخطط الرحلة</button>
+        <button id="d3GameOpen" class="d3-link-button" type="button">اللعبة المنشورة ↗</button>
+      </footer>
     </aside>
 
-    <section class="d2-canvas-shell" aria-label="المعاينة">
-      <header class="d2-canvas-toolbar">
-        <div class="d2-selection-copy"><span id="d2SelectionKind" class="d2-kicker">مشهد</span><strong id="d2SelectionTitle">رحلة الدخول النظيفة</strong><code id="d2SelectionCode">scene.clean-entry</code></div>
-        <div class="d2-canvas-actions">
-          <button id="d2Replay" class="d2-tool" type="button"><i data-lucide="rotate-ccw"></i><span>إعادة</span></button>
-          <button id="d2Compare" class="d2-tool" type="button" aria-pressed="false"><i data-lucide="columns-2"></i><span>قبل / بعد</span></button>
-          <button id="d2Fullscreen" class="d2-tool" type="button"><i data-lucide="maximize-2"></i><span>ملء الشاشة</span></button>
+    <section class="d3-workspace" aria-label="مساحة العمل">
+      <header class="d3-workspace-header">
+        <div class="d3-selection">
+          <span id="d3SelectionKind" class="d3-kicker">رحلة</span><h1 id="d3SelectionTitle">رحلة الدخول النظيفة</h1>
+          <div class="d3-selection-meta"><code id="d3SelectionCode">scene.clean-entry</code><span id="d3SelectionStatus" class="d3-status neutral">لا توجد ملاحظات</span></div>
+        </div>
+        <div class="d3-preview-actions">
+          <button id="d3Replay" class="d3-icon-button" type="button" aria-label="إعادة المعاينة" title="إعادة المعاينة">↻</button>
+          <button id="d3CompareToggle" class="d3-button ghost" type="button" aria-pressed="false">قبل / بعد</button>
+          <button id="d3Fullscreen" class="d3-icon-button" type="button" aria-label="ملء الشاشة" title="ملء الشاشة">⛶</button>
         </div>
       </header>
 
-      <div id="d2PreviewArea" class="d2-preview-area">
-        <div id="d2LivePane" class="d2-live-pane"><iframe id="d2PreviewFrame" title="المعاينة الحية" allow="fullscreen"></iframe><div id="d2PreviewLoading" class="d2-preview-loading"><span class="d2-spinner"></span><strong>جارٍ تجهيز المعاينة</strong></div></div>
-        <section id="d2ComparePane" class="d2-compare-pane" hidden>
-          <article class="d2-compare-card"><header><strong>قبل</strong><span>الحالة المرجعية</span></header><div class="d2-compare-frame"><iframe id="d2BeforeFrame" title="المعاينة السابقة" loading="lazy"></iframe><div id="d2BeforeEmpty" class="d2-compare-empty">أضف رابط النسخة السابقة.</div></div><label><span>رابط قبل</span><input id="d2BeforeUrl" type="url" dir="ltr" placeholder="https://..."></label></article>
-          <article class="d2-compare-card"><header><strong>بعد</strong><span>النسخة الحالية</span></header><div class="d2-compare-frame"><iframe id="d2AfterFrame" title="المعاينة الحالية" loading="lazy"></iframe><div id="d2AfterEmpty" class="d2-compare-empty">المعاينة الحالية ستظهر هنا.</div></div><label><span>رابط بعد</span><input id="d2AfterUrl" type="url" dir="ltr" placeholder="https://..."></label></article>
-          <footer class="d2-compare-footer"><button id="d2UseCurrent" class="d2-button subtle" type="button">استخدام المعاينة الحالية</button><button id="d2SaveCompare" class="d2-button dark" type="button">حفظ المقارنة</button><span id="d2CompareState"></span></footer>
+      <div id="d3PreviewShell" class="d3-preview-shell">
+        <div id="d3LiveView" class="d3-live-view"><iframe id="d3PreviewFrame" title="معاينة المشهد" allow="fullscreen"></iframe><div id="d3PreviewState" class="d3-preview-state"><span class="d3-spinner" aria-hidden="true"></span><strong>جارٍ تجهيز المعاينة</strong><small>ستظهر النتيجة هنا دون مغادرة مساحة العمل.</small></div></div>
+        <section id="d3CompareView" class="d3-compare-view" hidden aria-label="المقارنة البصرية">
+          <article class="d3-compare-side"><header><div><strong>قبل</strong><span>المرجع السابق</span></div><button class="d3-link-button" type="button" data-open-compare="before">فتح ↗</button></header><div class="d3-compare-frame"><iframe id="d3BeforeFrame" title="الحالة السابقة"></iframe><div id="d3BeforeEmpty" class="d3-empty-compare">أضف رابط النسخة السابقة من إعدادات المقارنة.</div></div></article>
+          <article class="d3-compare-side"><header><div><strong>بعد</strong><span>النسخة الحالية</span></div><button class="d3-link-button" type="button" data-open-compare="after">فتح ↗</button></header><div class="d3-compare-frame"><iframe id="d3AfterFrame" title="الحالة الحالية"></iframe><div id="d3AfterEmpty" class="d3-empty-compare">المعاينة الحالية ستظهر هنا.</div></div></article>
+          <details class="d3-compare-settings"><summary>إعدادات وروابط المقارنة</summary><div class="d3-compare-fields">
+            <label><span>رابط قبل</span><input id="d3BeforeUrl" type="url" dir="ltr" placeholder="https://..."></label>
+            <label><span>رابط بعد</span><input id="d3AfterUrl" type="url" dir="ltr" placeholder="https://..."></label>
+            <button id="d3UseCurrent" class="d3-button ghost" type="button">استخدام المعاينة الحالية</button><button id="d3SaveCompare" class="d3-button primary" type="button">حفظ المقارنة</button><span id="d3CompareMessage" class="d3-helper"></span>
+          </div></details>
         </section>
       </div>
 
-      <footer class="d2-context-bar"><div><strong id="d2ContextTitle">ملخص المشهد</strong><p id="d2ContextDescription">اختر مشهدًا أو عنصرًا من القائمة.</p></div><div id="d2ContextStatus" class="d2-status-pill">بدون ملاحظات</div></footer>
+      <section class="d3-focus-card" aria-label="الإجراء التالي">
+        <div class="d3-focus-copy"><strong id="d3ContextTitle">ماذا تريد أن تفعل؟</strong><p id="d3ContextDescription">عاين المشهد، ثم اختر إجراءً واحدًا واضحًا.</p></div>
+        <div class="d3-focus-actions">
+          <button id="d3StartTask" class="d3-focus-action primary" type="button"><span>اطلب تعديلًا</span><small>حوّل فكرتك إلى مهمة قابلة للتنفيذ</small></button>
+          <button id="d3ReviewOpen" class="d3-focus-action" type="button"><span>راجع النتيجة</span><small id="d3ReviewHint">لا توجد مراجعة تنتظر قرارك</small></button>
+          <button id="d3BriefOpen" class="d3-focus-action" type="button"><span>جهّز أمرًا للمطور الذكي</span><small>سياق ومعايير قبول جاهزة للنسخ</small></button>
+        </div>
+      </section>
     </section>
-
-    <aside id="d2Inspector" class="d2-inspector" aria-label="المراجعة">
-      <header class="d2-inspector-head"><div><span class="d2-kicker">المراجعة</span><strong id="d2InspectorTitle">رحلة الدخول النظيفة</strong></div><button id="d2InspectorClose" class="d2-icon-button d2-mobile-only" type="button" aria-label="إغلاق المراجعة"><i data-lucide="x"></i></button></header>
-      <div id="d2ReviewSummary" class="d2-review-summary"></div>
-      <section class="d2-new-note"><label for="d2NewNote">ملاحظة جديدة</label><textarea id="d2NewNote" maxlength="12000" placeholder="اكتب ملاحظة محددة مرتبطة بما تراه…"></textarea><button id="d2AddNote" class="d2-button dark" type="button"><i data-lucide="message-square-plus"></i><span>إضافة الملاحظة</span></button></section>
-      <div id="d2ThreadList" class="d2-thread-list"></div>
-    </aside>
   </main>
 
-  <nav class="d2-mobile-nav" aria-label="تنقل مساحة التطوير">
-    <button type="button" data-mobile-view="navigator"><i data-lucide="list-tree"></i><span>المحتوى</span></button>
-    <button class="active" type="button" data-mobile-view="preview"><i data-lucide="monitor-play"></i><span>المعاينة</span></button>
-    <button type="button" data-mobile-view="inspector"><i data-lucide="messages-square"></i><span>المراجعة</span><span id="d2MobileReviewCount" class="d2-count">0</span></button>
+  <nav class="d3-mobile-nav d3-mobile-only" aria-label="تنقل مساحة التطوير">
+    <button type="button" data-mobile-view="content"><span>☰</span><b>المحتوى</b></button><button class="active" type="button" data-mobile-view="preview"><span>▣</span><b>المعاينة</b></button><button type="button" data-mobile-view="work"><span>✓</span><b>العمل</b><i id="d3MobileCount" class="d3-count" hidden>0</i></button>
   </nav>
 </div>
 
-<div id="d2ModalScrim" class="d2-modal-scrim" hidden></div>
-<section id="d2RequestModal" class="d2-modal" role="dialog" aria-modal="true" aria-labelledby="d2RequestTitle" hidden>
-  <header><div><span class="d2-kicker">طلب تطوير</span><h2 id="d2RequestTitle">إضافة طلب جديد</h2></div><button class="d2-icon-button" type="button" data-close-modal aria-label="إغلاق"><i data-lucide="x"></i></button></header>
-  <form id="d2RequestForm"><div class="d2-request-kind"><button class="active" type="button" data-request-kind="scene">مشهد</button><button type="button" data-request-kind="element">عنصر</button></div><label><span>اسم الطلب</span><input id="d2RequestName" required maxlength="120"></label><label><span>الوصف المطلوب</span><textarea id="d2RequestDescription" maxlength="6000"></textarea></label><label><span>مكانه في الرحلة</span><textarea id="d2RequestScenario" maxlength="3000"></textarea></label><button class="d2-button dark wide" type="submit">حفظ الطلب</button></form>
+<div id="d3DrawerScrim" class="d3-scrim" hidden></div>
+<aside id="d3Drawer" class="d3-drawer" role="dialog" aria-modal="true" aria-label="العمل على المشهد" aria-hidden="true">
+  <header class="d3-drawer-header"><div><span id="d3DrawerKicker" class="d3-kicker">مهمة تطوير</span><h2 id="d3DrawerTitle">اطلب تعديلًا</h2></div><button id="d3DrawerClose" class="d3-icon-button" type="button" aria-label="إغلاق">×</button></header>
+  <div class="d3-drawer-tabs" role="tablist" aria-label="أدوات العمل"><button class="active" type="button" role="tab" aria-selected="true" data-drawer-tab="task">المهمة</button><button type="button" role="tab" aria-selected="false" data-drawer-tab="review">المراجعة <span id="d3DrawerReviewCount">0</span></button><button type="button" role="tab" aria-selected="false" data-drawer-tab="brief">أمر الذكاء</button></div>
+  <div class="d3-drawer-body">
+    <section id="d3TaskPanel" class="d3-panel" data-panel="task">
+      <div class="d3-panel-intro"><strong>صف النتيجة، لا الحل البرمجي</strong><p>المطور الذكي يحتاج هدفًا واضحًا ومعيار نجاح، وليس نصًا طويلًا مبهمًا.</p></div>
+      <form id="d3TaskForm" class="d3-form">
+        <label><span>ما المشكلة الحالية؟</span><textarea id="d3TaskProblem" maxlength="3000" required placeholder="مثال: الانتقال يتوقف فوق الطاولة ويشتت المستخدم."></textarea></label>
+        <label><span>ما النتيجة المطلوبة؟</span><textarea id="d3TaskOutcome" maxlength="3000" required placeholder="مثال: حركة واحدة مستمرة تمر بالطاولة دون توقف."></textarea></label>
+        <label><span>كيف نعرف أنها نجحت؟</span><textarea id="d3TaskCriteria" maxlength="3000" placeholder="مثال: لا توجد قفزة بصرية، وتعمل على الجوال والكمبيوتر."></textarea></label>
+        <div class="d3-evidence-options"><span>الدليل المطلوب</span><label><input type="checkbox" value="desktop" checked> صورة كمبيوتر</label><label><input type="checkbox" value="mobile" checked> صورة جوال</label><label><input type="checkbox" value="functional" checked> اختبار وظيفي</label></div>
+        <div class="d3-form-actions"><button id="d3SaveTask" class="d3-button primary wide" type="submit">حفظ كمهمة تطوير</button><button id="d3CopyTask" class="d3-button ghost wide" type="button">نسخ أمر التنفيذ</button></div>
+      </form>
+    </section>
+    <section id="d3ReviewPanel" class="d3-panel" data-panel="review" hidden><div id="d3ReviewSummary" class="d3-review-summary"></div><div id="d3ThreadList" class="d3-thread-list"></div></section>
+    <section id="d3BriefPanel" class="d3-panel" data-panel="brief" hidden><div class="d3-panel-intro"><strong>جسر واضح بينك وبين المطور الذكي</strong><p>الحزمة تجمع سياق المشهد، الحالة الحالية، المطلوب، ومعايير القبول في أمر واحد.</p></div><label class="d3-brief-label"><span>حزمة التنفيذ</span><textarea id="d3BriefText" readonly></textarea></label><div class="d3-form-actions"><button id="d3CopyBrief" class="d3-button primary wide" type="button">نسخ الحزمة</button><button id="d3RefreshBrief" class="d3-button ghost wide" type="button">تحديث من المهمة</button></div></section>
+  </div>
+</aside>
+
+<div id="d3ModalScrim" class="d3-scrim" hidden></div>
+<section id="d3RequestModal" class="d3-modal" role="dialog" aria-modal="true" aria-labelledby="d3RequestTitle" hidden>
+  <header><div><span class="d3-kicker">إضافة إلى المنصة</span><h2 id="d3RequestTitle">طلب جديد</h2></div><button id="d3RequestClose" class="d3-icon-button" type="button" aria-label="إغلاق">×</button></header>
+  <form id="d3RequestForm" class="d3-form"><div class="d3-request-kind" role="radiogroup" aria-label="نوع الطلب"><button class="active" type="button" data-request-kind="scene">مشهد جديد</button><button type="button" data-request-kind="element">عنصر جديد</button></div><label><span>اسم واضح</span><input id="d3RequestName" maxlength="120" required placeholder="مثال: شاشة اختيار الجولة"></label><label><span>ما الذي يجب أن يراه أو يفعله المستخدم؟</span><textarea id="d3RequestDescription" maxlength="6000" required></textarea></label><label><span>أين يظهر في رحلة اللعبة؟</span><textarea id="d3RequestScenario" maxlength="3000"></textarea></label><button class="d3-button primary wide" type="submit">حفظ الطلب وفتحه للمراجعة</button></form>
 </section>
 
-<section id="d2UtilityOverlay" class="d2-utility" hidden><header><div><span class="d2-kicker" id="d2UtilityKicker">أداة</span><strong id="d2UtilityTitle">مخطط الرحلة</strong></div><div><button id="d2UtilityReload" class="d2-tool" type="button"><i data-lucide="rotate-ccw"></i><span>إعادة</span></button><button id="d2UtilityClose" class="d2-button dark" type="button">العودة</button></div></header><iframe id="d2UtilityFrame" title="أداة التطوير"></iframe></section>
-
-<div id="d2Toast" class="d2-toast" role="status" aria-live="polite"></div>
-<script type="module" src="./src/developer-d2.js?v=D2-workbench"></script>
+<section id="d3Utility" class="d3-utility" hidden><header><div><span id="d3UtilityKicker" class="d3-kicker">أداة</span><h2 id="d3UtilityTitle">أداة التطوير</h2></div><button id="d3UtilityClose" class="d3-button primary" type="button">العودة</button></header><iframe id="d3UtilityFrame" title="أداة التطوير"></iframe></section>
+<div id="d3Toast" class="d3-toast" role="status" aria-live="polite"></div>
+<script type="module" src="./src/developer-d3.js?v=D3-task-workspace"></script>
 </body>
 </html>
