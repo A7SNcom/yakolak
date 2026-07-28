@@ -1,6 +1,6 @@
 import {SVGLoader} from 'three/addons/loaders/SVGLoader.js';
 
-console.info('[Yakolak] DEVELOPER D1 SCENE RUNNER LOADED');
+console.info('[Yakolak] DEVELOPER D1 REVIEW FIXES LOADED');
 
 const params=new URLSearchParams(location.search);
 const elementId=params.get('element')||'';
@@ -8,19 +8,23 @@ const sceneId=elementId?'':(params.get('scene')||'loading-star');
 const entityKind=elementId?'element':'scene';
 const entityId=elementId||sceneId;
 const preview=params.get('preview')==='1';
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const loader=document.getElementById('sceneLoading');
 const loaderProjection=loader?.querySelector('.loaderProjection');
 const status=document.getElementById('sceneStatus');
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const rad=value=>value*Math.PI/180;
+const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
+const smoother=value=>{const t=clamp(value,0,1);return t*t*t*(t*(t*6-15)+10)};
 const realRemoveLoader=()=>{if(loader?.parentNode)loader.parentNode.removeChild(loader)};
 let replayTimer=0;
 
 const HIDDEN_UI=['yakolakGameHud','yakolakGameScore','yakolakGameSetup','yakolakTools','yakolakCalibrationPanel','yakolakOnlineDialog','yakolakTutorialDialog','yakolakOnlineEntry','yakolakHowTo','yakolakEntry','yakolakFloatingSettings','yakolakEntrySettings'];
+const TABLE_COLOR='#c2c3bf';
+const WALL_COLOR='#fafaf8';
+const OUTLINE_COLOR='#aaa8a1';
 
-document.body.dataset.preview=preview?'1':'0';
-document.body.dataset.developerEntityKind=entityKind;
-document.body.dataset.developerEntity=entityId;
+Object.assign(document.body.dataset,{preview:preview?'1':'0',developerEntityKind:entityKind,developerEntity:entityId});
 if(sceneId)document.body.dataset.developerScene=sceneId;
 if(elementId)document.body.dataset.developerElement=elementId;
 if(status)status.textContent=`D1 · ${entityId}`;
@@ -50,7 +54,7 @@ function markReady(details={}){
 async function waitForGame(){
   for(let index=0;index<800;index++){
     const game=globalThis.__yakolakGame;
-    if(game?.THREE&&game?.renderer&&game?.camera&&game?.gameGroup?.parent&&game?.meshes&&document.body.classList.contains('yakolak-ready'))return game;
+    if(game?.THREE&&game?.renderer&&game?.camera&&game?.controls&&game?.gameGroup?.parent&&game?.meshes&&document.body.classList.contains('yakolak-ready'))return game;
     await wait(25);
   }
   throw new Error(`Developer D1 could not load ${entityKind} ${entityId}`);
@@ -77,6 +81,49 @@ function solid(object,color){
   });
 }
 
+function styleTable(scene){
+  const table=findTable(scene);
+  if(!table)return null;
+  table.visible=true;
+  table.traverse?.(object=>{
+    if(!object.isMesh||!object.material)return;
+    const materials=Array.isArray(object.material)?object.material:[object.material];
+    materials.filter(Boolean).forEach(material=>{
+      material.color?.set?.(TABLE_COLOR);
+      material.emissive?.set?.('#000000');
+      if('emissiveIntensity' in material)material.emissiveIntensity=0;
+      if('roughness' in material)material.roughness=.82;
+      if('metalness' in material)material.metalness=0;
+      if('map' in material)material.map=null;
+      if('normalMap' in material)material.normalMap=null;
+      if('roughnessMap' in material)material.roughnessMap=null;
+      material.transparent=false;
+      material.opacity=1;
+      material.depthWrite=true;
+      material.needsUpdate=true;
+    });
+  });
+  return table;
+}
+
+function styleRoomOutlines(scene){
+  const room=scene.getObjectByName('yakolak-soft-empty-room');
+  const lines=room?.children?.filter(object=>object.isLine)||[];
+  lines.forEach((line,index)=>{
+    const outline=index<12;
+    line.visible=outline;
+    if(!outline)return;
+    line.material.color?.set?.(OUTLINE_COLOR);
+    line.material.transparent=true;
+    line.material.opacity=.58;
+    line.material.depthTest=true;
+    line.material.depthWrite=false;
+    line.material.needsUpdate=true;
+    line.renderOrder=-780;
+  });
+  return lines.filter(line=>line.visible).length;
+}
+
 function hideDeveloperNoise(game){
   HIDDEN_UI.forEach(id=>{
     const element=document.getElementById(id);
@@ -92,29 +139,32 @@ function hideDeveloperNoise(game){
 function prepareRoom(game){
   const scene=game.gameGroup.parent;
   scene.background?.set?.('#ffffff');
-  solid(scene.getObjectByName('room-back-wall'),'#ffffff');
-  solid(scene.getObjectByName('room-left-wall'),'#ffffff');
-  solid(scene.getObjectByName('room-right-wall'),'#ffffff');
-  solid(scene.getObjectByName('room-ceiling'),'#ffffff');
+  solid(scene.getObjectByName('room-back-wall'),WALL_COLOR);
+  solid(scene.getObjectByName('room-left-wall'),WALL_COLOR);
+  solid(scene.getObjectByName('room-right-wall'),WALL_COLOR);
+  solid(scene.getObjectByName('room-ceiling'),WALL_COLOR);
   solid(scene.getObjectByName('room-floor'),'#deddd7');
   const front=scene.getObjectByName('room-front-wall');
   if(front)front.visible=false;
-  const room=scene.getObjectByName('yakolak-soft-empty-room');
-  room?.traverse?.(object=>{
-    if(object.isLine)object.visible=false;
-    if(/trim|grid|edge/i.test(object.name||''))object.visible=false;
-  });
+  styleRoomOutlines(scene);
+  styleTable(scene);
   hideDeveloperNoise(game);
   return scene;
 }
 
 function setCamera(game,position,target,fov=44){
+  const targetVector=new game.THREE.Vector3(...target);
   game.camera.position.set(...position);
   game.camera.fov=fov;
   game.camera.near=.1;
   game.camera.far=12000;
   game.camera.updateProjectionMatrix();
-  game.camera.lookAt(new game.THREE.Vector3(...target));
+  game.controls.target.copy(targetVector);
+  game.controls.minDistance=160;
+  game.controls.maxDistance=2600;
+  game.controls.enabled=!preview;
+  game.camera.lookAt(targetVector);
+  game.controls.update();
   renderGame(game);
 }
 
@@ -124,8 +174,7 @@ function frameObjects(game,objects,{direction=[1,.72,1],fov=44,padding=1.12,targ
   const box=new game.THREE.Box3();
   valid.forEach(object=>{object.updateMatrixWorld(true);box.expandByObject(object,true)});
   if(box.isEmpty())return false;
-  const center=box.getCenter(new game.THREE.Vector3());
-  center.add(new game.THREE.Vector3(...targetOffset));
+  const center=box.getCenter(new game.THREE.Vector3()).add(new game.THREE.Vector3(...targetOffset));
   const sphere=box.getBoundingSphere(new game.THREE.Sphere());
   const vertical=rad(fov);
   const horizontal=2*Math.atan(Math.tan(vertical/2)*Math.max(.35,game.camera.aspect));
@@ -158,12 +207,12 @@ function resetGameTransform(game){
 function configureEmptyTable(game){
   const scene=prepareRoom(game);
   game.gameGroup.visible=false;
-  const table=findTable(scene);
+  const table=styleTable(scene);
   const portrait=innerHeight>innerWidth*1.18;
   if(!frameObjects(game,[table],{direction:portrait?[1,.78,1]:[1,.68,1],fov:portrait?49:43,padding:portrait?1.2:1.08})){
     setCamera(game,portrait?[980,420,1120]:[1150,430,1250],[0,-300,0],portrait?49:43);
   }
-  return{mode:'static',composition:'empty-table',framing:'object-fit'};
+  return{mode:'static',composition:'empty-table',framing:'object-fit',tableColor:TABLE_COLOR,roomOutlineLines:String(styleRoomOutlines(scene))};
 }
 
 function applyMeshPose(mesh,position,rotation){
@@ -181,7 +230,7 @@ function configureBoardBases(game){
   game.gameGroup.visible=true;
   const meshes=game.meshes||{};
   const selected=[];
-  const add=(mesh,p,r)=>{if(applyMeshPose(mesh,p,r))selected.push(mesh)};
+  const add=(mesh,position,rotation)=>{if(applyMeshPose(mesh,position,rotation))selected.push(mesh)};
   add(meshes['9'],[0,6,0],[-90,0,0]);
   add(meshes['3-right'],[135,6,0],[-90,0,0]);
   add(meshes['3-left'],[-135,6,0],[-90,0,180]);
@@ -202,7 +251,7 @@ function officialLogo(THREE,svgData,width,name){
     const material=new THREE.MeshBasicMaterial({
       color:path.color||'#242421',
       transparent:false,
-      depthTest:false,
+      depthTest:true,
       depthWrite:false,
       toneMapped:false,
       side:THREE.DoubleSide
@@ -212,7 +261,7 @@ function officialLogo(THREE,svgData,width,name){
       geometry.scale(1,-1,1);
       const mesh=new THREE.Mesh(geometry,material);
       mesh.position.z=pathIndex*.02;
-      mesh.renderOrder=9000+pathIndex;
+      mesh.renderOrder=90+pathIndex;
       raw.add(mesh);
     });
   });
@@ -229,19 +278,19 @@ function officialLogo(THREE,svgData,width,name){
   return wrapper;
 }
 
-async function configureLogoWall(game){
+async function buildLogoWall(game){
   const scene=prepareRoom(game);
   game.gameGroup.visible=false;
   const old=scene.getObjectByName('yakolak-developer-d1-logo-wall');
   if(old)scene.remove(old);
   const [yakolakSvg,mtkyfSvg]=await Promise.all([
-    loadOfficialSvg('./assets/YAKOLAK.svg?v=D1-approved'),
-    loadOfficialSvg('./assets/MTKYF.svg?v=D1-approved')
+    loadOfficialSvg('./assets/YAKOLAK.svg?v=D1-review-fixed'),
+    loadOfficialSvg('./assets/MTKYF.svg?v=D1-review-fixed')
   ]);
   const portrait=innerHeight>innerWidth*1.18;
   const group=new game.THREE.Group();
   group.name='yakolak-developer-d1-logo-wall';
-  group.position.set(2374,265,0);
+  group.position.set(2372,265,0);
   group.rotation.y=-Math.PI/2;
   const yakolak=officialLogo(game.THREE,yakolakSvg,portrait?340:650,'d1-yakolak-logo');
   yakolak.position.set(0,portrait?145:220,0);
@@ -249,8 +298,14 @@ async function configureLogoWall(game){
   mtkyf.position.set(0,portrait?-145:-220,0);
   group.add(yakolak,mtkyf);
   scene.add(group);
-  setCamera(game,portrait?[1320,265,0]:[1120,260,0],[2380,265,0],portrait?49:42);
-  return{mode:'static',composition:'two-tone-logo-wall',logoRendering:'svg-geometry-two-tone'};
+  return group;
+}
+
+async function configureLogoWall(game){
+  await buildLogoWall(game);
+  const portrait=innerHeight>innerWidth*1.18;
+  setCamera(game,portrait?[1320,265,0]:[1120,260,0],[2300,265,0],portrait?49:42);
+  return{mode:'static',composition:'two-tone-logo-wall',logoRendering:'svg-geometry-two-tone',cameraTarget:'room-wall',zoomContinuity:'stable-controls-target'};
 }
 
 async function configureLogoElement(game,id){
@@ -258,7 +313,7 @@ async function configureLogoElement(game,id){
   game.gameGroup.visible=false;
   hideTable(scene);
   scene.background?.set?.('#d8d7d1');
-  const url=id==='logo-yakolak'?'./assets/YAKOLAK.svg?v=D1-element':'./assets/MTKYF.svg?v=D1-element';
+  const url=id==='logo-yakolak'?'./assets/YAKOLAK.svg?v=D1-element-fixed':'./assets/MTKYF.svg?v=D1-element-fixed';
   const svg=await loadOfficialSvg(url);
   const logo=officialLogo(game.THREE,svg,id==='logo-yakolak'?640:560,`d1-element-${id}`);
   logo.position.set(0,0,0);
@@ -286,20 +341,15 @@ async function configureElement(game,id){
   if(id==='table'){
     prepareRoom(game);
     game.gameGroup.visible=false;
-    const table=findTable(scene);
+    const table=styleTable(scene);
     if(!table)throw new Error('Missing D1 table element');
-    table.visible=true;
     frameObjects(game,[table],{direction:[1,.72,1],fov:42,padding:1.12});
-    return{mode:'element',composition:'table',visibleObjects:'1'};
+    return{mode:'element',composition:'table',visibleObjects:'1',tableColor:TABLE_COLOR};
   }
   if(id==='logo-yakolak'||id==='logo-mtkyf')return configureLogoElement(game,id);
   if(id==='base-large')return isolateMeshElement(game,game.meshes?.['9'],id,{padding:1.28});
   if(id==='base-small')return isolateMeshElement(game,game.meshes?.['3-right'],id,{padding:1.42});
-  const type={
-    'stone-large':'l',
-    'stone-medium':'m',
-    'stone-small':'s'
-  }[id];
+  const type={'stone-large':'l','stone-medium':'m','stone-small':'s'}[id];
   if(type){
     const piece=game.pieces?.find(candidate=>candidate.type===type&&candidate.dir==='front')||game.pieces?.find(candidate=>candidate.type===type);
     return isolateMeshElement(game,piece?.mesh,id,{direction:[1,.7,1],fov:38,padding:1.7});
@@ -310,6 +360,8 @@ async function configureElement(game,id){
 function enforceIntroIsolation(game){
   hideDeveloperNoise(game);
   if(game.setupGroup)game.setupGroup.visible=false;
+  const mainBase=game.meshes?.['9'];
+  if(mainBase)mainBase.visible=true;
   HIDDEN_UI.forEach(id=>document.getElementById(id)?.remove());
 }
 
@@ -325,7 +377,7 @@ async function configureUnboxing(game){
   setCamera(game,portrait?[430,560,620]:[520,430,520],[0,0,0],portrait?48:43);
   realRemoveLoader();
   triggerIntroReplay();
-  for(let index=0;index<18;index++){
+  for(let index=0;index<22;index++){
     enforceIntroIsolation(game);
     renderGame(game);
     await wait(50);
@@ -336,7 +388,96 @@ async function configureUnboxing(game){
       triggerIntroReplay();
     },6800);
   }
-  return{mode:'sequence',composition:'unboxing-only',setupHidden:'true',replaySource:'keyboard-runtime'};
+  return{mode:'sequence',composition:'unboxing-only',setupHidden:'true',largeBaseVisible:String(Boolean(game.meshes?.['9']?.visible)),replaySource:'keyboard-runtime'};
+}
+
+function projectLoaderAnchor(game,worldPoint){
+  if(!globalThis.__yakolakEntryLoader?.anchor)return false;
+  const direction=new game.THREE.Vector3();
+  game.camera.getWorldDirection(direction);
+  const toward=worldPoint.clone().sub(game.camera.position);
+  if(direction.dot(toward)<=0){globalThis.__yakolakEntryLoader.anchor(-180,innerHeight/2);return false}
+  const projected=worldPoint.clone().project(game.camera);
+  const x=(projected.x*.5+.5)*innerWidth;
+  const y=(-projected.y*.5+.5)*innerHeight;
+  globalThis.__yakolakEntryLoader.anchor(x,y);
+  return x>-90&&x<innerWidth+90&&y>-110&&y<innerHeight+110&&projected.z>-1&&projected.z<1;
+}
+
+function entryPoses(){
+  const portrait=innerHeight>innerWidth*1.18;
+  const compact=!portrait&&(innerWidth<=900||innerHeight<=620);
+  const start=portrait
+    ?{position:[0,250,-720],target:[0,250,-2300],fov:49}
+    :compact
+      ?{position:[0,250,-930],target:[0,250,-2300],fov:46}
+      :{position:[0,250,-1120],target:[0,250,-2300],fov:42};
+  const end=portrait
+    ?{position:[1320,265,0],target:[2300,265,0],fov:49}
+    :compact
+      ?{position:[1240,260,0],target:[2300,260,0],fov:46}
+      :{position:[1120,260,0],target:[2300,260,0],fov:42};
+  return{portrait,compact,start,end};
+}
+
+async function configureCleanEntry(game){
+  const scene=prepareRoom(game);
+  game.gameGroup.visible=false;
+  await buildLogoWall(game);
+  const poses=entryPoses();
+  const startPosition=new game.THREE.Vector3(...poses.start.position);
+  const endPosition=new game.THREE.Vector3(...poses.end.position);
+  const startTarget=new game.THREE.Vector3(...poses.start.target);
+  const endTarget=new game.THREE.Vector3(...poses.end.target);
+  const positionCurve=new game.THREE.CubicBezierCurve3(
+    startPosition,
+    new game.THREE.Vector3(0,poses.portrait?285:275,poses.portrait?-500:-790),
+    new game.THREE.Vector3(poses.portrait?860:760,poses.portrait?300:285,poses.portrait?-430:-560),
+    endPosition
+  );
+  const targetCurve=new game.THREE.CubicBezierCurve3(
+    startTarget,
+    new game.THREE.Vector3(0,245,-1650),
+    new game.THREE.Vector3(1500,245,-320),
+    endTarget
+  );
+  const wallAnchor=new game.THREE.Vector3(0,250,-2370);
+  setCamera(game,poses.start.position,poses.start.target,poses.start.fov);
+  game.renderer.domElement.style.pointerEvents='none';
+  game.controls.enabled=false;
+  projectLoaderAnchor(game,wallAnchor);
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  globalThis.__yakolakEntryLoader?.handoff?.();
+  const duration=reduced?1450:4700;
+  const started=performance.now();
+  await new Promise(resolve=>{
+    const frame=now=>{
+      const raw=clamp((now-started)/duration,0,1);
+      const t=smoother(raw);
+      const position=positionCurve.getPoint(t);
+      const target=targetCurve.getPoint(t);
+      game.camera.position.copy(position);
+      game.controls.target.copy(target);
+      game.camera.lookAt(target);
+      game.camera.fov=poses.start.fov+(poses.end.fov-poses.start.fov)*t;
+      game.camera.updateProjectionMatrix();
+      projectLoaderAnchor(game,wallAnchor);
+      renderGame(game);
+      if(raw<1)requestAnimationFrame(frame);else resolve();
+    };
+    requestAnimationFrame(frame);
+  });
+  game.camera.position.copy(endPosition);
+  game.controls.target.copy(endTarget);
+  game.camera.lookAt(endTarget);
+  game.controls.enabled=!preview;
+  game.renderer.domElement.style.pointerEvents=preview?'none':'auto';
+  game.controls.update();
+  renderGame(game);
+  globalThis.__yakolakEntryLoader?.finish?.();
+  document.body.dataset.yakolakEntry='complete';
+  globalThis.__yakolakV126Entry={build:'D1',phase:'complete',source:'developer-d1-review-fixes',cameraMotion:'single-position-target-bezier',continuity:'no-cuts'};
+  return{mode:'sequence',composition:'clean-entry',cameraMotion:'single-position-target-bezier',continuity:'no-cuts',duration:String(duration),controlsTarget:'room-wall'};
 }
 
 async function loadThreeEntity(){
@@ -344,8 +485,8 @@ async function loadThreeEntity(){
     loader.id='yakolakLoader';
     loader.remove=()=>{loader.dataset.removePending='1'};
   }
-  await import('./mobile-clarity-v120.js?v=D1-developer');
-  await import('./app-game-v114.js?v=D1-developer');
+  await import('./mobile-clarity-v120.js?v=D1-review-fixes');
+  await import('./app-game-developer-d1.js?v=D1-review-fixes');
   const game=await waitForGame();
 
   if(elementId){
@@ -356,15 +497,9 @@ async function loadThreeEntity(){
     return;
   }
 
-  if(sceneId==='clean-entry'){
-    await import('./entry-v126.js?v=D1-developer');
-    for(let index=0;index<400&&!globalThis.__yakolakV126Entry?.phase;index++)await wait(25);
-    markReady({mode:'sequence',composition:'clean-entry'});
-    return;
-  }
-
   let details;
-  if(sceneId==='empty-table')details=configureEmptyTable(game);
+  if(sceneId==='clean-entry')details=await configureCleanEntry(game);
+  else if(sceneId==='empty-table')details=configureEmptyTable(game);
   else if(sceneId==='board-bases')details=configureBoardBases(game);
   else if(sceneId==='logo-wall')details=await configureLogoWall(game);
   else if(sceneId==='unboxing-intro')details=await configureUnboxing(game);
