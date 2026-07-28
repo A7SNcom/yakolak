@@ -3,28 +3,34 @@
 ## Permanent instructions
 Open `AGENTS.md`, `ops/ai-team/TEAM_OS.md`, then execute exactly the one task below. You are a flexible generalist; the assignment is temporary.
 
-This task is read-only. Do not create a code branch or edit project files. Update only your `WORKER REPORT` block. Stop after one task.
+This task is read-only. Do not create a code branch or edit project files. Update only your `WORKER REPORT` block when the task becomes executable. Stop after one task.
 
 <!-- MANAGER TASK:START -->
 ## Manager task
-- Cycle: `005-evidence-reconciliation`
-- Task ID: `YAK-005-03`
-- Status: `READY`
+- Cycle: `006-correction-closure`
+- Task ID: `YAK-006-07`
+- Status: `READY_AFTER_DEPLOYMENT`
 - Task type: `TEST/REVIEW`
 - Effort: `S (2 points)`
 - Risk: `high-human-interface`
-- OBSERVED: PR #43 exact head is now `30c089e75715d045b21329176ce3d2f4fd98863c`; your prior report inspected older `201d8b5b...` and is stale for merge purposes. Current workflows show President Portal and Architecture Guardrails success, AI Team OS failure, and Vercel failure from daily deployment limit.
-- Single outcome: refresh exact-head CI, Preview, and visual-evidence readiness for PR #43 and return `PASS_TO_REVIEW | HOLD | FAIL`.
-- Allowed scope: PR #43 metadata/comments/checks/artifacts; Vercel deployment metadata; exact-head desktop/mobile evidence only.
-- Forbidden scope: no repository edits, merge, portal activation, API reconciliation, reusing stale screenshots as exact-head proof, or treating a quota failure as code success.
+- OBSERVED: President Development OS PR #47 exact candidate head is `f3e5dd72d8d118584a6db2244aa7ce71acfd0ce7`. Exact-head President Portal and architecture-related checks passed and artifact `8703302002` exists, but the stable-alias READY Vercel deployment still reports commit `674881388d0db62f74cbbfcbb61028596807f45b`; the protected API signal check currently redirects to Vercel SSO and cannot be read non-interactively.
+- Single outcome: when a READY deployment metadata SHA equals the exact PR #47 head, verify the protected stable alias, API availability, desktop `1440x1000`, mobile `390x844`, and all exact-head gates; return `PASS_TO_REVIEW | HOLD | FAIL`.
+- Why now: PR #47 cannot receive Rashed personal PASS or Hakam release verdict without an exact-head deployed artifact and independent evidence review.
+- Base branch: `agent/president-development-os` / PR #47.
+- Allowed scope: PR #47 metadata/checks/artifacts; Vercel deployment metadata for branch `agent/president-development-os`; protected stable alias; exact-head desktop/mobile evidence; API read availability.
+- Forbidden scope: no implementation, repository edit, merge, public Production activation, authentication change, stale screenshot substitution, per-deployment URL adoption, or inference that SSO/API inaccessibility means no President input.
+- Change budget: read-only.
 - Acceptance criteria:
-  1. Confirm exact current head.
-  2. List all exact-head workflow conclusions.
-  3. Verify whether a READY Vercel deployment commit equals exact head.
-  4. Verify exact-head desktop/mobile artifact availability and inspect it, or explicitly report stale/missing.
-  5. State missing reviewer/Rashed/Hakam gates separately from CI/Preview.
-- Stop conditions: head moves, checks pending, Preview mismatch/unavailable, artifact stale/missing, or evidence inaccessible.
-- Expected artifact: concise exact-head evidence verdict; this is not reviewer PASS or Hakam MERGE_OK.
+  1. Confirm exact PR #47 head and all required check conclusions.
+  2. Confirm READY Vercel metadata SHA equals that exact head.
+  3. Inspect true desktop `1440x1000` and mobile `390x844` artifacts from the same head.
+  4. Verify the canonical protected stable alias serves the candidate and report API access status separately.
+  5. Separate CI/Preview evidence from missing reviewer, Hakam, and Rashed gates.
+- Required validation: exact identifiers for PR head, workflow run/artifact, deployment ID/SHA, alias, viewport evidence, and API response.
+- Independent reviewer: Hakam audits after Sara's report; Sara does not grant manager approval.
+- Stop conditions: no matching deployment, head movement, stale/missing artifacts, inaccessible evidence, or trust-boundary ambiguity. On stop, return `HOLD` without fabrication.
+- Expected artifact: concise exact-head evidence verdict for Rashed and Hakam.
+- Context links: `ops/ai-team/BOARD.md`, `ops/ai-team/PRESIDENT_PORTAL.md`, PR #47.
 <!-- MANAGER TASK:END -->
 
 <!-- WORKER REPORT:START -->
