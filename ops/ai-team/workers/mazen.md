@@ -37,13 +37,14 @@ Do not create work when the manager assigns `NO_TASK`. Stop without repository w
 
 <!-- WORKER REPORT:START -->
 ## Worker report
-- Result: `PENDING`
-- Summary: —
-- Observed head / freshness: —
-- Evidence inspected: —
-- Runtime contract map: —
-- Deterministic assertions: —
-- Residual risks: —
-- Recommended next task: —
-- Team note: —
+- Result: `BLOCKED_STALE_HEAD`
+- Summary: `OBSERVED` PR #49 moved materially after the manager snapshot, so conflict resolution was not started. The board recorded integration head `8bb77c28619b23c7c0a580ff8f6bbb0a52d8f4ee`, while fresh PR #49 metadata reports head `a3a22e4f5b3549a925fc5f3b7b89b66204e81883`; the task explicitly requires stopping when either parent moves.
+- Blueprint node/revision: `track-visual-development` / revision `3`.
+- Task status / acceptance progress: `BLOCKED`; 0/5 acceptance gates attempted because the freshness prerequisite failed before branch creation or conflict edits.
+- Observed heads / evidence: PR #49 base `agent/president-development-os` @ `f3e5dd72d8d118584a6db2244aa7ce71acfd0ce7`; fresh PR #49 head `agent/yakolak-team-os` @ `a3a22e4f5b3549a925fc5f3b7b89b66204e81883`; board snapshot still cites `8bb77c28619b23c7c0a580ff8f6bbb0a52d8f4ee`. PR remains open, draft, non-mergeable, with five changed coordination files.
+- Changed paths / validation: `CHANGED` only this worker report block; no product, runtime, coordination-conflict, alias, API, verifier, or portal files were edited. No branch or PR was created. No verifier was run because doing so on a stale premise would not validate the required artifact.
+- Blocker / gate delta: PR #49 remains `HOLD`; no gate advanced or weakened. `legacy-debt delta: unchanged`; `migration-gate delta: unchanged`; governance gate remains blocked on a refreshed exact-head contract.
+- Residual risks: resolving against the stale snapshot could overwrite newer Team OS evidence or create a misleading mergeable branch.
+- Recommended next task: Rashed refreshes BOARD and Mazen's contract with exact PR #49 parent heads and the current five conflict paths; then rerun `YAK-006-08` from those immutable heads.
+- Team note: الرأس تحرك، لذلك الوقوف هنا يحمي السجل بدل حل تعارضات على نسخة انتهت. 🛑
 <!-- WORKER REPORT:END -->
