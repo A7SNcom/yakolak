@@ -1,97 +1,110 @@
 # Yakolak Durable Project History
 
-_Last verified: 2026-07-28. Refresh all facts against GitHub before acting._
+_Last verified: 2026-07-28. Refresh all heads/checks before acting._
 
 ## Product objective
-Yakolak is a 3D board game intended to become fully playable online with stable rules, a polished understandable first-run journey, responsive desktop/mobile UX, and an evidence-driven developer/review workspace.
 
-## Repository and active lines
+Yakolak is a 3D board game intended to become fully playable online with stable shared rules, authoritative/recoverable sessions, a clear first-run journey, responsive desktop/mobile UX, and an evidence-driven development/review environment.
+
+## Repository lines
+
 - Repository: `A7SNcom/yakolak`
 - Production branch: `main`
-- Production version file identifies Build 125: `v125-white-wall-continuity`.
-- PR #35: draft `Developer D4: variant-aware AI development workspace`.
-- PR #35 head branch: `agent/developer-d2-workbench`; verified head `d8d2a50f4a604dc4ba95c5ef762a66ffa7fb92c2` on 2026-07-28.
-- PR #35 targets `agent/developer-d1-scene-gallery`, not `main`; it is a layered development PR, not a production release PR.
-- Team integration branch: `agent/yakolak-team-os`.
-- PR #36 carries the AI team operating system from the team branch back toward the active D integration source; it remains draft and is not a production release.
+- Production version metadata identifies Build 125.
+- PR #35 is the draft D4 developer-workspace line on `agent/developer-d2-workbench`, based on another layered branch rather than `main`.
+- PR #36 / `agent/yakolak-team-os` contains the engineering operating system and architecture guardrails; it remains draft and is not a release PR.
+- PR #29 contains the original vNext clean-foundation documentation that informed the canonical architecture now copied and enforced in the active team line.
 
-## Released product line
-- Builds through v120 focused on online play, mobile clarity, rules/round behavior, and visual stability.
-- Builds v121–v125 introduced and refined the room/wall entry journey.
-- Build 125 unifies loader and menu on a neutral white wall and reveals the table only after a player choice.
-- The current D branch includes Build 126 clean entry rebuilt from the stable room/table foundation with a continuous wall-to-wall camera path and official logos.
+## Root architecture diagnosis
 
-## Developer workspace line
-- D1 established isolated scene/element previews and persisted reviews.
-- D2 added a three-area workbench, before/after comparison, review queue, and mobile navigation.
-- D3 simplified the workflow around one content list, one central preview, and an on-demand evidence-oriented work drawer.
-- D4 adds a unified registry, variants, deterministic preview URLs, per-variant review/comparison keys, broader game-state coverage, and journey auditing.
+The largest recurring cause of defects is structural:
 
-## Current D4 contract
-`definition -> variant -> preview URL -> review key -> comparison key`
+1. `src/app-game-v085.js` is a large mixed-responsibility runtime containing Three.js rendering, assets, camera, input, game state/rules, UI, timers, tutorial, motion, and setup.
+2. `src/app-game-v112.js` fetches older JavaScript as text, modifies it through exact/regex replacements, and imports a generated Blob module.
+3. `src/app-game-v114.js` patches the patched runtime again, adds more replacements/globals, and executes another Blob module before loading online code.
+4. Developer previews can depend on hidden mutable runtime objects and can write state directly.
+5. Version numbers in source filenames plus stacked PR branches obscure the current source of truth.
 
-Key files:
-- `src/developer-d4-registry.js`
-- `src/developer-d4.js`
-- `src/developer-scene-d4-router.js`
-- `src/developer-scene-d4-states.js`
-- `src/developer-scene-d4-variants.js`
-- `src/app-game-developer-d4.js`
-- `developer.html`
-- `developer-scene.html`
+Consequences repeatedly observed:
 
-## Current product/workspace blockers
-1. Remove the nested Blob-relative module failure around `./online-client-v114.js` and prove game plus online hooks load.
-2. Add true three-player preview support and use runtime-correct `turnIndex` for all turn variants.
-3. Render real `yakolakOnlineDialog` lifecycle states rather than only the launcher or substitute overlays.
-4. Close journey gaps for draw, bot thinking, turn timeout, piece tray, last move, full online lifecycle, and online status pill.
+- exact source-marker failures after harmless edits;
+- Blob-relative import/module-resolution failures;
+- stale state keys and impossible preview/runtime combinations;
+- local/online/preview behavior drift;
+- fixes that create a new layer rather than remove the root cause;
+- tests preserving named builds without preventing architectural debt.
 
-## Verified CI state at source head `d8d2a50f...`
-- Success: Verify v112 tutorial — run `30377398185`.
-- Success: Verify v118 round selection — run `30377398301`.
-- Success: Verify v125 white wall — run `30377398038`.
-- Success: Verify Build 126 Clean Entry — run `30377398026`.
-- Success: Verify Developer D3 UX — run `30377398175`.
-- Success: Audit Developer D4 Journey — latest observed success in the same head sequence.
-- Failure: Verify Developer D1 — run `30377398315`, job `90336466217`, first failing step `Verify D1 structure and syntax`.
+This is not solved by more reviewers alone. The code must move to single ownership and enforceable module boundaries.
 
-The earlier statement that all shared regressions were failing is now stale. Agents must reproduce the current D1 failure instead of repeating the completed shared-CI repair.
+## Canonical architecture decision
 
-## Preview/deployment state
-- Vercel reported free-plan deployment rate-limit failures during PR #35 activity.
-- A later Vercel update reported a branch preview Ready.
-- Always verify current preview/deployment state before relying on either claim.
+The version-layer runtime is legacy maintenance-only.
 
-## Repository hygiene risks
-- Multiple open draft PRs represent overlapping experiments and historical branches.
-- Some PRs are stacked on non-main bases.
-- Version naming spans D1–D4 and Builds 121–128, which can confuse product runtime work with developer-workspace work.
-- The manager must verify the active integration path and current head before every assignment.
+The target architecture is:
 
-## Durable engineering decisions
-- Preserve existing game rules and released behavior unless the user explicitly changes them.
-- Native runtime correctness is P0; visual completeness follows.
-- Never silence, skip, weaken, or delete a regression workflow to obtain green CI.
-- Use deterministic fixtures for retained historical surfaces rather than pointing old verifiers at a new active shell.
-- Use one shared preview contract rather than duplicated state-specific URL/key logic.
-- Keep PR #35 draft until P0 blockers and regression/evidence gates are resolved.
-- Do not merge PR #35, write to `main`, or deploy production without explicit user authorization.
+- `src/core/` — state machine/reducer, actions, lifecycle, effects, snapshots;
+- `src/game/` — deterministic headless rules, board, inventory, turn, win/draw, scoring;
+- `src/experience/` — input, camera, motion, UI, accessibility, mobile policies;
+- `src/network/` — rooms, authority, reconnect, idempotency, synchronization;
+- `src/render/` — Three.js scene projection only.
 
-## Durable team-system decisions
-- Rashed is the only manager; duplicate manager automations are forbidden.
-- Team: seven flexible workers plus independent read-only auditor Hakam.
-- Scheduling uses one manager and four two-person pods because the platform permits five active tasks.
-- Every employee still receives exactly one separate task, report, evidence trail, and evaluation per cycle.
-- At most four workers write code; code effort is capped at eight points per hour; L tasks must be split.
-- Root `AGENTS.md` defines mandatory coding, scope, validation, and branch rules.
-- Every implementation needs a separate reviewer and Hakam `MERGE_OK`; no self-approval.
-- Hakam scores manager/workers, maintains an evidence-based capability ledger, and can veto unsafe/stale/overlapping work.
-- A stale premise or materially moved head blocks the task; agents do not repeat completed work.
+One state snapshot is the source of truth. Local, bot, online, tutorial, and preview use the same game commands/results. Camera/input/network/render/UI are adapters and never decide game legality.
+
+Canonical references:
+
+- `docs/architecture/GAME_ARCHITECTURE.md`
+- `docs/architecture/MIGRATION_ROADMAP.md`
+- `docs/architecture/DEBT_REGISTER.md`
+
+## Migration decision
+
+Use incremental strangler-style slices behind reversible flags, not a broad rewrite:
+
+1. freeze new structural debt;
+2. contracts and deterministic state machine;
+3. pure game rules;
+4. replay/parity harness against accepted behavior;
+5. camera and input adapters;
+6. one complete local playable round;
+7. bot and authoritative online session;
+8. developer workspace adapters;
+9. visual parity and controlled cutover;
+10. human-approved legacy deletion.
+
+No new `app-game-vNNN.js`, source-text replacement, Blob bootstrap, hidden `globalThis.__yakolak*` contract, or duplicate state/rules is permitted.
+
+## Architecture enforcement added
+
+- root `AGENTS.md` and Copilot instructions enforce canonical direction;
+- `scripts/verify-architecture-guardrails.mjs` detects forbidden new patterns;
+- `.github/workflows/architecture-guardrails.yml` runs on relevant PR/push changes;
+- architecture verification is included in `npm test`;
+- every task reports affected debt IDs, `legacy-debt delta`, and `migration-gate delta`.
+
+## Current released/developer behavior to preserve
+
+- Existing game rules and released behavior remain unchanged unless the user explicitly authorizes a rule change.
+- Current accepted regression surfaces include v112 tutorial, v118 rounds, v125 wall journey, Build 126 clean entry, retained D3, and D4 audit.
+- D1 has had a recurring structural verification failure and requires fresh evidence before repair.
+- D4 still has legacy-maintenance gaps around wrapper/import loading, real three-player/turn state, native online lifecycle, and journey coverage. These are maintained only when needed to preserve/inspect behavior or unblock migration.
+
+## Team governance decisions
+
+- Rashed is the only manager. A second manager is forbidden.
+- Hakam is a permanent independent read-only final auditor with merge veto.
+- A separate read-only Architecture Steward is named per runtime-boundary change; this is not a second manager.
+- Scheduled pods run hourly, but employees may receive `NO_TASK`; the schedule does not justify busywork.
+- Default capacity is two code writers / five points until two consecutive audited implementation cycles pass strongly.
+- Every implementation requires an independent reviewer; architecture-sensitive work also requires `ARCH_OK`; Hakam must issue `MERGE_OK`.
+- Prompts follow `PROMPT_STANDARD.md` and separate `OBSERVED`, `INFERRED`, `CHANGED`, `VALIDATED`, and `UNKNOWN`.
+- No artifact means `NO_ARTIFACT`, never partial completion.
+- No PR #35/main/Production action or rule/secrets/schema/auth/destructive change without explicit user authorization.
 
 ## Immediate sequence
-1. Repair the current D1 structural failure without weakening retained D1 coverage.
-2. Remove Blob/import failure mode and prove both runtime hooks load.
-3. Correct 2/3/4-player and `turnIndex` previews.
-4. Implement deterministic native online lifecycle states after the seam is independently reviewed.
-5. Promote the journey audit to strict and close real coverage gaps.
-6. Run desktop/mobile functional evidence and real two-client online validation before proposing a release path.
+
+1. keep architecture/team guardrails green;
+2. issue a fresh demand-driven cycle after the architecture reset;
+3. implement Slice 1 contracts/state without DOM/Three.js;
+4. extract one pure rule slice with deterministic tests;
+5. build replay/parity before expanding visual or online states;
+6. perform only necessary legacy maintenance that preserves behavior or enables migration.
