@@ -4,6 +4,7 @@
 
 - Cycle: `003-architecture-reset`
 - Status: `PROCESS_FREEZE_UNTIL_NEXT_MANAGER_CYCLE`
+- President: Ahmad
 - Manager: Rashed
 - Auditor: Hakam
 - Integration branch: `agent/yakolak-team-os`
@@ -11,6 +12,17 @@
 - Previous source branch: `agent/developer-d2-workbench`
 - Snapshot time: `2026-07-28T20:14+03:00`
 - Current bottleneck: stop structural debt growth and establish a canonical migration path before more legacy/D4 feature work.
+
+## President communication channel
+
+- Human interface: `developer.html` — the President interface; D1/D2/D3/D4 identify workspace generations, not different human roles.
+- Contract: `ops/ai-team/PRESIDENT_PORTAL.md`.
+- President directives/messages/decisions: `/api/developer-president` on the current accessible team-branch Preview.
+- Rashed review outbox: `ops/ai-team/president-outbox.json`.
+- Rashed directive replies/statuses: `ops/ai-team/president-status.json`.
+- Rashed is the only team member who communicates managerial results to the President.
+- No item reaches the President review queue without reviewer `PASS`, `ARCH_OK` when required, Hakam `MERGE_OK`, CI `GREEN`, working Preview, exact commit SHA, and Rashed personal `PASS`.
+- President review approval does not authorize Production, rules, secrets, schema/authentication, destructive operations, or major deletion unless that exact scope is explicitly requested and confirmed.
 
 ## Critical diagnosis
 
@@ -56,25 +68,29 @@ The board overrides stale `READY` task blocks until the next manager cycle repla
 
 ## Next-cycle priority
 
-Rashed must choose one bottleneck and assign only ready work. Preferred sequence:
+Rashed must first reconcile President directives and decisions, then choose one bottleneck and assign only ready work. Preferred sequence:
 
-1. validate architecture guard on the latest PR head;
-2. establish Slice 1 contracts/state machine without DOM or Three.js;
-3. extract one pure game-rule contract with headless tests;
-4. build deterministic replay/parity before more visual/online feature states;
-5. perform only essential legacy maintenance needed to preserve current behavior or unblock migration.
+1. process the President channel and record acknowledgements/statuses;
+2. validate architecture and President portal guards on the latest PR head;
+3. establish Slice 1 contracts/state machine without DOM or Three.js;
+4. extract one pure game-rule contract with headless tests;
+5. build deterministic replay/parity before more visual/online feature states;
+6. perform only essential legacy maintenance needed to preserve current behavior or unblock migration.
 
 ## Release and merge gates
 
 - [ ] Architecture guard passes on current integration PR.
+- [ ] President portal trust-boundary test passes.
 - [ ] No new version runtime/source patch/Blob/global/state duplication.
 - [ ] Reviewer PASS for each implementation.
 - [ ] `ARCH_OK` for runtime-boundary work.
 - [ ] Hakam `MERGE_OK`.
 - [ ] Relevant deterministic/regression/browser/online evidence.
+- [ ] Working Vercel Preview and exact commit SHA.
+- [ ] Rashed personal inspection before President handoff.
 - [ ] `legacy-debt delta` and `migration-gate delta` recorded.
-- [ ] User explicitly authorizes PR #35/main/Production actions.
+- [ ] President explicitly authorizes PR #35/main/Production actions.
 
 ## Human gates
 
-No PR #35 merge, `main` write/merge, Production deployment, rule change, secrets/schema/authentication/destructive operation, or major deletion without explicit user authorization.
+No PR #35 merge, `main` write/merge, Production deployment, rule change, secrets/schema/authentication/destructive operation, or major deletion without explicit President authorization.
