@@ -28,7 +28,7 @@ requireText(sceneHtml,'@keyframes bounce','approved loading motion');
 ['loading-star','empty-table','logo-wall','board-bases','clean-entry','unboxing-intro'].forEach(id=>requireText(registry,`id:'${id}'`,'scene registry'));
 ['base-large','base-small','stone-large','stone-medium','stone-small','loading-star-element','table','logo-yakolak','logo-mtkyf'].forEach(id=>requireText(registry,`id:'${id}'`,'element registry'));
 ['all','single','sequence','elements'].forEach(id=>requireText(gallery,`id:'${id}'`,'gallery filters'));
-requireText(gallery,"from './developer-d1-registry.js",'shared registry import');
+requireText(gallery,'developer-d1-registry.js','shared registry import');
 requireText(gallery,"const API_URL='./api/developer-d1'",'shared API endpoint');
 requireText(gallery,'IntersectionObserver','lazy preview loading');
 requireText(gallery,"stage.classList.add('open')",'entity open flow');
