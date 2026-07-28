@@ -26,12 +26,34 @@ async function waitCardPreview(card,timeout=120000){
   if(state!=='ready')throw new Error(`preview ${await card.getAttribute('data-scene')} failed`);
 }
 
+async function openGalleryScene(page,id){
+  await page.locator(`[data-scene="${id}"] .scene-open`).click();
+  await page.locator('#devStage.open').waitFor();
+  const frame=page.frameLocator('#devStageFrame');
+  await frame.locator('body[data-scene-ready="true"]').waitFor({timeout:120000});
+  return frame;
+}
+
+async function closeGalleryScene(page){
+  await page.getByRole('button',{name:/العودة للمعرض/}).click();
+  await page.locator('#devStage').waitFor({state:'hidden'});
+}
+
+async function writeSceneNote(page,text){
+  await page.getByRole('button',{name:'فتح الملاحظات'}).click();
+  await page.locator('#devNotesPanel.open').waitFor();
+  await page.locator('#devNotesInput').fill(text);
+  await page.waitForFunction(()=>document.getElementById('devNotesStatus')?.textContent==='تم الحفظ');
+}
+
 async function checkGallery(browser,name,contextOptions){
   const context=await browser.newContext(contextOptions);
   const page=await context.newPage();
   const pageErrors=[];
   page.on('pageerror',error=>pageErrors.push(String(error?.stack||error)));
   await page.goto(`${BASE_URL}/developer.html`,{waitUntil:'domcontentloaded',timeout:60000});
+  await page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('yakolak:developer-d1:scene-note:')).forEach(key=>localStorage.removeItem(key)));
+  await page.reload({waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>document.body.dataset.developerBuild==='D1');
   const cards=page.locator('.scene-card');
   if(await cards.count()!==6)throw new Error(`${name}: expected 6 scene cards`);
@@ -45,20 +67,37 @@ async function checkGallery(browser,name,contextOptions){
   if(await page.locator('.scene-card:visible').count()!==2)throw new Error(`${name}: sequence filter did not show 2 cards`);
   await page.getByRole('button',{name:'كل المشاهد'}).click();
 
-  await page.locator('[data-scene="unboxing-intro"] .scene-open').click();
-  await page.locator('#devStage.open').waitFor();
-  const frame=page.frameLocator('#devStageFrame');
-  await frame.locator('body[data-scene-ready="true"]').waitFor({timeout:120000});
+  const unboxingNote=`${name} · ملاحظة إنترو فك العلبة`;
+  const loadingNote=`${name} · ملاحظة مشهد التحميل`;
+  const frame=await openGalleryScene(page,'unboxing-intro');
   const setupHidden=await frame.locator('body').getAttribute('data-setup-hidden');
   if(setupHidden!=='true')throw new Error(`${name}: unboxing stage was not isolated`);
-  await page.waitForTimeout(1300);
-  await page.screenshot({path:path.join(output,`${name}-02-open-scene.png`)});
-  await page.getByRole('button',{name:/العودة للمعرض/}).click();
-  await page.locator('#devStage').waitFor({state:'hidden'});
+  await writeSceneNote(page,unboxingNote);
+  await page.waitForTimeout(300);
+  await page.screenshot({path:path.join(output,`${name}-02-notes-panel.png`)});
+  await page.getByRole('button',{name:'إغلاق الملاحظات'}).click();
+  await closeGalleryScene(page);
+  const unboxingCard=page.locator('[data-scene="unboxing-intro"]');
+  if(!await unboxingCard.evaluate(element=>element.classList.contains('has-note')))throw new Error(`${name}: unboxing note indicator missing`);
+
+  await openGalleryScene(page,'loading-star');
+  await page.getByRole('button',{name:'فتح الملاحظات'}).click();
+  if(await page.locator('#devNotesInput').inputValue()!=='')throw new Error(`${name}: notes leaked between scenes`);
+  await page.locator('#devNotesInput').fill(loadingNote);
+  await page.waitForFunction(()=>document.getElementById('devNotesStatus')?.textContent==='تم الحفظ');
+  await page.getByRole('button',{name:'إغلاق الملاحظات'}).click();
+  await closeGalleryScene(page);
+
+  await openGalleryScene(page,'unboxing-intro');
+  await page.getByRole('button',{name:'فتح الملاحظات'}).click();
+  const restored=await page.locator('#devNotesInput').inputValue();
+  if(restored!==unboxingNote)throw new Error(`${name}: unboxing note was not restored`);
+  await page.getByRole('button',{name:'إغلاق الملاحظات'}).click();
+  await closeGalleryScene(page);
 
   if(pageErrors.length)throw new Error(`${name}: page errors\n${pageErrors.join('\n')}`);
   await context.close();
-  return{name,cards:6,previews:6,single:4,sequence:2,back:true};
+  return{name,cards:6,previews:6,single:4,sequence:2,back:true,notes:true,notesIsolated:true};
 }
 
 async function assertScene(page,id,state){
@@ -137,4 +176,4 @@ try{
 
 fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({build:'D1',url:BASE_URL,results,failures},null,2));
 if(failures.length)throw new Error(`Developer D1 visual failures: ${JSON.stringify(failures)}`);
-console.log('Developer D1 gallery and all six isolated scenes passed');
+console.log('Developer D1 gallery, isolated scenes, and per-scene notes passed');
