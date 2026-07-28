@@ -7,30 +7,30 @@ For implementation, create `agent/noor/<task-id>` from the latest assigned base 
 
 <!-- MANAGER TASK:START -->
 ## Manager task
-- Cycle: `004-canonical-entry-contract`
-- Task ID: `YAK-004-01`
+- Cycle: `006-correction-closure`
+- Task ID: `YAK-006-01`
 - Status: `READY`
-- Task type: `IMPLEMENT`
-- Effort: `M (3 points)`
+- Task type: `IMPLEMENT_CORRECTION`
+- Effort: `XS (1 point)`
 - Risk: `high-architecture-state`
-- OBSERVED: integration base `326c1548011bdc90717e25ee22c66187abdafbc8`; `MIGRATION_ROADMAP.md` Slice 1 requires Node-only contracts and Boot -> Entry -> Mode-selection transitions; no canonical `src/core` implementation was found at assignment time.
-- Single outcome: add the first deterministic, headless entry-state contract and focused Node tests.
-- Why now: this is the first executable migration gate after Phase 0 debt freeze.
-- Architecture/debt impact: affected debt `DEBT-MONOLITH/STATE-DUPLICATION`; expected legacy-debt delta `unchanged`; migration-gate delta `Slice 1 started`.
-- Base branch: latest `agent/yakolak-team-os`; stop if head moved materially or another Slice 1 PR exists.
-- Allowed scope: up to two stable modules under `src/core/` and one focused test under `tests/` or `scripts/`; at most 4 files / 200 logical changed lines.
-- Forbidden scope: legacy `app-game-v*`, developer preview/runtime files, DOM, Three.js, network, storage, timers, globals, Blob, source patching, package dependencies, feature flag wiring, game rules.
+- OBSERVED: PR #41 exact head `d5f2781d6189deae907ae2cf5c6db05d57c5774f`; Nada issued `ARCH_HOLD` because exported `VALID_MODES = Object.freeze(new Set(...))` remains mutable through `.add/.delete/.clear`; Hakam kept PR #41 HOLD.
+- Single outcome: make the accepted-mode contract externally immutable and prove external consumers cannot alter reducer legality.
+- Why now: this is the only identified blocker in the first canonical entry slice.
+- Architecture/debt impact: `DEBT-MONOLITH/STATE-DUPLICATION`; legacy-debt delta `unchanged`; migration-gate delta may move Slice 1 to merge-ready only after renewed gates.
+- Base/branch: continue the existing PR #41 branch `agent/noor/yak-004-01`; verify exact current head before editing and stop if it moved unexpectedly.
+- Allowed scope: `src/core/entry-contracts.js` and `tests/entry-reducer.test.mjs`; maximum 2 files / 60 logical changed lines.
+- Forbidden scope: reducer redesign, new state/actions/modes, game rules, DOM, Three.js, network, storage, timers, globals, Blob, source patching, dependencies, legacy files, portal/team-system files.
 - Acceptance criteria:
-  1. Named contracts cover `Action`, `AppState`, `Effect`, and `RenderSnapshot` in plain JS/JSDoc or equivalent existing style.
-  2. Deterministic transition function covers initial Boot, Boot -> Entry, Entry -> Mode selection.
-  3. Invalid events have an explicit deterministic result, not silent mutation.
-  4. Node-only tests prove initial state, valid transitions, and at least two invalid-event cases.
-  5. Architecture guard and syntax/focused tests pass.
-- Validation: `node --check` changed files; focused Node test; `npm run test:architecture`; report exact commands/results.
+  1. No exported mutable collection can change accepted modes.
+  2. Validation remains a pure deterministic contract, e.g. private collection plus `isValidMode` or immutable values.
+  3. A focused test proves attempted external mutation cannot change accepted/rejected mode behavior.
+  4. Existing five focused tests remain green.
+  5. `node --check`, focused Node tests, and Architecture Guardrails pass.
+- Validation: exact syntax commands; `node --test tests/entry-reducer.test.mjs`; `npm run test:architecture`; report exact results and new PR head.
 - Independent reviewer: Sami.
 - Architecture Steward: Nada.
-- Stop conditions: stale base, unclear state naming, need to touch legacy/runtime/browser files, scope exceeds M, or existing canonical implementation found.
-- Expected artifact: one draft PR to `agent/yakolak-team-os`; otherwise exact `BLOCKED` evidence.
+- Stop conditions: PR head mismatch, correction requires reducer redesign or >60 lines, new public API ambiguity, or forbidden file needed.
+- Expected artifact: update existing draft PR #41 with one bounded correction commit; otherwise exact `BLOCKED` evidence.
 <!-- MANAGER TASK:END -->
 
 <!-- WORKER REPORT:START -->
