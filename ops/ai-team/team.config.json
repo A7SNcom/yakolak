@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "timezone": "Asia/Riyadh",
+  "manager": "Rashed",
+  "auditor": "Hakam",
+  "workers": ["Noor", "Sami", "Lina", "Mazen", "Nada", "Omar", "Sara", "Hakam"],
+  "pods": [
+    {"id": "A", "minute": 8, "workers": ["Noor", "Sami"]},
+    {"id": "B", "minute": 18, "workers": ["Lina", "Mazen"]},
+    {"id": "C", "minute": 28, "workers": ["Nada", "Omar"]},
+    {"id": "D", "minute": 42, "workers": ["Sara", "Hakam"]}
+  ],
+  "managerMinute": 0,
+  "limits": {
+    "activeAutomations": 5,
+    "maxCodeWritersPerCycle": 4,
+    "maxCodeEffortPointsPerCycle": 8,
+    "maxTaskEffort": "M",
+    "minimumIndependentNonCodeTasks": 4
+  },
+  "effortPoints": {"XS": 1, "S": 2, "M": 3},
+  "implementationTypes": ["IMPLEMENT"],
+  "allowedTaskTypes": ["IMPLEMENT", "REVIEW", "TEST", "RESEARCH", "DOC", "INCIDENT", "AUDIT", "REVIEW/RESEARCH", "TEST/REVIEW"]
+}
