@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "lastPresidentEventId": 0,
+  "lastReconciledAt": null,
+  "blueprint": {
+    "canonicalRevision": 1,
+    "lastProcessedDraftVersion": 0,
+    "status": "canonical_only"
+  },
+  "directives": {}
+}
