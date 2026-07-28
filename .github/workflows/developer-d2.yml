@@ -36,6 +36,7 @@ jobs:
       - name: Check D2 application syntax
         run: |
           mkdir -p artifacts/developer-d2
+          cp src/developer-d2.js artifacts/developer-d2/source.js
           if node --check src/developer-d2.js > artifacts/developer-d2/syntax.txt 2>&1; then
             echo "Syntax check passed" > artifacts/developer-d2/syntax.txt
           else
