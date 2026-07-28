@@ -3,7 +3,10 @@ import {SVGLoader} from 'three/addons/loaders/SVGLoader.js';
 console.info('[Yakolak] DEVELOPER D1 SCENE RUNNER LOADED');
 
 const params=new URLSearchParams(location.search);
-const sceneId=params.get('scene')||'loading-star';
+const elementId=params.get('element')||'';
+const sceneId=elementId?'':(params.get('scene')||'loading-star');
+const entityKind=elementId?'element':'scene';
+const entityId=elementId||sceneId;
 const preview=params.get('preview')==='1';
 const loader=document.getElementById('sceneLoading');
 const loaderProjection=loader?.querySelector('.loaderProjection');
@@ -16,8 +19,11 @@ let replayTimer=0;
 const HIDDEN_UI=['yakolakGameHud','yakolakGameScore','yakolakGameSetup','yakolakTools','yakolakCalibrationPanel','yakolakOnlineDialog','yakolakTutorialDialog','yakolakOnlineEntry','yakolakHowTo','yakolakEntry','yakolakFloatingSettings','yakolakEntrySettings'];
 
 document.body.dataset.preview=preview?'1':'0';
-document.body.dataset.developerScene=sceneId;
-if(status)status.textContent=`D1 · ${sceneId}`;
+document.body.dataset.developerEntityKind=entityKind;
+document.body.dataset.developerEntity=entityId;
+if(sceneId)document.body.dataset.developerScene=sceneId;
+if(elementId)document.body.dataset.developerElement=elementId;
+if(status)status.textContent=`D1 · ${entityId}`;
 
 globalThis.__yakolakLoading={set(_value,text){if(status&&text)status.textContent=`D1 · ${text}`}};
 globalThis.__yakolakEntryLoader={
@@ -37,8 +43,8 @@ globalThis.__yakolakEntryLoader={
 
 function markReady(details={}){
   Object.assign(document.body.dataset,{sceneReady:'true',...details});
-  globalThis.__yakolakDeveloperD1Scene={build:'D1',sceneId,preview,...details};
-  parent.postMessage({type:'yakolak-developer-scene-ready',scene:sceneId,build:'D1',details},'*');
+  globalThis.__yakolakDeveloperD1Scene={build:'D1',entityKind,entityId,sceneId,elementId,preview,...details};
+  parent.postMessage({type:'yakolak-developer-scene-ready',entityKind,entityId,scene:sceneId,element:elementId,build:'D1',details},'*');
 }
 
 async function waitForGame(){
@@ -47,7 +53,7 @@ async function waitForGame(){
     if(game?.THREE&&game?.renderer&&game?.camera&&game?.gameGroup?.parent&&game?.meshes&&document.body.classList.contains('yakolak-ready'))return game;
     await wait(25);
   }
-  throw new Error(`Developer D1 could not load ${sceneId}`);
+  throw new Error(`Developer D1 could not load ${entityKind} ${entityId}`);
 }
 
 function renderGame(game){
@@ -105,6 +111,8 @@ function prepareRoom(game){
 function setCamera(game,position,target,fov=44){
   game.camera.position.set(...position);
   game.camera.fov=fov;
+  game.camera.near=.1;
+  game.camera.far=12000;
   game.camera.updateProjectionMatrix();
   game.camera.lookAt(new game.THREE.Vector3(...target));
   renderGame(game);
@@ -136,6 +144,12 @@ function hideGameChildren(game){
   game.gameGroup.traverse?.(object=>{if(object!==game.gameGroup)object.visible=false});
 }
 
+function resetGameTransform(game){
+  game.gameGroup.position.set(0,0,0);
+  game.gameGroup.rotation.set(0,0,0);
+  game.gameGroup.scale.set(1,1,1);
+}
+
 function configureEmptyTable(game){
   const scene=prepareRoom(game);
   game.gameGroup.visible=false;
@@ -158,6 +172,7 @@ function applyMeshPose(mesh,position,rotation){
 function configureBoardBases(game){
   prepareRoom(game);
   hideGameChildren(game);
+  resetGameTransform(game);
   game.gameGroup.visible=true;
   const meshes=game.meshes||{};
   const selected=[];
@@ -233,6 +248,57 @@ async function configureLogoWall(game){
   return{mode:'static',composition:'two-tone-logo-wall',logoRendering:'svg-geometry-two-tone'};
 }
 
+async function configureLogoElement(game,id){
+  const scene=prepareRoom(game);
+  game.gameGroup.visible=false;
+  scene.background?.set?.('#d8d7d1');
+  const url=id==='logo-yakolak'?'./assets/YAKOLAK.svg?v=D1-element':'./assets/MTKYF.svg?v=D1-element';
+  const svg=await loadOfficialSvg(url);
+  const logo=officialLogo(game.THREE,svg,id==='logo-yakolak'?640:560,`d1-element-${id}`);
+  logo.position.set(0,0,0);
+  scene.add(logo);
+  frameObjects(game,[logo],{direction:[0,0,1],fov:40,padding:1.18});
+  return{mode:'element',composition:id,source:id==='logo-yakolak'?'assets/YAKOLAK.svg':'assets/MTKYF.svg'};
+}
+
+function isolateMeshElement(game,mesh,id,{rotation=[-90,0,0],direction=[1,.85,1],fov=40,padding=1.35}={}){
+  prepareRoom(game);
+  hideGameChildren(game);
+  resetGameTransform(game);
+  game.gameGroup.visible=true;
+  if(!mesh)throw new Error(`Missing D1 element ${id}`);
+  mesh.visible=true;
+  mesh.position.set(0,0,0);
+  mesh.rotation.set(...rotation.map(rad));
+  frameObjects(game,[mesh],{direction,fov,padding});
+  return{mode:'element',composition:id,visibleObjects:'1'};
+}
+
+async function configureElement(game,id){
+  const scene=game.gameGroup.parent;
+  if(id==='table'){
+    prepareRoom(game);
+    game.gameGroup.visible=false;
+    const table=findTable(scene);
+    if(!table)throw new Error('Missing D1 table element');
+    frameObjects(game,[table],{direction:[1,.72,1],fov:42,padding:1.12});
+    return{mode:'element',composition:'table',visibleObjects:'1'};
+  }
+  if(id==='logo-yakolak'||id==='logo-mtkyf')return configureLogoElement(game,id);
+  if(id==='base-large')return isolateMeshElement(game,game.meshes?.['9'],id,{padding:1.28});
+  if(id==='base-small')return isolateMeshElement(game,game.meshes?.['3-right'],id,{padding:1.42});
+  const type={
+    'stone-large':'l',
+    'stone-medium':'m',
+    'stone-small':'s'
+  }[id];
+  if(type){
+    const piece=game.pieces?.find(candidate=>candidate.type===type&&candidate.dir==='front')||game.pieces?.find(candidate=>candidate.type===type);
+    return isolateMeshElement(game,piece?.mesh,id,{direction:[1,.7,1],fov:38,padding:1.7});
+  }
+  throw new Error(`Unknown D1 element ${id}`);
+}
+
 function enforceIntroIsolation(game){
   hideDeveloperNoise(game);
   if(game.setupGroup)game.setupGroup.visible=false;
@@ -265,7 +331,7 @@ async function configureUnboxing(game){
   return{mode:'sequence',composition:'unboxing-only',setupHidden:'true',replaySource:'keyboard-runtime'};
 }
 
-async function loadThreeScene(){
+async function loadThreeEntity(){
   if(loader){
     loader.id='yakolakLoader';
     loader.remove=()=>{loader.dataset.removePending='1'};
@@ -273,6 +339,14 @@ async function loadThreeScene(){
   await import('./mobile-clarity-v120.js?v=D1-developer');
   await import('./app-game-v114.js?v=D1-developer');
   const game=await waitForGame();
+
+  if(elementId){
+    const details=await configureElement(game,elementId);
+    realRemoveLoader();
+    renderGame(game);
+    markReady(details);
+    return;
+  }
 
   if(sceneId==='clean-entry'){
     await import('./entry-v126.js?v=D1-developer');
@@ -295,13 +369,13 @@ async function loadThreeScene(){
 
 addEventListener('pagehide',()=>{if(replayTimer)clearInterval(replayTimer)});
 
-if(sceneId==='loading-star'){
-  markReady({mode:'single',composition:'approved-loading-star'});
+if(sceneId==='loading-star'||elementId==='loading-star-element'){
+  markReady({mode:elementId?'element':'single',composition:elementId?'loading-star-element':'approved-loading-star'});
 }else{
-  loadThreeScene().catch(error=>{
-    console.error('[Yakolak] Developer D1 scene failed',error);
+  loadThreeEntity().catch(error=>{
+    console.error('[Yakolak] Developer D1 entity failed',error);
     if(status)status.textContent='D1 · ERROR';
     document.body.dataset.sceneError=String(error?.message||error);
-    parent.postMessage({type:'yakolak-developer-scene-error',scene:sceneId,error:String(error?.message||error)},'*');
+    parent.postMessage({type:'yakolak-developer-scene-error',entityKind,entityId,scene:sceneId,element:elementId,error:String(error?.message||error)},'*');
   });
 }
