@@ -35,14 +35,15 @@ For implementation, create `agent/noor/<task-id>` from the latest assigned base 
 
 <!-- WORKER REPORT:START -->
 ## Worker report
-- Result: `PENDING`
-- Summary: —
-- Observed head / freshness: —
-- Commit / PR / evidence: —
-- Files inspected or changed: —
-- Budget used: —
-- Validation: —
-- Residual risks: —
-- Recommended next task: —
-- Team note: —
+- Result: `ARTIFACT_READY`
+- Summary: `CHANGED` added canonical JSDoc contracts, a deterministic Boot -> Entry -> Mode-selection reducer, explicit rejected-transition effects, render snapshot projection, and five Node-only tests.
+- Observed head / freshness: `OBSERVED` worker branch was created from latest integration ref at base `cee65db6455ca9ec314152d46fcda9140f623450`; the board's embedded snapshot SHA `326c1548...` was stale but intervening changes were coordination/report files only, with no `src/core` overlap.
+- Commit / PR / evidence: head `d5f2781d6189deae907ae2cf5c6db05d57c5774f`; draft PR #41 `https://github.com/A7SNcom/yakolak/pull/41`.
+- Files inspected or changed: inspected `AGENTS.md`, `TEAM_OS.md`, `PROMPT_STANDARD.md`, `MIGRATION_ROADMAP.md`, architecture guard, and `BOARD.md`; changed `src/core/entry-contracts.js`, `src/core/entry-reducer.js`, `tests/entry-reducer.test.mjs` only.
+- Budget used: 3 files, 151 added logical lines, within M / 200-line limit.
+- Validation: `VALIDATED` local isolated ESM harness: `node --check` both source modules passed; `node --test tests/entry-reducer.test.mjs` passed 5/5. Full repository `npm run test:architecture` is `UNKNOWN` until PR CI completes; no claim of green CI is made.
+- Residual risks: JSDoc import types need reviewer confirmation for repository tooling; integration branch moved after manager snapshot; PR remains unmergeable until Sami PASS, Nada ARCH_OK, architecture CI, and Hakam MERGE_OK.
+- Architecture/debt: affected `DEBT-MONOLITH/STATE-DUPLICATION`; legacy-debt delta `unchanged`; migration-gate delta `Slice 1 started`.
+- Recommended next task: Sami independently review PR #41 against the exact base/head and acceptance criteria; Nada separately issue architecture verdict.
+- Team note: أول حجر نظيف في الأساس—الآن نخلّي المراجعين يختبرونه بدون مجاملة 😄
 <!-- WORKER REPORT:END -->
