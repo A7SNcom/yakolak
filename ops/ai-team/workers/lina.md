@@ -7,29 +7,30 @@ For implementation, create `agent/lina/<task-id>` from the latest assigned base 
 
 <!-- MANAGER TASK:START -->
 ## Manager task
-- Cycle: `002-evidence-first`
-- Task ID: `YAK-002-03`
+- Cycle: `006-correction-closure`
+- Task ID: `YAK-006-02`
 - Status: `READY`
-- Task type: `IMPLEMENT`
+- Task type: `IMPLEMENT_PROCESS_GUARD`
 - Effort: `S (2 points)`
-- Risk: `high-runtime-loading`
-- Objective: Remove only the Blob-relative resolution of `./online-client-v114.js` from the D4 wrapper and prove the resolved URL is origin-based.
-- Why now: D4 preview evidence is untrustworthy until the real game and online hooks load deterministically; cycle 001 produced no artifact, so scope is reduced.
-- Observed base/head: source `d8d2a50f4a604dc4ba95c5ef762a66ffa7fb92c2`; integration snapshot `b5279840c52722d60c69069e7f05e05dd458cda0`; observed `2026-07-28T17:01Z`.
-- Base branch: latest `agent/yakolak-team-os` after verifying target files and locks.
-- Allowed files: `src/app-game-developer-d4.js` and one focused verifier under `scripts/`.
-- Forbidden files / conflicts: `developer-scene.html`, production entry/runtime, D1, registry/state, online lifecycle redesign, dependencies.
-- Change budget: at most 2 files / 80 logical changed lines.
+- Risk: `medium-process-contract`
+- OBSERVED: Omar diagnosed PR #43 AI Team OS failure as `STALE_VERIFIER`; `scripts/verify-ai-team-os.mjs` hard-codes obsolete literal labels while current canonical task contracts preserve the required semantics under labels such as `OBSERVED`, `Single outcome`, `Allowed scope`, `Forbidden scope`, `Validation`, and `Stop conditions`.
+- Single outcome: make the verifier schema-aware so it accepts current semantic labels while continuing to reject genuinely incomplete task contracts.
+- Why now: required team-system CI is red and blocks trustworthy review of PR #43; bypassing or weakening the verifier is forbidden.
+- Architecture/debt impact: no game/runtime debt; governance invariant remains equal or stronger; President portal remains inactive.
+- Base branch: latest `agent/yakolak-team-os`; create `agent/lina/yak-006-02` after verifying no competing verifier PR exists.
+- Allowed scope: `scripts/verify-ai-team-os.mjs` plus one focused fixture/test file under `scripts/` or `tests/`; maximum 2 files / 100 logical changed lines.
+- Forbidden scope: workflow disabling/skipping, PR #43 special-case, reducing required semantic fields, changing worker task contracts, portal/runtime/game files, dependencies, test deletion, broad refactor.
 - Acceptance criteria:
-  1. Reproduce or statically prove the old Blob-relative failure mode.
-  2. Resolve the online-client URL from repository/page origin before Blob execution.
-  3. Keep one bootstrap path with no hidden fallback.
-  4. Focused verifier fails on the old pattern and passes on the new pattern.
-  5. Syntax checks pass.
-- Required validation: syntax checks, focused verifier, exact old/new resolved URL evidence; browser readiness only if available without relying on rate-limited Vercel.
-- Independent reviewer: Nada.
-- Expected artifact: bounded draft PR or exact `BLOCKED`; absence is `NO_ARTIFACT`.
-- Context links: `AGENTS.md`, `ops/ai-team/BOARD.md`, `src/app-game-developer-d4.js`, `src/online-client-v114.js`, historical PR #26 pattern.
+  1. A versioned or explicit normalization layer maps accepted canonical aliases to required semantic fields.
+  2. Current cycle-005/006 task contracts pass without PR-specific exceptions.
+  3. An intentionally incomplete fixture fails for the exact missing semantic invariant.
+  4. Effort, budget, reviewer, Architecture Steward/Hakam, locks, and human-gate checks remain enforced.
+  5. Existing `Verify AI Team OS` command and syntax checks pass locally.
+- Validation: `node --check scripts/verify-ai-team-os.mjs`; run verifier against repository; run positive and negative focused fixtures; report exact commands/results.
+- Independent reviewer: Omar.
+- Architecture Steward: not required; this changes process validation, not runtime/state/rules/network/bootstrap/dependencies.
+- Stop conditions: correction needs workflow bypass, more than two files/100 lines, invariant meaning is ambiguous, or another active verifier correction exists.
+- Expected artifact: one bounded draft PR to `agent/yakolak-team-os`; otherwise exact `BLOCKED` evidence.
 <!-- MANAGER TASK:END -->
 
 <!-- WORKER REPORT:START -->
