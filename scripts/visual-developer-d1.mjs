@@ -37,6 +37,7 @@ async function openGalleryScene(page,id){
 async function closeGalleryScene(page){
   await page.getByRole('button',{name:/العودة للمعرض/}).click();
   await page.locator('#devStage').waitFor({state:'hidden'});
+  await page.waitForFunction(()=>!location.hash.startsWith('#scene='));
 }
 
 async function writeSceneNote(page,text){
