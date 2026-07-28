@@ -36,14 +36,15 @@ For implementation, create `agent/noor/<task-id>` from the latest assigned base 
 <!-- WORKER REPORT:START -->
 ## Worker report
 - Result: `ARTIFACT_READY`
-- Summary: `CHANGED` added canonical JSDoc contracts, a deterministic Boot -> Entry -> Mode-selection reducer, explicit rejected-transition effects, render snapshot projection, and five Node-only tests.
-- Observed head / freshness: `OBSERVED` worker branch was created from latest integration ref at base `cee65db6455ca9ec314152d46fcda9140f623450`; the board's embedded snapshot SHA `326c1548...` was stale but intervening changes were coordination/report files only, with no `src/core` overlap.
-- Commit / PR / evidence: head `d5f2781d6189deae907ae2cf5c6db05d57c5774f`; draft PR #41 `https://github.com/A7SNcom/yakolak/pull/41`.
-- Files inspected or changed: inspected `AGENTS.md`, `TEAM_OS.md`, `PROMPT_STANDARD.md`, `MIGRATION_ROADMAP.md`, architecture guard, and `BOARD.md`; changed `src/core/entry-contracts.js`, `src/core/entry-reducer.js`, `tests/entry-reducer.test.mjs` only.
-- Budget used: 3 files, 151 added logical lines, within M / 200-line limit.
-- Validation: `VALIDATED` local isolated ESM harness: `node --check` both source modules passed; `node --test tests/entry-reducer.test.mjs` passed 5/5. Full repository `npm run test:architecture` is `UNKNOWN` until PR CI completes; no claim of green CI is made.
-- Residual risks: JSDoc import types need reviewer confirmation for repository tooling; integration branch moved after manager snapshot; PR remains unmergeable until Sami PASS, Nada ARCH_OK, architecture CI, and Hakam MERGE_OK.
-- Architecture/debt: affected `DEBT-MONOLITH/STATE-DUPLICATION`; legacy-debt delta `unchanged`; migration-gate delta `Slice 1 started`.
-- Recommended next task: Sami independently review PR #41 against the exact base/head and acceptance criteria; Nada separately issue architecture verdict.
-- Team note: أول حجر نظيف في الأساس—الآن نخلّي المراجعين يختبرونه بدون مجاملة 😄
+- Summary: `CHANGED` replaced the exported mutable Set with a frozen validation facade backed by a private Set, preserving the reducer's `.has()` contract while removing external mutation methods. Added one focused test proving consumers cannot replace validation or alter accepted/rejected behavior.
+- Observed head / freshness: `OBSERVED` PR #41 was open at assigned head `d5f2781d6189deae907ae2cf5c6db05d57c5774f` immediately before editing; corrected exact head is `9da9afc4e2690feab03e66ad1a19bb8621cc5f7e`.
+- Commit / PR / evidence: correction commits `a60b9ae73e1b57d06226850d82e03d3367977e3e` and `9da9afc4e2690feab03e66ad1a19bb8621cc5f7e`; draft PR #41 `https://github.com/A7SNcom/yakolak/pull/41`.
+- Files inspected or changed: `CHANGED` only `src/core/entry-contracts.js` and `tests/entry-reducer.test.mjs`; reducer and all forbidden areas remained untouched.
+- Budget used: 2 files; 22 net additions beyond the prior PR state, within XS correction ceiling and the explicit 2-file / 60-line task budget.
+- Validation: `OBSERVED` GitHub queued `Verify Architecture Guardrails` run `30395085282` for exact corrected head. `UNKNOWN` until CI completes: syntax, six focused tests, and architecture guard conclusion; no green claim is made before the run finishes.
+- Acceptance evidence: `VALID_MODES` is frozen and exposes only `has`; its backing Set is module-private. The new test asserts `.add/.delete/.clear` are absent, assignment to `.has` throws, a canonical mode remains accepted, and an external mode remains rejected.
+- Residual risks: renewed independent reviewer and Architecture Steward must confirm that the facade is an acceptable stable public contract; CI is still queued.
+- Architecture/debt: affected `DEBT-MONOLITH/STATE-DUPLICATION`; legacy-debt delta `unchanged`; migration-gate delta `correction artifact ready`, not merge-ready until green validation plus Sami PASS, Nada ARCH_OK, and Hakam MERGE_OK.
+- Recommended next task: Sami performs the renewed exact-head independent review only after the corrected artifact and CI evidence are available; Nada separately renews the architecture verdict.
+- Team note: الباب الجانبي اتقفل؛ الآن ننتظر الاختبار والمراجعة المستقلة قبل أي دمج. 🔒
 <!-- WORKER REPORT:END -->
