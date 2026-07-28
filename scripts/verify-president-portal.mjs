@@ -20,7 +20,7 @@ const blueprint=JSON.parse(read('ops/ai-team/development-blueprint.json'));
 
 includes(ui,["const API='./api/developer-president'","gates.reviewer==='PASS'","gates.manager==='PASS'","gates.hakam==='MERGE_OK'","gates.ci==='GREEN'","document.body.dataset.developerRole='president'","wireSingleChannel"],'President UI');
 includes(api,["summary||''","activitySummary","hasNewPresidentInput","blueprint_save","blueprint_conflict","updated_by='president'","sameOrigin(req)"],'President API');
-includes(blueprintUi,["const CANONICAL='./ops/ai-team/development-blueprint.json'","البرمجة بعد التوثيق","action:'blueprint_save'","expectedVersion","baseRevision","president blueprint changed"],'Blueprint UI');
+includes(blueprintUi,["const CANONICAL='./ops/ai-team/development-blueprint.json'","البرمجة بعد التوثيق","action:'blueprint_save'","expectedVersion","baseRevision","سيصبح عمل راشد القديم متوقفًا"],'Blueprint UI');
 includes(html,['developer-president.js','developer-blueprint.js'],'developer.html');
 includes(manager,['?summary=1&after=<lastPresidentEventId>','do not fetch or reanalyse the full channel','Programming after documentation','blueprintNodeId','blueprintRevision','pause ordinary backlog initiative'],'manager runbook');
 includes(contract,['The President may use the portal many times in one day or only once','Programming after documentation','optimistic concurrency','blueprintNodeId','Rashed personally inspected'],'President contract');
