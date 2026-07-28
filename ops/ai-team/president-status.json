@@ -3,7 +3,7 @@
   "lastPresidentEventId": 0,
   "lastReconciledAt": null,
   "blueprint": {
-    "canonicalRevision": 1,
+    "canonicalRevision": 2,
     "lastProcessedDraftVersion": 0,
     "status": "canonical_only"
   },
