@@ -50,7 +50,7 @@ requireText(api,"console.info('[Yakolak D1 shared feedback]'",'assistant-readabl
 requireText(runner,"elementId=params.get('element')",'element route');
 requireText(runner,'configureElement','element isolation');
 requireText(runner,"id==='base-large'",'large base element');
-requireText(runner,"id==='stone-small'",'stone elements');
+requireText(runner,"'stone-small':'s'",'stone elements');
 requireText(runner,'configureLogoElement','logo elements');
 requireText(runner,"sceneId==='loading-star'||elementId==='loading-star-element'",'loading star scene and element');
 requireText(runner,'configureEmptyTable','empty table scene');
