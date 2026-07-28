@@ -1,75 +1,105 @@
 # Yakolak Agent Instructions
 
-These rules apply to every AI agent working in this repository. More specific `AGENTS.md` files may add constraints but must not weaken this contract.
+These rules apply to every AI agent in this repository. More specific `AGENTS.md` files may add constraints but cannot weaken this contract.
 
-## Mission
-Ship Yakolak as a stable, understandable, human-playable online 3D board game. Improve the developer workspace only when it helps inspect, test, review, compare, migrate, or safely ship the real game.
+## Mission and authority
+
+Ship Yakolak as a stable, understandable, human-playable online 3D board game.
+
+- Ahmad is the President and final product authority.
+- Rashed is the sole delegated manager and initiative owner.
+- Rashed plans, delegates, reviews, and decides; he does not implement product code.
+- Workers execute bounded tasks; reviewers, Architecture Steward, and Hakam independently verify.
+
+Improve the developer workspace only when it strengthens President direction, visual planning, execution traceability, testing, review, migration, or safe delivery of the real game.
 
 ## Read before editing
-1. Read the task contract and only its linked context.
-2. Read `docs/architecture/GAME_ARCHITECTURE.md`, `MIGRATION_ROADMAP.md`, and relevant entries in `DEBT_REGISTER.md` for any runtime/game change.
-3. Re-read the assigned base branch head and every allowed file immediately before writing.
-4. Identify the existing source of truth. Do not create a parallel state model, router, registry, lifecycle, rule set, or visual substitute.
-5. Check active ownership in `ops/ai-team/BOARD.md`.
-6. Separate in your report: verified observations, engineering inference, action taken, and unresolved uncertainty.
+
+1. Read the exact task contract and only linked context.
+2. Read `ops/ai-team/RASHED_LEADERSHIP_OS.md`, `TEAM_OS.md`, `PROMPT_STANDARD.md`, and the referenced node in `development-blueprint.json`.
+3. Read architecture/migration/debt documents for runtime/game changes.
+4. Re-read the assigned base head and every allowed file immediately before writing.
+5. Check current ownership in `BOARD.md`.
+6. Identify the existing source of truth; never create a parallel state, router, registry, lifecycle, rule set, or visual substitute.
+7. Separate `OBSERVED`, `INFERRED`, `CHANGED`, `VALIDATED`, and `UNKNOWN` in reports.
+
+## Programming-after-documentation gate
+
+Normal implementation is forbidden without:
+
+- a canonical `blueprintNodeId` and `blueprintRevision`;
+- node status `ready` or `in_progress`;
+- documented problem/opportunity, intended behavior, non-goals, acceptance criteria, owner, reviewer, risk, and dependencies;
+- a task ID linked to the node.
+
+Immediately before writing, verify that the blueprint revision and President intent remain current. If a material unreconciled President amendment affects the node, stop with `BLOCKED: president blueprint changed`.
+
+Workers do not alter strategy or self-assign follow-up work. They may propose a next step; Rashed accepts, changes, parks, or rejects it.
+
+Emergency security/data/production containment may precede full documentation only to prevent harm; Rashed documents the incident and assigns follow-up in the same cycle.
 
 ## Architectural direction
+
 - The version-layer runtime is legacy maintenance-only.
-- Do not add another `app-game-vNNN.js`, wrapper layer, runtime source-text replacement, Blob module bootstrap, hidden `globalThis.__yakolak*` contract, or DOM/mesh state as a source of truth.
-- Net-new behavior must advance the canonical modules described in `GAME_ARCHITECTURE.md`: `core`, `game`, `experience`, `network`, and `render`.
-- One state machine/reducer owns lifecycle transitions. State changes use named actions/commands.
-- Game rules are deterministic and headless. They do not import DOM, Three.js, fetch, storage, animation frames, or wall-clock timers.
+- Do not add another `app-game-vNNN.js`, wrapper layer, runtime source-text replacement, Blob bootstrap, hidden `globalThis.__yakolak*`, or DOM/mesh state as truth.
+- Net-new behavior advances canonical `core`, `game`, `experience`, `network`, and `render` modules.
+- One state machine/reducer owns lifecycle transitions through named actions/commands.
+- Game rules are deterministic and headless; no DOM, Three.js, fetch, storage, animation frame, or wall-clock dependency.
 - Local, bot, online, tutorial, and developer preview consume the same game commands/results.
-- Camera, input, renderer, UI, and network are adapters; none may decide game legality.
-- Stable source filenames are required. Build/release versions belong in metadata, tags, and changelogs.
-- A legacy-only feature requires explicit user authorization, a registered debt increase, and a removal task.
+- Camera, input, renderer, UI, and network are adapters and never decide legality.
+- Stable source filenames are required; versions belong in metadata, tags, and changelogs.
+- Legacy-only features require explicit President authorization, registered debt increase, and removal task.
 
 ## Scope and effort
-- One task must produce one observable outcome.
-- `XS`: <=15 minutes, one file, <=40 logical changed lines.
-- `S`: <=30 minutes, at most two files, <=80 logical changed lines.
-- `M`: <=50 minutes, at most four tightly related files, <=200 logical changed lines.
-- `L`: larger than one hourly run. Do not implement it; split it and report the first safe slice.
-- Generated artifacts, lockfiles, and snapshots do not count toward the line limit, but must be justified.
+
+- One task produces one observable outcome.
+- `XS`: <=15 minutes, one file, <=40 logical lines.
+- `S`: <=30 minutes, at most two files, <=80 logical lines.
+- `M`: <=50 minutes, at most four tightly related files, <=200 logical lines.
+- `L`: never implement in one run; split first.
 - Do not reformat, rename, or modernize unrelated code.
-- `NO_TASK` is preferable to low-value busywork or a stale premise.
+- `NO_TASK` is preferable to stale or low-value activity.
 
 ## Coding rules
-- Prefer readable ES modules and named functions over compressed one-line code.
+
+- Prefer readable ES modules and named functions over compressed code.
 - Use `const` by default and `let` only for real reassignment. Avoid `var`.
-- Keep configuration/data separate from UI behavior, preview routing separate from workspace state, and online transport separate from visual presentation.
-- Reuse existing helpers and contracts. Do not duplicate business rules in preview-only code.
-- Make state transitions explicit and deterministic. Online operations must be idempotent or safely retryable.
-- Do not hide errors. Surface actionable context and preserve the original cause.
-- Do not use arbitrary sleeps as correctness. Poll only with a bounded timeout and a verifiable readiness condition.
-- Guard DOM access and asynchronous cleanup. Clear timers, listeners, actors, subscriptions, and pending work on teardown.
+- Separate configuration/data from UI behavior, preview routing from workspace state, and transport from presentation.
+- Reuse existing helpers/contracts; never duplicate game rules in preview or network code.
+- Make transitions explicit/deterministic; online operations must be idempotent or safely retryable.
+- Surface actionable errors and preserve original causes.
+- Do not use arbitrary sleeps as correctness; use bounded readiness checks.
+- Clean timers, listeners, actors, subscriptions, and pending work on teardown.
 - Never embed secrets, tokens, private URLs, or production credentials.
-- Do not add a dependency when a small native solution exists. Any dependency requires a reason, size/security consideration, and a test.
-- New modules should have one reason to change. If rules, rendering, network, and UI appear in one file, stop and split the design before implementation.
+- Dependencies require reason, size/security consideration, and tests.
+- If rules, rendering, network, and UI appear in one file, stop and split the design.
 
 ## Game-specific rules
-- Preserve released game rules unless the user explicitly authorizes a rule change.
-- Native runtime state is the source of truth during legacy maintenance. Do not replace a real game or online state with a fake overlay when the native state can be rendered.
-- Player counts, turn ownership, legal moves, scoring, rounds, reconnect behavior, and rematches must match the actual runtime contract.
-- Protect desktop and mobile behavior. Do not increase DPR, geometry, texture size, GPU work, or animation cost without before/after evidence.
-- Every migrated rule/transition requires deterministic replay or parity evidence against the accepted behavior.
+
+- Preserve released rules unless the President explicitly authorizes a change.
+- Native runtime state remains truth during legacy maintenance; do not substitute fake overlays.
+- Player counts, turn ownership, legal moves, scoring, rounds, reconnect, and rematches must match runtime contracts.
+- Protect desktop/mobile performance; no higher DPR/geometry/texture/GPU/animation cost without evidence.
+- Every migrated rule/transition requires deterministic replay or parity evidence.
 
 ## Validation ladder
-Run the smallest sufficient ladder, in order:
-1. architecture guardrail and syntax/type/static checks for every changed file;
-2. focused deterministic test for the changed contract;
-3. relevant existing regression suite;
-4. browser functional test for UI/runtime changes;
-5. desktop and mobile visual evidence when appearance or interaction changes;
-6. real online two-client evidence for networking/lifecycle changes.
 
-Never delete, skip, weaken, invert, or bypass a test to make CI green. A failing unrelated test must be reported, not concealed.
+1. blueprint/node/revision validity plus architecture/static checks;
+2. focused deterministic test;
+3. relevant regression suite;
+4. browser functional test for UI/runtime;
+5. desktop/mobile visual evidence for appearance/interaction;
+6. real two-client evidence for networking/lifecycle.
+
+Never weaken, skip, delete, invert, or bypass tests for green CI. Report unrelated failures honestly.
 
 ## Branch and review
-- Work from the task's exact base branch on `agent/<name>/<task-id>`.
-- Open one draft PR to `agent/yakolak-team-os` for implementation work.
-- Do not push to `main`, merge PR #35, deploy production, alter secrets, delete branches, or perform destructive data/schema work without explicit user approval.
-- No author self-approval. Implementation requires a named independent reviewer, an architecture-steward verdict when runtime boundaries change, and Hakam's cycle verdict before manager merge.
+
+- Work from the exact base on `agent/<name>/<task-id>`.
+- Open one draft PR to `agent/yakolak-team-os` for implementation.
+- No `main`, PR #35 merge, Production deployment, rules, secrets, authentication, destructive schema/data work, material recurring cost, major deletion, or branch deletion without exact President authorization.
+- No self-approval. Implementation requires an independent reviewer, Architecture Steward when relevant, Hakam verdict, and Rashed's management decision.
 
 ## Required handoff
-Report the task ID, outcome, commit/PR, files changed, validation commands and results, evidence, residual risks, affected debt IDs, `legacy-debt delta`, `migration-gate delta`, and the smallest next task. Claims without exact evidence are unverified.
+
+Report task ID, `blueprintNodeId`, `blueprintRevision`, outcome, commit/PR, files, validation/evidence, residual risks, debt IDs, `legacy-debt delta`, `migration-gate delta`, `blueprint delta`, and smallest proposed next task. Claims without exact evidence are unverified.
