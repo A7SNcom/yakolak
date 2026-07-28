@@ -1,0 +1,47 @@
+name: Verify Architecture Guardrails
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'scripts/verify-architecture-guardrails.mjs'
+      - 'docs/architecture/**'
+      - 'AGENTS.md'
+      - 'package.json'
+      - '.github/workflows/architecture-guardrails.yml'
+  push:
+    branches:
+      - agent/yakolak-team-os
+    paths:
+      - 'src/**'
+      - 'scripts/verify-architecture-guardrails.mjs'
+      - 'docs/architecture/**'
+      - 'AGENTS.md'
+      - 'package.json'
+      - '.github/workflows/architecture-guardrails.yml'
+  workflow_dispatch:
+
+jobs:
+  architecture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check guardrail script syntax
+        run: node --check scripts/verify-architecture-guardrails.mjs
+      - name: Verify architecture policy
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin "${{ github.base_ref }}:${{ github.base_ref }}" --force
+            node scripts/verify-architecture-guardrails.mjs --diff "${{ github.base_ref }}"
+          else
+            node scripts/verify-architecture-guardrails.mjs
+          fi
