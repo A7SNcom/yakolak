@@ -140,6 +140,11 @@ function findTable(scene){
   return scene.getObjectByName('yakolak-svg-table')||scene.getObjectByName('yakolak-fallback-simple-table');
 }
 
+function hideTable(scene){
+  const table=findTable(scene);
+  if(table)table.visible=false;
+}
+
 function hideGameChildren(game){
   game.gameGroup.traverse?.(object=>{if(object!==game.gameGroup)object.visible=false});
 }
@@ -251,6 +256,7 @@ async function configureLogoWall(game){
 async function configureLogoElement(game,id){
   const scene=prepareRoom(game);
   game.gameGroup.visible=false;
+  hideTable(scene);
   scene.background?.set?.('#d8d7d1');
   const url=id==='logo-yakolak'?'./assets/YAKOLAK.svg?v=D1-element':'./assets/MTKYF.svg?v=D1-element';
   const svg=await loadOfficialSvg(url);
@@ -258,11 +264,12 @@ async function configureLogoElement(game,id){
   logo.position.set(0,0,0);
   scene.add(logo);
   frameObjects(game,[logo],{direction:[0,0,1],fov:40,padding:1.18});
-  return{mode:'element',composition:id,source:id==='logo-yakolak'?'assets/YAKOLAK.svg':'assets/MTKYF.svg'};
+  return{mode:'element',composition:id,source:id==='logo-yakolak'?'assets/YAKOLAK.svg':'assets/MTKYF.svg',tableHidden:'true'};
 }
 
 function isolateMeshElement(game,mesh,id,{rotation=[-90,0,0],direction=[1,.85,1],fov=40,padding=1.35}={}){
-  prepareRoom(game);
+  const scene=prepareRoom(game);
+  hideTable(scene);
   hideGameChildren(game);
   resetGameTransform(game);
   game.gameGroup.visible=true;
@@ -271,7 +278,7 @@ function isolateMeshElement(game,mesh,id,{rotation=[-90,0,0],direction=[1,.85,1]
   mesh.position.set(0,0,0);
   mesh.rotation.set(...rotation.map(rad));
   frameObjects(game,[mesh],{direction,fov,padding});
-  return{mode:'element',composition:id,visibleObjects:'1'};
+  return{mode:'element',composition:id,visibleObjects:'1',tableHidden:'true'};
 }
 
 async function configureElement(game,id){
@@ -281,6 +288,7 @@ async function configureElement(game,id){
     game.gameGroup.visible=false;
     const table=findTable(scene);
     if(!table)throw new Error('Missing D1 table element');
+    table.visible=true;
     frameObjects(game,[table],{direction:[1,.72,1],fov:42,padding:1.12});
     return{mode:'element',composition:'table',visibleObjects:'1'};
   }
