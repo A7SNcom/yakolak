@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "revision": 1,
-  "updatedAt": "2026-07-28T20:50:00+03:00",
+  "revision": 2,
+  "updatedAt": "2026-07-28T21:15:00+03:00",
   "updatedBy": "Rashed",
   "title": "مسار تطوير ياكلك",
   "nodes": [
@@ -22,14 +22,14 @@
       "id": "track-canonical-architecture",
       "type": "decision",
       "title": "الهجرة إلى معمارية نظيفة بلا طبقات ترقيع جديدة",
-      "body": "تفصل الحالة والقواعد والشبكة والكاميرا والعرض، وتمنع wrappers وBlob ونسخ الحالة الموازية. أي تطوير جديد يجب أن يتحرك داخل المسار المعماري المعتمد.",
-      "status": "ready",
-      "owner": "Rashed",
-      "taskId": "architecture-roadmap",
+      "body": "أول شريحة تنفيذية للهجرة: تعريف Action وAppState وEffect وRenderSnapshot مع انتقال حتمي Boot → Entry → Mode واختبارات Node، بلا DOM أو Three.js أو شبكة أو wrappers.",
+      "status": "in_progress",
+      "owner": "Noor",
+      "taskId": "YAK-004-01",
       "evidenceUrl": "",
       "x": 380,
       "y": 340,
-      "revision": 1
+      "revision": 2
     },
     {
       "id": "track-visual-development",
