@@ -23,6 +23,7 @@ const requireValue=(block,name,worker)=>{
   if(!value)errors.push(`${worker}: missing ${name}`);
   return value;
 };
+const reviewerIdentity=value=>clean(value.split(/[,(]/)[0]).replace(/[.:;!?]+$/,'').trim();
 
 const configPath='ops/ai-team/team.config.json';
 if(!exists(configPath))throw new Error(`Missing ${configPath}`);
@@ -106,7 +107,7 @@ for(const worker of workers){
 }
 
 for(const {worker,reviewer} of taskReviewers){
-  const reviewerName=reviewer.split(/[,(]/)[0].trim();
+  const reviewerName=reviewerIdentity(reviewer);
   if(reviewerName===worker)errors.push(`${worker}: self-review is forbidden`);
   if(!workerSet.has(reviewerName))errors.push(`${worker}: unknown reviewer ${reviewerName}`);
   if(reviewerName===config.auditor)errors.push(`${worker}: auditor cannot replace the implementation reviewer`);
