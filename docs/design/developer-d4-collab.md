@@ -13,12 +13,14 @@
 - The product runtime uses `gameState.turnIndex`; D4 currently writes `currentIndex`.
 - The native online launcher is `yakolakOnlineEntry`; the actual panel is `yakolakOnlineDialog`.
 - D4 currently covers online landing, room-code and waiting, but not the full native lifecycle.
+- The advisory audit completed successfully with 0 integrity failures, 4 P0 blockers and 7 P1/P2 coverage gaps.
 
 ## Decisions
 - Prefer one shared contract resolver over duplicated preview and state special cases.
 - Treat native runtime correctness as P0 and visual completeness as P1/P2.
 - Keep the journey audit advisory while P0 work is active; enable `--strict` after integration.
 - Do not accept substitute overlays when the real native UI can be rendered deterministically.
+- Keep PR #35 in draft while any P0 blocker remains, preventing accidental merge of an unverified D4 state.
 
 ## Open Questions
 - Will the consolidated preview contract avoid the nested D1-wrapper Blob entirely, or rewrite its relative online import to an absolute URL?
@@ -38,7 +40,7 @@
 - [DONE] Task: Audit actual game journey coverage
   Result: Identified four P0 correctness blockers and seven real P1/P2 coverage gaps with source evidence.
   Files: `docs/design/developer-d4-journey-audit.md`, `scripts/audit-developer-d4-journey.mjs`, `.github/workflows/developer-d4-journey-audit.yml`
-  Validation: Advisory GitHub Actions audit publishes a machine-readable JSON artifact.
+  Validation: Advisory GitHub Actions audit passed and published a machine-readable JSON artifact.
 - [INBOUND] Task: Monitor colleague integration and validate the audit output
   Reason: Prevent overlapping edits while checking that the preview-contract work resolves the discovered runtime gaps.
   Files: collaboration log, workflow status and audit artifact only unless reassigned
@@ -56,7 +58,8 @@
 - Confirmed online launcher/dialog are separate native elements.
 - Confirmed the online lifecycle includes loading, waiting, playing, finished/rematch, cancelled and recoverable error/offline states.
 - Added structural registry checks and an advisory machine-readable journey report.
+- GitHub Actions run `30373124609` completed successfully and uploaded artifact `developer-d4-journey-audit`.
 
 ## Next Recommended Step
 - Other instance: complete the consolidated preview contract and the four P0 fixes.
-- This instance: watch the branch, inspect the next commit, then run/check the audit workflow before taking another implementation slice.
+- This instance: watch the branch, inspect the next commit, then rerun/check the audit before taking another implementation slice.
