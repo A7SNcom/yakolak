@@ -22,3 +22,7 @@ export const elementDefinitions=[
 export const developerDefinitions=[...sceneDefinitions,...elementDefinitions];
 export const definitionKey=definition=>`${definition.kind}:${definition.id}`;
 export const definitionMap=new Map(developerDefinitions.map(definition=>[definitionKey(definition),definition]));
+
+if(typeof window!=='undefined'&&/(?:^|\/)developer\.html$/.test(location.pathname)){
+  import('./developer-d1-workspace.js?v=D1-workspace-v1').catch(error=>console.error('[Yakolak] D1 workspace failed to load',error));
+}
