@@ -1,8 +1,11 @@
 # Yakolak Hourly Pods
 
-The platform allows five active scheduled tasks. Yakolak therefore uses one manager automation and four worker-pod automations while preserving separate named employees, tasks, branches, and reports.
+The scheduling platform permits five active tasks. Yakolak therefore uses one manager automation and four pod automations while preserving separate named employees, contracts, branches, reports, evidence, and evaluations.
 
-## Schedule (Asia/Riyadh)
+Pods compress scheduling only. They do not combine identities or guarantee that every employee receives work.
+
+## Schedule — Asia/Riyadh
+
 - `00` — Rashed manager cycle.
 - `08` — Pod A: Noor, then Sami.
 - `18` — Pod B: Lina, then Mazen.
@@ -10,27 +13,46 @@ The platform allows five active scheduled tasks. Yakolak therefore uses one mana
 - `42` — Pod D: Sara, then Hakam.
 
 ## Pod execution contract
-For each named employee, sequentially:
-1. Read that employee's file first.
-2. Read `AGENTS.md`, `TEAM_OS.md`, and only task-linked context.
-3. Execute exactly one task for that employee.
-4. Use that employee's own branch and PR for implementation.
-5. Update only that employee's `WORKER REPORT` block.
-6. Stop that identity before starting the next employee.
-7. Re-read the integration branch head and `BOARD.md` before the second employee to detect collisions or manager changes.
 
-A pod is scheduling compression, not shared identity. Evidence, task scope, branch, report, and evaluation remain separate.
+For each named employee, sequentially:
+
+1. Open that employee's file first.
+2. Read `AGENTS.md`, `TEAM_OS.md`, `PROMPT_STANDARD.md`, and only linked context.
+3. Verify the task status, current heads, premise, locks, architecture direction, and artifacts.
+4. If status is `NO_TASK`, do not edit project files, create a branch, or invent a report; stop that identity cleanly.
+5. If status is `HOLD`, inspect only the stated prerequisite if requested; otherwise stop.
+6. If `READY`, execute exactly one task for that employee.
+7. Use the employee's own branch/PR for implementation.
+8. Update only that employee's report block.
+9. End the identity completely before starting the second employee.
+10. Re-read integration head, `BOARD.md`, locks, open PRs, and the second employee's premise before continuing.
+
+The second employee must not inherit conclusions, memory, authority, or unverified claims from the first.
 
 ## Failure isolation
-- If the first employee is blocked or fails, report it and continue the second employee only when their task is independent.
-- If the first employee changes a file or branch needed by the second, the second must report `BLOCKED: ownership moved`.
-- Never combine two worker tasks into one PR or one report.
-- Never transfer unverified conclusions from one employee to another as facts.
 
-## Pod mapping
-- Pod A: Noor + Sami. Preferred pattern: implementer plus independent reviewer of the same bounded area.
-- Pod B: Lina + Mazen. Tasks must own disjoint files and contracts.
-- Pod C: Nada + Omar. Preferred for research, architecture, product-state mapping, and repository lineage.
-- Pod D: Sara + Hakam. Sara verifies product/test evidence; Hakam independently evaluates the full manager cycle and may veto merges.
+- A blocked/failed first task does not block the second when scopes and premises are independent.
+- If the first task changes a dependency or owned file needed by the second, the second reports `BLOCKED: ownership/premise moved`.
+- Never combine two tasks into one PR, one report, or one evidence claim.
+- Never turn a missing implementation artifact into a review artifact; reviewers may evaluate the baseline only and report `NO_ARTIFACT`.
+- Architecture, regression, or human-gate failure stops implementation immediately.
 
-These are scheduling pairings, not permanent technical roles. Rashed may change task types, but Hakam always remains independent and read-only.
+## Pairing guidance
+
+- Pod A: preferred bounded implementer + independent reviewer of the same area.
+- Pod B: preferred two disjoint migration slices, or implementer + architecture reviewer. Never parallel edits on one slice.
+- Pod C: preferred architecture/research/lineage work only when it unlocks a named next decision; otherwise `NO_TASK`.
+- Pod D: Sara handles test/evidence work only when a real baseline/artifact exists; Hakam independently audits meaningful cycle evidence and uses `NO_CHANGE` when nothing changed.
+
+These pairings are not permanent specialties. Rashed may vary task types based on capability evidence. Hakam always remains independent and read-only.
+
+## Capacity safety
+
+The automation schedule does not imply eight active tasks. Default cycle capacity is:
+
+- zero to two implementation employees;
+- up to five code-effort points;
+- only necessary reviewers/stewards;
+- remaining employees `NO_TASK`.
+
+Idle automation runs are safer and cheaper than manufactured repository work.
