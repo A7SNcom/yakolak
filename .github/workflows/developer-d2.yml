@@ -1,72 +1,10 @@
-name: Verify Developer D2
+name: Archived Developer D2 Verification
 
 on:
-  push:
-    branches:
-      - agent/developer-d2-workbench
-  pull_request:
-    paths:
-      - developer.html
-      - developer-scene.html
-      - package.json
-      - api/developer-d1.js
-      - api/developer-d1-workspace.js
-      - api/developer-d1-comparisons.js
-      - src/developer-d2.js
-      - src/developer-d2.css
-      - src/developer-d2-registry.js
-      - src/developer-scene-d1.js
-      - src/developer-scene-d1-router.js
-      - docs/design/developer-d2-**
-      - scripts/verify-developer-d2-workbench.mjs
-      - scripts/visual-developer-d2.mjs
-      - .github/workflows/developer-d2.yml
+  workflow_dispatch:
 
 jobs:
-  verify:
+  archived:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Check D2 registry syntax
-        run: node --check src/developer-d2-registry.js
-      - name: Check D2 application syntax
-        run: |
-          mkdir -p artifacts/developer-d2
-          cp src/developer-d2.js artifacts/developer-d2/source.js
-          if node --check src/developer-d2.js > artifacts/developer-d2/syntax.txt 2>&1; then
-            echo "Syntax check passed" > artifacts/developer-d2/syntax.txt
-          else
-            cat artifacts/developer-d2/syntax.txt
-            exit 1
-          fi
-      - name: Check compatible APIs and scene runtime
-        run: |
-          node --check api/developer-d1.js
-          node --check api/developer-d1-workspace.js
-          node --check api/developer-d1-comparisons.js
-          node --check src/developer-scene-d1.js
-          node --check src/developer-scene-d1-router.js
-      - name: Verify D2 workbench structure
-        run: node scripts/verify-developer-d2-workbench.mjs
-      - name: Install Chromium quietly
-        run: |
-          npm install --no-save --silent playwright >/dev/null 2>&1
-          npx playwright install --with-deps chromium >/dev/null 2>&1
-      - name: Start Developer D2 locally
-        run: |
-          python3 -m http.server 4173 > /tmp/developer-d2-server.log 2>&1 &
-          for i in {1..30}; do curl -fsS http://127.0.0.1:4173/developer.html >/dev/null && exit 0; sleep 1; done
-          cat /tmp/developer-d2-server.log
-          exit 1
-      - name: Verify desktop mobile compare queue and preview
-        run: node scripts/visual-developer-d2.mjs
-      - if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: developer-d2-visuals
-          path: artifacts/developer-d2
-          if-no-files-found: warn
+      - run: echo "Developer D2 has been superseded by the evidence-driven Developer D3 UX workflow."
