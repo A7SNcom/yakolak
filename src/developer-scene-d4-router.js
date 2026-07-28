@@ -1,0 +1,10 @@
+const params=new URLSearchParams(location.search);
+const sceneId=params.get('scene')||'';
+const elementId=params.get('element')||'';
+const variant=params.get('variant')||'current';
+const STATE_SCENES=new Set(['tutorial-first-move','gameplay-ready','legal-moves','turn-state','winner-highlight','round-result','online-entry']);
+const STATE_ELEMENTS=new Set(['zone-marker','score-marker','game-hud','tutorial-dialog','online-panel','winner-glow']);
+const COLOR_ELEMENTS=new Set(['base-small','stone-large','stone-medium','stone-small']);
+if(STATE_SCENES.has(sceneId)||STATE_ELEMENTS.has(elementId))await import('./developer-scene-d4-states.js?v=D4-complete-states');
+else if(COLOR_ELEMENTS.has(elementId)&&!['current','front'].includes(variant))await import('./developer-scene-d4-variants.js?v=D4-element-variants');
+else await import('./developer-scene-d1-router.js?v=D4-compatible-base');
