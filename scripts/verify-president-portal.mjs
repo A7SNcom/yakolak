@@ -149,7 +149,7 @@ for (const task of ledger.tasks) {
   if (!initiativeIds.has(task.initiativeId)) fail(`task ${task.id} references missing initiative`);
   if (!blueprintNodeIds.has(task.blueprintNodeId)) fail(`task ${task.id} references missing blueprint node`);
   if (!Number.isInteger(task.blueprintRevision) || task.blueprintRevision < 1 || task.blueprintRevision > blueprint.revision) fail(`task ${task.id} has invalid blueprint revision`);
-  if (!task.title || !task.outcome || !task.status || !task.owner || !task.nextAction || !task.presid entAttention) fail(`task ${task.id} incomplete`);
+  if (!task.title || !task.outcome || !task.status || !task.owner || !task.nextAction || !task.presidentAttention) fail(`task ${task.id} incomplete`);
   if (!task.progress || !Number.isFinite(task.progress.completed) || !Number.isFinite(task.progress.total) || task.progress.total < 1 || task.progress.completed < 0 || task.progress.completed > task.progress.total) fail(`task ${task.id} progress invalid`);
   if (!Array.isArray(task.acceptance) || !task.acceptance.length) fail(`task ${task.id} missing acceptance criteria`);
   if (!Array.isArray(task.events) || !task.events.length) fail(`task ${task.id} missing event history`);
@@ -162,7 +162,7 @@ if (!ledger.tasks.some(task => task.blueprintNodeId === 'track-visual-developmen
 if (!ledger.tasks.some(task => task.id === 'YAK-004-01')) fail('ledger missing current canonical entry task');
 
 if (manifest.version !== 2 || manifest.humanRole !== 'president' || manifest.manager !== 'Rashed' || manifest.productionEnabledByDefault !== false) fail('invalid President runtime manifest');
-if (manifest.blueprint !== BLUEPRINT.replace('./', './') || manifest.ledger !== LEDGER.replace('./', './')) fail('manifest project sources mismatch');
+if (manifest.blueprint !== './ops/ai-team/development-blueprint.json' || manifest.ledger !== './ops/ai-team/development-ledger.json') fail('manifest project sources mismatch');
 for (const view of ['portfolio', 'tasks', 'timeline', 'reviews', 'directives']) if (!manifest.views?.includes(view)) fail(`manifest missing view ${view}`);
 if (manifest.reportingCadence !== 'meaningful-event') fail('manifest reporting cadence must be meaningful-event');
 for (const gate of ['reviewer:PASS', 'manager:PASS', 'hakam:MERGE_OK', 'ci:GREEN', 'exact-head-preview']) if (!manifest.reviewGates?.includes(gate)) fail(`manifest missing ${gate}`);
