@@ -52,6 +52,8 @@ requireText(runner,'configureElement','element isolation');
 requireText(runner,"id==='base-large'",'large base element');
 requireText(runner,"'stone-small':'s'",'stone elements');
 requireText(runner,'configureLogoElement','logo elements');
+requireText(runner,'function hideTable(scene)','element table isolation');
+requireText(runner,"tableHidden:'true'",'isolated element marker');
 requireText(runner,"sceneId==='loading-star'||elementId==='loading-star-element'",'loading star scene and element');
 requireText(runner,'configureEmptyTable','empty table scene');
 requireText(runner,'configureBoardBases','board bases scene');
@@ -66,4 +68,4 @@ requireText(runner,"visibleObjects:String(selected.length)",'named board objects
 rejectText(html,'type="password"','password gate');
 rejectText(html,'./app.js','client bootstrap isolation');
 rejectText(sceneHtml,'./app.js','client bootstrap isolation');
-console.log('Developer D1 shared notes, renaming, scenes, and elements verification passed');
+console.log('Developer D1 shared notes, renaming, scenes, and isolated elements verification passed');
