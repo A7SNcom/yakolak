@@ -7,25 +7,19 @@ This task is read-only. Do not create a code branch or edit project files. Updat
 
 <!-- MANAGER TASK:START -->
 ## Manager task
-- Cycle: `005-evidence-reconciliation`
-- Task ID: `YAK-005-02`
-- Status: `READY`
-- Task type: `DIAGNOSIS`
+- Cycle: `006-correction-closure`
+- Task ID: `YAK-006-05`
+- Status: `READY_AFTER_ARTIFACT`
+- Task type: `REVIEW`
 - Effort: `S (2 points)`
 - Risk: `medium-process-contract`
-- OBSERVED: PR #43 exact head `30c089e75715d045b21329176ce3d2f4fd98863c` has `Verify AI Team OS` run `30389672752` failure while President Portal and Architecture Guardrails succeed. Hakam forbids weakening or bypassing the verifier.
-- Single outcome: identify the exact failing verifier assertion and classify the root cause as `PROPOSED_CONTRACT_DEFECT | STALE_VERIFIER | BOTH | UNKNOWN`.
-- Why now: PR #43 cannot advance while the required team-system check is red.
-- Allowed scope: PR #43 exact diff, `Verify AI Team OS` job/steps/logs, verifier/config/task-contract files directly referenced by the failure, base branch equivalents for comparison.
-- Forbidden scope: no code/config/document edits, no skip/disable/relax proposal without proving the intended invariant, no broad lineage report, no merge or portal activation.
-- Acceptance criteria:
-  1. Cite exact run/job/step and failing assertion/message.
-  2. Identify exact file/field mismatch on head and base.
-  3. State which invariant the verifier is meant to protect.
-  4. Recommend the smallest correction owner and allowed files; do not implement it.
-  5. State whether PR #43 remains HOLD.
-- Stop conditions: logs unavailable, head moved, failure cannot be reproduced from evidence, or ownership ambiguous.
-- Expected artifact: compact root-cause report that unlocks one bounded correction task.
+- OBSERVED: your cycle-005 diagnosis classified the PR #43 AI Team OS failure as `STALE_VERIFIER`; Lina is assigned `YAK-006-02` to add semantic-field normalization without weakening invariants.
+- Single outcome: independently verify the correction accepts current canonical task labels and still rejects genuinely incomplete contracts.
+- Allowed scope: Lina draft PR exact diff/head; `scripts/verify-ai-team-os.mjs`; focused positive/negative fixture; current task contracts and original failing assertion.
+- Forbidden scope: no implementation, no workflow skip, no PR-specific exception, no acceptance from summary alone, no portal/game changes.
+- Acceptance criteria: reproduce positive pass and negative failure; verify all semantic invariants remain required; verify scope/budget; inspect for special-cases or weakened checks; issue `PASS | CONDITIONAL | FAIL` with exact evidence.
+- Stop conditions: no artifact, stale head, missing negative fixture, or correction changes unrelated files.
+- Expected artifact: exact-head independent review for Hakam; `NO_ARTIFACT` if Lina has not produced a PR.
 <!-- MANAGER TASK:END -->
 
 <!-- WORKER REPORT:START -->
