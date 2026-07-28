@@ -2,95 +2,78 @@
 
 ## Active cycle
 
-- Cycle: `003-architecture-reset`
-- Status: `PROCESS_FREEZE_UNTIL_NEXT_MANAGER_CYCLE`
+- Cycle: `004-canonical-entry-contract`
+- Status: `ACTIVE`
 - President: Ahmad
 - Manager: Rashed
 - Auditor: Hakam
-- Integration branch: `agent/yakolak-team-os`
-- Product release branch: `main` (human gate)
-- Previous source branch: `agent/developer-d2-workbench`
-- Snapshot time: `2026-07-28T20:14+03:00`
-- Current bottleneck: stop structural debt growth and establish a canonical migration path before more legacy/D4 feature work.
+- Integration branch: `agent/yakolak-team-os` — verify fresh head before acting
+- Source PR #35 head: verify fresh before acting; human-gated
+- President Portal PR #38 head: verify fresh before acting — `HOLD`, not merged, channel inactive
+- Snapshot time: `2026-07-28T21:01+03:00` plus subsequent PR #38 synchronization; refresh before action
+- Current bottleneck: establish the first deterministic Boot -> Entry -> Mode-selection contract without DOM, Three.js, network, or legacy wrappers.
+
+## Fresh evidence
+
+- PR #36: open, draft, unmerged; verify current mergeability/head.
+- PR #38: open, draft, unmerged; exact head must be refreshed before review.
+- PR #38 checks observed during implementation: Architecture Guardrails, AI Team OS, President contract, and desktop/mobile browser journey passed on tested heads; D1 failure also existed on the base branch.
+- Vercel branch alias reached READY only for older PR #38 commits; an exact-head Preview remains required before `Preview PASS`.
+- President API is not an active source of truth until PR #38 is merged. No directives, messages, or decisions are reconciled from it before activation.
 
 ## President communication channel
 
-- Human interface: `developer.html` — the President interface; D1/D2/D3/D4 identify workspace generations, not different human roles.
+- Human interface: `developer.html`; D1/D2/D3/D4 identify workspace generations, not separate human roles.
 - Contract: `ops/ai-team/PRESIDENT_PORTAL.md`.
-- President directives/messages/decisions: `/api/developer-president` on the current accessible team-branch Preview.
+- President directives/messages/decisions: `/api/developer-president` on the exact current protected Preview after activation.
 - Rashed review outbox: `ops/ai-team/president-outbox.json`.
 - Rashed directive replies/statuses: `ops/ai-team/president-status.json`.
-- Rashed is the only team member who communicates managerial results to the President.
-- No item reaches the President review queue without reviewer `PASS`, `ARCH_OK` when required, Hakam `MERGE_OK`, CI `GREEN`, working Preview, exact commit SHA, and Rashed personal `PASS`.
-- President review approval does not authorize Production, rules, secrets, schema/authentication, destructive operations, or major deletion unless that exact scope is explicitly requested and confirmed.
+- Rashed is the sole team member who communicates managerial results to the President.
+- Existing D4 request/review actions are routed through Rashed; no parallel direct-to-worker channel is permitted.
+- No item reaches the President review queue without reviewer `PASS`, `ARCH_OK` when required, Hakam `MERGE_OK`, CI `GREEN`, exact-head Preview, exact commit SHA, and Rashed personal `PASS`.
+- The API is disabled in Production by default; enabling it requires explicit authorization and `PRESIDENT_PORTAL_PRODUCTION_ENABLED=1` in a protected environment.
 
-## Critical diagnosis
+## Assignments and locks
 
-The repeated defects are not isolated mistakes. The accepted runtime still combines many responsibilities in `src/app-game-v085.js`, while later builds fetch old JavaScript as text, replace exact strings/regular expressions, execute Blob modules, expose private state through globals, and mutate runtime state from preview layers.
+| Employee | Task | Status | Lock / role |
+|---|---|---|---|
+| Noor | `YAK-004-01` first canonical entry contracts + reducer tests | `READY` | new `src/core/` contract/reducer files and one focused Node test |
+| Sami | `YAK-004-02` independent review of Noor artifact | `READY` after artifact | read-only reviewer |
+| Lina | — | `NO_TASK` | no legacy wrapper work |
+| Mazen | — | `NO_TASK` | no parallel state model |
+| Nada | `YAK-004-03` Architecture Steward for Noor | `READY` after artifact | read-only `ARCH_OK/HOLD/REJECT` |
+| Omar | — | `NO_TASK` | no lineage busywork |
+| Sara | `YAK-004-04` verify PR #38 exact-head CI/Preview evidence | `READY` | read-only; no portal activation or merge |
+| Hakam | `YAK-004-05` final cycle audit | `READY` | read-only final verdict |
 
-The clean vNext architecture existed in draft PR #29 but was isolated and non-enforced. Active work continued repairing layers instead of migrating the source of truth.
+## Capacity
 
-## Architecture reset completed
+- Implementation writers: **1 / 2 maximum**.
+- Implementation effort: **3 / 5 points maximum**.
+- No second implementation until Noor produces a reviewable artifact.
+- New behavior must remain canonical; no legacy-debt increase is authorized.
 
-- Canonical architecture: `docs/architecture/GAME_ARCHITECTURE.md`
-- Incremental roadmap: `docs/architecture/MIGRATION_ROADMAP.md`
-- Structural debt register: `docs/architecture/DEBT_REGISTER.md`
-- Prompt standard: `ops/ai-team/PROMPT_STANDARD.md`
-- Automated guard: `scripts/verify-architecture-guardrails.mjs`
-- CI workflow: `.github/workflows/architecture-guardrails.yml`
-- Root agent contract updated to forbid new version layers, source patching, Blob bootstrap, hidden global contracts, and duplicate state/rules.
+## Cycle acceptance gates
 
-## Freeze
+### `YAK-004-01`
 
-All prior cycle-002 assignments are `STALE/HOLD`. No employee may execute them from old worker files during this freeze.
+- Named contracts for `Action`, `AppState`, `Effect`, and `RenderSnapshot` exist without browser/runtime dependencies.
+- A deterministic transition function covers Boot -> Entry -> Mode selection and rejects/ignores invalid transitions explicitly.
+- Node-only tests prove initial state, allowed transitions, and at least two invalid-event cases.
+- No DOM, Three.js, network, storage, timer, Blob, global, or source-patching dependency.
+- Reviewer `PASS`, Nada `ARCH_OK`, architecture guard green, then Hakam `MERGE_OK` before manager merge.
 
-Until Rashed publishes a fresh cycle from the latest head:
+### PR #38
 
-| Employee | Status | Action |
-|---|---|---|
-| Noor | `NO_TASK` | no branch or code change |
-| Sami | `NO_TASK` | no review without a fresh artifact |
-| Lina | `NO_TASK` | no legacy wrapper repair from stale premise |
-| Mazen | `NO_TASK` | no state/preview mutation work |
-| Nada | `NO_TASK` | no research busywork |
-| Omar | `NO_TASK` | no repeated lineage report |
-| Sara | `NO_TASK` | no test review without an artifact |
-| Hakam | `NO_CHANGE` | verify freeze/guard evidence only |
+- Keep `HOLD` until checks complete on exact head, Vercel Preview matches exact head, desktop/mobile evidence is independently inspected, and Hakam issues `MERGE_OK`.
+- Do not treat `/api/developer-president` as active before merge.
+- President review approval never implies Production or another unstated human gate.
 
-The board overrides stale `READY` task blocks until the next manager cycle replaces them.
+## Deltas
 
-## Capacity for next cycle
-
-- Default maximum: **2 implementation workers / 5 points**.
-- Remaining employees receive only necessary review/steward/test work or `NO_TASK`.
-- Architecture Steward required for runtime/state/rules/network/bootstrap/dependency changes.
-- No four-writer cycle until canonical core plus replay/parity harness are proven.
-
-## Next-cycle priority
-
-Rashed must first reconcile President directives and decisions, then choose one bottleneck and assign only ready work. Preferred sequence:
-
-1. process the President channel and record acknowledgements/statuses;
-2. validate architecture and President portal guards on the latest PR head;
-3. establish Slice 1 contracts/state machine without DOM or Three.js;
-4. extract one pure game-rule contract with headless tests;
-5. build deterministic replay/parity before more visual/online feature states;
-6. perform only essential legacy maintenance needed to preserve current behavior or unblock migration.
-
-## Release and merge gates
-
-- [ ] Architecture guard passes on current integration PR.
-- [ ] President portal trust-boundary test passes.
-- [ ] No new version runtime/source patch/Blob/global/state duplication.
-- [ ] Reviewer PASS for each implementation.
-- [ ] `ARCH_OK` for runtime-boundary work.
-- [ ] Hakam `MERGE_OK`.
-- [ ] Relevant deterministic/regression/browser/online evidence.
-- [ ] Working Vercel Preview and exact commit SHA.
-- [ ] Rashed personal inspection before President handoff.
-- [ ] `legacy-debt delta` and `migration-gate delta` recorded.
-- [ ] President explicitly authorizes PR #35/main/Production actions.
+- Expected `legacy-debt delta`: `unchanged`.
+- Expected `migration-gate delta`: Slice 1 moves from documentation to first executable deterministic contract.
 
 ## Human gates
 
-No PR #35 merge, `main` write/merge, Production deployment, rule change, secrets/schema/authentication/destructive operation, or major deletion without explicit President authorization.
+No PR #35 merge, `main` write/merge, Production deployment, game-rule change, secrets/schema/authentication/destructive operation, major deletion, or Production President-channel enablement without Ahmad's explicit authorization for that exact action.
