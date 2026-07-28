@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "timezone": "Asia/Riyadh",
   "manager": "Rashed",
   "auditor": "Hakam",
@@ -13,12 +13,16 @@
   "managerMinute": 0,
   "limits": {
     "activeAutomations": 5,
-    "maxCodeWritersPerCycle": 4,
-    "maxCodeEffortPointsPerCycle": 8,
+    "defaultMaxCodeWritersPerCycle": 2,
+    "defaultMaxCodeEffortPointsPerCycle": 5,
+    "provenMaxCodeWritersPerCycle": 3,
+    "provenMaxCodeEffortPointsPerCycle": 7,
     "maxTaskEffort": "M",
-    "minimumIndependentNonCodeTasks": 4
+    "minimumIndependentNonCodeTasks": 0
   },
   "effortPoints": {"XS": 1, "S": 2, "M": 3},
-  "implementationTypes": ["IMPLEMENT"],
-  "allowedTaskTypes": ["IMPLEMENT", "REVIEW", "TEST", "RESEARCH", "DOC", "INCIDENT", "AUDIT", "REVIEW/RESEARCH", "TEST/REVIEW"]
+  "implementationTypes": ["IMPLEMENT", "INCIDENT/IMPLEMENT"],
+  "allowedTaskTypes": ["IMPLEMENT", "INCIDENT/IMPLEMENT", "REVIEW", "TEST", "RESEARCH", "DOC", "INCIDENT", "AUDIT", "REVIEW/RESEARCH", "TEST/REVIEW"],
+  "taskStatuses": ["READY", "HOLD", "NO_TASK"],
+  "architectureVerdicts": ["ARCH_OK", "ARCH_HOLD", "ARCH_REJECT"]
 }
