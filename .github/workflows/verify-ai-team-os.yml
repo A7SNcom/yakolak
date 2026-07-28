@@ -1,0 +1,39 @@
+name: Verify AI Team OS
+
+on:
+  push:
+    branches:
+      - agent/yakolak-team-os
+    paths:
+      - AGENTS.md
+      - .github/copilot-instructions.md
+      - .github/workflows/verify-ai-team-os.yml
+      - ops/ai-team/**
+      - scripts/verify-ai-team-os.mjs
+  pull_request:
+    paths:
+      - AGENTS.md
+      - .github/copilot-instructions.md
+      - .github/workflows/verify-ai-team-os.yml
+      - ops/ai-team/**
+      - scripts/verify-ai-team-os.mjs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-team-os-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate team configuration, tasks, effort and review gates
+        run: node scripts/verify-ai-team-os.mjs
