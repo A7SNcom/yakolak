@@ -7,20 +7,19 @@ This task is read-only. Do not create a code branch or edit project files. Updat
 
 <!-- MANAGER TASK:START -->
 ## Manager task
-- Cycle: `004-canonical-entry-contract`
-- Task ID: `YAK-004-02`
-- Status: `READY`
+- Cycle: `006-correction-closure`
+- Task ID: `YAK-006-03`
+- Status: `READY_AFTER_ARTIFACT`
 - Task type: `REVIEW`
-- Effort: `S (2 points)`
+- Effort: `XS (1 point)`
 - Risk: `high-architecture-state`
-- OBSERVED: review only Noor PR for `YAK-004-01`; if no artifact exists, return `NO_ARTIFACT`.
-- Single outcome: independently determine whether Noor's state contract is deterministic, bounded, tested, and free of browser/legacy coupling.
-- Allowed scope: task contract, Noor diff/base/head, focused tests, architecture docs/guard output.
-- Forbidden scope: no implementation, no rewriting Noor's solution, no acceptance from summary alone.
-- Acceptance criteria: verify every binary criterion; inspect invalid-event semantics; verify no duplicate state source or forbidden dependency; reproduce focused test and architecture guard; issue `PASS | CONDITIONAL | FAIL` with exact evidence.
-- Architecture/debt check: confirm legacy-debt delta `unchanged` and Slice 1 progress is honest.
-- Stop conditions: no PR/commit, stale base, missing test evidence, or diff outside budget.
-- Expected artifact: compact independent verdict for Hakam.
+- OBSERVED: prior PR #41 head `d5f2781d...` received Nada `ARCH_HOLD` because exported accepted modes were externally mutable; Noor is assigned `YAK-006-01` to correct only that defect on the existing PR.
+- Single outcome: independently decide whether the corrected exact PR #41 head closes the mutability defect without changing behavior or scope.
+- Allowed scope: corrected PR #41 diff since `d5f2781d...`, `src/core/entry-contracts.js`, `tests/entry-reducer.test.mjs`, focused tests, architecture guard, original task and Nada report.
+- Forbidden scope: no implementation, no acceptance from Noor summary, no redesign, no stale-head verdict.
+- Acceptance criteria: verify external mutation cannot alter mode legality; reproduce all focused tests including mutation-resistance test; verify no new public mutable registry or behavior change; confirm budget and debt/migration claims; issue `PASS | CONDITIONAL | FAIL` with exact head/evidence.
+- Stop conditions: no correction artifact, head mismatch, tests unavailable, or diff exceeds assigned scope.
+- Expected artifact: renewed exact-head review for Hakam; `NO_ARTIFACT` if Noor has not produced a new head.
 <!-- MANAGER TASK:END -->
 
 <!-- WORKER REPORT:START -->
