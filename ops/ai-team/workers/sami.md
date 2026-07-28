@@ -7,29 +7,29 @@ This task is read-only. Do not create a code branch or edit project files. Updat
 
 <!-- MANAGER TASK:START -->
 ## Manager task
-- Cycle: `001-hardening`
-- Task ID: `YAK-001-02`
+- Cycle: `002-evidence-first`
+- Task ID: `YAK-002-02`
 - Status: `READY`
 - Task type: `REVIEW`
 - Effort: `S (2 points)`
 - Risk: `medium-CI`
-- Objective: Independently identify the current D1 root cause and review Noor's proposed fix for correctness and preserved coverage.
-- Why now: Noor must not self-validate a CI repair, and the previous process used stale conclusions.
-- Observed base/head: source `d8d2a50f4a604dc4ba95c5ef762a66ffa7fb92c2`; D1 run `30377398315`, job `90336466217`; observed `2026-07-28T16:16Z`.
-- Base branch: read-only latest source/integration and Noor PR if available.
-- Allowed files: D1 workflow, retained D1 HTML/fixture, D1 verifier scripts, current logs, Noor PR diff and checks.
-- Forbidden files / conflicts: no repository writes except this report block; no test deletion/skip suggestions; do not edit Noor's branch.
+- Objective: Independently reproduce the D1 failure and review Noor's artifact without accepting Noor's diagnosis as evidence.
+- Why now: Noor requires independent review; cycle 001 had no artifact.
+- Observed base/head: source `d8d2a50f4a604dc4ba95c5ef762a66ffa7fb92c2`; integration snapshot `b5279840c52722d60c69069e7f05e05dd458cda0`; observed `2026-07-28T17:01Z`.
+- Base branch: latest source/integration and Noor PR if it exists.
+- Allowed files: D1 workflow, verifier, retained fixture/HTML, current logs, Noor diff/checks.
+- Forbidden files / conflicts: read-only except this report; no test-weakening suggestions.
 - Change budget: read-only.
 - Acceptance criteria:
-  1. State the exact first failing assertion/command with evidence.
-  2. Explain the smallest valid root-cause fix independently of Noor's explanation.
-  3. Check Noor's diff stays within scope/budget and preserves intended assertions.
-  4. Issue `PASS`, `CONDITIONAL`, or `FAIL` with specific reasons.
-  5. State the exact checks Hakam should require before merge.
-- Required validation: cite run/job/step, exact file/symbol/assertion, Noor commit/PR/check IDs if present.
+  1. Cite the exact current first failure.
+  2. State an independent root-cause explanation.
+  3. If Noor has a PR, verify scope, budget, coverage, and checks.
+  4. If no PR exists, label it `NO_ARTIFACT` and provide baseline-only findings.
+  5. Issue `PASS`, `CONDITIONAL`, or `FAIL` and exact checks Hakam should require.
+- Required validation: exact command/assertion/file/symbol and PR/commit/run/job IDs when available.
 - Independent reviewer: none; Hakam audits this review.
-- Expected artifact: a compact review verdict in this report block.
-- Context links: `AGENTS.md`, `ops/ai-team/EVALUATION.md`, `ops/ai-team/BOARD.md`, run `30377398315`, job `90336466217`, Noor task/PR.
+- Expected artifact: compact independent verdict.
+- Context links: `AGENTS.md`, `ops/ai-team/EVALUATION.md`, `ops/ai-team/BOARD.md`, Noor task/PR, prior D1 run/job.
 <!-- MANAGER TASK:END -->
 
 <!-- WORKER REPORT:START -->
