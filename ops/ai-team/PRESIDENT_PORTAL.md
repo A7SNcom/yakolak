@@ -10,12 +10,13 @@
 
 ## Canonical interface
 
-- Branch preview: `https://yakolak-git-agent-yakolak-team-os-ahmdkcoms-projects.vercel.app/developer.html`
+- Current PR Preview alias: `https://yakolak-git-agent-president-portal-ahmdkcoms-projects.vercel.app/developer.html`
+- Canonical alias after approved integration: `https://yakolak-git-agent-yakolak-team-os-ahmdkcoms-projects.vercel.app/developer.html`
 - President channel API: `/api/developer-president`
 - Manager review outbox: `ops/ai-team/president-outbox.json`
 - Manager status replies: `ops/ai-team/president-status.json`
 
-If Vercel protection blocks access, use the connected Vercel tool to inspect the branch alias or deployment. Do not replace this with a second chat or a parallel issue inbox.
+A Preview is valid only when its Vercel deployment metadata references the exact current commit SHA. An older successful deployment behind the branch head is not accepted as review evidence. If Vercel protection blocks access, use the connected Vercel tool to inspect the branch alias or deployment. Do not replace this with a second chat or a parallel issue inbox.
 
 ## President → Rashed
 
