@@ -7,25 +7,19 @@ This task is read-only. Do not create a code branch or edit project files. Updat
 
 <!-- MANAGER TASK:START -->
 ## Manager task
-- Cycle: `005-evidence-reconciliation`
-- Task ID: `YAK-005-01`
-- Status: `READY`
+- Cycle: `006-correction-closure`
+- Task ID: `YAK-006-04`
+- Status: `READY_AFTER_ARTIFACT`
 - Task type: `ARCHITECTURE_STEWARD`
-- Effort: `S (2 points)`
+- Effort: `XS (1 point)`
 - Risk: `high-architecture-state`
-- OBSERVED: PR #41 exact head is `d5f2781d6189deae907ae2cf5c6db05d57c5774f`; Sami independently returned PASS with 5/5 focused tests and green Architecture Guardrails; Hakam keeps PR #41 HOLD because no Architecture Steward verdict exists.
-- Single outcome: issue `ARCH_OK | ARCH_HOLD | ARCH_REJECT` for PR #41 at the exact head above.
-- Why now: this is the missing independent gate for the first canonical Boot → Entry → Mode-selection contract.
-- Allowed scope: PR #41 task contract, exact diff, `src/core/entry-contracts.js`, `src/core/entry-reducer.js`, `tests/entry-reducer.test.mjs`, architecture docs, debt register, guard evidence.
-- Forbidden scope: no implementation, alternative design, file edits, merge, portal work, or acceptance from summaries alone.
-- Acceptance criteria:
-  1. Verify canonical dependency direction and one state owner.
-  2. Verify named actions, deterministic transitions, and explicit invalid-event semantics.
-  3. Verify no DOM, Three.js, network, storage, timer, Blob, global, source patching, dependency, duplicate state/rules, or feature-file mixing.
-  4. Verify scope/budget and honest `legacy-debt delta: unchanged` and Slice 1 migration claim.
-  5. Return exact paths/symbols and a single verdict.
-- Stop conditions: head mismatch, missing diff/tests, unclear ownership, or evidence unavailable.
-- Expected artifact: concise exact-head Architecture Steward report for Hakam.
+- OBSERVED: your prior exact-head verdict for PR #41 was `ARCH_HOLD` solely because exported `VALID_MODES` was externally mutable; Noor is assigned one XS correction on the same PR.
+- Single outcome: issue renewed `ARCH_OK | ARCH_HOLD | ARCH_REJECT` for the corrected exact PR #41 head.
+- Allowed scope: corrected diff since `d5f2781d...`, entry contracts/tests, architecture docs, focused tests and architecture guard evidence.
+- Forbidden scope: no implementation, alternative design, unrelated review, merge, portal or verifier work.
+- Acceptance criteria: verify accepted-mode legality cannot be mutated externally; deterministic single-owner boundary remains intact; no forbidden dependency or new state/rule source; scope/budget and debt/migration claims remain honest; cite exact head/paths/tests.
+- Stop conditions: no new artifact, stale head, missing tests, or correction broadens behavior.
+- Expected artifact: one exact-head Architecture Steward verdict for Hakam; `NO_ARTIFACT` if correction is absent.
 <!-- MANAGER TASK:END -->
 
 <!-- WORKER REPORT:START -->
