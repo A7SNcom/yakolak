@@ -3,36 +3,33 @@
 ## Permanent instructions
 Open `AGENTS.md`, `ops/ai-team/TEAM_OS.md`, then execute exactly the one task below. You are a flexible generalist; the assignment is temporary.
 
-For implementation, create `agent/mazen/<task-id>` from the latest assigned base and open one draft PR to `agent/yakolak-team-os`. Update only your `WORKER REPORT` block. Stop after one task.
+This cycle is read-only. Do not create a code branch or edit project files. Update only your `WORKER REPORT` block. Stop after one task.
 
 <!-- MANAGER TASK:START -->
 ## Manager task
-- Cycle: `001-hardening`
-- Task ID: `YAK-001-04`
+- Cycle: `002-evidence-first`
+- Task ID: `YAK-002-05`
 - Status: `READY`
-- Task type: `IMPLEMENT`
-- Effort: `M (3 points)`
+- Task type: `RESEARCH`
+- Effort: `S (2 points)`
 - Risk: `high-game-state`
-- Objective: Make D4 local-player and turn previews use the real 2/3/4-player and `turnIndex` runtime contract.
-- Why now: Current D4 metadata/state writes omit three-player play and still reference stale `currentIndex`.
-- Observed base/head: source `d8d2a50f4a604dc4ba95c5ef762a66ffa7fb92c2`; integration implementation head `fbadc7de98303651c0e4f8c96117c602b59c23bf`; observed `2026-07-28T16:16Z`.
-- Base branch: latest `agent/yakolak-team-os` after confirming target paths are materially unchanged.
-- Allowed files:
-  - `src/developer-d4-registry.js`
-  - player/turn-only portions of `src/developer-scene-d4-states.js`
-  - `scripts/verify-developer-d4-contract.mjs`
-- Forbidden files / conflicts: D4 wrapper/import files; package/CI/D1 files; online lifecycle implementation; unrelated state/visual redesign.
-- Change budget: at most 3 files and 180 logical changed lines.
+- Objective: Produce an implementation-ready map of the real 2/3/4-player and turn ownership contract without changing code.
+- Why now: Cycle 001 produced no implementation artifact, and Sara proved the current static verifier can be false-green.
+- Observed base/head: source `d8d2a50f4a604dc4ba95c5ef762a66ffa7fb92c2`; integration snapshot `b5279840c52722d60c69069e7f05e05dd458cda0`; observed `2026-07-28T17:01Z`.
+- Base branch: repository-wide read-only inspection.
+- Allowed files: current game runtime player setup, turn state, HUD, D4 registry/state files, focused tests/audits.
+- Forbidden files / conflicts: no code or test changes; no wrapper/import or online lifecycle work.
+- Change budget: read-only.
 - Acceptance criteria:
-  1. Add a true `three-players` gameplay variant.
-  2. 2/3/4-player previews activate exactly intended players, bases, pieces, and HUD state using existing runtime helpers/contracts.
-  3. All four turn variants set and report `game.state.turnIndex`.
-  4. Remove stale D4 player/turn `currentIndex` metadata/writes without touching unrelated legacy runtime code.
-  5. Contract tests assert the variant set and runtime-correct turn key.
-- Required validation: syntax-check changed files; run D4 contract verifier; search changed D4 paths for stale `currentIndex`; browser functional evidence if available.
-- Independent reviewer: Sara.
-- Expected artifact: one bounded draft PR with deterministic contract evidence.
-- Context links: `AGENTS.md`, `ops/ai-team/BOARD.md`, actual player/turn contract in current game runtime, D4 registry/state/audit files.
+  1. Identify exact source-of-truth symbols for player count, player order, active bases/pieces, HUD rows, `turnIndex`, and active color.
+  2. Map expected values for 2/3/4-player previews and all four turns.
+  3. Identify every stale D4 `currentIndex` use relevant to this contract.
+  4. Propose one smallest future implementation slice within S effort.
+  5. Define deterministic assertions that would fail the current baseline.
+- Required validation: exact paths/symbols and current baseline values; no claims without source evidence.
+- Independent reviewer: none; Sara independently challenges the map and Hakam audits both.
+- Expected artifact: compact contract table and smallest implementation slice.
+- Context links: `AGENTS.md`, `ops/ai-team/BOARD.md`, Sara cycle-001 report, current runtime and D4 contract files.
 <!-- MANAGER TASK:END -->
 
 <!-- WORKER REPORT:START -->
@@ -40,10 +37,9 @@ For implementation, create `agent/mazen/<task-id>` from the latest assigned base
 - Result: `PENDING`
 - Summary: —
 - Observed head / freshness: —
-- Commit / PR / evidence: —
-- Files inspected or changed: —
-- Budget used: —
-- Validation: —
+- Evidence inspected: —
+- Runtime contract map: —
+- Deterministic assertions: —
 - Residual risks: —
 - Recommended next task: —
 - Team note: —
