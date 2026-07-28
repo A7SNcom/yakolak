@@ -7,9 +7,15 @@ on:
       - 'api/developer-president.js'
       - 'src/developer-president.js'
       - 'src/developer-president.css'
+      - 'src/president-portal-manifest.json'
       - 'ops/ai-team/PRESIDENT_PORTAL.md'
+      - 'ops/ai-team/RASHED_LEADERSHIP_OS.md'
+      - 'ops/ai-team/DEVELOPMENT_VISIBILITY.md'
+      - 'ops/ai-team/development-blueprint.json'
+      - 'ops/ai-team/development-ledger.json'
       - 'ops/ai-team/president-outbox.json'
       - 'ops/ai-team/president-status.json'
+      - 'ops/ai-team/PROMPT_STANDARD.md'
       - 'ops/ai-team/manager.md'
       - 'ops/ai-team/BOARD.md'
       - 'scripts/verify-president-portal.mjs'
@@ -17,15 +23,21 @@ on:
       - '.github/workflows/verify-president-portal.yml'
   push:
     branches:
-      - 'agent/president-portal'
+      - 'agent/president-portal-v3'
     paths:
       - 'developer.html'
       - 'api/developer-president.js'
       - 'src/developer-president.js'
       - 'src/developer-president.css'
+      - 'src/president-portal-manifest.json'
       - 'ops/ai-team/PRESIDENT_PORTAL.md'
+      - 'ops/ai-team/RASHED_LEADERSHIP_OS.md'
+      - 'ops/ai-team/DEVELOPMENT_VISIBILITY.md'
+      - 'ops/ai-team/development-blueprint.json'
+      - 'ops/ai-team/development-ledger.json'
       - 'ops/ai-team/president-outbox.json'
       - 'ops/ai-team/president-status.json'
+      - 'ops/ai-team/PROMPT_STANDARD.md'
       - 'ops/ai-team/manager.md'
       - 'ops/ai-team/BOARD.md'
       - 'scripts/verify-president-portal.mjs'
@@ -44,13 +56,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Check President API and interface syntax
+      - name: Check President API, interface and verifier syntax
         run: |
           node --check api/developer-president.js
           node --check src/developer-president.js
           node --check scripts/verify-president-portal.mjs
           node --check scripts/visual-president-portal.mjs
-      - name: Verify President and Rashed trust contract
+      - name: Verify President, Rashed and development visibility contracts
         run: node scripts/verify-president-portal.mjs
       - name: Install Chromium quietly
         run: |
@@ -62,7 +74,7 @@ jobs:
           for i in {1..30}; do curl -fsS http://127.0.0.1:4174/developer.html >/dev/null && exit 0; sleep 1; done
           cat /tmp/president-portal-server.log
           exit 1
-      - name: Verify desktop and mobile President journeys
+      - name: Verify project map, tasks, timeline and President journeys
         run: node scripts/visual-president-portal.mjs
       - if: always()
         uses: actions/upload-artifact@v4
