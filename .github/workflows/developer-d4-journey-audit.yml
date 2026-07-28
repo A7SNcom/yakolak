@@ -1,0 +1,40 @@
+name: Audit Developer D4 Journey
+
+on:
+  pull_request:
+    paths:
+      - 'src/developer-d4-registry.js'
+      - 'src/developer-scene-d4-*.js'
+      - 'src/app-game-developer-d4.js'
+      - 'src/app-game-v085.js'
+      - 'src/online-client-v114.js'
+      - 'scripts/audit-developer-d4-journey.mjs'
+      - 'docs/design/developer-d4-journey-audit.md'
+      - '.github/workflows/developer-d4-journey-audit.yml'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run advisory journey audit
+        run: node scripts/audit-developer-d4-journey.mjs
+
+      - name: Upload audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: developer-d4-journey-audit
+          path: artifacts/developer-d4-journey-audit.json
+          if-no-files-found: error
+          retention-days: 14
