@@ -11,7 +11,7 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
 body{padding:28px}
-button{font:inherit}
+button,textarea{font:inherit}
 .dev-shell{max-width:1440px;margin:auto}
 .dev-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:24px}
 .dev-brand{display:flex;flex-direction:column;gap:8px}
@@ -25,6 +25,7 @@ h1{margin:0;font-size:clamp(30px,4vw,54px);line-height:1}
 .scene-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
 .scene-card{position:relative;min-width:0;border:1px solid var(--line);border-radius:24px;background:var(--card);overflow:hidden;box-shadow:0 14px 40px rgba(42,39,33,.07);transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
 .scene-card:hover{transform:translateY(-3px);border-color:#b9b5ad;box-shadow:0 20px 54px rgba(42,39,33,.11)}
+.scene-card.has-note{border-color:#aaa59b}
 .scene-preview{position:relative;aspect-ratio:16/10;background:linear-gradient(145deg,#f1f0ec,#e5e3dd);overflow:hidden}
 .scene-preview iframe{position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none;background:#fff;opacity:0;transition:opacity .28s ease}
 .scene-card.preview-ready .scene-preview iframe{opacity:1}
@@ -40,16 +41,30 @@ h1{margin:0;font-size:clamp(30px,4vw,54px);line-height:1}
 .scene-type{display:inline-flex;margin-bottom:8px;padding:5px 8px;border-radius:999px;background:#efeee9;color:#69655e;font-size:11px;font-weight:900}
 .scene-title{margin:0 0 5px;font-size:19px;line-height:1.2}
 .scene-desc{margin:0;color:var(--muted);font-size:13px;line-height:1.6}
+.scene-note-indicator{display:none;width:max-content;margin-top:11px;padding:5px 8px;border-radius:999px;background:#262522;color:#fff;font-size:10px;font-weight:900}
+.scene-card.has-note .scene-note-indicator{display:inline-flex}
 .scene-open{flex:0 0 auto;width:42px;height:42px;border:1px solid var(--line);border-radius:50%;background:#fff;color:var(--ink);font-size:20px;font-weight:900;cursor:pointer}
 .scene-card[hidden]{display:none}
-.dev-stage{position:fixed;inset:0;z-index:1000;background:#fff;display:none}
+.dev-stage{position:fixed;inset:0;z-index:1000;background:#fff;display:none;overflow:hidden}
 .dev-stage.open{display:block}
 .dev-stage iframe{width:100%;height:100%;border:0;background:#fff}
-.dev-back{position:absolute;top:max(16px,env(safe-area-inset-top));right:max(16px,env(safe-area-inset-right));z-index:20;display:flex;align-items:center;gap:9px;border:1px solid rgba(32,32,30,.2);border-radius:999px;background:rgba(255,255,255,.9);color:#20201e;padding:11px 15px;font-weight:900;cursor:pointer;box-shadow:0 12px 32px rgba(0,0,0,.14);backdrop-filter:blur(12px)}
+.dev-back,.dev-notes-toggle{position:absolute;z-index:45;display:flex;align-items:center;gap:9px;border:1px solid rgba(32,32,30,.2);border-radius:999px;background:rgba(255,255,255,.92);color:#20201e;padding:11px 15px;font-weight:900;cursor:pointer;box-shadow:0 12px 32px rgba(0,0,0,.14);backdrop-filter:blur(12px)}
+.dev-back{top:max(16px,env(safe-area-inset-top));right:max(16px,env(safe-area-inset-right))}
+.dev-notes-toggle{right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom))}
 .dev-stage-title{position:absolute;top:max(18px,env(safe-area-inset-top));left:max(18px,env(safe-area-inset-left));z-index:20;padding:10px 13px;border-radius:13px;background:rgba(32,32,30,.82);color:#fff;font-size:12px;font-weight:900;backdrop-filter:blur(12px)}
+.dev-notes-panel{position:absolute;inset:0 0 0 auto;z-index:40;display:flex;flex-direction:column;width:min(430px,calc(100vw - 20px));padding:88px 20px max(20px,env(safe-area-inset-bottom));background:rgba(250,250,247,.98);border-left:1px solid rgba(32,32,30,.14);box-shadow:-18px 0 60px rgba(0,0,0,.18);transform:translateX(104%);transition:transform .24s ease;backdrop-filter:blur(18px)}
+.dev-notes-panel.open{transform:translateX(0)}
+.dev-notes-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}
+.dev-notes-copy h2{margin:0 0 4px;font-size:24px}
+.dev-notes-copy p{margin:0;color:var(--muted);font-size:12px;line-height:1.5}
+.dev-notes-close{width:40px;height:40px;flex:0 0 auto;border:1px solid var(--line);border-radius:50%;background:#fff;color:var(--ink);font-size:21px;font-weight:900;cursor:pointer}
+.dev-notes-input{width:100%;min-height:220px;flex:1;resize:none;border:1px solid var(--line);border-radius:18px;background:#fff;color:var(--ink);padding:16px;outline:none;line-height:1.75;font-size:15px;box-shadow:inset 0 1px 0 rgba(0,0,0,.02)}
+.dev-notes-input:focus{border-color:#8f8a80;box-shadow:0 0 0 3px rgba(32,32,30,.07)}
+.dev-notes-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:12px;color:var(--muted);font-size:11px;font-weight:800}
+.dev-notes-status{color:#4e4b45}
 .empty-state{grid-column:1/-1;padding:60px 20px;text-align:center;color:var(--muted);font-weight:800}
 @media(max-width:1050px){.scene-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:680px){body{padding:18px}.dev-head{align-items:flex-start;flex-direction:column}.scene-grid{grid-template-columns:1fr}.dev-tabs{top:8px;width:100%}.dev-count{display:none}.scene-card{border-radius:20px}.dev-stage-title{display:none}}
+@media(max-width:680px){body{padding:18px}.dev-head{align-items:flex-start;flex-direction:column}.scene-grid{grid-template-columns:1fr}.dev-tabs{top:8px;width:100%}.dev-count{display:none}.scene-card{border-radius:20px}.dev-stage-title{display:none}.dev-notes-panel{width:100%;border-left:0;padding-inline:16px}.dev-notes-toggle{padding:11px 14px}}
 </style>
 </head>
 <body>
@@ -67,9 +82,21 @@ h1{margin:0;font-size:clamp(30px,4vw,54px);line-height:1}
 </main>
 <section id="devStage" class="dev-stage" aria-hidden="true">
   <button id="devBack" class="dev-back" type="button"><span>↩</span><span>العودة للمعرض</span></button>
+  <button id="devNotesToggle" class="dev-notes-toggle" type="button" aria-label="فتح الملاحظات" aria-expanded="false"><span>✎</span><span>ملاحظات</span></button>
   <div id="devStageTitle" class="dev-stage-title">المشهد</div>
   <iframe id="devStageFrame" title="مشهد المطور" allow="fullscreen"></iframe>
+  <aside id="devNotesPanel" class="dev-notes-panel" aria-hidden="true">
+    <div class="dev-notes-head">
+      <div class="dev-notes-copy">
+        <h2>ملاحظات المشهد</h2>
+        <p id="devNotesScene">المشهد</p>
+      </div>
+      <button id="devNotesClose" class="dev-notes-close" type="button" aria-label="إغلاق الملاحظات">×</button>
+    </div>
+    <textarea id="devNotesInput" class="dev-notes-input" placeholder="اكتب ملاحظاتك عن هذا المشهد…" aria-label="ملاحظات المشهد"></textarea>
+    <div class="dev-notes-foot"><span>الحفظ تلقائي على هذا الجهاز</span><span id="devNotesStatus" class="dev-notes-status">محفوظ</span></div>
+  </aside>
 </section>
-<script type="module" src="./src/developer-d1.js?v=D1-fix1"></script>
+<script type="module" src="./src/developer-d1.js?v=D1-notes1"></script>
 </body>
 </html>
