@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 2,
+  "positive": "- Cycle: `006-test`\n- Task ID: `YAK-999-01`\n- Status: `READY`\n- Task type: `IMPLEMENT_PROCESS_GUARD`\n- Effort: `S (2 points)`\n- Risk: `medium`\n- OBSERVED: exact head and failing assertion recorded\n- Single outcome: verifier accepts canonical semantic labels\n- Why now: required check is red\n- Base branch: `agent/yakolak-team-os`\n- Allowed scope: verifier plus one fixture; max 2 files / 100 lines\n- Forbidden scope: no workflow bypass or weakened invariant\n- Acceptance criteria: positive passes and incomplete negative fails\n- Validation: run syntax, repository verifier, and fixtures\n- Independent reviewer: Omar\n- Expected artifact: bounded draft PR\n- Stop conditions: stop on scope or invariant ambiguity",
+  "negative": "- Cycle: `006-test`\n- Task ID: `YAK-999-02`\n- Status: `READY`\n- Task type: `IMPLEMENT_PROCESS_GUARD`\n- Effort: `S (2 points)`\n- Risk: `medium`\n- OBSERVED: exact head recorded\n- Single outcome: intentionally incomplete task\n- Why now: fixture\n- Base branch: `agent/yakolak-team-os`\n- Allowed scope: verifier only\n- Forbidden scope: no bypass\n- Acceptance criteria: must fail for missing validation\n- Independent reviewer: Omar\n- Expected artifact: none\n- Stop conditions: none",
+  "negativeMissing": "validation"
+}
