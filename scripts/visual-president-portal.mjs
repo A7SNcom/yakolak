@@ -9,7 +9,7 @@ const json=(route,payload)=>route.fulfill({status:200,contentType:'application/j
 const validReview={
   id:'president-review:YAK-TEST-01',status:'ready_for_president',taskId:'YAK-TEST-01',title:'رحلة دخول جاهزة للقرار',
   summary:'تم تنفيذ المهمة واختبارها وراجعها الفريق.',worker:'Noor',reviewer:'Sami',commitSha:'0123456789abcdef0123456789abcdef01234567',
-  prUrl:'https://github.com/A7SNcom/yakolak/pull/38',previewUrl:`${base}/developer.html`,decisionScope:'team_integration',
+  prUrl:'https://github.com/A7SNcom/yakolak/pull/43',previewUrl:`${base}/developer.html`,decisionScope:'team_integration',
   gates:{reviewer:'PASS',manager:'PASS',hakam:'MERGE_OK',ci:'GREEN'},evidence:[],createdAt:'2026-07-28T17:00:00.000Z'
 };
 const invalidReview={...validReview,id:'president-review:YAK-TEST-02',title:'يجب ألا تظهر',gates:{...validReview.gates,ci:'RED'}};
@@ -33,6 +33,11 @@ async function mock(page){
   });
 }
 
+async function openOffice(page){
+  await page.getByRole('button',{name:/مكتب الرئيس/}).click();
+  await page.locator('#presidentPortal.open').waitFor();
+}
+
 async function verify(viewport,name){
   const browser=await chromium.launch({headless:true});
   const page=await browser.newPage({viewport});
@@ -44,12 +49,20 @@ async function verify(viewport,name){
   if(await page.title()!=='ياكلك · واجهة الرئيس')throw new Error(`${name}: wrong title`);
   if(!(await page.locator('#d4NewRequest').isHidden()))throw new Error(`${name}: legacy direct-request channel remains visible`);
   if(!String(await page.locator('#d4StartTask').textContent()).includes('راشد'))throw new Error(`${name}: main task action does not name Rashed`);
-  await page.locator('#d4StartTask').click();
-  await page.locator('#presidentPortal.open').waitFor();
-  if(await page.locator('#presidentDirectives').isHidden())throw new Error(`${name}: scene task did not route to Rashed directives`);
-  await page.locator('#presidentClose').click();
-  await page.getByRole('button',{name:/مكتب الرئيس/}).click();
-  await page.locator('#presidentPortal.open').waitFor();
+
+  if(name==='desktop'){
+    await page.locator('#d4StartTask').click();
+    await page.locator('#presidentPortal.open').waitFor();
+    if(await page.locator('#presidentDirectives').isHidden())throw new Error(`${name}: scene task did not route to Rashed directives`);
+    await page.locator('#presidentClose').click();
+  }else{
+    await openOffice(page);
+    await page.getByRole('button',{name:/تعليماتي لراشد/}).click();
+    if(await page.locator('#presidentDirectives').isHidden())throw new Error(`${name}: visible mobile office cannot reach Rashed directives`);
+    await page.locator('#presidentClose').click();
+  }
+
+  await openOffice(page);
   await page.getByText('رحلة دخول جاهزة للقرار').waitFor();
   if(await page.getByText('يجب ألا تظهر').count())throw new Error(`${name}: invalid review was exposed`);
   if(await page.locator('#presidentReviewCount').textContent()!=='1')throw new Error(`${name}: review gate count is not 1`);
