@@ -85,3 +85,5 @@ Rashed reads decisions/messages every cycle and updates tasks/statuses according
 ## Security boundary
 
 The browser can create President directives, messages, and decisions only. It cannot write manager status, fabricate reviewer/Hakam gates, or place items in the review outbox. Manager-side communication remains versioned in GitHub.
+
+The server API is enabled automatically only in Preview/development environments. In Vercel Production it returns `president_portal_disabled_in_production` unless the President explicitly authorizes the channel and the protected environment sets `PRESIDENT_PORTAL_PRODUCTION_ENABLED=1`. Do not add this variable merely to obtain a green deployment.
