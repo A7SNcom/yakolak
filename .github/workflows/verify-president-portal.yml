@@ -1,0 +1,50 @@
+name: Verify President Portal
+
+on:
+  pull_request:
+    paths:
+      - 'developer.html'
+      - 'api/developer-president.js'
+      - 'src/developer-president.js'
+      - 'src/developer-president.css'
+      - 'ops/ai-team/PRESIDENT_PORTAL.md'
+      - 'ops/ai-team/president-outbox.json'
+      - 'ops/ai-team/president-status.json'
+      - 'ops/ai-team/manager.md'
+      - 'ops/ai-team/BOARD.md'
+      - 'scripts/verify-president-portal.mjs'
+      - '.github/workflows/verify-president-portal.yml'
+  push:
+    branches:
+      - 'agent/president-portal'
+    paths:
+      - 'developer.html'
+      - 'api/developer-president.js'
+      - 'src/developer-president.js'
+      - 'src/developer-president.css'
+      - 'ops/ai-team/PRESIDENT_PORTAL.md'
+      - 'ops/ai-team/president-outbox.json'
+      - 'ops/ai-team/president-status.json'
+      - 'ops/ai-team/manager.md'
+      - 'ops/ai-team/BOARD.md'
+      - 'scripts/verify-president-portal.mjs'
+      - '.github/workflows/verify-president-portal.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check President API and interface syntax
+        run: |
+          node --check api/developer-president.js
+          node --check src/developer-president.js
+          node --check scripts/verify-president-portal.mjs
+      - name: Verify President and Rashed trust contract
+        run: node scripts/verify-president-portal.mjs
