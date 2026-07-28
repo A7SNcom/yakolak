@@ -25,15 +25,14 @@ This task is read-only. Do not create a code branch or edit project files. Updat
 <!-- WORKER REPORT:START -->
 ## Worker report
 - Result: `PASS`
-- Summary / verdict: `PASS` — PR #41 is deterministic, bounded to the assigned canonical slice, explicitly rejects invalid transitions without mutation, and contains no browser, network, legacy-runtime, storage, timer, Blob, global, source-patching, dependency, or game-rule coupling.
-- Observed head / freshness: exact PR base `cee65db6455ca9ec314152d46fcda9140f623450`, head `d5f2781d6189deae907ae2cf5c6db05d57c5774f`; integration moved afterward only for Noor's report commit, so the implementation diff remains reviewable and non-overlapping.
-- Commit / PR / evidence reviewed: draft PR #41, 3 files, 151 additions; exact diff and workflow run `30386208694`, job `90366042170`.
-- Files inspected: `src/core/entry-contracts.js`, `src/core/entry-reducer.js`, `tests/entry-reducer.test.mjs`, manager task, `AGENTS.md`, `MIGRATION_ROADMAP.md`, and architecture guard rules.
-- Validation: independently reran `node --check` on both source modules and `node --test tests/entry-reducer.test.mjs`; 5/5 tests passed. Exact-head Architecture Guardrails workflow completed `success`; syntax and policy steps both passed.
-- Acceptance criteria: named `Action`, `AppState`, `Effect`, and `RenderSnapshot` contracts present; Boot -> Entry -> Mode selection deterministic; valid mode selection deterministic; invalid transition and invalid mode preserve state and emit explicit rejection effects; scope is 3 files / 151 lines within M budget.
-- Residual risks: `Object.freeze(new Set(...))` does not make Set contents deeply immutable, but the Set is module-private-by-convention and no mutation path exists in this slice; future API hardening may replace it with a predicate or frozen array. Vercel failed from account deployment quota, not code correctness, and no Preview is required for this Node-only contract.
-- Architecture/debt: legacy-debt delta `unchanged`; Slice 1 progress claim is honest but incomplete until Architecture Steward and Hakam gates pass.
-- Required merge checks: Nada `ARCH_OK`, Hakam `MERGE_OK`, manager freshness check; do not treat this report as GitHub account-level self-approval.
-- Recommended next task: Nada perform the independent architecture ownership/dependency review on exact PR #41 head.
-- Team note: الاختبارات قالت نعم، والـSet حاول يتفلسف شوي بس ما كسر العقد 😄
+- Summary / verdict: `PASS` for corrected PR #41 exact head `9da9afc4e2690feab03e66ad1a19bb8621cc5f7e`. The correction closes the exported mutable-Set defect without changing modes, reducer transitions, public action/state contracts, or forbidden runtime areas.
+- Observed head / freshness: `OBSERVED` PR #41 moved from assigned baseline `d5f2781d6189deae907ae2cf5c6db05d57c5774f` to exact correction head `9da9afc4e2690feab03e66ad1a19bb8621cc5f7e`; comparison is exactly 2 files, 7 additions/1 deletion in contracts and 24 additions/8 deletions in the focused test.
+- Diff inspected: `src/core/entry-contracts.js` now keeps `acceptedModes` module-private and exports a frozen facade exposing only `has(mode)`; `tests/entry-reducer.test.mjs` adds a shared state helper and one mutation-resistance test. `src/core/entry-reducer.js` is unchanged and continues consuming `.has()`.
+- Independent validation: `VALIDATED` syntax checks passed for contracts, reducer, and test. `node --test tests/entry-reducer.test.mjs` passed 6/6 in an independently reconstructed Node ESM harness. GitHub `Verify Architecture Guardrails` run `30395085282`, job `90395890552`, completed `success` on the exact corrected head.
+- Acceptance criteria: external callers receive no Set and no `.add/.delete/.clear`; frozen facade assignment to `.has` throws; canonical `MODE.LOCAL` remains accepted and an external mode remains rejected; prior five tests plus the new sixth test pass; no public mutable registry or product behavior change was introduced.
+- Scope / budget: correction is limited to the two authorized files and remains under the explicit 60-logical-line ceiling. No reducer redesign, mode/action change, dependency, legacy, browser, network, portal, or team-system change occurred.
+- Architecture/debt: legacy-debt delta `unchanged`; migration-gate delta `reviewer PASS after immutable-contract correction`, still not merge-ready until Nada issues renewed `ARCH_OK` and Hakam issues `MERGE_OK`.
+- Residual risks: the facade is intentionally minimal; any future need to enumerate modes must add an immutable API deliberately rather than re-exporting a collection.
+- Recommended next task: Nada performs renewed exact-head Architecture Steward review; Hakam audits only after that report exists.
+- Team note: هذه المرة العقد مغلق فعلاً، والاختبارات أثبتت أن المستهلك الخارجي ما يقدر يغيّر القانون. ✅
 <!-- WORKER REPORT:END -->
