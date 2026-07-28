@@ -33,8 +33,9 @@ async function mock(page){
   });
 }
 
-async function openOffice(page){
-  await page.getByRole('button',{name:/مكتب الرئيس/}).click();
+async function openOffice(page,name){
+  if(name==='mobile')await page.locator('.d4-mobile-nav [data-mobile-view="work"]').click();
+  else await page.getByRole('button',{name:/مكتب الرئيس/}).click();
   await page.locator('#presidentPortal.open').waitFor();
 }
 
@@ -56,13 +57,13 @@ async function verify(viewport,name){
     if(await page.locator('#presidentDirectives').isHidden())throw new Error(`${name}: scene task did not route to Rashed directives`);
     await page.locator('#presidentClose').click();
   }else{
-    await openOffice(page);
+    await openOffice(page,name);
     await page.getByRole('button',{name:/تعليماتي لراشد/}).click();
-    if(await page.locator('#presidentDirectives').isHidden())throw new Error(`${name}: visible mobile office cannot reach Rashed directives`);
+    if(await page.locator('#presidentDirectives').isHidden())throw new Error(`${name}: visible mobile work navigation cannot reach Rashed directives`);
     await page.locator('#presidentClose').click();
   }
 
-  await openOffice(page);
+  await openOffice(page,name);
   await page.getByText('رحلة دخول جاهزة للقرار').waitFor();
   if(await page.getByText('يجب ألا تظهر').count())throw new Error(`${name}: invalid review was exposed`);
   if(await page.locator('#presidentReviewCount').textContent()!=='1')throw new Error(`${name}: review gate count is not 1`);
