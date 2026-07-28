@@ -16,6 +16,11 @@ replaceExact(
 replaceExact("const BUILD='112';", "const BUILD='D1';", 'D1 build number');
 
 const releasePatch = [
+  'replaceExact(',
+  '  "  controls.target.x=clamp(controls.target.x,-560,560);\\n  controls.target.y=clamp(controls.target.y,ROOM_CFG.floorY+80,ROOM_CFG.topY-170);\\n  controls.target.z=clamp(controls.target.z,-560,560);",',
+  '  "  controls.target.x=clamp(controls.target.x,ROOM_LIMIT.minX,ROOM_LIMIT.maxX);\\n  controls.target.y=clamp(controls.target.y,ROOM_CFG.floorY+80,ROOM_CFG.topY-170);\\n  controls.target.z=clamp(controls.target.z,ROOM_LIMIT.minZ,ROOM_LIMIT.maxZ);",',
+  "  'allow D1 wall camera targets'",
+  ');',
   'replaceRegex(',
   '  /function startTurnTimer\\(\\)\\{.*?\\n\\}\\nasync function runTutorial/s,',
   '  `function startTurnTimer(){',
