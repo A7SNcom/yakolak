@@ -2,9 +2,11 @@ export const sceneDefinitions=[
   {id:'loading-star',kind:'scene',type:'single',defaultName:'مشهد التحميل',description:'النجمة المعتمدة بحركة الارتداد والانضغاط والظل.',label:'مشهد واحد',mark:'✦',sourceKey:'scene.loading-star'},
   {id:'empty-table',kind:'scene',type:'single',defaultName:'الغرفة والطاولة',description:'الغرفة المتوازنة مع الطاولة المتوسطة وحدود موحدة على جميع الجدران.',label:'مشهد واحد',mark:'□',sourceKey:'scene.empty-table'},
   {id:'logo-wall',kind:'scene',type:'single',defaultName:'جدار الشعارات',description:'الجدار النهائي بالشعارين الأصليين وبكاميرا ثابتة عند التقريب والابتعاد.',label:'مشهد واحد',mark:'Y',sourceKey:'scene.logo-wall'},
+  {id:'color-selection',kind:'scene',type:'single',defaultName:'اختيار اللون',description:'مشهد إعداد اللعبة الحقيقي لاختيار لون اللاعب.',label:'مشهد واحد',mark:'●',sourceKey:'gameState.setupStep="color"'},
+  {id:'player-count-selection',kind:'scene',type:'single',defaultName:'اختيار عدد اللاعبين',description:'مشهد إعداد اللعبة الحقيقي لاختيار لاعبين أو 3 أو 4 لاعبين.',label:'مشهد واحد',mark:'4',sourceKey:'gameState.setupStep="bots"'},
   {id:'board-bases',kind:'scene',type:'single',defaultName:'القاعدة والأربع قواعد',description:'ميدان اللعب ومناطق الراحة الأربع فقط بتكوين ثابت.',label:'مشهد واحد',mark:'＋',sourceKey:'scene.board-bases'},
-  {id:'clean-entry',kind:'scene',type:'sequence',defaultName:'رحلة الدخول النظيفة',description:'حركة واحدة متصلة من جدار التحميل إلى جدار الشعارات مرورًا بالغرفة.',label:'مجموعة مشاهد',mark:'→',sourceKey:'scene.clean-entry'},
-  {id:'unboxing-intro',kind:'scene',type:'sequence',defaultName:'إنترو فك العلبة',description:'فك العلبة وإظهار ميدان اللعب ومناطق الراحة والشوك فقط، دون إعداد اللاعبين.',label:'مجموعة مشاهد',mark:'↥',sourceKey:'scene.unboxing-intro'}
+  {id:'clean-entry',kind:'scene',type:'sequence',defaultName:'رحلة الدخول النظيفة',description:'زوم أوت واسع يتمركز فوق الطاولة ويظهر الغرفة قبل الانتقال السلس لجدار الشعارات.',label:'مجموعة مشاهد',mark:'→',sourceKey:'scene.clean-entry'},
+  {id:'unboxing-intro',kind:'scene',type:'sequence',defaultName:'إنترو فك العلبة',description:'فك العلبة وإظهار ميدان اللعب ومناطق الراحة والشوك فقط، دون بقايا تفاعل أو إعداد لاعبين.',label:'مجموعة مشاهد',mark:'↥',sourceKey:'scene.unboxing-intro'}
 ];
 
 export const elementDefinitions=[
@@ -22,7 +24,3 @@ export const elementDefinitions=[
 export const developerDefinitions=[...sceneDefinitions,...elementDefinitions];
 export const definitionKey=definition=>`${definition.kind}:${definition.id}`;
 export const definitionMap=new Map(developerDefinitions.map(definition=>[definitionKey(definition),definition]));
-
-if(typeof window!=='undefined'&&/(?:^|\/)developer\.html$/.test(location.pathname)){
-  import('./developer-d1-workspace.js?v=D1-workspace-v1').catch(error=>console.error('[Yakolak] D1 workspace failed to load',error));
-}
