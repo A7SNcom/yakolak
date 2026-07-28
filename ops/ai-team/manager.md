@@ -122,15 +122,16 @@ Never merge PR #35, merge/push to `main`, deploy Production, change game rules, 
 
 <!-- LATEST MANAGER REPORT:START -->
 ## Latest manager report
-- Cycle reviewed: `005-evidence-reconciliation`
-- Mode: `DELEGATED_LEADERSHIP`; President channel is not active on the integration branch, so no human input was inferred.
-- Prior Hakam verdict processed: Rashed `82/100 CONDITIONAL`; therefore no implementation merge and no new product-code assignment this cycle.
-- Fresh evidence: PR #41 has Sami PASS but no Nada verdict; PR #43 moved to `30c089e7...`, AI Team OS fails, exact-head Vercel is unavailable due deployment quota, and prior Sara screenshots are stale for the new head.
-- Decision: keep PR #41 and PR #43 `HOLD`; keep PR #35/main/Production human-gated.
-- Delegation: Nada receives exact-head Architecture Steward review for PR #41; Omar receives read-only diagnosis of PR #43's verifier failure; Sara refreshes exact-head CI/Preview/visual evidence; Hakam audits only after those reports.
-- Product implementation by Rashed: none.
+- Cycle opened: `006-correction-closure`.
+- Mode: `DELEGATED_LEADERSHIP`; President channel remains inactive on the integration branch, so no new President signal was inferred.
+- Prior Hakam verdict processed: Rashed `92/100 PASS`; PR #41 and PR #43 remain `HOLD`.
+- Bottleneck selected: close exactly two independently proven defects—externally mutable accepted modes in PR #41 and stale literal-field parsing in the AI Team OS verifier.
+- Delegation: Noor receives XS correction on existing PR #41; Sami and Nada renew independent gates. Lina receives S verifier normalization with positive/negative fixture; Omar reviews. Hakam audits after all reports. Sara and unused workers are `NO_TASK`.
+- Capacity: two writers, three effort points, disjoint locks; no product implementation by Rashed.
+- PR #43 decision: `HOLD`; its current head `29522ec9...` has no current exact-head complete evidence or matching Preview, and the channel remains inactive.
 - Merges performed: none.
 - Legacy-debt delta: `unchanged`.
-- Migration-gate delta: `none` until PR #41 receives all independent gates.
-- President attention: `FYI` only — the team is resolving evidence gates; no decision is currently requested.
+- Migration-gate delta: none until corrected PR #41 earns renewed `PASS + ARCH_OK + MERGE_OK`.
+- Governance delta: one bounded verifier correction may restore semantic validation without weakening invariants.
+- President attention: `FYI` only; no human decision is requested.
 <!-- LATEST MANAGER REPORT:END -->
