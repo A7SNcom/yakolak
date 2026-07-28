@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="yakolak-version" content="developer-d1-scene-review-fixes">
+<meta name="yakolak-version" content="developer-d1-review-center">
 <title>Yakolak Developer Scene D1</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="./styles/v114-online.css?v=D1-review-fixes">
+<link rel="stylesheet" href="./styles/v114-online.css?v=D1-review-center">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script>
 <style>
@@ -30,25 +30,8 @@ body[data-preview="1"] .scene-status{display:none}
 </style>
 </head>
 <body>
-<div id="sceneLoading" class="scene-loading" aria-hidden="true">
-  <div class="loaderProjection">
-    <div class="starBounce">
-      <svg class="loadingStar" viewBox="0 0 802 798" xmlns="http://www.w3.org/2000/svg">
-        <g transform="matrix(4.166667,0,0,4.166667,484.7475,797.470417)">
-          <path d="M0,-191.393L-20.116,-183.832L-40.232,-191.393L-55.534,-176.304L-76.986,-175.028L-84.828,-155.02L-103.907,-145.13L-102.932,-123.662L-116.339,-106.867L-106.717,-87.651L-112.134,-66.855L-95.528,-53.214L-92.018,-32.013L-71.299,-26.306L-59.469,-8.364L-38.22,-11.578L-20.116,0L-2.012,-11.578L19.237,-8.364L31.067,-26.306L51.786,-32.013L55.296,-53.214L71.902,-66.855L66.486,-87.651L76.108,-106.867L62.7,-123.662L63.675,-145.13L44.596,-155.02L36.754,-175.028L15.302,-176.304L0,-191.393Z"/>
-        </g>
-      </svg>
-    </div>
-    <div class="loadingShadow"></div>
-  </div>
-</div>
-<div id="view"></div>
-<div id="hint" aria-hidden="true"></div>
-<button id="settingsBtn" aria-hidden="true">SET</button>
-<button id="clearCacheBtn" hidden>مسح</button>
-<div id="panel" aria-hidden="true"></div>
-<textarea id="out"></textarea>
-<div id="sceneStatus" class="scene-status">D1</div>
-<script type="module" src="./src/developer-scene-d1.js?v=D1-review-fixes"></script>
+<div id="sceneLoading" class="scene-loading" aria-hidden="true"><div class="loaderProjection"><div class="starBounce"><svg class="loadingStar" viewBox="0 0 802 798" xmlns="http://www.w3.org/2000/svg"><g transform="matrix(4.166667,0,0,4.166667,484.7475,797.470417)"><path d="M0,-191.393L-20.116,-183.832L-40.232,-191.393L-55.534,-176.304L-76.986,-175.028L-84.828,-155.02L-103.907,-145.13L-102.932,-123.662L-116.339,-106.867L-106.717,-87.651L-112.134,-66.855L-95.528,-53.214L-92.018,-32.013L-71.299,-26.306L-59.469,-8.364L-38.22,-11.578L-20.116,0L-2.012,-11.578L19.237,-8.364L31.067,-26.306L51.786,-32.013L55.296,-53.214L71.902,-66.855L66.486,-87.651L76.108,-106.867L62.7,-123.662L63.675,-145.13L44.596,-155.02L36.754,-175.028L15.302,-176.304L0,-191.393Z"/></g></svg></div><div class="loadingShadow"></div></div></div>
+<div id="view"></div><div id="hint" aria-hidden="true"></div><button id="settingsBtn" aria-hidden="true">SET</button><button id="clearCacheBtn" hidden>مسح</button><div id="panel" aria-hidden="true"></div><textarea id="out"></textarea><div id="sceneStatus" class="scene-status">D1</div>
+<script type="module" src="./src/developer-scene-d1-router.js?v=D1-review-center"></script>
 </body>
 </html>
