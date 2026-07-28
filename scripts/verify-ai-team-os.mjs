@@ -44,11 +44,29 @@ const minutes=[config.managerMinute,...(config.pods||[]).map(pod=>pod.minute)];
 if(new Set(minutes).size!==minutes.length)errors.push('schedule minutes must be unique');
 if(minutes.some(minute=>!Number.isInteger(minute)||minute<0||minute>59))errors.push('schedule minutes must be integers from 0 to 59');
 
-const requiredStatic=['AGENTS.md','.github/copilot-instructions.md','ops/ai-team/TEAM_OS.md','ops/ai-team/EVALUATION.md','ops/ai-team/PODS.md','ops/ai-team/BOARD.md','ops/ai-team/HISTORY.md','ops/ai-team/manager.md'];
+const requiredStatic=[
+  'AGENTS.md',
+  '.github/copilot-instructions.md',
+  '.github/workflows/architecture-guardrails.yml',
+  'docs/architecture/GAME_ARCHITECTURE.md',
+  'docs/architecture/MIGRATION_ROADMAP.md',
+  'docs/architecture/DEBT_REGISTER.md',
+  'ops/ai-team/PROMPT_STANDARD.md',
+  'ops/ai-team/TEAM_OS.md',
+  'ops/ai-team/EVALUATION.md',
+  'ops/ai-team/PODS.md',
+  'ops/ai-team/BOARD.md',
+  'ops/ai-team/HISTORY.md',
+  'ops/ai-team/manager.md',
+  'scripts/verify-architecture-guardrails.mjs'
+];
 for(const file of requiredStatic)if(!exists(file))errors.push(`missing required file ${file}`);
 
 const board=read('ops/ai-team/BOARD.md');
 const boardCycle=clean(board.match(/^- Cycle:\s*(.+)$/m)?.[1]);
+const boardStatus=clean(board.match(/^- Status:\s*(.+)$/m)?.[1]);
+const freeze=/^PROCESS_FREEZE/.test(boardStatus);
+const provenTier=/^- Capacity tier:\s*PROVEN\b/im.test(board);
 if(!boardCycle)errors.push('BOARD.md has no active cycle');
 
 let codeWriters=0;
@@ -65,10 +83,26 @@ for(const worker of workers){
   const text=read(relative);
   if(count(text,'<!-- MANAGER TASK:START -->')!==1||count(text,'<!-- MANAGER TASK:END -->')!==1)errors.push(`${worker}: manager task markers must appear exactly once`);
   if(count(text,'<!-- WORKER REPORT:START -->')!==1||count(text,'<!-- WORKER REPORT:END -->')!==1)errors.push(`${worker}: worker report markers must appear exactly once`);
+
+  if(freeze){
+    const expected=worker===config.auditor?'NO_CHANGE':'NO_TASK';
+    const row=new RegExp(`\\|\\s*${escape(worker)}\\s*\\|\\s*\\\`${expected}\\\`\\s*\\|`);
+    if(!row.test(board))errors.push(`${worker}: freeze board must declare ${expected}`);
+    continue;
+  }
+
   const task=text.match(/<!-- MANAGER TASK:START -->([\s\S]*?)<!-- MANAGER TASK:END -->/)?.[1]||'';
   const cycle=requireValue(task,'Cycle',worker);
   const id=requireValue(task,'Task ID',worker);
   const status=requireValue(task,'Status',worker);
+
+  if(cycle&&boardCycle&&cycle!==boardCycle)errors.push(`${worker}: cycle ${cycle} does not match board ${boardCycle}`);
+  if(id&&!/^YAK-\d{3}-\d{2}$/.test(id))errors.push(`${worker}: invalid task id ${id}`);
+  if(status&&!config.taskStatuses.includes(status))errors.push(`${worker}: invalid status ${status}`);
+  if(!board.includes(`| ${worker} |`))errors.push(`${worker}: missing from BOARD assignments/status table`);
+
+  if(status==='NO_TASK')continue;
+
   const type=requireValue(task,'Task type',worker);
   const effort=requireValue(task,'Effort',worker);
   requireValue(task,'Risk',worker);
@@ -85,25 +119,23 @@ for(const worker of workers){
   requireValue(task,'Expected artifact',worker);
   requireValue(task,'Context links',worker);
 
-  if(cycle&&boardCycle&&cycle!==boardCycle)errors.push(`${worker}: cycle ${cycle} does not match board ${boardCycle}`);
-  if(id&&!/^YAK-\d{3}-\d{2}$/.test(id))errors.push(`${worker}: invalid task id ${id}`);
-  if(status&&!['READY','HOLD','NO_TASK'].includes(status))errors.push(`${worker}: invalid status ${status}`);
   if(type&&!config.allowedTaskTypes.includes(type))errors.push(`${worker}: invalid task type ${type}`);
   const effortMatch=effort.match(/^(XS|S|M)\s*\((\d+) points?\)$/i);
   if(!effortMatch){
     errors.push(`${worker}: invalid effort format ${effort}`);
-  }else{
-    const level=effortMatch[1].toUpperCase();
-    const points=Number(effortMatch[2]);
-    if(config.effortPoints[level]!==points)errors.push(`${worker}: ${level} must equal ${config.effortPoints[level]} points`);
-    if(config.implementationTypes.includes(type)){
-      codeWriters+=1;
-      codePoints+=points;
-      if(!reviewer||/^none\b/i.test(reviewer))errors.push(`${worker}: implementation requires an independent reviewer`);
-      else taskReviewers.push({worker,reviewer});
-    }else nonCodeTasks+=1;
+    continue;
   }
-  if(!board.includes(`| ${worker} |`))errors.push(`${worker}: missing from BOARD active assignments`);
+  const level=effortMatch[1].toUpperCase();
+  const points=Number(effortMatch[2]);
+  if(config.effortPoints[level]!==points)errors.push(`${worker}: ${level} must equal ${config.effortPoints[level]} points`);
+
+  if(status!=='READY')continue;
+  if(config.implementationTypes.includes(type)){
+    codeWriters+=1;
+    codePoints+=points;
+    if(!reviewer||/^none\b/i.test(reviewer))errors.push(`${worker}: implementation requires an independent reviewer`);
+    else taskReviewers.push({worker,reviewer});
+  }else nonCodeTasks+=1;
 }
 
 for(const {worker,reviewer} of taskReviewers){
@@ -113,21 +145,37 @@ for(const {worker,reviewer} of taskReviewers){
   if(reviewerName===config.auditor)errors.push(`${worker}: auditor cannot replace the implementation reviewer`);
 }
 
-if(codeWriters>config.limits.maxCodeWritersPerCycle)errors.push(`code writers ${codeWriters} exceed limit ${config.limits.maxCodeWritersPerCycle}`);
-if(codePoints>config.limits.maxCodeEffortPointsPerCycle)errors.push(`code effort ${codePoints} exceeds limit ${config.limits.maxCodeEffortPointsPerCycle}`);
-if(nonCodeTasks<config.limits.minimumIndependentNonCodeTasks)errors.push(`non-code tasks ${nonCodeTasks} below minimum ${config.limits.minimumIndependentNonCodeTasks}`);
+if(!freeze){
+  const maxWriters=provenTier?config.limits.provenMaxCodeWritersPerCycle:config.limits.defaultMaxCodeWritersPerCycle;
+  const maxPoints=provenTier?config.limits.provenMaxCodeEffortPointsPerCycle:config.limits.defaultMaxCodeEffortPointsPerCycle;
+  if(codeWriters>maxWriters)errors.push(`code writers ${codeWriters} exceed ${provenTier?'proven':'default'} limit ${maxWriters}`);
+  if(codePoints>maxPoints)errors.push(`code effort ${codePoints} exceeds ${provenTier?'proven':'default'} limit ${maxPoints}`);
+  if(nonCodeTasks<config.limits.minimumIndependentNonCodeTasks)errors.push(`non-code tasks ${nonCodeTasks} below minimum ${config.limits.minimumIndependentNonCodeTasks}`);
+}
 
 const manager=read('ops/ai-team/manager.md');
 if(!/sole manager/i.test(manager))errors.push('manager.md must declare one sole manager');
+for(const keyword of ['NO_TASK','Architecture Steward','legacy-debt delta','migration-gate delta'])if(!manager.includes(keyword))errors.push(`manager.md missing ${keyword}`);
+
 const auditorFile=read(`ops/ai-team/workers/${config.auditor.toLowerCase()}.md`);
 if(!/independent cycle auditor/i.test(auditorFile)||!/permanently read-only/i.test(auditorFile))errors.push('auditor file must enforce independent read-only operation');
-const auditorTask=auditorFile.match(/<!-- MANAGER TASK:START -->([\s\S]*?)<!-- MANAGER TASK:END -->/)?.[1]||'';
-if(field(auditorTask,'Task type')!=='AUDIT')errors.push('auditor task type must be AUDIT');
+if(!freeze){
+  const auditorTask=auditorFile.match(/<!-- MANAGER TASK:START -->([\s\S]*?)<!-- MANAGER TASK:END -->/)?.[1]||'';
+  if(field(auditorTask,'Task type')!=='AUDIT')errors.push('auditor task type must be AUDIT');
+}
 
 const pods=read('ops/ai-team/PODS.md');
 for(const worker of workers)if(!pods.includes(worker))errors.push(`PODS.md does not mention ${worker}`);
+for(const keyword of ['NO_TASK','NO_CHANGE','scheduling'])if(!pods.includes(keyword))errors.push(`PODS.md missing ${keyword}`);
+
+const teamOs=read('ops/ai-team/TEAM_OS.md');
+for(const keyword of ['NO_TASK','Architecture Steward','legacy-debt delta','migration-gate delta','PROMPT_STANDARD.md'])if(!teamOs.includes(keyword))errors.push(`TEAM_OS.md missing ${keyword}`);
+
 const evaluation=read('ops/ai-team/EVALUATION.md');
-for(const keyword of ['Tripwires','MERGE_OK','Manager score','Capability ledger'])if(!evaluation.includes(keyword))errors.push(`EVALUATION.md missing ${keyword}`);
+for(const keyword of ['tripwires','MERGE_OK','Manager score','Capability ledger','ARCH_REJECT'])if(!evaluation.toLowerCase().includes(keyword.toLowerCase()))errors.push(`EVALUATION.md missing ${keyword}`);
+
+const promptStandard=read('ops/ai-team/PROMPT_STANDARD.md');
+for(const keyword of ['OBSERVED','INFERRED','NO_TASK','Stop conditions'])if(!promptStandard.includes(keyword))errors.push(`PROMPT_STANDARD.md missing ${keyword}`);
 
 if(errors.length){
   console.error(`AI Team OS verification failed with ${errors.length} error(s):`);
@@ -135,4 +183,5 @@ if(errors.length){
   process.exit(1);
 }
 
-console.log(`AI Team OS verified: ${workers.length} workers, ${config.pods.length} pods, ${codeWriters} code writers, ${codePoints} code points, ${nonCodeTasks} independent non-code tasks, cycle ${boardCycle}.`);
+const mode=freeze?`freeze ${boardStatus}`:`${codeWriters} code writers, ${codePoints} code points, ${nonCodeTasks} independent READY tasks`;
+console.log(`AI Team OS verified: ${workers.length} workers, ${config.pods.length} pods, ${mode}, cycle ${boardCycle}.`);
