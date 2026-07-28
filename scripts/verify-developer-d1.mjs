@@ -14,6 +14,10 @@ requireText(html,'id="sceneTabs"','scene filters');
 requireText(html,'id="devBack"','floating return button');
 requireText(html,'id="devStageFrame"','isolated stage');
 requireText(html,'scene-preview-state','preview readiness state');
+requireText(html,'id="devNotesToggle"','notes toggle');
+requireText(html,'id="devNotesPanel"','notes panel');
+requireText(html,'id="devNotesInput"','notes input');
+requireText(html,'الحفظ تلقائي على هذا الجهاز','notes persistence disclosure');
 requireText(sceneHtml,'loaderProjection','approved loading star');
 requireText(sceneHtml,'@keyframes bounce','approved loading motion');
 
@@ -23,6 +27,11 @@ requireText(gallery,'IntersectionObserver','lazy preview loading');
 requireText(gallery,"stage.classList.add('open')",'scene open flow');
 requireText(gallery,"stageFrame.src='about:blank'",'scene close cleanup');
 requireText(gallery,'yakolak-developer-scene-ready','preview readiness bridge');
+requireText(gallery,"const NOTES_PREFIX='yakolak:developer-d1:scene-note:'",'per-scene notes namespace');
+requireText(gallery,'localStorage.setItem','notes save');
+requireText(gallery,'localStorage.getItem','notes restore');
+requireText(gallery,'scene-note-indicator','notes card indicator');
+requireText(gallery,'scheduleNoteSave','notes autosave');
 
 requireText(runner,"sceneId==='loading-star'",'loading scene');
 requireText(runner,'configureEmptyTable','empty table scene');
@@ -39,4 +48,4 @@ requireText(runner,'triggerIntroReplay','runtime intro replay');
 
 rejectText(html,'./app.js','client bootstrap isolation');
 rejectText(sceneHtml,'./app.js','client bootstrap isolation');
-console.log('Developer D1 isolated scene verification passed');
+console.log('Developer D1 isolated scenes and per-scene notes verification passed');
