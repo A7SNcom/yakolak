@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {ACTION,APP_PHASE,MODE} from '../src/core/entry-contracts.js';
+import {ACTION,APP_PHASE,MODE,VALID_MODES} from '../src/core/entry-contracts.js';
 import {createInitialState,toRenderSnapshot,transitionEntryState} from '../src/core/entry-reducer.js';
+
+function modeSelectionState(){
+  const entry=transitionEntryState(createInitialState(),{type:ACTION.BOOT_COMPLETED}).state;
+  return transitionEntryState(entry,{type:ACTION.OPEN_MODE_SELECTION}).state;
+}
 
 test('initial state is deterministic boot state',()=>{
   const state=createInitialState();
@@ -24,9 +29,7 @@ test('boot advances to entry then mode selection',()=>{
 });
 
 test('mode selection records a valid mode deterministically',()=>{
-  const entry=transitionEntryState(createInitialState(),{type:ACTION.BOOT_COMPLETED}).state;
-  const modes=transitionEntryState(entry,{type:ACTION.OPEN_MODE_SELECTION}).state;
-  const selected=transitionEntryState(modes,{type:ACTION.SELECT_MODE,mode:MODE.ONLINE});
+  const selected=transitionEntryState(modeSelectionState(),{type:ACTION.SELECT_MODE,mode:MODE.ONLINE});
   assert.equal(selected.state.selectedMode,MODE.ONLINE);
   assert.equal(selected.state.revision,3);
 });
@@ -41,9 +44,22 @@ test('invalid transition preserves state and emits rejection',()=>{
 });
 
 test('invalid mode preserves state and emits rejection',()=>{
-  const entry=transitionEntryState(createInitialState(),{type:ACTION.BOOT_COMPLETED}).state;
-  const modes=transitionEntryState(entry,{type:ACTION.OPEN_MODE_SELECTION}).state;
-  const result=transitionEntryState(modes,{type:ACTION.SELECT_MODE,mode:'invalid'});
-  assert.strictEqual(result.state,modes);
+  const state=modeSelectionState();
+  const result=transitionEntryState(state,{type:ACTION.SELECT_MODE,mode:'invalid'});
+  assert.strictEqual(result.state,state);
   assert.equal(result.effects[0].reason,'invalid_mode');
+});
+
+test('external consumers cannot mutate accepted mode legality',()=>{
+  assert.equal(Object.isFrozen(VALID_MODES),true);
+  assert.equal('add' in VALID_MODES,false);
+  assert.equal('delete' in VALID_MODES,false);
+  assert.equal('clear' in VALID_MODES,false);
+  assert.throws(()=>{VALID_MODES.has=()=>true},TypeError);
+
+  const state=modeSelectionState();
+  const accepted=transitionEntryState(state,{type:ACTION.SELECT_MODE,mode:MODE.LOCAL});
+  const rejected=transitionEntryState(state,{type:ACTION.SELECT_MODE,mode:'external-mode'});
+  assert.equal(accepted.state.selectedMode,MODE.LOCAL);
+  assert.equal(rejected.effects[0].reason,'invalid_mode');
 });
