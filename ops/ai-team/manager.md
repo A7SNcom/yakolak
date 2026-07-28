@@ -26,17 +26,18 @@ Continuously improve both:
 1. Record a fresh snapshot: integration head SHA, source/PR head SHA, timestamp, check conclusions, open worker PRs, and active locks.
 2. Reject stale reports and tasks whose premise has already changed or completed.
 3. Process Hakam's prior score and merge verdicts. Do not override Hakam by assertion; resolve the evidence or hold the work.
-4. Merge only bounded green worker PRs with independent reviewer PASS and Hakam `MERGE_OK` into `agent/yakolak-team-os`.
-5. Select one current bottleneck.
-6. Assign exactly one task to Noor, Sami, Lina, Mazen, Nada, Omar, Sara, and Hakam.
-7. Use at most four code writers and at most eight code-effort points. Never assign an `L` task.
-8. Match risk and effort to the current capability ledger. Reduce scope after weak performance.
-9. Pair every implementation with a different independent reviewer. Hakam is the final auditor, not the implementation reviewer.
-10. Give explicit non-overlapping locks and change budgets.
-11. Update only the `MANAGER TASK` blocks; preserve reports.
-12. Refresh `BOARD.md`, durable `HISTORY.md` facts, and concise useful `TEAM_ROOM.md` handoffs.
-13. Add one concise Arabic comment to PR #36 only for meaningful progress, blocker, audit failure, or human decision.
-14. Replace only the report block below.
+4. An implementation task with no commit/draft PR by audit time is `NO_ARTIFACT`; its reviewer may inspect only the baseline, and the next manager must retry smaller or replace it rather than calling it partial completion.
+5. Merge only bounded green worker PRs with independent reviewer PASS and Hakam `MERGE_OK` into `agent/yakolak-team-os`.
+6. Select one current bottleneck.
+7. Assign exactly one task to Noor, Sami, Lina, Mazen, Nada, Omar, Sara, and Hakam.
+8. Use at most four code writers and at most eight code-effort points. Never assign an `L` task.
+9. Match risk and effort to the current capability ledger. Reduce scope after weak or missing evidence.
+10. Pair every implementation with a different independent reviewer. Hakam is the final auditor, not the implementation reviewer.
+11. Give explicit non-overlapping locks and change budgets.
+12. Update only the `MANAGER TASK` blocks; preserve reports.
+13. Refresh `BOARD.md`, durable `HISTORY.md` facts, and concise useful `TEAM_ROOM.md` handoffs.
+14. Add one concise Arabic comment to PR #36 only for meaningful progress, blocker, audit failure, or human decision.
+15. Replace only the report block below.
 
 ## Delegation standard
 A valid task has one observable outcome, current head evidence, type, XS/S/M effort, risk, small file scope, line/file budget, acceptance criteria, validation ladder, named independent reviewer, expected artifact, and only necessary context.
@@ -67,14 +68,14 @@ Stop and report rather than force a change when:
 
 <!-- LATEST MANAGER REPORT:START -->
 ## Latest manager report
-- Cycle reviewed: `000-bootstrap design review`
-- Result: `PROCESS_REBUILT`
-- Observed integration head: `fbadc7de98303651c0e4f8c96117c602b59c23bf` before hardening commits
-- Observed source head: `d8d2a50f4a604dc4ba95c5ef762a66ffa7fb92c2`
-- Current CI snapshot: v112, v118, v125, Build 126, D3 and D4 audit green; D1 remains failing at run `30377398315`, job `90336466217`.
-- Failures found in old process: duplicate managers, impossible eight-schedule design under five-task limit, stale bootstrap tasks after source moved, no effort/change budgets, no capability adaptation, no independent manager/merge veto.
-- Corrective action: one manager + four isolated two-person pods; Hakam auditor; AGENTS coding contract; scoring/tripwires; fresh-head checkpoint; eight-point code budget.
-- Merges performed: latest D4 source synchronization only; no main/production or PR #35 merge.
-- Human decisions needed: none.
-- Next manager action: run cycle `001-hardening` from the latest team head and preserve Hakam independence.
+- Cycle reviewed: `001-hardening`; new cycle published: `002-evidence-first`.
+- Result: `PASS_WITH_NO_ARTIFACTS`.
+- Fresh snapshot: source/PR #35 head `d8d2a50f4a604dc4ba95c5ef762a66ffa7fb92c2`; integration/PR #36 head observed as `b5279840c52722d60c69069e7f05e05dd458cda0`; observed `2026-07-28T17:01Z`.
+- Checks: `Verify AI Team OS` run `30379953601` succeeded; Vercel status is failing from the free-plan build-rate limit. Prior D1 failure remains unclosed until fresh reproduction.
+- Hakam processed: manager `91/100 PASS`; Sara `90/100 PASS`; Noor/Sami/Lina/Mazen/Nada/Omar unverified; all implementation tasks and PR #36 remain `HOLD`; no `MERGE_OK`.
+- Merges performed: none.
+- Process correction: missing implementation artifact is now explicitly `NO_ARTIFACT`, never partial completion.
+- Bottleneck selected: trustworthy developer-preview baseline before broader D4 state or online implementation.
+- Capacity assigned: two code writers / four code points; six independent non-code tasks; all locks disjoint.
+- Human decisions needed: none. PR #35, `main`, and production remain untouched.
 <!-- LATEST MANAGER REPORT:END -->
