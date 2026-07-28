@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - developer.html
+      - developer-d1.html
       - developer-scene.html
       - package.json
       - api/developer-d1.js
@@ -30,7 +31,6 @@ on:
 
 jobs:
   verify:
-    if: github.event_name != 'pull_request' || github.head_ref != 'agent/developer-d2-workbench'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -58,9 +58,18 @@ jobs:
         run: |
           npm install --no-save --silent playwright >/dev/null 2>&1
           npx playwright install --with-deps chromium >/dev/null 2>&1
-      - name: Start Developer D1 locally
+      - name: Start retained Developer D1 fixture locally
         run: |
-          python3 -m http.server 4173 > /tmp/developer-d1-server.log 2>&1 &
+          mkdir -p .ci-developer-d1
+          for entry in "$PWD"/* "$PWD"/.[!.]*; do
+            name="$(basename "$entry")"
+            [ "$name" = ".ci-developer-d1" ] && continue
+            [ "$name" = "developer.html" ] && continue
+            [ "$name" = ".git" ] && continue
+            ln -s "$entry" ".ci-developer-d1/$name"
+          done
+          cp developer-d1.html .ci-developer-d1/developer.html
+          python3 -m http.server 4173 --directory .ci-developer-d1 > /tmp/developer-d1-server.log 2>&1 &
           for i in {1..30}; do curl -fsS http://127.0.0.1:4173/developer.html >/dev/null && exit 0; sleep 1; done
           cat /tmp/developer-d1-server.log
           exit 1
