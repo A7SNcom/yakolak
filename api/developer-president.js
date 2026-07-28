@@ -21,6 +21,9 @@ function json(res,status,payload){
   res.setHeader('referrer-policy','no-referrer');
   res.end(JSON.stringify(payload));
 }
+function portalEnabled(){
+  return process.env.VERCEL_ENV!=='production'||process.env.PRESIDENT_PORTAL_PRODUCTION_ENABLED==='1';
+}
 function getClient(){
   const url=process.env.TURSO_DATABASE_URL,authToken=process.env.TURSO_AUTH_TOKEN;
   if(!url||!authToken)return null;
@@ -125,6 +128,7 @@ function statusFor(error){
 export default async function handler(req,res){
   res.setHeader('allow','GET, POST, OPTIONS');
   if(req.method==='OPTIONS'){res.statusCode=204;res.end();return}
+  if(!portalEnabled()){json(res,403,{ok:false,error:'president_portal_disabled_in_production'});return}
   const db=getClient();
   if(!db){json(res,503,{ok:false,error:'president_store_unavailable'});return}
   try{
