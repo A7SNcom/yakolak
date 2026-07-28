@@ -1,10 +1,10 @@
 {
   "name": "yakolak",
-  "version": "0.127.0",
+  "version": "0.128.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --check app.js && node --check src/entry-v126.js && node --check src/app-game-v114.js && node --check src/mobile-clarity-v120.js && node --check src/online-client-v114.js && node --check src/online-rules-v114.js && node --check src/online-rules-v118.js && node --check src/online-rounds-v118.js && node --check src/online-last-move-v119.js && node --check api/rooms.js && node --check api/rooms-v118.js && node --check api/developer-d1.js && node --check api/developer-d1-workspace.js && node --check api/developer-d1-comparisons.js && node --check src/developer-d2-registry.js && node --check src/developer-d2.js && node --check src/developer-scene-d1.js && node scripts/verify-v126-clean-entry.mjs && node scripts/verify-developer-d2-workbench.mjs"
+    "test": "node --check app.js && node --check src/entry-v126.js && node --check src/app-game-v114.js && node --check src/mobile-clarity-v120.js && node --check src/online-client-v114.js && node --check src/online-rules-v114.js && node --check src/online-rules-v118.js && node --check src/online-rounds-v118.js && node --check src/online-last-move-v119.js && node --check api/rooms.js && node --check api/rooms-v118.js && node --check api/developer-d1.js && node --check api/developer-d1-workspace.js && node --check api/developer-d1-comparisons.js && node --check src/developer-d2-registry.js && node --check src/developer-d3.js && node --check src/developer-scene-d1.js && node scripts/verify-v126-clean-entry.mjs && node scripts/verify-developer-d3.mjs"
   },
   "engines": {
     "node": "22.x"
