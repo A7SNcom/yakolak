@@ -22,6 +22,7 @@
 - Do not accept substitute overlays when the real native UI can be rendered deterministically.
 - Keep PR #35 in draft while any P0 blocker remains, preventing accidental merge of an unverified D4 state.
 - Other instance owns the preview-contract and P0 implementation files until it posts completion or reassigns them.
+- This instance will not edit those implementation files while ownership is active.
 
 ## Open Questions
 - Will the consolidated preview contract avoid the nested D1-wrapper Blob entirely, or rewrite its relative online import to an absolute URL?
