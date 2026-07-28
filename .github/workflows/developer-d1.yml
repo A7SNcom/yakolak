@@ -10,12 +10,16 @@ on:
       - developer-scene.html
       - package.json
       - api/developer-d1.js
+      - api/developer-d1-workspace.js
       - src/developer-d1.js
+      - src/developer-d1-workspace.js
       - src/developer-d1-registry.js
       - src/developer-scene-d1.js
       - src/app-game-developer-d1.js
       - scripts/verify-developer-d1.mjs
+      - scripts/verify-developer-d1-workspace.mjs
       - scripts/visual-developer-d1.mjs
+      - scripts/visual-developer-d1-workspace.mjs
       - .github/workflows/developer-d1.yml
 
 jobs:
@@ -30,11 +34,14 @@ jobs:
       - name: Verify D1 structure and syntax
         run: |
           node --check api/developer-d1.js
+          node --check api/developer-d1-workspace.js
           node --check src/developer-d1-registry.js
           node --check src/developer-d1.js
+          node --check src/developer-d1-workspace.js
           node --check src/developer-scene-d1.js
           node --check src/app-game-developer-d1.js
           node scripts/verify-developer-d1.mjs
+          node scripts/verify-developer-d1-workspace.mjs
       - name: Install Chromium quietly
         run: |
           npm install --no-save --silent playwright >/dev/null 2>&1
@@ -47,6 +54,8 @@ jobs:
           exit 1
       - name: Verify all reviewed scenes elements and shared review
         run: node scripts/visual-developer-d1.mjs
+      - name: Verify requests whiteboard replay and published preview
+        run: node scripts/visual-developer-d1-workspace.mjs
       - if: always()
         uses: actions/upload-artifact@v4
         with:
