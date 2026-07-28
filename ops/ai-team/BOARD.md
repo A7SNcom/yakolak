@@ -7,13 +7,13 @@
 - President: Ahmad
 - Executive deputy / sole manager: Rashed
 - Auditor: Hakam
-- Integration branch/head at manager refresh: `agent/yakolak-team-os` @ `8bb77c28619b23c7c0a580ff8f6bbb0a52d8f4ee`
+- Integration branch/head at manager refresh: `agent/yakolak-team-os` @ `d12861be3d11a3b3ef8d7480fe877da45c4aa1fa`
 - Source PR #35: human-gated; no action
 - President Development OS: PR #47, branch `agent/president-development-os`, exact candidate head `f3e5dd72d8d118584a6db2244aa7ce71acfd0ce7`
 - Team-to-Development-OS synchronization: draft PR #49 — `HOLD`, conflict resolution required
 - Canonical protected stable URL: `https://yakolak-git-agent-president-development-os-ahmdkcoms-projects.vercel.app/developer.html`
 - Canonical entry PR #41 exact head: `9da9afc4e2690feab03e66ad1a19bb8621cc5f7e`
-- Snapshot time: `2026-07-29T01:03+03:00`
+- Snapshot time: `2026-07-29T02:03+03:00`
 - Leadership mode: `PRESIDENT_SIGNAL_UNKNOWN` because protected API access redirected to Vercel SSO; continue only safe non-conflicting work.
 
 ## President directive — primary Development OS
@@ -32,7 +32,7 @@ Ahmad authorizes the protected President Development OS as the primary communica
 
 1. `initiative:canonical-entry-contract`
    - Outcome: immutable deterministic Boot → Entry → Mode-selection contract.
-   - Current state: independently approved; PR #41 is `HOLD_FOR_REBASE` because GitHub reports it non-mergeable against the moved integration base.
+   - Current state: independently approved; PR #41 remains held for a refreshed mergeable head and renewed exact-head gates.
 2. `initiative:team-contract-verifier`
    - Outcome: verifier validates current semantic task fields without weakening required invariants.
    - Current state: parser/fixtures are sound but PR #48 remains `HOLD` pending fresh base, green run and Omar exact-head PASS.
@@ -42,14 +42,14 @@ Ahmad authorizes the protected President Development OS as the primary communica
 
 ## Fresh evidence processed
 
-- Protected President API signal check again returned a Vercel SSO redirect; unread state was not inferred either way.
-- PR #47 exact head `f3e5dd72...`: President Portal workflow, desktop/mobile journey, Architecture Guardrails, Build 126, v112, v118, v125 and D3 succeeded.
-- Exact-head visual artifact exists from workflow run `30397269800`, artifact `8703302002`.
+- Protected President API signal check at `2026-07-29T02:03+03:00` again returned a Vercel SSO redirect; unread state was not inferred either way.
+- PR #47 remains open, draft and non-mergeable at exact head `f3e5dd72d8d118584a6db2244aa7ce71acfd0ce7`.
+- PR #47 exact-head President Portal workflow, desktop/mobile journey, Architecture Guardrails, Build 126, v112, v118, v125 and D3 checks previously succeeded; visual artifact `8703302002` exists for that head.
 - No READY Vercel deployment for branch `agent/president-development-os` matches PR #47 head; the stable alias remains on older commit `674881388d0db62f74cbbfcbb61028596807f45b`.
-- PR #47 is currently non-mergeable against the moved integration base.
-- Rashed opened draft synchronization PR #49 from current Team OS into the Development OS; GitHub reports conflicts, so no merge was attempted.
-- Hakam issued PR #41 `MERGE_OK`; Sami `PASS`, Nada `ARCH_OK`, focused tests 6/6 and Architecture Guardrails are green.
-- GitHub reports PR #41 non-mergeable against the current integration base; no forced merge occurred.
+- PR #49 now points to Team OS head `d12861be3d11a3b3ef8d7480fe877da45c4aa1fa`, remains open, draft and non-mergeable, and still changes only five coordination files.
+- Mazen correctly stopped on stale-head protection before touching conflicts; his task must be refreshed from the current PR #49 parents.
+- Hakam recorded `NO_CHANGE`; Sara remains `NO_TASK` until a matching READY deployment exists.
+- PR #41 retains prior audited `MERGE_OK` evidence only for its audited head; no forced merge occurred.
 - No public Production write API was enabled and Rashed implemented no product code.
 
 ## Assignments and locks
@@ -59,9 +59,9 @@ Ahmad authorizes the protected President Development OS as the primary communica
 | Noor | refresh/rebase PR #41 without behavior change, then revalidate exact head | `READY_NEXT_CYCLE` | existing PR #41 only |
 | Sami | renewed independent review after refreshed PR #41 head | `READY_AFTER_ARTIFACT` | read-only |
 | Lina | PR #48 semantic verifier normalization | `HOLD_FOR_REBASE` | verifier + fixtures only |
-| Mazen | `YAK-006-08` resolve PR #49 synchronization conflicts without changing product behavior | `READY` | PR #49 coordination files only |
+| Mazen | `YAK-006-08` resolve PR #49 synchronization conflicts without changing product behavior | `READY_REFRESHED` | PR #49 coordination files only |
 | Nada | renewed Architecture Steward review after refreshed PR #41 head | `READY_AFTER_ARTIFACT` | read-only |
-| Omar | exact-head verifier review after green rerun | `READY_AFTER_ARTIFACT` | read-only |
+| Omar | exact-head verifier review after green rerun; then PR #49 exact-diff review | `READY_AFTER_ARTIFACT` | read-only |
 | Sara | `YAK-006-07` PR #47 exact-head evidence refresh | `READY_AFTER_DEPLOYMENT` | wait for matching READY Vercel SHA |
 | Hakam | release audits after refreshed reports | `READY_AFTER_REPORTS` | read-only |
 | Rashed | reconcile evidence, branch freshness and visible ledger | `ACTIVE` | manager only |
@@ -102,7 +102,7 @@ Ahmad authorizes the protected President Development OS as the primary communica
 
 - `legacy-debt delta`: `unchanged`.
 - `migration-gate delta`: Slice 1 approved but awaiting refreshed mergeable head.
-- `governance delta`: synchronization conflict is isolated in PR #49 with one bounded owner.
+- `governance delta`: PR #49 freshness was reconciled; conflict resolution remains isolated to one bounded owner and five coordination files.
 - `communication delta`: protected stable President → Rashed channel remains official; signal state remains unknown because SSO blocks the API probe.
 
 ## Human gates
