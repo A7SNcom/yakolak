@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-
 const read=path=>fs.readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 const html=read('developer.html');
 const sceneHtml=read('developer-scene.html');
@@ -8,33 +7,22 @@ const registry=read('src/developer-d1-registry.js');
 const runner=read('src/developer-scene-d1.js');
 const runtime=read('src/app-game-developer-d1.js');
 const api=read('api/developer-d1.js');
-
 const requireText=(source,text,label)=>{if(!source.includes(text))throw new Error(`${label}: missing ${text}`)};
 const rejectText=(source,text,label)=>{if(source.includes(text))throw new Error(`${label}: unexpected ${text}`)};
-
 requireText(html,'D1 · DEVELOPMENT','D1 identity');
 requireText(html,'id="sceneTabs"','scene filters');
 requireText(html,'id="devBack"','floating return button');
 requireText(html,'id="devStageFrame"','isolated stage');
-requireText(html,'id="devEditor"','shared editor');
-requireText(html,'id="devNameInput"','rename input');
-requireText(html,'id="devNotesInput"','notes input');
-requireText(html,'مخزن D1 المشترك','shared persistence disclosure');
+requireText(html,'id="devThreadList"','thread list');
+requireText(html,'id="devNewThreadInput"','new thread composer');
+requireText(html,'id="devAddThread"','new thread action');
+requireText(html,'الملاحظات القديمة رُحّلت دون حذف','old comments preservation');
 requireText(sceneHtml,'loaderProjection','approved loading star');
 requireText(sceneHtml,'@keyframes bounce','approved loading motion');
 requireText(sceneHtml,'D1-review-fixes','review fixes cache marker');
-
 ['loading-star','empty-table','logo-wall','board-bases','clean-entry','unboxing-intro'].forEach(id=>requireText(registry,`id:'${id}'`,'scene registry'));
 ['base-large','base-small','stone-large','stone-medium','stone-small','loading-star-element','table','logo-yakolak','logo-mtkyf'].forEach(id=>requireText(registry,`id:'${id}'`,'element registry'));
-[
-  "defaultName:'الغرفة والطاولة'",
-  "defaultName:'ميدان اللعب'",
-  "defaultName:'منطقة الراحة'",
-  "defaultName:'شوكة كبيرة'",
-  "defaultName:'شوكة وسط'",
-  "defaultName:'شوكة صغيرة'"
-].forEach(text=>requireText(registry,text,'reviewed source naming'));
-
+["defaultName:'الغرفة والطاولة'","defaultName:'ميدان اللعب'","defaultName:'منطقة الراحة'","defaultName:'شوكة كبيرة'","defaultName:'شوكة وسط'","defaultName:'شوكة صغيرة'"].forEach(text=>requireText(registry,text,'reviewed source naming'));
 ['all','single','sequence','elements'].forEach(id=>requireText(gallery,`id:'${id}'`,'gallery filters'));
 requireText(gallery,'developer-d1-registry.js','shared registry import');
 requireText(gallery,"const API_URL='./api/developer-d1'",'shared API endpoint');
@@ -42,21 +30,34 @@ requireText(gallery,'IntersectionObserver','lazy preview loading');
 requireText(gallery,"stage.classList.add('open')",'entity open flow');
 requireText(gallery,"stageFrame.src='about:blank'",'entity close cleanup');
 requireText(gallery,'displayName(definition)','runtime rename mapping');
-requireText(gallery,"method:'POST'",'shared notes save');
-requireText(gallery,'loadSharedState','shared notes restore');
-requireText(gallery,'sourceKey:activeEditorEntity.sourceKey','code mapping persistence');
-
+requireText(gallery,"action:'create_thread'",'thread creation');
+requireText(gallery,"action:'add_comment'",'thread replies');
+requireText(gallery,"action:'set_status'",'thread status changes');
+requireText(gallery,'ready_for_review','ready for review state');
+requireText(gallery,'needs_changes','needs changes state');
+requireText(gallery,'approved','approval state');
+requireText(gallery,'rejected','rejection state');
+requireText(gallery,'اعتماد التغيير','approval action');
+requireText(gallery,'رفض التغيير','rejection action');
+requireText(gallery,'تعقيب: توجد مشكلة','follow-up action');
+requireText(gallery,'رد المطور','developer reply role');
+requireText(gallery,'loadSharedState','shared review restore');
 requireText(api,"@tursodatabase/serverless/compat",'Turso persistence');
-requireText(api,"yakolak_developer_d1_entities",'entity storage table');
-requireText(api,"yakolak_developer_d1_events",'event history table');
+requireText(api,'yakolak_developer_d1_entities','entity storage table');
+requireText(api,'yakolak_developer_d1_events','event history table');
+requireText(api,'yakolak_developer_d1_threads','thread storage table');
+requireText(api,'yakolak_developer_d1_comments','comment storage table');
+requireText(api,'migrateLegacyNotes','legacy notes migration');
+requireText(api,'LEGACY_RESOLUTIONS','legacy developer replies');
+requireText(api,"action==='create_thread'",'create thread API');
+requireText(api,"action==='add_comment'",'add comment API');
+requireText(api,"action==='set_status'",'set status API');
 requireText(api,'sameOrigin(req)','same-origin public writes');
-requireText(api,"console.info('[Yakolak D1 shared feedback]'",'assistant-readable event log');
-
+requireText(api,"console.info('[Yakolak D1 review activity]'",'assistant-readable review log');
 requireText(runtime,'allow D1 wall camera targets','wall target clamp patch');
 requireText(runtime,'ROOM_LIMIT.minX','room-wide target limits');
 requireText(runtime,'THREE,controls,meshes','D1 controls bridge');
 requireText(runtime,'__yakolakDeveloperD1Runtime','D1 runtime marker');
-
 requireText(runner,"const TABLE_COLOR='#c2c3bf'",'balanced table color');
 requireText(runner,'function styleRoomOutlines','four-wall outline styling');
 requireText(runner,"roomOutlineLines:String(styleRoomOutlines(scene))",'outline readiness marker');
@@ -71,8 +72,8 @@ requireText(runner,"composition:'unboxing-only'",'intro-only isolation');
 requireText(runner,"logoRendering:'svg-geometry-two-tone'",'two-tone logo rendering');
 requireText(runner,"visibleObjects:String(selected.length)",'named board objects');
 rejectText(runner,"import('./entry-v126.js",'legacy entry journey removed');
-
+rejectText(html,'id="devNotesInput"','destructive single notes field');
 rejectText(html,'type="password"','password gate');
 rejectText(html,'./app.js','client bootstrap isolation');
 rejectText(sceneHtml,'./app.js','client bootstrap isolation');
-console.log('Developer D1 all review notes, shared notes, naming, scenes, and elements verification passed');
+console.log('Developer D1 threaded review, legacy notes, resolved scenes, and isolated elements verification passed');
