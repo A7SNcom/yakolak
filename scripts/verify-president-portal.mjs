@@ -20,10 +20,10 @@ for(const token of[
   "task.onclick=()=>openPortalFor('directives')",
   "review.onclick=()=>openPortalFor('reviews')"
 ])if(!ui.includes(token))fail(`UI missing ${token}`);
-for(const token of["'president'","directive_create","review_decision","sameOrigin(req)"])if(!api.includes(token))fail(`API missing ${token}`);
+for(const token of["'president'","directive_create","review_decision","sameOrigin(req)","PRESIDENT_PORTAL_PRODUCTION_ENABLED==='1'","president_portal_disabled_in_production"])if(!api.includes(token))fail(`API missing ${token}`);
 if(api.includes("author_role,body,created_at) VALUES(?,?,?,?,?,?)")&&api.includes("'manager'"))fail('browser API must not write manager role');
 if(!manager.includes('PRESIDENT_PORTAL.md')||!manager.includes('president-outbox.json'))fail('manager runbook is not wired to President portal');
-if(!contract.includes('reviewer verdict is `PASS`')||!contract.includes('Rashed personally inspected'))fail('review gate contract incomplete');
+if(!contract.includes('reviewer verdict is `PASS`')||!contract.includes('Rashed personally inspected')||!contract.includes('PRESIDENT_PORTAL_PRODUCTION_ENABLED'))fail('review/security gate contract incomplete');
 if(outbox.version!==1||!Array.isArray(outbox.items))fail('invalid President outbox');
 if(status.version!==1||typeof status.directives!=='object'||Array.isArray(status.directives))fail('invalid President status file');
 console.log('President portal contract verified');
