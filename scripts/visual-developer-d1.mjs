@@ -230,6 +230,7 @@ async function checkElements(browser){
     const state=await waitSceneReady(page);
     if(state.developerEntityKind!=='element'||state.developerElement!==id)throw new Error(`${id}: element identity missing`);
     if(id!=='loading-star-element'&&state.mode!=='element')throw new Error(`${id}: element mode missing`);
+    if(!['loading-star-element','table'].includes(id)&&state.tableHidden!=='true')throw new Error(`${id}: table backdrop was not hidden`);
     if(pageErrors.length)throw new Error(`${id}: page errors\n${pageErrors.join('\n')}`);
     if(['base-large','stone-large','table','logo-yakolak'].includes(id))await page.screenshot({path:path.join(output,`element-${id}.png`)});
     results.push(state);
@@ -253,4 +254,4 @@ try{
 
 fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({build:'D1',url:BASE_URL,results,failures},null,2));
 if(failures.length)throw new Error(`Developer D1 visual failures: ${JSON.stringify(failures)}`);
-console.log('Developer D1 shared notes, renaming, scenes, and elements passed');
+console.log('Developer D1 shared notes, renaming, scenes, and isolated elements passed');
