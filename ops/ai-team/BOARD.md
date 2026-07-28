@@ -3,60 +3,85 @@
 ## Active cycle
 
 - Cycle: `004-canonical-entry-contract`
-- Status: `ACTIVE`
+- Status: `ACTIVE_WITH_VISUAL_DOCUMENTATION_MIGRATION`
+- President: Ahmad
 - Manager: Rashed
 - Auditor: Hakam
-- Integration branch/head: `agent/yakolak-team-os` @ `326c1548011bdc90717e25ee22c66187abdafbc8`
-- Source PR #35 head: verify fresh before acting; human-gated
-- President Portal PR #38 head: `dae593e6d5fb458295ee91f46722655f8a1d7f1e` — `HOLD`, not merged, channel inactive
-- Snapshot time: `2026-07-28T21:01+03:00`
-- Current bottleneck: establish the first deterministic Boot -> Entry -> Mode-selection contract without DOM, Three.js, network, or legacy wrappers.
+- Integration branch observed by PR #44: `agent/yakolak-team-os` @ `5d3871544031a84c553b27768ef00ef2a382b55d`
+- President visual workflow: draft PR #44 on `agent/president-portal`; `HOLD` until exact-head CI/Preview/review
+- Product release branch: `main` — human gate
+- Snapshot time: `2026-07-28T21:24+03:00`
+- Current bottleneck: establish the first deterministic Boot → Entry → Mode-selection contract while activating the President-directed visual development workflow safely.
+
+## President checkpoint policy
+
+- The President is asynchronous and is not expected to attend every hour.
+- Rashed checks `GET /api/developer-president?summary=1&after=<lastPresidentEventId>` first.
+- No new input: no full inbox reread; continue proactive evidence-based work.
+- New input: pause ordinary initiative, reconcile directives/messages/decisions/blueprint edits, then continue.
+- The API/channel remains inactive for the scheduled manager until PR #44 is merged into the integration branch.
+
+## Visual development reference
+
+- Canonical board: `ops/ai-team/development-blueprint.json`
+- Canonical revision: `2`
+- Active implementation node: `track-canonical-architecture` / node revision `2`
+- Active task link: `YAK-004-01`, owner Noor, status `in_progress`
+- President edits are stored as a separate API draft; stale browser saves conflict rather than overwrite.
+- After activation, any affected task older than a new President blueprint edit becomes `BLOCKED: president blueprint changed` until Rashed reconciles it.
 
 ## Fresh evidence
 
-- PR #36: open, draft, mergeable, unmerged; integration head above.
-- PR #38: open, draft, mergeable, unmerged.
-- PR #38 exact-head checks at snapshot: Architecture Guardrails, AI Team OS, Build 126, v112, and v125 passed; President Portal, v118, and D3 were still running; D1 failed on the known baseline regression.
-- Vercel branch alias was READY only for older commit `07d61c82c9d876fd1942e9c9e4ac14aa02cb7257`, not PR #38 head; therefore no Preview PASS.
-- President API is not an active source of truth until PR #38 is merged. No directives, messages, or decisions were reconciled this cycle.
+- PR #36 remains the draft Engineering OS line; verify current head/checks before any merge.
+- PR #44 is the only current President visual workflow PR; old PR #38 is closed/unmerged and must not be used as current evidence.
+- PR #44 must have exact-head GitHub checks, matching Vercel Preview, desktop/mobile evidence, independent review, Hakam `MERGE_OK`, and manager `PASS` before integration.
+- D1 has a known baseline regression; it may not be hidden or weakened.
 
 ## Assignments and locks
 
-| Employee | Task | Status | Lock / role |
+| Employee | Task | Status | Blueprint / role |
 |---|---|---|---|
-| Noor | `YAK-004-01` first canonical entry contracts + reducer tests | `READY` | new `src/core/` contract/reducer files and one focused Node test |
-| Sami | `YAK-004-02` independent review of Noor artifact | `READY` after artifact | read-only reviewer |
+| Noor | `YAK-004-01` first canonical entry contracts + reducer tests | `READY/IN_PROGRESS` | `track-canonical-architecture@2`; implementation owner |
+| Sami | `YAK-004-02` independent review of Noor artifact | `READY` after artifact | same node/revision; read-only reviewer |
 | Lina | — | `NO_TASK` | no legacy wrapper work |
 | Mazen | — | `NO_TASK` | no parallel state model |
-| Nada | `YAK-004-03` Architecture Steward for Noor | `READY` after artifact | read-only `ARCH_OK/HOLD/REJECT` |
+| Nada | `YAK-004-03` Architecture Steward for Noor | `READY` after artifact | same node/revision; `ARCH_OK/HOLD/REJECT` |
 | Omar | — | `NO_TASK` | no lineage busywork |
-| Sara | `YAK-004-04` verify PR #38 exact-head CI/Preview evidence | `READY` | read-only; no portal activation or merge |
-| Hakam | `YAK-004-05` final cycle audit | `READY` | read-only final verdict |
+| Sara | `YAK-004-04` verify PR #44 exact-head CI/Preview/desktop/mobile | `READY` | read-only; no activation/merge |
+| Hakam | `YAK-004-05` final cycle audit | `READY` | verifies blueprint → prompt → diff → tests → review chain |
 
 ## Capacity
 
 - Implementation writers: **1 / 2 maximum**.
 - Implementation effort: **3 / 5 points maximum**.
 - No second implementation until Noor produces a reviewable artifact.
-- New behavior must remain canonical; no legacy-debt increase is authorized.
+- No new behavior may increase legacy debt.
+- Future implementation tasks require a current canonical blueprint node/revision before assignment.
 
 ## Cycle acceptance gates
 
 ### `YAK-004-01`
+
 - Named contracts for `Action`, `AppState`, `Effect`, and `RenderSnapshot` exist without browser/runtime dependencies.
-- A deterministic transition function covers Boot -> Entry -> Mode selection and rejects/ignores invalid transitions explicitly.
+- A deterministic transition function covers Boot → Entry → Mode selection and handles invalid transitions explicitly.
 - Node-only tests prove initial state, allowed transitions, and at least two invalid-event cases.
 - No DOM, Three.js, network, storage, timer, Blob, global, or source-patching dependency.
 - Reviewer `PASS`, Nada `ARCH_OK`, architecture guard green, then Hakam `MERGE_OK` before manager merge.
+- Diff remains aligned with `track-canonical-architecture@2`.
 
-### PR #38
-- Keep `HOLD` until checks complete on exact head, Vercel Preview matches exact head, desktop/mobile evidence is independently inspected, and Hakam issues `MERGE_OK`.
-- Do not treat `/api/developer-president` as active before merge.
+### PR #44
+
+- Cursor summary avoids rereading an unchanged President inbox.
+- New President input pauses ordinary initiative; no new input permits continued initiative.
+- Editable visual blueprint supports nodes, links, status, owner, task ID, evidence, revision and conflict-safe saves.
+- Browser cannot fabricate Rashed/reviewer/Hakam/CI/outbox/canonical-board state.
+- Static/Syntax tests, exact-head Preview, desktop/mobile interaction evidence, independent review, and Hakam `MERGE_OK` exist.
 
 ## Deltas
 
 - Expected `legacy-debt delta`: `unchanged`.
-- Expected `migration-gate delta`: Slice 1 moves from documentation to first executable deterministic contract.
+- Expected `migration-gate delta`: Slice 1 advances to deterministic contracts.
+- `blueprint delta`: revision `1 → 2`; active canonical task and President visual workflow documented.
 
 ## Human gates
 
