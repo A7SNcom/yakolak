@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
+  <rect width="1440" height="900" fill="#f6f6f3"/>
+  <rect x="0" y="0" width="1440" height="64" fill="#ffffff" stroke="#deddd8"/>
+  <text x="1388" y="39" text-anchor="end" font-family="Arial,sans-serif" font-size="22" font-weight="700" fill="#1f201e">ياكلك · مساحة التطوير</text>
+  <rect x="24" y="16" width="184" height="34" rx="10" fill="#1f201e"/>
+  <text x="116" y="38" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="700" fill="#fff">فتح اللعبة المنشورة</text>
+  <rect x="220" y="16" width="132" height="34" rx="10" fill="#eef2eb" stroke="#d8ded3"/>
+  <text x="286" y="38" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="700" fill="#315c45">مخطط الرحلة</text>
+  <rect x="364" y="16" width="132" height="34" rx="10" fill="#fff4df" stroke="#ead5aa"/>
+  <text x="430" y="38" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="700" fill="#78551c">طلب جديد</text>
+
+  <rect x="0" y="64" width="278" height="836" fill="#fbfbf9" stroke="#deddd8"/>
+  <text x="250" y="102" text-anchor="end" font-family="Arial,sans-serif" font-size="12" font-weight="700" fill="#777870">المحتوى</text>
+  <rect x="18" y="116" width="242" height="38" rx="10" fill="#fff" stroke="#dad9d4"/>
+  <text x="238" y="141" text-anchor="end" font-family="Arial,sans-serif" font-size="13" fill="#777870">ابحث عن مشهد أو عنصر…</text>
+  <text x="250" y="184" text-anchor="end" font-family="Arial,sans-serif" font-size="11" font-weight="700" fill="#90918a">المشاهد</text>
+  <g font-family="Arial,sans-serif" font-size="13">
+    <rect x="14" y="198" width="250" height="54" rx="12" fill="#1f201e"/>
+    <circle cx="40" cy="225" r="12" fill="#fff" opacity=".18"/>
+    <text x="238" y="220" text-anchor="end" font-weight="700" fill="#fff">رحلة الدخول</text>
+    <text x="238" y="239" text-anchor="end" font-size="10" fill="#c8c9c4">بانتظار قرار · 2</text>
+    <rect x="14" y="260" width="250" height="54" rx="12" fill="#fff"/>
+    <circle cx="40" cy="287" r="12" fill="#eef0eb"/>
+    <text x="238" y="282" text-anchor="end" font-weight="700" fill="#292a27">الغرفة والطاولة</text>
+    <text x="238" y="301" text-anchor="end" font-size="10" fill="#888982">معتمدة</text>
+    <rect x="14" y="322" width="250" height="54" rx="12" fill="#fff"/>
+    <circle cx="40" cy="349" r="12" fill="#fff1dc"/>
+    <text x="238" y="344" text-anchor="end" font-weight="700" fill="#292a27">اختيار اللون</text>
+    <text x="238" y="363" text-anchor="end" font-size="10" fill="#8a641f">تحتاج تعديل · 1</text>
+    <rect x="14" y="384" width="250" height="54" rx="12" fill="#fff"/>
+    <circle cx="40" cy="411" r="12" fill="#eef0eb"/>
+    <text x="238" y="406" text-anchor="end" font-weight="700" fill="#292a27">اختيار اللاعبين</text>
+    <text x="238" y="425" text-anchor="end" font-size="10" fill="#888982">قيد التنفيذ</text>
+  </g>
+  <text x="250" y="478" text-anchor="end" font-family="Arial,sans-serif" font-size="11" font-weight="700" fill="#90918a">العناصر</text>
+  <g font-family="Arial,sans-serif" font-size="13" fill="#292a27">
+    <text x="238" y="515" text-anchor="end">شعار ياكلك</text>
+    <text x="238" y="555" text-anchor="end">شعار متكيف</text>
+    <text x="238" y="595" text-anchor="end">نجمة التحميل</text>
+  </g>
+
+  <rect x="278" y="64" width="802" height="836" fill="#efefeb"/>
+  <rect x="302" y="84" width="754" height="52" rx="14" fill="#fff" stroke="#deddd8"/>
+  <text x="1028" y="106" text-anchor="end" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#222320">رحلة الدخول</text>
+  <text x="1028" y="124" text-anchor="end" font-family="Arial,sans-serif" font-size="10" fill="#85867f">scene · entry-journey</text>
+  <rect x="318" y="94" width="70" height="32" rx="9" fill="#f0f0ec"/>
+  <text x="353" y="115" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="700" fill="#444540">ملء الشاشة</text>
+  <rect x="396" y="94" width="70" height="32" rx="9" fill="#f0f0ec"/>
+  <text x="431" y="115" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="700" fill="#444540">إعادة</text>
+  <rect x="474" y="94" width="92" height="32" rx="9" fill="#1f201e"/>
+  <text x="520" y="115" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="700" fill="#fff">قبل / بعد</text>
+
+  <rect x="302" y="152" width="754" height="492" rx="18" fill="#fff" stroke="#d8d7d1"/>
+  <rect x="318" y="168" width="722" height="460" rx="12" fill="#f9f9f6"/>
+  <rect x="348" y="194" width="662" height="408" rx="10" fill="#e6e5df"/>
+  <rect x="380" y="222" width="598" height="352" rx="8" fill="#f7f7f4"/>
+  <text x="679" y="384" text-anchor="middle" font-family="Arial,sans-serif" font-size="20" font-weight="700" fill="#31322f">المعاينة الحية للمشهد</text>
+  <text x="679" y="414" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#7d7e77">تفاعل كامل داخل إطار واحد؛ بدون فتح نافذة جديدة</text>
+
+  <rect x="302" y="660" width="754" height="216" rx="18" fill="#fff" stroke="#d8d7d1"/>
+  <text x="1028" y="692" text-anchor="end" font-family="Arial,sans-serif" font-size="13" font-weight="700" fill="#252623">ملخص التغيير</text>
+  <rect x="318" y="710" width="230" height="142" rx="12" fill="#fafaf7" stroke="#e4e3de"/>
+  <text x="526" y="738" text-anchor="end" font-family="Arial,sans-serif" font-size="12" font-weight="700" fill="#31322f">قبل</text>
+  <text x="526" y="765" text-anchor="end" font-family="Arial,sans-serif" font-size="11" fill="#777870">الحركة متقطعة وتظهر الطاولة فجأة.</text>
+  <rect x="562" y="710" width="230" height="142" rx="12" fill="#f1f5f0" stroke="#d9e4d7"/>
+  <text x="770" y="738" text-anchor="end" font-family="Arial,sans-serif" font-size="12" font-weight="700" fill="#315c45">بعد</text>
+  <text x="770" y="765" text-anchor="end" font-family="Arial,sans-serif" font-size="11" fill="#52645a">انتقال واحد مستمر بين الجدارين.</text>
+  <rect x="806" y="710" width="234" height="142" rx="12" fill="#fafaf7" stroke="#e4e3de"/>
+  <text x="1018" y="738" text-anchor="end" font-family="Arial,sans-serif" font-size="12" font-weight="700" fill="#31322f">حالة التنفيذ</text>
+  <text x="1018" y="766" text-anchor="end" font-family="Arial,sans-serif" font-size="11" fill="#777870">جاهز للمراجعة</text>
+  <rect x="908" y="798" width="110" height="34" rx="10" fill="#2f674d"/>
+  <text x="963" y="820" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="700" fill="#fff">اعتماد</text>
+
+  <rect x="1080" y="64" width="360" height="836" fill="#fff" stroke="#deddd8"/>
+  <rect x="1098" y="84" width="324" height="48" rx="12" fill="#f5f5f1"/>
+  <text x="1400" y="106" text-anchor="end" font-family="Arial,sans-serif" font-size="14" font-weight="700" fill="#242522">المراجعة</text>
+  <text x="1400" y="123" text-anchor="end" font-family="Arial,sans-serif" font-size="10" fill="#7c7d76">2 ملاحظات نشطة</text>
+  <rect x="1098" y="148" width="324" height="112" rx="14" fill="#fff8e9" stroke="#ead5aa"/>
+  <text x="1402" y="174" text-anchor="end" font-family="Arial,sans-serif" font-size="12" font-weight="700" fill="#77551e">بانتظار قرارك</text>
+  <text x="1402" y="199" text-anchor="end" font-family="Arial,sans-serif" font-size="12" fill="#3b3c38">تأكد أن الطاولة تمر عابرًا دون توقف.</text>
+  <text x="1402" y="229" text-anchor="end" font-family="Arial,sans-serif" font-size="10" fill="#85867f">رد المطور · قبل 8 دقائق</text>
+  <rect x="1098" y="274" width="324" height="142" rx="14" fill="#f6f6f3" stroke="#e1e0db"/>
+  <text x="1402" y="300" text-anchor="end" font-family="Arial,sans-serif" font-size="12" font-weight="700" fill="#30312e">السجل</text>
+  <text x="1402" y="329" text-anchor="end" font-family="Arial,sans-serif" font-size="11" fill="#666760">المراجع: الحركة ليست سلسة.</text>
+  <text x="1402" y="358" text-anchor="end" font-family="Arial,sans-serif" font-size="11" fill="#496052">المطور: تم توحيد مسار الكاميرا.</text>
+  <text x="1402" y="387" text-anchor="end" font-family="Arial,sans-serif" font-size="11" fill="#666760">النظام: أصبحت جاهزة للمراجعة.</text>
+  <rect x="1098" y="432" width="324" height="112" rx="14" fill="#fff" stroke="#deddd8"/>
+  <text x="1402" y="458" text-anchor="end" font-family="Arial,sans-serif" font-size="12" font-weight="700" fill="#30312e">تعقيب جديد</text>
+  <text x="1402" y="489" text-anchor="end" font-family="Arial,sans-serif" font-size="11" fill="#8a8b84">اكتب ملاحظة مباشرة مرتبطة بالمشهد…</text>
+  <rect x="1300" y="505" width="102" height="28" rx="8" fill="#1f201e"/>
+  <text x="1351" y="524" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" font-weight="700" fill="#fff">إضافة</text>
+  <text x="1402" y="588" text-anchor="end" font-family="Arial,sans-serif" font-size="11" font-weight="700" fill="#90918a">اختصارات</text>
+  <text x="1402" y="620" text-anchor="end" font-family="Arial,sans-serif" font-size="11" fill="#555650">R إعادة المشهد</text>
+  <text x="1402" y="647" text-anchor="end" font-family="Arial,sans-serif" font-size="11" fill="#555650">C فتح المقارنة</text>
+  <text x="1402" y="674" text-anchor="end" font-family="Arial,sans-serif" font-size="11" fill="#555650">⌘K بحث سريع</text>
+</svg>
