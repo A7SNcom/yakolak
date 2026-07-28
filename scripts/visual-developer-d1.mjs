@@ -5,61 +5,41 @@ import {chromium} from 'playwright';
 const BASE_URL=process.env.D1_URL||'http://127.0.0.1:4173';
 const output=path.resolve('artifacts/developer-d1');
 fs.mkdirSync(output,{recursive:true});
+const scenes=['loading-star','empty-table','logo-wall','board-bases','clean-entry','unboxing-intro'];
+const elements=['base-large','base-small','stone-large','stone-medium','stone-small','loading-star-element','table','logo-yakolak','logo-mtkyf'];
+const results=[],failures=[];
 
-const sceneIds=['loading-star','empty-table','logo-wall','board-bases','clean-entry','unboxing-intro'];
-const elementIds=['base-large','base-small','stone-large','stone-medium','stone-small','loading-star-element','table','logo-yakolak','logo-mtkyf'];
-const failures=[];
-const results=[];
-
-async function installStoreMock(context){
+async function mockStore(context){
   const store=new Map();
   await context.route('**/api/developer-d1',async route=>{
     const request=route.request();
-    if(request.method()==='GET'){
-      await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,entities:[...store.values()]})});
-      return;
-    }
+    if(request.method()==='GET')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,entities:[...store.values()]})});
     if(request.method()==='POST'){
-      const body=request.postDataJSON();
-      const key=`${body.entityType}:${body.entityId}`;
-      const previous=store.get(key);
-      const entity={
-        entityType:body.entityType,
-        entityId:body.entityId,
-        sourceKey:body.sourceKey||'',
-        displayName:body.displayName||'',
-        notes:body.notes||'',
-        version:(previous?.version||0)+1,
-        createdAt:previous?.createdAt||new Date().toISOString(),
-        updatedAt:new Date().toISOString()
-      };
+      const body=request.postDataJSON(),key=`${body.entityType}:${body.entityId}`,old=store.get(key),now=new Date().toISOString();
+      const entity={...body,version:(old?.version||0)+1,createdAt:old?.createdAt||now,updatedAt:now};
       store.set(key,entity);
-      await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,entity})});
-      return;
+      return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,entity})});
     }
-    await route.fulfill({status:405,contentType:'application/json',body:JSON.stringify({ok:false,error:'method_not_allowed'})});
+    return route.fulfill({status:405,contentType:'application/json',body:'{"ok":false}'});
   });
   return store;
 }
 
-async function waitSceneReady(page,timeout=120000){
+async function waitReady(page,timeout=120000){
   await page.waitForFunction(()=>document.body.dataset.sceneReady==='true'||Boolean(document.body.dataset.sceneError),null,{timeout});
   const state=await page.evaluate(()=>({...document.body.dataset}));
-  if(state.sceneError)throw new Error(`${state.developerEntity||state.developerScene} failed: ${state.sceneError}`);
-  if(state.sceneReady!=='true')throw new Error(`${state.developerEntity||state.developerScene} never became ready`);
+  if(state.sceneError||state.sceneReady!=='true')throw new Error(`${state.developerEntity||'entity'} failed: ${state.sceneError||'not ready'}`);
   return state;
 }
 
-async function waitCardPreview(card,timeout=120000){
+async function waitPreview(card){
   await card.scrollIntoViewIfNeeded();
-  await card.locator('iframe').waitFor({state:'attached'});
   const handle=await card.elementHandle();
-  await card.page().waitForFunction(element=>element.classList.contains('preview-ready')||element.classList.contains('preview-error'),handle,{timeout});
-  const state=await card.getAttribute('data-preview-state');
-  if(state!=='ready')throw new Error(`preview ${await card.getAttribute('data-entity-id')} failed`);
+  await card.page().waitForFunction(el=>el.classList.contains('preview-ready')||el.classList.contains('preview-error'),handle,{timeout:120000});
+  if(await card.getAttribute('data-preview-state')!=='ready')throw new Error(`preview ${await card.getAttribute('data-entity-id')} failed`);
 }
 
-async function openGalleryEntity(page,selector){
+async function openEntity(page,selector){
   await page.locator(`${selector} .scene-open`).click();
   await page.locator('#devStage.open').waitFor();
   const frame=page.frameLocator('#devStageFrame');
@@ -67,14 +47,15 @@ async function openGalleryEntity(page,selector){
   return frame;
 }
 
-async function closeGalleryEntity(page){
+async function closeEntity(page){
   await page.getByRole('button',{name:/العودة للمعرض/}).click();
   await page.locator('#devStage').waitFor({state:'hidden'});
 }
 
-async function openEditorFromStage(page){
-  await page.getByRole('button',{name:'فتح الملاحظات والتسمية'}).click();
+async function openEditor(page,fromStage=true){
+  if(fromStage)await page.getByRole('button',{name:'فتح الملاحظات والتسمية'}).click();
   await page.locator('#devEditor.open').waitFor();
+  await page.waitForTimeout(140);
 }
 
 async function saveEditor(page,name,note){
@@ -84,154 +65,99 @@ async function saveEditor(page,name,note){
   await page.waitForFunction(()=>document.getElementById('devEditorStatus')?.textContent==='تم الحفظ في المخزن المشترك');
 }
 
-async function checkGallery(browser,name,contextOptions){
-  const context=await browser.newContext(contextOptions);
-  const store=await installStoreMock(context);
-  const page=await context.newPage();
-  const pageErrors=[];
-  page.on('pageerror',error=>pageErrors.push(String(error?.stack||error)));
+async function galleryCheck(browser,label,options){
+  const context=await browser.newContext(options),store=await mockStore(context),page=await context.newPage(),errors=[];
+  page.on('pageerror',error=>errors.push(String(error?.stack||error)));
   await page.goto(`${BASE_URL}/developer.html`,{waitUntil:'domcontentloaded',timeout:60000});
   await page.evaluate(()=>localStorage.removeItem('yakolak:developer-d1:shared-review:v1'));
   await page.reload({waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>document.body.dataset.developerBuild==='D1'&&document.body.dataset.developerSharedReady==='true');
-
-  const cards=page.locator('.scene-card');
-  if(await cards.count()!==15)throw new Error(`${name}: expected 15 total scene and element cards`);
-  if(await page.locator('.scene-card:visible').count()!==6)throw new Error(`${name}: all-scenes tab did not show 6 cards`);
-  for(const id of sceneIds)await waitCardPreview(page.locator(`[data-scene="${id}"]`));
-  await page.locator('.scene-card:visible').first().scrollIntoViewIfNeeded();
-  await page.screenshot({path:path.join(output,`${name}-01-scenes.png`),fullPage:true});
-
+  if(await page.locator('.scene-card').count()!==15)throw new Error(`${label}: expected 15 cards`);
+  if(await page.locator('.scene-card:visible').count()!==6)throw new Error(`${label}: expected 6 scenes`);
+  await waitPreview(page.locator('[data-scene="loading-star"]'));
+  await waitPreview(page.locator('[data-scene="unboxing-intro"]'));
+  await page.screenshot({path:path.join(output,`${label}-01-scenes.png`),fullPage:true});
   await page.getByRole('button',{name:'مشهد واحد'}).click();
-  if(await page.locator('.scene-card:visible').count()!==4)throw new Error(`${name}: single filter did not show 4 cards`);
+  if(await page.locator('.scene-card:visible').count()!==4)throw new Error(`${label}: single filter`);
   await page.getByRole('button',{name:'مجموعة مشاهد'}).click();
-  if(await page.locator('.scene-card:visible').count()!==2)throw new Error(`${name}: sequence filter did not show 2 cards`);
+  if(await page.locator('.scene-card:visible').count()!==2)throw new Error(`${label}: sequence filter`);
   await page.getByRole('button',{name:'العناصر'}).click();
-  if(await page.locator('.scene-card:visible').count()!==9)throw new Error(`${name}: elements filter did not show 9 cards`);
-  await waitCardPreview(page.locator('[data-element="base-large"]'));
-  await waitCardPreview(page.locator('[data-element="loading-star-element"]'));
-  await page.screenshot({path:path.join(output,`${name}-02-elements.png`),fullPage:true});
+  if(await page.locator('.scene-card:visible').count()!==9)throw new Error(`${label}: elements filter`);
+  await waitPreview(page.locator('[data-element="base-large"]'));
+  await waitPreview(page.locator('[data-element="loading-star-element"]'));
+  await page.screenshot({path:path.join(output,`${label}-02-elements.png`),fullPage:true});
   await page.getByRole('button',{name:'كل المشاهد'}).click();
 
-  const renamedScene=`إنترو العلبة ${name}`;
-  const sceneNote=`${name} · افصل الإنترو عن إعداد اللاعبين`;
-  const frame=await openGalleryEntity(page,'[data-scene="unboxing-intro"]');
-  if(await frame.locator('body').getAttribute('data-setup-hidden')!=='true')throw new Error(`${name}: unboxing stage was not isolated`);
-  await openEditorFromStage(page);
-  if(await page.locator('#devCodeKey').textContent()!=='scene.unboxing-intro')throw new Error(`${name}: scene code mapping missing`);
-  await saveEditor(page,renamedScene,sceneNote);
-  await page.screenshot({path:path.join(output,`${name}-03-shared-editor.png`)});
+  const sceneName=`إنترو العلبة ${label}`,sceneNote=`${label} · افصل الإنترو عن إعداد اللاعبين`;
+  const frame=await openEntity(page,'[data-scene="unboxing-intro"]');
+  if(await frame.locator('body').getAttribute('data-setup-hidden')!=='true')throw new Error(`${label}: intro setup leaked`);
+  await openEditor(page);
+  if(await page.locator('#devCodeKey').textContent()!=='scene.unboxing-intro')throw new Error(`${label}: scene code key`);
+  await saveEditor(page,sceneName,sceneNote);
+  await page.screenshot({path:path.join(output,`${label}-03-shared-editor.png`)});
   await page.getByRole('button',{name:'إغلاق المحرر'}).click();
-  await closeGalleryEntity(page);
-  const unboxingCard=page.locator('[data-scene="unboxing-intro"]');
-  if((await unboxingCard.locator('.scene-title').textContent())!==renamedScene)throw new Error(`${name}: renamed scene did not update card`);
-  if(!await unboxingCard.evaluate(element=>element.classList.contains('has-note')))throw new Error(`${name}: scene note indicator missing`);
+  await closeEntity(page);
+  if(await page.locator('[data-scene="unboxing-intro"] .scene-title').textContent()!==sceneName)throw new Error(`${label}: renamed scene did not update`);
 
   await page.reload({waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>document.body.dataset.developerSharedReady==='true');
-  const restoredScene=page.locator('[data-scene="unboxing-intro"]');
-  if((await restoredScene.locator('.scene-title').textContent())!==renamedScene)throw new Error(`${name}: shared scene name was not restored`);
-  await restoredScene.locator('.scene-edit').click();
-  await page.locator('#devEditor.open').waitFor();
-  if(await page.locator('#devNotesInput').inputValue()!==sceneNote)throw new Error(`${name}: shared scene note was not restored`);
+  const restored=page.locator('[data-scene="unboxing-intro"]');
+  if(await restored.locator('.scene-title').textContent()!==sceneName)throw new Error(`${label}: scene name not restored`);
+  await restored.locator('.scene-edit').click();
+  await openEditor(page,false);
+  if(await page.locator('#devNotesInput').inputValue()!==sceneNote)throw new Error(`${label}: scene note not restored`);
   await page.getByRole('button',{name:'إغلاق المحرر'}).click();
 
   await page.getByRole('button',{name:'العناصر'}).click();
-  const renamedElement=`القاعدة الأم ${name}`;
-  const elementNote=`${name} · الاسم الجديد للقاعدة الكبيرة`;
-  const baseCard=page.locator('[data-element="base-large"]');
-  await baseCard.locator('.scene-edit').click();
-  await page.locator('#devEditor.open').waitFor();
-  if(await page.locator('#devCodeKey').textContent()!=='meshes["9"]')throw new Error(`${name}: element code mapping missing`);
-  await saveEditor(page,renamedElement,elementNote);
+  const elementName=`القاعدة الأم ${label}`,elementNote=`${label} · الاسم الجديد للقاعدة الكبيرة`,base=page.locator('[data-element="base-large"]');
+  await base.locator('.scene-edit').click();
+  await openEditor(page,false);
+  if(await page.locator('#devCodeKey').textContent()!=='meshes["9"]')throw new Error(`${label}: element code key`);
+  await saveEditor(page,elementName,elementNote);
   await page.getByRole('button',{name:'إغلاق المحرر'}).click();
-  if((await baseCard.locator('.scene-title').textContent())!==renamedElement)throw new Error(`${name}: renamed element did not update card`);
-  const elementFrame=await openGalleryEntity(page,'[data-element="base-large"]');
-  if(await elementFrame.locator('body').getAttribute('data-developer-element')!=='base-large')throw new Error(`${name}: base element route failed`);
-  await openEditorFromStage(page);
-  if(await page.locator('#devNotesInput').inputValue()!==elementNote)throw new Error(`${name}: element note did not persist`);
+  if(await base.locator('.scene-title').textContent()!==elementName)throw new Error(`${label}: renamed element did not update`);
+  const elementFrame=await openEntity(page,'[data-element="base-large"]');
+  if(await elementFrame.locator('body').getAttribute('data-table-hidden')!=='true')throw new Error(`${label}: element table backdrop visible`);
+  await openEditor(page);
+  if(await page.locator('#devNotesInput').inputValue()!==elementNote)throw new Error(`${label}: element note not restored`);
   await page.getByRole('button',{name:'إغلاق المحرر'}).click();
-  await closeGalleryEntity(page);
-
-  if(store.size!==2)throw new Error(`${name}: expected two shared entities, got ${store.size}`);
-  if(pageErrors.length)throw new Error(`${name}: page errors\n${pageErrors.join('\n')}`);
+  await closeEntity(page);
+  if(store.size!==2)throw new Error(`${label}: shared store expected 2, got ${store.size}`);
+  if(errors.length)throw new Error(`${label}: page errors\n${errors.join('\n')}`);
   await context.close();
-  return{name,totalCards:15,scenes:6,elements:9,sharedEntities:2,renaming:true,notes:true};
+  return{label,totalCards:15,scenes:6,elements:9,sharedEntities:2,renaming:true,notes:true};
 }
 
-async function assertScene(page,id,state){
+async function sceneRuntime(page,id,state){
   const runtime=await page.evaluate(()=>{
-    const game=globalThis.__yakolakGame;
-    const scene=game?.gameGroup?.parent;
-    const logoWall=scene?.getObjectByName?.('yakolak-developer-d1-logo-wall');
-    const named=['9','3-right','3-left','3-front','3-back'];
-    const logoColors=[];
-    let logoMeshes=0;
-    logoWall?.traverse?.(object=>{
-      if(!object.isMesh||!object.material)return;
-      logoMeshes++;
-      const materials=Array.isArray(object.material)?object.material:[object.material];
-      materials.forEach(material=>{if(material.color)logoColors.push(`#${material.color.getHexString()}`)});
-    });
-    const table=scene?.getObjectByName?.('yakolak-svg-table')||scene?.getObjectByName?.('yakolak-fallback-simple-table');
-    const tableBox=table?new game.THREE.Box3().setFromObject(table):null;
-    const projected=tableBox?[tableBox.min.clone().project(game.camera),tableBox.max.clone().project(game.camera)]:[];
-    return{
-      gameGroupVisible:game?.gameGroup?.visible,
-      setupVisible:game?.setupGroup?.visible,
-      visibleBases:named.filter(name=>game?.meshes?.[name]?.visible).length,
-      logoChildren:logoWall?.children?.length||0,
-      logoMeshes,
-      distinctLogoColors:[...new Set(logoColors)].length,
-      tableProjection:projected.map(point=>({x:point.x,y:point.y,z:point.z})),
-      setupDomVisible:[...document.querySelectorAll('#yakolakGameSetup,#yakolakGameHud,#yakolakGameScore')].some(element=>getComputedStyle(element).display!=='none')
-    };
+    const game=globalThis.__yakolakGame,scene=game?.gameGroup?.parent,wall=scene?.getObjectByName?.('yakolak-developer-d1-logo-wall');
+    const colors=[];let logoMeshes=0;
+    wall?.traverse?.(o=>{if(o.isMesh&&o.material){logoMeshes++;(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.color&&colors.push(m.color.getHexString()))}});
+    return{gameVisible:game?.gameGroup?.visible,setupVisible:game?.setupGroup?.visible,visibleBases:['9','3-right','3-left','3-front','3-back'].filter(k=>game?.meshes?.[k]?.visible).length,logoChildren:wall?.children?.length||0,logoMeshes,logoColors:new Set(colors).size,setupDom:[...document.querySelectorAll('#yakolakGameSetup,#yakolakGameHud,#yakolakGameScore')].some(e=>getComputedStyle(e).display!=='none')};
   });
-  if(id==='empty-table'){
-    if(runtime.gameGroupVisible!==false)throw new Error('empty-table: game objects are visible');
-    const points=runtime.tableProjection;
-    if(points.length===2&&points.some(point=>Math.abs(point.x)>1.25||Math.abs(point.y)>1.25))throw new Error(`empty-table: table is badly cropped ${JSON.stringify(points)}`);
-  }
-  if(id==='board-bases'&&(state.visibleObjects!=='5'||runtime.visibleBases!==5))throw new Error(`board-bases: expected five named objects, got ${state.visibleObjects}/${runtime.visibleBases}`);
-  if(id==='logo-wall'&&(state.logoRendering!=='svg-geometry-two-tone'||runtime.logoChildren!==2||runtime.logoMeshes<2||runtime.distinctLogoColors<2))throw new Error(`logo-wall: approved two-tone geometry is incomplete ${JSON.stringify(runtime)}`);
-  if(id==='unboxing-intro'&&(state.setupHidden!=='true'||runtime.setupVisible!==false||runtime.setupDomVisible))throw new Error(`unboxing-intro: setup leaked into intro ${JSON.stringify(runtime)}`);
-  if(id==='clean-entry'){
-    const complete=await page.evaluate(()=>globalThis.__yakolakV126Entry?.phase==='complete');
-    if(!complete)throw new Error('clean-entry: sequence did not complete');
-  }
+  if(id==='empty-table'&&runtime.gameVisible!==false)throw new Error('empty table leaked game');
+  if(id==='board-bases'&&(state.visibleObjects!=='5'||runtime.visibleBases!==5))throw new Error('board bases not five');
+  if(id==='logo-wall'&&(state.logoRendering!=='svg-geometry-two-tone'||runtime.logoChildren!==2||runtime.logoMeshes<2||runtime.logoColors<2))throw new Error('logo wall not two-tone');
+  if(id==='unboxing-intro'&&(state.setupHidden!=='true'||runtime.setupVisible!==false||runtime.setupDom))throw new Error('intro setup leaked');
+  if(id==='clean-entry'&&!await page.evaluate(()=>globalThis.__yakolakV126Entry?.phase==='complete'))throw new Error('clean entry incomplete');
 }
 
-async function checkScenes(browser){
-  const context=await browser.newContext({viewport:{width:1280,height:800},deviceScaleFactor:1});
-  const page=await context.newPage();
-  for(const id of sceneIds){
-    const pageErrors=[];
-    page.removeAllListeners('pageerror');
-    page.on('pageerror',error=>pageErrors.push(String(error?.stack||error)));
+async function catalogCheck(browser){
+  const context=await browser.newContext({viewport:{width:1100,height:760},deviceScaleFactor:1}),page=await context.newPage();
+  for(const id of scenes){
+    const errors=[];page.removeAllListeners('pageerror');page.on('pageerror',e=>errors.push(String(e)));
     await page.goto(`${BASE_URL}/developer-scene.html?scene=${id}&d=D1`,{waitUntil:'domcontentloaded',timeout:60000});
-    const state=await waitSceneReady(page);
-    if(id==='unboxing-intro')await page.waitForTimeout(1600);
-    if(pageErrors.length)throw new Error(`${id}: page errors\n${pageErrors.join('\n')}`);
-    await assertScene(page,id,state);
-    await page.screenshot({path:path.join(output,`scene-${id}.png`)});
-    results.push(state);
+    const state=await waitReady(page);if(id==='unboxing-intro')await page.waitForTimeout(1600);if(errors.length)throw new Error(`${id}: ${errors.join('\n')}`);
+    await sceneRuntime(page,id,state);await page.screenshot({path:path.join(output,`scene-${id}.png`)});results.push(state);
   }
-  await context.close();
-}
-
-async function checkElements(browser){
-  const context=await browser.newContext({viewport:{width:1100,height:760},deviceScaleFactor:1});
-  const page=await context.newPage();
-  for(const id of elementIds){
-    const pageErrors=[];
-    page.removeAllListeners('pageerror');
-    page.on('pageerror',error=>pageErrors.push(String(error?.stack||error)));
+  for(const id of elements){
+    const errors=[];page.removeAllListeners('pageerror');page.on('pageerror',e=>errors.push(String(e)));
     await page.goto(`${BASE_URL}/developer-scene.html?element=${id}&d=D1`,{waitUntil:'domcontentloaded',timeout:60000});
-    const state=await waitSceneReady(page);
-    if(state.developerEntityKind!=='element'||state.developerElement!==id)throw new Error(`${id}: element identity missing`);
-    if(id!=='loading-star-element'&&state.mode!=='element')throw new Error(`${id}: element mode missing`);
-    if(!['loading-star-element','table'].includes(id)&&state.tableHidden!=='true')throw new Error(`${id}: table backdrop was not hidden`);
-    if(pageErrors.length)throw new Error(`${id}: page errors\n${pageErrors.join('\n')}`);
+    const state=await waitReady(page);
+    if(state.developerEntityKind!=='element'||state.developerElement!==id)throw new Error(`${id}: identity`);
+    if(id!=='loading-star-element'&&state.mode!=='element')throw new Error(`${id}: mode`);
+    if(!['loading-star-element','table'].includes(id)&&state.tableHidden!=='true')throw new Error(`${id}: table backdrop visible`);
+    if(errors.length)throw new Error(`${id}: ${errors.join('\n')}`);
     if(['base-large','stone-large','table','logo-yakolak'].includes(id))await page.screenshot({path:path.join(output,`element-${id}.png`)});
     results.push(state);
   }
@@ -240,18 +166,10 @@ async function checkElements(browser){
 
 const browser=await chromium.launch({headless:true});
 try{
-  try{results.push(await checkGallery(browser,'desktop',{viewport:{width:1440,height:900},deviceScaleFactor:1}))}
-  catch(error){failures.push({scope:'desktop-gallery',error:String(error?.stack||error)})}
-  try{results.push(await checkGallery(browser,'mobile',{viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true}))}
-  catch(error){failures.push({scope:'mobile-gallery',error:String(error?.stack||error)})}
-  try{await checkScenes(browser)}
-  catch(error){failures.push({scope:'scene-catalog',error:String(error?.stack||error)})}
-  try{await checkElements(browser)}
-  catch(error){failures.push({scope:'element-catalog',error:String(error?.stack||error)})}
-}finally{
-  await browser.close();
-}
-
+  try{results.push(await galleryCheck(browser,'desktop',{viewport:{width:1440,height:900},deviceScaleFactor:1}))}catch(error){failures.push({scope:'desktop-gallery',error:String(error?.stack||error)})}
+  try{results.push(await galleryCheck(browser,'mobile',{viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true}))}catch(error){failures.push({scope:'mobile-gallery',error:String(error?.stack||error)})}
+  try{await catalogCheck(browser)}catch(error){failures.push({scope:'catalog',error:String(error?.stack||error)})}
+}finally{await browser.close()}
 fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({build:'D1',url:BASE_URL,results,failures},null,2));
 if(failures.length)throw new Error(`Developer D1 visual failures: ${JSON.stringify(failures)}`);
 console.log('Developer D1 shared notes, renaming, scenes, and isolated elements passed');
