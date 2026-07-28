@@ -1,4 +1,5 @@
 import './developer-d1-before-after.js?v=D1-before-after';
+import './developer-d1-board-v2.js?v=D1-board-v2';
 
 export const sceneDefinitions=[
   {id:'loading-star',kind:'scene',type:'single',defaultName:'مشهد التحميل',description:'النجمة المعتمدة بحركة الارتداد والانضغاط والظل.',label:'مشهد واحد',mark:'✦',sourceKey:'scene.loading-star'},
