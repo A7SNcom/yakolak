@@ -1,447 +1,81 @@
 import {sceneDefinitions,elementDefinitions,developerDefinitions,definitionKey} from './developer-d1-registry.js?v=D1-shared';
 
-console.info('[Yakolak] DEVELOPER D1 SHARED REVIEW GALLERY LOADED');
+console.info('[Yakolak] DEVELOPER D1 REVIEW THREADS LOADED');
 
-const tabs=[
-  {id:'all',label:'كل المشاهد'},
-  {id:'single',label:'مشهد واحد'},
-  {id:'sequence',label:'مجموعة مشاهد'},
-  {id:'elements',label:'العناصر'}
-];
-const LOCAL_KEY='yakolak:developer-d1:shared-review:v1';
+const tabs=[{id:'all',label:'كل المشاهد'},{id:'single',label:'مشهد واحد'},{id:'sequence',label:'مجموعة مشاهد'},{id:'elements',label:'العناصر'}];
+const STATUS={open:{label:'جديدة',tone:'open'},in_progress:{label:'قيد المعالجة',tone:'in_progress'},ready_for_review:{label:'جاهزة لمراجعتك',tone:'ready_for_review'},needs_changes:{label:'تحتاج تعديل',tone:'needs_changes'},approved:{label:'معتمدة',tone:'approved'},rejected:{label:'مرفوضة',tone:'rejected'}};
+const ROLE={reviewer:'مراجعتي',developer:'رد المطور',system:'النظام'};
+const LOCAL_KEY='yakolak:developer-d1:review-threads:v2';
+const LEGACY_LOCAL_KEY='yakolak:developer-d1:shared-review:v1';
 const API_URL='./api/developer-d1';
-const grid=document.getElementById('sceneGrid');
-const tabsRoot=document.getElementById('sceneTabs');
-const count=document.getElementById('sceneCount');
-const stage=document.getElementById('devStage');
-const stageFrame=document.getElementById('devStageFrame');
-const stageTitle=document.getElementById('devStageTitle');
-const back=document.getElementById('devBack');
-const notesToggle=document.getElementById('devNotesToggle');
-const editor=document.getElementById('devEditor');
-const editorScrim=document.getElementById('devEditorScrim');
-const editorClose=document.getElementById('devEditorClose');
-const editorEntity=document.getElementById('devEditorEntity');
-const nameInput=document.getElementById('devNameInput');
-const codeKey=document.getElementById('devCodeKey');
-const notesInput=document.getElementById('devNotesInput');
-const saveButton=document.getElementById('devSave');
-const editorStatus=document.getElementById('devEditorStatus');
-let activeFilter='all';
-let activeStageEntity=null;
-let activeEditorEntity=null;
-let saveTimer=0;
-let dirty=false;
-let remoteAvailable=false;
-const stateByKey=new Map();
-
-function localSnapshot(){
-  try{
-    const parsed=JSON.parse(localStorage.getItem(LOCAL_KEY)||'{}');
-    return parsed&&typeof parsed==='object'?parsed:{};
-  }catch{return{}}
-}
-
+const grid=document.getElementById('sceneGrid'),tabsRoot=document.getElementById('sceneTabs'),count=document.getElementById('sceneCount'),stage=document.getElementById('devStage'),stageFrame=document.getElementById('devStageFrame'),stageTitle=document.getElementById('devStageTitle'),back=document.getElementById('devBack'),notesToggle=document.getElementById('devNotesToggle'),editor=document.getElementById('devEditor'),editorScrim=document.getElementById('devEditorScrim'),editorClose=document.getElementById('devEditorClose'),editorEntity=document.getElementById('devEditorEntity'),nameInput=document.getElementById('devNameInput'),saveNameButton=document.getElementById('devSaveName'),codeKey=document.getElementById('devCodeKey'),overview=document.getElementById('devReviewOverview'),newThreadInput=document.getElementById('devNewThreadInput'),addThreadButton=document.getElementById('devAddThread'),threadList=document.getElementById('devThreadList'),editorStatus=document.getElementById('devEditorStatus');
+let activeFilter='all',activeStageEntity=null,activeEditorEntity=null,remoteAvailable=false;
+const stateByKey=new Map(),threadsByKey=new Map();
+const uuid=prefix=>`${prefix}:${crypto.randomUUID()}`;
+function localSnapshot(key){try{const parsed=JSON.parse(localStorage.getItem(key)||'{}');return parsed&&typeof parsed==='object'?parsed:{}}catch{return{}}}
+function persistLocal(){try{const entities={},threads={};stateByKey.forEach((value,key)=>entities[key]=value);threadsByKey.forEach((value,key)=>threads[key]=value);localStorage.setItem(LOCAL_KEY,JSON.stringify({entities,threads,updatedAt:new Date().toISOString()}));return true}catch{return false}}
 function loadLocal(){
-  const local=localSnapshot();
+  const current=localSnapshot(LOCAL_KEY);
+  Object.entries(current.entities||{}).forEach(([key,value])=>stateByKey.set(key,{displayName:String(value?.displayName||''),updatedAt:String(value?.updatedAt||''),source:'local'}));
+  Object.entries(current.threads||{}).forEach(([key,value])=>{if(Array.isArray(value))threadsByKey.set(key,value)});
+  const legacy=localSnapshot(LEGACY_LOCAL_KEY);
   developerDefinitions.forEach(definition=>{
-    const key=definitionKey(definition);
-    const value=local[key];
-    if(!value||typeof value!=='object')return;
-    stateByKey.set(key,{
-      displayName:String(value.displayName||''),
-      notes:String(value.notes||''),
-      updatedAt:String(value.updatedAt||''),
-      pending:Boolean(value.pending),
-      source:'local'
-    });
-  });
-}
-
-function persistLocal(){
-  try{
-    const out={};
-    stateByKey.forEach((value,key)=>{out[key]=value});
-    localStorage.setItem(LOCAL_KEY,JSON.stringify(out));
-    return true;
-  }catch{return false}
-}
-
-function stateFor(definition){
-  return stateByKey.get(definitionKey(definition))||{displayName:'',notes:'',updatedAt:'',pending:false,source:'default'};
-}
-
-function displayName(definition){
-  return stateFor(definition).displayName.trim()||definition.defaultName;
-}
-
-function setStatus(text,tone=''){
-  editorStatus.textContent=text;
-  editorStatus.className=`dev-editor-status${tone?` ${tone}`:''}`;
-}
-
-function entityUrl(definition,preview=false){
-  const url=new URL('./developer-scene.html',location.href);
-  if(definition.kind==='element')url.searchParams.set('element',definition.id);
-  else url.searchParams.set('scene',definition.id);
-  if(preview)url.searchParams.set('preview','1');
-  url.searchParams.set('d','D1');
-  return url.toString();
-}
-
-function cardFromMessage(event){
-  return[...grid.querySelectorAll('.scene-card')].find(card=>card.querySelector('iframe')?.contentWindow===event.source)||null;
-}
-
-addEventListener('message',event=>{
-  const data=event.data||{};
-  if(!String(data.type||'').startsWith('yakolak-developer-scene-'))return;
-  const card=cardFromMessage(event);
-  if(!card)return;
-  const state=card.querySelector('.scene-preview-state span');
-  if(data.type==='yakolak-developer-scene-ready'){
-    card.classList.remove('preview-error');
-    card.classList.add('preview-ready');
-    card.dataset.previewState='ready';
-    if(state)state.textContent=card.dataset.entityKind==='element'?'العنصر جاهز':'المشهد جاهز';
-  }else{
-    card.classList.add('preview-error');
-    card.dataset.previewState='error';
-    if(state)state.textContent='تعذر تحميل المعاينة';
-  }
-});
-
-const previewObserver=new IntersectionObserver(entries=>{
-  entries.forEach(entry=>{
-    if(!entry.isIntersecting)return;
-    const iframe=entry.target.querySelector('iframe[data-src]');
-    if(iframe&&!iframe.src.includes('developer-scene.html')){
-      iframe.src=iframe.dataset.src;
-      delete iframe.dataset.src;
-      entry.target.dataset.previewState='loading';
+    const key=definitionKey(definition),value=legacy[key];
+    if(!stateByKey.has(key)&&value?.displayName)stateByKey.set(key,{displayName:String(value.displayName),updatedAt:String(value.updatedAt||''),source:'legacy-local'});
+    if(value?.notes&&!threadsByKey.get(key)?.length){
+      const created=String(value.updatedAt||new Date().toISOString()),threadId=`local-legacy:${key}`;
+      threadsByKey.set(key,[{id:threadId,entityType:definition.kind,entityId:definition.id,status:'open',title:String(value.notes).split(/\n/)[0].slice(0,100),legacySource:'local_v1',createdAt:created,updatedAt:created,comments:[{id:`local-legacy-comment:${key}`,threadId,authorRole:'reviewer',kind:'legacy',body:String(value.notes),createdAt:created}],localOnly:true}]);
     }
-    previewObserver.unobserve(entry.target);
-  });
-},{rootMargin:'180px 0px',threshold:.06});
-
-function renderTabs(){
-  tabsRoot.innerHTML='';
-  tabs.forEach(tab=>{
-    const button=document.createElement('button');
-    button.type='button';
-    button.className='dev-tab'+(tab.id===activeFilter?' active':'');
-    button.textContent=tab.label;
-    button.dataset.filter=tab.id;
-    button.setAttribute('aria-pressed',String(tab.id===activeFilter));
-    button.onclick=()=>{
-      activeFilter=tab.id;
-      renderTabs();
-      applyFilter();
-    };
-    tabsRoot.append(button);
   });
 }
-
-function updateCardState(card,definition){
-  const entityState=stateFor(definition);
-  const title=card.querySelector('.scene-title');
-  const previewTitle=card.querySelector('.scene-preview-state strong');
-  const indicator=card.querySelector('.scene-note-indicator');
-  const hasNote=Boolean(entityState.notes.trim());
-  if(title)title.textContent=displayName(definition);
-  if(previewTitle)previewTitle.textContent=displayName(definition);
-  card.classList.toggle('has-note',hasNote);
-  if(indicator)indicator.textContent=hasNote?'لديه ملاحظات':'';
-}
-
+const stateFor=definition=>stateByKey.get(definitionKey(definition))||{displayName:'',updatedAt:'',source:'default'};
+const displayName=definition=>stateFor(definition).displayName.trim()||definition.defaultName;
+const threadsFor=definition=>threadsByKey.get(definitionKey(definition))||[];
+function setStatus(text,tone=''){editorStatus.textContent=text;editorStatus.className=`dev-editor-status${tone?` ${tone}`:''}`}
+function entityUrl(definition,preview=false){const url=new URL('./developer-scene.html',location.href);if(definition.kind==='element')url.searchParams.set('element',definition.id);else url.searchParams.set('scene',definition.id);if(preview)url.searchParams.set('preview','1');url.searchParams.set('d','D1');return url.toString()}
+function formatTime(value){if(!value)return'';try{return new Intl.DateTimeFormat('ar-SA',{dateStyle:'short',timeStyle:'short'}).format(new Date(value))}catch{return String(value)}}
+const cardFromMessage=event=>[...grid.querySelectorAll('.scene-card')].find(card=>card.querySelector('iframe')?.contentWindow===event.source)||null;
+addEventListener('message',event=>{const data=event.data||{};if(!String(data.type||'').startsWith('yakolak-developer-scene-'))return;const card=cardFromMessage(event);if(!card)return;const state=card.querySelector('.scene-preview-state span');if(data.type==='yakolak-developer-scene-ready'){card.classList.remove('preview-error');card.classList.add('preview-ready');card.dataset.previewState='ready';if(state)state.textContent=card.dataset.entityKind==='element'?'العنصر جاهز':'المشهد جاهز'}else{card.classList.add('preview-error');card.dataset.previewState='error';if(state)state.textContent='تعذر تحميل المعاينة'}});
+const previewObserver=new IntersectionObserver(entries=>entries.forEach(entry=>{if(!entry.isIntersecting)return;const iframe=entry.target.querySelector('iframe[data-src]');if(iframe&&!iframe.src.includes('developer-scene.html')){iframe.src=iframe.dataset.src;delete iframe.dataset.src;entry.target.dataset.previewState='loading'}previewObserver.unobserve(entry.target)}),{rootMargin:'180px 0px',threshold:.06});
+function renderTabs(){tabsRoot.innerHTML='';tabs.forEach(tab=>{const button=document.createElement('button');button.type='button';button.className='dev-tab'+(tab.id===activeFilter?' active':'');button.textContent=tab.label;button.dataset.filter=tab.id;button.setAttribute('aria-pressed',String(tab.id===activeFilter));button.onclick=()=>{activeFilter=tab.id;renderTabs();applyFilter()};tabsRoot.append(button)})}
+function reviewSummary(definition){const threads=threadsFor(definition),active=threads.filter(thread=>!['approved','rejected'].includes(thread.status)),ready=threads.filter(thread=>thread.status==='ready_for_review'),needs=threads.filter(thread=>thread.status==='needs_changes');return{total:threads.length,active:active.length,ready:ready.length,needs:needs.length}}
+function updateCardState(card,definition){const title=card.querySelector('.scene-title'),previewTitle=card.querySelector('.scene-preview-state strong'),indicator=card.querySelector('.scene-note-indicator'),summary=reviewSummary(definition);if(title)title.textContent=displayName(definition);if(previewTitle)previewTitle.textContent=displayName(definition);card.classList.toggle('has-review',summary.total>0);card.classList.toggle('needs-review',summary.ready>0||summary.needs>0);if(indicator)indicator.textContent=summary.ready?`${summary.ready} بانتظار مراجعتك`:summary.needs?`${summary.needs} تحتاج تعديل`:summary.active?`${summary.active} ملاحظات نشطة`:summary.total?`${summary.total} في السجل`:''}
 function cardFor(definition){
-  const article=document.createElement('article');
-  article.className='scene-card';
-  article.dataset.type=definition.type;
-  article.dataset.entityKind=definition.kind;
-  article.dataset.entityId=definition.id;
-  if(definition.kind==='scene')article.dataset.scene=definition.id;
-  else article.dataset.element=definition.id;
-  article.dataset.previewState='idle';
-
-  const preview=document.createElement('div');
-  preview.className='scene-preview';
-  preview.onclick=()=>openEntity(definition);
-  const iframe=document.createElement('iframe');
-  iframe.title=`معاينة ${displayName(definition)}`;
-  iframe.loading='lazy';
-  iframe.src='about:blank';
-  iframe.dataset.src=entityUrl(definition,true);
-  iframe.setAttribute('tabindex','-1');
-  const previewState=document.createElement('div');
-  previewState.className='scene-preview-state';
-  previewState.innerHTML=`<div class="scene-preview-mark">${definition.mark}</div><strong>${displayName(definition)}</strong><span>جارٍ تجهيز المعاينة</span>`;
-  preview.append(iframe,previewState);
-
-  const meta=document.createElement('div');
-  meta.className='scene-meta';
-  const copy=document.createElement('div');
-  copy.className='scene-copy';
-  const type=document.createElement('span');
-  type.className='scene-type';
-  type.textContent=definition.label;
-  const title=document.createElement('h2');
-  title.className='scene-title';
-  title.textContent=displayName(definition);
-  const desc=document.createElement('p');
-  desc.className='scene-desc';
-  desc.textContent=definition.description;
-  const source=document.createElement('code');
-  source.className='scene-code';
-  source.textContent=definition.sourceKey;
-  const noteIndicator=document.createElement('span');
-  noteIndicator.className='scene-note-indicator';
-  copy.append(type,title,desc,source,noteIndicator);
-
-  const actions=document.createElement('div');
-  actions.className='scene-actions';
-  const open=document.createElement('button');
-  open.type='button';
-  open.className='scene-open';
-  open.setAttribute('aria-label',`فتح ${displayName(definition)}`);
-  open.textContent='↗';
-  open.onclick=event=>{event.stopPropagation();openEntity(definition)};
-  const edit=document.createElement('button');
-  edit.type='button';
-  edit.className='scene-edit';
-  edit.setAttribute('aria-label',`ملاحظات وتسمية ${displayName(definition)}`);
-  edit.textContent='✎';
-  edit.onclick=event=>{event.stopPropagation();openEditor(definition)};
-  actions.append(open,edit);
-  meta.append(copy,actions);
-  article.append(preview,meta);
-  article.tabIndex=0;
-  article.onkeydown=event=>{
-    if(event.key==='Enter'){event.preventDefault();openEntity(definition)}
-    if(event.key===' '){event.preventDefault();openEditor(definition)}
-  };
-  updateCardState(article,definition);
-  previewObserver.observe(article);
-  return article;
+  const article=document.createElement('article');article.className='scene-card';article.dataset.type=definition.type;article.dataset.entityKind=definition.kind;article.dataset.entityId=definition.id;if(definition.kind==='scene')article.dataset.scene=definition.id;else article.dataset.element=definition.id;article.dataset.previewState='idle';
+  const preview=document.createElement('div');preview.className='scene-preview';preview.onclick=()=>openEntity(definition);const iframe=document.createElement('iframe');iframe.title=`معاينة ${displayName(definition)}`;iframe.loading='lazy';iframe.src='about:blank';iframe.dataset.src=entityUrl(definition,true);iframe.setAttribute('tabindex','-1');const previewState=document.createElement('div');previewState.className='scene-preview-state';previewState.innerHTML=`<div class="scene-preview-mark">${definition.mark}</div><strong>${displayName(definition)}</strong><span>جارٍ تجهيز المعاينة</span>`;preview.append(iframe,previewState);
+  const meta=document.createElement('div');meta.className='scene-meta';const copy=document.createElement('div');copy.className='scene-copy';const type=document.createElement('span');type.className='scene-type';type.textContent=definition.label;const title=document.createElement('h2');title.className='scene-title';title.textContent=displayName(definition);const desc=document.createElement('p');desc.className='scene-desc';desc.textContent=definition.description;const source=document.createElement('code');source.className='scene-code';source.textContent=definition.sourceKey;const indicator=document.createElement('span');indicator.className='scene-note-indicator';copy.append(type,title,desc,source,indicator);
+  const actions=document.createElement('div');actions.className='scene-actions';const open=document.createElement('button');open.type='button';open.className='scene-open';open.setAttribute('aria-label',`فتح ${displayName(definition)}`);open.textContent='↗';open.onclick=event=>{event.stopPropagation();openEntity(definition)};const edit=document.createElement('button');edit.type='button';edit.className='scene-edit';edit.setAttribute('aria-label',`سجل مراجعة ${displayName(definition)}`);edit.textContent='☰';edit.onclick=event=>{event.stopPropagation();openEditor(definition)};actions.append(open,edit);meta.append(copy,actions);article.append(preview,meta);article.tabIndex=0;article.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();openEntity(definition)}if(event.key===' '){event.preventDefault();openEditor(definition)}};updateCardState(article,definition);previewObserver.observe(article);return article;
 }
-
-function renderCards(){
-  previewObserver.disconnect();
-  grid.innerHTML='';
-  developerDefinitions.forEach(definition=>grid.append(cardFor(definition)));
-  applyFilter();
+function renderCards(){previewObserver.disconnect();grid.innerHTML='';developerDefinitions.forEach(definition=>grid.append(cardFor(definition)));applyFilter()}
+const definitionForCard=card=>developerDefinitions.find(definition=>definition.kind===card.dataset.entityKind&&definition.id===card.dataset.entityId)||null;
+function applyFilter(){let visible=0,visibleKind='مشهد';grid.querySelectorAll('.scene-card').forEach(card=>{const definition=definitionForCard(card),show=activeFilter==='elements'?definition?.kind==='element':definition?.kind==='scene'&&(activeFilter==='all'||definition.type===activeFilter);card.hidden=!show;if(show){visible++;if(card.dataset.previewState==='idle')previewObserver.observe(card)}});if(activeFilter==='elements')visibleKind='عنصر';count.textContent=`${visible} ${visible===1?visibleKind:(activeFilter==='elements'?'عناصر':'مشاهد')}`}
+function updateVisible(definition){const card=grid.querySelector(`.scene-card[data-entity-kind="${definition.kind}"][data-entity-id="${definition.id}"]`);if(card)updateCardState(card,definition);if(activeStageEntity&&definitionKey(activeStageEntity)===definitionKey(definition))stageTitle.textContent=`D1 · ${displayName(definition)}`}
+function replaceThread(thread){const definition=developerDefinitions.find(item=>item.kind===thread.entityType&&item.id===thread.entityId);if(!definition)return;const key=definitionKey(definition),list=[...threadsFor(definition)],index=list.findIndex(item=>item.id===thread.id);if(index>=0)list[index]=thread;else list.unshift(thread);list.sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt)));threadsByKey.set(key,list);persistLocal();updateVisible(definition);if(activeEditorEntity&&definitionKey(activeEditorEntity)===key)renderReviewPanel()}
+async function apiAction(payload,{busyButton=null,success='تم الحفظ'}={}){if(busyButton)busyButton.disabled=true;setStatus('جارٍ الحفظ في السجل المشترك…');try{const response=await fetch(API_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});if(!response.ok)throw new Error(`store_${response.status}`);const data=await response.json();if(!data?.ok)throw new Error(data?.error||'invalid_store_response');remoteAvailable=true;setStatus(success,'ok');return data}catch(error){console.warn('[Yakolak] D1 review action failed',error);setStatus('تعذر الحفظ المشترك؛ لم تُحذف أي بيانات قديمة','warn');return null}finally{if(busyButton)busyButton.disabled=false}}
+async function saveName(){if(!activeEditorEntity)return;const definition=activeEditorEntity,data=await apiAction({action:'save_entity',entityType:definition.kind,entityId:definition.id,sourceKey:definition.sourceKey,displayName:nameInput.value.trim()},{busyButton:saveNameButton,success:'تم حفظ الاسم'});if(!data?.entity)return;stateByKey.set(definitionKey(definition),{displayName:String(data.entity.displayName||''),updatedAt:String(data.entity.updatedAt||''),source:'shared'});persistLocal();updateVisible(definition);editorEntity.textContent=`${definition.kind==='element'?'عنصر':'مشهد'} · ${displayName(definition)}`}
+async function createReviewThread(){if(!activeEditorEntity)return;const body=newThreadInput.value.trim();if(!body){setStatus('اكتب الملاحظة أولًا','warn');newThreadInput.focus();return}const data=await apiAction({action:'create_thread',threadId:uuid('thread'),commentId:uuid('comment'),entityType:activeEditorEntity.kind,entityId:activeEditorEntity.id,authorRole:'reviewer',body},{busyButton:addThreadButton,success:'تمت إضافة الملاحظة دون حذف السابق'});if(data?.thread){newThreadInput.value='';replaceThread(data.thread)}}
+function statusBadge(thread){const cfg=STATUS[thread.status]||STATUS.open,badge=document.createElement('span');badge.className=`status-badge status-${cfg.tone}`;badge.textContent=cfg.label;return badge}
+function commentNode(comment){const item=document.createElement('article');item.className=`thread-comment ${comment.authorRole||'reviewer'}`;const head=document.createElement('div');head.className='comment-head';const role=document.createElement('span');role.className='comment-role';role.textContent=ROLE[comment.authorRole]||comment.authorRole;const time=document.createElement('time');time.className='comment-time';time.textContent=formatTime(comment.createdAt);head.append(role,time);const body=document.createElement('div');body.className='comment-body';body.textContent=String(comment.body??'');item.append(head,body);return item}
+function makeButton(label,className,handler){const element=document.createElement('button');element.type='button';element.className=`thread-action ${className||''}`;element.textContent=label;element.onclick=handler;return element}
+function threadNode(thread){
+  const article=document.createElement('section');article.className='review-thread';article.dataset.threadId=thread.id;const head=document.createElement('div');head.className='thread-head';const copy=document.createElement('div');const title=document.createElement('div');title.className='thread-title';title.textContent=thread.title||thread.comments?.[0]?.body?.split(/\n/)[0]?.slice(0,100)||'ملاحظة';const meta=document.createElement('div');meta.className='thread-meta';meta.textContent=`بدأت ${formatTime(thread.createdAt)} · ${thread.comments?.length||0} تعليقات`;copy.append(title,meta);head.append(copy,statusBadge(thread));const timeline=document.createElement('div');timeline.className='thread-timeline';(thread.comments||[]).forEach(comment=>timeline.append(commentNode(comment)));const divider=document.createElement('div');divider.className='thread-divider';const compose=document.createElement('div');compose.className='thread-compose';const input=document.createElement('textarea');input.className='dev-comment-input';input.maxLength=12000;input.placeholder='اكتب تعقيبًا أو ردًا جديدًا…';let role='reviewer';
+  const roles=document.createElement('div');roles.className='thread-role-row';const reviewerRole=document.createElement('button');reviewerRole.type='button';reviewerRole.className='role-chip active';reviewerRole.textContent='تعقيبي';const developerRole=document.createElement('button');developerRole.type='button';developerRole.className='role-chip';developerRole.textContent='رد المطور';const setRole=value=>{role=value;reviewerRole.classList.toggle('active',value==='reviewer');developerRole.classList.toggle('active',value==='developer')};reviewerRole.onclick=()=>setRole('reviewer');developerRole.onclick=()=>setRole('developer');roles.append(reviewerRole,developerRole);
+  const doReply=async(kind='reply')=>{const text=input.value.trim();if(!text){setStatus('اكتب الرد أو التعقيب أولًا','warn');input.focus();return}const data=await apiAction({action:'add_comment',threadId:thread.id,commentId:uuid('comment'),authorRole:role,kind:role==='developer'?'implementation':kind,body:text},{success:'تمت إضافة الرد وحفظ السجل السابق'});if(data?.thread){input.value='';replaceThread(data.thread)}};
+  const setThread=async(status,{requireText=false,defaultText='',authorRole='reviewer'}={})=>{const text=input.value.trim()||defaultText;if(requireText&&!text){setStatus('اكتب المشكلة أو التعديل المطلوب أولًا','warn');input.focus();return}const data=await apiAction({action:'set_status',threadId:thread.id,status,commentId:text?uuid('comment'):undefined,authorRole,body:text},{success:`تم تغيير الحالة إلى: ${(STATUS[status]||STATUS.open).label}`});if(data?.thread){input.value='';replaceThread(data.thread)}};
+  const devActions=document.createElement('div');devActions.className='thread-dev-actions';devActions.append(makeButton('إضافة الرد','reply',()=>doReply()),makeButton('جاري التنفيذ','progress',()=>setThread('in_progress',{defaultText:'بدأ المطور معالجة هذه الملاحظة.',authorRole:'developer'})),makeButton('جاهز للمراجعة','ready',()=>setThread('ready_for_review',{defaultText:'اكتمل التغيير وأصبح جاهزًا لمراجعتك.',authorRole:'developer'})));
+  const reviewActions=document.createElement('div');reviewActions.className='thread-review-actions';reviewActions.append(makeButton('اعتماد التغيير','approve',()=>setThread('approved',{defaultText:'تمت مراجعة التغيير واعتماده.',authorRole:'reviewer'})),makeButton('رفض التغيير','reject',()=>setThread('rejected',{defaultText:'تم رفض التغيير في صورته الحالية.',authorRole:'reviewer'})),makeButton('تعقيب: توجد مشكلة','changes',()=>setThread('needs_changes',{requireText:true,authorRole:'reviewer'})));
+  compose.append(input,roles,devActions,reviewActions);article.append(head,timeline,divider,compose);return article;
 }
-
-function definitionForCard(card){
-  return developerDefinitions.find(definition=>definition.kind===card.dataset.entityKind&&definition.id===card.dataset.entityId)||null;
-}
-
-function applyFilter(){
-  let visible=0;
-  let visibleKind='مشهد';
-  grid.querySelectorAll('.scene-card').forEach(card=>{
-    const definition=definitionForCard(card);
-    const show=activeFilter==='elements'
-      ?definition?.kind==='element'
-      :definition?.kind==='scene'&&(activeFilter==='all'||definition.type===activeFilter);
-    card.hidden=!show;
-    if(show){visible++;if(card.dataset.previewState==='idle')previewObserver.observe(card)}
-  });
-  if(activeFilter==='elements')visibleKind='عنصر';
-  count.textContent=`${visible} ${visible===1?visibleKind:(activeFilter==='elements'?'عناصر':'مشاهد')}`;
-}
-
-function updateVisibleNames(definition){
-  const card=grid.querySelector(`.scene-card[data-entity-kind="${definition.kind}"][data-entity-id="${definition.id}"]`);
-  if(card)updateCardState(card,definition);
-  if(activeStageEntity&&definitionKey(activeStageEntity)===definitionKey(definition))stageTitle.textContent=`D1 · ${displayName(definition)}`;
-}
-
-function editorDraft(){
-  if(!activeEditorEntity)return null;
-  return{
-    entityType:activeEditorEntity.kind,
-    entityId:activeEditorEntity.id,
-    sourceKey:activeEditorEntity.sourceKey,
-    displayName:nameInput.value.trim(),
-    notes:notesInput.value
-  };
-}
-
-function storeDraftLocally(definition,draft,pending=true){
-  const key=definitionKey(definition);
-  stateByKey.set(key,{
-    displayName:draft.displayName,
-    notes:draft.notes,
-    updatedAt:new Date().toISOString(),
-    pending,
-    source:'local'
-  });
-  persistLocal();
-  updateVisibleNames(definition);
-}
-
-async function pushDraft(definition,draft,{quiet=false}={}){
-  storeDraftLocally(definition,draft,true);
-  if(!quiet){saveButton.disabled=true;setStatus('جارٍ الحفظ المشترك…')}
-  try{
-    const response=await fetch(API_URL,{
-      method:'POST',
-      headers:{'content-type':'application/json'},
-      body:JSON.stringify(draft)
-    });
-    if(!response.ok)throw new Error(`store_${response.status}`);
-    const data=await response.json();
-    if(!data?.ok||!data.entity)throw new Error('invalid_store_response');
-    stateByKey.set(definitionKey(definition),{
-      displayName:String(data.entity.displayName||''),
-      notes:String(data.entity.notes||''),
-      updatedAt:String(data.entity.updatedAt||new Date().toISOString()),
-      pending:false,
-      source:'shared'
-    });
-    persistLocal();
-    remoteAvailable=true;
-    updateVisibleNames(definition);
-    if(activeEditorEntity&&definitionKey(activeEditorEntity)===definitionKey(definition))setStatus('تم الحفظ في المخزن المشترك','ok');
-    return true;
-  }catch(error){
-    console.warn('[Yakolak] D1 shared save unavailable; local copy retained',error);
-    if(activeEditorEntity&&definitionKey(activeEditorEntity)===definitionKey(definition))setStatus('حُفظ محليًا وسيُعاد رفعه تلقائيًا','warn');
-    return false;
-  }finally{
-    if(!quiet)saveButton.disabled=false;
-  }
-}
-
-async function saveEditor({quiet=false}={}){
-  if(!activeEditorEntity)return false;
-  clearTimeout(saveTimer);
-  const definition=activeEditorEntity;
-  const draft=editorDraft();
-  if(!draft)return false;
-  dirty=false;
-  return pushDraft(definition,draft,{quiet});
-}
-
-function scheduleSave(){
-  if(!activeEditorEntity)return;
-  dirty=true;
-  storeDraftLocally(activeEditorEntity,editorDraft(),true);
-  setStatus('تغييرات غير مرفوعة بعد','warn');
-  clearTimeout(saveTimer);
-  saveTimer=setTimeout(()=>saveEditor({quiet:true}),850);
-}
-
-function openEditor(definition){
-  if(activeEditorEntity&&dirty)saveEditor({quiet:true});
-  activeEditorEntity=definition;
-  dirty=false;
-  const current=stateFor(definition);
-  nameInput.value=current.displayName||definition.defaultName;
-  notesInput.value=current.notes||'';
-  editorEntity.textContent=`${definition.kind==='element'?'عنصر':'مشهد'} · ${displayName(definition)}`;
-  codeKey.textContent=definition.sourceKey;
-  setStatus(current.pending?'محفوظ محليًا وبانتظار المزامنة':current.source==='shared'?'محفوظ في المخزن المشترك':'جاهز',current.pending?'warn':current.source==='shared'?'ok':'');
-  editor.classList.add('open');
-  editorScrim.classList.add('open');
-  editor.setAttribute('aria-hidden','false');
-  editorScrim.setAttribute('aria-hidden','false');
-  notesToggle.setAttribute('aria-expanded','true');
-  requestAnimationFrame(()=>nameInput.focus({preventScroll:true}));
-}
-
-function closeEditor(){
-  if(activeEditorEntity&&dirty)saveEditor({quiet:true});
-  editor.classList.remove('open');
-  editorScrim.classList.remove('open');
-  editor.setAttribute('aria-hidden','true');
-  editorScrim.setAttribute('aria-hidden','true');
-  notesToggle.setAttribute('aria-expanded','false');
-  activeEditorEntity=null;
-  dirty=false;
-}
-
-function openEntity(definition){
-  activeStageEntity=definition;
-  stageFrame.src=entityUrl(definition,false);
-  stageTitle.textContent=`D1 · ${displayName(definition)}`;
-  stage.classList.add('open');
-  stage.setAttribute('aria-hidden','false');
-  document.body.style.overflow='hidden';
-  back.focus({preventScroll:true});
-  const hashKey=definition.kind==='element'?'element':'scene';
-  history.pushState({developerEntity:definitionKey(definition)},'',`#${hashKey}=${definition.id}`);
-}
-
-function closeEntity({historyBack=false}={}){
-  if(!stage.classList.contains('open'))return;
-  closeEditor();
-  stage.classList.remove('open');
-  stage.setAttribute('aria-hidden','true');
-  stageFrame.src='about:blank';
-  document.body.style.overflow='';
-  activeStageEntity=null;
-  if(historyBack&&location.hash)history.back();
-}
-
+function renderOverview(definition){const summary=reviewSummary(definition);overview.innerHTML='';const add=(text,tone='')=>{const chip=document.createElement('span');chip.className='review-count';if(tone)chip.dataset.tone=tone;chip.textContent=text;overview.append(chip)};add(`${summary.total} إجمالي`);add(`${summary.active} نشطة`,summary.active?'warn':'');add(`${summary.ready} بانتظار مراجعتك`,summary.ready?'warn':'');add(`${threadsFor(definition).filter(thread=>thread.status==='approved').length} معتمدة`,'ok')}
+function renderReviewPanel(){if(!activeEditorEntity)return;renderOverview(activeEditorEntity);threadList.innerHTML='';const threads=threadsFor(activeEditorEntity);if(!threads.length){const empty=document.createElement('div');empty.className='thread-empty';empty.textContent='لا توجد ملاحظات بعد. أضف أول ملاحظة وستبقى كل الردود والحالات محفوظة هنا.';threadList.append(empty);return}threads.forEach(thread=>threadList.append(threadNode(thread)))}
+function openEditor(definition){activeEditorEntity=definition;const current=stateFor(definition);nameInput.value=current.displayName||definition.defaultName;newThreadInput.value='';editorEntity.textContent=`${definition.kind==='element'?'عنصر':'مشهد'} · ${displayName(definition)}`;codeKey.textContent=definition.sourceKey;renderReviewPanel();setStatus(remoteAvailable?'متصل بسجل المراجعة المشترك':'جارٍ مزامنة سجل المراجعة…',remoteAvailable?'ok':'');editor.classList.add('open');editorScrim.classList.add('open');editor.setAttribute('aria-hidden','false');editorScrim.setAttribute('aria-hidden','false');notesToggle.setAttribute('aria-expanded','true');requestAnimationFrame(()=>newThreadInput.focus({preventScroll:true}))}
+function closeEditor(){editor.classList.remove('open');editorScrim.classList.remove('open');editor.setAttribute('aria-hidden','true');editorScrim.setAttribute('aria-hidden','true');notesToggle.setAttribute('aria-expanded','false');activeEditorEntity=null}
+function openEntity(definition){activeStageEntity=definition;stageFrame.src=entityUrl(definition,false);stageTitle.textContent=`D1 · ${displayName(definition)}`;stage.classList.add('open');stage.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';back.focus({preventScroll:true});const hashKey=definition.kind==='element'?'element':'scene';history.pushState({developerEntity:definitionKey(definition)},'',`#${hashKey}=${definition.id}`)}
+function closeEntity({historyBack=false}={}){if(!stage.classList.contains('open'))return;closeEditor();stage.classList.remove('open');stage.setAttribute('aria-hidden','true');stageFrame.src='about:blank';document.body.style.overflow='';activeStageEntity=null;if(historyBack&&location.hash)history.back()}
 async function loadSharedState(){
-  try{
-    const response=await fetch(API_URL,{cache:'no-store'});
-    if(!response.ok)throw new Error(`store_${response.status}`);
-    const data=await response.json();
-    if(!data?.ok||!Array.isArray(data.entities))throw new Error('invalid_store_response');
-    data.entities.forEach(entity=>{
-      const key=`${entity.entityType}:${entity.entityId}`;
-      const local=stateByKey.get(key);
-      if(local?.pending)return;
-      stateByKey.set(key,{
-        displayName:String(entity.displayName||''),
-        notes:String(entity.notes||''),
-        updatedAt:String(entity.updatedAt||''),
-        pending:false,
-        source:'shared'
-      });
-    });
-    remoteAvailable=true;
-    persistLocal();
-    renderCards();
-    document.body.dataset.developerStore='shared';
-  }catch(error){
-    console.info('[Yakolak] D1 shared store unavailable in this environment',error);
-    document.body.dataset.developerStore='local';
-  }
-  const pending=developerDefinitions.filter(definition=>stateFor(definition).pending);
-  for(const definition of pending){
-    const current=stateFor(definition);
-    await pushDraft(definition,{
-      entityType:definition.kind,
-      entityId:definition.id,
-      sourceKey:definition.sourceKey,
-      displayName:current.displayName,
-      notes:current.notes
-    },{quiet:true});
-  }
+  try{const response=await fetch(API_URL,{cache:'no-store'});if(!response.ok)throw new Error(`store_${response.status}`);const data=await response.json();if(!data?.ok||!Array.isArray(data.entities)||!Array.isArray(data.threads))throw new Error('invalid_store_response');data.entities.forEach(entity=>stateByKey.set(`${entity.entityType}:${entity.entityId}`,{displayName:String(entity.displayName||''),updatedAt:String(entity.updatedAt||''),source:'shared'}));const grouped=new Map();data.threads.forEach(thread=>{const key=`${thread.entityType}:${thread.entityId}`,list=grouped.get(key)||[];list.push(thread);grouped.set(key,list)});developerDefinitions.forEach(definition=>{const key=definitionKey(definition);if(grouped.has(key))threadsByKey.set(key,grouped.get(key))});remoteAvailable=true;persistLocal();renderCards();if(activeEditorEntity)renderReviewPanel();document.body.dataset.developerStore='shared';setStatus('تمت مزامنة سجل المراجعة','ok')}
+  catch(error){console.info('[Yakolak] D1 shared review store unavailable',error);document.body.dataset.developerStore='local';setStatus('عرض محلي؛ تعذر الاتصال بالمخزن المشترك','warn')}
   document.body.dataset.developerSharedReady='true';
 }
-
-notesToggle.onclick=()=>{if(activeStageEntity)openEditor(activeStageEntity)};
-editorClose.onclick=closeEditor;
-editorScrim.onclick=closeEditor;
-saveButton.onclick=()=>saveEditor();
-nameInput.addEventListener('input',scheduleSave);
-notesInput.addEventListener('input',scheduleSave);
-back.onclick=()=>closeEntity({historyBack:true});
-addEventListener('keydown',event=>{
-  if(event.key!=='Escape')return;
-  if(editor.classList.contains('open'))closeEditor();
-  else closeEntity({historyBack:true});
-});
-addEventListener('popstate',()=>{if(!location.hash)closeEntity()});
-addEventListener('beforeunload',()=>{if(activeEditorEntity&&dirty)storeDraftLocally(activeEditorEntity,editorDraft(),true)});
-
-loadLocal();
-renderTabs();
-renderCards();
-document.body.dataset.developerBuild='D1';
-loadSharedState();
+notesToggle.onclick=()=>{if(activeStageEntity)openEditor(activeStageEntity)};editorClose.onclick=closeEditor;editorScrim.onclick=closeEditor;saveNameButton.onclick=saveName;addThreadButton.onclick=createReviewThread;newThreadInput.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();createReviewThread()}});back.onclick=()=>closeEntity({historyBack:true});addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(editor.classList.contains('open'))closeEditor();else closeEntity({historyBack:true})});addEventListener('popstate',()=>{if(!location.hash)closeEntity()});
+loadLocal();renderTabs();renderCards();document.body.dataset.developerBuild='D1';loadSharedState();
