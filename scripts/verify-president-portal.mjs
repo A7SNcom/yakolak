@@ -8,6 +8,7 @@ const manager=read('ops/ai-team/manager.md');
 const contract=read('ops/ai-team/PRESIDENT_PORTAL.md');
 const outbox=JSON.parse(read('ops/ai-team/president-outbox.json'));
 const status=JSON.parse(read('ops/ai-team/president-status.json'));
+const manifest=JSON.parse(read('src/president-portal-manifest.json'));
 
 for(const token of[
   "const API='./api/developer-president'",
@@ -26,4 +27,6 @@ if(!manager.includes('PRESIDENT_PORTAL.md')||!manager.includes('president-outbox
 if(!contract.includes('reviewer verdict is `PASS`')||!contract.includes('Rashed personally inspected')||!contract.includes('PRESIDENT_PORTAL_PRODUCTION_ENABLED'))fail('review/security gate contract incomplete');
 if(outbox.version!==1||!Array.isArray(outbox.items))fail('invalid President outbox');
 if(status.version!==1||typeof status.directives!=='object'||Array.isArray(status.directives))fail('invalid President status file');
+if(manifest.version!==1||manifest.humanRole!=='president'||manifest.manager!=='Rashed'||manifest.productionEnabledByDefault!==false)fail('invalid President runtime manifest');
+for(const gate of['reviewer:PASS','manager:PASS','hakam:MERGE_OK','ci:GREEN','exact-head-preview'])if(!manifest.reviewGates?.includes(gate))fail(`manifest missing ${gate}`);
 console.log('President portal contract verified');
