@@ -52,7 +52,7 @@ function visibleTargetMetrics(page){return page.evaluate(()=>{
 
 async function run(browser,label,options){
   const context=await browser.newContext(options);await context.grantPermissions(['clipboard-read','clipboard-write'],{origin:BASE});const store=await mock(context);const page=await context.newPage();const errors=[];page.on('pageerror',error=>errors.push(String(error)));page.on('console',message=>{if(message.type()==='error')errors.push(message.text())});
-  await page.goto(`${BASE}/developer.html`,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.body.dataset.developerReady==='true');await page.locator('#d3PreviewState.hidden').waitFor({state:'attached',timeout:10000}).catch(()=>{});
+  await page.goto(`${BASE}/developer.html`,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.body.dataset.developerReady==='true');await page.locator('#d3PreviewState.hidden').waitFor({state:'attached',timeout:10000}).catch(()=>{});await page.waitForTimeout(280);
   const initial={horizontalOverflow:await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth),visibleIframes:await page.locator('iframe:visible').count(),targets:await visibleTargetMetrics(page),focusCardVisible:await page.locator('.d3-focus-card').isVisible(),errors};
   if(initial.horizontalOverflow!==0)throw new Error(`${label}: horizontal overflow ${initial.horizontalOverflow}`);
   if(initial.visibleIframes!==1)throw new Error(`${label}: expected one visible iframe, got ${initial.visibleIframes}`);
