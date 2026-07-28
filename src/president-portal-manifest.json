@@ -1,9 +1,19 @@
 {
-  "version": 1,
+  "version": 2,
   "humanRole": "president",
   "manager": "Rashed",
   "interface": "developer.html",
   "api": "./api/developer-president",
+  "blueprint": "./ops/ai-team/development-blueprint.json",
+  "ledger": "./ops/ai-team/development-ledger.json",
+  "views": [
+    "portfolio",
+    "tasks",
+    "timeline",
+    "reviews",
+    "directives"
+  ],
+  "reportingCadence": "meaningful-event",
   "productionEnabledByDefault": false,
   "reviewGates": [
     "reviewer:PASS",
