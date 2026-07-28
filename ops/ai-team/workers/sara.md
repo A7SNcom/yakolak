@@ -7,29 +7,19 @@ This task is read-only. Do not create a code branch or edit project files. Updat
 
 <!-- MANAGER TASK:START -->
 ## Manager task
-- Cycle: `002-evidence-first`
-- Task ID: `YAK-002-06`
+- Cycle: `004-canonical-entry-contract`
+- Task ID: `YAK-004-04`
 - Status: `READY`
 - Task type: `TEST/REVIEW`
 - Effort: `S (2 points)`
-- Risk: `high-game-state`
-- Objective: Independently challenge Mazen's runtime contract map and define the smallest executable test that prevents false-green player/turn previews.
-- Why now: Your cycle-001 review established that URL/key checks are insufficient; this cycle must turn that finding into a bounded executable test design.
-- Observed base/head: source `d8d2a50f4a604dc4ba95c5ef762a66ffa7fb92c2`; integration snapshot `b5279840c52722d60c69069e7f05e05dd458cda0`; observed `2026-07-28T17:01Z`.
-- Base branch: read-only latest source/integration and Mazen report when available.
-- Allowed files: real player/turn runtime, D4 registry/state, current contract verifier, audit, browser-test patterns.
-- Forbidden files / conflicts: no code changes; no import-wrapper or online-lifecycle review.
-- Change budget: read-only.
-- Acceptance criteria:
-  1. Verify or contradict each source-of-truth symbol in Mazen's map.
-  2. Specify test inputs and exact expected outputs for 2/3/4 players and four turns.
-  3. Identify the smallest test file/scope that can run without browser flakiness.
-  4. State what still requires browser desktop/mobile evidence after deterministic tests.
-  5. Issue `PASS`, `CONDITIONAL`, or `FAIL` on the proposed next slice.
-- Required validation: exact paths/symbols/assertions and evidence that the proposed test fails current baseline.
-- Independent reviewer: none; Hakam audits this review.
-- Expected artifact: executable evidence matrix and verdict.
-- Context links: `AGENTS.md`, `ops/ai-team/BOARD.md`, Mazen report, Sara cycle-001 report, D4 contract/audit files.
+- Risk: `high-human-interface`
+- OBSERVED: the original PR #38 was closed after its head branch was reset without merging the portal files. The replacement President Portal PR must be inspected from its own exact current head; older READY Vercel deployments are not sufficient.
+- Single outcome: determine whether the replacement President Portal PR has exact-head CI and exact-head Preview evidence sufficient to leave HOLD or advance to independent review.
+- Allowed scope: replacement PR metadata/diff/comments/checks/artifacts; Vercel deployment metadata and true desktop/mobile evidence.
+- Forbidden scope: no repository edits, merge, portal activation, API reconciliation, or claims based on stale Preview.
+- Acceptance criteria: confirm exact current head; list all exact-head check conclusions; verify Preview commit equals head; inspect desktop screenshot dimensions `1440x1000` and mobile dimensions `390x844`; verify the old direct task channel is hidden; state `PASS_TO_REVIEW | HOLD | FAIL` with exact evidence.
+- Stop conditions: checks still running, Preview mismatch/unavailable, artifact unavailable, head moves, or the mobile artifact is not truly mobile-sized.
+- Expected artifact: concise evidence verdict. This is not reviewer PASS or Hakam MERGE_OK.
 <!-- MANAGER TASK:END -->
 
 <!-- WORKER REPORT:START -->
@@ -38,8 +28,8 @@ This task is read-only. Do not create a code branch or edit project files. Updat
 - Summary / verdict: —
 - Observed head / freshness: —
 - Evidence reviewed: —
-- Executable evidence matrix: —
-- Browser evidence still required: —
+- Exact-head checks: —
+- Preview / desktop-mobile evidence: —
 - Residual risks: —
 - Recommended next task: —
 - Team note: —
