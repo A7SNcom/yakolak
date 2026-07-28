@@ -1,78 +1,73 @@
 # Yakolak AI Team Board
 
 ## Active cycle
-- Cycle: `001-hardening`
+- Cycle: `002-evidence-first`
 - Manager: Rashed
 - Auditor: Hakam
 - Integration branch: `agent/yakolak-team-os`
 - Source branch under review: `agent/developer-d2-workbench`
 - Product release branch: `main` (human gate)
-- Observed source head: `d8d2a50f4a604dc4ba95c5ef762a66ffa7fb92c2`
-- Observed integration head before process hardening: `fbadc7de98303651c0e4f8c96117c602b59c23bf`
-- Snapshot evidence time: `2026-07-28T16:16Z`
-- Cycle objective: close the only current shared CI failure and advance three bounded P0 D4 contracts without overlap, while independently mapping online, release, test, and governance risks.
-
-## Current verified state
-At source head `d8d2a50f...`:
-- Green: v112, v118, v125, Build 126, Developer D3, and D4 journey audit.
-- Failing: Developer D1 run `30377398315`, job `90336466217`, first failure at `Verify D1 structure and syntax`.
-- The old bootstrap claim that all shared game workflows fail is stale and must not be reused.
+- Observed source/PR #35 head: `d8d2a50f4a604dc4ba95c5ef762a66ffa7fb92c2`
+- Observed integration/PR #36 head: `b5279840c52722d60c69069e7f05e05dd458cda0`
+- Snapshot evidence time: `2026-07-28T17:01Z`
+- Current checks: `Verify AI Team OS` run `30379953601` succeeded on the integration head; Vercel status is failing from the free-plan build-rate limit on both source and integration heads. Prior source regression evidence remains v112/v118/v125/Build126/D3/D4-audit green and D1 run `30377398315` failing until freshly reproduced.
+- Open implementation worker PRs: none found from cycle 001.
+- Prior Hakam verdict: manager `91/100 PASS`; all implementation tasks `HOLD`; PR #36 `HOLD`; no `MERGE_OK`.
+- Cycle bottleneck: establish a trustworthy developer-preview baseline by producing small verifiable artifacts for D1 integrity and D4 module loading before broader state or online work.
 
 ## Capacity
-- Code writers: Noor (S=2), Lina (M=3), Mazen (M=3) = **3 writers / 8 points**.
-- Independent non-code work: Sami, Nada, Omar, Sara, Hakam = **5 workers**.
-- No L tasks. Every implementation has a separate reviewer and Hakam final audit.
+- Code writers: Noor `S=2`, Lina `S=2` = **2 writers / 4 points**.
+- Independent non-code work: Sami, Mazen, Nada, Omar, Sara, Hakam = **6 workers**.
+- No L tasks. Every implementation has an independent reviewer and Hakam final audit.
 
 ## Active assignments
 | Worker | Task | Type | Effort | Owned scope | Independent reviewer | Expected output |
 |---|---|---:|---:|---|---|---|
-| Noor | `YAK-001-01` | IMPLEMENT | S/2 | earliest D1 structure failure only | Sami | draft PR |
-| Sami | `YAK-001-02` | REVIEW | S/2 | D1 failure + Noor diff, read-only | — | review verdict |
-| Lina | `YAK-001-03` | IMPLEMENT | M/3 | D4 wrapper/import contract only | Nada | draft PR |
-| Mazen | `YAK-001-04` | IMPLEMENT | M/3 | player-count/turn preview contract only | Sara | draft PR |
-| Nada | `YAK-001-05` | REVIEW/RESEARCH | S/2 | wrapper risk + native online seam, read-only | — | design/review matrix |
-| Omar | `YAK-001-06` | REVIEW | S/2 | branch/PR lineage, read-only | — | integration map |
-| Sara | `YAK-001-07` | TEST/REVIEW | M/3 | Mazen diff + release coverage, read-only | — | test verdict/matrix |
-| Hakam | `YAK-001-08` | AUDIT | M/3 | entire cycle, read-only | — | scores + merge verdicts |
+| Noor | `YAK-002-01` | INCIDENT/IMPLEMENT | S/2 | earliest D1 failure only | Sami | bounded draft PR or exact BLOCKED report |
+| Sami | `YAK-002-02` | REVIEW | S/2 | D1 evidence and Noor diff, read-only | — | independent verdict |
+| Lina | `YAK-002-03` | IMPLEMENT | S/2 | D4 wrapper import resolution only | Nada | bounded draft PR or exact BLOCKED report |
+| Nada | `YAK-002-04` | REVIEW | S/2 | Lina diff and load contract, read-only | — | independent verdict |
+| Mazen | `YAK-002-05` | RESEARCH | S/2 | real player/turn runtime contract, read-only | — | implementation-ready contract map |
+| Sara | `YAK-002-06` | TEST/REVIEW | S/2 | independent false-green test design, read-only | — | executable evidence matrix |
+| Omar | `YAK-002-07` | REVIEW | XS/1 | current branch/PR lineage only | — | concise active-line map |
+| Hakam | `YAK-002-08` | AUDIT | M/3 | entire cycle, read-only | — | scores and merge verdicts |
 
 ## File locks
-- D1 verifier/fixture earliest-root files: Noor. Sami is read-only.
-- `src/app-game-developer-d4.js` and one focused import verifier: Lina. Nada is read-only.
-- `src/developer-d4-registry.js`, player/turn portions of `src/developer-scene-d4-states.js`, and D4 contract assertions: Mazen. Sara is read-only.
-- Online lifecycle implementation remains unowned for writing this cycle.
-- Coordination/system files: Rashed only; Hakam may write only Hakam's report block.
+- D1 verifier/fixture root cause: Noor; Sami read-only.
+- `src/app-game-developer-d4.js` plus one focused verifier: Lina; Nada read-only.
+- Player/turn runtime, D4 registry/state, and related tests: Mazen and Sara read-only this cycle; no writer owns them.
+- Online lifecycle implementation remains unowned.
+- Coordination files: Rashed only; Hakam may write only Hakam's report block.
 
 ## Change budgets
-- Noor: at most 2 tightly related files / 80 logical changed lines. Fix only the earliest D1 root cause; no workflow weakening.
-- Lina: at most 3 files / 160 logical changed lines. No production entry changes.
-- Mazen: at most 3 files / 180 logical changed lines. No online lifecycle redesign.
-- Exceeding budget requires `BLOCKED: split required`, not silent expansion.
+- Noor: at most 2 tightly related files / 80 logical changed lines.
+- Lina: at most 2 tightly related files / 80 logical changed lines.
+- All other assignments are read-only except their own report block.
+- Any implementation without a draft PR/commit by Hakam audit time is `NO_ARTIFACT`, not partial completion.
 
 ## Release gates
-- [ ] Developer D1 regression passes without skip/weakening.
-- [x] Retained D3 fixture verifier passes at current source head.
-- [x] Active D4 shell/contract path reaches green shared regressions at current source head.
-- [x] v112, v118, v125, and Build 126 regressions pass at current source head.
+- [ ] Developer D1 regression passes without weakened coverage.
+- [x] Verify AI Team OS run `30379953601` passes.
+- [x] Prior retained D3 and active D4 audit evidence is green at source head.
 - [ ] Game and online hooks load without Blob-relative import errors.
-- [ ] 2/3/4-player and all four turn variants use runtime-correct state.
+- [ ] 2/3/4-player and all four turn variants have deterministic runtime-correct evidence.
 - [ ] Native online lifecycle previews are deterministic.
 - [ ] Strict D4 journey audit passes.
-- [ ] Desktop and mobile evidence attached for critical variants.
-- [ ] Real two-client online evidence exists for lifecycle/reconnect work.
-- [ ] Hakam issues `MERGE_OK` for each integration PR.
+- [ ] Desktop/mobile evidence exists for critical variants.
+- [ ] Real two-client evidence exists for lifecycle/reconnect changes.
+- [ ] Hakam issues `MERGE_OK` for each worker integration PR.
 - [ ] User explicitly authorizes any release action.
 
 ## Manager review queue
-1. Confirm every task file matches this board and current integration head.
-2. Reject stale-base or over-budget reports.
-3. Require Sami/Nada/Sara review evidence before Hakam audit.
-4. Require Hakam score >=85 and `MERGE_OK` before any worker PR merge.
-5. Merge only to `agent/yakolak-team-os`; no PR #35/main/production action.
-6. Refresh HISTORY only after verified results.
+1. Treat cycle-001 missing artifacts as `NO_ARTIFACT`; do not claim partial progress.
+2. Require exact fresh reproduction before either implementation writes.
+3. Require Sami/Nada reviewer evidence before Hakam audit.
+4. Merge nothing unless Hakam issues `MERGE_OK`; currently no merge is authorized.
+5. No PR #35/main/production action.
 
 ## Known blockers and risks
-- Developer D1 has one current structural failure; exact assertion must be taken from current logs/reproduction, not guessed.
-- PR #35 remains a layered draft PR against `agent/developer-d1-scene-gallery`, not a production release PR.
-- Vercel free-plan deployment limits have fluctuated; live preview state must be verified when needed.
-- Multiple historical draft PRs can mislead agents about the active runtime line.
-- Current D4 P0 gaps still include Blob import resolution, three-player/turnIndex correctness, and native online dialog lifecycle.
+- D1's previous failure must be freshly reproduced; old logs are context, not proof of the current root cause.
+- D4 preview still uses layered wrapper logic and may fail module resolution from Blob URLs.
+- Static URL/key tests can falsely pass while rendered player/turn state is wrong.
+- Vercel preview checks are rate-limited; browser evidence may need GitHub-hosted or local deterministic alternatives.
+- Multiple historical draft PRs remain a lineage hazard.
