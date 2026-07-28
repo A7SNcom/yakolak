@@ -7,29 +7,30 @@ For implementation, create `agent/noor/<task-id>` from the latest assigned base 
 
 <!-- MANAGER TASK:START -->
 ## Manager task
-- Cycle: `002-evidence-first`
-- Task ID: `YAK-002-01`
+- Cycle: `004-canonical-entry-contract`
+- Task ID: `YAK-004-01`
 - Status: `READY`
-- Task type: `INCIDENT/IMPLEMENT`
-- Effort: `S (2 points)`
-- Risk: `medium-CI`
-- Objective: Freshly reproduce the earliest Developer D1 failure and either fix its single root cause or report an exact blocker with evidence.
-- Why now: D1 is the only previously verified shared regression failure, but cycle 001 produced no artifact and stale logs cannot substitute for current reproduction.
-- Observed base/head: source `d8d2a50f4a604dc4ba95c5ef762a66ffa7fb92c2`; integration snapshot `b5279840c52722d60c69069e7f05e05dd458cda0`; observed `2026-07-28T17:01Z`.
-- Base branch: latest `agent/yakolak-team-os` after re-reading `BOARD.md` and verifying target files.
-- Allowed files: the exact first-failing D1 verifier/fixture file and at most one directly required D1 fixture/workflow file.
-- Forbidden files / conflicts: D4 runtime/state files; package-wide unrelated tests; no assertion deletion, skip, inversion, or loosening.
-- Change budget: at most 2 files / 80 logical changed lines.
+- Task type: `IMPLEMENT`
+- Effort: `M (3 points)`
+- Risk: `high-architecture-state`
+- OBSERVED: integration base `326c1548011bdc90717e25ee22c66187abdafbc8`; `MIGRATION_ROADMAP.md` Slice 1 requires Node-only contracts and Boot -> Entry -> Mode-selection transitions; no canonical `src/core` implementation was found at assignment time.
+- Single outcome: add the first deterministic, headless entry-state contract and focused Node tests.
+- Why now: this is the first executable migration gate after Phase 0 debt freeze.
+- Architecture/debt impact: affected debt `DEBT-MONOLITH/STATE-DUPLICATION`; expected legacy-debt delta `unchanged`; migration-gate delta `Slice 1 started`.
+- Base branch: latest `agent/yakolak-team-os`; stop if head moved materially or another Slice 1 PR exists.
+- Allowed scope: up to two stable modules under `src/core/` and one focused test under `tests/` or `scripts/`; at most 4 files / 200 logical changed lines.
+- Forbidden scope: legacy `app-game-v*`, developer preview/runtime files, DOM, Three.js, network, storage, timers, globals, Blob, source patching, package dependencies, feature flag wiring, game rules.
 - Acceptance criteria:
-  1. Record exact command, first failing assertion, and current output.
-  2. Explain the root cause before changing code.
-  3. Produce one bounded fix or `BLOCKED` with exact missing prerequisite.
-  4. Focused D1 command passes after the fix.
-  5. No regression coverage is weakened.
-- Required validation: syntax check changed JS/MJS; exact D1 command; directly affected verifier; attach commit/PR/run/job evidence.
+  1. Named contracts cover `Action`, `AppState`, `Effect`, and `RenderSnapshot` in plain JS/JSDoc or equivalent existing style.
+  2. Deterministic transition function covers initial Boot, Boot -> Entry, Entry -> Mode selection.
+  3. Invalid events have an explicit deterministic result, not silent mutation.
+  4. Node-only tests prove initial state, valid transitions, and at least two invalid-event cases.
+  5. Architecture guard and syntax/focused tests pass.
+- Validation: `node --check` changed files; focused Node test; `npm run test:architecture`; report exact commands/results.
 - Independent reviewer: Sami.
-- Expected artifact: draft PR or precise `BLOCKED`; absence of both is `NO_ARTIFACT`.
-- Context links: `AGENTS.md`, `ops/ai-team/BOARD.md`, prior run `30377398315` / job `90336466217`, current D1 workflow and verifier.
+- Architecture Steward: Nada.
+- Stop conditions: stale base, unclear state naming, need to touch legacy/runtime/browser files, scope exceeds M, or existing canonical implementation found.
+- Expected artifact: one draft PR to `agent/yakolak-team-os`; otherwise exact `BLOCKED` evidence.
 <!-- MANAGER TASK:END -->
 
 <!-- WORKER REPORT:START -->
