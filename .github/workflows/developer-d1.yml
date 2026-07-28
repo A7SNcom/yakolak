@@ -11,13 +11,17 @@ on:
       - package.json
       - api/developer-d1.js
       - api/developer-d1-workspace.js
+      - api/developer-d1-comparisons.js
       - src/developer-d1.js
       - src/developer-d1-workspace.js
+      - src/developer-d1-before-after.js
+      - src/developer-d1-board-v2.js
       - src/developer-d1-registry.js
       - src/developer-scene-d1.js
       - src/developer-scene-d1-router.js
       - src/developer-scene-d1-logo-helper.js
       - src/app-game-developer-d1.js
+      - docs/design/developer-d1-scene-board-concept.svg
       - scripts/verify-developer-d1.mjs
       - scripts/verify-developer-d1-workspace.mjs
       - scripts/visual-developer-d1.mjs
@@ -37,9 +41,12 @@ jobs:
         run: |
           node --check api/developer-d1.js
           node --check api/developer-d1-workspace.js
+          node --check api/developer-d1-comparisons.js
           node --check src/developer-d1-registry.js
           node --check src/developer-d1.js
           node --check src/developer-d1-workspace.js
+          node --check src/developer-d1-before-after.js
+          node --check src/developer-d1-board-v2.js
           node --check src/developer-scene-d1.js
           node --check src/developer-scene-d1-router.js
           node --check src/developer-scene-d1-logo-helper.js
@@ -58,7 +65,7 @@ jobs:
           exit 1
       - name: Verify central reviews scenes elements and persisted statuses
         run: node scripts/visual-developer-d1.mjs
-      - name: Verify requests no-auto-board whiteboard replay and published preview
+      - name: Verify requests board v2 before-after replay and published preview
         run: node scripts/visual-developer-d1-workspace.mjs
       - if: always()
         uses: actions/upload-artifact@v4
