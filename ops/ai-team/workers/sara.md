@@ -1,39 +1,47 @@
 # Sara
 
 ## Permanent instructions
-Open `ops/ai-team/TEAM_OS.md`, then execute exactly the one task in the manager block below. You are a generalist; this task is temporary, not a permanent role.
+Open `AGENTS.md`, `ops/ai-team/TEAM_OS.md`, then execute exactly the one task below. You are a flexible generalist; the assignment is temporary.
 
-This task is read-only. Do not create a code branch or edit project files. Update only the `WORKER REPORT` block in this file directly on `agent/yakolak-team-os`. Preserve the manager block. Stop after one task.
+This task is read-only. Do not create a code branch or edit project files. Update only your `WORKER REPORT` block. Stop after one task.
 
 <!-- MANAGER TASK:START -->
 ## Manager task
-- Cycle: `000-bootstrap`
-- Task ID: `YAK-000-07`
+- Cycle: `001-hardening`
+- Task ID: `YAK-001-07`
 - Status: `READY`
-- Objective: Build a release-gate coverage matrix showing which current tests prove each critical product and D4 requirement and which gaps remain.
-- Why now: The manager needs independent evidence that green checks actually cover playability, online behavior, desktop/mobile UX, and D4 correctness.
-- Base branch: `agent/developer-d2-workbench`
-- Allowed files: read-only workflows, scripts, package.json, D4 audit/docs, product verification scripts, and current check results.
-- Forbidden files / conflicts: no code or workflow edits; do not duplicate Sami's root-cause report.
+- Task type: `TEST/REVIEW`
+- Effort: `M (3 points)`
+- Risk: `high-game-state`
+- Objective: Independently review Mazen's player/turn contract and map the exact evidence needed to prevent a false-green D4 state preview.
+- Why now: Player counts and turn ownership affect real game correctness, and static contract checks alone may miss broken rendered state.
+- Observed base/head: source `d8d2a50f4a604dc4ba95c5ef762a66ffa7fb92c2`; observed `2026-07-28T16:16Z`.
+- Base branch: read-only latest source/integration and Mazen PR if available.
+- Allowed files: Mazen PR/diff/checks; D4 registry/state/contract tests; actual game player/turn runtime; workflows and browser evidence scripts.
+- Forbidden files / conflicts: no repository writes except this report block; no code changes; no online lifecycle review assigned to Nada.
+- Change budget: read-only.
 - Acceptance criteria:
-  1. Map every release gate in `BOARD.md` to existing tests/workflows.
-  2. Mark coverage as strong, partial, absent, or currently blocked.
-  3. Distinguish static syntax checks, deterministic functional checks, browser tests, visual evidence, and real online/manual tests.
-  4. Identify the three highest-risk false-green gaps.
-  5. Recommend the next smallest test task after CI is repaired.
-- Required validation: cite exact workflow/script names and what they actually assert.
-- Expected artifact: a compact coverage matrix in your report block.
-- Context links: `ops/ai-team/BOARD.md`, PR #35, `.github/workflows/`, `scripts/`.
+  1. Verify `three-players` activates exactly three players/bases/piece sets/HUD entries.
+  2. Verify all four turn variants use `turnIndex` and visibly identify the correct active color.
+  3. Search changed D4 scope for stale `currentIndex` and distinguish unrelated legacy occurrences.
+  4. Issue `PASS`, `CONDITIONAL`, or `FAIL` on Mazen's PR.
+  5. Map static, deterministic, browser, desktop/mobile, and real-game evidence still required before release.
+- Required validation: exact paths/symbols/assertions, Mazen PR/commit/check IDs, and current workflow/script behavior.
+- Independent reviewer: none; Hakam audits this review.
+- Expected artifact: review verdict plus compact release-evidence matrix.
+- Context links: `AGENTS.md`, `ops/ai-team/BOARD.md`, Mazen task/PR, current game runtime, D4 registry/state/tests/audit.
 <!-- MANAGER TASK:END -->
 
 <!-- WORKER REPORT:START -->
 ## Worker report
 - Result: `PENDING`
-- Summary: —
-- Commit / PR / evidence: —
-- Files inspected or changed: —
-- Validation: —
+- Summary / verdict: —
+- Observed head / freshness: —
+- Commit / PR / evidence reviewed: —
+- Files and symbols inspected: —
+- Validation/evidence matrix: —
 - Residual risks: —
+- Required merge checks: —
 - Recommended next task: —
 - Team note: —
 <!-- WORKER REPORT:END -->
