@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "humanRole": "president",
+  "manager": "Rashed",
+  "interface": "developer.html",
+  "api": "./api/developer-president",
+  "productionEnabledByDefault": false,
+  "reviewGates": [
+    "reviewer:PASS",
+    "manager:PASS",
+    "hakam:MERGE_OK",
+    "ci:GREEN",
+    "exact-head-preview"
+  ]
+}
