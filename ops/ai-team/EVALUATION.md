@@ -1,67 +1,132 @@
 # Yakolak Agent Evaluation
 
 ## Purpose
-Measure verified engineering value, not message length, confidence, or number of commits. **Hakam** is the independent cycle auditor. Hakam is read-only, cannot implement, cannot merge, and may reject the manager's assignments or a worker's completion claim.
+
+Measure verified engineering value, architecture safety, and migration progress—not message length, confidence, scheduled activity, or commit count.
+
+**Hakam** is the independent final auditor. Hakam is read-only, cannot implement or merge, and may reject the manager's assignments, prompts, architecture decisions, or completion claims.
 
 ## Worker score (100)
-- Correctness and acceptance criteria: 30
-- Evidence quality and traceability: 20
-- Scope discipline and ownership compliance: 15
-- Code/design quality: 15
-- Validation depth appropriate to risk: 15
-- Honest handoff and residual-risk reporting: 5
+
+- Correctness and acceptance criteria: 25
+- Evidence quality and traceability: 15
+- Scope/budget/ownership discipline: 15
+- Architecture alignment and debt impact: 20
+- Validation depth appropriate to risk: 20
+- Honest uncertainty and handoff: 5
 
 Verdict:
+
 - `PASS`: 85–100 and no tripwire.
-- `CONDITIONAL`: 70–84; manager must assign a bounded correction or stronger verification.
+- `CONDITIONAL`: 70–84; bounded correction or stronger evidence required.
 - `FAIL`: below 70 or any tripwire.
+- `NO_TASK`: not scored; correct when no ready valuable work exists.
+- `NO_CHANGE`: not scored; valid for an auditor/reviewer when no new artifact exists.
 
 ## Manager score (100)
-- Freshness of repository/CI snapshot: 20
-- Task fit to worker capability and hourly effort: 20
-- Non-overlap and lock quality: 15
-- Priority/bottleneck judgment: 15
-- Review and merge judgment: 15
-- Measurable product progress: 10
-- Concise, accurate communication: 5
 
-A manager cycle below 85 cannot merge worker PRs. Hakam records the failure and the next cycle must be process-repair only.
+- Freshness of repository/CI/architecture snapshot: 15
+- Bottleneck and migration-gate judgment: 20
+- Task fit to capability and hourly effort: 15
+- Non-overlap, locks, reviewer/steward independence: 15
+- Prompt precision and anti-hallucination quality: 10
+- Review/merge judgment: 10
+- Verified product/debt/migration progress: 10
+- Concise accurate communication: 5
 
-## Tripwires
-Any one of these is an automatic `FAIL`:
-- stale-base writing after the assigned head moved materially;
-- editing outside allowed files;
-- disabling, skipping, weakening, or deleting a regression check for green CI;
-- fabricated testing, screenshots, IDs, commits, or results;
-- self-approval or manager merge without independent review;
+A manager cycle below 85 cannot merge worker PRs. The next cycle becomes process repair only.
+
+A cycle that manufactures work for idle employees, advances no bottleneck/gate, or reports activity as progress cannot score above 69.
+
+## Architecture Steward verdict
+
+For runtime-boundary changes, the named read-only steward checks:
+
+- canonical dependency direction;
+- single ownership of lifecycle, rules, camera, input, network, render, and UI;
+- absence of new version layers, source patching, Blob bootstraps, hidden global contracts, or duplicate state/rules;
+- architecture guardrail status;
+- registered debt and migration deltas.
+
+Verdicts:
+
+- `ARCH_OK`
+- `ARCH_HOLD`
+- `ARCH_REJECT`
+
+`ARCH_REJECT` blocks merge regardless of functional CI.
+
+## Automatic tripwires
+
+Any one is an automatic `FAIL`:
+
+- stale-base writing after a material head move;
+- editing outside allowed scope or budget;
+- disabling, skipping, weakening, deleting, or bypassing regression/architecture checks;
+- fabricated tests, screenshots, identifiers, commits, results, or manual verification;
+- self-approval or merge without independent review;
 - fake preview state replacing available native runtime behavior;
-- direct `main` write, production deployment, secrets/schema/destructive action without user approval;
-- hidden conflict, unresolved critical error, or knowingly misleading status.
+- direct `main` write, Production deployment, secrets/schema/destructive action, or rule change without user approval;
+- hidden critical conflict/error or misleading status;
+- adding another `app-game-vNNN.js` or suffixed version-layer runtime;
+- adding source-text runtime replacement, Blob module bootstrap, or hidden `globalThis.__yakolak*` contract;
+- creating a second source of truth for rules, turn, state, camera, online lifecycle, or rendering;
+- implementing rules in UI/preview/network code instead of the shared game core;
+- unregistered structural-debt increase;
+- using vague or invented premises after tools return insufficient evidence.
 
 ## Capability ledger
-Hakam maintains a rolling evidence-based capability table in the latest audit report. For each worker and domain, use:
-- `PROVEN`: two recent PASS results at this effort level;
-- `TRIAL`: no sufficient evidence yet;
-- `REDUCE`: a conditional/failure requires a smaller next task;
-- `PAUSE`: repeated failure or a tripwire; no code task until two successful read-only tasks.
 
-Domains: repository/CI, JavaScript runtime, Three.js/UI, online lifecycle, testing/evidence, architecture/review.
+Hakam maintains evidence by worker and domain:
 
-Names do not create permanent specialties. The manager uses the ledger only to match current task risk and effort to demonstrated capability.
+- `PROVEN`: two recent PASS results at the same effort/risk;
+- `TRIAL`: insufficient evidence;
+- `REDUCE`: conditional/failure requires smaller next work;
+- `PAUSE`: repeated failure/tripwire; no implementation until two successful read-only tasks.
+
+Domains:
+
+- repository/CI;
+- JavaScript/runtime;
+- game core/state machine;
+- Three.js/input/camera/UI;
+- online lifecycle/network;
+- testing/replay/evidence;
+- architecture/review.
+
+Names never create specialties; the ledger matches demonstrated capability to current risk.
 
 ## Effort adaptation
-- After `PASS >= 92`, the worker may receive the same or one higher effort class next cycle.
-- After `PASS 85–91`, keep the same maximum effort.
-- After `CONDITIONAL`, reduce one effort class and assign explicit acceptance checks.
-- After `FAIL`, assign read-only diagnosis or a tiny correction reviewed by another worker.
-- Never give an `L` task to an hourly worker. Split it first.
+
+- PASS >=92: same or one higher class next cycle.
+- PASS 85–91: keep maximum effort.
+- CONDITIONAL: reduce one class and make acceptance checks explicit.
+- FAIL: read-only diagnosis or XS correction reviewed by another worker.
+- NO_ARTIFACT: retry at same/smaller effort or replace; never call partial completion.
+- Never assign `L`; split contracts and slices first.
+
+## Debt and migration accounting
+
+Every implementation/review report records:
+
+- affected debt IDs;
+- `legacy-debt delta`: increased / unchanged / reduced;
+- `migration-gate delta`: none or exact roadmap gate advanced.
+
+Legacy-only activity with unchanged/increased debt may still be necessary for a production defect, but it must not be scored as migration progress.
 
 ## Merge verdict
-For each implementation PR Hakam records:
-- task contract valid: yes/no;
-- diff within budget: yes/no;
-- independent reviewer verdict: pass/conditional/fail;
+
+For each implementation PR, Hakam records:
+
+- task/prompt valid: yes/no;
+- premise fresh: yes/no;
+- diff within scope/budget: yes/no;
+- independent reviewer verdict;
+- Architecture Steward verdict when required;
+- architecture guardrail status;
 - CI/evidence sufficient for risk: yes/no;
+- debt/migration delta honest: yes/no;
 - audit verdict: `MERGE_OK | HOLD | REJECT`.
 
-Only `MERGE_OK` permits Rashed to merge into `agent/yakolak-team-os`. Human gates still apply afterward.
+Only `MERGE_OK` permits Rashed to merge into `agent/yakolak-team-os`. Human gates still override all automation.
