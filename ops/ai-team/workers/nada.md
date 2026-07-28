@@ -7,19 +7,25 @@ This task is read-only. Do not create a code branch or edit project files. Updat
 
 <!-- MANAGER TASK:START -->
 ## Manager task
-- Cycle: `004-canonical-entry-contract`
-- Task ID: `YAK-004-03`
+- Cycle: `005-evidence-reconciliation`
+- Task ID: `YAK-005-01`
 - Status: `READY`
 - Task type: `ARCHITECTURE_STEWARD`
 - Effort: `S (2 points)`
 - Risk: `high-architecture-state`
-- OBSERVED: inspect only Noor artifact for `YAK-004-01`; if absent, report `NO_ARTIFACT`.
-- Single outcome: issue `ARCH_OK | ARCH_HOLD | ARCH_REJECT` on the first canonical entry-state slice.
-- Allowed scope: architecture docs, debt register, Noor contract/diff/tests, architecture guard evidence.
-- Forbidden scope: no implementation, no alternative rewrite, no merge.
-- Acceptance criteria: verify canonical dependency direction; one state owner; named actions and deterministic transitions; no DOM/Three.js/network/storage/timers/globals/Blob/source patching; no feature-file mixing; honest debt/migration delta.
-- Stop conditions: stale base, no artifact, missing focused tests, or unclear ownership.
-- Expected artifact: concise steward verdict with exact paths/symbols and required correction if not `ARCH_OK`.
+- OBSERVED: PR #41 exact head is `d5f2781d6189deae907ae2cf5c6db05d57c5774f`; Sami independently returned PASS with 5/5 focused tests and green Architecture Guardrails; Hakam keeps PR #41 HOLD because no Architecture Steward verdict exists.
+- Single outcome: issue `ARCH_OK | ARCH_HOLD | ARCH_REJECT` for PR #41 at the exact head above.
+- Why now: this is the missing independent gate for the first canonical Boot → Entry → Mode-selection contract.
+- Allowed scope: PR #41 task contract, exact diff, `src/core/entry-contracts.js`, `src/core/entry-reducer.js`, `tests/entry-reducer.test.mjs`, architecture docs, debt register, guard evidence.
+- Forbidden scope: no implementation, alternative design, file edits, merge, portal work, or acceptance from summaries alone.
+- Acceptance criteria:
+  1. Verify canonical dependency direction and one state owner.
+  2. Verify named actions, deterministic transitions, and explicit invalid-event semantics.
+  3. Verify no DOM, Three.js, network, storage, timer, Blob, global, source patching, dependency, duplicate state/rules, or feature-file mixing.
+  4. Verify scope/budget and honest `legacy-debt delta: unchanged` and Slice 1 migration claim.
+  5. Return exact paths/symbols and a single verdict.
+- Stop conditions: head mismatch, missing diff/tests, unclear ownership, or evidence unavailable.
+- Expected artifact: concise exact-head Architecture Steward report for Hakam.
 <!-- MANAGER TASK:END -->
 
 <!-- WORKER REPORT:START -->
