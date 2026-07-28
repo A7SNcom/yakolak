@@ -9,8 +9,14 @@ const count=(text,needle)=>text.split(needle).length-1;
 const clean=value=>String(value||'').replaceAll('`','').trim();
 const escape=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 const field=(block,name)=>{
-  const match=block.match(new RegExp(`^- ${escape(name)}:\\s*(.+)$`,'m'));
-  return clean(match?.[1]);
+  const expression=new RegExp(`^- ${escape(name)}:\\s*(.*)$`,'m');
+  const match=expression.exec(block);
+  if(!match)return'';
+  const inline=clean(match[1]);
+  if(inline)return inline;
+  const remainder=block.slice(match.index+match[0].length);
+  const nextFieldIndex=remainder.search(/\n- [A-Z][^\n:]*:/);
+  return clean(remainder.slice(0,nextFieldIndex<0?undefined:nextFieldIndex));
 };
 const requireValue=(block,name,worker)=>{
   const value=field(block,name);
