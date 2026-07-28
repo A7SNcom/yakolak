@@ -1,0 +1,53 @@
+name: Verify President Visual Workflow
+
+on:
+  pull_request:
+    paths:
+      - 'developer.html'
+      - 'api/developer-president.js'
+      - 'src/developer-president.js'
+      - 'src/developer-president.css'
+      - 'src/developer-blueprint.js'
+      - 'src/developer-blueprint.css'
+      - 'ops/ai-team/development-blueprint.json'
+      - 'ops/ai-team/PRESIDENT_PORTAL.md'
+      - 'ops/ai-team/president-*.json'
+      - 'ops/ai-team/manager.md'
+      - 'ops/ai-team/PROMPT_STANDARD.md'
+      - 'ops/ai-team/TEAM_OS.md'
+      - 'ops/ai-team/EVALUATION.md'
+      - 'AGENTS.md'
+      - 'scripts/verify-president-portal.mjs'
+      - 'package.json'
+  push:
+    branches:
+      - agent/president-portal
+    paths:
+      - 'developer.html'
+      - 'api/developer-president.js'
+      - 'src/developer-president.*'
+      - 'src/developer-blueprint.*'
+      - 'ops/ai-team/development-blueprint.json'
+      - 'scripts/verify-president-portal.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Syntax
+        run: |
+          node --check api/developer-president.js
+          node --check src/developer-president.js
+          node --check src/developer-blueprint.js
+      - name: President and blueprint contracts
+        run: npm run test:president
