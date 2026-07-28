@@ -1,5 +1,14 @@
 {
   "version": 1,
   "updatedAt": null,
+  "lastPresidentEventId": 0,
+  "lastPresidentInputAt": null,
+  "leadershipMode": "DELEGATED_LEADERSHIP",
+  "lastReturnBriefAt": null,
+  "blueprint": {
+    "canonicalRevision": 2,
+    "lastReconciledPresidentRevision": 0,
+    "status": "canonical_only"
+  },
   "directives": {}
 }
