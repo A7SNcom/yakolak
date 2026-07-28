@@ -42,6 +42,12 @@ async function verify(viewport,name){
   await page.goto(`${base}/developer.html`,{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>document.body.dataset.developerRole==='president');
   if(await page.title()!=='ياكلك · واجهة الرئيس')throw new Error(`${name}: wrong title`);
+  if(!(await page.locator('#d4NewRequest').isHidden()))throw new Error(`${name}: legacy direct-request channel remains visible`);
+  if(!String(await page.locator('#d4StartTask').textContent()).includes('راشد'))throw new Error(`${name}: main task action does not name Rashed`);
+  await page.locator('#d4StartTask').click();
+  await page.locator('#presidentPortal.open').waitFor();
+  if(await page.locator('#presidentDirectives').isHidden())throw new Error(`${name}: scene task did not route to Rashed directives`);
+  await page.locator('#presidentClose').click();
   await page.getByRole('button',{name:/مكتب الرئيس/}).click();
   await page.locator('#presidentPortal.open').waitFor();
   await page.getByText('رحلة دخول جاهزة للقرار').waitFor();
