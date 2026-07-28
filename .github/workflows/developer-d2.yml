@@ -34,7 +34,14 @@ jobs:
       - name: Check D2 registry syntax
         run: node --check src/developer-d2-registry.js
       - name: Check D2 application syntax
-        run: node --check src/developer-d2.js
+        run: |
+          mkdir -p artifacts/developer-d2
+          if node --check src/developer-d2.js > artifacts/developer-d2/syntax.txt 2>&1; then
+            echo "Syntax check passed" > artifacts/developer-d2/syntax.txt
+          else
+            cat artifacts/developer-d2/syntax.txt
+            exit 1
+          fi
       - name: Check compatible APIs and scene runtime
         run: |
           node --check api/developer-d1.js
