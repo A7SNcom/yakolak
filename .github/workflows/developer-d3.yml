@@ -13,6 +13,7 @@ on:
       - api/developer-d1.js
       - api/developer-d1-workspace.js
       - api/developer-d1-comparisons.js
+      - scripts/build-developer-d3-fixture.mjs
       - scripts/verify-developer-d3.mjs
       - scripts/visual-developer-d3.mjs
       - docs/design/developer-d3-ux-evidence.md
@@ -27,21 +28,31 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Check D3 syntax and structure
+      - name: Check retained D3 fixture syntax and structure
         run: |
           node --check src/developer-d3.js
           node --check src/developer-d2-registry.js
           node --check api/developer-d1.js
           node --check api/developer-d1-workspace.js
           node --check api/developer-d1-comparisons.js
+          node --check scripts/build-developer-d3-fixture.mjs
           node scripts/verify-developer-d3.mjs
       - name: Install Chromium quietly
         run: |
           npm install --no-save --silent playwright >/dev/null 2>&1
           npx playwright install --with-deps chromium >/dev/null 2>&1
-      - name: Start Developer D3 locally
+      - name: Start retained Developer D3 fixture locally
         run: |
-          python3 -m http.server 4173 > /tmp/developer-d3-server.log 2>&1 &
+          mkdir -p .ci-developer-d3
+          for entry in "$PWD"/* "$PWD"/.[!.]*; do
+            name="$(basename "$entry")"
+            [ "$name" = ".ci-developer-d3" ] && continue
+            [ "$name" = "developer.html" ] && continue
+            [ "$name" = ".git" ] && continue
+            ln -s "$entry" ".ci-developer-d3/$name"
+          done
+          cp developer-d3.html .ci-developer-d3/developer.html
+          python3 -m http.server 4173 --directory .ci-developer-d3 > /tmp/developer-d3-server.log 2>&1 &
           for i in {1..30}; do curl -fsS http://127.0.0.1:4173/developer.html >/dev/null && exit 0; sleep 1; done
           cat /tmp/developer-d3-server.log
           exit 1

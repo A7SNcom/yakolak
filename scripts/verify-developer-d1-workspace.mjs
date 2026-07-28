@@ -1,1 +1,8 @@
-import fs from 'node:fs';const read=p=>fs.readFileSync(new URL(`../${p}`,import.meta.url),'utf8');const js=read('src/developer-d1-workspace.js'),api=read('api/developer-d1-workspace.js'),html=read('developer.html');const need=(s,t)=>{if(!s.includes(t))throw new Error(`missing ${t}`)};for(const text of ['مركز المراجعات','بانتظار قراري','تحتاج تعديل','قيد التنفيذ','الطلبات','مكتملة','لن يفتح الوايت بورد تلقائيًا','DRAWFLOW_VERSION=\'0.0.60\'','request_comment','reviewFilter=\'decision\''])need(js,text);for(const text of ['yakolak_developer_d1_request_comments','resolveKnownRequests','request_comment'])need(api,text);need(html,'developer-d1-workspace.js?v=D1-review-center');console.log('D1 central review workspace contracts verified');
+import fs from 'node:fs';
+const read=p=>fs.readFileSync(new URL(`../${p}`,import.meta.url),'utf8');
+const js=read('src/developer-d1-workspace.js'),api=read('api/developer-d1-workspace.js'),html=read('developer-d1.html');
+const need=(s,t)=>{if(!s.includes(t))throw new Error(`missing ${t}`)};
+for(const text of ['مركز المراجعات','بانتظار قراري','تحتاج تعديل','قيد التنفيذ','الطلبات','مكتملة','لن يفتح الوايت بورد تلقائيًا',"DRAWFLOW_VERSION='0.0.60'",'request_comment',"reviewFilter='decision'"])need(js,text);
+for(const text of ['yakolak_developer_d1_request_comments','resolveKnownRequests','request_comment'])need(api,text);
+need(html,'developer-d1-workspace.js?v=D1-review-center');
+console.log('D1 retained fixture central review workspace contracts verified');

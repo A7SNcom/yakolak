@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 const read=path=>fs.readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
-const html=read('developer.html'),sceneHtml=read('developer-scene.html'),gallery=read('src/developer-d1.js'),workspace=read('src/developer-d1-workspace.js'),registry=read('src/developer-d1-registry.js'),router=read('src/developer-scene-d1-router.js'),api=read('api/developer-d1.js'),workspaceApi=read('api/developer-d1-workspace.js');
+const html=read('developer-d1.html'),sceneHtml=read('developer-scene.html'),gallery=read('src/developer-d1.js'),workspace=read('src/developer-d1-workspace.js'),registry=read('src/developer-d1-registry.js'),router=read('src/developer-scene-d1-router.js'),api=read('api/developer-d1.js'),workspaceApi=read('api/developer-d1-workspace.js');
 const need=(src,text,label)=>{if(!src.includes(text))throw new Error(`${label}: missing ${text}`)};
 need(workspace,'id="d1ReviewOpen"','review center trigger');
 need(html,'developer-d1-workspace.js?v=D1-review-center','workspace boot');
@@ -23,4 +23,4 @@ need(router,"interactionResidue:'blocked'",'unboxing click residue blocked');
 need(router,"prepareSetup(game,'color')",'color selection scene');
 need(router,"prepareSetup(game,'bots')",'player count scene');
 need(gallery,"const STATUS=",'per-entity review still present');
-console.log('Developer D1 review persistence, central review center, requests and all scene contracts verified');
+console.log('Developer D1 retained fixture, review persistence, requests and scene contracts verified');
