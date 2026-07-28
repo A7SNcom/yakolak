@@ -15,6 +15,7 @@ const tabs=[
   {id:'sequence',label:'مجموعة مشاهد'}
 ];
 
+const NOTES_PREFIX='yakolak:developer-d1:scene-note:';
 const grid=document.getElementById('sceneGrid');
 const tabsRoot=document.getElementById('sceneTabs');
 const count=document.getElementById('sceneCount');
@@ -22,7 +23,64 @@ const stage=document.getElementById('devStage');
 const stageFrame=document.getElementById('devStageFrame');
 const stageTitle=document.getElementById('devStageTitle');
 const back=document.getElementById('devBack');
+const notesToggle=document.getElementById('devNotesToggle');
+const notesPanel=document.getElementById('devNotesPanel');
+const notesClose=document.getElementById('devNotesClose');
+const notesInput=document.getElementById('devNotesInput');
+const notesScene=document.getElementById('devNotesScene');
+const notesStatus=document.getElementById('devNotesStatus');
 let activeFilter='all';
+let activeScene=null;
+let noteSaveTimer=0;
+
+function noteKey(sceneId){return `${NOTES_PREFIX}${sceneId}`}
+function readNote(sceneId){
+  try{return localStorage.getItem(noteKey(sceneId))||''}
+  catch{return ''}
+}
+function writeNote(sceneId,value){
+  try{
+    if(value.trim())localStorage.setItem(noteKey(sceneId),value);
+    else localStorage.removeItem(noteKey(sceneId));
+    return true;
+  }catch{return false}
+}
+function setNoteStatus(text){if(notesStatus)notesStatus.textContent=text}
+function updateCardNote(sceneId){
+  const card=grid.querySelector(`.scene-card[data-scene="${sceneId}"]`);
+  if(!card)return;
+  const hasNote=Boolean(readNote(sceneId).trim());
+  card.classList.toggle('has-note',hasNote);
+  const indicator=card.querySelector('.scene-note-indicator');
+  if(indicator)indicator.textContent=hasNote?'ملاحظة محفوظة':'';
+}
+function saveActiveNote(){
+  if(!activeScene)return;
+  clearTimeout(noteSaveTimer);
+  const saved=writeNote(activeScene.id,notesInput.value);
+  updateCardNote(activeScene.id);
+  setNoteStatus(saved?'تم الحفظ':'تعذر الحفظ');
+}
+function scheduleNoteSave(){
+  if(!activeScene)return;
+  setNoteStatus('جارٍ الحفظ…');
+  clearTimeout(noteSaveTimer);
+  noteSaveTimer=setTimeout(saveActiveNote,240);
+}
+function openNotes(){
+  if(!activeScene)return;
+  notesPanel.classList.add('open');
+  notesPanel.setAttribute('aria-hidden','false');
+  notesToggle.setAttribute('aria-expanded','true');
+  requestAnimationFrame(()=>notesInput.focus({preventScroll:true}));
+}
+function closeNotes(){
+  saveActiveNote();
+  notesPanel.classList.remove('open');
+  notesPanel.setAttribute('aria-hidden','true');
+  notesToggle.setAttribute('aria-expanded','false');
+  notesToggle.focus({preventScroll:true});
+}
 
 const previewObserver=new IntersectionObserver(entries=>{
   entries.forEach(entry=>{
@@ -118,7 +176,9 @@ function cardFor(scene){
   const desc=document.createElement('p');
   desc.className='scene-desc';
   desc.textContent=scene.description;
-  copy.append(type,title,desc);
+  const noteIndicator=document.createElement('span');
+  noteIndicator.className='scene-note-indicator';
+  copy.append(type,title,desc,noteIndicator);
 
   const open=document.createElement('button');
   open.type='button';
@@ -138,7 +198,10 @@ function cardFor(scene){
 function renderCards(){
   previewObserver.disconnect();
   grid.innerHTML='';
-  scenes.forEach(scene=>grid.append(cardFor(scene)));
+  scenes.forEach(scene=>{
+    grid.append(cardFor(scene));
+    updateCardNote(scene.id);
+  });
   applyFilter();
 }
 
@@ -153,6 +216,14 @@ function applyFilter(){
 }
 
 function openScene(scene){
+  if(activeScene)saveActiveNote();
+  activeScene=scene;
+  notesInput.value=readNote(scene.id);
+  notesScene.textContent=scene.title;
+  setNoteStatus('محفوظ');
+  notesPanel.classList.remove('open');
+  notesPanel.setAttribute('aria-hidden','true');
+  notesToggle.setAttribute('aria-expanded','false');
   stageFrame.src=sceneUrl(scene,false);
   stageTitle.textContent=`D1 · ${scene.title}`;
   stage.classList.add('open');
@@ -164,16 +235,29 @@ function openScene(scene){
 
 function closeScene({historyBack=false}={}){
   if(!stage.classList.contains('open'))return;
+  saveActiveNote();
+  notesPanel.classList.remove('open');
+  notesPanel.setAttribute('aria-hidden','true');
+  notesToggle.setAttribute('aria-expanded','false');
   stage.classList.remove('open');
   stage.setAttribute('aria-hidden','true');
   stageFrame.src='about:blank';
   document.body.style.overflow='';
+  activeScene=null;
   if(historyBack&&location.hash.startsWith('#scene='))history.back();
 }
 
+notesToggle.onclick=openNotes;
+notesClose.onclick=closeNotes;
+notesInput.addEventListener('input',scheduleNoteSave);
 back.onclick=()=>closeScene({historyBack:true});
-addEventListener('keydown',event=>{if(event.key==='Escape')closeScene({historyBack:true})});
+addEventListener('keydown',event=>{
+  if(event.key!=='Escape')return;
+  if(notesPanel.classList.contains('open'))closeNotes();
+  else closeScene({historyBack:true});
+});
 addEventListener('popstate',()=>{if(!location.hash.startsWith('#scene='))closeScene()});
+addEventListener('beforeunload',saveActiveNote);
 
 renderTabs();
 renderCards();
