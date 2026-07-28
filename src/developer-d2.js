@@ -150,7 +150,7 @@ async function saveComparison(){
 
 function openRequestModal(){requestKind='scene';document.querySelectorAll('[data-request-kind]').forEach(button=>button.classList.toggle('active',button.dataset.requestKind==='scene'));$('#d2RequestForm').reset();$('#d2ModalScrim').hidden=false;$('#d2RequestModal').hidden=false;requestAnimationFrame(()=>$('#d2RequestName').focus())}
 function closeRequestModal(){$('#d2ModalScrim').hidden=true;$('#d2RequestModal').hidden=true}
-async function submitRequest(event){event.preventDefault();const title=$('#d2RequestName').value.trim();if(!title)return;try{const data=await post(WORKSPACE_API,{action:'request_create',kind:requestKind,title,description:$('#d2RequestDescription').value.trim(),scenario:$('#d2RequestScenario').value.trim()});replaceRequest(data.request);closeRequestModal();navMode='queue';renderNavigator();selectRequest(data.request);toast('تم حفظ الطلب')}catch(error){console.error(error);toast('تعذر حفظ الطلب')}
+async function submitRequest(event){event.preventDefault();const title=$('#d2RequestName').value.trim();if(!title)return;try{const data=await post(WORKSPACE_API,{action:'request_create',kind:requestKind,title,description:$('#d2RequestDescription').value.trim(),scenario:$('#d2RequestScenario').value.trim()});replaceRequest(data.request);closeRequestModal();navMode='queue';renderNavigator();selectRequest(data.request);toast('تم حفظ الطلب')}catch(error){console.error(error);toast('تعذر حفظ الطلب')}}
 
 function utilityOpen(kind){
   const overlay=$('#d2UtilityOverlay'),frame=$('#d2UtilityFrame');overlay.hidden=false;document.body.dataset.utility=kind;
