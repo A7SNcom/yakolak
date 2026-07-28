@@ -125,15 +125,16 @@ Never merge PR #35, merge/push unrelated game work to `main`, expose unauthentic
 
 <!-- LATEST MANAGER REPORT:START -->
 ## Latest manager report
-- Cycle: `006-correction-closure` reconciliation at integration head `75ce236345c5da325aedf6a38683d015cfb9d4ee`.
-- President signal check: protected API returned a Vercel SSO redirect, so unread President state could not be determined. This is recorded as an access blocker; no absence of input was inferred and only non-conflicting evidence/coordination work continued.
-- President Development OS / PR #47: exact candidate head `f3e5dd72d8d118584a6db2244aa7ce71acfd0ce7` remains `HOLD`. Static President Portal and architecture-related checks plus artifact `8703302002` are green/current, but the stable-alias READY deployment metadata still points to `674881388d0db62f74cbbfcbb61028596807f45b`. No Sara `PASS_TO_REVIEW`, Hakam release verdict or manager PASS exists. Protected operation continues; public unauthenticated writes remain blocked.
-- PR #41 management decision: Hakam issued `MERGE_OK` at `9da9afc4e2690feab03e66ad1a19bb8621cc5f7e`, with Sami `PASS`, Nada `ARCH_OK`, 6/6 focused tests and green Architecture Guardrails. GitHub currently reports the PR non-mergeable against the moved integration base, so Rashed records `HOLD_FOR_REBASE`; no merge was forced. The next bounded action is a no-behavior-change refresh/rebase followed by exact-head gate confirmation.
-- PR #48 verifier: remains `HOLD`. Mazen and Sara stale manager contracts were refreshed to cycle-006 schema without changing worker reports or weakening the verifier. PR #48 must be rebased/rerun, then Omar must issue a fresh exact-head verdict before Hakam reconsideration.
-- Delegation state: Mazen is current `NO_TASK`; Sara is `READY_AFTER_DEPLOYMENT` for PR #47; no fabricated evidence task was created. No product code was implemented by Rashed.
-- Merges performed: none.
+- Cycle: `006-correction-closure` reconciliation at `2026-07-29T01:03+03:00`.
+- President signal check: protected API again returned a Vercel SSO redirect, so unread President state remains unknown. No absence of input was inferred; only safe non-conflicting coordination continued.
+- President Development OS / PR #47: exact candidate head `f3e5dd72d8d118584a6db2244aa7ce71acfd0ce7` remains `HOLD` and non-mergeable against the moved integration base. Exact-head portal/static checks and visual artifact `8703302002` exist, but no READY Vercel deployment for the branch matches that head; the stable alias still points to older commit `674881388d0db62f74cbbfcbb61028596807f45b`. Sara, Hakam and manager release gates therefore remain pending.
+- Management action: Rashed opened draft synchronization PR #49 from current `agent/yakolak-team-os` into `agent/president-development-os`. GitHub reports conflicts, so no merge was attempted. Mazen received bounded task `YAK-006-08` to resolve only the five coordination-file conflicts, preserve current Team OS evidence and all President Development OS contracts, and introduce no product/runtime behavior.
+- Review plan: Omar independently reviews the exact synchronization diff after Mazen's artifact. Sara remains `READY_AFTER_DEPLOYMENT` and must not review stale or mismatched Preview evidence. Hakam audits only after reports and exact-head deployment exist.
+- PR #41: prior `MERGE_OK` remains evidence, but current branch refresh and renewed exact-head gates are still required before any integration decision.
+- PR #48: remains `HOLD_FOR_REBASE`; no verifier weakening or bypass is authorized.
+- Merges performed: none. Rashed implemented no product code.
 - Legacy-debt delta: `unchanged`.
-- Migration-gate delta: Slice 1 is independently approved but awaits branch refresh and final mergeability confirmation.
-- Governance delta: stale task contracts corrected; President API access blocker and exact-head deployment mismatch are explicitly visible.
+- Migration-gate delta: Slice 1 remains approved but unmerged pending refreshed mergeability.
+- Governance delta: PR #47 synchronization risk is isolated in draft PR #49 with one owner, one reviewer and explicit trust-boundary stops.
 - President attention: `FYI` only—no human decision required now.
 <!-- LATEST MANAGER REPORT:END -->
