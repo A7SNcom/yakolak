@@ -1,0 +1,200 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "updatedAt": "2026-07-28T22:20:00+03:00",
+  "updatedBy": "Rashed",
+  "portfolio": {
+    "leadershipMode": "DELEGATED_LEADERSHIP",
+    "activeInitiativeId": "initiative-canonical-entry",
+    "summary": "تثبيت أول عقدة تنفيذية نظيفة للعبة بالتوازي مع تجهيز واجهة الرئيس وراشد كسجل تطوير مرئي واحد.",
+    "health": "attention",
+    "nextManagementAction": "إكمال مراجعة PR #41 وإعادة التحقق من PR #43 بعد إضافة سجل التطوير المرئي."
+  },
+  "initiatives": [
+    {
+      "id": "initiative-canonical-entry",
+      "blueprintNodeId": "track-canonical-architecture",
+      "title": "أول عقدة دخول حتمية في المعمارية النظيفة",
+      "outcome": "عقود وحالة Boot → Entry → Mode تعمل بلا DOM أو Three.js أو شبكة، مع اختبارات Node حتمية.",
+      "status": "review",
+      "owner": "Rashed",
+      "priority": "high",
+      "taskIds": ["YAK-004-01", "YAK-004-02", "YAK-004-03", "YAK-004-05"],
+      "dependencies": [],
+      "risks": ["يجب منع خلق مصدر حالة موازٍ", "لا دمج قبل ARCH_OK وMERGE_OK"],
+      "recommendation": "إكمال مراجعة المعمارية والتدقيق ثم اتخاذ قرار الدمج في فرع الفريق.",
+      "links": [
+        {"label": "PR #41", "url": "https://github.com/A7SNcom/yakolak/pull/41"}
+      ]
+    },
+    {
+      "id": "initiative-president-development-os",
+      "blueprintNodeId": "track-visual-development",
+      "title": "واجهة الرئيس ونظام قيادة راشد المرئي",
+      "outcome": "كل التطوير مترابط بصريًا من الهدف إلى المهمة والتقرير والمراجعة والدليل والقرار.",
+      "status": "in_progress",
+      "owner": "Rashed",
+      "priority": "high",
+      "taskIds": ["YAK-SYS-PORTAL-01"],
+      "dependencies": ["initiative-canonical-entry"],
+      "risks": ["أدلة المراجعة القديمة تصبح غير صالحة عند تحرك رأس PR", "لا تفعيل Production دون إذن الرئيس"],
+      "recommendation": "إكمال العرض المرئي والتحقق الآلي ثم تكليف Sara وHakam بمراجعة الرأس الجديد.",
+      "links": [
+        {"label": "PR #43", "url": "https://github.com/A7SNcom/yakolak/pull/43"}
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "YAK-004-01",
+      "initiativeId": "initiative-canonical-entry",
+      "blueprintNodeId": "track-canonical-architecture",
+      "blueprintRevision": 3,
+      "title": "العقود والحالة الحتمية للدخول",
+      "outcome": "إضافة Action وAppState وEffect وRenderSnapshot وانتقالات Boot → Entry → Mode مع اختبارات Node.",
+      "status": "review",
+      "effort": "M",
+      "risk": "high-architecture-state",
+      "owner": "Noor",
+      "reviewer": "Sami",
+      "architectureSteward": "Nada",
+      "auditor": "Hakam",
+      "progress": {"completed": 4, "total": 7, "label": "التنفيذ والاختبارات ومراجعة Sami مكتملة؛ تنتظر المعمارية والتدقيق وقرار راشد."},
+      "acceptance": [
+        {"text": "عقود Action وAppState وEffect وRenderSnapshot", "status": "PASS"},
+        {"text": "انتقالات Boot → Entry → Mode حتمية", "status": "PASS"},
+        {"text": "حالات غير صالحة بنتيجة صريحة", "status": "PASS"},
+        {"text": "اختبارات Node مركزة", "status": "PASS"},
+        {"text": "مراجعة مستقلة", "status": "PASS"},
+        {"text": "مراجعة المعمارية", "status": "PENDING"},
+        {"text": "تدقيق وقرار الدمج", "status": "PENDING"}
+      ],
+      "gates": {
+        "artifact": "PASS",
+        "reviewer": "PASS",
+        "architecture": "PENDING",
+        "hakam": "PENDING",
+        "ci": "UNKNOWN",
+        "preview": "NOT_REQUIRED",
+        "manager": "PENDING",
+        "president": "NOT_REQUIRED"
+      },
+      "links": {
+        "prUrl": "https://github.com/A7SNcom/yakolak/pull/41",
+        "commitSha": "d5f2781d6189deae907ae2cf5c6db05d57c5774f",
+        "previewUrl": "",
+        "evidence": []
+      },
+      "blockedBy": [],
+      "nextAction": "Nada تصدر ARCH_OK/HOLD/REJECT، ثم Hakam يدقق قبل قرار راشد.",
+      "presidentAttention": "NONE",
+      "events": [
+        {
+          "id": "event-yak-004-01-assigned",
+          "at": "2026-07-28T21:01:00+03:00",
+          "type": "assigned",
+          "actor": "Rashed",
+          "title": "تكليف Noor بأول شريحة معمارية",
+          "detail": "مهمة واحدة محدودة بثلاثة ملفات ونتيجة حتمية قابلة للاختبار.",
+          "evidence": []
+        },
+        {
+          "id": "event-yak-004-01-artifact",
+          "at": "2026-07-28T21:35:00+03:00",
+          "type": "artifact",
+          "actor": "Noor",
+          "title": "إنتاج PR #41",
+          "detail": "151 سطرًا منطقيًا في ثلاثة ملفات؛ اختبارات Node المحلية 5/5.",
+          "evidence": [
+            {"label": "PR #41", "url": "https://github.com/A7SNcom/yakolak/pull/41"}
+          ]
+        },
+        {
+          "id": "event-yak-004-01-review",
+          "at": "2026-07-28T21:50:00+03:00",
+          "type": "review",
+          "actor": "Sami",
+          "title": "مراجعة مستقلة PASS",
+          "detail": "النتيجة الوظيفية مقبولة وتبقى مراجعة حدود المعمارية والتدقيق النهائي.",
+          "evidence": []
+        }
+      ]
+    },
+    {
+      "id": "YAK-SYS-PORTAL-01",
+      "initiativeId": "initiative-president-development-os",
+      "blueprintNodeId": "track-visual-development",
+      "blueprintRevision": 3,
+      "title": "ربط كل التطوير في واجهة الرئيس",
+      "outcome": "إظهار خريطة المشروع والمهام والتقدم والبوابات والسجل الزمني والتوجيهات والمراجعات في واجهة واحدة.",
+      "status": "in_progress",
+      "effort": "initiative",
+      "risk": "high-process-ui",
+      "owner": "Framework developer",
+      "reviewer": "Sara",
+      "architectureSteward": "Nada",
+      "auditor": "Hakam",
+      "progress": {"completed": 3, "total": 8, "label": "عقود القيادة والقناة والـblueprint موجودة؛ سجل التطوير والعرض المرئي قيد البناء."},
+      "acceptance": [
+        {"text": "راشد نائب مفوض ولا يكتب كود المنتج", "status": "PASS"},
+        {"text": "قناة واحدة بين الرئيس وراشد", "status": "PASS"},
+        {"text": "Blueprint مرجعي", "status": "PASS"},
+        {"text": "سجل تطوير موحد", "status": "IN_PROGRESS"},
+        {"text": "خريطة ومهام وخط زمني في الواجهة", "status": "IN_PROGRESS"},
+        {"text": "تحقق آلي من الروابط والتقارير", "status": "PENDING"},
+        {"text": "Preview مطابق للرأس واختبار جوال/كمبيوتر", "status": "PENDING"},
+        {"text": "Sara PASS وHakam MERGE_OK وقرار راشد", "status": "PENDING"}
+      ],
+      "gates": {
+        "artifact": "IN_PROGRESS",
+        "reviewer": "PENDING",
+        "architecture": "PENDING",
+        "hakam": "PENDING",
+        "ci": "PENDING",
+        "preview": "PENDING",
+        "manager": "PENDING",
+        "president": "FYI"
+      },
+      "links": {
+        "prUrl": "https://github.com/A7SNcom/yakolak/pull/43",
+        "commitSha": "",
+        "previewUrl": "",
+        "evidence": []
+      },
+      "blockedBy": [],
+      "nextAction": "إكمال الواجهة والتحقق ثم إعادة مراجعة الرأس الجديد بدل الاعتماد على أدلة قديمة.",
+      "presidentAttention": "FYI",
+      "events": [
+        {
+          "id": "event-portal-direction",
+          "at": "2026-07-28T21:55:00+03:00",
+          "type": "decision",
+          "actor": "President",
+          "title": "اعتماد راشد كقائد مفوض",
+          "detail": "راشد يقود ويخطط ويفوض في غياب الرئيس، والفريق هو المنفذ.",
+          "evidence": []
+        },
+        {
+          "id": "event-portal-leadership-os",
+          "at": "2026-07-28T22:00:00+03:00",
+          "type": "documentation",
+          "actor": "Framework developer",
+          "title": "إضافة Rashed Leadership OS",
+          "detail": "تثبيت أنماط القيادة والتفويض وميزانية انتباه الرئيس والبرمجة بعد التوثيق.",
+          "evidence": [
+            {"label": "PR #43", "url": "https://github.com/A7SNcom/yakolak/pull/43"}
+          ]
+        },
+        {
+          "id": "event-portal-ledger",
+          "at": "2026-07-28T22:20:00+03:00",
+          "type": "progress",
+          "actor": "Framework developer",
+          "title": "بدء سجل التطوير المرئي",
+          "detail": "إضافة مصدر إداري يربط المبادرات والمهام والتقارير والبوابات والأدلة والقرارات.",
+          "evidence": []
+        }
+      ]
+    }
+  ]
+}
