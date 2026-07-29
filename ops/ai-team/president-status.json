@@ -6,8 +6,8 @@
   "leadershipMode": "DELEGATED_LEADERSHIP",
   "lastReturnBriefAt": null,
   "blueprint": {
-    "canonicalRevision": 7,
-    "lastReconciledPresidentRevision": 7,
+    "canonicalRevision": 8,
+    "lastReconciledPresidentRevision": 8,
     "status": "reconciled"
   },
   "directives": {}

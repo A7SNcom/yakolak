@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "humanRole": "president",
   "manager": "Rashed",
   "interface": "developer.html",
@@ -10,6 +10,9 @@
   "content": ["scene", "journey", "element", "task"],
   "taskStatuses": ["planned", "in_progress", "review", "done"],
   "taskFeeds": ["president", "work"],
+  "editing": ["task", "president-comment"],
+  "protectedEditing": ["manager-comment", "work-entry"],
+  "previewLoading": "parent-ready-message",
   "conversationRoles": ["Ahmad", "Rashed"],
   "workRoles": ["Rashed", "Noor", "Sami", "Lina", "Mazen", "Nada", "Omar", "Sara", "Hakam"],
   "managerAuthentication": "RASHED_PORTAL_KEY",

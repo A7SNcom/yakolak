@@ -144,7 +144,7 @@ async function readAll(db){
 }
 
 async function createTask(db,body,actor){
-  const id=cleanId(body.id),parentType=cleanText(body.parentType||'none',24),parentId=cleanId(body.parentId||'root-task-list'),title=cleanText(body.title,240),description=cleanText(body.description,8000),attachments=cleanAttachments(body.attachments);
+  const id=cleanId(body.id),parentType=cleanText(body.parentType||'none',24),parentId=cleanId(body.parentId||'root-task-list'),title=cleanText(body.title,240),description=cleanText(body.description,20_000),attachments=cleanAttachments(body.attachments);
   if(!PARENT_TYPES.has(parentType)||!title)throw new Error('invalid_task');
   const now=new Date().toISOString();
   const maximum=await db.execute(`SELECT COALESCE(MAX(position),-1) AS maximum FROM ${TASK_STATE_TABLE}`);
@@ -154,6 +154,14 @@ async function createTask(db,body,actor){
   await recordEvent(db,'task_create',{taskId:id,parentType,parentId,actor});
   const result=await db.execute({sql:`SELECT * FROM ${TASK_TABLE} WHERE id=? LIMIT 1`,args:[id]});
   return taskFromRow(result.rows[0]);
+}
+async function updateTask(db,body,actor){
+  if(actor!=='president')throw new Error('protected_author_content');
+  const taskId=cleanId(body.taskId),title=cleanText(body.title,240),description=cleanText(body.description,20_000),attachments=cleanAttachments(body.attachments),now=new Date().toISOString();
+  if(!title)throw new Error('invalid_task');
+  const result=await db.execute({sql:`UPDATE ${TASK_TABLE} SET title=?,description=?,attachments_json=?,updated_at=? WHERE id=? RETURNING *`,args:[title,description,JSON.stringify(attachments),now,taskId]});
+  if(!result.rows?.[0])throw new Error('task_not_found');
+  await recordEvent(db,'task_update',{taskId,actor,attachments:attachments.length});return taskFromRow(result.rows[0]);
 }
 async function setTaskStatus(db,body,actor){
   const taskId=cleanId(body.taskId),status=cleanText(body.status,24),now=new Date().toISOString();
@@ -195,6 +203,14 @@ async function addTaskComment(db,body,actor){
   await db.execute({sql:`INSERT INTO ${COMMENT_TABLE}(id,task_id,author_role,body,attachments_json,created_at) VALUES(?,?,?,?,?,?)`,args:[id,taskId,actor,comment,JSON.stringify(attachments),now]});
   await recordEvent(db,'task_comment',{commentId:id,taskId,actor,attachments:attachments.length});
   return commentFromRow({id,task_id:taskId,author_role:actor,body:comment,attachments_json:JSON.stringify(attachments),created_at:now});
+}
+async function updateTaskComment(db,body,actor){
+  if(actor!=='president')throw new Error('protected_author_content');
+  const commentId=cleanId(body.commentId),comment=cleanText(body.body,20_000),attachments=cleanAttachments(body.attachments);
+  if(!comment&&!attachments.length)throw new Error('invalid_comment');
+  const result=await db.execute({sql:`UPDATE ${COMMENT_TABLE} SET body=?,attachments_json=? WHERE id=? AND author_role='president' RETURNING *`,args:[comment,JSON.stringify(attachments),commentId]});
+  if(!result.rows?.[0])throw new Error('protected_author_content');
+  await recordEvent(db,'task_comment_update',{commentId,actor,attachments:attachments.length});return commentFromRow(result.rows[0]);
 }
 async function addTaskWork(db,body,actor){
   const id=cleanId(body.id),taskId=cleanId(body.taskId),entryType=cleanText(body.entryType,24),work=cleanText(body.body,12_000),attachments=cleanAttachments(body.attachments);
@@ -250,8 +266,8 @@ async function saveDecision(db,body){
 function statusFor(error){
   if(error?.message==='payload_too_large'||error?.message==='attachment_too_large')return 413;
   if(['invalid_id','invalid_directive','invalid_message','invalid_decision','decision_requires_comment','invalid_payload','invalid_attachment','invalid_task','invalid_task_status','invalid_task_order','invalid_comment','invalid_work_entry'].includes(error?.message))return 400;
-  if(['manager_auth_required','worker_auth_required','worker_channel_forbidden','work_channel_forbidden'].includes(error?.message))return 403;
-  if(error?.message==='directive_not_found')return 404;
+  if(['manager_auth_required','worker_auth_required','worker_channel_forbidden','work_channel_forbidden','protected_author_content'].includes(error?.message))return 403;
+  if(['directive_not_found','task_not_found'].includes(error?.message))return 404;
   if(['forbidden_origin','manager_auth_required','president_approval_required'].includes(error?.message))return 403;
   if(String(error?.message||'').includes('UNIQUE constraint failed'))return 409;
   return 500;
@@ -272,11 +288,13 @@ export default async function handler(req,res){
     const action=cleanText(body.action,40),actor=actorFor(req,body);
     if(actor.startsWith('worker:')&&action!=='task_work_add')throw new Error('work_channel_forbidden');
     if(action==='task_create')json(res,200,{ok:true,task:await createTask(db,body,actor)});
+    else if(action==='task_update')json(res,200,{ok:true,task:await updateTask(db,body,actor)});
     else if(action==='task_status')json(res,200,{ok:true,taskState:await setTaskStatus(db,body,actor)});
     else if(action==='task_reorder')json(res,200,{ok:true,taskIds:await reorderTasks(db,body,actor)});
     else if(action==='task_delete')json(res,200,{ok:true,taskState:await deleteTask(db,body,actor)});
     else if(action==='content_delete')json(res,200,{ok:true,contentState:await deleteContent(db,body,actor)});
     else if(action==='task_comment')json(res,200,{ok:true,comment:await addTaskComment(db,body,actor)});
+    else if(action==='task_comment_update')json(res,200,{ok:true,comment:await updateTaskComment(db,body,actor)});
     else if(action==='task_work_add')json(res,200,{ok:true,work:await addTaskWork(db,body,actor)});
     else if(action==='directive_create')json(res,200,{ok:true,directive:await createDirective(db,body)});
     else if(action==='message_add')json(res,200,{ok:true,message:await addMessage(db,body)});

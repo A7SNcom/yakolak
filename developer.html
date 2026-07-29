@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
   <title>ياكلك</title>
-  <link rel="stylesheet" href="./src/developer-president.css?v=tasks-v3">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0,0">
+  <link rel="stylesheet" href="./src/developer-president.css?v=editor-v1">
 </head>
 <body>
   <header class="topbar">
@@ -23,11 +24,7 @@
   </header>
 
   <section id="globalTaskComposer" class="global-task-composer" hidden>
-    <form id="globalTaskForm" class="task-create-form">
-      <input name="title" maxlength="240" placeholder="مهمة جديدة" required>
-      <label class="attachment-button">مرفق<input name="attachments" type="file" accept="image/*,application/pdf,text/plain" multiple></label>
-      <button type="submit">إضافة</button>
-    </form>
+    <button id="openGlobalTask" class="primary-action icon-action" type="button" aria-label="إضافة مهمة"><span class="material-symbols-rounded" aria-hidden="true">add</span><span>إضافة مهمة</span></button>
   </section>
 
   <main id="contentGrid" class="card-grid" aria-live="polite"></main>
@@ -40,8 +37,8 @@
           <h1 id="modalTitle"></h1>
         </div>
         <div class="modal-actions">
-          <button id="removeCurrent" class="remove-button" type="button">إزالة</button>
-          <button id="modalClose" class="close-button" type="button" aria-label="إغلاق">×</button>
+          <button id="removeCurrent" class="icon-button danger" type="button" aria-label="إزالة"><span class="material-symbols-rounded" aria-hidden="true">delete</span></button>
+          <button id="modalClose" class="icon-button" type="button" aria-label="إغلاق"><span class="material-symbols-rounded" aria-hidden="true">close</span></button>
         </div>
       </header>
 
@@ -56,18 +53,42 @@
       <div class="modal-body">
         <p id="modalDescription" class="description"></p>
         <section id="linkedTasksSection" class="linked-tasks">
-          <form id="linkedTaskForm" class="task-create-form">
-            <input name="title" maxlength="240" placeholder="أضف مهمة" required>
-            <label class="attachment-button">مرفق<input name="attachments" type="file" accept="image/*,application/pdf,text/plain" multiple></label>
-            <button type="submit">إضافة</button>
-          </form>
+          <button id="openLinkedTask" class="secondary-action icon-action" type="button" aria-label="إضافة مهمة"><span class="material-symbols-rounded" aria-hidden="true">add</span><span>إضافة مهمة</span></button>
           <div id="linkedTasks" class="task-list"></div>
         </section>
       </div>
     </article>
   </dialog>
 
+  <dialog id="editorModal" class="editor-modal" aria-labelledby="editorHeading">
+    <form id="editorForm" class="editor-card" method="dialog">
+      <header class="editor-header">
+        <h2 id="editorHeading">إضافة مهمة</h2>
+        <button id="editorClose" class="icon-button" type="button" aria-label="إغلاق"><span class="material-symbols-rounded" aria-hidden="true">close</span></button>
+      </header>
+      <div class="editor-body">
+        <label id="editorTitleField" class="field"><span>العنوان</span><input id="editorTitle" maxlength="240" autocomplete="off"></label>
+        <div class="rich-editor">
+          <div class="editor-toolbar" role="toolbar" aria-label="تنسيق النص">
+            <button type="button" data-command="bold" aria-label="عريض"><span class="material-symbols-rounded" aria-hidden="true">format_bold</span></button>
+            <button type="button" data-command="italic" aria-label="مائل"><span class="material-symbols-rounded" aria-hidden="true">format_italic</span></button>
+            <button type="button" data-command="insertUnorderedList" aria-label="قائمة نقطية"><span class="material-symbols-rounded" aria-hidden="true">format_list_bulleted</span></button>
+            <button type="button" data-command="insertOrderedList" aria-label="قائمة رقمية"><span class="material-symbols-rounded" aria-hidden="true">format_list_numbered</span></button>
+            <button type="button" data-command="createLink" aria-label="رابط"><span class="material-symbols-rounded" aria-hidden="true">link</span></button>
+          </div>
+          <div id="editorContent" class="editor-content" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="اكتب التفاصيل"></div>
+        </div>
+        <div id="editorAttachments" class="editor-attachments"></div>
+        <label class="attachment-button icon-action"><span class="material-symbols-rounded" aria-hidden="true">attach_file</span><span>مرفق</span><input id="editorFiles" type="file" accept="image/*,application/pdf,text/plain" multiple></label>
+      </div>
+      <footer class="editor-footer">
+        <button id="editorCancel" class="icon-action quiet-action" type="button"><span class="material-symbols-rounded" aria-hidden="true">close</span><span>إلغاء</span></button>
+        <button id="editorSave" class="icon-action primary-action" type="submit"><span class="material-symbols-rounded" aria-hidden="true">check</span><span>حفظ</span></button>
+      </footer>
+    </form>
+  </dialog>
+
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-  <script type="module" src="./src/developer-president.js?v=tasks-v3"></script>
+  <script type="module" src="./src/developer-president.js?v=editor-v1"></script>
 </body>
 </html>

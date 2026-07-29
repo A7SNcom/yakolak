@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "revision": 7,
-  "updatedAt": "2026-07-29T19:00:00+03:00",
+  "revision": 8,
+  "updatedAt": "2026-07-29T20:00:00+03:00",
   "updatedBy": "Rashed framework",
   "portfolio": {
     "leadershipMode": "DELEGATED_LEADERSHIP",
     "activeInitiativeId": "initiative-minimal-card-workspace",
-    "summary": "داخل كل مهمة قناة أحمد وراشد وقناة شغل راشد مع الفريق. ترتيب الرئيس يحدد الأولوية، وراشد يحافظ على مهمة واحدة تحت التنفيذ ويفوض التنفيذ إلى أعوانه الأربعة.",
+    "summary": "إضافة وتعديل واضحان من نافذة واحدة، وكتابات راشد والفريق محفوظة للقراءة فقط، والمعاينة تعرض لودر الصفحة ثم المحتوى الصحيح دون إظهار شاشة تحميل اللعبة.",
     "health": "attention",
     "nextManagementAction": "تشغيل المجدولات الخمسة على المهمة المرتبة، ثم مراجعة وضوح التكليفات وردود الفريق داخل تبويب الشغل."
   },
@@ -63,10 +63,10 @@
       "blueprintNodeId": "initiative-minimal-card-workspace",
       "title": "صفحة كروت واحدة للتطوير",
       "outcome": "تصفح المشاهد والرحلات والعناصر والمهام من شبكة واحدة، وفتح المعاينة والتعليقات بين أحمد وراشد داخل الكرت فقط.",
-      "status": "review",
+      "status": "in_progress",
       "owner": "Rashed",
       "priority": "urgent",
-      "taskIds": ["YAK-008-01", "YAK-009-01", "YAK-010-01"],
+      "taskIds": ["YAK-008-01", "YAK-009-01", "YAK-010-01", "YAK-011-01"],
       "dependencies": [],
       "risks": ["الحفاظ على عقود المعاينة الحالية", "عدم لمس منطق اللعبة أو الإنتاج", "عدم إعادة إدخال الحشو أو الواجهات القديمة"],
       "recommendation": "استبدال الصفحة الحية بالكامل مع إبقاء ملفات المعاينة القائمة كمصدر وحيد للمحتوى.",
@@ -434,6 +434,38 @@
         {"id": "event-yak-010-president-amendment", "at": "2026-07-29T19:00:00+03:00", "type": "president", "actor": "President Ahmad", "title": "ربط المجدولات الخمسة بالمهمة", "detail": "طلب أن يختار راشد المهمة المرتبة عند غياب مهمة تحت التنفيذ، ثم يفوض أربعة أعوان، مع عرض التكليفات والردود داخل تبويب الشغل.", "evidence": []},
         {"id": "event-yak-010-browser-validated", "at": "2026-07-29T19:20:00+03:00", "type": "validation", "actor": "Codex UI implementer", "title": "نجاح التبويبين والسحب على الكمبيوتر والجوال", "detail": "نجحت قناة أحمد وراشد وقناة الشغل والمرفقات والسحب المحفوظ والحالات والإزالة دون أخطاء متصفح أو تجاوز أفقي.", "evidence": []},
         {"id": "event-yak-010-preview-ready", "at": "2026-07-29T19:25:00+03:00", "type": "validation", "actor": "Vercel", "title": "نسخة المعاينة مطابقة", "detail": "نجح نشر الرأس 46f69dd، وتحقق وجود تبويب الشغل وآلية السحب الجديدة في الصفحة المنشورة.", "evidence": [{"label": "نسخة المعاينة", "url": "https://yakolak-git-agent-codexyak-007-unifie-ae230b-ahmdkcoms-projects.vercel.app/developer.html"}]}
+      ]
+    },
+    {
+      "id": "YAK-011-01",
+      "initiativeId": "initiative-minimal-card-workspace",
+      "blueprintNodeId": "initiative-minimal-card-workspace",
+      "blueprintRevision": 8,
+      "title": "تصحيح الإضافة والتعديل والمعاينات",
+      "outcome": "نافذة إضافة وتعديل بنص طويل منسق، وحماية كتابات راشد والفريق، ومعاينات صحيحة بلودر مستقل، وإجراءات أيقونية موحدة ومساحات مريحة.",
+      "status": "in_progress",
+      "effort": "M",
+      "risk": "medium-persistent-developer-ui",
+      "owner": "Codex UI implementer",
+      "reviewer": "Sara",
+      "architectureSteward": "NOT_REQUIRED",
+      "auditor": "Hakam",
+      "progress": {"completed": 0, "total": 6, "label": "جارٍ تنفيذ توجيه الرئيس واختباره على الكمبيوتر والجوال."},
+      "acceptance": [
+        {"text": "زر الإضافة يفتح نافذة بمحرر طويل ومنسق", "status": "PENDING"},
+        {"text": "يمكن تعديل المهام وردود أحمد فقط", "status": "PENDING"},
+        {"text": "المعاينة تخفي شاشة تحميل اللعبة وتعرض المحتوى الصحيح أو خطأ خاصًا به", "status": "PENDING"},
+        {"text": "الإضافة والتعديل والإزالة تستخدم عائلة أيقونات واحدة", "status": "PENDING"},
+        {"text": "ألوان خفيفة وفراغات أقل على الكمبيوتر والجوال", "status": "PENDING"},
+        {"text": "لا تغيير في منطق اللعبة أو الإنتاج", "status": "PENDING"}
+      ],
+      "gates": {"artifact": "PENDING", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "PENDING", "preview": "PENDING", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
+      "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "", "previewUrl": "https://yakolak-git-agent-codexyak-007-unifie-ae230b-ahmdkcoms-projects.vercel.app/developer.html", "evidence": []},
+      "blockedBy": [],
+      "nextAction": "تنفيذ الواجهة والتخزين ثم التحقق الفعلي من المعاينات على الكمبيوتر والجوال.",
+      "presidentAttention": "REVIEW_MILESTONE",
+      "events": [
+        {"id": "event-yak-011-president-amendment", "at": "2026-07-29T20:00:00+03:00", "type": "president", "actor": "President Ahmad", "title": "تصحيح الإضافة والمعاينات", "detail": "طلب نافذة إضافة بنص طويل منسق وتعديل محتوى أحمد وحماية كتابات الفريق وإصلاح المعاينات واللودر والأيقونات والفراغات.", "evidence": []}
       ]
     }
   ]

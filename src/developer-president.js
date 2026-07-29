@@ -5,14 +5,14 @@ const LEDGER_URL='./ops/ai-team/development-ledger.json';
 const KIND_LABEL={scene:'مشهد',journey:'رحلة',element:'عنصر',task:'مهمة'};
 const STATUS_LABEL={planned:'خطة',in_progress:'تحت التنفيذ',review:'للمراجعة',done:'تمت'};
 const STATUS_ORDER=['planned','in_progress','review','done'];
-const state={filter:'all',query:'',content:[],tasks:[],taskStates:new Map(),contentStates:new Map(),comments:[],work:[],current:null,channelAvailable:false,previewSources:[],previewSourceIndex:0,previewVersionIndex:0};
+const state={filter:'all',query:'',content:[],tasks:[],taskStates:new Map(),contentStates:new Map(),comments:[],work:[],current:null,channelAvailable:false,previewSources:[],previewSourceIndex:0,previewVersionIndex:0,editor:null,previewFrame:null,previewTimer:null};
 let taskSorter=null;
 
 const grid=document.querySelector('#contentGrid');
 const filters=document.querySelector('#filters');
 const searchInput=document.querySelector('#searchInput');
 const globalTaskComposer=document.querySelector('#globalTaskComposer');
-const globalTaskForm=document.querySelector('#globalTaskForm');
+const openGlobalTask=document.querySelector('#openGlobalTask');
 const modal=document.querySelector('#contentModal');
 const modalKind=document.querySelector('#modalKind');
 const modalTitle=document.querySelector('#modalTitle');
@@ -27,13 +27,34 @@ const previewItemSelect=document.querySelector('#previewItemSelect');
 const previewVersionField=document.querySelector('#previewVersionField');
 const previewVersionSelect=document.querySelector('#previewVersionSelect');
 const linkedTasksSection=document.querySelector('#linkedTasksSection');
-const linkedTaskForm=document.querySelector('#linkedTaskForm');
+const openLinkedTask=document.querySelector('#openLinkedTask');
 const linkedTasks=document.querySelector('#linkedTasks');
+const editorModal=document.querySelector('#editorModal');
+const editorForm=document.querySelector('#editorForm');
+const editorHeading=document.querySelector('#editorHeading');
+const editorTitleField=document.querySelector('#editorTitleField');
+const editorTitle=document.querySelector('#editorTitle');
+const editorContent=document.querySelector('#editorContent');
+const editorFiles=document.querySelector('#editorFiles');
+const editorAttachments=document.querySelector('#editorAttachments');
 
 function text(value){return String(value??'').trim()}
 function baseUrl(){return new URL('./',window.location.href).href}
 function unique(values){return [...new Set(values.filter(Boolean))]}
 function safeId(value){return String(value).replace(/[^a-zA-Z0-9:_-]/g,'-').slice(0,160)}
+function iconButton(name,label,className='icon-button'){const button=document.createElement('button');button.type='button';button.className=className;button.setAttribute('aria-label',label);const icon=document.createElement('span');icon.className='material-symbols-rounded';icon.setAttribute('aria-hidden','true');icon.textContent=name;button.append(icon);return button}
+function appendInline(container,value){
+  const pattern=/(\*\*([^*]+)\*\*|\*([^*]+)\*|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\))/g;let cursor=0,match;
+  while((match=pattern.exec(value))){if(match.index>cursor)container.append(document.createTextNode(value.slice(cursor,match.index)));let node;if(match[2]){node=document.createElement('strong');node.textContent=match[2]}else if(match[3]){node=document.createElement('em');node.textContent=match[3]}else{node=document.createElement('a');node.textContent=match[4];node.href=match[5];node.rel='noreferrer noopener';node.target='_blank'}container.append(node);cursor=pattern.lastIndex}if(cursor<value.length)container.append(document.createTextNode(value.slice(cursor)))
+}
+function appendPlainRich(container,value){
+  const lines=String(value||'').split(/\r?\n/);let list=null;
+  for(const line of lines){const match=line.match(/^\s*([-*]|\d+\.)\s+(.+)$/);if(match){const ordered=/\d/.test(match[1]);if(!list||list.tagName!==(ordered?'OL':'UL')){list=document.createElement(ordered?'ol':'ul');container.append(list)}const item=document.createElement('li');appendInline(item,match[2]);list.append(item);continue}list=null;const p=document.createElement('p');appendInline(p,line||' ');container.append(p)}
+}
+function richTextFromEditor(){
+  const walk=node=>{if(node.nodeType===Node.TEXT_NODE)return node.textContent||'';const tag=node.nodeName.toLowerCase(),inside=[...node.childNodes].map(walk).join('');if(tag==='strong'||tag==='b')return`**${inside}**`;if(tag==='em'||tag==='i')return`*${inside}*`;if(tag==='a'){const href=node.getAttribute('href')||'';return /^https?:\/\//i.test(href)?`[${inside}](${href})`:inside}if(tag==='li')return`${inside.trim()}\n`;if(tag==='ul')return[...node.children].map(child=>`- ${walk(child).trim()}\n`).join('');if(tag==='ol')return[...node.children].map((child,index)=>`${index+1}. ${walk(child).trim()}\n`).join('');if(['p','div','br'].includes(tag))return`${inside}\n`;return inside};return walk(editorContent).replace(/\n{3,}/g,'\n\n').trim().slice(0,20000)
+}
+function renderRich(container,value){container.replaceChildren();appendPlainRich(container,value)}
 function contentKey(item){return safeId(`content:${item.kind}:${item.id}`)}
 function taskState(taskId){return state.taskStates.get(taskId)||{taskId,status:'planned',position:Number.MAX_SAFE_INTEGER,deleted:false}}
 function isDeletedContent(item){return state.contentStates.get(contentKey(item))?.deleted===true}
@@ -143,15 +164,16 @@ function createStatusSelect(task){
 }
 function createTaskRow(task,{draggable=false}={}){
   const row=document.createElement('article');row.className='task-row';row.dataset.taskId=task.id;
-  if(draggable){const handle=document.createElement('button');handle.type='button';handle.className='drag-handle';handle.textContent='سحب';handle.setAttribute('aria-label',`إعادة ترتيب ${task.title}`);row.append(handle)}
+  if(draggable){const handle=iconButton('drag_indicator',`إعادة ترتيب ${task.title}`,'drag-handle icon-button');row.append(handle)}
   const copy=document.createElement('button');copy.type='button';copy.className='task-copy';
   const title=document.createElement('strong');title.textContent=task.title;copy.append(title);
   const context=[taskParentTitle(task),task.description].filter(Boolean).join(' — ');
   if(context){const description=document.createElement('span');description.textContent=context;copy.append(description)}
   copy.addEventListener('click',()=>openTask(task));
   const actions=document.createElement('div');actions.className='task-row-actions';
-  const remove=document.createElement('button');remove.type='button';remove.className='row-remove';remove.textContent='إزالة';remove.addEventListener('click',()=>removeTask(task));
-  actions.append(createStatusSelect(task),remove);row.append(copy,actions);return row;
+  const edit=iconButton('edit','تعديل المهمة');edit.addEventListener('click',()=>openTaskEditor(task));
+  const remove=iconButton('delete','إزالة المهمة','icon-button danger');remove.addEventListener('click',()=>removeTask(task));
+  actions.append(createStatusSelect(task),edit,remove);row.append(copy,actions);return row;
 }
 function renderGrid(){
   taskSorter?.destroy();taskSorter=null;
@@ -194,6 +216,7 @@ function renderPreviewSelectors(){
   previewControls.hidden=previewItemField.hidden&&previewVersionField.hidden;
 }
 function renderPreview(){
+  clearTimeout(state.previewTimer);state.previewFrame=null;
   mediaViewport.replaceChildren();
   const source=state.previewSources[state.previewSourceIndex];
   mediaSection.hidden=!source;if(!source)return;
@@ -206,8 +229,12 @@ function renderPreview(){
   }
   const version=source.versions[state.previewVersionIndex];
   if(!version)return;
-  const frame=document.createElement('iframe');frame.src=contractFor(source.definition,version.id,baseUrl()).previewUrl;frame.title=`${source.title} — ${version.name}`;mediaViewport.append(frame);
+  const loading=document.createElement('div');loading.className='preview-loading';const spinner=document.createElement('span');spinner.className='preview-spinner';spinner.setAttribute('aria-hidden','true');const loadingLabel=document.createElement('span');loadingLabel.textContent='جارٍ تجهيز المعاينة';loading.append(spinner,loadingLabel);
+  const frame=document.createElement('iframe');frame.className='preview-frame';frame.src=contractFor(source.definition,version.id,baseUrl()).previewUrl;frame.title=`${source.title} — ${version.name}`;frame.dataset.entityId=source.id;frame.dataset.variantId=version.id;state.previewFrame=frame;mediaViewport.append(loading,frame);
+  state.previewTimer=setTimeout(()=>showPreviewError(frame,'تعذرت المعاينة'),20000);
 }
+function showPreviewError(frame,message){if(frame!==state.previewFrame)return;clearTimeout(state.previewTimer);const error=document.createElement('div');error.className='preview-error';const label=document.createElement('span');label.textContent=message;const retry=iconButton('refresh','إعادة المحاولة');retry.addEventListener('click',renderPreview);error.append(label,retry);mediaViewport.replaceChildren(error)}
+window.addEventListener('message',event=>{const frame=state.previewFrame,data=event.data;if(!frame||event.source!==frame.contentWindow||!data||typeof data!=='object')return;if(data.entityId&&data.entityId!==frame.dataset.entityId)return;if(data.variant&&data.variant!==frame.dataset.variantId)return;if(data.type==='yakolak-developer-scene-ready'){clearTimeout(state.previewTimer);frame.classList.add('ready');mediaViewport.querySelector('.preview-loading')?.remove()}else if(data.type==='yakolak-developer-scene-error')showPreviewError(frame,'تعذرت معاينة هذا المحتوى')});
 
 function attachmentLink(attachment){
   const link=document.createElement('a');link.className='attachment-link';link.href=attachment.data;link.download=attachment.name||'attachment';link.textContent=attachment.name||'مرفق';return link;
@@ -215,43 +242,35 @@ function attachmentLink(attachment){
 function createComment(comment){
   const manager=comment.authorRole==='manager';
   const article=document.createElement('article');article.className=`comment ${manager?'rashed':'ahmad'}`;
-  const header=document.createElement('strong');header.textContent=manager?'راشد':'أحمد';article.append(header);
-  if(comment.body){const body=document.createElement('p');body.textContent=comment.body;article.append(body)}
+  const heading=document.createElement('div');heading.className='comment-heading';const header=document.createElement('strong');header.textContent=manager?'راشد':'أحمد';heading.append(header);if(!manager&&!String(comment.id).startsWith('update-')){const edit=iconButton('edit','تعديل الرد');edit.addEventListener('click',()=>openCommentEditor(comment));heading.append(edit)}article.append(heading);
+  if(comment.body){const body=document.createElement('div');body.className='rich-copy';renderRich(body,comment.body);article.append(body)}
   if(comment.attachments?.length){const attachments=document.createElement('div');attachments.className='attachment-list';attachments.append(...comment.attachments.map(attachmentLink));article.append(attachments)}
   return article;
 }
 function createWorkEntry(entry){
   const article=document.createElement('article');article.className=`comment work-entry ${entry.authorRole==='manager'?'rashed':'worker'}`;
   const header=document.createElement('strong');header.textContent=entry.authorRole==='manager'?'راشد':entry.authorName;article.append(header);
-  if(entry.body){const body=document.createElement('p');body.textContent=entry.body;article.append(body)}
+  if(entry.body){const body=document.createElement('div');body.className='rich-copy';renderRich(body,entry.body);article.append(body)}
   if(entry.attachments?.length){const attachments=document.createElement('div');attachments.className='attachment-list';attachments.append(...entry.attachments.map(attachmentLink));article.append(attachments)}
   return article;
 }
-function createCommentForm(task){
-  const form=document.createElement('form');form.className='comment-form';form.hidden=!state.channelAvailable;
-  const input=document.createElement('textarea');input.name='body';input.rows=1;input.maxLength=12000;input.placeholder='أضف تحديثًا أو تعليقًا';
-  const fileLabel=document.createElement('label');fileLabel.className='attachment-button';fileLabel.textContent='مرفق';
-  const file=document.createElement('input');file.name='attachments';file.type='file';file.multiple=true;file.accept='image/*,application/pdf,text/plain';fileLabel.append(file);
-  const submit=document.createElement('button');submit.type='submit';submit.textContent='إرسال';form.append(input,fileLabel,submit);
-  form.addEventListener('submit',async event=>{event.preventDefault();submit.disabled=true;try{const attachments=await filesToAttachments(file.files);if(!text(input.value)&&!attachments.length)return;const result=await post({action:'task_comment',id:`comment-${Date.now()}-${crypto.randomUUID()}`,taskId:task.id,body:input.value,attachments});state.comments.push(result.comment);input.value='';file.value='';renderModalTasks()}finally{submit.disabled=false}});
-  return form;
-}
+function createCommentButton(task){const button=iconButton('add_comment','إضافة رد','secondary-action icon-action');const label=document.createElement('span');label.textContent='إضافة رد';button.append(label);button.hidden=!state.channelAvailable;button.addEventListener('click',()=>openCommentEditor(null,task));return button}
 function createTaskDetail(task,{open=false}={}){
   const details=document.createElement('details');details.className='task-detail';details.open=open;details.dataset.taskId=task.id;
   const summary=document.createElement('summary');
   const title=document.createElement('strong');title.textContent=task.title;summary.append(title,createStatusSelect(task));details.append(summary);
   const body=document.createElement('div');body.className='task-detail-body';
-  if(task.description){const description=document.createElement('p');description.className='description';description.textContent=task.description;body.append(description)}
+  if(task.description){const description=document.createElement('div');description.className='description rich-copy';renderRich(description,task.description);body.append(description)}
   if(task.attachments?.length){const attachments=document.createElement('div');attachments.className='attachment-list';attachments.append(...task.attachments.map(attachmentLink));body.append(attachments)}
   const tabs=document.createElement('div');tabs.className='task-feed-tabs';
   const conversationButton=document.createElement('button');conversationButton.type='button';conversationButton.className='active';conversationButton.textContent='أحمد وراشد';
   const workButton=document.createElement('button');workButton.type='button';workButton.textContent='الشغل';tabs.append(conversationButton,workButton);
   const feed=document.createElement('div');feed.className='comments';
-  const conversationForm=createCommentForm(task);
-  const showConversation=()=>{conversationButton.classList.add('active');workButton.classList.remove('active');feed.replaceChildren(...commentsForTask(task).map(createComment));conversationForm.hidden=!state.channelAvailable};
-  const showWork=()=>{workButton.classList.add('active');conversationButton.classList.remove('active');const entries=workForTask(task);feed.replaceChildren(...entries.map(createWorkEntry));if(!entries.length){const empty=document.createElement('p');empty.className='feed-empty';empty.textContent='لا يوجد شغل مسجل';feed.append(empty)}conversationForm.hidden=true};
-  conversationButton.addEventListener('click',showConversation);workButton.addEventListener('click',showWork);showConversation();body.append(tabs,feed,conversationForm);
-  const remove=document.createElement('button');remove.type='button';remove.className='detail-remove';remove.textContent='إزالة المهمة';remove.addEventListener('click',()=>removeTask(task));body.append(remove);
+  const commentButton=createCommentButton(task);
+  const showConversation=()=>{conversationButton.classList.add('active');workButton.classList.remove('active');feed.replaceChildren(...commentsForTask(task).map(createComment));commentButton.hidden=!state.channelAvailable};
+  const showWork=()=>{workButton.classList.add('active');conversationButton.classList.remove('active');const entries=workForTask(task);feed.replaceChildren(...entries.map(createWorkEntry));if(!entries.length){const empty=document.createElement('p');empty.className='feed-empty';empty.textContent='لا يوجد شغل مسجل';feed.append(empty)}commentButton.hidden=true};
+  conversationButton.addEventListener('click',showConversation);workButton.addEventListener('click',showWork);showConversation();body.append(tabs,feed,commentButton);
+  const detailActions=document.createElement('div');detailActions.className='detail-actions';const edit=iconButton('edit','تعديل المهمة');edit.addEventListener('click',()=>openTaskEditor(task));const remove=iconButton('delete','إزالة المهمة','icon-button danger');remove.addEventListener('click',()=>removeTask(task));detailActions.append(edit,remove);body.append(detailActions);
   details.append(body);return details;
 }
 function linkedTasksFor(item){return sortedTasks().filter(task=>task.parentType===item.kind&&task.parentId===item.id)}
@@ -263,12 +282,12 @@ function renderModalTasks(){
 function openContent(item){
   state.current=item;state.previewSources=previewSourcesFor(item);state.previewSourceIndex=0;state.previewVersionIndex=0;
   modalKind.textContent=KIND_LABEL[item.kind];modalTitle.textContent=item.title;modalDescription.textContent=item.description;modalDescription.hidden=!item.description;
-  removeCurrent.hidden=false;linkedTaskForm.hidden=!state.channelAvailable;renderPreview();renderModalTasks();modal.showModal();
+  removeCurrent.hidden=false;openLinkedTask.hidden=!state.channelAvailable;renderPreview();renderModalTasks();modal.showModal();
 }
 function openTask(task){
   state.current=task;state.previewSources=previewSourcesFor(task);state.previewSourceIndex=0;state.previewVersionIndex=0;
   modalKind.textContent='مهمة';modalTitle.textContent=task.title;modalDescription.textContent='';modalDescription.hidden=true;
-  removeCurrent.hidden=false;linkedTaskForm.hidden=true;renderPreview();renderModalTasks();modal.showModal();
+  removeCurrent.hidden=false;openLinkedTask.hidden=true;renderPreview();renderModalTasks();modal.showModal();
 }
 
 async function filesToAttachments(fileList){
@@ -283,12 +302,19 @@ async function post(payload){
   const response=await fetch(API_URL,{method:'POST',headers:{'content-type':'application/json','accept':'application/json'},body:JSON.stringify(payload)});
   const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||'save_failed');return result;
 }
-async function createTaskFromForm(form,parent){
-  const title=text(form.elements.title.value);if(!title)return;
-  const attachments=await filesToAttachments(form.elements.attachments.files);
-  const result=await post({action:'task_create',id:`task-${Date.now()}-${crypto.randomUUID()}`,parentType:parent?.kind||'none',parentId:parent?.id||'root-task-list',title,description:'',attachments});
-  state.tasks.push({...result.task,kind:'task'});const maximum=Math.max(-1,...[...state.taskStates.values()].map(entry=>Number(entry.position)||0));state.taskStates.set(result.task.id,{taskId:result.task.id,status:'planned',position:maximum+1,deleted:false});
-  form.reset();renderGrid();renderModalTasks();
+function renderEditorAttachments(){editorAttachments.replaceChildren();for(const [index,attachment]of(state.editor?.attachments||[]).entries()){const chip=document.createElement('span');chip.className='attachment-chip';chip.append(document.createTextNode(attachment.name||'مرفق'));const remove=iconButton('close','إزالة المرفق');remove.addEventListener('click',()=>{state.editor.attachments.splice(index,1);renderEditorAttachments()});chip.append(remove);editorAttachments.append(chip)}}
+function openEditor(config){
+  state.editor={...config,attachments:[...(config.attachments||[])]};editorHeading.textContent=config.heading;editorTitleField.hidden=!config.showTitle;editorTitle.value=config.title||'';editorContent.replaceChildren();appendPlainRich(editorContent,config.body||'');editorFiles.value='';renderEditorAttachments();editorModal.showModal();setTimeout(()=>config.showTitle?editorTitle.focus():editorContent.focus(),0)
+}
+function openTaskEditor(task=null,parent=null){openEditor({type:task?'task-edit':'task-create',heading:task?'تعديل المهمة':'إضافة مهمة',showTitle:true,title:task?.title||'',body:task?.description||'',attachments:task?.attachments||[],task,parent})}
+function openCommentEditor(comment=null,task=null){openEditor({type:comment?'comment-edit':'comment-create',heading:comment?'تعديل الرد':'إضافة رد',showTitle:false,body:comment?.body||'',attachments:comment?.attachments||[],comment,task:task||state.tasks.find(item=>item.id===comment?.taskId)})}
+async function saveEditor(){
+  const config=state.editor;if(!config)return;const title=text(editorTitle.value),body=richTextFromEditor();const added=await filesToAttachments(editorFiles.files);const attachments=[...config.attachments,...added].slice(0,3);if(config.showTitle&&!title)return editorTitle.focus();if(!config.showTitle&&!body&&!attachments.length)return editorContent.focus();
+  if(config.type==='task-create'){const parent=config.parent;const result=await post({action:'task_create',id:`task-${Date.now()}-${crypto.randomUUID()}`,parentType:parent?.kind||'none',parentId:parent?.id||'root-task-list',title,description:body,attachments});state.tasks.push({...result.task,kind:'task'});const maximum=Math.max(-1,...[...state.taskStates.values()].map(entry=>Number(entry.position)||0));state.taskStates.set(result.task.id,{taskId:result.task.id,status:'planned',position:maximum+1,deleted:false})}
+  else if(config.type==='task-edit'){const result=await post({action:'task_update',taskId:config.task.id,title,description:body,attachments});Object.assign(config.task,result.task,{kind:'task'});if(state.current?.id===config.task.id){modalTitle.textContent=config.task.title;state.previewSources=previewSourcesFor(config.task);renderPreview()}}
+  else if(config.type==='comment-create'){const result=await post({action:'task_comment',id:`comment-${Date.now()}-${crypto.randomUUID()}`,taskId:config.task.id,body,attachments});state.comments.push(result.comment)}
+  else if(config.type==='comment-edit'){const result=await post({action:'task_comment_update',commentId:config.comment.id,body,attachments});Object.assign(config.comment,result.comment)}
+  editorModal.close();state.editor=null;renderGrid();renderModalTasks()
 }
 async function updateTaskStatus(task,status){
   if(status==='done'&&!window.confirm('اعتماد المهمة كمكتملة؟')){renderGrid();renderModalTasks();return}
@@ -313,13 +339,18 @@ async function start(){
 
 filters.addEventListener('click',event=>{const button=event.target.closest('[data-filter]');if(!button)return;state.filter=button.dataset.filter;filters.querySelectorAll('[data-filter]').forEach(candidate=>candidate.classList.toggle('active',candidate===button));renderGrid()});
 searchInput.addEventListener('input',()=>{state.query=searchInput.value;renderGrid()});
-globalTaskForm.addEventListener('submit',async event=>{event.preventDefault();await createTaskFromForm(globalTaskForm,null)});
-linkedTaskForm.addEventListener('submit',async event=>{event.preventDefault();if(state.current?.kind!=='task')await createTaskFromForm(linkedTaskForm,state.current)});
+openGlobalTask.addEventListener('click',()=>openTaskEditor(null,null));
+openLinkedTask.addEventListener('click',()=>{if(state.current?.kind!=='task')openTaskEditor(null,state.current)});
 removeCurrent.addEventListener('click',()=>state.current?.kind==='task'?removeTask(state.current):removeContent(state.current));
 document.querySelector('#modalClose').addEventListener('click',()=>modal.close());
 modal.addEventListener('click',event=>{if(event.target===modal)modal.close()});
-modal.addEventListener('close',()=>{mediaViewport.replaceChildren();state.current=null;state.previewSources=[]});
+modal.addEventListener('close',()=>{clearTimeout(state.previewTimer);state.previewFrame=null;mediaViewport.replaceChildren();state.current=null;state.previewSources=[]});
 previewItemSelect.addEventListener('change',()=>{state.previewSourceIndex=Number(previewItemSelect.value);state.previewVersionIndex=0;renderPreview()});
 previewVersionSelect.addEventListener('change',()=>{state.previewVersionIndex=Number(previewVersionSelect.value);renderPreview()});
+document.querySelector('#editorClose').addEventListener('click',()=>editorModal.close());
+document.querySelector('#editorCancel').addEventListener('click',()=>editorModal.close());
+editorModal.addEventListener('click',event=>{if(event.target===editorModal)editorModal.close()});
+editorForm.addEventListener('submit',async event=>{event.preventDefault();const save=document.querySelector('#editorSave');save.disabled=true;try{await saveEditor()}finally{save.disabled=false}});
+document.querySelector('.editor-toolbar').addEventListener('click',event=>{const button=event.target.closest('[data-command]');if(!button)return;const command=button.dataset.command;if(command==='createLink'){const url=window.prompt('الرابط');if(!/^https?:\/\//i.test(url||''))return;document.execCommand(command,false,url)}else document.execCommand(command,false,null);editorContent.focus()});
 
 start();

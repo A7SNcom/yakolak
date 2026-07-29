@@ -12,7 +12,7 @@ function createStore(){
   return{
     tasks:[{id:'task-custom-journey',parentType:'journey',parentId:'journey-1',title:'مراجعة رحلة الدخول',description:'افحص الانتقال بين المشاهد.',attachments:[],createdBy:'manager',createdAt:'2026-07-29T14:00:00Z',updatedAt:'2026-07-29T14:00:00Z'}],
     taskStates:[{taskId:'YAK-009-01',status:'in_progress',position:0,deleted:false,updatedAt:'2026-07-29T14:00:00Z'},{taskId:'task-custom-journey',status:'planned',position:1,deleted:false,updatedAt:'2026-07-29T14:00:00Z'}],
-    contentStates:[],taskComments:[{id:'comment-rashed-1',taskId:'task-custom-journey',authorRole:'manager',body:'المعاينة جاهزة لملاحظتك.',attachments:[],createdAt:'2026-07-29T14:10:00Z'}],
+    contentStates:[],taskComments:[{id:'comment-rashed-1',taskId:'task-custom-journey',authorRole:'manager',body:'المعاينة جاهزة لملاحظتك.',attachments:[],createdAt:'2026-07-29T14:10:00Z'},{id:'comment-ahmad-1',taskId:'task-custom-journey',authorRole:'president',body:'راجع البداية.',attachments:[],createdAt:'2026-07-29T14:12:00Z'}],
     taskWork:[
       {id:'work-1',taskId:'task-custom-journey',authorRole:'manager',authorName:'Rashed',entryType:'delegation',body:'يا نور، افحص بداية الرحلة وأرسل النتيجة بصورة واضحة.',attachments:[],createdAt:'2026-07-29T14:20:00Z'},
       {id:'work-2',taskId:'task-custom-journey',authorRole:'worker',authorName:'Noor',entryType:'update',body:'راجعت البداية، والانتقال الأول يحتاج تعديلًا بسيطًا.',attachments:[],createdAt:'2026-07-29T14:30:00Z'}
@@ -22,7 +22,7 @@ function createStore(){
 function upsert(items,key,value){const index=items.findIndex(item=>item[key]===value[key]);if(index>=0)items[index]=value;else items.push(value)}
 async function mock(page,store){
   await page.route('**/ops/ai-team/development-ledger.json',route=>respond(route,ledger));
-  await page.route('**/developer-scene.html*',route=>route.fulfill({status:200,contentType:'text/html; charset=utf-8',body:'<!doctype html><html lang="ar" dir="rtl"><style>body{margin:0;display:grid;place-items:center;height:100vh;background:#17201e;color:#fff;font:700 26px Tahoma}</style><body>معاينة</body></html>'}));
+  await page.route('**/developer-scene.html*',route=>{const url=new URL(route.request().url()),entityId=url.searchParams.get('scene')||url.searchParams.get('element')||'';return route.fulfill({status:200,contentType:'text/html; charset=utf-8',body:`<!doctype html><html lang="ar" dir="rtl"><style>body{margin:0;display:grid;place-items:center;height:100vh;background:#17201e;color:#fff;font:700 26px Tahoma}</style><body>معاينة<script>parent.postMessage({type:'yakolak-developer-scene-ready',entityId:${JSON.stringify(entityId)}},'*')<\/script></body></html>`})});
   await page.route('**/api/developer-president',async route=>{
     const request=route.request();
     if(request.method()==='GET')return respond(route,{ok:true,channelVersion:2,directives:[],decisions:[],...store});
@@ -30,6 +30,7 @@ async function mock(page,store){
     if(body.action==='task_create'){
       const task={id:body.id,parentType:body.parentType,parentId:body.parentId,title:body.title,description:body.description||'',attachments:body.attachments||[],createdBy:'president',createdAt:now,updatedAt:now};store.tasks.push(task);store.taskStates.push({taskId:task.id,status:'planned',position:store.taskStates.length+20,deleted:false,updatedAt:now});return respond(route,{ok:true,task});
     }
+    if(body.action==='task_update'){const task=store.tasks.find(item=>item.id===body.taskId);Object.assign(task,{title:body.title,description:body.description||'',attachments:body.attachments||[],updatedAt:now});return respond(route,{ok:true,task})}
     if(body.action==='task_status'){
       if(body.status==='in_progress')store.taskStates=store.taskStates.map(entry=>entry.status==='in_progress'&&entry.taskId!==body.taskId?{...entry,status:'planned'}:entry);
       const taskState={...(store.taskStates.find(entry=>entry.taskId===body.taskId)||{taskId:body.taskId,position:0,deleted:false}),status:body.status,updatedAt:now};upsert(store.taskStates,'taskId',taskState);return respond(route,{ok:true,taskState});
@@ -38,6 +39,7 @@ async function mock(page,store){
     if(body.action==='task_delete'){const taskState={...(store.taskStates.find(entry=>entry.taskId===body.taskId)||{taskId:body.taskId,status:'planned',position:0}),deleted:true,updatedAt:now};upsert(store.taskStates,'taskId',taskState);return respond(route,{ok:true,taskState})}
     if(body.action==='content_delete'){const contentState={itemId:body.itemId,deleted:true,updatedAt:now};upsert(store.contentStates,'itemId',contentState);return respond(route,{ok:true,contentState})}
     if(body.action==='task_comment'){const comment={id:body.id,taskId:body.taskId,authorRole:'president',body:body.body||'',attachments:body.attachments||[],createdAt:now};store.taskComments.push(comment);return respond(route,{ok:true,comment})}
+    if(body.action==='task_comment_update'){const comment=store.taskComments.find(item=>item.id===body.commentId&&item.authorRole==='president');Object.assign(comment,{body:body.body||'',attachments:body.attachments||[]});return respond(route,{ok:true,comment})}
     return route.fulfill({status:400,contentType:'application/json',body:'{"ok":false}'});
   });
 }
@@ -57,6 +59,8 @@ async function verify(viewport,name){
 
     await page.locator('[data-item-id="journey:journey-1"]').click();
     await page.locator('#contentModal[open]').waitFor();
+    await page.locator('.preview-frame.ready').waitFor();
+    if(await page.locator('.preview-loading').count())throw new Error(`${name}: preview loader remained after readiness`);
     if(await page.locator('#previewItemSelect option').count()<2)throw new Error(`${name}: journey preview selector is missing`);
     if(!(await page.locator('#previewVersionField').isHidden()))throw new Error(`${name}: single version selector should be hidden`);
     await page.getByText('راشد',{exact:true}).waitFor();
@@ -66,15 +70,18 @@ async function verify(viewport,name){
     await firstTask.getByText('راجعت البداية، والانتقال الأول يحتاج تعديلًا بسيطًا.',{exact:true}).waitFor();
     await page.screenshot({path:path.join(artifacts,`${name}-task-work.png`),fullPage:true});
     await firstTask.getByRole('button',{name:'أحمد وراشد'}).click();
-    const commentForm=page.locator('#linkedTasks .comment-form').first();
-    await commentForm.locator('textarea').fill('أعد فحص البداية.');
-    await commentForm.locator('input[type="file"]').setInputFiles({name:'note.txt',mimeType:'text/plain',buffer:Buffer.from('yakolak note')});
-    await commentForm.locator('button[type="submit"]').click();
+    if(await firstTask.locator('.comment.rashed').first().getByRole('button',{name:'تعديل الرد'}).count())throw new Error(`${name}: Rashed reply is editable`);
+    await firstTask.getByRole('button',{name:'إضافة رد'}).click();
+    await page.locator('#editorContent').fill('أعد فحص البداية.');
+    await page.locator('#editorFiles').setInputFiles({name:'note.txt',mimeType:'text/plain',buffer:Buffer.from('yakolak note')});
+    await page.locator('#editorSave').click();
     await page.getByText('أعد فحص البداية.',{exact:true}).waitFor();
     await page.getByText('note.txt',{exact:true}).waitFor();
 
-    await page.locator('#linkedTaskForm input[name="title"]').fill('مهمة مرتبطة جديدة');
-    await page.locator('#linkedTaskForm button[type="submit"]').click();
+    await page.locator('#openLinkedTask').click();
+    await page.locator('#editorTitle').fill('مهمة مرتبطة جديدة');
+    await page.locator('#editorContent').fill('تفاصيل طويلة للمهمة.');
+    await page.locator('#editorSave').click();
     await page.locator('#linkedTasks').getByText('مهمة مرتبطة جديدة',{exact:true}).waitFor();
     await page.locator('#modalClose').click();
 
@@ -89,6 +96,11 @@ async function verify(viewport,name){
     if(await page.locator('.task-row').count()<3)throw new Error(`${name}: ordered task rows are missing`);
     if(await page.locator('.task-row .status-in_progress').count()!==1)throw new Error(`${name}: more than one task is in progress`);
     const customRow=page.locator('[data-task-id="task-custom-journey"]');
+    await customRow.getByRole('button',{name:'تعديل المهمة'}).click();
+    await page.locator('#editorTitle').fill('مراجعة رحلة الدخول المعدلة');
+    await page.locator('#editorContent').fill('**مطلوب بوضوح**\n- افحص البداية');
+    await page.locator('#editorSave').click();
+    await customRow.getByText('مراجعة رحلة الدخول المعدلة',{exact:true}).waitFor();
     await customRow.locator('.status-select').selectOption('in_progress');
     await page.locator('[data-task-id="task-custom-journey"] .status-in_progress').waitFor();await page.waitForTimeout(100);
     if(await page.locator('.task-row .status-in_progress').count()!==1)throw new Error(`${name}: active task exclusivity failed`);
@@ -99,7 +111,7 @@ async function verify(viewport,name){
       await page.waitForTimeout(250);if(store.reorderCalls<1)throw new Error('desktop: task order was not saved');
     }
 
-    page.once('dialog',dialog=>dialog.accept());await customRow.locator('.row-remove').click();
+    page.once('dialog',dialog=>dialog.accept());await customRow.getByRole('button',{name:'إزالة المهمة'}).click();
     await page.locator('[data-task-id="task-custom-journey"]').waitFor({state:'detached'});
     await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:path.join(artifacts,`${name}-ordered-tasks.png`),fullPage:true});
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);if(overflow>2)throw new Error(`${name}: horizontal overflow ${overflow}px`);
