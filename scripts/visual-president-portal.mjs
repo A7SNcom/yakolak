@@ -79,7 +79,7 @@ async function mock(page) {
 
 async function openOffice(page, name) {
   if (name === 'mobile') await page.locator('.d4-mobile-nav [data-mobile-view="work"]').click();
-  else await page.getByRole('button', {name: /قيادة المشروع/}).click();
+  else await page.getByRole('button', {name: /لوحة القيادة/}).click();
   await page.locator('#presidentPortal.open').waitFor();
 }
 
@@ -94,42 +94,35 @@ async function verify(viewport, name) {
     await page.waitForFunction(() => document.body.dataset.developerRole === 'president');
     if (await page.title() !== 'ياكلك · واجهة الرئيس') throw new Error(`${name}: wrong title`);
     if (!(await page.locator('#d4NewRequest').isHidden())) throw new Error(`${name}: legacy direct-request channel remains visible`);
-    if (!String(await page.locator('#d4StartTask').textContent()).includes('راشد')) throw new Error(`${name}: main task action does not name Rashed`);
-
-    if (name === 'desktop') {
-      await page.locator('#d4StartTask').click();
-      await page.locator('#presidentPortal.open').waitFor();
-      if (await page.locator('#presidentDirectives').isHidden()) throw new Error(`${name}: scene task did not route to Rashed directives`);
-      await page.locator('#presidentClose').click();
-    }
+    if (!(await page.locator('#d4StartTask').isHidden())) throw new Error(`${name}: legacy task action remains visible`);
 
     await openOffice(page, name);
     const portfolioPanel = page.locator('#presidentPortfolio');
-    await portfolioPanel.getByText('مسار تطوير ياكلك', {exact: true}).waitFor();
-    await portfolioPanel.getByText('إغلاق العيبين المثبتين قبل توسيع التطوير', {exact: true}).waitFor();
-    if (await portfolioPanel.locator('[data-blueprint-node]').count() < 5) throw new Error(`${name}: project map did not render enough nodes`);
-    await page.screenshot({path: path.join(artifacts, `${name}-portfolio.png`), fullPage: true});
+    await portfolioPanel.getByText('هذا ما يديره راشد الآن', {exact: true}).waitFor();
+    if (await portfolioPanel.locator('.president-answer').count() !== 5) throw new Error(`${name}: leadership summary must answer five questions`);
+    await portfolioPanel.getByText('ما القرار المطلوب مني؟', {exact: true}).waitFor();
+    await page.screenshot({path: path.join(artifacts, `${name}-leadership.png`)});
 
-    await page.getByRole('button', {name: /^المهام/}).click();
+    await page.locator('.president-nav [data-president-tab="tasks"]').click();
+    if (await page.locator('.president-kanban-column').count() !== 5) throw new Error(`${name}: kanban must render five columns`);
     const correctionTask = page.locator('#presidentTasks [data-task-id="YAK-006-01"]');
     await correctionTask.waitFor();
-    if (!String(await correctionTask.locator('.president-card-title strong').textContent()).includes('إغلاق قابلية تعديل عقد الأوضاع')) throw new Error(`${name}: expected correction task title is missing`);
-    const progress = String(await correctionTask.locator('.president-progress-label').textContent());
-    if (!progress.includes('Noor') && !progress.includes('Artifact')) throw new Error(`${name}: task progress is not visible`);
-    await page.screenshot({path: path.join(artifacts, `${name}-tasks.png`), fullPage: true});
+    if (!String(await correctionTask.locator('h2').textContent()).includes('إغلاق قابلية تعديل عقد الأوضاع')) throw new Error(`${name}: expected correction task title is missing`);
+    if (!String(await correctionTask.locator('.president-kanban-owner').textContent()).includes('نور')) throw new Error(`${name}: task owner is not visible`);
+    await page.screenshot({path: path.join(artifacts, `${name}-kanban.png`)});
 
-    await page.getByRole('button', {name: /^السجل/}).click();
+    await page.locator('.president-nav [data-president-tab="timeline"]').click();
     const timelinePanel = page.locator('#presidentTimeline');
     await timelinePanel.getByText('إسناد التصحيح إلى Noor', {exact: true}).waitFor();
     await page.screenshot({path: path.join(artifacts, `${name}-timeline.png`), fullPage: true});
 
-    await page.getByRole('button', {name: /بانتظار قراري/}).click();
+    await page.locator('.president-nav [data-president-tab="reviews"]').click();
     const reviewPanel = page.locator('#presidentReviews');
     await reviewPanel.getByText('رحلة دخول جاهزة للقرار', {exact: true}).waitFor();
     if (await reviewPanel.getByText('يجب ألا تظهر', {exact: true}).count()) throw new Error(`${name}: invalid review was exposed`);
     if (await page.locator('#presidentReviewCount').textContent() !== '1') throw new Error(`${name}: review gate count is not 1`);
 
-    await page.getByRole('button', {name: /تعليماتي لراشد/}).click();
+    await page.locator('.president-nav [data-president-tab="directives"]').click();
     const directivePanel = page.locator('#presidentDirectives');
     await directivePanel.getByText('تطوير مشهد البداية', {exact: true}).waitFor();
     await directivePanel.getByText('استلم راشد التكليف وقسّمه إلى مهمة محدودة.', {exact: true}).waitFor();
@@ -137,6 +130,9 @@ async function verify(viewport, name) {
     await directivePanel.locator('.president-form textarea[name="body"]').fill('نفّذ نتيجة واحدة قابلة للمراجعة.');
     await directivePanel.locator('.president-form button[type="submit"]').click();
     await directivePanel.getByText('اختبار تكليف الرئيس', {exact: true}).waitFor();
+
+    await page.locator('.president-nav [data-president-tab="team"]').click();
+    if (await page.locator('.president-team-card').count() !== 9) throw new Error(`${name}: team responsibilities are incomplete`);
 
     const documentOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     if (documentOverflow > 2) throw new Error(`${name}: horizontal document overflow ${documentOverflow}px`);
@@ -148,4 +144,4 @@ async function verify(viewport, name) {
 
 await verify({width: 1440, height: 1000}, 'desktop');
 await verify({width: 390, height: 844}, 'mobile');
-console.log('President project map, tasks, timeline, reviews, and directives passed desktop/mobile verification');
+console.log('President leadership, kanban, team, timeline, reviews, directives, and scenes passed desktop/mobile verification');
