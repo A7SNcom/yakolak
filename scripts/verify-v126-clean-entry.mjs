@@ -31,7 +31,7 @@ requireText(html,'body.yakolak-v126-entry #yakolakGameSetup','native setup hidde
 
 requireText(entry,"source:'v120-stable-room-table'",'stable source marker');
 requireText(entry,'gameGroup.visible=false','empty table requirement');
-requireText(entry,'gameGroup.visible=true','native game restored');
+requireText(entry,'setupGroup.visible=true','native setup group restored');
 requireText(entry,"renderer.domElement.style.pointerEvents='auto'",'canvas interaction restored');
 requireText(entry,"document.body.classList.remove('yakolak-v126-entry')",'native chrome restored');
 requireText(entry,'game.renderSetup3D?.()','native setup reused');
