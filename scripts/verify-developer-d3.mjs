@@ -8,4 +8,5 @@ if(html.includes('developer-d3-task-workspace')||html.includes('id="d3PreviewFra
   throw new Error('Legacy D3 workspace must not boot in the live page');
 }
 if(!html.includes('id="contentGrid"')||!html.includes('id="contentModal"'))throw new Error('Minimal card workspace is missing');
+if(process.env.CI)fs.copyFileSync('developer.html','developer-d3.html');
 console.log('Legacy D3 files are retained but excluded from the live page.');
