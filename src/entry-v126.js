@@ -181,7 +181,6 @@ function disposeLogoWall(logos){
 function restoreNativeExperience(game,logos){
   const {renderer,gameGroup,setupGroup,render,state}=game;
   disposeLogoWall(logos);
-  gameGroup.visible=true;
   if(setupGroup)setupGroup.visible=true;
   renderer.domElement.style.pointerEvents='auto';
   document.body.classList.remove('yakolak-v126-entry');
@@ -191,7 +190,7 @@ function restoreNativeExperience(game,logos){
 }
 
 async function animateJourney(game,poses,wallAnchor){
-  const {THREE,renderer,camera,render}=game;
+  const {THREE,camera,render}=game;
   if(reduced){
     applyPose(camera,THREE,poses.end);
     projectLoaderAnchor(camera,THREE,wallAnchor);
