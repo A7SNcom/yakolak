@@ -168,19 +168,8 @@ function createStableJourney(THREE,start,end,portrait){
   };
 }
 
-function disposeLogoWall(logos){
-  if(!logos)return;
-  logos.parent?.remove?.(logos);
-  logos.traverse?.(object=>{
-    object.geometry?.dispose?.();
-    const materials=Array.isArray(object.material)?object.material:[object.material];
-    materials.filter(Boolean).forEach(material=>material.dispose?.());
-  });
-}
-
-function restoreNativeExperience(game,logos){
-  const {renderer,gameGroup,setupGroup,render,state}=game;
-  disposeLogoWall(logos);
+function restoreNativeExperience(game){
+  const {renderer,setupGroup,render,state}=game;
   if(setupGroup)setupGroup.visible=true;
   renderer.domElement.style.pointerEvents='auto';
   document.body.classList.remove('yakolak-v126-entry');
@@ -237,7 +226,7 @@ async function runJourney(game){
   const anchorVisible=projectLoaderAnchor(camera,THREE,wallAnchor);
   render();
   if(anchorVisible&&!reduced)await wait(120);
-  restoreNativeExperience(game,logos);
+  restoreNativeExperience(game);
   globalThis.__yakolakEntryLoader?.finish?.();
   document.body.dataset.yakolakEntry='complete';
 
@@ -245,6 +234,7 @@ async function runJourney(game){
     build:BUILD,
     phase:'complete',
     source:'v120-stable-room-table',
+    logos,
     logoInk:INK,
     cameraMotion:reduced?'reduced-motion-skip':'single-cubic-slerp',
     gameGroupHidden:!gameGroup.visible,
