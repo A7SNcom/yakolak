@@ -24,6 +24,10 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff;color:
 #yakolakLoaderStar path{fill:var(--yakolak-ink)}
 #yakolakLoader.error #yakolakLoaderStar path{fill:#8f3b34}
 .loadingShadow{position:absolute;top:123px;left:13px;width:70px;height:8px;border-radius:50%;background:#000;opacity:.075;filter:blur(.6px);transform-origin:center;animation:loaderShadow var(--loader-cycle) infinite;will-change:transform,opacity}
+#yakolakLoaderError{position:absolute;left:50%;top:calc(50% + 98px);width:min(340px,calc(100vw - 32px));transform:translateX(-50%);display:none;text-align:center;direction:rtl}
+#yakolakLoader.error #yakolakLoaderError{display:grid;gap:12px}
+#yakolakLoaderError p{margin:0;color:#682f2a;font-size:15px;line-height:1.6;font-weight:800}
+#yakolakRetry{justify-self:center;min-width:132px;min-height:46px;border:1px solid #6f3934;border-radius:14px;background:#fff;color:#532924;font:900 14px system-ui;cursor:pointer;touch-action:manipulation}
 .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 @keyframes bounce{
   0%{transform:translateY(0) scale(1);animation-timing-function:cubic-bezier(.55,.08,.68,.19)}
@@ -41,11 +45,11 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff;color:
   58%{transform:scale(1.04,.94);opacity:.105}
   78%{transform:scale(.72,.76);opacity:.065}
 }
-#yakolakGameHud,#yakolakGameScore,#yakolakGameSetup,#yakolakTools,#yakolakCalibrationPanel,#yakolakOnlineDialog,#yakolakTutorialDialog,#yakolakOnlineEntry,#yakolakHowTo,#yakolakEntry,#yakolakFloatingSettings,#yakolakEntrySettings{display:none!important;visibility:hidden!important;pointer-events:none!important}
-@media(prefers-reduced-motion:reduce){:root{--loader-cycle:1100ms}}
+body.yakolak-v126-entry #yakolakGameHud,body.yakolak-v126-entry #yakolakGameScore,body.yakolak-v126-entry #yakolakGameSetup,body.yakolak-v126-entry #yakolakTools,body.yakolak-v126-entry #yakolakCalibrationPanel,body.yakolak-v126-entry #yakolakOnlineDialog,body.yakolak-v126-entry #yakolakTutorialDialog,body.yakolak-v126-entry #yakolakOnlineEntry,body.yakolak-v126-entry #yakolakHowTo,body.yakolak-v126-entry #yakolakEntry,body.yakolak-v126-entry #yakolakFloatingSettings,body.yakolak-v126-entry #yakolakEntrySettings{display:none!important;visibility:hidden!important;pointer-events:none!important}
+@media(prefers-reduced-motion:reduce){:root{--loader-cycle:1100ms}.starBounce,#yakolakLoaderStar,.loadingShadow{animation:none!important}}
 </style>
 </head>
-<body>
+<body class="yakolak-v126-entry">
 <div id="yakolakLoader" aria-busy="true" aria-describedby="yakolakLoaderStatus">
   <div id="yakolakLoaderAnchor" aria-hidden="true">
     <div class="loaderProjection">
@@ -58,6 +62,10 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff;color:
       </div>
       <div class="loadingShadow"></div>
     </div>
+  </div>
+  <div id="yakolakLoaderError" role="alert">
+    <p id="yakolakLoaderErrorMessage">تعذر تجهيز اللعبة.</p>
+    <button id="yakolakRetry" type="button">إعادة المحاولة</button>
   </div>
   <span id="yakolakLoaderStatus" class="sr-only">تحميل اللعبة</span>
 </div>
@@ -75,6 +83,8 @@ const ASSET_VERSION=clearToken||BUILD;
 const loaderEl=document.getElementById('yakolakLoader');
 const loaderAnchor=document.getElementById('yakolakLoaderAnchor');
 const loaderStatus=document.getElementById('yakolakLoaderStatus');
+const loaderErrorMessage=document.getElementById('yakolakLoaderErrorMessage');
+const retryButton=document.getElementById('yakolakRetry');
 const removeLoaderNow=()=>{if(loaderEl?.parentNode)loaderEl.parentNode.removeChild(loaderEl)};
 if(loaderEl)loaderEl.remove=()=>{loaderEl.dataset.removePending='1'};
 window.__yakolakEntryLoader={
@@ -91,6 +101,16 @@ window.__yakolakEntryLoader={
   finish(){
     if(!loaderEl?.isConnected)return;
     removeLoaderNow();
+  },
+  error(message){
+    if(!loaderEl?.isConnected)return;
+    loaderEl.classList.remove('handoff');
+    loaderEl.classList.add('error');
+    loaderEl.setAttribute('aria-busy','false');
+    const text=message||'تعذر تجهيز اللعبة.';
+    if(loaderStatus)loaderStatus.textContent=text;
+    if(loaderErrorMessage)loaderErrorMessage.textContent=text;
+    retryButton?.focus?.();
   }
 };
 window.__yakolakLoading={set(value,status){if(status&&loaderStatus)loaderStatus.textContent=status}};
@@ -110,6 +130,7 @@ async function cleanReload(){
   await Promise.allSettled(jobs);hardReload();
 }
 window.__yakolakCleanReload=cleanReload;
+retryButton?.addEventListener('click',cleanReload);
 async function checkVersion(){
   try{
     const response=await fetch('./version.json?v='+ASSET_VERSION,{cache:'no-store'});
