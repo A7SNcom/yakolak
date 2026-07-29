@@ -349,22 +349,23 @@
       "reviewer": "Sara",
       "architectureSteward": "NOT_REQUIRED",
       "auditor": "Hakam",
-      "progress": {"completed": 4, "total": 5, "label": "الصفحة والكروت والمعاينة والتعليقات واختبار الكمبيوتر والجوال مكتملة؛ تنتظر النسخة التجريبية والمراجعة."},
+      "progress": {"completed": 5, "total": 5, "label": "الصفحة والكروت والمعاينة والتعليقات واختبار الكمبيوتر والجوال والنسخة التجريبية مكتملة؛ تنتظر المراجعة المستقلة."},
       "acceptance": [
         {"text": "لا توجد قيادة أو كانبان أو تنقل متشعب في الصفحة الحية", "status": "PASS"},
         {"text": "المشاهد والرحلات والعناصر والمهام تظهر ككروت قابلة للتصفية", "status": "PASS"},
         {"text": "النافذة تعرض الوسائط بالأسهم عند تعددها ولا تفرض صورة على المهمة", "status": "PASS"},
         {"text": "التعليقات مقتصرة على أحمد وراشد", "status": "PASS"},
-        {"text": "نجاح التحقق على الكمبيوتر والجوال دون تغيير اللعبة أو الإنتاج", "status": "PENDING"}
+        {"text": "نجاح التحقق على الكمبيوتر والجوال دون تغيير اللعبة أو الإنتاج", "status": "PASS"}
       ],
-      "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "PENDING", "preview": "PENDING", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
-      "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "", "previewUrl": "", "evidence": []},
+      "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "GREEN", "preview": "PASS", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
+      "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "96cf4bb", "previewUrl": "https://yakolak-git-agent-codexyak-007-unifie-ae230b-ahmdkcoms-projects.vercel.app/developer.html", "evidence": []},
       "blockedBy": [],
       "nextAction": "نشر نسخة تجريبية مطابقة، ثم مراجعة سارة وتدقيق حَكَم وقرار راشد.",
       "presidentAttention": "REVIEW_MILESTONE",
       "events": [
         {"id": "event-yak-008-president-amendment", "at": "2026-07-29T15:00:00+03:00", "type": "president", "actor": "President Ahmad", "title": "إلغاء تصميم القيادة والكانبان", "detail": "طلب صفحة واحدة شديدة البساطة تعتمد على الكروت والمعاينة والتعليقات بين أحمد وراشد فقط.", "evidence": []},
-        {"id": "event-yak-008-browser-validated", "at": "2026-07-29T16:10:00+03:00", "type": "validation", "actor": "Codex UI implementer", "title": "نجاح رحلة الكروت على الكمبيوتر والجوال", "detail": "نجحت التصفية وفتح رحلة والتنقل بين مشاهدها وفتح مهمة بلا صورة وإرسال تعليق، دون تجاوز أفقي أو أخطاء متصفح.", "evidence": []}
+        {"id": "event-yak-008-browser-validated", "at": "2026-07-29T16:10:00+03:00", "type": "validation", "actor": "Codex UI implementer", "title": "نجاح رحلة الكروت على الكمبيوتر والجوال", "detail": "نجحت التصفية وفتح رحلة والتنقل بين مشاهدها وفتح مهمة بلا صورة وإرسال تعليق، دون تجاوز أفقي أو أخطاء متصفح.", "evidence": []},
+        {"id": "event-yak-008-preview-ready", "at": "2026-07-29T16:20:00+03:00", "type": "validation", "actor": "Vercel", "title": "نسخة المعاينة جاهزة", "detail": "نجح نشر الرأس 96cf4bb على بيئة المعاينة المرتبطة بطلب الدمج #50.", "evidence": [{"label": "نسخة المعاينة", "url": "https://yakolak-git-agent-codexyak-007-unifie-ae230b-ahmdkcoms-projects.vercel.app/developer.html"}]}
       ]
     }
   ]
