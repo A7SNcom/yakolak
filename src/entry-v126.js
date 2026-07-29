@@ -168,23 +168,37 @@ function createStableJourney(THREE,start,end,portrait){
   };
 }
 
-async function runJourney(game){
-  const {THREE,renderer,camera,gameGroup,render}=game;
-  const scene=gameGroup.parent;
-  cleanStableRoom(scene,gameGroup);
-  renderer.domElement.style.pointerEvents='none';
+function disposeLogoWall(logos){
+  if(!logos)return;
+  logos.parent?.remove?.(logos);
+  logos.traverse?.(object=>{
+    object.geometry?.dispose?.();
+    const materials=Array.isArray(object.material)?object.material:[object.material];
+    materials.filter(Boolean).forEach(material=>material.dispose?.());
+  });
+}
 
-  const logos=await createOfficialLogoWall(scene,THREE,render);
-  const wallAnchor=new THREE.Vector3(0,250,-2370);
-  let poses=poseSet();
-  applyPose(camera,THREE,poses.start);
+function restoreNativeExperience(game,logos){
+  const {renderer,gameGroup,setupGroup,render,state}=game;
+  disposeLogoWall(logos);
+  gameGroup.visible=true;
+  if(setupGroup)setupGroup.visible=true;
+  renderer.domElement.style.pointerEvents='auto';
+  document.body.classList.remove('yakolak-v126-entry');
+  if(!state?.configured)game.renderSetup3D?.();
+  else game.setResponsiveOverview?.();
   render();
-  projectLoaderAnchor(camera,THREE,wallAnchor);
+}
 
-  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-  globalThis.__yakolakEntryLoader?.handoff?.();
-
-  const duration=reduced?1150:2650;
+async function animateJourney(game,poses,wallAnchor){
+  const {THREE,renderer,camera,render}=game;
+  if(reduced){
+    applyPose(camera,THREE,poses.end);
+    projectLoaderAnchor(camera,THREE,wallAnchor);
+    render();
+    return;
+  }
+  const duration=2650;
   const {positionCurve,startQuaternion,endQuaternion}=createStableJourney(THREE,poses.start,poses.end,poses.portrait);
   const started=performance.now();
   await new Promise(resolve=>{
@@ -201,28 +215,41 @@ async function runJourney(game){
     };
     requestAnimationFrame(frame);
   });
+}
+
+async function runJourney(game){
+  const {THREE,renderer,camera,gameGroup,render}=game;
+  const scene=gameGroup.parent;
+  cleanStableRoom(scene,gameGroup);
+  renderer.domElement.style.pointerEvents='none';
+
+  const logos=await createOfficialLogoWall(scene,THREE,render);
+  const wallAnchor=new THREE.Vector3(0,250,-2370);
+  const poses=poseSet();
+  applyPose(camera,THREE,poses.start);
+  render();
+  projectLoaderAnchor(camera,THREE,wallAnchor);
+
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  globalThis.__yakolakEntryLoader?.handoff?.();
+  await animateJourney(game,poses,wallAnchor);
 
   applyPose(camera,THREE,poses.end);
   const anchorVisible=projectLoaderAnchor(camera,THREE,wallAnchor);
   render();
-  if(anchorVisible)await wait(120);
+  if(anchorVisible&&!reduced)await wait(120);
+  restoreNativeExperience(game,logos);
   globalThis.__yakolakEntryLoader?.finish?.();
   document.body.dataset.yakolakEntry='complete';
-
-  addEventListener('resize',()=>{
-    poses=poseSet();
-    applyPose(camera,THREE,poses.end);
-    render();
-  },{passive:true});
 
   globalThis.__yakolakV126Entry={
     build:BUILD,
     phase:'complete',
     source:'v120-stable-room-table',
-    logos,
     logoInk:INK,
-    cameraMotion:'single-cubic-slerp',
-    gameGroupHidden:!gameGroup.visible
+    cameraMotion:reduced?'reduced-motion-skip':'single-cubic-slerp',
+    gameGroupHidden:!gameGroup.visible,
+    nativeInteraction:renderer.domElement.style.pointerEvents
   };
   console.info('[Yakolak] v126 clean entry journey complete');
 }
