@@ -15,7 +15,8 @@ const rejectText=(source,text,label)=>{
 
 requireText(app,"./src/app-game-v114.js?v=",'stable room import');
 requireText(app,"./src/entry-v126.js?v=",'clean entry import');
-requireText(app,'__yakolakEntryLoader?.error?.','visible bootstrap recovery');
+requireText(app,"loader?.classList.add('error')",'visible bootstrap recovery');
+requireText(app,"document.getElementById('yakolakRetry')",'bootstrap retry focus');
 ['app-game-v121','app-game-v122','app-game-v123','app-game-v124','app-game-v125'].forEach(value=>rejectText(app,value,'app bootstrap'));
 
 requireText(html,'id="yakolakLoaderStar"','star-only loader');
