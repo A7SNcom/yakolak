@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "humanRole": "president",
   "manager": "Rashed",
   "interface": "developer.html",
@@ -9,7 +9,10 @@
   "views": ["cards", "ordered-tasks"],
   "content": ["scene", "journey", "element", "task"],
   "taskStatuses": ["planned", "in_progress", "review", "done"],
+  "taskFeeds": ["president", "work"],
   "conversationRoles": ["Ahmad", "Rashed"],
+  "workRoles": ["Rashed", "Noor", "Sami", "Lina", "Mazen", "Nada", "Omar", "Sara", "Hakam"],
   "managerAuthentication": "RASHED_PORTAL_KEY",
+  "workerAuthentication": "YAKOLAK_WORKER_KEY",
   "productionEnabledByDefault": false
 }

@@ -9,6 +9,7 @@ const TASK_TABLE='yakolak_development_tasks';
 const TASK_STATE_TABLE='yakolak_development_task_state';
 const CONTENT_STATE_TABLE='yakolak_development_content_state';
 const COMMENT_TABLE='yakolak_development_task_comments';
+const WORK_TABLE='yakolak_development_task_work';
 const MAX_BODY_BYTES=3_200_000;
 const KINDS=new Set(['instruction','scene','element','architecture']);
 const PRIORITIES=new Set(['normal','high','urgent']);
@@ -16,6 +17,8 @@ const DECISIONS=new Set(['approved','needs_changes','rejected']);
 const ITEM_TYPES=new Set(['directive','review','content']);
 const TASK_STATUSES=new Set(['planned','in_progress','review','done']);
 const PARENT_TYPES=new Set(['none','scene','journey','element']);
+const WORK_ENTRY_TYPES=new Set(['delegation','update']);
+const WORKER_NAMES=new Set(['Noor','Sami','Lina','Mazen','Nada','Omar','Sara','Hakam']);
 const ID_PATTERN=/^[a-zA-Z0-9][a-zA-Z0-9:_-]{5,159}$/;
 let client;
 let tablesReady;
@@ -45,13 +48,15 @@ async function ensureTables(db){
     await db.execute(`CREATE TABLE IF NOT EXISTS ${TASK_STATE_TABLE} (task_id TEXT PRIMARY KEY,status TEXT NOT NULL DEFAULT 'planned',position INTEGER NOT NULL DEFAULT 0,deleted INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL)`);
     await db.execute(`CREATE TABLE IF NOT EXISTS ${CONTENT_STATE_TABLE} (item_id TEXT PRIMARY KEY,deleted INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL)`);
     await db.execute(`CREATE TABLE IF NOT EXISTS ${COMMENT_TABLE} (id TEXT PRIMARY KEY,task_id TEXT NOT NULL,author_role TEXT NOT NULL,body TEXT NOT NULL DEFAULT '',attachments_json TEXT NOT NULL DEFAULT '[]',created_at TEXT NOT NULL)`);
+    await db.execute(`CREATE TABLE IF NOT EXISTS ${WORK_TABLE} (id TEXT PRIMARY KEY,task_id TEXT NOT NULL,author_role TEXT NOT NULL,author_name TEXT NOT NULL,entry_type TEXT NOT NULL,body TEXT NOT NULL DEFAULT '',attachments_json TEXT NOT NULL DEFAULT '[]',created_at TEXT NOT NULL)`);
     await Promise.all([
       db.execute(`CREATE INDEX IF NOT EXISTS idx_president_directives_updated ON ${DIRECTIVE_TABLE}(updated_at DESC)`),
       db.execute(`CREATE INDEX IF NOT EXISTS idx_president_messages_item ON ${MESSAGE_TABLE}(item_type,item_id,created_at ASC)`),
       db.execute(`CREATE INDEX IF NOT EXISTS idx_president_events_created ON ${EVENT_TABLE}(created_at DESC)`),
       db.execute(`CREATE INDEX IF NOT EXISTS idx_development_tasks_parent ON ${TASK_TABLE}(parent_type,parent_id,updated_at DESC)`),
       db.execute(`CREATE INDEX IF NOT EXISTS idx_development_task_order ON ${TASK_STATE_TABLE}(position ASC,updated_at ASC)`),
-      db.execute(`CREATE INDEX IF NOT EXISTS idx_development_comments_task ON ${COMMENT_TABLE}(task_id,created_at ASC)`)
+      db.execute(`CREATE INDEX IF NOT EXISTS idx_development_comments_task ON ${COMMENT_TABLE}(task_id,created_at ASC)`),
+      db.execute(`CREATE INDEX IF NOT EXISTS idx_development_work_task ON ${WORK_TABLE}(task_id,created_at ASC)`)
     ]);
   })();
   await tablesReady;
@@ -90,6 +95,15 @@ function safeEqual(left,right){
   return a.length===b.length&&a.length>0&&timingSafeEqual(a,b);
 }
 function actorFor(req,body){
+  if(body.actorRole==='worker'){
+    const name=cleanText(body.actorName,40);
+    if(!WORKER_NAMES.has(name))throw new Error('worker_auth_required');
+    const configured=process.env.YAKOLAK_WORKER_KEY;
+    const supplied=String(req.headers['x-yakolak-worker-key']||'').trim();
+    if(!configured&&process.env.VERCEL_ENV!=='production')return`worker:${name}`;
+    if(!configured||!safeEqual(configured,supplied))throw new Error('worker_auth_required');
+    return`worker:${name}`;
+  }
   if(body.actorRole!=='manager')return'president';
   const configured=process.env.RASHED_PORTAL_KEY;
   const supplied=String(req.headers['x-yakolak-manager-key']||'').trim();
@@ -105,6 +119,7 @@ const taskFromRow=row=>({id:String(row.id),parentType:String(row.parent_type),pa
 const taskStateFromRow=row=>({taskId:String(row.task_id),status:String(row.status),position:Number(row.position||0),deleted:Boolean(Number(row.deleted||0)),updatedAt:String(row.updated_at)});
 const contentStateFromRow=row=>({itemId:String(row.item_id),deleted:Boolean(Number(row.deleted||0)),updatedAt:String(row.updated_at)});
 const commentFromRow=row=>({id:String(row.id),taskId:String(row.task_id),authorRole:String(row.author_role),body:String(row.body||''),attachments:parseJson(row.attachments_json,[]),createdAt:String(row.created_at)});
+const workFromRow=row=>({id:String(row.id),taskId:String(row.task_id),authorRole:String(row.author_role),authorName:String(row.author_name),entryType:String(row.entry_type),body:String(row.body||''),attachments:parseJson(row.attachments_json,[]),createdAt:String(row.created_at)});
 
 async function recordEvent(db,action,payload){
   const createdAt=new Date().toISOString();
@@ -112,18 +127,19 @@ async function recordEvent(db,action,payload){
   console.info('[Yakolak President]',JSON.stringify({action,...payload,createdAt}));
 }
 async function readAll(db){
-  const [directives,messages,decisions,tasks,taskStates,contentStates,taskComments]=await Promise.all([
+  const [directives,messages,decisions,tasks,taskStates,contentStates,taskComments,taskWork]=await Promise.all([
     db.execute(`SELECT * FROM ${DIRECTIVE_TABLE} ORDER BY updated_at DESC,created_at DESC`),
     db.execute(`SELECT * FROM ${MESSAGE_TABLE} ORDER BY created_at ASC,id ASC`),
     db.execute(`SELECT * FROM ${DECISION_TABLE} ORDER BY updated_at DESC`),
     db.execute(`SELECT * FROM ${TASK_TABLE} ORDER BY created_at ASC,id ASC`),
     db.execute(`SELECT * FROM ${TASK_STATE_TABLE} ORDER BY position ASC,updated_at ASC`),
     db.execute(`SELECT * FROM ${CONTENT_STATE_TABLE} ORDER BY updated_at ASC`),
-    db.execute(`SELECT * FROM ${COMMENT_TABLE} ORDER BY created_at ASC,id ASC`)
+    db.execute(`SELECT * FROM ${COMMENT_TABLE} ORDER BY created_at ASC,id ASC`),
+    db.execute(`SELECT * FROM ${WORK_TABLE} ORDER BY created_at ASC,id ASC`)
   ]);
   return{
     directives:(directives.rows||[]).map(directiveFromRow),messages:(messages.rows||[]).map(messageFromRow),decisions:(decisions.rows||[]).map(decisionFromRow),
-    tasks:(tasks.rows||[]).map(taskFromRow),taskStates:(taskStates.rows||[]).map(taskStateFromRow),contentStates:(contentStates.rows||[]).map(contentStateFromRow),taskComments:(taskComments.rows||[]).map(commentFromRow)
+    tasks:(tasks.rows||[]).map(taskFromRow),taskStates:(taskStates.rows||[]).map(taskStateFromRow),contentStates:(contentStates.rows||[]).map(contentStateFromRow),taskComments:(taskComments.rows||[]).map(commentFromRow),taskWork:(taskWork.rows||[]).map(workFromRow)
   };
 }
 
@@ -172,12 +188,24 @@ async function deleteContent(db,body,actor){
   return{itemId,deleted:true,updatedAt:now};
 }
 async function addTaskComment(db,body,actor){
+  if(actor.startsWith('worker:'))throw new Error('worker_channel_forbidden');
   const id=cleanId(body.id),taskId=cleanId(body.taskId),comment=cleanText(body.body,12_000),attachments=cleanAttachments(body.attachments);
   if(!comment&&!attachments.length)throw new Error('invalid_comment');
   const now=new Date().toISOString();
   await db.execute({sql:`INSERT INTO ${COMMENT_TABLE}(id,task_id,author_role,body,attachments_json,created_at) VALUES(?,?,?,?,?,?)`,args:[id,taskId,actor,comment,JSON.stringify(attachments),now]});
   await recordEvent(db,'task_comment',{commentId:id,taskId,actor,attachments:attachments.length});
   return commentFromRow({id,task_id:taskId,author_role:actor,body:comment,attachments_json:JSON.stringify(attachments),created_at:now});
+}
+async function addTaskWork(db,body,actor){
+  const id=cleanId(body.id),taskId=cleanId(body.taskId),entryType=cleanText(body.entryType,24),work=cleanText(body.body,12_000),attachments=cleanAttachments(body.attachments);
+  if(!WORK_ENTRY_TYPES.has(entryType)||(!work&&!attachments.length))throw new Error('invalid_work_entry');
+  const worker=actor.startsWith('worker:'),authorName=worker?actor.slice(7):'Rashed';
+  if(actor!=='manager'&&!worker)throw new Error('work_channel_forbidden');
+  if(entryType==='delegation'&&actor!=='manager')throw new Error('manager_auth_required');
+  const now=new Date().toISOString(),authorRole=worker?'worker':'manager';
+  await db.execute({sql:`INSERT INTO ${WORK_TABLE}(id,task_id,author_role,author_name,entry_type,body,attachments_json,created_at) VALUES(?,?,?,?,?,?,?,?)`,args:[id,taskId,authorRole,authorName,entryType,work,JSON.stringify(attachments),now]});
+  await recordEvent(db,'task_work_add',{workId:id,taskId,entryType,authorName,attachments:attachments.length});
+  return workFromRow({id,task_id:taskId,author_role:authorRole,author_name:authorName,entry_type:entryType,body:work,attachments_json:JSON.stringify(attachments),created_at:now});
 }
 
 async function createDirective(db,body){
@@ -221,7 +249,8 @@ async function saveDecision(db,body){
 }
 function statusFor(error){
   if(error?.message==='payload_too_large'||error?.message==='attachment_too_large')return 413;
-  if(['invalid_id','invalid_directive','invalid_message','invalid_decision','decision_requires_comment','invalid_payload','invalid_attachment','invalid_task','invalid_task_status','invalid_task_order','invalid_comment'].includes(error?.message))return 400;
+  if(['invalid_id','invalid_directive','invalid_message','invalid_decision','decision_requires_comment','invalid_payload','invalid_attachment','invalid_task','invalid_task_status','invalid_task_order','invalid_comment','invalid_work_entry'].includes(error?.message))return 400;
+  if(['manager_auth_required','worker_auth_required','worker_channel_forbidden','work_channel_forbidden'].includes(error?.message))return 403;
   if(error?.message==='directive_not_found')return 404;
   if(['forbidden_origin','manager_auth_required','president_approval_required'].includes(error?.message))return 403;
   if(String(error?.message||'').includes('UNIQUE constraint failed'))return 409;
@@ -241,12 +270,14 @@ export default async function handler(req,res){
     if(!sameOrigin(req))throw new Error('forbidden_origin');
     let body;try{body=parseBody(req)}catch{throw new Error('invalid_payload')}
     const action=cleanText(body.action,40),actor=actorFor(req,body);
+    if(actor.startsWith('worker:')&&action!=='task_work_add')throw new Error('work_channel_forbidden');
     if(action==='task_create')json(res,200,{ok:true,task:await createTask(db,body,actor)});
     else if(action==='task_status')json(res,200,{ok:true,taskState:await setTaskStatus(db,body,actor)});
     else if(action==='task_reorder')json(res,200,{ok:true,taskIds:await reorderTasks(db,body,actor)});
     else if(action==='task_delete')json(res,200,{ok:true,taskState:await deleteTask(db,body,actor)});
     else if(action==='content_delete')json(res,200,{ok:true,contentState:await deleteContent(db,body,actor)});
     else if(action==='task_comment')json(res,200,{ok:true,comment:await addTaskComment(db,body,actor)});
+    else if(action==='task_work_add')json(res,200,{ok:true,work:await addTaskWork(db,body,actor)});
     else if(action==='directive_create')json(res,200,{ok:true,directive:await createDirective(db,body)});
     else if(action==='message_add')json(res,200,{ok:true,message:await addMessage(db,body)});
     else if(action==='directive_cancel')json(res,200,{ok:true,directive:await cancelDirective(db,body)});

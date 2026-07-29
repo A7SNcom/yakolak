@@ -5,7 +5,8 @@ const LEDGER_URL='./ops/ai-team/development-ledger.json';
 const KIND_LABEL={scene:'مشهد',journey:'رحلة',element:'عنصر',task:'مهمة'};
 const STATUS_LABEL={planned:'خطة',in_progress:'تحت التنفيذ',review:'للمراجعة',done:'تمت'};
 const STATUS_ORDER=['planned','in_progress','review','done'];
-const state={filter:'all',query:'',content:[],tasks:[],taskStates:new Map(),contentStates:new Map(),comments:[],current:null,channelAvailable:false,previewSources:[],previewSourceIndex:0,previewVersionIndex:0};
+const state={filter:'all',query:'',content:[],tasks:[],taskStates:new Map(),contentStates:new Map(),comments:[],work:[],current:null,channelAvailable:false,previewSources:[],previewSourceIndex:0,previewVersionIndex:0};
+let taskSorter=null;
 
 const grid=document.querySelector('#contentGrid');
 const filters=document.querySelector('#filters');
@@ -114,8 +115,9 @@ function commentsForTask(task){
   const updates=task.ledger?unique([text(task.ledger.progress?.label),text(task.ledger.nextAction)]).map((body,index)=>({id:`update-${task.id}-${index}`,taskId:task.id,authorRole:'manager',body,attachments:[]})):[];
   return [...updates,...state.comments.filter(comment=>comment.taskId===task.id)];
 }
+function workForTask(task){return state.work.filter(entry=>entry.taskId===task.id)}
 function taskParentTitle(task){return task.parentType==='none'?'':state.content.find(item=>item.kind===task.parentType&&item.id===task.parentId)?.title||''}
-function taskSearchText(task){return [task.title,task.description,task.parentId,...commentsForTask(task).map(comment=>comment.body)].join(' ')}
+function taskSearchText(task){return [task.title,task.description,task.parentId,...commentsForTask(task).map(comment=>comment.body),...workForTask(task).flatMap(entry=>[entry.authorName,entry.body])].join(' ')}
 
 function visibleEntries(){
   const content=state.content.filter(item=>!isDeletedContent(item));
@@ -141,7 +143,7 @@ function createStatusSelect(task){
 }
 function createTaskRow(task,{draggable=false}={}){
   const row=document.createElement('article');row.className='task-row';row.dataset.taskId=task.id;
-  if(draggable){const handle=document.createElement('button');handle.type='button';handle.className='drag-handle';handle.textContent='سحب';handle.setAttribute('aria-label',`إعادة ترتيب ${task.title}`);wireDragHandle(handle,row);row.append(handle)}
+  if(draggable){const handle=document.createElement('button');handle.type='button';handle.className='drag-handle';handle.textContent='سحب';handle.setAttribute('aria-label',`إعادة ترتيب ${task.title}`);row.append(handle)}
   const copy=document.createElement('button');copy.type='button';copy.className='task-copy';
   const title=document.createElement('strong');title.textContent=task.title;copy.append(title);
   const context=[taskParentTitle(task),task.description].filter(Boolean).join(' — ');
@@ -152,11 +154,23 @@ function createTaskRow(task,{draggable=false}={}){
   actions.append(createStatusSelect(task),remove);row.append(copy,actions);return row;
 }
 function renderGrid(){
+  taskSorter?.destroy();taskSorter=null;
   grid.replaceChildren();grid.classList.toggle('task-mode',state.filter==='task');
   globalTaskComposer.hidden=state.filter!=='task'||!state.channelAvailable;
   const entries=visibleEntries();
   if(!entries.length){const empty=document.createElement('p');empty.className='empty';empty.textContent='لا توجد نتائج';grid.append(empty);return}
   for(const item of entries)grid.append(item.kind==='task'?createTaskRow(item,{draggable:state.filter==='task'&&!state.query}):createContentCard(item));
+  activateTaskSorting();
+}
+
+function activateTaskSorting(){
+  if(state.filter!=='task'||state.query||!window.Sortable)return;
+  taskSorter=window.Sortable.create(grid,{animation:160,handle:'.drag-handle',draggable:'.task-row',ghostClass:'moving',chosenClass:'chosen',forceFallback:true,fallbackTolerance:4,touchStartThreshold:3,onEnd:persistTaskOrder});
+}
+async function persistTaskOrder(){
+  const ids=[...grid.querySelectorAll('.task-row')].map(element=>element.dataset.taskId);
+  ids.forEach((id,position)=>state.taskStates.set(id,{...taskState(id),position}));
+  try{await post({action:'task_reorder',taskIds:ids})}catch{renderGrid()}
 }
 
 function sourceForDefinition(definition){return{id:definition.id,title:definition.defaultName,definition,versions:variantsFor(definition)}}
@@ -206,6 +220,13 @@ function createComment(comment){
   if(comment.attachments?.length){const attachments=document.createElement('div');attachments.className='attachment-list';attachments.append(...comment.attachments.map(attachmentLink));article.append(attachments)}
   return article;
 }
+function createWorkEntry(entry){
+  const article=document.createElement('article');article.className=`comment work-entry ${entry.authorRole==='manager'?'rashed':'worker'}`;
+  const header=document.createElement('strong');header.textContent=entry.authorRole==='manager'?'راشد':entry.authorName;article.append(header);
+  if(entry.body){const body=document.createElement('p');body.textContent=entry.body;article.append(body)}
+  if(entry.attachments?.length){const attachments=document.createElement('div');attachments.className='attachment-list';attachments.append(...entry.attachments.map(attachmentLink));article.append(attachments)}
+  return article;
+}
 function createCommentForm(task){
   const form=document.createElement('form');form.className='comment-form';form.hidden=!state.channelAvailable;
   const input=document.createElement('textarea');input.name='body';input.rows=1;input.maxLength=12000;input.placeholder='أضف تحديثًا أو تعليقًا';
@@ -222,7 +243,14 @@ function createTaskDetail(task,{open=false}={}){
   const body=document.createElement('div');body.className='task-detail-body';
   if(task.description){const description=document.createElement('p');description.className='description';description.textContent=task.description;body.append(description)}
   if(task.attachments?.length){const attachments=document.createElement('div');attachments.className='attachment-list';attachments.append(...task.attachments.map(attachmentLink));body.append(attachments)}
-  const comments=document.createElement('div');comments.className='comments';comments.append(...commentsForTask(task).map(createComment));body.append(comments,createCommentForm(task));
+  const tabs=document.createElement('div');tabs.className='task-feed-tabs';
+  const conversationButton=document.createElement('button');conversationButton.type='button';conversationButton.className='active';conversationButton.textContent='أحمد وراشد';
+  const workButton=document.createElement('button');workButton.type='button';workButton.textContent='الشغل';tabs.append(conversationButton,workButton);
+  const feed=document.createElement('div');feed.className='comments';
+  const conversationForm=createCommentForm(task);
+  const showConversation=()=>{conversationButton.classList.add('active');workButton.classList.remove('active');feed.replaceChildren(...commentsForTask(task).map(createComment));conversationForm.hidden=!state.channelAvailable};
+  const showWork=()=>{workButton.classList.add('active');conversationButton.classList.remove('active');const entries=workForTask(task);feed.replaceChildren(...entries.map(createWorkEntry));if(!entries.length){const empty=document.createElement('p');empty.className='feed-empty';empty.textContent='لا يوجد شغل مسجل';feed.append(empty)}conversationForm.hidden=true};
+  conversationButton.addEventListener('click',showConversation);workButton.addEventListener('click',showWork);showConversation();body.append(tabs,feed,conversationForm);
   const remove=document.createElement('button');remove.type='button';remove.className='detail-remove';remove.textContent='إزالة المهمة';remove.addEventListener('click',()=>removeTask(task));body.append(remove);
   details.append(body);return details;
 }
@@ -277,26 +305,10 @@ async function removeContent(item){
   const result=await post({action:'content_delete',itemId:contentKey(item)});state.contentStates.set(result.contentState.itemId,result.contentState);modal.close();renderGrid();
 }
 
-function wireDragHandle(handle,row){
-  let active=false;
-  const finish=async()=>{
-    if(!active)return;active=false;row.classList.remove('moving');
-    const ids=[...grid.querySelectorAll('.task-row')].map(element=>element.dataset.taskId);
-    ids.forEach((id,position)=>state.taskStates.set(id,{...taskState(id),position}));
-    try{await post({action:'task_reorder',taskIds:ids})}catch{renderGrid()}
-  };
-  handle.addEventListener('pointerdown',event=>{active=true;row.classList.add('moving');handle.setPointerCapture(event.pointerId);window.addEventListener('pointerup',finish,{once:true});event.preventDefault()});
-  handle.addEventListener('pointermove',event=>{
-    if(!active)return;const target=document.elementFromPoint(event.clientX,event.clientY)?.closest('.task-row');if(!target||target===row)return;
-    const rect=target.getBoundingClientRect();if(event.clientY<rect.top+rect.height/2)target.before(row);else target.after(row);
-  });
-  handle.addEventListener('pointerup',finish);handle.addEventListener('pointercancel',finish);
-}
-
 async function readJson(url){const response=await fetch(url,{headers:{accept:'application/json'},cache:'no-store'});if(!response.ok)throw new Error(`read_failed_${response.status}`);return response.json()}
 async function start(){
-  const [ledger,payload]=await Promise.all([readJson(LEDGER_URL).catch(()=>({tasks:[]})),readJson(API_URL).catch(()=>({ok:false,tasks:[],taskStates:[],contentStates:[],taskComments:[],messages:[]}))]);
-  state.channelAvailable=Boolean(payload.ok);state.contentStates=new Map((payload.contentStates||[]).map(entry=>[entry.itemId,entry]));state.comments=payload.taskComments||[];state.content=contentItems();mergeTasks(ledger,payload);renderGrid();document.body.dataset.developerReady='true';
+  const [ledger,payload]=await Promise.all([readJson(LEDGER_URL).catch(()=>({tasks:[]})),readJson(API_URL).catch(()=>({ok:false,tasks:[],taskStates:[],contentStates:[],taskComments:[],taskWork:[],messages:[]}))]);
+  state.channelAvailable=Boolean(payload.ok);state.contentStates=new Map((payload.contentStates||[]).map(entry=>[entry.itemId,entry]));state.comments=payload.taskComments||[];state.work=payload.taskWork||[];state.content=contentItems();mergeTasks(ledger,payload);renderGrid();document.body.dataset.developerReady='true';
 }
 
 filters.addEventListener('click',event=>{const button=event.target.closest('[data-filter]');if(!button)return;state.filter=button.dataset.filter;filters.querySelectorAll('[data-filter]').forEach(candidate=>candidate.classList.toggle('active',candidate===button));renderGrid()});

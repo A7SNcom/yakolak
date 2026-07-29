@@ -56,3 +56,11 @@ The automation schedule does not imply eight active tasks. Default cycle capacit
 - remaining employees `NO_TASK`.
 
 Idle automation runs are safer and cheaper than manufactured repository work.
+
+## Development task feed
+
+- Rashed selects the single ordered task in progress. When none exists, he chooses the first planned task in the President's order, adjusted only for a clearly higher urgent priority.
+- Rashed records each pod assignment as a short `delegation` entry in that task's work feed. He does not implement the assignment.
+- Each pod reads only its newest unanswered assignment and records factual `update` entries under the named worker identity.
+- President/Rashed comments remain separate from the work feed. Workers cannot write to the President channel or change task status/order.
+- Rashed moves verified work to review. Only President Ahmad can approve `done`.

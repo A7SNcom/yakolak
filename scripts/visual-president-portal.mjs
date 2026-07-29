@@ -12,7 +12,11 @@ function createStore(){
   return{
     tasks:[{id:'task-custom-journey',parentType:'journey',parentId:'journey-1',title:'مراجعة رحلة الدخول',description:'افحص الانتقال بين المشاهد.',attachments:[],createdBy:'manager',createdAt:'2026-07-29T14:00:00Z',updatedAt:'2026-07-29T14:00:00Z'}],
     taskStates:[{taskId:'YAK-009-01',status:'in_progress',position:0,deleted:false,updatedAt:'2026-07-29T14:00:00Z'},{taskId:'task-custom-journey',status:'planned',position:1,deleted:false,updatedAt:'2026-07-29T14:00:00Z'}],
-    contentStates:[],taskComments:[{id:'comment-rashed-1',taskId:'task-custom-journey',authorRole:'manager',body:'المعاينة جاهزة لملاحظتك.',attachments:[],createdAt:'2026-07-29T14:10:00Z'}],messages:[],reorderCalls:0
+    contentStates:[],taskComments:[{id:'comment-rashed-1',taskId:'task-custom-journey',authorRole:'manager',body:'المعاينة جاهزة لملاحظتك.',attachments:[],createdAt:'2026-07-29T14:10:00Z'}],
+    taskWork:[
+      {id:'work-1',taskId:'task-custom-journey',authorRole:'manager',authorName:'Rashed',entryType:'delegation',body:'يا نور، افحص بداية الرحلة وأرسل النتيجة بصورة واضحة.',attachments:[],createdAt:'2026-07-29T14:20:00Z'},
+      {id:'work-2',taskId:'task-custom-journey',authorRole:'worker',authorName:'Noor',entryType:'update',body:'راجعت البداية، والانتقال الأول يحتاج تعديلًا بسيطًا.',attachments:[],createdAt:'2026-07-29T14:30:00Z'}
+    ],messages:[],reorderCalls:0
   };
 }
 function upsert(items,key,value){const index=items.findIndex(item=>item[key]===value[key]);if(index>=0)items[index]=value;else items.push(value)}
@@ -56,6 +60,12 @@ async function verify(viewport,name){
     if(await page.locator('#previewItemSelect option').count()<2)throw new Error(`${name}: journey preview selector is missing`);
     if(!(await page.locator('#previewVersionField').isHidden()))throw new Error(`${name}: single version selector should be hidden`);
     await page.getByText('راشد',{exact:true}).waitFor();
+    const firstTask=page.locator('#linkedTasks .task-detail').first();
+    await firstTask.getByRole('button',{name:'الشغل'}).click();
+    await firstTask.getByText('يا نور، افحص بداية الرحلة وأرسل النتيجة بصورة واضحة.',{exact:true}).waitFor();
+    await firstTask.getByText('راجعت البداية، والانتقال الأول يحتاج تعديلًا بسيطًا.',{exact:true}).waitFor();
+    await page.screenshot({path:path.join(artifacts,`${name}-task-work.png`),fullPage:true});
+    await firstTask.getByRole('button',{name:'أحمد وراشد'}).click();
     const commentForm=page.locator('#linkedTasks .comment-form').first();
     await commentForm.locator('textarea').fill('أعد فحص البداية.');
     await commentForm.locator('input[type="file"]').setInputFiles({name:'note.txt',mimeType:'text/plain',buffer:Buffer.from('yakolak note')});
@@ -99,4 +109,4 @@ async function verify(viewport,name){
 
 await verify({width:1440,height:1000},'desktop');
 await verify({width:390,height:844},'mobile');
-console.log('Fuzzy search, dropdown previews, linked tasks, attachments, statuses, reorder, and removal passed desktop/mobile verification.');
+console.log('Task feeds, fuzzy search, dropdown previews, attachments, statuses, reorder, and removal passed desktop/mobile verification.');
