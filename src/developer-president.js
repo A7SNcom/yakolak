@@ -131,9 +131,7 @@ function mediaForItem(item){
       return variant?[previewForDefinition(definition,variant)]:[];
     });
   }
-  const images=(item.images||[]).map(url=>({type:'image',url,title:item.title}));
-  const preview=safeUrl(item.task?.links?.previewUrl);
-  return preview?[...images,{type:'iframe',url:preview,title:item.title}]:images;
+  return (item.images||[]).map(url=>({type:'image',url,title:item.title}));
 }
 
 function renderMedia(){

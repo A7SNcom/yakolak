@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 const read=path=>fs.readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
-const html=read('developer-d1.html'),sceneHtml=read('developer-scene.html'),gallery=read('src/developer-d1.js'),workspace=read('src/developer-d1-workspace.js'),registry=read('src/developer-d1-registry.js'),router=read('src/developer-scene-d1-router.js'),api=read('api/developer-d1.js'),workspaceApi=read('api/developer-d1-workspace.js');
+const html=read('developer-d1.html'),sceneHtml=read('developer-scene.html'),gallery=read('src/developer-d1.js'),workspace=read('src/developer-d1-workspace.js'),registry=read('src/developer-d1-registry.js'),router=read('src/developer-scene-d1-router.js'),activeRouter=read('src/developer-scene-d4-router.js'),api=read('api/developer-d1.js'),workspaceApi=read('api/developer-d1-workspace.js');
 const need=(src,text,label)=>{if(!src.includes(text))throw new Error(`${label}: missing ${text}`)};
 need(workspace,'id="d1ReviewOpen"','review center trigger');
 need(html,'developer-d1-workspace.js?v=D1-review-center','workspace boot');
 need(html,'developer-d1.js?v=D1-review-center','gallery boot');
-need(sceneHtml,'developer-scene-d1-router.js?v=D1-review-center','special scene router');
+need(sceneHtml,'developer-scene-d4-router.js?v=D4-complete-scenes','active scene router');
+need(activeRouter,"base:'./developer-scene-d1-router.js?v=D4-compatible-base'",'D1-compatible base delegation');
 for(const id of ['loading-star','empty-table','logo-wall','color-selection','player-count-selection','board-bases','clean-entry','unboxing-intro'])need(registry,`id:'${id}'`,'scene registry');
 for(const id of ['base-large','base-small','stone-large','stone-medium','stone-small','loading-star-element','table','logo-yakolak','logo-mtkyf'])need(registry,`id:'${id}'`,'element registry');
 need(api,'if(!existing)','legacy migration must not reset status');
