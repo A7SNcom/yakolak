@@ -56,7 +56,7 @@
       "dependencies": [],
       "risks": ["الحفاظ على عقود معاينة المشاهد الحالية", "عدم خلط بيانات موثقة باستنتاجات أو نسب تقدم تخمينية", "عدم لمس منطق اللعبة أو الإنتاج"],
       "recommendation": "تنفيذ واجهة موحدة قابلة للرجوع على فرع مستقل، ثم عرض دليل كمبيوتر وجوال قبل أي دمج.",
-      "links": []
+      "links": [{"label": "طلب الدمج #50", "url": "https://github.com/A7SNcom/yakolak/pull/50"}]
     }
   ],
   "tasks": [
@@ -280,7 +280,7 @@
         {"text": "Sara وHakam وقرار راشد", "status": "PENDING"}
       ],
       "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "GREEN", "preview": "PENDING", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
-      "links": {"prUrl": "", "commitSha": "", "previewUrl": "", "evidence": []},
+      "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "eda133a", "previewUrl": "", "evidence": []},
       "blockedBy": [],
       "nextAction": "مراجعة مستقلة على رأس الفرع، ثم نسخة معاينة مطابقة وقرار راشد.",
       "presidentAttention": "REVIEW_MILESTONE",
@@ -312,7 +312,7 @@
         {"text": "لا تغيير في ملفات اللعبة أو منطقها أو الإنتاج", "status": "PASS"}
       ],
       "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "GREEN", "preview": "PENDING", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
-      "links": {"prUrl": "", "commitSha": "", "previewUrl": "", "evidence": []},
+      "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "eda133a", "previewUrl": "", "evidence": []},
       "blockedBy": [],
       "nextAction": "مراجعة سارة للصور ونسخة معاينة مطابقة للرأس.",
       "presidentAttention": "REVIEW_MILESTONE",
