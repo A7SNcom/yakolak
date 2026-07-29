@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "revision": 5,
-  "updatedAt": "2026-07-29T15:00:00+03:00",
+  "revision": 6,
+  "updatedAt": "2026-07-29T17:00:00+03:00",
   "updatedBy": "Rashed framework",
   "portfolio": {
     "leadershipMode": "DELEGATED_LEADERSHIP",
     "activeInitiativeId": "initiative-minimal-card-workspace",
-    "summary": "الرئيس أحمد ألغى تصميم القيادة والكانبان. الاتجاه الحالي صفحة واحدة شديدة البساطة: كروت للمشاهد والرحلات والعناصر والمهام، ومعاينة وتعليقات أحمد وراشد داخل نافذة الكرت فقط.",
+    "summary": "الصفحة الواحدة تصبح نظام مهام مرتبًا: المحتوى بطاقات نصية، والمهام سطور قابلة للسحب بحالة واحدة وتعليقات ومرفقات. كل ملاحظة على مشهد أو رحلة أو عنصر تصبح مهمة مرتبطة به.",
     "health": "attention",
-    "nextManagementAction": "استبدال الصفحة الحية بالواجهة البسيطة واختبار التصفية والمعاينة والتعليقات على الكمبيوتر والجوال."
+    "nextManagementAction": "تنفيذ التخزين والترتيب والحالات والمرفقات، ثم اختبار البحث والسحب والموافقة والمعاينة على الكمبيوتر والجوال."
   },
   "initiatives": [
     {
@@ -66,7 +66,7 @@
       "status": "in_progress",
       "owner": "Rashed",
       "priority": "urgent",
-      "taskIds": ["YAK-008-01"],
+      "taskIds": ["YAK-008-01", "YAK-009-01"],
       "dependencies": [],
       "risks": ["الحفاظ على عقود المعاينة الحالية", "عدم لمس منطق اللعبة أو الإنتاج", "عدم إعادة إدخال الحشو أو الواجهات القديمة"],
       "recommendation": "استبدال الصفحة الحية بالكامل مع إبقاء ملفات المعاينة القائمة كمصدر وحيد للمحتوى.",
@@ -342,7 +342,7 @@
       "blueprintRevision": 5,
       "title": "استبدال صفحة التطوير بشبكة كروت بسيطة",
       "outcome": "صفحة واحدة بتصفية للمشاهد والرحلات والعناصر والمهام، ونافذة معاينة بوسائط قابلة للتنقل وتعليقات أحمد وراشد فقط.",
-      "status": "in_progress",
+      "status": "superseded",
       "effort": "M",
       "risk": "medium-developer-ui",
       "owner": "Codex UI implementer",
@@ -366,6 +366,39 @@
         {"id": "event-yak-008-president-amendment", "at": "2026-07-29T15:00:00+03:00", "type": "president", "actor": "President Ahmad", "title": "إلغاء تصميم القيادة والكانبان", "detail": "طلب صفحة واحدة شديدة البساطة تعتمد على الكروت والمعاينة والتعليقات بين أحمد وراشد فقط.", "evidence": []},
         {"id": "event-yak-008-browser-validated", "at": "2026-07-29T16:10:00+03:00", "type": "validation", "actor": "Codex UI implementer", "title": "نجاح رحلة الكروت على الكمبيوتر والجوال", "detail": "نجحت التصفية وفتح رحلة والتنقل بين مشاهدها وفتح مهمة بلا صورة وإرسال تعليق، دون تجاوز أفقي أو أخطاء متصفح.", "evidence": []},
         {"id": "event-yak-008-preview-ready", "at": "2026-07-29T16:20:00+03:00", "type": "validation", "actor": "Vercel", "title": "نسخة المعاينة جاهزة", "detail": "نجح نشر الرأس 96cf4bb على بيئة المعاينة المرتبطة بطلب الدمج #50.", "evidence": [{"label": "نسخة المعاينة", "url": "https://yakolak-git-agent-codexyak-007-unifie-ae230b-ahmdkcoms-projects.vercel.app/developer.html"}]}
+      ]
+    },
+    {
+      "id": "YAK-009-01",
+      "initiativeId": "initiative-minimal-card-workspace",
+      "blueprintNodeId": "initiative-minimal-card-workspace",
+      "blueprintRevision": 6,
+      "title": "توحيد المحتوى حول مهام مرتبة",
+      "outcome": "بطاقات محتوى نصية، وقائمة مهام مرتبة قابلة للسحب والحذف، وحالات منضبطة، وبحث تقريبي، ومعاينة بالقوائم، ومرفقات وتعليقات داخل كل مهمة.",
+      "status": "in_progress",
+      "effort": "L-split-implementation",
+      "risk": "medium-persistent-developer-workflow",
+      "owner": "Codex UI implementer",
+      "reviewer": "Sara",
+      "architectureSteward": "NOT_REQUIRED",
+      "auditor": "Hakam",
+      "progress": {"completed": 5, "total": 6, "label": "التخزين والواجهة والبحث والسحب والحالات والمرفقات واختبار الكمبيوتر والجوال مكتملة؛ تنتظر نسخة المعاينة."},
+      "acceptance": [
+        {"text": "إزالة أي محتوى أو مهمة مع حفظ الإزالة", "status": "PASS"},
+        {"text": "المهام سطر لكل مهمة وقابلة للسحب والترتيب المحفوظ", "status": "PASS"},
+        {"text": "كل ملاحظة على محتوى تصبح مهمة ولكل مهمة تعليقات ومرفقات", "status": "PASS"},
+        {"text": "حالة واحدة من خطة أو تحت التنفيذ أو للمراجعة أو تمت، ومهمة واحدة فقط تحت التنفيذ", "status": "PASS"},
+        {"text": "البحث تقريبي والمعاينة تستخدم قوائم المحتوى والإصدار عند الحاجة فقط", "status": "PASS"},
+        {"text": "نجاح اختبار الكمبيوتر والجوال دون تغيير اللعبة أو الإنتاج", "status": "PASS"}
+      ],
+      "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "PENDING", "preview": "PENDING", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
+      "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "", "previewUrl": "", "evidence": []},
+      "blockedBy": [],
+      "nextAction": "نشر نسخة معاينة مطابقة، ثم مراجعة سارة وتدقيق حَكَم وقرار راشد.",
+      "presidentAttention": "REVIEW_MILESTONE",
+      "events": [
+        {"id": "event-yak-009-president-amendment", "at": "2026-07-29T17:00:00+03:00", "type": "president", "actor": "President Ahmad", "title": "تحويل التعليقات إلى مهام مرتبة", "detail": "طلب حذف الزوائد، وإضافة الإزالة والبحث والسحب والحالات والمرفقات، وربط كل تواصل بالمهمة نفسها.", "evidence": []},
+        {"id": "event-yak-009-browser-validated", "at": "2026-07-29T18:10:00+03:00", "type": "validation", "actor": "Codex UI implementer", "title": "نجاح مسار المهام على الكمبيوتر والجوال", "detail": "نجح البحث التقريبي وقوائم المعاينة والمهمة المرتبطة والمرفق والحالة الحصرية والسحب المحفوظ والإزالة، دون تجاوز أفقي أو أخطاء متصفح.", "evidence": []}
       ]
     }
   ]

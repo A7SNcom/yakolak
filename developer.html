@@ -5,11 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
   <title>ياكلك</title>
-  <link rel="stylesheet" href="./src/developer-president.css?v=cards-v1">
+  <link rel="stylesheet" href="./src/developer-president.css?v=tasks-v2">
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="./" aria-label="ياكلك">ياكلك</a>
+    <label class="search-box">
+      <span class="sr-only">بحث</span>
+      <input id="searchInput" type="search" placeholder="بحث" autocomplete="off">
+    </label>
     <nav id="filters" class="filters" aria-label="تصفية المحتوى">
       <button class="active" type="button" data-filter="all">الكل</button>
       <button type="button" data-filter="scene">المشاهد</button>
@@ -18,6 +21,14 @@
       <button type="button" data-filter="task">المهام</button>
     </nav>
   </header>
+
+  <section id="globalTaskComposer" class="global-task-composer" hidden>
+    <form id="globalTaskForm" class="task-create-form">
+      <input name="title" maxlength="240" placeholder="مهمة جديدة" required>
+      <label class="attachment-button">مرفق<input name="attachments" type="file" accept="image/*,application/pdf,text/plain" multiple></label>
+      <button type="submit">إضافة</button>
+    </form>
+  </section>
 
   <main id="contentGrid" class="card-grid" aria-live="polite"></main>
 
@@ -28,28 +39,34 @@
           <span id="modalKind" class="kind"></span>
           <h1 id="modalTitle"></h1>
         </div>
-        <button id="modalClose" class="close-button" type="button" aria-label="إغلاق">×</button>
+        <div class="modal-actions">
+          <button id="removeCurrent" class="remove-button" type="button">إزالة</button>
+          <button id="modalClose" class="close-button" type="button" aria-label="إغلاق">×</button>
+        </div>
       </header>
 
       <section id="mediaSection" class="media-section" aria-label="المعاينة">
+        <div id="previewControls" class="preview-controls">
+          <label id="previewItemField"><span id="previewItemLabel">المعاينة</span><select id="previewItemSelect"></select></label>
+          <label id="previewVersionField"><span>الإصدار</span><select id="previewVersionSelect"></select></label>
+        </div>
         <div id="mediaViewport" class="media-viewport"></div>
-        <button id="mediaNext" class="media-arrow next" type="button" aria-label="التالي">‹</button>
-        <button id="mediaPrevious" class="media-arrow previous" type="button" aria-label="السابق">›</button>
       </section>
 
       <div class="modal-body">
         <p id="modalDescription" class="description"></p>
-        <p id="modalRelation" class="relation" hidden></p>
-        <section id="comments" class="comments" aria-label="التعليقات"></section>
-        <form id="commentForm" class="comment-form">
-          <label class="sr-only" for="commentInput">اكتب تعليقك</label>
-          <textarea id="commentInput" rows="1" maxlength="12000" placeholder="اكتب تعليقك" required></textarea>
-          <button type="submit">إرسال</button>
-        </form>
+        <section id="linkedTasksSection" class="linked-tasks">
+          <form id="linkedTaskForm" class="task-create-form">
+            <input name="title" maxlength="240" placeholder="أضف مهمة" required>
+            <label class="attachment-button">مرفق<input name="attachments" type="file" accept="image/*,application/pdf,text/plain" multiple></label>
+            <button type="submit">إضافة</button>
+          </form>
+          <div id="linkedTasks" class="task-list"></div>
+        </section>
       </div>
     </article>
   </dialog>
 
-  <script type="module" src="./src/developer-president.js?v=cards-v1"></script>
+  <script type="module" src="./src/developer-president.js?v=tasks-v2"></script>
 </body>
 </html>

@@ -1,13 +1,15 @@
 {
-  "version": 3,
+  "version": 4,
   "humanRole": "president",
   "manager": "Rashed",
   "interface": "developer.html",
   "api": "./api/developer-president",
   "blueprint": "./ops/ai-team/development-blueprint.json",
   "ledger": "./ops/ai-team/development-ledger.json",
-  "views": ["cards"],
+  "views": ["cards", "ordered-tasks"],
   "content": ["scene", "journey", "element", "task"],
+  "taskStatuses": ["planned", "in_progress", "review", "done"],
   "conversationRoles": ["Ahmad", "Rashed"],
+  "managerAuthentication": "RASHED_PORTAL_KEY",
   "productionEnabledByDefault": false
 }
