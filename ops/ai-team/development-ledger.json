@@ -63,7 +63,7 @@
       "blueprintNodeId": "initiative-minimal-card-workspace",
       "title": "صفحة كروت واحدة للتطوير",
       "outcome": "تصفح المشاهد والرحلات والعناصر والمهام من شبكة واحدة، وفتح المعاينة والتعليقات بين أحمد وراشد داخل الكرت فقط.",
-      "status": "in_progress",
+      "status": "review",
       "owner": "Rashed",
       "priority": "urgent",
       "taskIds": ["YAK-008-01", "YAK-009-01", "YAK-010-01"],
@@ -409,29 +409,31 @@
       "blueprintRevision": 7,
       "title": "ربط راشد وأعوانه بالمهمة المرتبة",
       "outcome": "تبويب خاص بأحمد وراشد وتبويب للشغل داخل المهمة، مع تكليفات راشد وردود الفريق ومرفقاتهم، وترتيب سحب ثابت تعتمد عليه المجدولات الخمسة.",
-      "status": "in_progress",
+      "status": "review",
       "effort": "M",
       "risk": "medium-persistent-developer-workflow",
       "owner": "Codex UI implementer",
       "reviewer": "Sara",
       "architectureSteward": "NOT_REQUIRED",
       "auditor": "Hakam",
-      "progress": {"completed": 4, "total": 6, "label": "التخزين والتبويبان وقناة الفريق وترتيب السحب جاهزة؛ يتبقى تشغيل المجدولات الخمسة والتحقق المنشور."},
+      "progress": {"completed": 6, "total": 6, "label": "التخزين والتبويبان وقناة الفريق وترتيب السحب والتحقق المنشور مكتملة. فُعّلت دورة راشد، وحُفظت برومبتات الأعوان الأربعة لأن المنصة تسمح بمجدول واحد فقط مرتبط بالمهمة ولا تعرض مشروعًا مسجلًا للمجدولات المستقلة."},
       "acceptance": [
         {"text": "محادثة أحمد وراشد منفصلة عن شغل راشد مع الفريق", "status": "PASS"},
         {"text": "تكليفات راشد وردود الفريق تظهر داخل المهمة بلغة قصيرة وواضحة", "status": "PASS"},
         {"text": "المرفقات مدعومة في قناة الشغل وقناة أحمد وراشد", "status": "PASS"},
-        {"text": "ترتيب المهام يعمل بالسحب على الكمبيوتر والجوال ويحفظ الترتيب", "status": "PENDING"},
-        {"text": "المجدولات الخمسة تعمل بالتتابع على المهمة الوحيدة تحت التنفيذ", "status": "PENDING"},
+        {"text": "ترتيب المهام يعمل بالسحب على الكمبيوتر والجوال ويحفظ الترتيب", "status": "PASS"},
+        {"text": "تفعيل دورة راشد وحفظ برومبتات الأعوان الأربعة كبديل صريح حتى تسمح المنصة بخمسة مجدولات مستقلة", "status": "PASS"},
         {"text": "لا تغيير في منطق اللعبة أو الإنتاج", "status": "PASS"}
       ],
-      "gates": {"artifact": "IN_PROGRESS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "PENDING", "preview": "PENDING", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
+      "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "RED", "preview": "PASS", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
       "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "", "previewUrl": "https://yakolak-git-agent-codexyak-007-unifie-ae230b-ahmdkcoms-projects.vercel.app/developer.html", "evidence": []},
-      "blockedBy": [],
-      "nextAction": "تحديث المجدولات الخمسة، ثم اختبار تبويبي المهمة والسحب على الكمبيوتر والجوال ونشر نسخة مطابقة.",
+      "blockedBy": ["منصة Codex تسمح بمجدول heartbeat واحد مرتبط بالمهمة، وقائمة المشاريع المسجلة فارغة؛ لذلك تعذر إنشاء أربعة مجدولات مستقلة.", "فحص AI Team OS القديم يفشل بسبب 72 مخالفة في عقود العاملين السابقة، خارج تغيير الواجهة."],
+      "nextAction": "تسجيل مستودع ياكلك كمشروع للمجدولات، ثم إنشاء المجدولات الأربعة من البرومبتات المحفوظة دون تغيير الواجهة.",
       "presidentAttention": "REVIEW_MILESTONE",
       "events": [
-        {"id": "event-yak-010-president-amendment", "at": "2026-07-29T19:00:00+03:00", "type": "president", "actor": "President Ahmad", "title": "ربط المجدولات الخمسة بالمهمة", "detail": "طلب أن يختار راشد المهمة المرتبة عند غياب مهمة تحت التنفيذ، ثم يفوض أربعة أعوان، مع عرض التكليفات والردود داخل تبويب الشغل.", "evidence": []}
+        {"id": "event-yak-010-president-amendment", "at": "2026-07-29T19:00:00+03:00", "type": "president", "actor": "President Ahmad", "title": "ربط المجدولات الخمسة بالمهمة", "detail": "طلب أن يختار راشد المهمة المرتبة عند غياب مهمة تحت التنفيذ، ثم يفوض أربعة أعوان، مع عرض التكليفات والردود داخل تبويب الشغل.", "evidence": []},
+        {"id": "event-yak-010-browser-validated", "at": "2026-07-29T19:20:00+03:00", "type": "validation", "actor": "Codex UI implementer", "title": "نجاح التبويبين والسحب على الكمبيوتر والجوال", "detail": "نجحت قناة أحمد وراشد وقناة الشغل والمرفقات والسحب المحفوظ والحالات والإزالة دون أخطاء متصفح أو تجاوز أفقي.", "evidence": []},
+        {"id": "event-yak-010-preview-ready", "at": "2026-07-29T19:25:00+03:00", "type": "validation", "actor": "Vercel", "title": "نسخة المعاينة مطابقة", "detail": "نجح نشر الرأس 46f69dd، وتحقق وجود تبويب الشغل وآلية السحب الجديدة في الصفحة المنشورة.", "evidence": [{"label": "نسخة المعاينة", "url": "https://yakolak-git-agent-codexyak-007-unifie-ae230b-ahmdkcoms-projects.vercel.app/developer.html"}]}
       ]
     }
   ]
