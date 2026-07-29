@@ -10,5 +10,5 @@ import('./src/mobile-clarity-v120.js?v='+BUILD+'-policy')
   .catch(error=>{
     console.error('[Yakolak] v126 bootstrap failed',error);
     globalThis.__yakolakLoading?.set?.(100,'تعذر تجهيز رحلة البداية');
-    document.getElementById('yakolakLoader')?.classList.add('error');
+    globalThis.__yakolakEntryLoader?.error?.('تعذر تجهيز اللعبة. حاول إعادة المحاولة.');
   });
