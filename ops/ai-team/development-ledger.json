@@ -293,7 +293,7 @@
         {"text": "اختبار كمبيوتر وجوال ووصول أساسي", "status": "PASS"},
         {"text": "Sara وHakam وقرار راشد", "status": "PENDING"}
       ],
-      "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "GREEN", "preview": "PASS", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
+      "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "RED", "preview": "PASS", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
       "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "eda133a", "previewUrl": "https://yakolak-git-agent-codexyak-007-unifie-ae230b-ahmdkcoms-projects.vercel.app/developer.html", "evidence": []},
       "blockedBy": [],
       "nextAction": "مراجعة مستقلة على رأس الفرع، ثم تدقيق حَكَم وقرار راشد.",
@@ -443,29 +443,30 @@
       "blueprintRevision": 8,
       "title": "تصحيح الإضافة والتعديل والمعاينات",
       "outcome": "نافذة إضافة وتعديل بنص طويل منسق، وحماية كتابات راشد والفريق، ومعاينات صحيحة بلودر مستقل، وإجراءات أيقونية موحدة ومساحات مريحة.",
-      "status": "in_progress",
+      "status": "review",
       "effort": "M",
       "risk": "medium-persistent-developer-ui",
       "owner": "Codex UI implementer",
       "reviewer": "Sara",
       "architectureSteward": "NOT_REQUIRED",
       "auditor": "Hakam",
-      "progress": {"completed": 0, "total": 6, "label": "جارٍ تنفيذ توجيه الرئيس واختباره على الكمبيوتر والجوال."},
+      "progress": {"completed": 6, "total": 6, "label": "اكتملت نافذة الإضافة والتعديل والحماية والمعاينات والأيقونات وضبط المساحات، ونجح الاختبار المحلي والنشر التجريبي؛ تنتظر مراجعة الرئيس."},
       "acceptance": [
-        {"text": "زر الإضافة يفتح نافذة بمحرر طويل ومنسق", "status": "PENDING"},
-        {"text": "يمكن تعديل المهام وردود أحمد فقط", "status": "PENDING"},
-        {"text": "المعاينة تخفي شاشة تحميل اللعبة وتعرض المحتوى الصحيح أو خطأ خاصًا به", "status": "PENDING"},
-        {"text": "الإضافة والتعديل والإزالة تستخدم عائلة أيقونات واحدة", "status": "PENDING"},
-        {"text": "ألوان خفيفة وفراغات أقل على الكمبيوتر والجوال", "status": "PENDING"},
-        {"text": "لا تغيير في منطق اللعبة أو الإنتاج", "status": "PENDING"}
+        {"text": "زر الإضافة يفتح نافذة بمحرر طويل ومنسق", "status": "PASS"},
+        {"text": "يمكن تعديل المهام وردود أحمد فقط", "status": "PASS"},
+        {"text": "المعاينة تخفي شاشة تحميل اللعبة وتعرض المحتوى الصحيح أو خطأ خاصًا به", "status": "PASS"},
+        {"text": "الإضافة والتعديل والإزالة تستخدم عائلة أيقونات واحدة", "status": "PASS"},
+        {"text": "ألوان خفيفة وفراغات أقل على الكمبيوتر والجوال", "status": "PASS"},
+        {"text": "لا تغيير في منطق اللعبة أو الإنتاج", "status": "PASS"}
       ],
-      "gates": {"artifact": "PENDING", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "PENDING", "preview": "PENDING", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
-      "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "", "previewUrl": "https://yakolak-git-agent-codexyak-007-unifie-ae230b-ahmdkcoms-projects.vercel.app/developer.html", "evidence": []},
-      "blockedBy": [],
-      "nextAction": "تنفيذ الواجهة والتخزين ثم التحقق الفعلي من المعاينات على الكمبيوتر والجوال.",
+      "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "GREEN", "preview": "PASS", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
+      "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "6d9dfcc", "previewUrl": "https://yakolak-git-agent-codexyak-007-unifie-ae230b-ahmdkcoms-projects.vercel.app/developer.html", "evidence": []},
+      "blockedBy": ["فحص AI Team OS القديم ما زال يفشل بسبب مخالفات سابقة خارج نطاق هذه الواجهة."],
+      "nextAction": "مراجعة الرئيس للنسخة التجريبية، ثم مراجعة سارة وتدقيق حَكَم.",
       "presidentAttention": "REVIEW_MILESTONE",
       "events": [
-        {"id": "event-yak-011-president-amendment", "at": "2026-07-29T20:00:00+03:00", "type": "president", "actor": "President Ahmad", "title": "تصحيح الإضافة والمعاينات", "detail": "طلب نافذة إضافة بنص طويل منسق وتعديل محتوى أحمد وحماية كتابات الفريق وإصلاح المعاينات واللودر والأيقونات والفراغات.", "evidence": []}
+        {"id": "event-yak-011-president-amendment", "at": "2026-07-29T20:00:00+03:00", "type": "president", "actor": "President Ahmad", "title": "تصحيح الإضافة والمعاينات", "detail": "طلب نافذة إضافة بنص طويل منسق وتعديل محتوى أحمد وحماية كتابات الفريق وإصلاح المعاينات واللودر والأيقونات والفراغات.", "evidence": []},
+        {"id": "event-yak-011-browser-validated", "at": "2026-07-29T20:40:00+03:00", "type": "validation", "actor": "Codex UI implementer", "title": "نجاح الإضافة والتعديل والمعاينة", "detail": "نجحت الرحلة على الكمبيوتر والجوال، وظهرت معاينة حقيقية بعد جاهزيتها دون شاشة تحميل اللعبة أو أخطاء متصفح، ونجحت فحوص المستودع والنشر التجريبي.", "evidence": [{"label": "طلب الدمج #50", "url": "https://github.com/A7SNcom/yakolak/pull/50"}]}
       ]
     }
   ]
