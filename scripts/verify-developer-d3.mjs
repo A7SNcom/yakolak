@@ -1,13 +1,11 @@
 import fs from 'node:fs';
-import {writeDeveloperD3Fixture} from './build-developer-d3-fixture.mjs';
-const files=['developer.html','src/developer-d3.css','src/developer-d3.js','src/developer-d2-registry.js','scripts/build-developer-d3-fixture.mjs','scripts/visual-developer-d3.mjs','docs/design/developer-d3-ux-evidence.md'];
-for(const file of files)if(!fs.existsSync(file))throw new Error(`Missing ${file}`);
-const html=writeDeveloperD3Fixture();
-const css=fs.readFileSync('src/developer-d3.css','utf8');
-const js=fs.readFileSync('src/developer-d3.js','utf8');
-if(!html.includes('developer-d3-task-workspace'))throw new Error('Missing D3 marker');
-if((html.match(/id="d3PreviewFrame"/g)||[]).length!==1)throw new Error('Expected exactly one primary live preview');
-for(const id of ['d3StartTask','d3ReviewOpen','d3BriefOpen','d3Drawer','d3TaskProblem','d3TaskOutcome','d3TaskCriteria'])if(!html.includes(`id="${id}"`))throw new Error(`Missing ${id}`);
-if(!css.includes('[hidden]{display:none!important}')||!css.includes('@media(max-width:760px)')||!css.includes('prefers-reduced-motion'))throw new Error('Missing visibility, responsive, or motion safeguards');
-if(!js.includes('function buildBrief()')||!js.includes('الدليل المطلوب')||!js.includes("document.body.dataset.developerReady='true'"))throw new Error('Missing AI bridge or ready marker');
-console.log('Developer D3 retained fixture structure verification passed.');
+
+for(const file of ['developer.html','src/developer-d3.css','src/developer-d3.js','src/developer-d2-registry.js']){
+  if(!fs.existsSync(file))throw new Error(`Missing ${file}`);
+}
+const html=fs.readFileSync('developer.html','utf8');
+if(html.includes('developer-d3-task-workspace')||html.includes('id="d3PreviewFrame"')||html.includes('src/developer-d3.js')){
+  throw new Error('Legacy D3 workspace must not boot in the live page');
+}
+if(!html.includes('id="contentGrid"')||!html.includes('id="contentModal"'))throw new Error('Minimal card workspace is missing');
+console.log('Legacy D3 files are retained but excluded from the live page.');

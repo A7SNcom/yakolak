@@ -1,25 +1,13 @@
 {
-  "version": 2,
+  "version": 3,
   "humanRole": "president",
   "manager": "Rashed",
   "interface": "developer.html",
   "api": "./api/developer-president",
   "blueprint": "./ops/ai-team/development-blueprint.json",
   "ledger": "./ops/ai-team/development-ledger.json",
-  "views": [
-    "portfolio",
-    "tasks",
-    "timeline",
-    "reviews",
-    "directives"
-  ],
-  "reportingCadence": "meaningful-event",
-  "productionEnabledByDefault": false,
-  "reviewGates": [
-    "reviewer:PASS",
-    "manager:PASS",
-    "hakam:MERGE_OK",
-    "ci:GREEN",
-    "exact-head-preview"
-  ]
+  "views": ["cards"],
+  "content": ["scene", "journey", "element", "task"],
+  "conversationRoles": ["Ahmad", "Rashed"],
+  "productionEnabledByDefault": false
 }

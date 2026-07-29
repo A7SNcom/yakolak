@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "revision": 4,
-  "updatedAt": "2026-07-29T12:00:00+03:00",
+  "revision": 5,
+  "updatedAt": "2026-07-29T15:00:00+03:00",
   "updatedBy": "Rashed framework",
   "portfolio": {
     "leadershipMode": "DELEGATED_LEADERSHIP",
-    "activeInitiativeId": "initiative-unified-president-workspace",
-    "summary": "راشد استلم عدم رضا الرئيس أحمد وحوّله إلى مبادرة موحدة: لغة إدارية مفهومة، قيادة مختصرة، كانبان حقيقي، ومشاهد أوضح دون المساس باللعبة أو الإنتاج.",
+    "activeInitiativeId": "initiative-minimal-card-workspace",
+    "summary": "الرئيس أحمد ألغى تصميم القيادة والكانبان. الاتجاه الحالي صفحة واحدة شديدة البساطة: كروت للمشاهد والرحلات والعناصر والمهام، ومعاينة وتعليقات أحمد وراشد داخل نافذة الكرت فقط.",
     "health": "attention",
-    "nextManagementAction": "تفويض تنفيذ الواجهة الموحدة، ثم مراجعة النتيجة على الكمبيوتر والجوال وتقديمها للرئيس مع دليل قبل/بعد."
+    "nextManagementAction": "استبدال الصفحة الحية بالواجهة البسيطة واختبار التصفية والمعاينة والتعليقات على الكمبيوتر والجوال."
   },
   "initiatives": [
     {
@@ -49,13 +49,27 @@
       "blueprintNodeId": "initiative-unified-president-workspace",
       "title": "مساحة الرئيس الموحدة والواضحة",
       "outcome": "يستطيع الرئيس أحمد فهم ما يديره راشد واتخاذ القرار، ثم الانتقال إلى كانبان والمراجعات والمشاهد والعناصر من واجهة واحدة عربية ومتسقة.",
-      "status": "review",
+      "status": "superseded",
       "owner": "Rashed",
       "priority": "urgent",
       "taskIds": ["YAK-007-01", "YAK-007-02"],
       "dependencies": [],
       "risks": ["الحفاظ على عقود معاينة المشاهد الحالية", "عدم خلط بيانات موثقة باستنتاجات أو نسب تقدم تخمينية", "عدم لمس منطق اللعبة أو الإنتاج"],
       "recommendation": "تنفيذ واجهة موحدة قابلة للرجوع على فرع مستقل، ثم عرض دليل كمبيوتر وجوال قبل أي دمج.",
+      "links": [{"label": "طلب الدمج #50", "url": "https://github.com/A7SNcom/yakolak/pull/50"}]
+    },
+    {
+      "id": "initiative-minimal-card-workspace",
+      "blueprintNodeId": "initiative-minimal-card-workspace",
+      "title": "صفحة كروت واحدة للتطوير",
+      "outcome": "تصفح المشاهد والرحلات والعناصر والمهام من شبكة واحدة، وفتح المعاينة والتعليقات بين أحمد وراشد داخل الكرت فقط.",
+      "status": "in_progress",
+      "owner": "Rashed",
+      "priority": "urgent",
+      "taskIds": ["YAK-008-01"],
+      "dependencies": [],
+      "risks": ["الحفاظ على عقود المعاينة الحالية", "عدم لمس منطق اللعبة أو الإنتاج", "عدم إعادة إدخال الحشو أو الواجهات القديمة"],
+      "recommendation": "استبدال الصفحة الحية بالكامل مع إبقاء ملفات المعاينة القائمة كمصدر وحيد للمحتوى.",
       "links": [{"label": "طلب الدمج #50", "url": "https://github.com/A7SNcom/yakolak/pull/50"}]
     }
   ],
@@ -262,7 +276,7 @@
       "blueprintRevision": 4,
       "title": "توحيد القيادة والكانبان والفريق",
       "outcome": "واجهة عربية واحدة تجيب عن أسئلة الرئيس الخمسة وتعرض كانبان حقيقيًا بمالك وتقدم ودليل وخطوة تالية ومراجعات، مع مسؤوليات الفريق بلغة إدارية.",
-      "status": "in_progress",
+      "status": "superseded",
       "effort": "M",
       "risk": "medium-process-ui",
       "owner": "Codex UI implementer",
@@ -297,7 +311,7 @@
       "blueprintRevision": 4,
       "title": "تنظيف معاينة المشاهد والعناصر",
       "outcome": "تبقى المعاينة الحالية لكن بمساحة صحيحة وحشو أقل ومقارنة قبل/بعد واضحة على الكمبيوتر والجوال.",
-      "status": "artifact_ready",
+      "status": "superseded",
       "effort": "S",
       "risk": "low-developer-ui",
       "owner": "Codex UI implementer",
@@ -319,6 +333,38 @@
       "events": [
         {"id": "event-yak-007-scene-scope", "at": "2026-07-29T12:05:00+03:00", "type": "assigned", "actor": "Rashed", "title": "حصر العمل في واجهة المعاينة", "detail": "الحفاظ على مسارات اللعبة والعقود الحالية وعدم تعديل سلوك اللعبة.", "evidence": []},
         {"id": "event-yak-007-compare-validated", "at": "2026-07-29T13:20:00+03:00", "type": "validation", "actor": "Sara evidence runner", "title": "تساوي منطقتي قبل وبعد", "detail": "ظهرت منطقتا المقارنة بعرضين متساويين 535 بكسل، مع بقاء معاينة واحدة فقط في العرض العادي.", "evidence": []}
+      ]
+    },
+    {
+      "id": "YAK-008-01",
+      "initiativeId": "initiative-minimal-card-workspace",
+      "blueprintNodeId": "initiative-minimal-card-workspace",
+      "blueprintRevision": 5,
+      "title": "استبدال صفحة التطوير بشبكة كروت بسيطة",
+      "outcome": "صفحة واحدة بتصفية للمشاهد والرحلات والعناصر والمهام، ونافذة معاينة بوسائط قابلة للتنقل وتعليقات أحمد وراشد فقط.",
+      "status": "in_progress",
+      "effort": "M",
+      "risk": "medium-developer-ui",
+      "owner": "Codex UI implementer",
+      "reviewer": "Sara",
+      "architectureSteward": "NOT_REQUIRED",
+      "auditor": "Hakam",
+      "progress": {"completed": 4, "total": 5, "label": "الصفحة والكروت والمعاينة والتعليقات واختبار الكمبيوتر والجوال مكتملة؛ تنتظر النسخة التجريبية والمراجعة."},
+      "acceptance": [
+        {"text": "لا توجد قيادة أو كانبان أو تنقل متشعب في الصفحة الحية", "status": "PASS"},
+        {"text": "المشاهد والرحلات والعناصر والمهام تظهر ككروت قابلة للتصفية", "status": "PASS"},
+        {"text": "النافذة تعرض الوسائط بالأسهم عند تعددها ولا تفرض صورة على المهمة", "status": "PASS"},
+        {"text": "التعليقات مقتصرة على أحمد وراشد", "status": "PASS"},
+        {"text": "نجاح التحقق على الكمبيوتر والجوال دون تغيير اللعبة أو الإنتاج", "status": "PENDING"}
+      ],
+      "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "PENDING", "preview": "PENDING", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
+      "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "", "previewUrl": "", "evidence": []},
+      "blockedBy": [],
+      "nextAction": "نشر نسخة تجريبية مطابقة، ثم مراجعة سارة وتدقيق حَكَم وقرار راشد.",
+      "presidentAttention": "REVIEW_MILESTONE",
+      "events": [
+        {"id": "event-yak-008-president-amendment", "at": "2026-07-29T15:00:00+03:00", "type": "president", "actor": "President Ahmad", "title": "إلغاء تصميم القيادة والكانبان", "detail": "طلب صفحة واحدة شديدة البساطة تعتمد على الكروت والمعاينة والتعليقات بين أحمد وراشد فقط.", "evidence": []},
+        {"id": "event-yak-008-browser-validated", "at": "2026-07-29T16:10:00+03:00", "type": "validation", "actor": "Codex UI implementer", "title": "نجاح رحلة الكروت على الكمبيوتر والجوال", "detail": "نجحت التصفية وفتح رحلة والتنقل بين مشاهدها وفتح مهمة بلا صورة وإرسال تعليق، دون تجاوز أفقي أو أخطاء متصفح.", "evidence": []}
       ]
     }
   ]

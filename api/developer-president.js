@@ -8,7 +8,7 @@ const MAX_BODY_BYTES=64_000;
 const KINDS=new Set(['instruction','scene','element','architecture']);
 const PRIORITIES=new Set(['normal','high','urgent']);
 const DECISIONS=new Set(['approved','needs_changes','rejected']);
-const ITEM_TYPES=new Set(['directive','review']);
+const ITEM_TYPES=new Set(['directive','review','content']);
 const ID_PATTERN=/^[a-zA-Z0-9][a-zA-Z0-9:_-]{5,159}$/;
 let client;
 let tablesReady;

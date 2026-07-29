@@ -1,14 +1,14 @@
 import fs from 'node:fs';
+
 const read=file=>fs.readFileSync(file,'utf8');
-for(const file of['developer.html','src/developer-d4.css','src/developer-d4.js'])if(!fs.existsSync(file))throw new Error(`Missing ${file}`);
-const html=read('developer.html'),css=read('src/developer-d4.css'),js=read('src/developer-d4.js');
-const need=(source,text,label)=>{if(!source.includes(text))throw new Error(`${label}: missing ${text}`)};
-need(html,'developer-d4-variant-workspace','D4 shell marker');
-need(html,'src/developer-d4.js?v=D4-variant-workspace','D4 controller boot');
-if((html.match(/id="d4PreviewFrame"/g)||[]).length!==1)throw new Error('D4 shell must expose exactly one primary preview');
-for(const id of['d4VariantSelect','d4StartTask','d4ReviewOpen','d4BriefOpen','d4Drawer','d4CompareToggle','d4MobileContent','d4MobileCount'])need(html,`id="${id}"`,'D4 shell');
-need(html,'class="d4-mobile-nav d4-mobile-only"','D4 mobile navigation');
-for(const guard of['[hidden]{display:none!important}','@media(max-width:760px)','prefers-reduced-motion'])need(css,guard,'D4 CSS guardrail');
-for(const contract of['contractFor(','target().previewUrl',"document.body.dataset.developerReady='true'"])need(js,contract,'D4 controller contract');
-if(html.includes('developer-d3-task-workspace')||html.includes('id="d3PreviewFrame"'))throw new Error('Live shell regressed to D3');
-console.log('Developer D4 active shell verification passed.');
+for(const file of ['developer.html','src/developer-president.css','src/developer-president.js','src/developer-d4-registry.js']){
+  if(!fs.existsSync(file))throw new Error(`Missing ${file}`);
+}
+const html=read('developer.html'),css=read('src/developer-president.css'),js=read('src/developer-president.js');
+const need=(source,value)=>{if(!source.includes(value))throw new Error(`Missing ${value}`)};
+for(const value of ['id="contentGrid"','id="contentModal"','data-filter="scene"','data-filter="journey"','data-filter="element"','data-filter="task"'])need(html,value);
+for(const value of ['contractFor(','mediaForItem(','changeMedia(','@media(max-width:700px)','[hidden]{display:none!important}'])need(js+css,value);
+for(const legacy of ['id="d4PreviewFrame"','src/developer-d4.js','president-kanban','presidentPortal']){
+  if(html.includes(legacy))throw new Error(`Legacy live shell remains: ${legacy}`);
+}
+console.log('Minimal card shell and retained preview registry verified.');

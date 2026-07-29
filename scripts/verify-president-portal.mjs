@@ -1,200 +1,73 @@
 import fs from 'node:fs';
 
-const read = path => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
-const fail = message => { throw new Error(`[president-portal] ${message}`); };
-const requireTokens = (text, tokens, label) => {
-  for (const token of tokens) if (!text.includes(token)) fail(`${label} missing ${token}`);
+const read=path=>fs.readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
+const fail=message=>{throw new Error(`[president-portal] ${message}`)};
+const requireTokens=(source,tokens,label)=>{
+  for(const token of tokens)if(!source.includes(token))fail(`${label} missing ${token}`);
 };
-const requireAnyToken = (text, tokens, label) => {
-  if (!tokens.some(token => text.includes(token))) fail(`${label} missing one of: ${tokens.join(' | ')}`);
-};
-const uniqueIds = (items, label) => {
-  const seen = new Set();
-  for (const item of items) {
-    if (!item?.id) fail(`${label} item missing id`);
-    if (seen.has(item.id)) fail(`${label} duplicate id ${item.id}`);
-    seen.add(item.id);
+const uniqueIds=(items,label)=>{
+  const ids=new Set();
+  for(const item of items){
+    if(!item?.id||ids.has(item.id))fail(`${label} invalid id ${item?.id||'missing'}`);
+    ids.add(item.id);
   }
-  return seen;
+  return ids;
 };
 
-const ui = read('src/developer-president.js');
-const html = read('developer.html');
-const css = read('src/developer-president.css');
-const api = read('api/developer-president.js');
-const manager = read('ops/ai-team/manager.md');
-const leadership = read('ops/ai-team/RASHED_LEADERSHIP_OS.md');
-const contract = read('ops/ai-team/PRESIDENT_PORTAL.md');
-const visibility = read('ops/ai-team/DEVELOPMENT_VISIBILITY.md');
-const teamOs = read('ops/ai-team/TEAM_OS.md');
-const board = read('ops/ai-team/BOARD.md');
-const outbox = JSON.parse(read('ops/ai-team/president-outbox.json'));
-const status = JSON.parse(read('ops/ai-team/president-status.json'));
-const blueprint = JSON.parse(read('ops/ai-team/development-blueprint.json'));
-const ledger = JSON.parse(read('ops/ai-team/development-ledger.json'));
-const manifest = JSON.parse(read('src/president-portal-manifest.json'));
+const html=read('developer.html');
+const css=read('src/developer-president.css');
+const ui=read('src/developer-president.js');
+const api=read('api/developer-president.js');
+const leadership=read('ops/ai-team/RASHED_LEADERSHIP_OS.md');
+const teamOs=read('ops/ai-team/TEAM_OS.md');
+const blueprint=JSON.parse(read('ops/ai-team/development-blueprint.json'));
+const ledger=JSON.parse(read('ops/ai-team/development-ledger.json'));
+const status=JSON.parse(read('ops/ai-team/president-status.json'));
+const manifest=JSON.parse(read('src/president-portal-manifest.json'));
 
-requireTokens(ui, [
-  "const API = './api/developer-president'",
-  "const BLUEPRINT = './ops/ai-team/development-blueprint.json'",
-  "const LEDGER = './ops/ai-team/development-ledger.json'",
-  "gates.reviewer === 'PASS'",
-  "gates.manager === 'PASS'",
-  "gates.hakam === 'MERGE_OK'",
-  "gates.ci === 'GREEN'",
-  "document.body.dataset.developerRole = 'president'",
-  'function wireSingleChannel()',
-  "openPortalFor('directives')",
-  "openPortalFor('reviews')",
-  "data-president-tab=\"portfolio\"",
-  "data-president-tab=\"tasks\"",
-  "data-president-tab=\"timeline\"",
-  'function renderBlueprintMap()',
-  'function taskCard(task)',
-  'function renderTimeline()',
-  'function kanbanCard(task)',
-  'function renderTeam()',
-  'ماذا يعمل راشد الآن؟',
-  'لماذا هذا العمل؟',
-  'ما الذي أُنجز فعليًا؟',
-  'ما المتعطل؟',
-  'ما القرار المطلوب مني؟',
-  'قيد العمل',
-  'قيد المراجعة',
-  'راشد مدير المشروع. بقية الأعضاء ينفذون أو يراجعون',
-  'Promise.allSettled'
-], 'President UI');
-
-requireTokens(html, [
-  'president-unified-workspace-v3',
-  'المشاهد والعناصر',
-  'قبل / بعد',
-  'id="d4PreviewFrame"'
-], 'Unified shell');
-
-requireTokens(css, [
-  '.president-executive-grid',
-  '.president-kanban',
-  '.president-team-grid',
-  '.president-scene-mode .d4-preview-shell',
-  '@media(max-width:820px)'
-], 'Unified responsive styles');
-
-requireTokens(api, [
-  "'president'",
-  'directive_create',
-  'review_decision',
-  'sameOrigin(req)',
-  "PRESIDENT_PORTAL_PRODUCTION_ENABLED==='1'",
-  'president_portal_disabled_in_production'
-], 'President API');
-if (api.includes("author_role,body,created_at) VALUES(?,?,?,?,?,?)") && api.includes("'manager'")) fail('browser API must not write manager role');
-
-requireTokens(leadership, [
-  'delegated executive deputy',
-  'does **not** implement product code himself',
-  'PRESIDENT_SIGNAL',
-  'DELEGATED_LEADERSHIP',
-  'PRESIDENT_RETURN',
-  'Development visibility law',
-  'event-driven, not hourly ceremony',
-  'initiative containing several XS/S/M tasks',
-  'Workers implement; reviewers challenge'
-], 'Rashed leadership OS');
-
-requireTokens(manager, [
-  'RASHED_LEADERSHIP_OS.md',
-  'DEVELOPMENT_VISIBILITY.md',
-  'development-ledger.json',
-  'DELEGATED_LEADERSHIP',
-  'PRESIDENT_SIGNAL',
-  'You never implement product code yourself',
-  'Update it only when meaningful state changes',
-  'No change means no new event',
-  'ledger delta',
-  'president-outbox.json'
-], 'manager runbook');
-
-requireTokens(contract, [
-  'One linked project view',
-  '**Project**',
-  '**Tasks**',
-  '**Timeline**',
-  'event-driven checkpoints',
-  'President silence is neither a blocker',
-  'Rashed personally inspected',
-  'PRESIDENT_PORTAL_PRODUCTION_ENABLED'
-], 'President contract');
-
-requireTokens(visibility, [
-  'President intent → blueprint initiative',
-  'Event-driven reporting',
-  'Multi-cycle tasks',
-  'Rashed is the only normal writer',
-  'Project map',
-  'Timeline'
-], 'visibility contract');
-
-requireTokens(teamOs, [
-  'Rashed is not an implementation worker',
-  'DELEGATED_LEADERSHIP',
-  'Visual planning before implementation',
-  'President attention budget',
-  'never becomes the product-code author'
-], 'TEAM_OS');
-
-requireAnyToken(board, ['Executive deputy / sole manager: Rashed', 'Delegated executive / sole manager: Rashed'], 'BOARD manager identity');
-requireAnyToken(board, ['Visual/documented initiative map', 'Canonical visual blueprint'], 'BOARD visual planning');
-requireAnyToken(board, ['Workers implement', 'Implementation writers', 'Rashed implemented no product code'], 'BOARD execution ownership');
-
-if (outbox.version !== 1 || !Array.isArray(outbox.items)) fail('invalid President outbox');
-if (status.version !== 1 || typeof status.directives !== 'object' || Array.isArray(status.directives)) fail('invalid President status file');
-if (status.leadershipMode !== 'DELEGATED_LEADERSHIP') fail('default Rashed leadership mode must be DELEGATED_LEADERSHIP');
-if (!Number.isInteger(status.lastPresidentEventId) || status.lastPresidentEventId < 0) fail('invalid President event cursor');
-if (!status.blueprint || status.blueprint.canonicalRevision !== blueprint.revision) fail('President status blueprint revision mismatch');
-
-if (blueprint.schemaVersion !== 1 || !Number.isInteger(blueprint.revision) || !Array.isArray(blueprint.nodes) || !Array.isArray(blueprint.edges)) fail('invalid development blueprint');
-const blueprintNodeIds = uniqueIds(blueprint.nodes, 'blueprint nodes');
-for (const required of ['goal-online-yakolak', 'leadership-delegated-rashed', 'track-visual-development']) {
-  if (!blueprintNodeIds.has(required)) fail(`blueprint missing ${required}`);
-}
-for (const edge of blueprint.edges) {
-  if (!edge.id || !blueprintNodeIds.has(edge.from) || !blueprintNodeIds.has(edge.to)) fail(`invalid blueprint edge ${edge.id || 'unknown'}`);
+requireTokens(html,[
+  'id="filters"','id="contentGrid"','id="contentModal"','id="mediaViewport"','id="comments"','id="commentForm"',
+  'data-filter="scene"','data-filter="journey"','data-filter="element"','data-filter="task"'
+],'minimal page');
+for(const stale of ['president-kanban','presidentPortal','d4PreviewFrame','d4Drawer','developer-d4.js']){
+  if(html.includes(stale))fail(`legacy interface remains in live page: ${stale}`);
 }
 
-if (ledger.schemaVersion !== 1 || !Number.isInteger(ledger.revision) || !Array.isArray(ledger.initiatives) || !Array.isArray(ledger.tasks)) fail('invalid development ledger');
-if (!ledger.portfolio?.leadershipMode || !ledger.portfolio?.summary || !ledger.portfolio?.nextManagementAction) fail('ledger portfolio summary incomplete');
-const initiativeIds = uniqueIds(ledger.initiatives, 'ledger initiatives');
-const taskIds = uniqueIds(ledger.tasks, 'ledger tasks');
-if (!initiativeIds.has(ledger.portfolio.activeInitiativeId)) fail('ledger active initiative is missing');
+requireTokens(css,[
+  '.card-grid','.content-card','.content-modal','.media-arrow','.comments','.comment-form',
+  '@media(max-width:700px)','@media(prefers-reduced-motion:reduce)','[hidden]{display:none!important}'
+],'minimal styles');
+requireTokens(ui,[
+  "from './developer-d4-registry.js'",'function journeysFromScenes()','function mediaForItem(item)',
+  'function renderComments()','function changeMedia(step)',"itemType:'content'","message.authorRole==='president'",
+  "item.kind!=='task'","document.body.dataset.developerReady='true'"
+],'card workspace');
+requireTokens(api,["'directive','review','content'",'sameOrigin(req)',"author_role:'president'",'president_portal_disabled_in_production'],'conversation API');
+if(api.includes("author_role:'manager'")||api.includes("'manager',text"))fail('browser API must not author Rashed messages');
 
-for (const initiative of ledger.initiatives) {
-  if (!blueprintNodeIds.has(initiative.blueprintNodeId)) fail(`initiative ${initiative.id} references missing blueprint node`);
-  if (!initiative.title || !initiative.outcome || !initiative.status || !initiative.owner || !initiative.recommendation) fail(`initiative ${initiative.id} incomplete`);
-  for (const taskId of initiative.taskIds || []) if (!taskIds.has(taskId)) fail(`initiative ${initiative.id} references missing task ${taskId}`);
+requireTokens(leadership,['does **not** implement product code himself','Workers implement; reviewers challenge','President amendments'],'leadership contract');
+requireTokens(teamOs,['Rashed is not an implementation worker','never becomes the product-code author'],'team contract');
+
+if(blueprint.schemaVersion!==1||blueprint.revision!==5||!Array.isArray(blueprint.nodes)||!Array.isArray(blueprint.edges))fail('invalid blueprint revision');
+const blueprintIds=uniqueIds(blueprint.nodes,'blueprint');
+if(!blueprintIds.has('initiative-minimal-card-workspace'))fail('minimal card initiative missing');
+if(blueprint.nodes.find(node=>node.id==='initiative-unified-president-workspace')?.status!=='superseded')fail('old workspace was not superseded');
+for(const edge of blueprint.edges)if(!blueprintIds.has(edge.from)||!blueprintIds.has(edge.to))fail(`invalid edge ${edge.id}`);
+
+if(ledger.schemaVersion!==1||ledger.revision!==5||!Array.isArray(ledger.initiatives)||!Array.isArray(ledger.tasks))fail('invalid ledger revision');
+const initiativeIds=uniqueIds(ledger.initiatives,'initiatives');
+const taskIds=uniqueIds(ledger.tasks,'tasks');
+if(ledger.portfolio?.activeInitiativeId!=='initiative-minimal-card-workspace')fail('minimal initiative is not active');
+if(!taskIds.has('YAK-008-01'))fail('YAK-008-01 missing');
+for(const initiative of ledger.initiatives){
+  if(!blueprintIds.has(initiative.blueprintNodeId))fail(`initiative ${initiative.id} references missing blueprint node`);
+  for(const taskId of initiative.taskIds||[])if(!taskIds.has(taskId))fail(`initiative ${initiative.id} references missing task ${taskId}`);
 }
-
-const requiredGates = ['artifact', 'reviewer', 'architecture', 'hakam', 'ci', 'preview', 'manager', 'president'];
-for (const task of ledger.tasks) {
-  if (!initiativeIds.has(task.initiativeId)) fail(`task ${task.id} references missing initiative`);
-  if (!blueprintNodeIds.has(task.blueprintNodeId)) fail(`task ${task.id} references missing blueprint node`);
-  if (!Number.isInteger(task.blueprintRevision) || task.blueprintRevision < 1 || task.blueprintRevision > blueprint.revision) fail(`task ${task.id} has invalid blueprint revision`);
-  if (!task.title || !task.outcome || !task.status || !task.owner || !task.nextAction || !task.presidentAttention) fail(`task ${task.id} incomplete`);
-  if (!task.progress || !Number.isFinite(task.progress.completed) || !Number.isFinite(task.progress.total) || task.progress.total < 1 || task.progress.completed < 0 || task.progress.completed > task.progress.total) fail(`task ${task.id} progress invalid`);
-  if (!Array.isArray(task.acceptance) || !task.acceptance.length) fail(`task ${task.id} missing acceptance criteria`);
-  if (!Array.isArray(task.events) || !task.events.length) fail(`task ${task.id} missing event history`);
-  uniqueIds(task.events, `task ${task.id} events`);
-  for (const gate of requiredGates) if (!(gate in (task.gates || {}))) fail(`task ${task.id} missing gate ${gate}`);
-  for (const event of task.events) if (!event.at || !event.type || !event.actor || !event.title || !event.detail) fail(`task ${task.id} has incomplete event ${event.id}`);
+for(const task of ledger.tasks){
+  if(!initiativeIds.has(task.initiativeId)||!blueprintIds.has(task.blueprintNodeId))fail(`task ${task.id} has broken linkage`);
+  if(!task.title||!task.outcome||!task.owner||!task.nextAction||!Array.isArray(task.acceptance)||!task.acceptance.length)fail(`task ${task.id} incomplete`);
 }
+if(status.blueprint?.canonicalRevision!==blueprint.revision||status.blueprint?.lastReconciledPresidentRevision!==blueprint.revision)fail('President status revision mismatch');
+if(manifest.version!==3||manifest.views?.join(',')!=='cards'||manifest.conversationRoles?.join(',')!=='Ahmad,Rashed')fail('minimal runtime manifest mismatch');
 
-if (!ledger.tasks.some(task => task.blueprintNodeId === 'track-visual-development')) fail('ledger must expose President development OS work');
-if (!ledger.tasks.some(task => task.status === 'in_progress')) fail('ledger must expose current in-progress delegated work');
-
-if (manifest.version !== 2 || manifest.humanRole !== 'president' || manifest.manager !== 'Rashed' || manifest.productionEnabledByDefault !== false) fail('invalid President runtime manifest');
-if (manifest.blueprint !== './ops/ai-team/development-blueprint.json' || manifest.ledger !== './ops/ai-team/development-ledger.json') fail('manifest project sources mismatch');
-for (const view of ['portfolio', 'tasks', 'timeline', 'reviews', 'directives']) if (!manifest.views?.includes(view)) fail(`manifest missing view ${view}`);
-if (manifest.reportingCadence !== 'meaningful-event') fail('manifest reporting cadence must be meaningful-event');
-for (const gate of ['reviewer:PASS', 'manager:PASS', 'hakam:MERGE_OK', 'ci:GREEN', 'exact-head-preview']) if (!manifest.reviewGates?.includes(gate)) fail(`manifest missing ${gate}`);
-
-console.log('President portal, visible development ledger, and Rashed leadership contract verified');
+console.log('Minimal cards, previews, Ahmad/Rashed conversation, and blueprint amendment verified.');

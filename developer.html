@@ -1,75 +1,55 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="yakolak-version" content="developer-d4-variant-workspace">
-<meta name="yakolak-president-workspace" content="president-unified-workspace-v3">
-<meta name="yakolak-human-role" content="president">
-<title>ياكلك · واجهة الرئيس</title>
-<link rel="icon" href="data:,">
-<link rel="stylesheet" href="./src/developer-d4.css?v=D4-variant-workspace">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <title>ياكلك</title>
+  <link rel="stylesheet" href="./src/developer-president.css?v=cards-v1">
 </head>
 <body>
-<div id="d4App" class="d4-app" data-mobile-view="preview">
-  <header class="d4-header">
-    <button id="d4MobileContent" class="d4-icon-button d4-mobile-only" type="button" aria-label="فتح المحتوى">☰</button>
-    <a class="d4-brand" href="./developer.html"><strong>ياكلك</strong><span>مساحة الرئيس · المشاهد والعناصر</span></a>
-    <div class="d4-header-state"><i id="d4SyncDot" class="d4-sync-dot"></i><span id="d4SyncText">جارٍ المزامنة</span></div>
-    <div class="d4-header-actions"><button id="d4OpenQueue" class="d4-button ghost" type="button">المطلوب <b id="d4QueueCount" class="d4-count" hidden>0</b></button><button id="d4NewRequest" class="d4-button primary" type="button">＋ طلب جديد</button></div>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="ياكلك">ياكلك</a>
+    <nav id="filters" class="filters" aria-label="تصفية المحتوى">
+      <button class="active" type="button" data-filter="all">الكل</button>
+      <button type="button" data-filter="scene">المشاهد</button>
+      <button type="button" data-filter="journey">الرحلات</button>
+      <button type="button" data-filter="element">العناصر</button>
+      <button type="button" data-filter="task">المهام</button>
+    </nav>
   </header>
 
-  <main class="d4-layout">
-    <aside id="d4Navigator" class="d4-navigator" aria-label="محتوى التطوير">
-      <header class="d4-nav-header">
-        <div class="d4-nav-title"><div><strong>المشاهد والعناصر</strong><span id="d4Coverage">—</span></div><span id="d4NavCount">0</span></div>
-        <label class="d4-search"><span aria-hidden="true">⌕</span><input id="d4Search" type="search" placeholder="ابحث عن مشهد أو عنصر أو حالة" autocomplete="off"></label>
-        <div class="d4-filter-row" role="tablist" aria-label="تصفية المحتوى"><button class="active" type="button" role="tab" aria-selected="true" data-filter="all">الكل</button><button type="button" role="tab" aria-selected="false" data-filter="scene">المشاهد</button><button type="button" role="tab" aria-selected="false" data-filter="element">العناصر</button><button type="button" role="tab" aria-selected="false" data-filter="queue">المطلوب</button></div>
-      </header>
-      <div id="d4NavList" class="d4-nav-list" aria-live="polite"></div>
-      <footer class="d4-nav-footer"><button id="d4FlowOpen" class="d4-link-button" type="button">مخطط الرحلة</button><button id="d4GameOpen" class="d4-link-button" type="button">اللعبة المنشورة ↗</button></footer>
-    </aside>
+  <main id="contentGrid" class="card-grid" aria-live="polite"></main>
 
-    <section class="d4-workspace" aria-label="مساحة العمل">
-      <header class="d4-workspace-header">
-        <div class="d4-selection"><span id="d4SelectionKind" class="d4-kicker">رحلة</span><h1 id="d4SelectionTitle">رحلة الدخول النظيفة</h1><div class="d4-selection-meta"><code id="d4SelectionCode">scene.clean-entry</code><span id="d4SelectionStatus" class="d4-status neutral">لا توجد ملاحظات</span></div></div>
-        <label id="d4VariantField" class="d4-variant-field"><span>نسخة المشهد</span><select id="d4VariantSelect" aria-label="اختيار نسخة المشهد"></select><small id="d4VariantDescription"></small></label>
-        <div class="d4-preview-actions"><button id="d4Replay" class="d4-icon-button" type="button" aria-label="إعادة المعاينة" title="إعادة المعاينة">↻</button><button id="d4CompareToggle" class="d4-button ghost" type="button" aria-pressed="false">قبل / بعد</button><button id="d4Fullscreen" class="d4-icon-button" type="button" aria-label="ملء الشاشة" title="ملء الشاشة">⛶</button></div>
+  <dialog id="contentModal" class="content-modal" aria-labelledby="modalTitle">
+    <article class="modal-card">
+      <header class="modal-header">
+        <div>
+          <span id="modalKind" class="kind"></span>
+          <h1 id="modalTitle"></h1>
+        </div>
+        <button id="modalClose" class="close-button" type="button" aria-label="إغلاق">×</button>
       </header>
 
-      <div id="d4PreviewShell" class="d4-preview-shell">
-        <div id="d4LiveView" class="d4-live-view"><iframe id="d4PreviewFrame" title="معاينة المشهد" allow="fullscreen"></iframe><div id="d4PreviewState" class="d4-preview-state"><span class="d4-spinner" aria-hidden="true"></span><strong>جارٍ تجهيز المعاينة</strong><small>ستظهر النسخة المختارة هنا.</small><button id="d4RetryPreview" class="d4-button ghost" type="button" hidden>إعادة المحاولة</button></div></div>
-        <section id="d4CompareView" class="d4-compare-view" hidden aria-label="المقارنة البصرية">
-          <article class="d4-compare-side"><header><div><strong>قبل</strong><span>المرجع السابق لهذه النسخة</span></div><button class="d4-link-button" type="button" data-open-compare="before">فتح ↗</button></header><div class="d4-compare-frame"><iframe id="d4BeforeFrame" title="الحالة السابقة"></iframe><div id="d4BeforeEmpty" class="d4-empty-compare">أضف رابط النسخة السابقة.</div></div></article>
-          <article class="d4-compare-side"><header><div><strong>بعد</strong><span>النسخة المختارة الآن</span></div><button class="d4-link-button" type="button" data-open-compare="after">فتح ↗</button></header><div class="d4-compare-frame"><iframe id="d4AfterFrame" title="الحالة الحالية"></iframe><div id="d4AfterEmpty" class="d4-empty-compare">المعاينة الحالية ستظهر هنا.</div></div></article>
-          <details class="d4-compare-settings"><summary>روابط وإعدادات المقارنة</summary><div class="d4-compare-fields"><label><span>رابط قبل</span><input id="d4BeforeUrl" type="url" dir="ltr" placeholder="https://..."></label><label><span>رابط بعد</span><input id="d4AfterUrl" type="url" dir="ltr" placeholder="https://..."></label><button id="d4UseCurrent" class="d4-button ghost" type="button">استخدام الحالية</button><button id="d4SaveCompare" class="d4-button primary" type="button">حفظ لهذه النسخة</button><span id="d4CompareMessage" class="d4-helper"></span></div></details>
-        </section>
+      <section id="mediaSection" class="media-section" aria-label="المعاينة">
+        <div id="mediaViewport" class="media-viewport"></div>
+        <button id="mediaNext" class="media-arrow next" type="button" aria-label="التالي">‹</button>
+        <button id="mediaPrevious" class="media-arrow previous" type="button" aria-label="السابق">›</button>
+      </section>
+
+      <div class="modal-body">
+        <p id="modalDescription" class="description"></p>
+        <p id="modalRelation" class="relation" hidden></p>
+        <section id="comments" class="comments" aria-label="التعليقات"></section>
+        <form id="commentForm" class="comment-form">
+          <label class="sr-only" for="commentInput">اكتب تعليقك</label>
+          <textarea id="commentInput" rows="1" maxlength="12000" placeholder="اكتب تعليقك" required></textarea>
+          <button type="submit">إرسال</button>
+        </form>
       </div>
+    </article>
+  </dialog>
 
-      <section class="d4-next" aria-label="الإجراء التالي"><div class="d4-next-copy"><span>الخطوة التالية</span><strong id="d4ContextTitle">اختر إجراءً واحدًا</strong><p id="d4ContextDescription">عاين النسخة الحالية ثم اطلب تعديلًا أو راجع نتيجة.</p></div><div class="d4-next-actions"><button id="d4StartTask" class="d4-next-action primary" type="button"><span>اطلب تعديلًا</span><small>هدف ومعيار نجاح ودليل</small></button><button id="d4ReviewOpen" class="d4-next-action" type="button"><span>راجع النتيجة</span><small id="d4ReviewHint">لا توجد نتيجة بانتظارك</small></button><button id="d4BriefOpen" class="d4-next-action" type="button"><span>جهّز حزمة الذكاء</span><small>سياق واضح وحدود وقرار بشري</small></button></div></section>
-    </section>
-  </main>
-
-  <nav class="d4-mobile-nav d4-mobile-only" aria-label="تنقل مساحة التطوير"><button type="button" data-mobile-view="content"><span>☰</span><b>المحتوى</b></button><button class="active" type="button" data-mobile-view="preview"><span>▣</span><b>المعاينة</b></button><button type="button" data-mobile-view="work"><span>✓</span><b>العمل</b><i id="d4MobileCount" class="d4-count" hidden>0</i></button></nav>
-</div>
-
-<div id="d4DrawerScrim" class="d4-scrim" hidden></div>
-<aside id="d4Drawer" class="d4-drawer" role="dialog" aria-modal="true" aria-label="العمل على النسخة" aria-hidden="true">
-  <header class="d4-drawer-header"><div><span id="d4DrawerKicker" class="d4-kicker">مهمة تطوير</span><h2 id="d4DrawerTitle">اطلب تعديلًا</h2><small id="d4DrawerContext"></small></div><button id="d4DrawerClose" class="d4-icon-button" type="button" aria-label="إغلاق">×</button></header>
-  <div class="d4-drawer-tabs" role="tablist" aria-label="أدوات العمل"><button class="active" type="button" role="tab" aria-selected="true" data-drawer-tab="task">المهمة</button><button type="button" role="tab" aria-selected="false" data-drawer-tab="review">المراجعة <span id="d4DrawerReviewCount">0</span></button><button type="button" role="tab" aria-selected="false" data-drawer-tab="brief">حزمة الذكاء</button></div>
-  <div class="d4-drawer-body">
-    <section class="d4-panel" data-panel="task"><div class="d4-panel-intro"><strong>صف النتيجة التي تريدها</strong><p>لا تكتب الحل البرمجي؛ اشرح المشكلة والنتيجة وكيف ستعرف أنها نجحت.</p></div><form id="d4TaskForm" class="d4-form"><label><span>ما المشكلة الآن؟</span><textarea id="d4TaskProblem" maxlength="3000" required placeholder="ما الذي يربك المستخدم أو لا يعمل؟"></textarea></label><label><span>ما النتيجة المطلوبة؟</span><textarea id="d4TaskOutcome" maxlength="3000" required placeholder="صف السلوك النهائي بوضوح."></textarea></label><label><span>كيف نثبت النجاح؟</span><textarea id="d4TaskCriteria" maxlength="3000" required placeholder="معايير قابلة للملاحظة والاختبار."></textarea></label><fieldset class="d4-evidence-options"><legend>الدليل المطلوب</legend><label><input type="checkbox" value="desktop" checked> صورة كمبيوتر</label><label><input type="checkbox" value="mobile" checked> صورة جوال</label><label><input type="checkbox" value="functional" checked> اختبار وظيفي</label><label><input type="checkbox" value="accessibility" checked> فحص وصول</label></fieldset><div class="d4-form-actions"><button id="d4SaveTask" class="d4-button primary wide" type="submit">حفظ وربطها بهذه النسخة</button><button id="d4CopyTask" class="d4-button ghost wide" type="button">نسخ حزمة التنفيذ</button></div></form></section>
-    <section class="d4-panel" data-panel="review" hidden><div id="d4ReviewSummary" class="d4-review-summary"></div><div id="d4ThreadList" class="d4-thread-list"></div></section>
-    <section class="d4-panel" data-panel="brief" hidden><div class="d4-ai-contract"><div><span>مسؤولية الذكاء</span><strong>ينفّذ ويختبر ويعرض الدليل</strong></div><div><span>مسؤوليتك</span><strong>تراجع وتطلب تعديلًا أو تعتمد</strong></div><p>لن تعتبر المنصة النسخة معتمدة، ولن تطلب نشرها، إلا بقرار بشري صريح.</p></div><ol class="d4-ai-steps"><li class="ready"><b>1</b><span>السياق</span></li><li><b>2</b><span>التنفيذ</span></li><li><b>3</b><span>التحقق</span></li><li><b>4</b><span>قرارك</span></li></ol><details class="d4-disclosure"><summary>ما الذي يعرفه المطور الذكي وما حدوده؟</summary><p>يحصل على اسم المشهد والنسخة والمعرف البرمجي والمهمة ومعايير القبول والأدلة المطلوبة. لا يفترض هدفًا غير مكتوب، ولا يعتمد النتيجة أو ينشرها بدلًا عنك.</p></details><label class="d4-brief-label"><span>حزمة التنفيذ</span><textarea id="d4BriefText" readonly></textarea></label><div class="d4-form-actions"><button id="d4CopyBrief" class="d4-button primary wide" type="button">نسخ الحزمة</button><button id="d4RefreshBrief" class="d4-button ghost wide" type="button">تحديث من المهمة</button></div></section>
-  </div>
-</aside>
-
-<div id="d4ModalScrim" class="d4-scrim" hidden></div>
-<section id="d4RequestModal" class="d4-modal" role="dialog" aria-modal="true" aria-labelledby="d4RequestTitle" hidden><header><div><span class="d4-kicker">إضافة إلى الرحلة</span><h2 id="d4RequestTitle">طلب مشهد أو عنصر جديد</h2></div><button id="d4RequestClose" class="d4-icon-button" type="button" aria-label="إغلاق">×</button></header><form id="d4RequestForm" class="d4-form"><div class="d4-kind-switch"><button class="active" type="button" data-request-kind="scene">مشهد</button><button type="button" data-request-kind="element">عنصر</button></div><label><span>اسم الطلب</span><input id="d4RequestName" required maxlength="120"></label><label><span>ما الذي يجب أن يراه أو يفعله المستخدم؟</span><textarea id="d4RequestDescription" required maxlength="6000"></textarea></label><label><span>مكانه في رحلة اللعبة</span><textarea id="d4RequestScenario" maxlength="3000"></textarea></label><button class="d4-button primary wide" type="submit">حفظ الطلب وفتحه للمراجعة</button></form></section>
-
-<section id="d4Utility" class="d4-utility" hidden><header><div><span id="d4UtilityKicker" class="d4-kicker">أداة</span><strong id="d4UtilityTitle">مخطط الرحلة</strong></div><button id="d4UtilityClose" class="d4-button primary" type="button">العودة لمساحة التطوير</button></header><iframe id="d4UtilityFrame" title="أداة التطوير"></iframe></section>
-<div id="d4Toast" class="d4-toast" role="status" aria-live="polite"></div>
-<script type="module" src="./src/developer-d4.js?v=D4-variant-workspace"></script>
-<script type="module" src="./src/developer-president.js?v=President-v3"></script>
+  <script type="module" src="./src/developer-president.js?v=cards-v1"></script>
 </body>
 </html>
