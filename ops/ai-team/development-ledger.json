@@ -382,7 +382,7 @@
       "reviewer": "Sara",
       "architectureSteward": "NOT_REQUIRED",
       "auditor": "Hakam",
-      "progress": {"completed": 5, "total": 6, "label": "التخزين والواجهة والبحث والسحب والحالات والمرفقات واختبار الكمبيوتر والجوال مكتملة؛ تنتظر نسخة المعاينة."},
+      "progress": {"completed": 6, "total": 6, "label": "التخزين والواجهة والبحث والسحب والحالات والمرفقات واختبار الكمبيوتر والجوال ونسخة المعاينة مكتملة؛ تنتظر المراجعة المستقلة."},
       "acceptance": [
         {"text": "إزالة أي محتوى أو مهمة مع حفظ الإزالة", "status": "PASS"},
         {"text": "المهام سطر لكل مهمة وقابلة للسحب والترتيب المحفوظ", "status": "PASS"},
@@ -391,14 +391,15 @@
         {"text": "البحث تقريبي والمعاينة تستخدم قوائم المحتوى والإصدار عند الحاجة فقط", "status": "PASS"},
         {"text": "نجاح اختبار الكمبيوتر والجوال دون تغيير اللعبة أو الإنتاج", "status": "PASS"}
       ],
-      "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "PENDING", "preview": "PENDING", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
-      "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "", "previewUrl": "", "evidence": []},
-      "blockedBy": [],
+      "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "RED", "preview": "PASS", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
+      "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "ab8fe3d", "previewUrl": "https://yakolak-git-agent-codexyak-007-unifie-ae230b-ahmdkcoms-projects.vercel.app/developer.html", "evidence": []},
+      "blockedBy": ["فحص Verify AI Team OS القديم يفشل بسبب مخالفات تنسيق تكليفات الفريق، خارج نطاق الواجهة."],
       "nextAction": "نشر نسخة معاينة مطابقة، ثم مراجعة سارة وتدقيق حَكَم وقرار راشد.",
       "presidentAttention": "REVIEW_MILESTONE",
       "events": [
         {"id": "event-yak-009-president-amendment", "at": "2026-07-29T17:00:00+03:00", "type": "president", "actor": "President Ahmad", "title": "تحويل التعليقات إلى مهام مرتبة", "detail": "طلب حذف الزوائد، وإضافة الإزالة والبحث والسحب والحالات والمرفقات، وربط كل تواصل بالمهمة نفسها.", "evidence": []},
-        {"id": "event-yak-009-browser-validated", "at": "2026-07-29T18:10:00+03:00", "type": "validation", "actor": "Codex UI implementer", "title": "نجاح مسار المهام على الكمبيوتر والجوال", "detail": "نجح البحث التقريبي وقوائم المعاينة والمهمة المرتبطة والمرفق والحالة الحصرية والسحب المحفوظ والإزالة، دون تجاوز أفقي أو أخطاء متصفح.", "evidence": []}
+        {"id": "event-yak-009-browser-validated", "at": "2026-07-29T18:10:00+03:00", "type": "validation", "actor": "Codex UI implementer", "title": "نجاح مسار المهام على الكمبيوتر والجوال", "detail": "نجح البحث التقريبي وقوائم المعاينة والمهمة المرتبطة والمرفق والحالة الحصرية والسحب المحفوظ والإزالة، دون تجاوز أفقي أو أخطاء متصفح.", "evidence": []},
+        {"id": "event-yak-009-preview-ready", "at": "2026-07-29T18:20:00+03:00", "type": "validation", "actor": "Vercel", "title": "نسخة المعاينة جاهزة", "detail": "نجح نشر الرأس ab8fe3d على بيئة المعاينة المرتبطة بطلب الدمج #50.", "evidence": [{"label": "نسخة المعاينة", "url": "https://yakolak-git-agent-codexyak-007-unifie-ae230b-ahmdkcoms-projects.vercel.app/developer.html"}]}
       ]
     }
   ]
