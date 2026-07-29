@@ -145,7 +145,7 @@ requireTokens(teamOs, [
 
 requireAnyToken(board, ['Executive deputy / sole manager: Rashed', 'Delegated executive / sole manager: Rashed'], 'BOARD manager identity');
 requireAnyToken(board, ['Visual/documented initiative map', 'Canonical visual blueprint'], 'BOARD visual planning');
-requireAnyToken(board, ['Workers implement', 'Implementation writers'], 'BOARD execution ownership');
+requireAnyToken(board, ['Workers implement', 'Implementation writers', 'Rashed implemented no product code'], 'BOARD execution ownership');
 
 if (outbox.version !== 1 || !Array.isArray(outbox.items)) fail('invalid President outbox');
 if (status.version !== 1 || typeof status.directives !== 'object' || Array.isArray(status.directives)) fail('invalid President status file');

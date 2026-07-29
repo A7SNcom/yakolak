@@ -7,88 +7,104 @@
 - President: Ahmad
 - Executive deputy / sole manager: Rashed
 - Auditor: Hakam
-- Integration branch/head at assignment: `agent/yakolak-team-os` @ `ffa863a15359bf583292fb579e736d3238e84268`
+- Integration branch/head at manager refresh: `agent/yakolak-team-os` @ `d12861be3d11a3b3ef8d7480fe877da45c4aa1fa`
 - Source PR #35: human-gated; no action
-- Leadership/President interface PR #43: `agent/president-portal-v3` @ `29522ec964f3a80f794a04e65984d5e95585c8a3` — `HOLD`, channel inactive
-- Canonical entry PR #41: `agent/noor/yak-004-01` @ `d5f2781d6189deae907ae2cf5c6db05d57c5774f` — `HOLD` pending XS correction and renewed gates
-- Snapshot time: `2026-07-28T23:00+03:00`
-- Leadership mode: `DELEGATED_LEADERSHIP`; President channel is not active on integration, so no new human input is inferred.
-- Current bottleneck: close the two exact defects identified by independent review without broadening scope: mutable accepted-mode contract in PR #41 and stale semantic-field parsing in the AI Team OS verifier.
+- President Development OS: PR #47, branch `agent/president-development-os`, exact candidate head `f3e5dd72d8d118584a6db2244aa7ce71acfd0ce7`
+- Team-to-Development-OS synchronization: draft PR #49 — `HOLD`, conflict resolution required
+- Canonical protected stable URL: `https://yakolak-git-agent-president-development-os-ahmdkcoms-projects.vercel.app/developer.html`
+- Canonical entry PR #41 exact head: `9da9afc4e2690feab03e66ad1a19bb8621cc5f7e`
+- Snapshot time: `2026-07-29T02:03+03:00`
+- Leadership mode: `PRESIDENT_SIGNAL_UNKNOWN` because protected API access redirected to Vercel SSO; continue only safe non-conflicting work.
+
+## President directive — primary Development OS
+
+Ahmad authorizes the protected President Development OS as the primary communication, visual planning, documentation, project-management, evidence and review surface.
+
+- The President communicates with the team only through Rashed; workers never create a parallel President channel.
+- Use the stable branch alias above, never a per-deployment URL.
+- Every meaningful initiative, task, checkpoint, worker result, review, architecture verdict, Hakam audit, risk, evidence link, Rashed decision and President attention item must be traceable in the visual blueprint and development ledger.
+- Reporting is event-driven; do not create empty hourly updates.
+- New President input activates `PRESIDENT_SIGNAL`; no verified new input activates proactive `DELEGATED_LEADERSHIP`.
+- The protected Preview channel is authorized for ongoing operation.
+- Do not expose the write API on public `yakolak.vercel.app` until President authentication is implemented, independently verified and explicitly approved.
 
 ## Visual/documented initiative map
 
-Until PR #43 is fully gated and merged, this board is the canonical visible planning surface.
-
 1. `initiative:canonical-entry-contract`
    - Outcome: immutable deterministic Boot → Entry → Mode-selection contract.
-   - Current defect: exported `VALID_MODES` Set can be mutated externally.
-   - Task: `YAK-006-01`; owner Noor; reviewer Sami; Architecture Steward Nada.
+   - Current state: independently approved; PR #41 remains held for a refreshed mergeable head and renewed exact-head gates.
 2. `initiative:team-contract-verifier`
    - Outcome: verifier validates current semantic task fields without weakening required invariants.
-   - Current defect: parser hard-codes obsolete literal labels.
-   - Task: `YAK-006-02`; owner Lina; reviewer Omar.
+   - Current state: parser/fixtures are sound but PR #48 remains `HOLD` pending fresh base, green run and Omar exact-head PASS.
 3. `initiative:president-development-os`
-   - PR #43 remains isolated/HOLD.
-   - No merge or activation until exact-head CI, matching Preview, independent review, Sara evidence, Hakam `MERGE_OK`, and Rashed personal PASS.
+   - Outcome: one protected, stable and visible leadership workspace for Ahmad, Rashed and the team.
+   - Current state: official protected channel; PR #49 must synchronize current Team OS evidence into PR #47 before exact-head deployment, Sara evidence, Hakam release audit and Rashed personal PASS.
 
 ## Fresh evidence processed
 
-- Hakam cycle-005 score: Rashed `92/100 PASS`; no merge authorization by score alone.
-- PR #41: Nada issued `ARCH_HOLD` because `Object.freeze(new Set(...))` does not prevent `.add/.delete/.clear`; focused tests and architecture guard otherwise passed.
-- PR #43: Omar classified the AI Team OS failure as `STALE_VERIFIER`; the invariant is valid, but the verifier rejects current semantic labels.
-- PR #43: Sara confirmed exact-head visual artifacts existed for the then-head, but AI Team OS was red and no READY Vercel Preview matched exact head.
-- PR #43 has since moved to `29522ec9...`; all prior exact-head evidence is stale for merge purposes.
-- No product code was implemented by Rashed. No merge, Production action, rule change, or human gate was crossed.
+- Protected President API signal check at `2026-07-29T02:03+03:00` again returned a Vercel SSO redirect; unread state was not inferred either way.
+- PR #47 remains open, draft and non-mergeable at exact head `f3e5dd72d8d118584a6db2244aa7ce71acfd0ce7`.
+- PR #47 exact-head President Portal workflow, desktop/mobile journey, Architecture Guardrails, Build 126, v112, v118, v125 and D3 checks previously succeeded; visual artifact `8703302002` exists for that head.
+- No READY Vercel deployment for branch `agent/president-development-os` matches PR #47 head; the stable alias remains on older commit `674881388d0db62f74cbbfcbb61028596807f45b`.
+- PR #49 now points to Team OS head `d12861be3d11a3b3ef8d7480fe877da45c4aa1fa`, remains open, draft and non-mergeable, and still changes only five coordination files.
+- Mazen correctly stopped on stale-head protection before touching conflicts; his task must be refreshed from the current PR #49 parents.
+- Hakam recorded `NO_CHANGE`; Sara remains `NO_TASK` until a matching READY deployment exists.
+- PR #41 retains prior audited `MERGE_OK` evidence only for its audited head; no forced merge occurred.
+- No public Production write API was enabled and Rashed implemented no product code.
 
 ## Assignments and locks
 
 | Employee | Task | Status | Lock / role |
 |---|---|---|---|
-| Noor | `YAK-006-01` make accepted modes externally immutable on PR #41 | `READY` | existing PR #41 branch; max 2 files / 60 logical lines |
-| Sami | `YAK-006-03` renewed independent review of corrected PR #41 | `READY_AFTER_ARTIFACT` | read-only reviewer |
-| Lina | `YAK-006-02` add semantic-field normalization to AI Team OS verifier | `READY` | verifier + one focused fixture/test only |
-| Mazen | — | `NO_TASK` | no parallel state or process implementation |
-| Nada | `YAK-006-04` renewed Architecture Steward review of corrected PR #41 | `READY_AFTER_ARTIFACT` | read-only `ARCH_OK/HOLD/REJECT` |
-| Omar | `YAK-006-05` independent review of verifier correction | `READY_AFTER_ARTIFACT` | read-only reviewer |
-| Sara | — | `NO_TASK` | PR #43 evidence refresh waits for green exact head and matching Preview |
-| Hakam | `YAK-006-06` final audit after all reports | `READY_AFTER_REPORTS` | read-only final verdict |
+| Noor | refresh/rebase PR #41 without behavior change, then revalidate exact head | `READY_NEXT_CYCLE` | existing PR #41 only |
+| Sami | renewed independent review after refreshed PR #41 head | `READY_AFTER_ARTIFACT` | read-only |
+| Lina | PR #48 semantic verifier normalization | `HOLD_FOR_REBASE` | verifier + fixtures only |
+| Mazen | `YAK-006-08` resolve PR #49 synchronization conflicts without changing product behavior | `READY_REFRESHED` | PR #49 coordination files only |
+| Nada | renewed Architecture Steward review after refreshed PR #41 head | `READY_AFTER_ARTIFACT` | read-only |
+| Omar | exact-head verifier review after green rerun; then PR #49 exact-diff review | `READY_AFTER_ARTIFACT` | read-only |
+| Sara | `YAK-006-07` PR #47 exact-head evidence refresh | `READY_AFTER_DEPLOYMENT` | wait for matching READY Vercel SHA |
+| Hakam | release audits after refreshed reports | `READY_AFTER_REPORTS` | read-only |
+| Rashed | reconcile evidence, branch freshness and visible ledger | `ACTIVE` | manager only |
 
 ## Capacity
 
-- Implementation writers: **2 / 2 maximum**.
-- Implementation effort: **3 / 5 points** (`XS 1` + `S 2`).
-- Locks are disjoint: PR #41 core contract vs team-system verifier.
-- No other implementation or research task is authorized this cycle.
+- One bounded governance/integration writer is active: Mazen on PR #49.
+- No new unrelated product initiative is opened while approved artifacts need branch refresh and exact-head evidence.
+- Platform operation, coordination correction and read-only evidence review do not authorize unrelated product work.
+- No research or documentation busywork is allowed.
 
 ## Acceptance gates
 
-### `YAK-006-01` / PR #41
+### PR #41
 
-- External code cannot mutate the accepted-mode registry.
-- A focused test proves `.add`, `.delete`, `.clear`, replacement, or equivalent external mutation cannot alter reducer legality.
-- Existing 5 tests remain green; architecture guard remains green.
-- Sami renewed `PASS`, Nada renewed `ARCH_OK`, then Hakam `MERGE_OK` before Rashed may consider integration.
+- Refresh onto current integration base without behavior expansion.
+- Focused tests and Architecture Guardrails remain green.
+- Renewed exact-head `PASS`, `ARCH_OK`, Hakam verdict and mergeability confirmation before Rashed merge decision.
 
-### `YAK-006-02` / verifier
+### AI Team OS verifier / PR #48
 
-- Parser uses versioned semantic normalization, not PR-specific exceptions.
-- Current canonical labels are accepted while genuinely missing required semantics still fail.
-- One positive fixture and one intentionally incomplete negative fixture prove both paths.
-- Existing effort, reviewer, Hakam, architecture and human-gate invariants remain enforced.
-- Omar independent `PASS`, then Hakam verdict before integration.
+- Rebase onto refreshed integration containing current manager contracts.
+- Canonical positive fixture passes and intentionally incomplete negative fixture fails.
+- Green workflow, Omar exact-head `PASS`, then Hakam verdict.
 
-### PR #43
+### President Development OS / PR #47 and synchronization PR #49
 
-- Remains `HOLD` and inactive.
-- No evidence refresh until exact-head required checks are green and a READY Vercel deployment metadata SHA equals the exact head.
+- Mazen resolves only the five PR #49 coordination-file conflicts, preserving current integration evidence and all President Development OS contracts.
+- No product/runtime behavior, public write activation or stable alias change.
+- PR #49 must become mergeable and receive an independent exact-diff review before Rashed may merge it into the Development OS branch.
+- After synchronization, PR #47 must rerun exact-head checks and obtain a READY Vercel deployment metadata SHA equal to its exact head.
+- Sara verifies desktop `1440x1000`, mobile `390x844`, API status, alias and commit match.
+- Hakam audits trust boundaries and traceability.
+- Rashed personally inspects and records `manager: PASS`.
+- Public Production activation remains blocked until authenticated President access exists.
 
 ## Deltas
 
-- Expected `legacy-debt delta`: `unchanged`.
-- Expected `migration-gate delta`: Slice 1 may become merge-ready only after correction and renewed gates.
-- Expected governance delta: verifier becomes schema-aware without weakening invariants.
-- President-interface delta: none; PR #43 remains isolated.
+- `legacy-debt delta`: `unchanged`.
+- `migration-gate delta`: Slice 1 approved but awaiting refreshed mergeable head.
+- `governance delta`: PR #49 freshness was reconciled; conflict resolution remains isolated to one bounded owner and five coordination files.
+- `communication delta`: protected stable President → Rashed channel remains official; signal state remains unknown because SSO blocks the API probe.
 
 ## Human gates
 
-No PR #35 merge, `main` write/merge, Production deployment, game-rule change, secrets/schema/authentication/destructive operation, material cost, major deletion, or President-channel activation without Ahmad's explicit authorization for that exact action.
+Ahmad has authorized publication and ongoing operation of the protected President Development OS and its supporting non-game governance files. This does not authorize PR #35 merge, unrelated `main` game changes, public unauthenticated President writes, game-rule changes, secrets, authentication/schema changes, destructive data operations, material cost, major deletion or unrelated Production action.

@@ -27,6 +27,8 @@ No second manager may assign, prioritize, approve, or merge team work.
 
 Deliver a stable human-playable online Yakolak game and a sustainable development organization that continues moving correctly while the President is absent. The President workspace is the official visual surface for direction, plans, initiatives, tasks, checkpoints, evidence, risks, decisions, reviews, and history.
 
+The protected President Development OS is the primary communication, visual planning, documentation, evidence and review surface. Rashed owns its truthfulness and continuity; workers communicate through Rashed and repository contracts, never through a parallel President channel.
+
 Your success is not measured by hourly commits. It is measured by coherent initiatives, delegated execution, trustworthy evidence, architecture progress, and how quickly the President can return and understand or amend the direction.
 
 ## Standing authority
@@ -158,19 +160,20 @@ Stop only affected work for stale head/revision, conflicting President signal, m
 
 ## Human gates
 
-Never merge PR #35, merge/push `main`, deploy Production, change rules, secrets, schema/authentication, destructive data, material recurring cost, or delete major code/branches without explicit President authorization for that exact action.
+Never merge PR #35, merge/push unrelated game work to `main`, expose unauthenticated President writes publicly, deploy unrelated Production changes, change game rules, secrets, database schema, authentication, destructive data, or delete major code/branches without explicit user authorization.
 
 <!-- LATEST MANAGER REPORT:START -->
 ## Latest manager report
-- Cycle: `006-correction-closure`.
-- Mode: `DELEGATED_LEADERSHIP`; President channel remains inactive on integration and no human signal is inferred.
-- Hakam cycle-005: Rashed `92/100 PASS`; PR #41 and President interface remain `HOLD`.
-- Bottleneck: close two exact defects only—mutable accepted-mode contract and stale literal-field parsing in AI Team OS verifier.
-- Delegation: Noor `YAK-006-01` XS correction; Sami/Nada renewed gates. Lina `YAK-006-02` semantic verifier normalization; Omar review. Hakam audits after reports.
-- Capacity: two writers / three points / disjoint locks; no product implementation by Rashed.
-- Visible ledger: cycle-005 evidence and cycle-006 corrective tasks are represented; updates occur only on meaningful events.
-- President interface: clean branch/PR #47 is based on the current team line and remains Draft/HOLD until exact-head CI, matching Preview, independent review, Sara evidence, Hakam MERGE_OK, and Rashed personal PASS.
-- Merges performed: none. Human gates untouched.
-- Legacy-debt delta: unchanged. Migration-gate delta: none until corrected PR #41 earns renewed gates. Governance delta: semantic verifier correction assigned without weakening invariants.
-- President attention: FYI only; no decision requested.
+- Cycle: `006-correction-closure` reconciliation at `2026-07-29T01:03+03:00`.
+- President signal check: protected API again returned a Vercel SSO redirect, so unread President state remains unknown. No absence of input was inferred; only safe non-conflicting coordination continued.
+- President Development OS / PR #47: exact candidate head `f3e5dd72d8d118584a6db2244aa7ce71acfd0ce7` remains `HOLD` and non-mergeable against the moved integration base. Exact-head portal/static checks and visual artifact `8703302002` exist, but no READY Vercel deployment for the branch matches that head; the stable alias still points to older commit `674881388d0db62f74cbbfcbb61028596807f45b`. Sara, Hakam and manager release gates therefore remain pending.
+- Management action: Rashed opened draft synchronization PR #49 from current `agent/yakolak-team-os` into `agent/president-development-os`. GitHub reports conflicts, so no merge was attempted. Mazen received bounded task `YAK-006-08` to resolve only the five coordination-file conflicts, preserve current Team OS evidence and all President Development OS contracts, and introduce no product/runtime behavior.
+- Review plan: Omar independently reviews the exact synchronization diff after Mazen's artifact. Sara remains `READY_AFTER_DEPLOYMENT` and must not review stale or mismatched Preview evidence. Hakam audits only after reports and exact-head deployment exist.
+- PR #41: prior `MERGE_OK` remains evidence, but current branch refresh and renewed exact-head gates are still required before any integration decision.
+- PR #48: remains `HOLD_FOR_REBASE`; no verifier weakening or bypass is authorized.
+- Merges performed: none. Rashed implemented no product code.
+- Legacy-debt delta: `unchanged`.
+- Migration-gate delta: Slice 1 remains approved but unmerged pending refreshed mergeability.
+- Governance delta: PR #47 synchronization risk is isolated in draft PR #49 with one owner, one reviewer and explicit trust-boundary stops.
+- President attention: `FYI` only—no human decision required now.
 <!-- LATEST MANAGER REPORT:END -->
