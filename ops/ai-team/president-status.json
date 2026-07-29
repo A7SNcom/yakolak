@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "updatedAt": null,
+  "updatedAt": "2026-07-29T12:00:00+03:00",
   "lastPresidentEventId": 0,
-  "lastPresidentInputAt": null,
+  "lastPresidentInputAt": "2026-07-29T12:00:00+03:00",
   "leadershipMode": "DELEGATED_LEADERSHIP",
   "lastReturnBriefAt": null,
   "blueprint": {
-    "canonicalRevision": 3,
-    "lastReconciledPresidentRevision": 0,
-    "status": "canonical_only"
+    "canonicalRevision": 4,
+    "lastReconciledPresidentRevision": 4,
+    "status": "reconciled"
   },
   "directives": {}
 }

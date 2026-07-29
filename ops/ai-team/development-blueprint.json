@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "revision": 3,
-  "updatedAt": "2026-07-28T21:55:00+03:00",
+  "revision": 4,
+  "updatedAt": "2026-07-29T12:00:00+03:00",
   "updatedBy": "Rashed",
   "title": "مسار تطوير ياكلك",
   "nodes": [
@@ -108,6 +108,19 @@
       "x": 300,
       "y": 1040,
       "revision": 1
+    },
+    {
+      "id": "initiative-unified-president-workspace",
+      "type": "initiative",
+      "title": "مساحة واحدة واضحة لقيادة المشروع",
+      "body": "توجيه الرئيس أحمد: توحيد القيادة والمهام والمراجعات والمشاهد والعناصر في مساحة عربية مريحة. تعرض ما يديره راشد الآن ولماذا، النتائج المثبتة، التعطيل، والقرار المطلوب. تتضمن كانبان قريبًا من Trello ومعاينة مشاهد نظيفة، مع بقاء راشد مديرًا مفوضًا والفريق منفذًا، ومن دون أي تغيير في منطق اللعبة أو الإنتاج.",
+      "status": "in_progress",
+      "owner": "Rashed",
+      "taskId": "YAK-007",
+      "evidenceUrl": "",
+      "x": 1500,
+      "y": 1040,
+      "revision": 4
     }
   ],
   "edges": [
@@ -117,6 +130,7 @@
     {"id": "edge-visual-cursor", "from": "track-visual-development", "to": "initiative-president-signal-cursor", "label": "يرصد الإشارات"},
     {"id": "edge-visual-blueprint", "from": "track-visual-development", "to": "initiative-editable-visual-blueprint", "label": "يعرض المسار"},
     {"id": "edge-visual-return", "from": "track-visual-development", "to": "initiative-president-return-brief", "label": "يلخص للرئيس"},
-    {"id": "edge-architecture-online", "from": "track-canonical-architecture", "to": "track-online-session", "label": "يمكّن"}
+    {"id": "edge-architecture-online", "from": "track-canonical-architecture", "to": "track-online-session", "label": "يمكّن"},
+    {"id": "edge-visual-unified-workspace", "from": "track-visual-development", "to": "initiative-unified-president-workspace", "label": "يوحّد تجربة الرئيس"}
   ]
 }

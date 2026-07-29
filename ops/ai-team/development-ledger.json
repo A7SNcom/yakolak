@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "revision": 3,
-  "updatedAt": "2026-07-28T23:10:00+03:00",
+  "revision": 4,
+  "updatedAt": "2026-07-29T12:00:00+03:00",
   "updatedBy": "Rashed framework",
   "portfolio": {
     "leadershipMode": "DELEGATED_LEADERSHIP",
-    "activeInitiativeId": "initiative-correction-closure",
-    "summary": "واجهة المشروع تربط جميع الأعمال، وراشد بدأ cycle 006 بتصحيحين محددين ومتوازيين دون تجاوز السعة أو تنفيذ الكود بنفسه.",
+    "activeInitiativeId": "initiative-unified-president-workspace",
+    "summary": "راشد استلم عدم رضا الرئيس أحمد وحوّله إلى مبادرة موحدة: لغة إدارية مفهومة، قيادة مختصرة، كانبان حقيقي، ومشاهد أوضح دون المساس باللعبة أو الإنتاج.",
     "health": "attention",
-    "nextManagementAction": "انتظار Artifact Noor وLina، ثم تسجيل المراجعات والتدقيق وقرارات الدمج في السجل بدل إنشاء مهام جديدة."
+    "nextManagementAction": "تفويض تنفيذ الواجهة الموحدة، ثم مراجعة النتيجة على الكمبيوتر والجوال وتقديمها للرئيس مع دليل قبل/بعد."
   },
   "initiatives": [
     {
@@ -43,6 +43,20 @@
       "links": [
         {"label": "PR #47", "url": "https://github.com/A7SNcom/yakolak/pull/47"}
       ]
+    },
+    {
+      "id": "initiative-unified-president-workspace",
+      "blueprintNodeId": "initiative-unified-president-workspace",
+      "title": "مساحة الرئيس الموحدة والواضحة",
+      "outcome": "يستطيع الرئيس أحمد فهم ما يديره راشد واتخاذ القرار، ثم الانتقال إلى كانبان والمراجعات والمشاهد والعناصر من واجهة واحدة عربية ومتسقة.",
+      "status": "in_progress",
+      "owner": "Rashed",
+      "priority": "urgent",
+      "taskIds": ["YAK-007-01", "YAK-007-02"],
+      "dependencies": [],
+      "risks": ["الحفاظ على عقود معاينة المشاهد الحالية", "عدم خلط بيانات موثقة باستنتاجات أو نسب تقدم تخمينية", "عدم لمس منطق اللعبة أو الإنتاج"],
+      "recommendation": "تنفيذ واجهة موحدة قابلة للرجوع على فرع مستقل، ثم عرض دليل كمبيوتر وجوال قبل أي دمج.",
+      "links": []
     }
   ],
   "tasks": [
@@ -239,6 +253,70 @@
         {"id": "event-portal-direction", "at": "2026-07-28T21:55:00+03:00", "type": "decision", "actor": "President", "title": "اعتماد راشد كقائد مفوض", "detail": "راشد يقود ويخطط ويفوض في غياب الرئيس، والفريق هو المنفذ.", "evidence": []},
         {"id": "event-portal-ledger", "at": "2026-07-28T22:20:00+03:00", "type": "progress", "actor": "Framework developer", "title": "إنشاء سجل التطوير المرئي", "detail": "ربط المبادرات والمهام والتقارير والبوابات والأدلة والقرارات في مصدر إداري واحد.", "evidence": []},
         {"id": "event-portal-cycle-006", "at": "2026-07-28T23:10:00+03:00", "type": "architecture", "actor": "Framework developer", "title": "تركيب الواجهة فوق cycle 006", "detail": "الحفاظ على لوحة راشد وتكليفات الموظفين الحديثة وإضافة العرض المرئي فوقها بدل الكتابة عليها.", "evidence": [{"label": "PR #47", "url": "https://github.com/A7SNcom/yakolak/pull/47"}]}
+      ]
+    },
+    {
+      "id": "YAK-007-01",
+      "initiativeId": "initiative-unified-president-workspace",
+      "blueprintNodeId": "initiative-unified-president-workspace",
+      "blueprintRevision": 4,
+      "title": "توحيد القيادة والكانبان والفريق",
+      "outcome": "واجهة عربية واحدة تجيب عن أسئلة الرئيس الخمسة وتعرض كانبان حقيقيًا بمالك وتقدم ودليل وخطوة تالية ومراجعات، مع مسؤوليات الفريق بلغة إدارية.",
+      "status": "in_progress",
+      "effort": "M",
+      "risk": "medium-process-ui",
+      "owner": "Codex UI implementer",
+      "reviewer": "Sara",
+      "architectureSteward": "NOT_REQUIRED",
+      "auditor": "Hakam",
+      "progress": {"completed": 2, "total": 7, "label": "التوجيه موثق والواقع الحالي مفحوص؛ يجري تنفيذ الواجهة."},
+      "acceptance": [
+        {"text": "لغة عربية إدارية بلا مصطلحات خام ظاهرة", "status": "PENDING"},
+        {"text": "القيادة تجيب: ماذا ولماذا والمنجز والتعطيل والقرار", "status": "PENDING"},
+        {"text": "كانبان بأعمدة وبطاقات مختصرة وحقول الدليل والخطوة والمراجعة", "status": "PENDING"},
+        {"text": "مسؤوليات راشد والفريق واضحة وراشد لا يظهر كمنفذ كود", "status": "PENDING"},
+        {"text": "النتائج المعروضة مرتبطة بأدلة فعلية فقط", "status": "PENDING"},
+        {"text": "اختبار كمبيوتر وجوال ووصول أساسي", "status": "PENDING"},
+        {"text": "Sara وHakam وقرار راشد", "status": "PENDING"}
+      ],
+      "gates": {"artifact": "IN_PROGRESS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "PENDING", "preview": "PENDING", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
+      "links": {"prUrl": "", "commitSha": "", "previewUrl": "", "evidence": []},
+      "blockedBy": [],
+      "nextAction": "إكمال الواجهة وتشغيل التحقق البصري والوظيفي على الكمبيوتر والجوال.",
+      "presidentAttention": "REVIEW_MILESTONE",
+      "events": [
+        {"id": "event-yak-007-president-signal", "at": "2026-07-29T12:00:00+03:00", "type": "president", "actor": "President Ahmad", "title": "عدم رضا عن وضوح واجهات التطوير", "detail": "طلب توحيد القيادة والمهام والمراجعات والمشاهد بلغة إنسانية وكانبان عملي مع حماية اللعبة والإنتاج.", "evidence": []},
+        {"id": "event-yak-007-delegated", "at": "2026-07-29T12:05:00+03:00", "type": "assigned", "actor": "Rashed", "title": "تفويض تنفيذ واجهة الرئيس الموحدة", "detail": "راشد يحتفظ بالقيادة والتفويض والمراجعة؛ التنفيذ محصور في واجهات التطوير واختباراتها.", "evidence": []}
+      ]
+    },
+    {
+      "id": "YAK-007-02",
+      "initiativeId": "initiative-unified-president-workspace",
+      "blueprintNodeId": "initiative-unified-president-workspace",
+      "blueprintRevision": 4,
+      "title": "تنظيف معاينة المشاهد والعناصر",
+      "outcome": "تبقى المعاينة الحالية لكن بمساحة صحيحة وحشو أقل ومقارنة قبل/بعد واضحة على الكمبيوتر والجوال.",
+      "status": "ready",
+      "effort": "S",
+      "risk": "low-developer-ui",
+      "owner": "Codex UI implementer",
+      "reviewer": "Sara",
+      "architectureSteward": "NOT_REQUIRED",
+      "auditor": "Hakam",
+      "progress": {"completed": 1, "total": 4, "label": "حدود المهمة وعقود المعاينة الحالية موثقة."},
+      "acceptance": [
+        {"text": "منطقة المعاينة هي مركز العرض ولا تزاحمها نصوص طويلة", "status": "PENDING"},
+        {"text": "قبل وبعد يستخدمان نفس القياس والتسمية", "status": "PENDING"},
+        {"text": "المشاهد والعناصر في تصفح واحد واضح", "status": "PENDING"},
+        {"text": "لا تغيير في ملفات اللعبة أو منطقها أو الإنتاج", "status": "PENDING"}
+      ],
+      "gates": {"artifact": "PENDING", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "PENDING", "preview": "PENDING", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
+      "links": {"prUrl": "", "commitSha": "", "previewUrl": "", "evidence": []},
+      "blockedBy": [],
+      "nextAction": "تنفيذ التنظيف بعد تثبيت هيكل التنقل الموحد.",
+      "presidentAttention": "REVIEW_MILESTONE",
+      "events": [
+        {"id": "event-yak-007-scene-scope", "at": "2026-07-29T12:05:00+03:00", "type": "assigned", "actor": "Rashed", "title": "حصر العمل في واجهة المعاينة", "detail": "الحفاظ على مسارات اللعبة والعقود الحالية وعدم تعديل سلوك اللعبة.", "evidence": []}
       ]
     }
   ]
