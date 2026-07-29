@@ -19,6 +19,8 @@ const uniqueIds = (items, label) => {
 };
 
 const ui = read('src/developer-president.js');
+const html = read('developer.html');
+const css = read('src/developer-president.css');
 const api = read('api/developer-president.js');
 const manager = read('ops/ai-team/manager.md');
 const leadership = read('ops/ai-team/RASHED_LEADERSHIP_OS.md');
@@ -50,8 +52,33 @@ requireTokens(ui, [
   'function renderBlueprintMap()',
   'function taskCard(task)',
   'function renderTimeline()',
+  'function kanbanCard(task)',
+  'function renderTeam()',
+  'ماذا يعمل راشد الآن؟',
+  'لماذا هذا العمل؟',
+  'ما الذي أُنجز فعليًا؟',
+  'ما المتعطل؟',
+  'ما القرار المطلوب مني؟',
+  'قيد العمل',
+  'قيد المراجعة',
+  'راشد مدير المشروع. بقية الأعضاء ينفذون أو يراجعون',
   'Promise.allSettled'
 ], 'President UI');
+
+requireTokens(html, [
+  'president-unified-workspace-v3',
+  'المشاهد والعناصر',
+  'قبل / بعد',
+  'id="d4PreviewFrame"'
+], 'Unified shell');
+
+requireTokens(css, [
+  '.president-executive-grid',
+  '.president-kanban',
+  '.president-team-grid',
+  '.president-scene-mode .d4-preview-shell',
+  '@media(max-width:820px)'
+], 'Unified responsive styles');
 
 requireTokens(api, [
   "'president'",

@@ -26,6 +26,18 @@ const state = {
   staticAvailable: false
 };
 
+const TEAM = [
+  {name: 'Rashed', label: 'راشد', role: 'مدير المشروع ونائب الرئيس', responsibility: 'يحدد الأولوية، يفوض التنفيذ، يراجع الأدلة، ويرفع للرئيس القرارات المهمة فقط.', manager: true},
+  {name: 'Noor', label: 'نور', role: 'تنفيذ قواعد النظام الأساسية', responsibility: 'تنفذ المهام المحددة المتعلقة بثبات القواعد وحالة اللعبة.'},
+  {name: 'Sami', label: 'سامي', role: 'مراجعة جودة التنفيذ', responsibility: 'يفحص عمل زملائه ويتأكد أن النتيجة تطابق المطلوب.'},
+  {name: 'Lina', label: 'لينا', role: 'تنفيذ أدوات العمل والبيانات', responsibility: 'تحسن أدوات الفريق وسلامة المعلومات التي تظهر في المنصة.'},
+  {name: 'Mazen', label: 'مازن', role: 'تنفيذ الدمج وتنظيم الملفات', responsibility: 'يعالج التعارضات ويحافظ على اتساق ملفات العمل المشتركة.'},
+  {name: 'Nada', label: 'ندى', role: 'حماية بنية المنتج', responsibility: 'تمنع الحلول التي تكرر المنطق أو تزيد صعوبة صيانة اللعبة.'},
+  {name: 'Omar', label: 'عمر', role: 'مراجعة العقود والاختبارات', responsibility: 'يتحقق أن الاختبارات تقيس المعنى الصحيح ولا تخفي الأعطال.'},
+  {name: 'Sara', label: 'سارة', role: 'مراجعة التجربة البصرية', responsibility: 'تختبر الواجهة على الكمبيوتر والجوال وتراجع وضوحها.'},
+  {name: 'Hakam', label: 'حَكَم', role: 'مدقق مستقل نهائي', responsibility: 'يتأكد من صدق التقارير والأدلة قبل السماح لراشد بالاعتماد.'}
+];
+
 let activeTab = 'portfolio';
 
 function currentContext() {
@@ -88,8 +100,17 @@ function statusLabel(status) {
     MERGE_OK: 'مسموح بالدمج',
     IN_PROGRESS: 'قيد التنفيذ',
     FYI: 'للعلم',
-    NONE: 'لا يحتاج انتباهك'
+    NONE: 'لا يحتاج انتباهك',
+    DELEGATED_LEADERSHIP: 'راشد يقود الفريق الآن',
+    REVIEW_MILESTONE: 'مراجعة الرئيس عند اكتمال النتيجة'
   })[status] || status || '—';
+}
+
+function personLabel(value) {
+  const text = String(value || '');
+  const person = TEAM.find(item => text.toLowerCase().includes(item.name.toLowerCase()));
+  if (person) return person.label;
+  return ({'Framework developer': 'فريق المنصة', 'Codex UI implementer': 'فريق الواجهة', 'Independent reviewer + Sara evidence': 'مراجعة مستقلة وسارة', 'NOT_REQUIRED': 'غير مطلوب'})[text] || text || 'غير محدد';
 }
 
 function decisionFor(id) {
@@ -185,6 +206,14 @@ function wireSingleChannel() {
 
   const context = $('#d4ContextTitle');
   if (context) context.textContent = 'راشد يدير التطوير من مسار واحد موثق';
+
+  document.body.classList.add('president-scene-mode');
+  const next = document.querySelector('.d4-next');
+  if (next) next.hidden = true;
+  const selectionCode = $('#d4SelectionCode');
+  if (selectionCode) selectionCode.hidden = true;
+  const workspaceKind = $('#d4SelectionKind');
+  if (workspaceKind) workspaceKind.textContent = 'المشاهد والعناصر';
 }
 
 function inject() {
@@ -205,7 +234,7 @@ function inject() {
   button.id = 'd4PresidentOpen';
   button.className = 'd4-button ghost president-button';
   button.type = 'button';
-  button.innerHTML = 'قيادة المشروع <b id="d4PresidentCount" class="d4-count" hidden>0</b>';
+  button.innerHTML = 'لوحة القيادة <b id="d4PresidentCount" class="d4-count" hidden>0</b>';
   actions?.prepend(button);
 
   wireSingleChannel();
@@ -213,27 +242,35 @@ function inject() {
     <section id="presidentPortal" class="president-overlay" aria-hidden="true">
       <header class="president-bar">
         <div class="president-brand">
-          <span class="president-seal">ر</span>
-          <div><strong>قيادة تطوير ياكلك</strong><span>الرئيس يوجّه، راشد يقود، والفريق ينفّذ ويُراجع.</span></div>
+          <span class="president-seal">ي</span>
+          <div><strong>ياكلك · إدارة المشروع</strong><span>مساحة واحدة للرئيس أحمد</span></div>
         </div>
+        <nav class="president-top-nav" aria-label="أقسام المنصة">
+          <button class="active" type="button" data-president-tab="portfolio">القيادة</button>
+          <button type="button" data-president-tab="tasks">المهام</button>
+          <button type="button" data-president-tab="team">الفريق</button>
+          <button type="button" data-scenes>المشاهد والعناصر</button>
+        </nav>
         <div class="president-actions">
           <span id="presidentSync" class="president-sync">جارٍ المزامنة</span>
           <button id="presidentRefresh" class="d4-button ghost" type="button">تحديث</button>
-          <button id="presidentClose" class="d4-button primary" type="button">العودة</button>
+          <button id="presidentClose" class="d4-button primary" type="button">المشاهد</button>
         </div>
       </header>
       <div class="president-shell">
         <nav class="president-nav">
           <div class="president-manager">
-            <small>نائب الرئيس ومدير الفريق</small><strong>راشد</strong>
-            <span>يقود المبادرات ويعرض لك كل التقدم، ولا يرسل لك عملاً خامًا غير مراجع.</span>
+            <small>مدير المدير</small><strong>راشد</strong>
+            <span>يقود ويفوض ويراجع. الفريق هو من ينفذ.</span>
           </div>
-          <button class="president-tab active" type="button" data-president-tab="portfolio">المشروع <b id="presidentTaskCount">0</b></button>
-          <button class="president-tab" type="button" data-president-tab="tasks">المهام <b id="presidentActiveCount">0</b></button>
-          <button class="president-tab" type="button" data-president-tab="timeline">السجل <b id="presidentEventCount">0</b></button>
-          <button class="president-tab" type="button" data-president-tab="reviews">بانتظار قراري <b id="presidentReviewCount">0</b></button>
-          <button class="president-tab" type="button" data-president-tab="directives">تعليماتي لراشد <b id="presidentDirectiveCount">0</b></button>
-          <p class="president-nav-note">كل التفاصيل مرئية، لكن لا يطلب راشد انتباهك إلا عند قرار حقيقي أو مرحلة مكتملة.</p>
+          <button class="president-tab active" type="button" data-president-tab="portfolio">ملخص القيادة <b id="presidentTaskCount">0</b></button>
+          <button class="president-tab" type="button" data-president-tab="tasks">لوحة المهام <b id="presidentActiveCount">0</b></button>
+          <button class="president-tab" type="button" data-president-tab="reviews">قراراتي <b id="presidentReviewCount">0</b></button>
+          <button class="president-tab" type="button" data-president-tab="directives">تكليف راشد <b id="presidentDirectiveCount">0</b></button>
+          <button class="president-tab" type="button" data-president-tab="team">الفريق <b id="presidentTeamCount">9</b></button>
+          <button class="president-tab" type="button" data-president-tab="timeline">سجل النتائج <b id="presidentEventCount">0</b></button>
+          <button class="president-tab president-scenes-tab" type="button" data-scenes>المشاهد والعناصر <b>↗</b></button>
+          <p class="president-nav-note">التفاصيل التقنية مخفية افتراضيًا. افتحها فقط عندما تحتاج الدليل.</p>
         </nav>
         <main class="president-main">
           <section id="presidentSummary" class="president-summary"></section>
@@ -242,6 +279,7 @@ function inject() {
           <section id="presidentTimeline" class="president-section" hidden></section>
           <section id="presidentReviews" class="president-section" hidden></section>
           <section id="presidentDirectives" class="president-section" hidden></section>
+          <section id="presidentTeam" class="president-section" hidden></section>
         </main>
       </div>
     </section>`);
@@ -251,6 +289,9 @@ function inject() {
   $('#presidentRefresh').onclick = load;
   document.querySelectorAll('[data-president-tab]').forEach(tab => {
     tab.onclick = () => setTab(tab.dataset.presidentTab);
+  });
+  document.querySelectorAll('[data-scenes]').forEach(tab => {
+    tab.onclick = closePortal;
   });
   addEventListener('keydown', event => {
     if (event.key === 'Escape' && $('#presidentPortal')?.classList.contains('open')) closePortal();
@@ -278,7 +319,8 @@ function setTab(tab) {
     tasks: '#presidentTasks',
     timeline: '#presidentTimeline',
     reviews: '#presidentReviews',
-    directives: '#presidentDirectives'
+    directives: '#presidentDirectives',
+    team: '#presidentTeam'
   };
   for (const [name, selector] of Object.entries(sections)) $(selector).hidden = name !== tab;
   render();
@@ -369,6 +411,50 @@ function renderLeadershipStrip() {
     </article>`;
 }
 
+function administrativeText(value) {
+  let text = String(value || '');
+  for (const task of state.ledger.tasks || []) text = text.replaceAll(task.id, task.title);
+  return text
+    .replaceAll('Artifact', 'النتيجة')
+    .replaceAll('Preview', 'نسخة المعاينة')
+    .replaceAll('Commit', 'نسخة العمل')
+    .replaceAll('CI', 'الفحوص الآلية')
+    .replaceAll('PR', 'طلب الدمج')
+    .replaceAll('cycle', 'الدورة')
+    .replaceAll('accepted modes', 'قائمة الأوضاع المعتمدة')
+    .replaceAll('mutation-resistance', 'مقاومة التعديل')
+    .replaceAll('fixtures', 'أمثلة الاختبار')
+    .replaceAll('invariant', 'شرط السلامة')
+    .replaceAll('AI Team OS', 'نظام عمل الفريق')
+    .replaceAll('verifier', 'أداة التحقق')
+    .replaceAll('normalizer', 'موحّد البيانات')
+    .replaceAll('reducer', 'محرك الحالة');
+}
+
+function currentInitiative() {
+  const id = state.ledger.portfolio?.activeInitiativeId;
+  return (state.ledger.initiatives || []).find(item => item.id === id) || state.ledger.initiatives?.[0] || null;
+}
+
+function initiativeTasks(initiative = currentInitiative()) {
+  if (!initiative) return [];
+  return (initiative.taskIds || []).map(id => state.ledger.tasks.find(task => task.id === id)).filter(Boolean);
+}
+
+function verifiedResults() {
+  const results = [];
+  for (const task of state.ledger.tasks || []) {
+    for (const item of task.acceptance || []) {
+      if (item.status === 'PASS') results.push({task: task.title, text: item.text, id: task.id});
+    }
+  }
+  return results.slice(-6).reverse();
+}
+
+function leadershipAnswer(icon, question, answer, detail = '', tone = '') {
+  return `<article class="president-answer ${tone}"><span class="president-answer-icon">${icon}</span><div><small>${question}</small><strong>${escapeHtml(administrativeText(answer))}</strong>${detail ? `<p>${escapeHtml(administrativeText(detail))}</p>` : ''}</div></article>`;
+}
+
 function nodeTaskCount(nodeId) {
   return (state.ledger.tasks || []).filter(task => task.blueprintNodeId === nodeId).length;
 }
@@ -433,22 +519,33 @@ function initiativeCard(initiative) {
 
 function renderPortfolio() {
   const root = $('#presidentPortfolio');
-  root.innerHTML = `${renderLeadershipStrip()}${renderBlueprintMap()}<div class="president-initiative-grid">${(state.ledger.initiatives || []).map(initiativeCard).join('')}</div>`;
-  root.querySelectorAll('[data-blueprint-node]').forEach(button => {
-    button.onclick = () => {
-      const nodeId = button.dataset.blueprintNode;
-      setTab('tasks');
-      const task = document.querySelector(`[data-task-blueprint="${CSS.escape(nodeId)}"]`);
-      task?.scrollIntoView({behavior: 'smooth', block: 'start'});
-      task?.classList.add('focus');
-      setTimeout(() => task?.classList.remove('focus'), 1800);
-    };
-  });
+  const initiative = currentInitiative();
+  const tasks = initiativeTasks(initiative);
+  const active = tasks.find(task => task.status === 'in_progress') || tasks[0];
+  const blockers = tasks.flatMap(task => task.blockedBy || []);
+  const results = verifiedResults();
+  const decisions = pendingReviews();
+  root.innerHTML = `
+    <header class="president-page-heading"><div><small>مرحبًا أحمد</small><h1>هذا ما يديره راشد الآن</h1><p>ملخص إداري مباشر. افتح التفاصيل فقط إذا احتجت الدليل.</p></div><span class="president-updated">آخر تحديث<br><b>${escapeHtml(formatTime(state.ledger.updatedAt))}</b></span></header>
+    <section class="president-executive-grid">
+      ${leadershipAnswer('١', 'ماذا يعمل راشد الآن؟', initiative?.title || 'لا توجد مبادرة نشطة', active ? `فوّض التنفيذ إلى ${personLabel(active.owner)}: ${active.title}` : 'لا توجد مهمة منفذة الآن.', 'primary')}
+      ${leadershipAnswer('٢', 'لماذا هذا العمل؟', initiative?.outcome || 'لم يوثق السبب بعد.', initiative?.recommendation || '')}
+      ${leadershipAnswer('٣', 'ما الذي أُنجز فعليًا؟', results.length ? `${results.length} نتائج اجتازت معاييرها` : 'لا توجد نتيجة مكتملة مثبتة بعد', results[0] ? `${results[0].task}: ${results[0].text}` : 'لن نعرض نشاطًا على أنه إنجاز.')}
+      ${leadershipAnswer('٤', 'ما المتعطل؟', blockers.length ? `${blockers.length} عوائق موثقة` : 'لا يوجد عائق يمنع المبادرة الحالية', blockers[0] || 'الفريق يستطيع مواصلة العمل دون انتظارك.', blockers.length ? 'warning' : 'success')}
+      ${leadershipAnswer('٥', 'ما القرار المطلوب مني؟', decisions.length ? `${decisions.length} نتائج جاهزة لقرارك` : 'لا يوجد قرار مطلوب منك الآن', decisions[0]?.recommendation || 'راشد سيعود إليك عندما تكتمل نتيجة وتُراجع.', decisions.length ? 'decision' : 'success')}
+    </section>
+    <section class="president-brief-row">
+      <article class="president-focus-card"><header><div><small>توجيه راشد للفريق</small><strong>${escapeHtml(administrativeText(state.ledger.portfolio?.nextManagementAction || '—'))}</strong></div><button class="president-action primary" type="button" data-open-board>فتح لوحة المهام</button></header><div class="president-focus-progress"><span style="width:${active ? progressPercent(active) : 0}%"></span></div><p>${escapeHtml(administrativeText(active?.progress?.label || 'لا يوجد تقدم موثق بعد.'))}</p></article>
+      <article class="president-results-card"><header><small>آخر نتائج مثبتة</small><button class="president-action" type="button" data-open-history>كل السجل</button></header>${results.length ? `<ol>${results.slice(0,4).map(item => `<li><span>✓</span><div><strong>${escapeHtml(administrativeText(item.text))}</strong><small>${escapeHtml(item.task)}</small></div></li>`).join('')}</ol>` : '<p>لا توجد نتائج مثبتة بعد.</p>'}</article>
+    </section>`;
+  root.querySelector('[data-open-board]')?.addEventListener('click', () => setTab('tasks'));
+  root.querySelector('[data-open-history]')?.addEventListener('click', () => setTab('timeline'));
 }
 
 function gateChips(item) {
   const gates = item.gates || {};
-  return Object.entries(gates).map(([name, value]) => `<span class="president-gate ${escapeHtml(String(value).toLowerCase())}">${escapeHtml(name)}: ${escapeHtml(statusLabel(value))}</span>`).join('');
+  const labels = {artifact: 'النتيجة', reviewer: 'المراجع', architecture: 'سلامة البنية', hakam: 'التدقيق النهائي', ci: 'الفحوص', preview: 'المعاينة', manager: 'قرار راشد', president: 'قرار الرئيس'};
+  return Object.entries(gates).map(([name, value]) => `<span class="president-gate ${escapeHtml(String(value).toLowerCase())}">${escapeHtml(labels[name] || name)}: ${escapeHtml(statusLabel(value))}</span>`).join('');
 }
 
 function progressPercent(task) {
@@ -510,7 +607,39 @@ function renderTasks() {
     root.innerHTML = '<div class="president-empty">لا توجد مهام في سجل التطوير بعد.</div>';
     return;
   }
-  root.innerHTML = tasks.map(taskCard).join('');
+  const columns = [
+    {id: 'ready', title: 'قادم', description: 'جاهز بعد اكتمال متطلباته', statuses: ['new', 'documented', 'planned', 'ready']},
+    {id: 'doing', title: 'قيد العمل', description: 'ينفذه الفريق الآن', statuses: ['acknowledged', 'in_progress']},
+    {id: 'review', title: 'قيد المراجعة', description: 'نتيجة موجودة ويجري التحقق منها', statuses: ['artifact_ready', 'review', 'ready_for_president']},
+    {id: 'blocked', title: 'متعطل', description: 'له عائق واضح أو قرار معلّق', statuses: ['blocked', 'held', 'rejected']},
+    {id: 'done', title: 'تم', description: 'اكتمل بالدليل والقرار', statuses: ['completed', 'approved', 'superseded']}
+  ];
+  root.innerHTML = `<header class="president-page-heading compact"><div><small>إدارة العمل</small><h1>لوحة مهام ياكلك</h1><p>كل بطاقة تعرض المسؤول والنتيجة والدليل والخطوة التالية.</p></div><button class="president-action primary" type="button" data-new-directive>تكليف راشد</button></header>
+    <div class="president-kanban">${columns.map(column => {
+      const items = tasks.filter(task => column.id === 'blocked'
+        ? column.statuses.includes(task.status) || task.blockedBy?.length
+        : column.statuses.includes(task.status) && !task.blockedBy?.length);
+      return `<section class="president-kanban-column ${column.id}"><header><div><strong>${column.title}</strong><small>${column.description}</small></div><b>${items.length}</b></header><div class="president-kanban-list">${items.length ? items.map(kanbanCard).join('') : '<div class="president-kanban-empty">لا توجد بطاقات</div>'}</div></section>`;
+    }).join('')}</div>`;
+  root.querySelector('[data-new-directive]')?.addEventListener('click', () => setTab('directives'));
+}
+
+function kanbanCard(task) {
+  const percent = progressPercent(task);
+  const evidenceCount = [task.links?.previewUrl, task.links?.prUrl, task.links?.commitSha, ...(task.links?.evidence || [])].filter(Boolean).length;
+  const passed = (task.acceptance || []).filter(item => item.status === 'PASS').length;
+  const reviews = (task.events || []).filter(event => ['review', 'audit', 'architecture', 'decision'].includes(event.type));
+  return `<article class="president-kanban-card" data-task-id="${escapeHtml(task.id)}" data-task-blueprint="${escapeHtml(task.blueprintNodeId)}">
+    <div class="president-kanban-tags"><span>${escapeHtml(statusLabel(task.status))}</span>${task.presidentAttention && task.presidentAttention !== 'NONE' ? `<span class="attention">${escapeHtml(statusLabel(task.presidentAttention))}</span>` : ''}</div>
+    <h2>${escapeHtml(administrativeText(task.title))}</h2>
+    <p>${escapeHtml(administrativeText(task.outcome))}</p>
+    <div class="president-kanban-owner"><span class="president-avatar">${escapeHtml(personLabel(task.owner).slice(0,1))}</span><div><small>المسؤول</small><strong>${escapeHtml(personLabel(task.owner))}</strong></div><b>${percent}%</b></div>
+    <div class="president-card-progress"><span style="width:${percent}%"></span></div>
+    <dl class="president-card-facts"><div><dt>الدليل</dt><dd>${evidenceCount ? `${evidenceCount} مرفقات` : 'لم يرفق بعد'}</dd></div><div><dt>النجاح</dt><dd>${passed}/${task.acceptance?.length || 0}</dd></div><div><dt>المراجعات</dt><dd>${reviews.length}</dd></div></dl>
+    <div class="president-next-step"><small>الخطوة التالية</small><strong>${escapeHtml(administrativeText(task.nextAction || '—'))}</strong></div>
+    ${task.blockedBy?.length ? `<div class="president-card-blocker"><small>العائق</small>${escapeHtml(administrativeText(task.blockedBy.join('، ')))}</div>` : ''}
+    <details class="president-card-details"><summary>الدليل والتعليقات</summary><div class="president-links">${evidenceLinks(task) || '<span>لا يوجد رابط دليل حتى الآن.</span>'}</div><ul class="president-acceptance">${(task.acceptance || []).map(item => `<li class="${escapeHtml(String(item.status).toLowerCase())}"><span>${escapeHtml(statusLabel(item.status))}</span>${escapeHtml(administrativeText(item.text))}</li>`).join('')}</ul>${taskEvents(task)}</details>
+  </article>`;
 }
 
 function renderTimeline() {
@@ -520,17 +649,29 @@ function renderTimeline() {
     root.innerHTML = '<div class="president-empty">لا توجد أحداث تطوير موثقة بعد.</div>';
     return;
   }
-  root.innerHTML = `<article class="president-timeline-card"><header><small>سجل واحد لكل التطوير</small><strong>التحديثات والقرارات والمراجعات</strong></header><ol class="president-global-timeline">${events.map(event => `
-    <li><time>${escapeHtml(formatTime(event.at))}</time><i class="${escapeHtml(event.type)}"></i><div><small>${escapeHtml(event.actor)} · ${escapeHtml(event.taskId || '')}</small><strong>${escapeHtml(event.title)}</strong><p>${escapeHtml(event.detail)}</p><div class="president-links">${evidenceLinks(event)}</div></div></li>`).join('')}</ol></article>`;
+  root.innerHTML = `<article class="president-timeline-card"><header><small>نتائج لا نشاطات</small><strong>التحديثات والقرارات والمراجعات المثبتة</strong></header><ol class="president-global-timeline">${events.map(event => `
+    <li><time>${escapeHtml(formatTime(event.at))}</time><i class="${escapeHtml(event.type)}"></i><div><small>${escapeHtml(personLabel(event.actor))}</small><strong>${escapeHtml(administrativeText(event.title))}</strong><p>${escapeHtml(administrativeText(event.detail))}</p><div class="president-links">${evidenceLinks(event)}</div></div></li>`).join('')}</ol></article>`;
+}
+
+function renderTeam() {
+  const root = $('#presidentTeam');
+  root.innerHTML = `<header class="president-page-heading compact"><div><small>المسؤوليات</small><h1>من يقود ومن ينفذ؟</h1><p>راشد مدير المشروع. بقية الأعضاء ينفذون أو يراجعون ضمن مسؤوليات واضحة.</p></div></header>
+    <article class="president-command-chain"><div><span>أ</span><small>صاحب القرار النهائي</small><strong>الرئيس أحمد</strong></div><i>←</i><div class="manager"><span>ر</span><small>يقود ويفوض ويراجع</small><strong>راشد</strong></div><i>←</i><div><span>ف</span><small>تنفيذ ومراجعة مستقلة</small><strong>الفريق</strong></div></article>
+    <div class="president-team-grid">${TEAM.map(member => {
+      const owned = (state.ledger.tasks || []).filter(task => String(task.owner).toLowerCase().includes(member.name.toLowerCase()));
+      const reviewing = (state.ledger.tasks || []).filter(task => String(task.reviewer).toLowerCase().includes(member.name.toLowerCase()) || String(task.architectureSteward).toLowerCase().includes(member.name.toLowerCase()));
+      const activeOwned = owned.filter(task => !['completed', 'rejected', 'superseded'].includes(task.status));
+      return `<article class="president-team-card ${member.manager ? 'manager' : ''}"><header><span>${escapeHtml(member.label.slice(0,1))}</span><div><h2>${escapeHtml(member.label)}</h2><p>${escapeHtml(member.role)}</p></div>${member.manager ? '<b>المدير</b>' : ''}</header><p>${escapeHtml(member.responsibility)}</p><dl><div><dt>ينفذ الآن</dt><dd>${member.manager ? 'لا ينفذ؛ يدير الفريق' : activeOwned.length ? `${activeOwned.length} مهام` : 'لا توجد مهمة حالية'}</dd></div><div><dt>يراجع</dt><dd>${reviewing.length ? `${reviewing.length} مهام` : member.manager ? 'كل نتيجة قبل القرار' : 'لا توجد مراجعة حالية'}</dd></div></dl>${activeOwned.length ? `<details><summary>المهام الحالية</summary><ul>${activeOwned.map(task => `<li>${escapeHtml(administrativeText(task.title))}</li>`).join('')}</ul></details>` : ''}</article>`;
+    }).join('')}</div>`;
 }
 
 function reviewGateChips(item) {
   const gates = item.gates || {};
   return [
-    `المراجع: ${gates.reviewer || '—'}`,
-    `راشد: ${gates.manager || '—'}`,
-    `حَكَم: ${gates.hakam || '—'}`,
-    `CI: ${gates.ci || '—'}`
+    `المراجع: ${statusLabel(gates.reviewer)}`,
+    `راشد: ${statusLabel(gates.manager)}`,
+    `حَكَم: ${statusLabel(gates.hakam)}`,
+    `الفحوص: ${statusLabel(gates.ci)}`
   ].map(text => `<span class="president-gate">${escapeHtml(text)}</span>`).join('');
 }
 
@@ -651,7 +792,7 @@ function directiveCard(item) {
   card.className = `president-card ${status}`;
   card.dataset.directiveId = item.id;
   card.innerHTML = `
-    <header class="president-card-head"><div class="president-card-title"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.kind)} · ${escapeHtml(item.priority)} · ${escapeHtml(formatTime(item.createdAt))}</span></div><span class="president-status ${escapeHtml(status)}">${escapeHtml(statusLabel(status))}</span></header>
+    <header class="president-card-head"><div class="president-card-title"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(({instruction: 'تكليف عام', scene: 'مشهد', element: 'عنصر', architecture: 'تنظيم المنتج'})[item.kind] || 'تكليف')} · ${escapeHtml(({normal: 'عادية', high: 'عالية', urgent: 'عاجلة'})[item.priority] || 'عادية')} · ${escapeHtml(formatTime(item.createdAt))}</span></div><span class="president-status ${escapeHtml(status)}">${escapeHtml(statusLabel(status))}</span></header>
     <div class="president-card-body">
       <p>${escapeHtml(item.body)}</p>
       ${item.context?.code ? `<div class="president-context"><b>${escapeHtml(item.context.title)}</b><br><code>${escapeHtml(item.context.code)}</code></div>` : ''}
@@ -714,6 +855,7 @@ function render() {
   renderTimeline();
   renderReviews();
   renderDirectives();
+  renderTeam();
   setVisibleSection();
 }
 
@@ -723,7 +865,8 @@ function setVisibleSection() {
     tasks: '#presidentTasks',
     timeline: '#presidentTimeline',
     reviews: '#presidentReviews',
-    directives: '#presidentDirectives'
+    directives: '#presidentDirectives',
+    team: '#presidentTeam'
   };
   for (const [name, selector] of Object.entries(sections)) $(selector).hidden = name !== activeTab;
 }

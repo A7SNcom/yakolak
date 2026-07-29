@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="yakolak-version" content="developer-d4-variant-workspace">
+<meta name="yakolak-president-workspace" content="president-unified-workspace-v3">
 <meta name="yakolak-human-role" content="president">
 <title>ياكلك · واجهة الرئيس</title>
 <link rel="icon" href="data:,">
@@ -13,7 +14,7 @@
 <div id="d4App" class="d4-app" data-mobile-view="preview">
   <header class="d4-header">
     <button id="d4MobileContent" class="d4-icon-button d4-mobile-only" type="button" aria-label="فتح المحتوى">☰</button>
-    <a class="d4-brand" href="./developer.html"><strong>ياكلك</strong><span>واجهة الرئيس · مساحة التطوير D4</span></a>
+    <a class="d4-brand" href="./developer.html"><strong>ياكلك</strong><span>مساحة الرئيس · المشاهد والعناصر</span></a>
     <div class="d4-header-state"><i id="d4SyncDot" class="d4-sync-dot"></i><span id="d4SyncText">جارٍ المزامنة</span></div>
     <div class="d4-header-actions"><button id="d4OpenQueue" class="d4-button ghost" type="button">المطلوب <b id="d4QueueCount" class="d4-count" hidden>0</b></button><button id="d4NewRequest" class="d4-button primary" type="button">＋ طلب جديد</button></div>
   </header>
@@ -21,7 +22,7 @@
   <main class="d4-layout">
     <aside id="d4Navigator" class="d4-navigator" aria-label="محتوى التطوير">
       <header class="d4-nav-header">
-        <div class="d4-nav-title"><div><strong>رحلة اللعبة</strong><span id="d4Coverage">—</span></div><span id="d4NavCount">0</span></div>
+        <div class="d4-nav-title"><div><strong>المشاهد والعناصر</strong><span id="d4Coverage">—</span></div><span id="d4NavCount">0</span></div>
         <label class="d4-search"><span aria-hidden="true">⌕</span><input id="d4Search" type="search" placeholder="ابحث عن مشهد أو عنصر أو حالة" autocomplete="off"></label>
         <div class="d4-filter-row" role="tablist" aria-label="تصفية المحتوى"><button class="active" type="button" role="tab" aria-selected="true" data-filter="all">الكل</button><button type="button" role="tab" aria-selected="false" data-filter="scene">المشاهد</button><button type="button" role="tab" aria-selected="false" data-filter="element">العناصر</button><button type="button" role="tab" aria-selected="false" data-filter="queue">المطلوب</button></div>
       </header>
@@ -37,7 +38,7 @@
       </header>
 
       <div id="d4PreviewShell" class="d4-preview-shell">
-        <div id="d4LiveView" class="d4-live-view"><iframe id="d4PreviewFrame" title="معاينة المشهد" allow="fullscreen"></iframe><div id="d4PreviewState" class="d4-preview-state"><span class="d4-spinner" aria-hidden="true"></span><strong>جارٍ تجهيز المعاينة</strong><small>نحمّل نسخة واحدة فقط للحفاظ على الوضوح والأداء.</small><button id="d4RetryPreview" class="d4-button ghost" type="button" hidden>إعادة المحاولة</button></div></div>
+        <div id="d4LiveView" class="d4-live-view"><iframe id="d4PreviewFrame" title="معاينة المشهد" allow="fullscreen"></iframe><div id="d4PreviewState" class="d4-preview-state"><span class="d4-spinner" aria-hidden="true"></span><strong>جارٍ تجهيز المعاينة</strong><small>ستظهر النسخة المختارة هنا.</small><button id="d4RetryPreview" class="d4-button ghost" type="button" hidden>إعادة المحاولة</button></div></div>
         <section id="d4CompareView" class="d4-compare-view" hidden aria-label="المقارنة البصرية">
           <article class="d4-compare-side"><header><div><strong>قبل</strong><span>المرجع السابق لهذه النسخة</span></div><button class="d4-link-button" type="button" data-open-compare="before">فتح ↗</button></header><div class="d4-compare-frame"><iframe id="d4BeforeFrame" title="الحالة السابقة"></iframe><div id="d4BeforeEmpty" class="d4-empty-compare">أضف رابط النسخة السابقة.</div></div></article>
           <article class="d4-compare-side"><header><div><strong>بعد</strong><span>النسخة المختارة الآن</span></div><button class="d4-link-button" type="button" data-open-compare="after">فتح ↗</button></header><div class="d4-compare-frame"><iframe id="d4AfterFrame" title="الحالة الحالية"></iframe><div id="d4AfterEmpty" class="d4-empty-compare">المعاينة الحالية ستظهر هنا.</div></div></article>
@@ -69,6 +70,6 @@
 <section id="d4Utility" class="d4-utility" hidden><header><div><span id="d4UtilityKicker" class="d4-kicker">أداة</span><strong id="d4UtilityTitle">مخطط الرحلة</strong></div><button id="d4UtilityClose" class="d4-button primary" type="button">العودة لمساحة التطوير</button></header><iframe id="d4UtilityFrame" title="أداة التطوير"></iframe></section>
 <div id="d4Toast" class="d4-toast" role="status" aria-live="polite"></div>
 <script type="module" src="./src/developer-d4.js?v=D4-variant-workspace"></script>
-<script type="module" src="./src/developer-president.js?v=President-v1"></script>
+<script type="module" src="./src/developer-president.js?v=President-v3"></script>
 </body>
 </html>

@@ -49,7 +49,7 @@
       "blueprintNodeId": "initiative-unified-president-workspace",
       "title": "مساحة الرئيس الموحدة والواضحة",
       "outcome": "يستطيع الرئيس أحمد فهم ما يديره راشد واتخاذ القرار، ثم الانتقال إلى كانبان والمراجعات والمشاهد والعناصر من واجهة واحدة عربية ومتسقة.",
-      "status": "in_progress",
+      "status": "review",
       "owner": "Rashed",
       "priority": "urgent",
       "taskIds": ["YAK-007-01", "YAK-007-02"],
@@ -269,24 +269,25 @@
       "reviewer": "Sara",
       "architectureSteward": "NOT_REQUIRED",
       "auditor": "Hakam",
-      "progress": {"completed": 2, "total": 7, "label": "التوجيه موثق والواقع الحالي مفحوص؛ يجري تنفيذ الواجهة."},
+      "progress": {"completed": 6, "total": 7, "label": "الواجهة والكانبان والفريق واللغة العربية واختبارات الكمبيوتر والجوال مكتملة؛ تنتظر المراجعة المستقلة وقرار راشد."},
       "acceptance": [
-        {"text": "لغة عربية إدارية بلا مصطلحات خام ظاهرة", "status": "PENDING"},
-        {"text": "القيادة تجيب: ماذا ولماذا والمنجز والتعطيل والقرار", "status": "PENDING"},
-        {"text": "كانبان بأعمدة وبطاقات مختصرة وحقول الدليل والخطوة والمراجعة", "status": "PENDING"},
-        {"text": "مسؤوليات راشد والفريق واضحة وراشد لا يظهر كمنفذ كود", "status": "PENDING"},
-        {"text": "النتائج المعروضة مرتبطة بأدلة فعلية فقط", "status": "PENDING"},
-        {"text": "اختبار كمبيوتر وجوال ووصول أساسي", "status": "PENDING"},
+        {"text": "لغة عربية إدارية بلا مصطلحات خام ظاهرة", "status": "PASS"},
+        {"text": "القيادة تجيب: ماذا ولماذا والمنجز والتعطيل والقرار", "status": "PASS"},
+        {"text": "كانبان بأعمدة وبطاقات مختصرة وحقول الدليل والخطوة والمراجعة", "status": "PASS"},
+        {"text": "مسؤوليات راشد والفريق واضحة وراشد لا يظهر كمنفذ كود", "status": "PASS"},
+        {"text": "النتائج المعروضة مرتبطة بأدلة فعلية فقط", "status": "PASS"},
+        {"text": "اختبار كمبيوتر وجوال ووصول أساسي", "status": "PASS"},
         {"text": "Sara وHakam وقرار راشد", "status": "PENDING"}
       ],
-      "gates": {"artifact": "IN_PROGRESS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "PENDING", "preview": "PENDING", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
+      "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "GREEN", "preview": "PENDING", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
       "links": {"prUrl": "", "commitSha": "", "previewUrl": "", "evidence": []},
       "blockedBy": [],
-      "nextAction": "إكمال الواجهة وتشغيل التحقق البصري والوظيفي على الكمبيوتر والجوال.",
+      "nextAction": "مراجعة مستقلة على رأس الفرع، ثم نسخة معاينة مطابقة وقرار راشد.",
       "presidentAttention": "REVIEW_MILESTONE",
       "events": [
         {"id": "event-yak-007-president-signal", "at": "2026-07-29T12:00:00+03:00", "type": "president", "actor": "President Ahmad", "title": "عدم رضا عن وضوح واجهات التطوير", "detail": "طلب توحيد القيادة والمهام والمراجعات والمشاهد بلغة إنسانية وكانبان عملي مع حماية اللعبة والإنتاج.", "evidence": []},
-        {"id": "event-yak-007-delegated", "at": "2026-07-29T12:05:00+03:00", "type": "assigned", "actor": "Rashed", "title": "تفويض تنفيذ واجهة الرئيس الموحدة", "detail": "راشد يحتفظ بالقيادة والتفويض والمراجعة؛ التنفيذ محصور في واجهات التطوير واختباراتها.", "evidence": []}
+        {"id": "event-yak-007-delegated", "at": "2026-07-29T12:05:00+03:00", "type": "assigned", "actor": "Rashed", "title": "تفويض تنفيذ واجهة الرئيس الموحدة", "detail": "راشد يحتفظ بالقيادة والتفويض والمراجعة؛ التنفيذ محصور في واجهات التطوير واختباراتها.", "evidence": []},
+        {"id": "event-yak-007-browser-validated", "at": "2026-07-29T13:20:00+03:00", "type": "validation", "actor": "Codex UI implementer", "title": "نجاح التحقق على الكمبيوتر والجوال", "detail": "خمسة أعمدة وتسع بطاقات وتسعة أعضاء ظهرت دون أخطاء متصفح أو شاشة فارغة أو تجاوز أفقي، ونجحت جميع فحوص المستودع.", "evidence": []}
       ]
     },
     {
@@ -296,27 +297,28 @@
       "blueprintRevision": 4,
       "title": "تنظيف معاينة المشاهد والعناصر",
       "outcome": "تبقى المعاينة الحالية لكن بمساحة صحيحة وحشو أقل ومقارنة قبل/بعد واضحة على الكمبيوتر والجوال.",
-      "status": "ready",
+      "status": "artifact_ready",
       "effort": "S",
       "risk": "low-developer-ui",
       "owner": "Codex UI implementer",
       "reviewer": "Sara",
       "architectureSteward": "NOT_REQUIRED",
       "auditor": "Hakam",
-      "progress": {"completed": 1, "total": 4, "label": "حدود المهمة وعقود المعاينة الحالية موثقة."},
+      "progress": {"completed": 4, "total": 4, "label": "تنظيف منطقة العرض والتصفح والمقارنة مكتمل؛ ينتظر المراجعة ونسخة معاينة مطابقة."},
       "acceptance": [
-        {"text": "منطقة المعاينة هي مركز العرض ولا تزاحمها نصوص طويلة", "status": "PENDING"},
-        {"text": "قبل وبعد يستخدمان نفس القياس والتسمية", "status": "PENDING"},
-        {"text": "المشاهد والعناصر في تصفح واحد واضح", "status": "PENDING"},
-        {"text": "لا تغيير في ملفات اللعبة أو منطقها أو الإنتاج", "status": "PENDING"}
+        {"text": "منطقة المعاينة هي مركز العرض ولا تزاحمها نصوص طويلة", "status": "PASS"},
+        {"text": "قبل وبعد يستخدمان نفس القياس والتسمية", "status": "PASS"},
+        {"text": "المشاهد والعناصر في تصفح واحد واضح", "status": "PASS"},
+        {"text": "لا تغيير في ملفات اللعبة أو منطقها أو الإنتاج", "status": "PASS"}
       ],
-      "gates": {"artifact": "PENDING", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "PENDING", "preview": "PENDING", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
+      "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "GREEN", "preview": "PENDING", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
       "links": {"prUrl": "", "commitSha": "", "previewUrl": "", "evidence": []},
       "blockedBy": [],
-      "nextAction": "تنفيذ التنظيف بعد تثبيت هيكل التنقل الموحد.",
+      "nextAction": "مراجعة سارة للصور ونسخة معاينة مطابقة للرأس.",
       "presidentAttention": "REVIEW_MILESTONE",
       "events": [
-        {"id": "event-yak-007-scene-scope", "at": "2026-07-29T12:05:00+03:00", "type": "assigned", "actor": "Rashed", "title": "حصر العمل في واجهة المعاينة", "detail": "الحفاظ على مسارات اللعبة والعقود الحالية وعدم تعديل سلوك اللعبة.", "evidence": []}
+        {"id": "event-yak-007-scene-scope", "at": "2026-07-29T12:05:00+03:00", "type": "assigned", "actor": "Rashed", "title": "حصر العمل في واجهة المعاينة", "detail": "الحفاظ على مسارات اللعبة والعقود الحالية وعدم تعديل سلوك اللعبة.", "evidence": []},
+        {"id": "event-yak-007-compare-validated", "at": "2026-07-29T13:20:00+03:00", "type": "validation", "actor": "Sara evidence runner", "title": "تساوي منطقتي قبل وبعد", "detail": "ظهرت منطقتا المقارنة بعرضين متساويين 535 بكسل، مع بقاء معاينة واحدة فقط في العرض العادي.", "evidence": []}
       ]
     }
   ]
