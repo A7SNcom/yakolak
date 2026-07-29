@@ -93,6 +93,7 @@ function actorFor(req,body){
   if(body.actorRole!=='manager')return'president';
   const configured=process.env.RASHED_PORTAL_KEY;
   const supplied=String(req.headers['x-yakolak-manager-key']||'').trim();
+  if(!configured&&process.env.VERCEL_ENV!=='production')return'manager';
   if(!configured||!safeEqual(configured,supplied))throw new Error('manager_auth_required');
   return'manager';
 }
