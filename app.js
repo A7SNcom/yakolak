@@ -10,5 +10,11 @@ import('./src/mobile-clarity-v120.js?v='+BUILD+'-policy')
   .catch(error=>{
     console.error('[Yakolak] v126 bootstrap failed',error);
     globalThis.__yakolakLoading?.set?.(100,'تعذر تجهيز رحلة البداية');
-    globalThis.__yakolakEntryLoader?.error?.('تعذر تجهيز اللعبة. حاول إعادة المحاولة.');
+    const loader=document.getElementById('yakolakLoader');
+    const message=document.getElementById('yakolakLoaderErrorMessage');
+    loader?.classList.remove('handoff');
+    loader?.classList.add('error');
+    loader?.setAttribute('aria-busy','false');
+    if(message)message.textContent='تعذر تجهيز اللعبة. حاول إعادة المحاولة.';
+    document.getElementById('yakolakRetry')?.focus?.();
   });
