@@ -279,10 +279,10 @@
         {"text": "اختبار كمبيوتر وجوال ووصول أساسي", "status": "PASS"},
         {"text": "Sara وHakam وقرار راشد", "status": "PENDING"}
       ],
-      "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "GREEN", "preview": "PENDING", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
-      "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "eda133a", "previewUrl": "", "evidence": []},
+      "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "GREEN", "preview": "PASS", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
+      "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "eda133a", "previewUrl": "https://yakolak-git-agent-codexyak-007-unifie-ae230b-ahmdkcoms-projects.vercel.app/developer.html", "evidence": []},
       "blockedBy": [],
-      "nextAction": "مراجعة مستقلة على رأس الفرع، ثم نسخة معاينة مطابقة وقرار راشد.",
+      "nextAction": "مراجعة مستقلة على رأس الفرع، ثم تدقيق حَكَم وقرار راشد.",
       "presidentAttention": "REVIEW_MILESTONE",
       "events": [
         {"id": "event-yak-007-president-signal", "at": "2026-07-29T12:00:00+03:00", "type": "president", "actor": "President Ahmad", "title": "عدم رضا عن وضوح واجهات التطوير", "detail": "طلب توحيد القيادة والمهام والمراجعات والمشاهد بلغة إنسانية وكانبان عملي مع حماية اللعبة والإنتاج.", "evidence": []},
@@ -311,10 +311,10 @@
         {"text": "المشاهد والعناصر في تصفح واحد واضح", "status": "PASS"},
         {"text": "لا تغيير في ملفات اللعبة أو منطقها أو الإنتاج", "status": "PASS"}
       ],
-      "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "GREEN", "preview": "PENDING", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
-      "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "eda133a", "previewUrl": "", "evidence": []},
+      "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "GREEN", "preview": "PASS", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
+      "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "eda133a", "previewUrl": "https://yakolak-git-agent-codexyak-007-unifie-ae230b-ahmdkcoms-projects.vercel.app/developer.html", "evidence": []},
       "blockedBy": [],
-      "nextAction": "مراجعة سارة للصور ونسخة معاينة مطابقة للرأس.",
+      "nextAction": "مراجعة سارة للصور، ثم تدقيق حَكَم وقرار راشد.",
       "presidentAttention": "REVIEW_MILESTONE",
       "events": [
         {"id": "event-yak-007-scene-scope", "at": "2026-07-29T12:05:00+03:00", "type": "assigned", "actor": "Rashed", "title": "حصر العمل في واجهة المعاينة", "detail": "الحفاظ على مسارات اللعبة والعقود الحالية وعدم تعديل سلوك اللعبة.", "evidence": []},
