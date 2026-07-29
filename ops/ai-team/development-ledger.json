@@ -357,9 +357,9 @@
         {"text": "التعليقات مقتصرة على أحمد وراشد", "status": "PASS"},
         {"text": "نجاح التحقق على الكمبيوتر والجوال دون تغيير اللعبة أو الإنتاج", "status": "PASS"}
       ],
-      "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "GREEN", "preview": "PASS", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
-      "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "96cf4bb", "previewUrl": "https://yakolak-git-agent-codexyak-007-unifie-ae230b-ahmdkcoms-projects.vercel.app/developer.html", "evidence": []},
-      "blockedBy": [],
+      "gates": {"artifact": "PASS", "reviewer": "PENDING", "architecture": "NOT_REQUIRED", "hakam": "PENDING", "ci": "RED", "preview": "PASS", "manager": "PENDING", "president": "REVIEW_MILESTONE"},
+      "links": {"prUrl": "https://github.com/A7SNcom/yakolak/pull/50", "commitSha": "1772d51", "previewUrl": "https://yakolak-git-agent-codexyak-007-unifie-ae230b-ahmdkcoms-projects.vercel.app/developer.html", "evidence": []},
+      "blockedBy": ["فحص Verify AI Team OS القديم يفشل بسبب 72 مخالفة في تنسيق تكليفات الفريق، خارج نطاق الواجهة."],
       "nextAction": "نشر نسخة تجريبية مطابقة، ثم مراجعة سارة وتدقيق حَكَم وقرار راشد.",
       "presidentAttention": "REVIEW_MILESTONE",
       "events": [
