@@ -56,8 +56,9 @@ function buildPayload(rows){
     const id=safeId(rawId,`sheet-row-${index+2}`),status=statusFromArabic(rawStatus);
     if(type==='مهمة'){
       const deleted=status==='deleted';
-      tasks.push({id,parentType:'none',parentId:parent||'root-task-list',title:title||'مهمة بلا عنوان',description:details,attachments:attachmentFromUrl(link),createdBy:author||'Google Sheets',owner:author,link,updatedAt,status:deleted?'planned':status});
       taskStates.push({taskId:id,status:deleted?'planned':status,position:index,deleted,updatedAt});
+      if(deleted)return;
+      tasks.push({id,parentType:'none',parentId:parent||'root-task-list',title:title||'مهمة بلا عنوان',description:details,attachments:attachmentFromUrl(link),createdBy:author||'Google Sheets',owner:author,link,updatedAt,status});
       return;
     }
     if(type==='رد'){
