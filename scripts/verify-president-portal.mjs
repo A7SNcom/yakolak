@@ -10,6 +10,7 @@ const ui=read('src/developer-president.js');
 const api=read('api/developer-president.js');
 const packageJson=JSON.parse(read('package.json'));
 const manifest=JSON.parse(read('src/president-portal-manifest.json'));
+const documentation=read('docs/GOOGLE_SHEETS_DEVELOPMENT_DATABASE.md');
 
 requireTokens(html,[
   'id="searchInput"','id="filters"','id="contentGrid"','id="contentModal"','id="databaseLink"','id="refreshButton"',
@@ -37,5 +38,7 @@ if(manifest.database?.provider!=='google-sheets'||manifest.database?.spreadsheet
 const tabs=['المهام','المحتوى','المعاينات','المحادثات','سجل العمل','الإعدادات'];
 if(manifest.database?.tabs?.join(',')!==tabs.join(','))fail('database tabs mismatch');
 if(!manifest.database?.contentInSheets||!manifest.database?.previewsInSheets)fail('content database is not fully in Sheets');
+if(manifest.database?.documentation!=='docs/GOOGLE_SHEETS_DEVELOPMENT_DATABASE.md')fail('database documentation link mismatch');
+requireTokens(documentation,['المهام','المحتوى','المعاينات','المحادثات','سجل العمل','الإعدادات','YAKOLAK_SHEETS_SCRIPT_URL','YAKOLAK_SHEETS_API_TOKEN'],'database documentation');
 
 console.log('Tasks, content, preview variants, conversations, work log and settings are fully sourced from Google Sheets.');
