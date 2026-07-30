@@ -72,7 +72,7 @@ async function getAccessToken(){
   const unsigned=`${header}.${claim}`;
   const signer=createSign('RSA-SHA256');signer.update(unsigned);signer.end();
   const assertion=`${unsigned}.${signer.sign(auth.privateKey).toString('base64url')}`;
-  const response=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'urn:ietf:params:oauth2:grant-type:jwt-bearer',assertion})});
+  const response=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion})});
   const payload=await response.json().catch(()=>({}));
   if(!response.ok||!payload.access_token)throw new Error('sheets_auth_failed');
   tokenCache={value:payload.access_token,expiresAt:Date.now()+Number(payload.expires_in||3600)*1000};
