@@ -1,21 +1,25 @@
 {
-  "version": 6,
+  "version": 7,
   "humanRole": "president",
   "manager": "Rashed",
   "interface": "developer.html",
   "api": "./api/developer-president",
-  "blueprint": "./ops/ai-team/development-blueprint.json",
-  "ledger": "./ops/ai-team/development-ledger.json",
-  "views": ["cards", "ordered-tasks"],
-  "content": ["scene", "journey", "element", "task"],
+  "database": {
+    "provider": "google-sheets",
+    "spreadsheetId": "1lpr434PdM-UVhXaNXVtFUcl0oMGWXCRodG5Q6pmoI-c",
+    "sheet": "إدارة التطوير",
+    "language": "ar"
+  },
+  "views": ["summary", "tasks", "conversation", "work-log"],
+  "content": ["task", "reply", "update", "content"],
   "taskStatuses": ["planned", "in_progress", "review", "done"],
-  "taskFeeds": ["president", "work"],
   "editing": ["task", "president-comment"],
   "protectedEditing": ["manager-comment", "work-entry"],
-  "previewLoading": "parent-ready-message",
   "conversationRoles": ["Ahmad", "Rashed"],
-  "workRoles": ["Rashed", "Noor", "Sami", "Lina", "Mazen", "Nada", "Omar", "Sara", "Hakam"],
+  "workRoles": ["Rashed", "Noor", "Sami", "Lina", "Mazen", "Nada", "Omar", "Sara", "Hakam", "Kamel", "Kamila", "Mokamel"],
   "managerAuthentication": "RASHED_PORTAL_KEY",
   "workerAuthentication": "YAKOLAK_WORKER_KEY",
+  "googleAuthentication": ["GOOGLE_SERVICE_ACCOUNT_EMAIL", "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY"],
+  "publicReadFallback": true,
   "productionEnabledByDefault": false
 }
