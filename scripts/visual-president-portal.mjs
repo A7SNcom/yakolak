@@ -43,7 +43,7 @@ async function verify(viewport,name){
     await page.locator('#filters [data-filter="task"]').click();
     if(await page.locator('.task-row').count()!==2)throw new Error(`${name}: Google Sheet tasks are missing`);
     if(await page.locator('.task-row .status-in_progress').count()!==1)throw new Error(`${name}: status mapping failed`);
-    await page.locator('[data-task-id="YAK-TEST-02"] .task-copy').click();await page.getByText('استخدام Google Sheets كمصدر وحيد.',{exact:true}).waitFor();
+    await page.locator('[data-task-id="YAK-TEST-02"] .task-copy').click();await page.locator('#modalDescription').getByText('استخدام Google Sheets كمصدر وحيد.',{exact:true}).waitFor();
     await page.screenshot({path:path.join(artifacts,`${name}-google-sheet-workspace.png`),fullPage:true});
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);if(overflow>2)throw new Error(`${name}: horizontal overflow ${overflow}px`);
     if(errors.length)throw new Error(`${name}: ${errors.join(' | ')}`);
