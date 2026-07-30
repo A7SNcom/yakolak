@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 8,
   "humanRole": "president",
   "manager": "Rashed",
   "interface": "developer.html",
@@ -7,9 +7,11 @@
   "database": {
     "provider": "google-sheets",
     "spreadsheetId": "1lpr434PdM-UVhXaNXVtFUcl0oMGWXCRodG5Q6pmoI-c",
-    "sheetName": "إدارة التطوير",
-    "columns": ["المعرف", "النوع", "العنوان", "التفاصيل", "الحالة", "مرتبط بـ", "الكاتب", "الرابط", "آخر تحديث"],
-    "editing": "direct-in-google-sheets"
+    "sourceOfTruth": "google-sheets",
+    "tabs": ["المهام", "المحتوى", "المعاينات", "المحادثات", "سجل العمل", "الإعدادات"],
+    "contentInSheets": true,
+    "previewsInSheets": true,
+    "writeBridge": "optional-apps-script-environment"
   },
   "views": ["cards", "tasks"],
   "content": ["scene", "journey", "element", "task"],
