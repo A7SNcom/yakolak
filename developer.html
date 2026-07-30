@@ -3,92 +3,84 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#ffffff">
-  <title>ياكلك</title>
+  <meta name="theme-color" content="#f5f6f8">
+  <title>إدارة تطوير ياكلك</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0,0">
-  <link rel="stylesheet" href="./src/developer-president.css?v=editor-v1">
+  <link rel="stylesheet" href="./src/developer-president.css?v=sheets-v1">
 </head>
 <body>
   <header class="topbar">
-    <label class="search-box">
-      <span class="sr-only">بحث</span>
-      <input id="searchInput" type="search" placeholder="بحث" autocomplete="off">
-    </label>
-    <nav id="filters" class="filters" aria-label="تصفية المحتوى">
-      <button class="active" type="button" data-filter="all">الكل</button>
-      <button type="button" data-filter="scene">المشاهد</button>
-      <button type="button" data-filter="journey">الرحلات</button>
-      <button type="button" data-filter="element">العناصر</button>
-      <button type="button" data-filter="task">المهام</button>
-    </nav>
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">ي</span>
+      <div><strong>إدارة تطوير ياكلك</strong><small id="connectionText">جاري الاتصال</small></div>
+    </div>
+    <div class="top-actions">
+      <a id="sheetLink" class="button quiet" href="https://docs.google.com/spreadsheets/d/1lpr434PdM-UVhXaNXVtFUcl0oMGWXCRodG5Q6pmoI-c/edit" target="_blank" rel="noreferrer"><span class="material-symbols-rounded" aria-hidden="true">table_view</span><span>قاعدة البيانات</span></a>
+      <button id="refreshButton" class="icon-button" type="button" aria-label="تحديث"><span class="material-symbols-rounded" aria-hidden="true">refresh</span></button>
+    </div>
   </header>
 
-  <section id="globalTaskComposer" class="global-task-composer" hidden>
-    <button id="openGlobalTask" class="primary-action icon-action" type="button" aria-label="إضافة مهمة"><span class="material-symbols-rounded" aria-hidden="true">add</span><span>إضافة مهمة</span></button>
-  </section>
+  <main class="page-shell">
+    <section class="summary" aria-label="ملخص العمل">
+      <button type="button" data-status="all" class="summary-card active"><span>الكل</span><strong id="countAll">0</strong></button>
+      <button type="button" data-status="in_progress" class="summary-card"><span>قيد التنفيذ</span><strong id="countProgress">0</strong></button>
+      <button type="button" data-status="review" class="summary-card"><span>للمراجعة</span><strong id="countReview">0</strong></button>
+      <button type="button" data-status="done" class="summary-card"><span>مكتملة</span><strong id="countDone">0</strong></button>
+    </section>
 
-  <main id="contentGrid" class="card-grid" aria-live="polite"></main>
+    <section id="readOnlyNotice" class="notice" hidden>
+      <span class="material-symbols-rounded" aria-hidden="true">info</span>
+      <span>القاعدة متصلة للقراءة. الكتابة تحتاج مفتاح خدمة قوقل في Vercel.</span>
+    </section>
 
-  <dialog id="contentModal" class="content-modal" aria-labelledby="modalTitle">
-    <article class="modal-card">
-      <header class="modal-header">
-        <div>
-          <span id="modalKind" class="kind"></span>
-          <h1 id="modalTitle"></h1>
-        </div>
-        <div class="modal-actions">
-          <button id="removeCurrent" class="icon-button danger" type="button" aria-label="إزالة"><span class="material-symbols-rounded" aria-hidden="true">delete</span></button>
-          <button id="modalClose" class="icon-button" type="button" aria-label="إغلاق"><span class="material-symbols-rounded" aria-hidden="true">close</span></button>
-        </div>
+    <section class="work-card">
+      <header class="work-toolbar">
+        <label class="search-box"><span class="material-symbols-rounded" aria-hidden="true">search</span><input id="searchInput" type="search" placeholder="ابحث في المهام" autocomplete="off"></label>
+        <button id="newTaskButton" class="button primary" type="button"><span class="material-symbols-rounded" aria-hidden="true">add</span><span>مهمة جديدة</span></button>
       </header>
+      <div id="taskList" class="task-list" aria-live="polite"></div>
+    </section>
+  </main>
 
-      <section id="mediaSection" class="media-section" aria-label="المعاينة">
-        <div id="previewControls" class="preview-controls">
-          <label id="previewItemField"><span id="previewItemLabel">المعاينة</span><select id="previewItemSelect"></select></label>
-          <label id="previewVersionField"><span>الإصدار</span><select id="previewVersionSelect"></select></label>
-        </div>
-        <div id="mediaViewport" class="media-viewport"></div>
-      </section>
-
-      <div class="modal-body">
-        <p id="modalDescription" class="description"></p>
-        <section id="linkedTasksSection" class="linked-tasks">
-          <button id="openLinkedTask" class="secondary-action icon-action" type="button" aria-label="إضافة مهمة"><span class="material-symbols-rounded" aria-hidden="true">add</span><span>إضافة مهمة</span></button>
-          <div id="linkedTasks" class="task-list"></div>
-        </section>
+  <dialog id="taskDialog" class="task-dialog">
+    <article class="dialog-card">
+      <header class="dialog-header">
+        <div><span class="eyebrow">المهمة</span><h1 id="taskTitle"></h1></div>
+        <button id="closeTaskDialog" class="icon-button" type="button" aria-label="إغلاق"><span class="material-symbols-rounded" aria-hidden="true">close</span></button>
+      </header>
+      <div class="task-meta">
+        <label><span>الحالة</span><select id="taskStatus"></select></label>
+        <label><span>المسؤول</span><input id="taskOwner" readonly></label>
       </div>
+      <p id="taskDescription" class="task-description"></p>
+      <div id="taskContext" class="task-context" hidden></div>
+      <section class="feed-section">
+        <div class="feed-tabs"><button class="active" type="button" data-feed="conversation">أحمد وراشد</button><button type="button" data-feed="work">سجل العمل</button></div>
+        <div id="taskFeed" class="task-feed"></div>
+        <form id="commentForm" class="comment-form"><textarea id="commentInput" rows="3" placeholder="اكتب ردًا"></textarea><button class="button primary" type="submit">إرسال</button></form>
+      </section>
+      <footer class="dialog-footer">
+        <button id="editTaskButton" class="button quiet" type="button"><span class="material-symbols-rounded" aria-hidden="true">edit</span><span>تعديل</span></button>
+        <button id="deleteTaskButton" class="button danger" type="button"><span class="material-symbols-rounded" aria-hidden="true">delete</span><span>حذف</span></button>
+      </footer>
     </article>
   </dialog>
 
-  <dialog id="editorModal" class="editor-modal" aria-labelledby="editorHeading">
-    <form id="editorForm" class="editor-card" method="dialog">
-      <header class="editor-header">
-        <h2 id="editorHeading">إضافة مهمة</h2>
-        <button id="editorClose" class="icon-button" type="button" aria-label="إغلاق"><span class="material-symbols-rounded" aria-hidden="true">close</span></button>
-      </header>
-      <div class="editor-body">
-        <label id="editorTitleField" class="field"><span>العنوان</span><input id="editorTitle" maxlength="240" autocomplete="off"></label>
-        <div class="rich-editor">
-          <div class="editor-toolbar" role="toolbar" aria-label="تنسيق النص">
-            <button type="button" data-command="bold" aria-label="عريض"><span class="material-symbols-rounded" aria-hidden="true">format_bold</span></button>
-            <button type="button" data-command="italic" aria-label="مائل"><span class="material-symbols-rounded" aria-hidden="true">format_italic</span></button>
-            <button type="button" data-command="insertUnorderedList" aria-label="قائمة نقطية"><span class="material-symbols-rounded" aria-hidden="true">format_list_bulleted</span></button>
-            <button type="button" data-command="insertOrderedList" aria-label="قائمة رقمية"><span class="material-symbols-rounded" aria-hidden="true">format_list_numbered</span></button>
-            <button type="button" data-command="createLink" aria-label="رابط"><span class="material-symbols-rounded" aria-hidden="true">link</span></button>
-          </div>
-          <div id="editorContent" class="editor-content" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="اكتب التفاصيل"></div>
-        </div>
-        <div id="editorAttachments" class="editor-attachments"></div>
-        <label class="attachment-button icon-action"><span class="material-symbols-rounded" aria-hidden="true">attach_file</span><span>مرفق</span><input id="editorFiles" type="file" accept="image/*,application/pdf,text/plain" multiple></label>
+  <dialog id="editorDialog" class="editor-dialog">
+    <form id="editorForm" class="dialog-card editor-card">
+      <header class="dialog-header"><h2 id="editorHeading">مهمة جديدة</h2><button id="closeEditorDialog" class="icon-button" type="button" aria-label="إغلاق"><span class="material-symbols-rounded" aria-hidden="true">close</span></button></header>
+      <div class="form-grid">
+        <label class="full"><span>العنوان</span><input id="editorTitle" maxlength="240" required autocomplete="off"></label>
+        <label class="full"><span>التفاصيل</span><textarea id="editorDescription" rows="7" maxlength="20000"></textarea></label>
+        <label><span>المسؤول</span><input id="editorOwner" maxlength="80" placeholder="مثال: راشد"></label>
+        <label><span>مرتبط بـ</span><select id="editorParentType"><option value="none">عام</option><option value="scene">مشهد</option><option value="journey">رحلة</option><option value="element">عنصر</option></select></label>
+        <label id="parentIdField" class="full" hidden><span>معرف المشهد أو العنصر</span><input id="editorParentId" maxlength="160"></label>
       </div>
-      <footer class="editor-footer">
-        <button id="editorCancel" class="icon-action quiet-action" type="button"><span class="material-symbols-rounded" aria-hidden="true">close</span><span>إلغاء</span></button>
-        <button id="editorSave" class="icon-action primary-action" type="submit"><span class="material-symbols-rounded" aria-hidden="true">check</span><span>حفظ</span></button>
-      </footer>
+      <footer class="dialog-footer"><button id="cancelEditor" class="button quiet" type="button">إلغاء</button><button id="saveEditor" class="button primary" type="submit">حفظ</button></footer>
     </form>
   </dialog>
 
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-  <script type="module" src="./src/developer-president.js?v=editor-v1"></script>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script type="module" src="./src/developer-president.js?v=sheets-v1"></script>
 </body>
 </html>
