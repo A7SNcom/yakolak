@@ -11,7 +11,7 @@ requireTokens(html,[
   'إدارة تطوير ياكلك','id="connectionText"','id="sheetLink"','id="countAll"','id="countProgress"','id="countReview"','id="countDone"',
   'id="searchInput"','id="newTaskButton"','id="taskList"','id="taskDialog"','id="taskStatus"','id="taskFeed"','id="commentForm"','id="editorDialog"'
 ],'Arabic task interface');
-requireTokens(css,['.summary-card','.task-row','.status-in_progress','.feed-tabs','.notice','.task-dialog','.editor-dialog','@media(max-width:720px)','[hidden]{display:none!important}'],'compact responsive styles');
+requireTokens(css,['.summary-card','.task-row','.status-in_progress','.feed-tabs','.notice','.task-dialog','.editor-dialog','@media(max-width:760px)','[hidden]{display:none!important}'],'compact responsive styles');
 requireTokens(ui,[
   "const API_URL='./api/developer-president'","in_progress:'قيد التنفيذ'",'function filteredTasks()','function renderTasks()','function renderFeed()','function openTask(task)',
   "action:'task_create'","action:'task_update'","action:'task_status'","action:'task_delete'","action:'task_comment'",'state.writable','sheetLink.href=state.sheetUrl'
