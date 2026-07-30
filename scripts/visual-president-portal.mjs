@@ -37,7 +37,7 @@ async function verify(viewport,name){
     await page.locator('[data-item-id="journey:journey-1"]').click();
     await page.locator('#contentModal[open]').waitFor();await page.locator('.preview-frame.ready').waitFor();
     if(await page.locator('.preview-loading').count())throw new Error(`${name}: preview loader remained`);
-    await page.getByText('مراجعة رحلة الدخول',{exact:true}).waitFor();await page.getByText('المعاينة جاهزة للمراجعة.',{exact:true}).waitFor();await page.getByText('تم فحص البداية.',{exact:true}).waitFor();
+    await page.locator('#linkedTasks').getByText('مراجعة رحلة الدخول',{exact:true}).waitFor();await page.getByText('المعاينة جاهزة للمراجعة.',{exact:true}).waitFor();await page.getByText('تم فحص البداية.',{exact:true}).waitFor();
     await page.locator('#modalClose').click();
 
     await page.locator('#filters [data-filter="task"]').click();
