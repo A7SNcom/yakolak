@@ -4,116 +4,47 @@ import {chromium} from 'playwright';
 
 const base=process.env.PRESIDENT_BASE_URL||'http://127.0.0.1:4174';
 const artifacts=path.resolve('artifacts/president-portal');
-const ledger=JSON.parse(fs.readFileSync('ops/ai-team/development-ledger.json','utf8'));
 fs.mkdirSync(artifacts,{recursive:true});
 
 function respond(route,payload){return route.fulfill({status:200,contentType:'application/json; charset=utf-8',body:JSON.stringify(payload)})}
-function createStore(){
-  return{
-    tasks:[{id:'task-custom-journey',parentType:'journey',parentId:'journey-1',title:'مراجعة رحلة الدخول',description:'افحص الانتقال بين المشاهد.',attachments:[],createdBy:'manager',createdAt:'2026-07-29T14:00:00Z',updatedAt:'2026-07-29T14:00:00Z'}],
-    taskStates:[{taskId:'YAK-009-01',status:'in_progress',position:0,deleted:false,updatedAt:'2026-07-29T14:00:00Z'},{taskId:'task-custom-journey',status:'planned',position:1,deleted:false,updatedAt:'2026-07-29T14:00:00Z'}],
-    contentStates:[],taskComments:[{id:'comment-rashed-1',taskId:'task-custom-journey',authorRole:'manager',body:'المعاينة جاهزة لملاحظتك.',attachments:[],createdAt:'2026-07-29T14:10:00Z'},{id:'comment-ahmad-1',taskId:'task-custom-journey',authorRole:'president',body:'راجع البداية.',attachments:[],createdAt:'2026-07-29T14:12:00Z'}],
-    taskWork:[
-      {id:'work-1',taskId:'task-custom-journey',authorRole:'manager',authorName:'Rashed',entryType:'delegation',body:'يا نور، افحص بداية الرحلة وأرسل النتيجة بصورة واضحة.',attachments:[],createdAt:'2026-07-29T14:20:00Z'},
-      {id:'work-2',taskId:'task-custom-journey',authorRole:'worker',authorName:'Noor',entryType:'update',body:'راجعت البداية، والانتقال الأول يحتاج تعديلًا بسيطًا.',attachments:[],createdAt:'2026-07-29T14:30:00Z'}
-    ],messages:[],reorderCalls:0
-  };
-}
-function upsert(items,key,value){const index=items.findIndex(item=>item[key]===value[key]);if(index>=0)items[index]=value;else items.push(value)}
-async function mock(page,store){
-  await page.route('**/ops/ai-team/development-ledger.json',route=>respond(route,ledger));
+async function mock(page){
   await page.route('**/developer-scene.html*',route=>{const url=new URL(route.request().url()),entityId=url.searchParams.get('scene')||url.searchParams.get('element')||'';return route.fulfill({status:200,contentType:'text/html; charset=utf-8',body:`<!doctype html><html lang="ar" dir="rtl"><style>body{margin:0;display:grid;place-items:center;height:100vh;background:#17201e;color:#fff;font:700 26px Tahoma}</style><body>معاينة<script>parent.postMessage({type:'yakolak-developer-scene-ready',entityId:${JSON.stringify(entityId)}},'*')<\/script></body></html>`})});
-  await page.route('**/api/developer-president',async route=>{
-    const request=route.request();
-    if(request.method()==='GET')return respond(route,{ok:true,channelVersion:2,directives:[],decisions:[],...store});
-    const body=request.postDataJSON(),now=new Date().toISOString();
-    if(body.action==='task_create'){
-      const task={id:body.id,parentType:body.parentType,parentId:body.parentId,title:body.title,description:body.description||'',attachments:body.attachments||[],createdBy:'president',createdAt:now,updatedAt:now};store.tasks.push(task);store.taskStates.push({taskId:task.id,status:'planned',position:store.taskStates.length+20,deleted:false,updatedAt:now});return respond(route,{ok:true,task});
-    }
-    if(body.action==='task_update'){const task=store.tasks.find(item=>item.id===body.taskId);Object.assign(task,{title:body.title,description:body.description||'',attachments:body.attachments||[],updatedAt:now});return respond(route,{ok:true,task})}
-    if(body.action==='task_status'){
-      if(body.status==='in_progress')store.taskStates=store.taskStates.map(entry=>entry.status==='in_progress'&&entry.taskId!==body.taskId?{...entry,status:'planned'}:entry);
-      const taskState={...(store.taskStates.find(entry=>entry.taskId===body.taskId)||{taskId:body.taskId,position:0,deleted:false}),status:body.status,updatedAt:now};upsert(store.taskStates,'taskId',taskState);return respond(route,{ok:true,taskState});
-    }
-    if(body.action==='task_reorder'){store.reorderCalls+=1;body.taskIds.forEach((taskId,position)=>upsert(store.taskStates,'taskId',{...(store.taskStates.find(entry=>entry.taskId===taskId)||{taskId,status:'planned',deleted:false}),position,updatedAt:now}));return respond(route,{ok:true,taskIds:body.taskIds})}
-    if(body.action==='task_delete'){const taskState={...(store.taskStates.find(entry=>entry.taskId===body.taskId)||{taskId:body.taskId,status:'planned',position:0}),deleted:true,updatedAt:now};upsert(store.taskStates,'taskId',taskState);return respond(route,{ok:true,taskState})}
-    if(body.action==='content_delete'){const contentState={itemId:body.itemId,deleted:true,updatedAt:now};upsert(store.contentStates,'itemId',contentState);return respond(route,{ok:true,contentState})}
-    if(body.action==='task_comment'){const comment={id:body.id,taskId:body.taskId,authorRole:'president',body:body.body||'',attachments:body.attachments||[],createdAt:now};store.taskComments.push(comment);return respond(route,{ok:true,comment})}
-    if(body.action==='task_comment_update'){const comment=store.taskComments.find(item=>item.id===body.commentId&&item.authorRole==='president');Object.assign(comment,{body:body.body||'',attachments:body.attachments||[]});return respond(route,{ok:true,comment})}
-    return route.fulfill({status:400,contentType:'application/json',body:'{"ok":false}'});
-  });
+  await page.route('**/api/developer-president',route=>respond(route,{
+    ok:true,database:'google-sheets',sheetName:'إدارة التطوير',sheetUrl:'https://docs.google.com/spreadsheets/d/test/edit',writableInInterface:false,
+    tasks:[
+      {id:'YAK-TEST-01',kind:'task',parentType:'journey',parentId:'journey-1',title:'مراجعة رحلة الدخول',description:'افحص الانتقال بين المشاهد.',owner:'نور',status:'in_progress',updatedAt:'2026-07-30T05:00:00Z',link:'https://github.com/A7SNcom/yakolak/pull/50',attachments:[]},
+      {id:'YAK-TEST-02',kind:'task',parentType:'none',parentId:'واجهة التطوير',title:'تبسيط قاعدة البيانات',description:'استخدام Google Sheets كمصدر وحيد.',owner:'راشد',status:'review',updatedAt:'2026-07-30T05:10:00Z',attachments:[]}
+    ],
+    taskComments:[{id:'reply-1',taskId:'YAK-TEST-01',authorRole:'manager',authorName:'راشد',body:'المعاينة جاهزة للمراجعة.',updatedAt:'2026-07-30T05:20:00Z'}],
+    taskWork:[{id:'update-1',taskId:'YAK-TEST-01',authorRole:'worker',authorName:'نور',body:'تم فحص البداية.',updatedAt:'2026-07-30T05:30:00Z'}],contentStates:[],messages:[]
+  }));
 }
 
 async function verify(viewport,name){
   const browser=await chromium.launch({headless:true});
   try{
-    const store=createStore(),page=await browser.newPage({viewport});
-    const errors=[];page.on('pageerror',error=>errors.push(String(error)));await mock(page,store);
+    const page=await browser.newPage({viewport});const errors=[];page.on('pageerror',error=>errors.push(String(error)));await mock(page);
     await page.goto(`${base}/developer.html`,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.body.dataset.developerReady==='true');
-    if(await page.locator('.brand,.card-cover,.media-arrow').count())throw new Error(`${name}: decorative or stale preview UI remains`);
+    if(await page.locator('#editorModal,#openGlobalTask,.drag-handle').count())throw new Error(`${name}: legacy editing controls remain`);
     if(await page.locator('#filters [data-filter]').count()!==5)throw new Error(`${name}: filters are incomplete`);
+    await page.getByRole('link',{name:'فتح قاعدة البيانات'}).waitFor();
+    await page.getByText('تم التحديث من Google Sheets • 2 مهمة',{exact:true}).waitFor();
 
     await page.locator('#searchInput').fill('رحله دخوول');
     await page.locator('.content-card').first().getByText('رحلة الدخول',{exact:true}).waitFor();
     await page.locator('#searchInput').fill('');
 
     await page.locator('[data-item-id="journey:journey-1"]').click();
-    await page.locator('#contentModal[open]').waitFor();
-    await page.locator('.preview-frame.ready').waitFor();
-    if(await page.locator('.preview-loading').count())throw new Error(`${name}: preview loader remained after readiness`);
-    if(await page.locator('#previewItemSelect option').count()<2)throw new Error(`${name}: journey preview selector is missing`);
-    if(!(await page.locator('#previewVersionField').isHidden()))throw new Error(`${name}: single version selector should be hidden`);
-    await page.getByText('راشد',{exact:true}).waitFor();
-    const firstTask=page.locator('#linkedTasks .task-detail').first();
-    await firstTask.getByRole('button',{name:'الشغل'}).click();
-    await firstTask.getByText('يا نور، افحص بداية الرحلة وأرسل النتيجة بصورة واضحة.',{exact:true}).waitFor();
-    await firstTask.getByText('راجعت البداية، والانتقال الأول يحتاج تعديلًا بسيطًا.',{exact:true}).waitFor();
-    await page.screenshot({path:path.join(artifacts,`${name}-task-work.png`),fullPage:true});
-    await firstTask.getByRole('button',{name:'أحمد وراشد'}).click();
-    if(await firstTask.locator('.comment.rashed').first().getByRole('button',{name:'تعديل الرد'}).count())throw new Error(`${name}: Rashed reply is editable`);
-    await firstTask.getByRole('button',{name:'إضافة رد'}).click();
-    await page.locator('#editorContent').fill('أعد فحص البداية.');
-    await page.locator('#editorFiles').setInputFiles({name:'note.txt',mimeType:'text/plain',buffer:Buffer.from('yakolak note')});
-    await page.locator('#editorSave').click();
-    await page.getByText('أعد فحص البداية.',{exact:true}).waitFor();
-    await page.getByText('note.txt',{exact:true}).waitFor();
-
-    await page.locator('#openLinkedTask').click();
-    await page.locator('#editorTitle').fill('مهمة مرتبطة جديدة');
-    await page.locator('#editorContent').fill('تفاصيل طويلة للمهمة.');
-    await page.locator('#editorSave').click();
-    await page.locator('#linkedTasks').getByText('مهمة مرتبطة جديدة',{exact:true}).waitFor();
+    await page.locator('#contentModal[open]').waitFor();await page.locator('.preview-frame.ready').waitFor();
+    if(await page.locator('.preview-loading').count())throw new Error(`${name}: preview loader remained`);
+    await page.getByText('مراجعة رحلة الدخول',{exact:true}).waitFor();await page.getByText('المعاينة جاهزة للمراجعة.',{exact:true}).waitFor();await page.getByText('تم فحص البداية.',{exact:true}).waitFor();
     await page.locator('#modalClose').click();
 
-    await page.locator('[data-item-id="element:base-small"]').click();
-    await page.locator('#previewVersionField:not([hidden])').waitFor();
-    if(await page.locator('#previewVersionSelect option').count()<4)throw new Error(`${name}: element versions are incomplete`);
-    page.once('dialog',dialog=>dialog.accept());await page.locator('#removeCurrent').click();
-    await page.locator('[data-item-id="element:base-small"]').waitFor({state:'detached'});
-
     await page.locator('#filters [data-filter="task"]').click();
-    if(await page.locator('.content-card').count())throw new Error(`${name}: task view still uses cards`);
-    if(await page.locator('.task-row').count()<3)throw new Error(`${name}: ordered task rows are missing`);
-    if(await page.locator('.task-row .status-in_progress').count()!==1)throw new Error(`${name}: more than one task is in progress`);
-    const customRow=page.locator('[data-task-id="task-custom-journey"]');
-    await customRow.getByRole('button',{name:'تعديل المهمة'}).click();
-    await page.locator('#editorTitle').fill('مراجعة رحلة الدخول المعدلة');
-    await page.locator('#editorContent').fill('**مطلوب بوضوح**\n- افحص البداية');
-    await page.locator('#editorSave').click();
-    await customRow.getByText('مراجعة رحلة الدخول المعدلة',{exact:true}).waitFor();
-    await customRow.locator('.status-select').selectOption('in_progress');
-    await page.locator('[data-task-id="task-custom-journey"] .status-in_progress').waitFor();await page.waitForTimeout(100);
-    if(await page.locator('.task-row .status-in_progress').count()!==1)throw new Error(`${name}: active task exclusivity failed`);
-
-    if(name==='desktop'){
-      const handle=page.locator('[data-task-id="task-custom-journey"] .drag-handle'),target=page.locator('.task-row').first();await handle.scrollIntoViewIfNeeded();const from=await handle.boundingBox(),to=await target.boundingBox();
-      await page.mouse.move(from.x+from.width/2,from.y+from.height/2);await page.mouse.down();await page.mouse.move(to.x+to.width/2,to.y+3,{steps:4});await page.mouse.up();
-      await page.waitForTimeout(250);if(store.reorderCalls<1)throw new Error('desktop: task order was not saved');
-    }
-
-    page.once('dialog',dialog=>dialog.accept());await customRow.getByRole('button',{name:'إزالة المهمة'}).click();
-    await page.locator('[data-task-id="task-custom-journey"]').waitFor({state:'detached'});
-    await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:path.join(artifacts,`${name}-ordered-tasks.png`),fullPage:true});
+    if(await page.locator('.task-row').count()!==2)throw new Error(`${name}: Google Sheet tasks are missing`);
+    if(await page.locator('.task-row .status-in_progress').count()!==1)throw new Error(`${name}: status mapping failed`);
+    await page.locator('[data-task-id="YAK-TEST-02"] .task-copy').click();await page.getByText('استخدام Google Sheets كمصدر وحيد.',{exact:true}).waitFor();
+    await page.screenshot({path:path.join(artifacts,`${name}-google-sheet-workspace.png`),fullPage:true});
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);if(overflow>2)throw new Error(`${name}: horizontal overflow ${overflow}px`);
     if(errors.length)throw new Error(`${name}: ${errors.join(' | ')}`);
   }finally{await browser.close()}
@@ -121,4 +52,4 @@ async function verify(viewport,name){
 
 await verify({width:1440,height:1000},'desktop');
 await verify({width:390,height:844},'mobile');
-console.log('Task feeds, fuzzy search, dropdown previews, attachments, statuses, reorder, and removal passed desktop/mobile verification.');
+console.log('Google Sheet tasks, search, previews, linked updates and responsive layout passed desktop/mobile verification.');
