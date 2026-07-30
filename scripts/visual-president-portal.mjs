@@ -27,7 +27,7 @@ async function verify(viewport,name){
     await page.goto(`${base}/developer.html`,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.body.dataset.developerReady==='true');
     if(await page.locator('#editorModal,#openGlobalTask,.drag-handle').count())throw new Error(`${name}: legacy editing controls remain`);
     if(await page.locator('#filters [data-filter]').count()!==5)throw new Error(`${name}: filters are incomplete`);
-    await page.getByRole('link',{name:'فتح قاعدة البيانات'}).waitFor();
+    await page.locator('#databaseLink').waitFor();
     await page.getByText('تم التحديث من Google Sheets • 2 مهمة',{exact:true}).waitFor();
 
     await page.locator('#searchInput').fill('رحله دخوول');
