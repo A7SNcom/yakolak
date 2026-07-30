@@ -11,7 +11,8 @@
     "tabs": ["المهام", "المحتوى", "المعاينات", "المحادثات", "سجل العمل", "الإعدادات"],
     "contentInSheets": true,
     "previewsInSheets": true,
-    "writeBridge": "optional-apps-script-environment"
+    "writeBridge": "optional-apps-script-environment",
+    "documentation": "docs/GOOGLE_SHEETS_DEVELOPMENT_DATABASE.md"
   },
   "views": ["cards", "tasks"],
   "content": ["scene", "journey", "element", "task"],
