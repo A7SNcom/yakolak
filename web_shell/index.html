@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#efede8">
+  <meta name="description" content="ياكلك 2.2 — Godot + GDScript">
+  <title>ياكلك 2.2</title>
+  <link rel="preload" href="game.wasm" as="fetch" type="application/wasm" crossorigin>
+  <link rel="preload" href="game.pck" as="fetch" crossorigin>
+  <style>
+    :root{font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;color:#171717;background:#efede8}
+    *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#efede8}
+    #stage{position:fixed;inset:0;background:#efede8}
+    #game{position:absolute;inset:0;width:100%;height:100%;border:0;opacity:0;visibility:hidden;transition:opacity .35s ease;background:#efede8}
+    body[data-state="ready"] #game{opacity:1;visibility:visible}
+    #loader{position:absolute;inset:0;display:grid;place-items:center;padding:22px;transition:opacity .28s ease}
+    body[data-state="ready"] #loader{opacity:0;pointer-events:none}
+    .card{width:min(92vw,520px);padding:34px 28px;text-align:center;background:#faf8f2;border:1px solid #ded8cd;border-radius:28px;box-shadow:0 24px 70px #0002}
+    .star{font-size:74px;line-height:1;color:#d6a936;animation:bounce 1s ease-in-out infinite}
+    h1{margin:12px 0 6px;font-size:34px}p{margin:0;color:#625c53;line-height:1.8;font-size:17px}
+    .track{height:10px;margin:24px 0 12px;background:#ded9cf;border-radius:99px;overflow:hidden}
+    .bar{height:100%;width:42%;background:#171717;border-radius:99px;animation:load 1.4s ease-in-out infinite}
+    #detail{min-height:28px;font-size:15px;color:#71695f}
+    #retry{display:none;width:100%;margin-top:18px;padding:13px 18px;border:0;border-radius:14px;background:#171717;color:#fff;font:inherit;font-weight:700;cursor:pointer}
+    body[data-state="error"] .bar{animation:none;width:100%;background:#b42318}
+    body[data-state="error"] #retry{display:block}
+    @keyframes bounce{50%{transform:translateY(-10px) rotate(10deg)}}
+    @keyframes load{0%{transform:translateX(135%)}50%{transform:translateX(-70%)}100%{transform:translateX(-220%)}}
+    @media (prefers-reduced-motion:reduce){.star,.bar{animation:none}.bar{width:70%}}
+  </style>
+</head>
+<body data-state="loading">
+  <main id="stage">
+    <iframe id="game" title="لعبة ياكلك 2.2" src="game.html?v=2.2.0" allow="autoplay; fullscreen; gamepad" allowfullscreen></iframe>
+    <section id="loader" aria-live="polite">
+      <div class="card">
+        <div class="star">★</div>
+        <h1>ياكلك 2.2</h1>
+        <p id="message">جاري تحميل محرك اللعبة…</p>
+        <div class="track" aria-hidden="true"><div class="bar"></div></div>
+        <div id="detail">قد يستغرق التشغيل الأول عدة ثوانٍ فقط.</div>
+        <button id="retry" type="button">إعادة المحاولة</button>
+      </div>
+    </section>
+  </main>
+  <script>
+    (() => {
+      const body = document.body;
+      const frame = document.getElementById('game');
+      const message = document.getElementById('message');
+      const detail = document.getElementById('detail');
+      const retry = document.getElementById('retry');
+      let finished = false;
+
+      const phases = [
+        [4500, 'تنزيل ملفات المحرك…'],
+        [12000, 'تجهيز الرسوم ثلاثية الأبعاد…'],
+        [24000, 'بناء الغرفة واللوحة…']
+      ];
+      phases.forEach(([delay, text]) => setTimeout(() => {
+        if (!finished) message.textContent = text;
+      }, delay));
+
+      const fail = (text) => {
+        if (finished) return;
+        finished = true;
+        body.dataset.state = 'error';
+        message.textContent = 'تعذر تشغيل اللعبة';
+        detail.textContent = text || 'أعد المحاولة، وتأكد أن المتصفح محدث.';
+      };
+
+      const watchdog = setTimeout(() => fail('انتهت مهلة التشغيل. أعد المحاولة مرة واحدة.'), 90000);
+
+      window.addEventListener('message', (event) => {
+        if (event.source !== frame.contentWindow || !event.data) return;
+        if (event.data.type === 'yakolak-ready') {
+          finished = true;
+          clearTimeout(watchdog);
+          body.dataset.state = 'ready';
+          body.dataset.version = event.data.version || '2.2.0';
+          frame.focus();
+        } else if (event.data.type === 'yakolak-error') {
+          clearTimeout(watchdog);
+          fail(event.data.message);
+        }
+      });
+
+      frame.addEventListener('error', () => fail('تعذر فتح ملفات اللعبة من الخادم.'));
+      window.addEventListener('unhandledrejection', (event) => fail(String(event.reason || 'خطأ غير معروف')));
+      retry.addEventListener('click', () => location.reload());
+    })();
+  </script>
+</body>
+</html>
