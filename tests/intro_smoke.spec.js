@@ -26,7 +26,9 @@ async function expectCanvasToFillViewport(page, width, height) {
 }
 
 test('accepted Three.js intro timeline runs completely in Godot', async ({ page }) => {
-  test.setTimeout(120000);
+  // SwiftShader can take tens of seconds to encode screenshots of the original
+  // high-polygon STL models. This timeout does not alter the 5730ms intro.
+  test.setTimeout(300000);
   const failures = [];
   const introLogs = [];
 
@@ -49,14 +51,14 @@ test('accepted Three.js intro timeline runs completely in Godot', async ({ page 
 
   // Capture the animation while the lid and bases are moving, not only the final frame.
   await page.waitForTimeout(900);
-  await page.screenshot({ path: 'web/intro-mobile-motion.png', fullPage: true });
+  await page.screenshot({ path: 'web/intro-mobile-motion.png', fullPage: false, timeout: 120000 });
 
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'complete',
     null,
     { timeout: 15000 }
   );
-  await page.screenshot({ path: 'web/intro-mobile-final.png', fullPage: true });
+  await page.screenshot({ path: 'web/intro-mobile-final.png', fullPage: false, timeout: 120000 });
 
   expect(await page.evaluate(() => document.body.dataset.yakolakBases)).toBe('4');
   expect(await page.evaluate(() => document.body.dataset.yakolakPieces)).toBe('36');
@@ -81,7 +83,7 @@ test('accepted Three.js intro timeline runs completely in Godot', async ({ page 
     { timeout: 5000 }
   );
   await page.waitForTimeout(900);
-  await page.screenshot({ path: 'web/intro-desktop-motion.png', fullPage: true });
+  await page.screenshot({ path: 'web/intro-desktop-motion.png', fullPage: false, timeout: 120000 });
 
   expect(failures).toEqual([]);
 });
