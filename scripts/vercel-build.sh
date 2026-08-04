@@ -5,7 +5,7 @@ GODOT_VERSION="4.7.1"
 GODOT_TAG="4.7.1-stable"
 RELEASE="https://github.com/godotengine/godot-builds/releases/download/${GODOT_TAG}"
 
-echo "Installing Godot ${GODOT_TAG} for YAKOLAK 2.2.1"
+echo "Installing Godot ${GODOT_TAG} for YAKOLAK 2.2.2"
 curl --fail --location --retry 4 --connect-timeout 20 --max-time 180 \
   "${RELEASE}/Godot_v${GODOT_TAG}_linux.x86_64.zip" --output /tmp/godot.zip
 curl --fail --location --retry 4 --connect-timeout 20 --max-time 240 \
@@ -71,5 +71,20 @@ test -f web/index.js
 test -f web/index.wasm
 test -f web/index.pck
 
-echo "YAKOLAK 2.2.1 verified Web payload"
+# A successful export is not enough: launch the actual Web build in Chromium.
+echo "Installing Chromium test runner"
+npm install --no-save --no-package-lock --no-audit --no-fund @playwright/test@1.55.0
+npx playwright install chromium
+python3 -m http.server 8000 --directory web >/tmp/yakolak-web-server.log 2>&1 &
+server_pid=$!
+cleanup() {
+  kill "$server_pid" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+sleep 1
+npx playwright test tests/web_smoke.spec.js --project=chromium --workers=1 --reporter=line
+cleanup
+trap - EXIT
+
+echo "YAKOLAK 2.2.2 browser-verified Web payload"
 du -h web/index.wasm web/index.pck
