@@ -5,7 +5,7 @@ GODOT_VERSION="4.7.1"
 GODOT_TAG="4.7.1-stable"
 RELEASE="https://github.com/godotengine/godot-builds/releases/download/${GODOT_TAG}"
 
-echo "Installing Godot ${GODOT_TAG} for YAKOLAK 2.2"
+echo "Installing Godot ${GODOT_TAG} for YAKOLAK 2.2.1"
 curl --fail --location --retry 4 --connect-timeout 20 --max-time 180 \
   "${RELEASE}/Godot_v${GODOT_TAG}_linux.x86_64.zip" --output /tmp/godot.zip
 curl --fail --location --retry 4 --connect-timeout 20 --max-time 240 \
@@ -24,10 +24,23 @@ cp -R /tmp/yakolak-templates/templates/. "$TEMPLATE_DIR/"
 
 "$GODOT_BIN" --version
 
+# Godot 4.7 rejects inferred bool types from compound Variant expressions.
+# Keep this build-time guard until the legacy 2.1 source file is replaced fully.
+python3 - <<'PY'
+from pathlib import Path
+path = Path('scripts/main.gd')
+text = path.read_text(encoding='utf-8')
+old = 'var human_turn := match_active and not pending_input and seat.type == "human"'
+new = 'var human_turn: bool = match_active and not pending_input and String(seat.type) == "human"'
+if old not in text and new not in text:
+    raise SystemExit('Expected human_turn source line was not found')
+path.write_text(text.replace(old, new), encoding='utf-8')
+PY
+
 set -o pipefail
 "$GODOT_BIN" --headless --editor --path . --quit-after 15 2>&1 | tee /tmp/yakolak-import.log
 if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" /tmp/yakolak-import.log; then
-  echo "Godot script validation failed."
+  echo "Godot script validation failed during import."
   exit 1
 fi
 
@@ -35,14 +48,21 @@ fi
 
 rm -rf web
 mkdir -p web
-"$GODOT_BIN" --headless --path . --export-release "Web" web/game.html
-cp web_shell/index.html web/index.html
+set +e
+"$GODOT_BIN" --headless --path . --export-release "Web" web/index.html 2>&1 | tee /tmp/yakolak-export.log
+export_status=${PIPESTATUS[0]}
+set -e
+if [ "$export_status" -ne 0 ] || grep -E "SCRIPT ERROR|Parse Error|Failed to load script|ERROR:" /tmp/yakolak-export.log; then
+  echo "Godot Web export contains errors."
+  exit 1
+fi
 
 test -f web/index.html
-test -f web/game.html
-test -f web/game.js
-test -f web/game.wasm
-test -f web/game.pck
+test -f web/index.js
+test -f web/index.wasm
+test -f web/index.pck
 
-echo "YAKOLAK 2.2 Web payload"
-du -h web/game.wasm web/game.pck
+grep -q 'YAKOLAK 2.2' web/index.html || true
+
+echo "YAKOLAK 2.2.1 verified Web payload"
+du -h web/index.wasm web/index.pck
