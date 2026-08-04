@@ -1,0 +1,11 @@
+{
+  "version": "2.3.0-intro.1",
+  "scope": "intro-only",
+  "engine": "Godot 4.7.1",
+  "assets": "approved-original-assets",
+  "boardAndLid": "YAKOLAK_PORTABLE_KIT/assets/models/board-and-lid.stl",
+  "playerBase": "YAKOLAK_PORTABLE_KIT/assets/models/player-base.stl",
+  "pieces": 36,
+  "table": "extruded-from-approved-table.svg",
+  "status": "browser-verification-required"
+}
