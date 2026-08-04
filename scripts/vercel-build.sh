@@ -45,10 +45,15 @@ new = 'var csv_path := GENERATED_ROOT + "/intro_scatter.txt"'
 if old not in text and new not in text:
     raise SystemExit('intro scatter path was not found')
 path.write_text(text.replace(old, new), encoding='utf-8')
+
+source = Path('YAKOLAK_PORTABLE_KIT/assets/layout/intro-scatter.csv').read_bytes()
+runtime = Path('generated/intro_scatter.txt').read_bytes()
+if source != runtime:
+    raise SystemExit('runtime intro scatter copy differs from approved source')
+print('Exact 36-piece intro scatter data verified')
 PY
 
 sha256sum YAKOLAK_PORTABLE_KIT/assets/models/*.stl generated/*.obj
-cmp -s YAKOLAK_PORTABLE_KIT/assets/layout/intro-scatter.csv generated/intro_scatter.txt
 
 set -o pipefail
 "$GODOT_BIN" --headless --editor --path . --quit-after 30 2>&1 | tee /tmp/yakolak-import.log
