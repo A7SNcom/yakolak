@@ -29,17 +29,17 @@
     "playCompact":{"position":[245,325,285],"target":[0,0,0],"fov":45},
     "playPortrait2":{"position":[330,560,455],"target":[0,18,0],"fov":46},
     "playPortraitCrowded":{"position":[380,620,510],"target":[0,18,0],"fov":48},
-    "menuDesktop":{"position":[0,250,-820],"target":[0,250,-2386],"fov":42},
-    "menuCompact":{"position":[0,245,-560],"target":[0,245,-2386],"fov":46},
-    "menuPortrait":{"position":[0,250,-260],"target":[0,250,-2386],"fov":48},
-    "sideDesktop":{"position":[1080,260,0],"target":[2386,260,0],"fov":43},
-    "sideCompact":{"position":[980,250,0],"target":[2386,250,0],"fov":47},
-    "sidePortrait":{"position":[820,280,0],"target":[2386,280,0],"fov":49},
+    "setupPrimaryDesktop":{"position":[0,250,-820],"target":[0,250,-2386],"fov":42},
+    "setupPrimaryCompact":{"position":[0,245,-560],"target":[0,245,-2386],"fov":46},
+    "setupPrimaryPortrait":{"position":[0,250,-260],"target":[0,250,-2386],"fov":48},
+    "setupSecondaryDesktop":{"position":[1080,260,0],"target":[2386,260,0],"fov":43},
+    "setupSecondaryCompact":{"position":[980,250,0],"target":[2386,250,0],"fov":47},
+    "setupSecondaryPortrait":{"position":[820,280,0],"target":[2386,280,0],"fov":49},
     "entryStarDesktop":{"position":[0,250,-1534],"target":[0,250,-2354],"fov":42},
     "entryStarCompact":{"position":[0,250,-1534],"target":[0,250,-2354],"fov":46},
     "entryStarPortrait":{"position":[0,250,-1534],"target":[0,250,-2354],"fov":48},
-    "secondWallDesktop":{"position":[1050,275,0],"target":[2354,260,0],"fov":42},
-    "secondWallCompact":{"position":[820,285,0],"target":[2354,255,0],"fov":46},
-    "secondWallPortrait":{"position":[650,350,0],"target":[2354,260,0],"fov":48}
+    "brandWallDesktop":{"position":[1050,275,0],"target":[2354,260,0],"fov":42},
+    "brandWallCompact":{"position":[820,285,0],"target":[2354,255,0],"fov":46},
+    "brandWallPortrait":{"position":[650,350,0],"target":[2354,260,0],"fov":48}
   }
 }
