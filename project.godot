@@ -1,0 +1,39 @@
+; YAKOLAK 2.1 — Godot + GDScript
+; Generated from YAKOLAK_PORTABLE_KIT as the new implementation baseline.
+
+config_version=5
+
+[application]
+config/name="YAKOLAK 2.1"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+boot_splash/image="res://YAKOLAK_PORTABLE_KIT/assets/ui/loading-star.svg"
+boot_splash/bg_color=Color(0.96, 0.95, 0.92, 1)
+boot_splash/fullsize=false
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+window/handheld/orientation=1
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+environment/defaults/default_clear_color=Color(0.92, 0.91, 0.88, 1)
+
+[gui]
+theme/default_font_multichannel_signed_distance_field=true
+
+[input]
+confirm={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":13,"unicode":13)]
+}
+cancel={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":4194305)]
+}
