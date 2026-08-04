@@ -24,12 +24,13 @@ mkdir -p "$TEMPLATE_DIR"
 cp -R /tmp/yakolak-templates/templates/. "$TEMPLATE_DIR/"
 "$GODOT_BIN" --version
 
-# Convert only the approved STL files; placeholder geometry is forbidden.
+# Convert only approved source assets; substitute gameplay geometry is forbidden.
 rm -rf generated
 mkdir -p generated
 cp YAKOLAK_PORTABLE_KIT/assets/layout/intro-scatter.csv generated/intro_scatter.txt
 python3 scripts/prepare_assets.py
-for required in board lid player_base piece_small piece_medium piece_large score_marker; do
+python3 scripts/prepare_table.py
+for required in board lid player_base piece_small piece_medium piece_large score_marker table; do
   test -s "generated/${required}.obj"
 done
 test -s generated/intro_scatter.txt
