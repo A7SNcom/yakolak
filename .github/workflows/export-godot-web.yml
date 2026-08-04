@@ -1,0 +1,76 @@
+name: Export YAKOLAK Godot Web
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/yakolak-godot-2.1
+    paths-ignore:
+      - "web/**"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: yakolak-godot-web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  export-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      GODOT_VERSION: "4.7.1"
+      GODOT_STATUS: "stable"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Godot and export templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://downloads.godotengine.org/?flavor=stable&version=${GODOT_VERSION}"
+          curl --fail --location --retry 4 \
+            "${base}&platform=linux.64&slug=linux.x86_64.zip" \
+            --output /tmp/godot.zip
+          curl --fail --location --retry 4 \
+            "${base}&platform=templates&slug=export_templates.tpz" \
+            --output /tmp/templates.tpz
+          mkdir -p /tmp/godot /tmp/templates
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          unzip -q /tmp/templates.tpz -d /tmp/templates
+          GODOT_BIN="$(find /tmp/godot -maxdepth 1 -type f -name 'Godot_*' | head -n 1)"
+          chmod +x "$GODOT_BIN"
+          sudo install "$GODOT_BIN" /usr/local/bin/godot
+          template_dir="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}"
+          mkdir -p "$template_dir"
+          cp -R /tmp/templates/templates/. "$template_dir/"
+          godot --version
+
+      - name: Import project
+        run: godot --headless --editor --path . --quit-after 12
+
+      - name: Export Web release
+        run: |
+          rm -rf web
+          mkdir -p web
+          godot --headless --path . --export-release "Web" web/index.html
+          test -f web/index.html
+          test -n "$(find web -maxdepth 1 -type f -name '*.wasm' -print -quit)"
+
+      - name: Commit generated Web build
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "yakolak-build-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -f web
+          if git diff --cached --quiet; then
+            echo "Web export is unchanged."
+            exit 0
+          fi
+          git commit -m "Build YAKOLAK 2.1 Godot Web export"
+          git push origin HEAD:${GITHUB_REF_NAME}
