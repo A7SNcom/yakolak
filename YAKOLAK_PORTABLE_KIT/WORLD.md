@@ -1,6 +1,6 @@
 # World and Coordinates
 
-Coordinate system: Y is up; board center is `(0,0,0)`. Use any unit scale, but scale everything uniformly.
+Coordinate system: Y is up; board center is `(0,0,0)`. Use any unit scale, but scale everything uniformly. The same data is available in `assets/layout/world-layout.json`.
 
 ## Fixed measurements
 
@@ -88,6 +88,19 @@ Place the table at room center. Align the complete game group to the detected ta
 | desktop side wall | `1080,260,0` | `2386,260,0` | 43 |
 | compact side wall | `980,250,0` | `2386,250,0` | 47 |
 | portrait side wall | `820,280,0` | `2386,280,0` | 49 |
+
+## Approved loader-to-room poses
+
+| View | Position | Target | FOV |
+|---|---|---|---:|
+| desktop wall star | `0,250,-1534` | `0,250,-2354` | 42 |
+| compact wall star | `0,250,-1534` | `0,250,-2354` | 46 |
+| portrait wall star | `0,250,-1534` | `0,250,-2354` | 48 |
+| desktop second wall | `1050,275,0` | `2354,260,0` | 42 |
+| compact second wall | `820,285,0` | `2354,255,0` | 46 |
+| portrait second wall | `650,350,0` | `2354,260,0` | 48 |
+
+The room-reveal destination is the matching play pose above.
 
 ## Reference palette
 
