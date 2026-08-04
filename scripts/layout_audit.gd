@@ -1,8 +1,7 @@
 extends Node3D
 
-# This scene intentionally contains no intro animation, lid, board, room, or
-# invented transitions. It verifies only the authoritative final placement of
-# the four player bases and the 36 original pieces.
+# Geometry-only review. No intro, lid, board, room, labels, or invented motion.
+# The camera is orthographic and refits itself whenever the browser viewport changes.
 
 const U := 0.04
 const BASE_MESH := "res://generated/player_base.obj"
@@ -38,6 +37,12 @@ const PIECE_ROTATION := Vector3(-90, 0, 0)
 const SIDE_ORDER := ["right", "back", "left", "front"]
 const SIZE_ORDER := ["large", "medium", "small"]
 
+# Projected safe bounds for the approved four-base layout at the audit angle.
+const CONTENT_WIDTH := 21.5
+const CONTENT_HEIGHT := 18.0
+const CAMERA_MARGIN := 1.08
+
+var camera: Camera3D
 var base_count := 0
 var piece_count := 0
 var failed := false
@@ -47,7 +52,8 @@ func _ready() -> void:
 	_build_environment()
 	_build_camera()
 	_build_authoritative_layout()
-	_build_label()
+	get_viewport().size_changed.connect(_fit_camera_to_viewport)
+	_fit_camera_to_viewport.call_deferred()
 	_verify_and_publish.call_deferred()
 
 
@@ -78,14 +84,31 @@ func _build_environment() -> void:
 
 
 func _build_camera() -> void:
-	var camera := Camera3D.new()
+	camera = Camera3D.new()
 	camera.current = true
-	camera.fov = 43.0
+	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 	camera.near = 0.05
-	camera.far = 200.0
-	camera.position = Vector3(520, 430, 520) * U
+	camera.far = 100.0
+	camera.position = Vector3(14.0, 18.0, 14.0)
 	add_child(camera)
 	camera.look_at(Vector3.ZERO, Vector3.UP)
+
+
+func _fit_camera_to_viewport() -> void:
+	if camera == null:
+		return
+	var viewport_size := get_viewport().get_visible_rect().size
+	if viewport_size.x <= 1.0 or viewport_size.y <= 1.0:
+		return
+	var aspect := viewport_size.x / viewport_size.y
+	camera.size = maxf(CONTENT_HEIGHT, CONTENT_WIDTH / aspect) * CAMERA_MARGIN
+
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval(
+			"document.body.dataset.yakolakViewport='" +
+			str(int(viewport_size.x)) + "x" + str(int(viewport_size.y)) + "';",
+			true
+		)
 
 
 func _build_authoritative_layout() -> void:
@@ -124,37 +147,6 @@ func _build_authoritative_layout() -> void:
 				piece.set_meta("authoritative_size", size_name)
 				add_child(piece)
 				piece_count += 1
-
-
-func _build_label() -> void:
-	var canvas := CanvasLayer.new()
-	canvas.layer = 10
-	add_child(canvas)
-
-	var panel := ColorRect.new()
-	panel.color = Color(0.04, 0.04, 0.04, 0.78)
-	panel.position = Vector2(18, 18)
-	panel.size = Vector2(425, 74)
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	canvas.add_child(panel)
-
-	var title := Label.new()
-	title.text = "مراجعة هندسية 2.4 — القواعد والأحجار فقط"
-	title.position = Vector2(16, 10)
-	title.size = Vector2(395, 28)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	title.add_theme_font_size_override("font_size", 19)
-	title.add_theme_color_override("font_color", Color.WHITE)
-	panel.add_child(title)
-
-	var note := Label.new()
-	note.text = "لا توجد حركة أو صندوق أو عناصر مخترعة في هذه المرحلة"
-	note.position = Vector2(16, 40)
-	note.size = Vector2(395, 22)
-	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	note.add_theme_font_size_override("font_size", 14)
-	note.add_theme_color_override("font_color", Color("#d5d5d5"))
-	panel.add_child(note)
 
 
 func _verify_and_publish() -> void:
