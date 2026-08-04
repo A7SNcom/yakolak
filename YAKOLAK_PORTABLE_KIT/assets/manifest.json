@@ -16,6 +16,8 @@
     {"path":"table/roughness.png","role":"table-roughness","required":false},
     {"path":"ui/loading-star.svg","role":"loading-symbol","required":true},
     {"path":"room/ROOM.md","role":"generated-room-specification","required":true},
-    {"path":"room/room-plan.svg","role":"room-top-view-reference","required":false}
+    {"path":"room/room-plan.svg","role":"room-top-view-reference","required":false},
+    {"path":"layout/world-layout.json","role":"authoritative-spatial-data","required":true},
+    {"path":"layout/intro-scatter.csv","role":"exact-36-piece-intro-start-transforms","required":true}
   ]
 }
