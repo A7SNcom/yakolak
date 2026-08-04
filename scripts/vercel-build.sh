@@ -5,7 +5,7 @@ GODOT_VERSION="4.7.1"
 GODOT_TAG="4.7.1-stable"
 RELEASE="https://github.com/godotengine/godot-builds/releases/download/${GODOT_TAG}"
 
-echo "Building YAKOLAK 2.4 layout audit — four bases and 36 pieces only"
+echo "Building YAKOLAK 2.5 — exact Three.js intro port"
 
 curl --fail --location --retry 4 --connect-timeout 20 --max-time 180 \
   "${RELEASE}/Godot_v${GODOT_TAG}_linux.x86_64.zip" --output /tmp/godot.zip
@@ -24,30 +24,32 @@ mkdir -p "$TEMPLATE_DIR"
 cp -R /tmp/yakolak-templates/templates/. "$TEMPLATE_DIR/"
 "$GODOT_BIN" --version
 
-rm -rf generated web
+rm -rf generated web .godot
 mkdir -p generated web
-python3 scripts/prepare_layout_assets.py
-for required in player_base piece_large piece_medium piece_small; do
+python3 scripts/prepare_intro_assets.py
+for required in board_and_lid player_base piece_large piece_medium piece_small; do
   test -s "generated/${required}.obj"
 done
-sha256sum YAKOLAK_PORTABLE_KIT/assets/models/player-base.stl \
+sha256sum \
+  YAKOLAK_PORTABLE_KIT/assets/models/board-and-lid.stl \
+  YAKOLAK_PORTABLE_KIT/assets/models/player-base.stl \
   YAKOLAK_PORTABLE_KIT/assets/models/piece-large.stl \
   YAKOLAK_PORTABLE_KIT/assets/models/piece-medium.stl \
   YAKOLAK_PORTABLE_KIT/assets/models/piece-small.stl \
   generated/*.obj
 
 set -o pipefail
-"$GODOT_BIN" --headless --editor --path . --quit-after 25 2>&1 | tee /tmp/yakolak24-import.log
-if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file|Could not parse|ERROR:" /tmp/yakolak24-import.log; then
+"$GODOT_BIN" --headless --editor --path . --quit-after 30 2>&1 | tee /tmp/yakolak25-import.log
+if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file|Could not parse|ERROR:" /tmp/yakolak25-import.log; then
   echo "Godot import or script validation failed."
   exit 1
 fi
 
 set +e
-"$GODOT_BIN" --headless --path . --export-release "Web" web/index.html 2>&1 | tee /tmp/yakolak24-export.log
+"$GODOT_BIN" --headless --path . --export-release "Web" web/index.html 2>&1 | tee /tmp/yakolak25-export.log
 export_status=${PIPESTATUS[0]}
 set -e
-if [ "$export_status" -ne 0 ] || grep -E "SCRIPT ERROR|Parse Error|Failed to load script|ERROR:" /tmp/yakolak24-export.log; then
+if [ "$export_status" -ne 0 ] || grep -E "SCRIPT ERROR|Parse Error|Failed to load script|ERROR:" /tmp/yakolak25-export.log; then
   echo "Godot Web export failed."
   exit 1
 fi
@@ -86,7 +88,7 @@ if ldd "$CHROMIUM_BIN" | grep -q "not found"; then
   exit 1
 fi
 
-python3 -m http.server 8000 --directory web >/tmp/yakolak24-server.log 2>&1 &
+python3 -m http.server 8000 --directory web >/tmp/yakolak25-server.log 2>&1 &
 server_pid=$!
 cleanup() {
   kill "$server_pid" >/dev/null 2>&1 || true
@@ -94,11 +96,12 @@ cleanup() {
 trap cleanup EXIT
 sleep 1
 PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1 \
-  npx playwright test tests/layout_smoke.spec.js --workers=1 --reporter=line
+  npx playwright test tests/intro_smoke.spec.js --workers=1 --reporter=line
 cleanup
 trap - EXIT
 
-test -s web/layout-audit-mobile.png
-test -s web/layout-audit-desktop.png
-echo "YAKOLAK 2.4 layout audit passed portrait and desktop Chromium verification"
-du -h web/index.wasm web/index.pck web/layout-audit-mobile.png web/layout-audit-desktop.png
+test -s web/intro-mobile-motion.png
+test -s web/intro-mobile-final.png
+test -s web/intro-desktop-motion.png
+echo "YAKOLAK 2.5 exact intro passed mobile and desktop Chromium verification"
+du -h web/index.wasm web/index.pck web/intro-mobile-motion.png web/intro-mobile-final.png web/intro-desktop-motion.png
