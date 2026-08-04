@@ -36,6 +36,7 @@ test('approved-asset intro loads and completes naturally in Chromium', async ({ 
 
   expect(await page.evaluate(() => document.body.dataset.yakolakFallback || '')).toBe('');
   expect(await page.evaluate(() => document.body.dataset.yakolakDirector || '')).toBe('complete');
+  expect(await page.evaluate(() => document.body.dataset.yakolakTable || '')).toBe('approved-svg');
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();
