@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - agent/yakolak-godot-2.1
+      - agent/yakolak-godot-2.2
     paths-ignore:
       - "web/**"
 
@@ -18,7 +18,7 @@ concurrency:
 jobs:
   export-web:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     env:
       GODOT_VERSION: "4.7.1-stable"
     steps:
@@ -32,12 +32,8 @@ jobs:
         run: |
           set -euo pipefail
           release="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}"
-          curl --fail --location --retry 4 \
-            "${release}/Godot_v${GODOT_VERSION}_linux.x86_64.zip" \
-            --output /tmp/godot.zip
-          curl --fail --location --retry 4 \
-            "${release}/Godot_v${GODOT_VERSION}_export_templates.tpz" \
-            --output /tmp/templates.tpz
+          curl --fail --location --retry 4 "${release}/Godot_v${GODOT_VERSION}_linux.x86_64.zip" --output /tmp/godot.zip
+          curl --fail --location --retry 4 "${release}/Godot_v${GODOT_VERSION}_export_templates.tpz" --output /tmp/templates.tpz
           mkdir -p /tmp/godot /tmp/templates
           unzip -q /tmp/godot.zip -d /tmp/godot
           unzip -q /tmp/templates.tpz -d /tmp/templates
@@ -49,21 +45,57 @@ jobs:
           cp -R /tmp/templates/templates/. "$template_dir/"
           godot --version
 
-      - name: Import and validate project
-        run: godot --headless --editor --path . --quit-after 12
+      - name: Import and validate scripts
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --editor --path . --quit-after 15 2>&1 | tee /tmp/godot-import.log
+          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" /tmp/godot-import.log; then
+            echo "Godot script validation failed."
+            exit 1
+          fi
 
       - name: Run rules smoke tests
         run: godot --headless --path . --script res://scripts/rules_smoke_test.gd
 
-      - name: Export Web release
+      - name: Export lean Web release
+        shell: bash
         run: |
+          set -euo pipefail
           rm -rf web
           mkdir -p web
-          godot --headless --path . --export-release "Web" web/index.html
+          godot --headless --path . --export-release "Web" web/game.html
+          cp web_shell/index.html web/index.html
           test -f web/index.html
-          test -n "$(find web -maxdepth 1 -type f -name '*.wasm' -print -quit)"
+          test -f web/game.html
+          test -f web/game.wasm
+          test -f web/game.pck
+          du -h web/game.wasm web/game.pck
 
-      - name: Commit generated Web build
+      - name: Install browser test tools
+        shell: bash
+        run: |
+          npm init -y
+          npm install --save-dev @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Verify startup in Chromium
+        shell: bash
+        run: |
+          python3 -m http.server 8000 --directory web >/tmp/yakolak-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill $server_pid || true' EXIT
+          npx playwright test tests/web_smoke.spec.js --project=chromium --workers=1 --reporter=line
+
+      - name: Upload startup screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yakolak-2.2-web-smoke
+          path: web-smoke-2.2.png
+          if-no-files-found: ignore
+
+      - name: Commit verified Web build
         shell: bash
         run: |
           set -euo pipefail
@@ -71,8 +103,8 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add -f web
           if git diff --cached --quiet; then
-            echo "Web export is unchanged."
+            echo "Verified Web export is unchanged."
             exit 0
           fi
-          git commit -m "Build YAKOLAK 2.1 Godot Web export"
+          git commit -m "Build verified YAKOLAK 2.2 Web export"
           git push origin HEAD:${GITHUB_REF_NAME}
