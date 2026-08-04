@@ -7,14 +7,15 @@ test.use({
       '--use-gl=angle',
       '--use-angle=swiftshader',
       '--enable-webgl',
+      '--enable-unsafe-swiftshader',
       '--ignore-gpu-blocklist',
       '--disable-dev-shm-usage'
     ]
   }
 });
 
-test('approved-asset intro loads and completes in Chromium', async ({ page }) => {
-  test.setTimeout(150000);
+test('approved-asset intro loads and completes naturally in Chromium', async ({ page }) => {
+  test.setTimeout(90000);
   const failures = [];
 
   page.on('pageerror', error => failures.push(`pageerror: ${error.message}`));
@@ -30,9 +31,10 @@ test('approved-asset intro loads and completes in Chromium', async ({ page }) =>
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'complete',
     null,
-    { timeout: 120000 }
+    { timeout: 60000 }
   );
 
+  expect(await page.evaluate(() => document.body.dataset.yakolakFallback || '')).toBe('');
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();
