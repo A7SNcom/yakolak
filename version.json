@@ -1,0 +1,9 @@
+{
+  "name": "YAKOLAK",
+  "series": "2.x",
+  "version": "2.1.0",
+  "engine": "Godot 4.7.1",
+  "language": "GDScript",
+  "status": "preview",
+  "web_output": "web/index.html"
+}
