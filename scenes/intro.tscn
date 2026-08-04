@@ -1,18 +1,22 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/intro.gd" id="1_intro"]
-[ext_resource type="Script" path="res://scripts/intro_surface_alignment.gd" id="2_alignment"]
-[ext_resource type="Script" path="res://scripts/intro_director.gd" id="3_director"]
-[ext_resource type="Script" path="res://scripts/intro_watchdog.gd" id="4_watchdog"]
+[ext_resource type="Script" path="res://scripts/intro_table_asset.gd" id="2_table"]
+[ext_resource type="Script" path="res://scripts/intro_surface_alignment.gd" id="3_alignment"]
+[ext_resource type="Script" path="res://scripts/intro_director.gd" id="4_director"]
+[ext_resource type="Script" path="res://scripts/intro_watchdog.gd" id="5_watchdog"]
 
 [node name="YAKOLAKIntro23" type="Node3D"]
 script = ExtResource("1_intro")
 
+[node name="ApprovedTableAsset" type="Node" parent="."]
+script = ExtResource("2_table")
+
 [node name="SurfaceAlignment" type="Node" parent="."]
-script = ExtResource("2_alignment")
+script = ExtResource("3_alignment")
 
 [node name="IntroDirector" type="Node" parent="."]
-script = ExtResource("3_director")
+script = ExtResource("4_director")
 
 [node name="IntroWatchdog" type="Node" parent="."]
-script = ExtResource("4_watchdog")
+script = ExtResource("5_watchdog")
