@@ -2,12 +2,14 @@
 set -euo pipefail
 
 GODOT_VERSION="4.7.1"
-GODOT_STATUS="stable"
-BASE="https://downloads.godotengine.org/?flavor=stable&version=${GODOT_VERSION}"
+GODOT_TAG="4.7.1-stable"
+RELEASE="https://github.com/godotengine/godot-builds/releases/download/${GODOT_TAG}"
 
-echo "Installing Godot ${GODOT_VERSION}.${GODOT_STATUS} for YAKOLAK 2.2"
-curl --fail --location --retry 4 "${BASE}&platform=linux.64&slug=linux.x86_64.zip" --output /tmp/godot.zip
-curl --fail --location --retry 4 "${BASE}&platform=templates&slug=export_templates.tpz" --output /tmp/templates.tpz
+echo "Installing Godot ${GODOT_TAG} for YAKOLAK 2.2"
+curl --fail --location --retry 4 --connect-timeout 20 --max-time 180 \
+  "${RELEASE}/Godot_v${GODOT_TAG}_linux.x86_64.zip" --output /tmp/godot.zip
+curl --fail --location --retry 4 --connect-timeout 20 --max-time 240 \
+  "${RELEASE}/Godot_v${GODOT_TAG}_export_templates.tpz" --output /tmp/templates.tpz
 
 rm -rf /tmp/yakolak-godot /tmp/yakolak-templates
 mkdir -p /tmp/yakolak-godot /tmp/yakolak-templates
@@ -16,7 +18,7 @@ unzip -q /tmp/templates.tpz -d /tmp/yakolak-templates
 
 GODOT_BIN="$(find /tmp/yakolak-godot -maxdepth 1 -type f -name 'Godot_*' | head -n 1)"
 chmod +x "$GODOT_BIN"
-TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}"
+TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
 mkdir -p "$TEMPLATE_DIR"
 cp -R /tmp/yakolak-templates/templates/. "$TEMPLATE_DIR/"
 
