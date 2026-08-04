@@ -3,7 +3,8 @@
 
 No substitute geometry is generated. The approved board-and-lid STL is one
 complete multi-shell model that is instantiated twice by the intro: once as the
-board and once as the temporary lid.
+board and once as the temporary lid. Exact duplicate STL faces are removed to
+make the original geometry practical for real-time WebGL rendering.
 """
 from __future__ import annotations
 
@@ -129,9 +130,29 @@ def face_normal(a: Vec3, b: Vec3, c: Vec3) -> Vec3:
     return tuple(value / length for value in cross)  # type: ignore[return-value]
 
 
+def remove_duplicate_faces(triangles: list[Triangle]) -> list[Triangle]:
+    """Remove byte-equivalent geometry duplicates, never simplify the surface."""
+    unique: list[Triangle] = []
+    seen: set[tuple[tuple[float, float, float], ...]] = set()
+    for triangle in triangles:
+        vertex_keys = tuple(tuple(round(value, 6) for value in vertex) for vertex in triangle)
+        if len(set(vertex_keys)) != 3:
+            continue
+        # Sorting makes opposite-winding copies count as the same geometric face.
+        face_key = tuple(sorted(vertex_keys))
+        if face_key in seen:
+            continue
+        seen.add(face_key)
+        unique.append(triangle)
+    return unique
+
+
 def write_obj(path: Path, triangles: list[Triangle], source_name: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    triangles = recenter(triangles)
+    source_triangle_count = len(triangles)
+    triangles = remove_duplicate_faces(recenter(triangles))
+    if not triangles:
+        raise RuntimeError(f"No usable faces remained for {source_name}")
 
     vertices: list[Vec3] = []
     vertex_indices: dict[tuple[float, float, float], int] = {}
@@ -148,6 +169,7 @@ def write_obj(path: Path, triangles: list[Triangle], source_name: str) -> None:
 
     with path.open("w", encoding="utf-8", newline="\n") as handle:
         handle.write(f"# Approved YAKOLAK asset converted from {source_name}\n")
+        handle.write("# Only exact duplicate and degenerate faces were removed.\n")
         handle.write(f"o {path.stem}\n")
         for vertex in vertices:
             handle.write(f"v {vertex[0]:.6f} {vertex[1]:.6f} {vertex[2]:.6f}\n")
@@ -161,8 +183,10 @@ def write_obj(path: Path, triangles: list[Triangle], source_name: str) -> None:
 
     mins, maxs = bounds(triangles)
     dimensions = tuple(maxs[i] - mins[i] for i in range(3))
+    removed = source_triangle_count - len(triangles)
     print(
-        f"{path.name}: {len(triangles)} triangles, {len(vertices)} welded vertices, "
+        f"{path.name}: {source_triangle_count}->{len(triangles)} triangles "
+        f"({removed} duplicate/degenerate removed), {len(vertices)} welded vertices, "
         f"dimensions=({dimensions[0]:.2f}, {dimensions[1]:.2f}, {dimensions[2]:.2f})"
     )
 
@@ -179,7 +203,7 @@ def convert_board_and_lid() -> None:
     complete_model = [triangle for component in components for triangle in component]
     print(
         f"board-and-lid.stl complete model: {len(components)} shells, "
-        f"{len(complete_model)} triangles"
+        f"{len(complete_model)} source triangles"
     )
     if len(components) != 29:
         raise RuntimeError(
