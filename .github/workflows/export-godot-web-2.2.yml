@@ -1,0 +1,107 @@
+name: Export and verify YAKOLAK 2.2 Web
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/yakolak-godot-2.2
+    paths-ignore:
+      - "web/**"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: yakolak-godot-web-22-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  export-verify-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GODOT_VERSION: "4.7.1"
+      GODOT_STATUS: "stable"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Godot and export templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://downloads.godotengine.org/?flavor=stable&version=${GODOT_VERSION}"
+          curl --fail --location --retry 4 "${base}&platform=linux.64&slug=linux.x86_64.zip" --output /tmp/godot.zip
+          curl --fail --location --retry 4 "${base}&platform=templates&slug=export_templates.tpz" --output /tmp/templates.tpz
+          mkdir -p /tmp/godot /tmp/templates
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          unzip -q /tmp/templates.tpz -d /tmp/templates
+          GODOT_BIN="$(find /tmp/godot -maxdepth 1 -type f -name 'Godot_*' | head -n 1)"
+          chmod +x "$GODOT_BIN"
+          sudo install "$GODOT_BIN" /usr/local/bin/godot
+          template_dir="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}"
+          mkdir -p "$template_dir"
+          cp -R /tmp/templates/templates/. "$template_dir/"
+          godot --version
+
+      - name: Import and validate scripts
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --editor --path . --quit-after 15 2>&1 | tee /tmp/godot-import.log
+          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" /tmp/godot-import.log; then
+            echo "Godot script validation failed."
+            exit 1
+          fi
+
+      - name: Test gameplay rules
+        run: godot --headless --path . --script scripts/rules_smoke_test.gd
+
+      - name: Export lean Web build
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf web
+          mkdir -p web
+          godot --headless --path . --export-release "Web" web/game.html
+          cp web_shell/index.html web/index.html
+          test -f web/index.html
+          test -f web/game.html
+          test -f web/game.wasm
+          test -f web/game.pck
+          du -h web/game.wasm web/game.pck
+
+      - name: Install Chromium
+        run: npx --yes playwright@1.55.0 install --with-deps chromium
+
+      - name: Verify startup in a real browser
+        shell: bash
+        run: |
+          python3 -m http.server 8000 --directory web >/tmp/yakolak-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill $server_pid || true' EXIT
+          npx --yes @playwright/test@1.55.0 test tests/web_smoke.spec.js --project=chromium --workers=1 --reporter=line
+
+      - name: Upload startup screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yakolak-2.2-web-smoke
+          path: web-smoke-2.2.png
+          if-no-files-found: ignore
+
+      - name: Commit verified Web build
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "yakolak-build-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -f web
+          if git diff --cached --quiet; then
+            echo "Verified Web export is unchanged."
+            exit 0
+          fi
+          git commit -m "Build verified YAKOLAK 2.2 Web export"
+          git push origin HEAD:${GITHUB_REF_NAME}
