@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Convert only the approved base and piece STL files for the 2.4 layout audit.
+"""Convert the approved base and piece STL files for the 2.4 layout audit.
 
-The source coordinates and origins are preserved exactly. No recentering,
-rescaling, axis conversion, simplification, or substitute geometry is applied.
-Only exact duplicate and degenerate faces are removed from the source STL.
-The authoritative -90 degree X rotations are applied later in Godot.
+The source mesh shape and scale are preserved. CAD drawing offsets are removed
+only to create a predictable pivot: horizontal center at X/Y and bottom at Z=0.
+No axis conversion, simplification, or substitute geometry is applied. Exact
+duplicate and degenerate faces are removed. The authoritative -90 degree X
+rotations are applied later in Godot.
 """
 from __future__ import annotations
 
@@ -28,7 +29,7 @@ def parse_stl(path: Path) -> list[Triangle]:
             result: list[Triangle] = []
             offset = 84
             for _ in range(count):
-                offset += 12  # source normal
+                offset += 12
                 vertices: list[Vec3] = []
                 for _vertex in range(3):
                     vertices.append(struct.unpack_from("<fff", data, offset))
@@ -87,12 +88,29 @@ def bounds(triangles: list[Triangle]) -> tuple[Vec3, Vec3]:
     return mins, maxs  # type: ignore[return-value]
 
 
+def normalize_pivot(triangles: list[Triangle]) -> tuple[list[Triangle], Vec3]:
+    mins, maxs = bounds(triangles)
+    shift: Vec3 = (
+        (mins[0] + maxs[0]) * 0.5,
+        (mins[1] + maxs[1]) * 0.5,
+        mins[2],
+    )
+    normalized: list[Triangle] = []
+    for triangle in triangles:
+        normalized.append(tuple(
+            (vertex[0] - shift[0], vertex[1] - shift[1], vertex[2] - shift[2])
+            for vertex in triangle
+        ))  # type: ignore[arg-type]
+    return normalized, shift
+
+
 def write_obj(source_name: str, destination_name: str) -> None:
     source = MODELS / source_name
     original = parse_stl(source)
-    triangles = clean_faces(original)
-    if not triangles:
+    cleaned = clean_faces(original)
+    if not cleaned:
         raise RuntimeError(f"Approved asset became empty: {source_name}")
+    triangles, pivot_shift = normalize_pivot(cleaned)
 
     vertices: list[Vec3] = []
     vertex_index: dict[Vec3, int] = {}
@@ -100,7 +118,7 @@ def write_obj(source_name: str, destination_name: str) -> None:
     for triangle in triangles:
         indices: list[int] = []
         for vertex in triangle:
-            key = tuple(round(value, 6) for value in vertex)  # type: ignore[assignment]
+            key: Vec3 = tuple(round(value, 6) for value in vertex)  # type: ignore[assignment]
             if key not in vertex_index:
                 vertex_index[key] = len(vertices) + 1
                 vertices.append(key)
@@ -111,7 +129,7 @@ def write_obj(source_name: str, destination_name: str) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     with destination.open("w", encoding="utf-8", newline="\n") as handle:
         handle.write(f"# Approved YAKOLAK source: {source_name}\n")
-        handle.write("# Original coordinates and origin preserved exactly.\n")
+        handle.write("# Shape and scale preserved; CAD drawing offset removed for bottom-center pivot.\n")
         handle.write(f"o {destination.stem}\n")
         for x, y, z in vertices:
             handle.write(f"v {x:.6f} {y:.6f} {z:.6f}\n")
@@ -126,7 +144,8 @@ def write_obj(source_name: str, destination_name: str) -> None:
     mins, maxs = bounds(triangles)
     print(
         f"{destination_name}: {len(original)}->{len(triangles)} triangles; "
-        f"source_bounds=({mins[0]:.3f},{mins[1]:.3f},{mins[2]:.3f}).."
+        f"pivot_shift=({pivot_shift[0]:.3f},{pivot_shift[1]:.3f},{pivot_shift[2]:.3f}); "
+        f"normalized_bounds=({mins[0]:.3f},{mins[1]:.3f},{mins[2]:.3f}).."
         f"({maxs[0]:.3f},{maxs[1]:.3f},{maxs[2]:.3f})"
     )
 
