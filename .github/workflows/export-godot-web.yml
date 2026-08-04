@@ -20,8 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
-      GODOT_VERSION: "4.7.1"
-      GODOT_STATUS: "stable"
+      GODOT_VERSION: "4.7.1-stable"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,12 +31,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base="https://downloads.godotengine.org/?flavor=stable&version=${GODOT_VERSION}"
+          release="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}"
           curl --fail --location --retry 4 \
-            "${base}&platform=linux.64&slug=linux.x86_64.zip" \
+            "${release}/Godot_v${GODOT_VERSION}_linux.x86_64.zip" \
             --output /tmp/godot.zip
           curl --fail --location --retry 4 \
-            "${base}&platform=templates&slug=export_templates.tpz" \
+            "${release}/Godot_v${GODOT_VERSION}_export_templates.tpz" \
             --output /tmp/templates.tpz
           mkdir -p /tmp/godot /tmp/templates
           unzip -q /tmp/godot.zip -d /tmp/godot
@@ -45,13 +44,16 @@ jobs:
           GODOT_BIN="$(find /tmp/godot -maxdepth 1 -type f -name 'Godot_*' | head -n 1)"
           chmod +x "$GODOT_BIN"
           sudo install "$GODOT_BIN" /usr/local/bin/godot
-          template_dir="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}"
+          template_dir="$HOME/.local/share/godot/export_templates/${GODOT_VERSION/-stable/.stable}"
           mkdir -p "$template_dir"
           cp -R /tmp/templates/templates/. "$template_dir/"
           godot --version
 
-      - name: Import project
+      - name: Import and validate project
         run: godot --headless --editor --path . --quit-after 12
+
+      - name: Run rules smoke tests
+        run: godot --headless --path . --script res://scripts/rules_smoke_test.gd
 
       - name: Export Web release
         run: |
