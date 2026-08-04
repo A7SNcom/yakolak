@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
+  "buildCommand": "bash scripts/vercel-build.sh",
   "outputDirectory": "web",
   "cleanUrls": false,
   "headers": [
@@ -12,9 +13,22 @@
       ]
     },
     {
+      "source": "/(.*)\\.html",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    },
+    {
       "source": "/(.*)\\.wasm",
       "headers": [
         { "key": "Content-Type", "value": "application/wasm" },
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/(.*)\\.pck",
+      "headers": [
+        { "key": "Content-Type", "value": "application/octet-stream" },
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
       ]
     }
