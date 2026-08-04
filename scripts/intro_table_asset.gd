@@ -40,5 +40,7 @@ func _process(_delta: float) -> void:
 	old_top.queue_free()
 
 	applied = true
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("document.body.dataset.yakolakTable = 'approved-svg';", true)
 	print("YAKOLAK_APPROVED_TABLE_SVG_APPLIED")
 	set_process(false)
