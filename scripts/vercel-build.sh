@@ -98,6 +98,7 @@ PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1 \
 cleanup
 trap - EXIT
 
-test -s web/layout-audit.png
-echo "YAKOLAK 2.4 layout audit passed Chromium verification"
-du -h web/index.wasm web/index.pck web/layout-audit.png
+test -s web/layout-audit-mobile.png
+test -s web/layout-audit-desktop.png
+echo "YAKOLAK 2.4 layout audit passed portrait and desktop Chromium verification"
+du -h web/index.wasm web/index.pck web/layout-audit-mobile.png web/layout-audit-desktop.png
