@@ -26,11 +26,29 @@ cp -R /tmp/yakolak-templates/templates/. "$TEMPLATE_DIR/"
 
 # Convert only the approved STL files; placeholder geometry is forbidden.
 rm -rf generated
+mkdir -p generated
+cp YAKOLAK_PORTABLE_KIT/assets/layout/intro-scatter.csv generated/intro_scatter.txt
 python3 scripts/prepare_assets.py
 for required in board lid player_base piece_small piece_medium piece_large score_marker; do
   test -s "generated/${required}.obj"
 done
+test -s generated/intro_scatter.txt
+
+# Godot imports CSV files as translation tables. Point the runtime script to the
+# byte-identical TXT copy so the authoritative 36 transforms remain readable.
+python3 - <<'PY'
+from pathlib import Path
+path = Path('scripts/intro.gd')
+text = path.read_text(encoding='utf-8')
+old = 'var csv_path := ASSET_ROOT + "/layout/intro-scatter.csv"'
+new = 'var csv_path := GENERATED_ROOT + "/intro_scatter.txt"'
+if old not in text and new not in text:
+    raise SystemExit('intro scatter path was not found')
+path.write_text(text.replace(old, new), encoding='utf-8')
+PY
+
 sha256sum YAKOLAK_PORTABLE_KIT/assets/models/*.stl generated/*.obj
+cmp -s YAKOLAK_PORTABLE_KIT/assets/layout/intro-scatter.csv generated/intro_scatter.txt
 
 set -o pipefail
 "$GODOT_BIN" --headless --editor --path . --quit-after 30 2>&1 | tee /tmp/yakolak-import.log
