@@ -81,6 +81,10 @@ def parse_svg() -> list[Point]:
         (float(x), float(y))
         for x, y in re.findall(r'(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)', path_match.group(1))
     ]
+    # The SVG closes the path by repeating its first coordinate before Z.
+    # Ear-clipping expects that closing point to be implicit, not duplicated.
+    if len(source_points) > 1 and source_points[0] == source_points[-1]:
+        source_points.pop()
     if len(source_points) < 3:
         raise RuntimeError("Approved table SVG contains too few points")
 
