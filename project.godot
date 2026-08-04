@@ -1,0 +1,28 @@
+; Engine configuration file.
+; YAKOLAK 2.3 clean rebuild — intro milestone only.
+
+config_version=5
+
+[application]
+
+config/name="YAKOLAK Intro 2.3"
+config/description="Clean intro-only rebuild using the approved original YAKOLAK assets"
+run/main_scene="res://scenes/intro.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+window/handheld/orientation=1
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+renderer/rendering_method.web="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+environment/defaults/default_clear_color=Color(0.968627, 0.968627, 0.956863, 1)
