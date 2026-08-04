@@ -25,7 +25,6 @@ cp -R /tmp/yakolak-templates/templates/. "$TEMPLATE_DIR/"
 "$GODOT_BIN" --version
 
 # Godot 4.7 rejects inferred bool types from compound Variant expressions.
-# Keep this build-time guard until the legacy 2.1 source file is replaced fully.
 python3 - <<'PY'
 from pathlib import Path
 path = Path('scripts/main.gd')
@@ -46,6 +45,16 @@ fi
 
 "$GODOT_BIN" --headless --path . --script res://scripts/rules_smoke_test.gd
 
+set +e
+"$GODOT_BIN" --headless --path . --script res://scripts/ui_smoke_test.gd 2>&1 | tee /tmp/yakolak-ui-smoke.log
+ui_status=${PIPESTATUS[0]}
+set -e
+if [ "$ui_status" -ne 0 ] || grep -E "SCRIPT ERROR|Parse Error|Failed to load script|ERROR:" /tmp/yakolak-ui-smoke.log; then
+  echo "YAKOLAK runtime UI smoke test failed."
+  exit 1
+fi
+grep -q "YAKOLAK UI smoke test passed" /tmp/yakolak-ui-smoke.log
+
 rm -rf web
 mkdir -p web
 set +e
@@ -61,8 +70,6 @@ test -f web/index.html
 test -f web/index.js
 test -f web/index.wasm
 test -f web/index.pck
-
-grep -q 'YAKOLAK 2.2' web/index.html || true
 
 echo "YAKOLAK 2.2.1 verified Web payload"
 du -h web/index.wasm web/index.pck
