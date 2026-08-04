@@ -74,7 +74,7 @@ test -f web/index.pck
 # A successful export is not enough: launch the actual Web build in Chromium.
 echo "Installing Chromium test runner"
 npm install --no-save --no-package-lock --no-audit --no-fund @playwright/test@1.55.0
-npx playwright install chromium
+npx playwright install --with-deps chromium
 python3 -m http.server 8000 --directory web >/tmp/yakolak-web-server.log 2>&1 &
 server_pid=$!
 cleanup() {
@@ -82,7 +82,7 @@ cleanup() {
 }
 trap cleanup EXIT
 sleep 1
-npx playwright test tests/web_smoke.spec.js --project=chromium --workers=1 --reporter=line
+npx playwright test tests/web_smoke.spec.js --workers=1 --reporter=line
 cleanup
 trap - EXIT
 
