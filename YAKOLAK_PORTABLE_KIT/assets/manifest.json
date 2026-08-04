@@ -1,23 +1,113 @@
 {
   "kit": "YAKOLAK_PORTABLE_KIT",
+  "status": "definitive",
   "scalePolicy": "uniform-only",
+  "guide": "../README.md",
   "assets": [
-    {"path":"logos/YAKOLAK.svg","role":"official-game-logo","required":true},
-    {"path":"logos/MTKYF.svg","role":"official-company-logo","required":true},
-    {"path":"models/board-and-lid.stl","role":"board-and-intro-lid","instances":"1 board + 1 temporary lid","required":true},
-    {"path":"models/player-base.stl","role":"player-base","instances":4,"required":true},
-    {"path":"models/piece-small.stl","role":"small-piece","instances":12,"required":true},
-    {"path":"models/piece-medium.stl","role":"medium-piece","instances":12,"required":true},
-    {"path":"models/piece-large.stl","role":"large-piece","instances":12,"required":true},
-    {"path":"models/score-marker.stl","role":"score-point","instances":"dynamic","required":true},
-    {"path":"table/table.svg","role":"extruded-table-footprint","required":true},
-    {"path":"table/albedo.png","role":"table-albedo","required":false},
-    {"path":"table/normal.png","role":"table-normal","required":false},
-    {"path":"table/roughness.png","role":"table-roughness","required":false},
-    {"path":"ui/loading-star.svg","role":"loading-symbol","required":true},
-    {"path":"room/ROOM.md","role":"generated-room-specification","required":true},
-    {"path":"room/room-plan.svg","role":"room-top-view-reference","required":false},
-    {"path":"layout/world-layout.json","role":"authoritative-spatial-data","required":true},
-    {"path":"layout/intro-scatter.csv","role":"exact-36-piece-intro-start-transforms","required":true}
+    {
+      "path": "logos/YAKOLAK.svg",
+      "role": "official-game-logo",
+      "required": true
+    },
+    {
+      "path": "logos/MTKYF.svg",
+      "role": "official-company-logo",
+      "required": true
+    },
+    {
+      "path": "models/board-and-lid.stl",
+      "role": "board-and-intro-lid",
+      "instances": "1 board + 1 temporary lid",
+      "required": true
+    },
+    {
+      "path": "models/player-base.stl",
+      "role": "player-base",
+      "instances": 4,
+      "required": true
+    },
+    {
+      "path": "models/piece-small.stl",
+      "role": "small-piece",
+      "instances": 12,
+      "required": true
+    },
+    {
+      "path": "models/piece-medium.stl",
+      "role": "medium-piece",
+      "instances": 12,
+      "required": true
+    },
+    {
+      "path": "models/piece-large.stl",
+      "role": "large-piece",
+      "instances": 12,
+      "required": true
+    },
+    {
+      "path": "models/score-marker.stl",
+      "role": "score-point",
+      "instances": "dynamic",
+      "required": true
+    },
+    {
+      "path": "table/table.svg",
+      "role": "extruded-table-footprint",
+      "required": true
+    },
+    {
+      "path": "table/albedo.png",
+      "role": "table-albedo",
+      "required": false
+    },
+    {
+      "path": "table/normal.png",
+      "role": "table-normal",
+      "required": false
+    },
+    {
+      "path": "table/roughness.png",
+      "role": "table-roughness",
+      "required": false
+    },
+    {
+      "path": "ui/loading-star.svg",
+      "role": "approved-loading-symbol",
+      "required": true
+    },
+    {
+      "path": "room/ROOM.md",
+      "role": "generated-room-specification",
+      "required": true
+    },
+    {
+      "path": "room/room-plan.svg",
+      "role": "room-top-view-reference",
+      "required": false
+    },
+    {
+      "path": "layout/world-layout.json",
+      "role": "authoritative-spatial-and-camera-data",
+      "required": true
+    },
+    {
+      "path": "layout/intro-scatter.csv",
+      "role": "exact-36-piece-intro-start-transforms",
+      "required": true
+    },
+    {
+      "path": "reference/approved-contract.json",
+      "role": "rules-materials-lighting-icons-audio-motion-network-reference",
+      "required": true
+    }
+  ],
+  "excluded": [
+    "fonts",
+    "historical screenshots",
+    "prototype menus",
+    "numbered runtime wrappers",
+    "external texture archives",
+    "named-room experiment assets",
+    "duplicate logos or models"
   ]
 }
