@@ -73,8 +73,12 @@ jobs:
           test -f web/game.pck
           du -h web/game.wasm web/game.pck
 
-      - name: Install Chromium
-        run: npx --yes playwright@1.55.0 install --with-deps chromium
+      - name: Install browser test tools
+        shell: bash
+        run: |
+          npm init -y
+          npm install --save-dev @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
 
       - name: Verify startup in a real browser
         shell: bash
@@ -82,7 +86,7 @@ jobs:
           python3 -m http.server 8000 --directory web >/tmp/yakolak-server.log 2>&1 &
           server_pid=$!
           trap 'kill $server_pid || true' EXIT
-          npx --yes @playwright/test@1.55.0 test tests/web_smoke.spec.js --project=chromium --workers=1 --reporter=line
+          npx playwright test tests/web_smoke.spec.js --project=chromium --workers=1 --reporter=line
 
       - name: Upload startup screenshot
         if: always()
