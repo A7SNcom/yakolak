@@ -1,9 +1,9 @@
-; YAKOLAK 2.4 — geometry review only
+; YAKOLAK 2.5 — exact Three.js intro port
 config_version=5
 
 [application]
-config/name="YAKOLAK 2.4 Layout Audit"
-run/main_scene="res://scenes/layout_audit.tscn"
+config/name="YAKOLAK 2.5 Intro Port"
+run/main_scene="res://scenes/intro.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [display]
@@ -15,4 +15,4 @@ window/stretch/aspect="expand"
 [rendering]
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-environment/defaults/default_clear_color=Color(0.94, 0.94, 0.92, 1)
+environment/defaults/default_clear_color=Color(0.4667, 0.4667, 0.4667, 1)
