@@ -74,7 +74,35 @@ test -f web/index.pck
 # A successful export is not enough: launch the actual Web build in Chromium.
 echo "Installing Chromium test runner"
 npm install --no-save --no-package-lock --no-audit --no-fund @playwright/test@1.55.0
-npx playwright install --with-deps chromium
+PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1 npx playwright install chromium
+
+# Vercel's build image has no apt-get. Extract the two libraries Playwright reports missing.
+rm -rf /tmp/playwright-libs /tmp/playwright-debs
+mkdir -p /tmp/playwright-libs /tmp/playwright-debs
+curl --fail --location --retry 4 \
+  "https://archive.ubuntu.com/ubuntu/pool/main/n/nspr/libnspr4_4.35-0ubuntu0.20.04.1_amd64.deb" \
+  --output /tmp/playwright-debs/libnspr4.deb
+curl --fail --location --retry 4 \
+  "https://archive.ubuntu.com/ubuntu/pool/main/n/nss/libnss3_3.98-0ubuntu0.20.04.2_amd64.deb" \
+  --output /tmp/playwright-debs/libnss3.deb
+for deb in /tmp/playwright-debs/*.deb; do
+  work="$(mktemp -d)"
+  (cd "$work" && ar x "$deb")
+  data_archive="$(find "$work" -maxdepth 1 -type f -name 'data.tar.*' | head -n 1)"
+  test -n "$data_archive"
+  tar -xf "$data_archive" -C /tmp/playwright-libs
+  rm -rf "$work"
+done
+export LD_LIBRARY_PATH="/tmp/playwright-libs/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
+
+CHROMIUM_BIN="$(find "$HOME/.cache/ms-playwright" -type f \( -name chrome -o -name headless_shell \) | head -n 1)"
+test -x "$CHROMIUM_BIN"
+if ldd "$CHROMIUM_BIN" | grep -q "not found"; then
+  echo "Chromium still has missing shared libraries:"
+  ldd "$CHROMIUM_BIN" | grep "not found"
+  exit 1
+fi
+
 python3 -m http.server 8000 --directory web >/tmp/yakolak-web-server.log 2>&1 &
 server_pid=$!
 cleanup() {
@@ -82,7 +110,7 @@ cleanup() {
 }
 trap cleanup EXIT
 sleep 1
-npx playwright test tests/web_smoke.spec.js --workers=1 --reporter=line
+PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1 npx playwright test tests/web_smoke.spec.js --workers=1 --reporter=line
 cleanup
 trap - EXIT
 
