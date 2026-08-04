@@ -68,10 +68,12 @@ func _start_game() -> void:
 		_fail_startup("تعذر إنشاء مشهد اللعبة.")
 		return
 	add_child(game)
+	_patch_version_labels(game)
 
 	var deadline := Time.get_ticks_msec() + int(STARTUP_TIMEOUT_SECONDS * 1000.0)
 	while Time.get_ticks_msec() < deadline:
 		await get_tree().create_timer(0.1).timeout
+		_patch_version_labels(game)
 		if _contains_start_button(game):
 			if is_instance_valid(overlay):
 				overlay.queue_free()
@@ -79,6 +81,15 @@ func _start_game() -> void:
 			return
 
 	_fail_startup("بدأ المحرك لكن واجهة اللعبة لم تكتمل.")
+
+
+func _patch_version_labels(node: Node) -> void:
+	if node is Label:
+		node.text = String(node.text).replace("2.1", "2.2")
+	elif node is Label3D:
+		node.text = String(node.text).replace("2.1", "2.2")
+	for child in node.get_children():
+		_patch_version_labels(child)
 
 
 func _contains_start_button(node: Node) -> bool:
