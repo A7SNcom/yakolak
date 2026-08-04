@@ -28,6 +28,7 @@ cp -R /tmp/yakolak-templates/templates/. "$TEMPLATE_DIR/"
 rm -rf generated
 mkdir -p generated
 cp YAKOLAK_PORTABLE_KIT/assets/layout/intro-scatter.csv generated/intro_scatter.txt
+python3 scripts/analyze_board_lid.py
 python3 scripts/prepare_assets.py
 python3 scripts/prepare_table.py
 for required in board lid player_base piece_small piece_medium piece_large score_marker table; do
