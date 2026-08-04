@@ -1,9 +1,10 @@
 {
   "name": "YAKOLAK",
   "series": "2.x",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "engine": "Godot 4.7.1",
   "language": "GDScript",
   "status": "preview",
+  "release_focus": "reliable Web startup and visible loading progress",
   "web_output": "web/index.html"
 }
