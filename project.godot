@@ -27,13 +27,3 @@ environment/defaults/default_clear_color=Color(0.92, 0.91, 0.88, 1)
 
 [gui]
 theme/default_font_multichannel_signed_distance_field=true
-
-[input]
-confirm={
-"deadzone": 0.5,
-"events": [Object(InputEventKey,"physical_keycode":13,"unicode":13)]
-}
-cancel={
-"deadzone": 0.5,
-"events": [Object(InputEventKey,"physical_keycode":4194305)]
-}
