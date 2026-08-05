@@ -5,7 +5,7 @@ GODOT_VERSION="4.7.1"
 GODOT_TAG="4.7.1-stable"
 RELEASE="https://github.com/godotengine/godot-builds/releases/download/${GODOT_TAG}"
 
-echo "Building YAKOLAK 2.9 — approved intro plus playable stone placement"
+echo "Building YAKOLAK 3.0 — approved intro plus complete local match loop"
 python3 scripts/check_approved_baseline.py
 
 curl --fail --location --retry 4 --connect-timeout 20 --max-time 180 \
@@ -43,17 +43,17 @@ sha256sum \
   generated/*.obj
 
 set -o pipefail
-"$GODOT_BIN" --headless --editor --path . --quit-after 30 2>&1 | tee /tmp/yakolak29-import.log
-if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file|Could not parse|ERROR:" /tmp/yakolak29-import.log; then
+"$GODOT_BIN" --headless --editor --path . --quit-after 30 2>&1 | tee /tmp/yakolak30-import.log
+if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file|Could not parse|ERROR:" /tmp/yakolak30-import.log; then
   echo "Godot import or script validation failed."
   exit 1
 fi
 
 set +e
-"$GODOT_BIN" --headless --path . --export-release "Web" web/index.html 2>&1 | tee /tmp/yakolak29-export.log
+"$GODOT_BIN" --headless --path . --export-release "Web" web/index.html 2>&1 | tee /tmp/yakolak30-export.log
 export_status=${PIPESTATUS[0]}
 set -e
-if [ "$export_status" -ne 0 ] || grep -E "SCRIPT ERROR|Parse Error|Failed to load script|ERROR:" /tmp/yakolak29-export.log; then
+if [ "$export_status" -ne 0 ] || grep -E "SCRIPT ERROR|Parse Error|Failed to load script|ERROR:" /tmp/yakolak30-export.log; then
   echo "Godot Web export failed."
   exit 1
 fi
@@ -110,7 +110,7 @@ if ldd "$CHROMIUM_BIN" | grep -q "not found"; then
   exit 1
 fi
 
-python3 -m http.server 8000 --directory web >/tmp/yakolak29-server.log 2>&1 &
+python3 -m http.server 8000 --directory web >/tmp/yakolak30-server.log 2>&1 &
 server_pid=$!
 cleanup() {
   kill "$server_pid" >/dev/null 2>&1 || true
@@ -118,7 +118,7 @@ cleanup() {
 trap cleanup EXIT
 sleep 1
 PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1 \
-  npx playwright test tests/intro_smoke.spec.js tests/gameplay_smoke.spec.js --workers=1 --reporter=line
+  npx playwright test tests/intro_smoke.spec.js tests/gameplay_smoke.spec.js tests/local_match_smoke.spec.js --workers=1 --reporter=line
 cleanup
 trap - EXIT
 
@@ -127,8 +127,10 @@ test -s web/intro-mobile-final.png
 test -s web/intro-desktop-motion.png
 test -s web/gameplay-mobile-selected.png
 test -s web/gameplay-mobile-placed.png
+test -s web/local-match-round-win.png
 echo "YAKOLAK 2.8 passed exact v129 loader and unchanged camera/table verification"
 echo "YAKOLAK 2.9 passed physical stone selection and legal board placement verification"
+echo "YAKOLAK 3.0 passed ownership, turn order, official victory, scoring, and round reset verification"
 du -h web/index.wasm web/index.pck \
   web/intro-mobile-motion.png web/intro-mobile-final.png web/intro-desktop-motion.png \
-  web/gameplay-mobile-selected.png web/gameplay-mobile-placed.png
+  web/gameplay-mobile-selected.png web/gameplay-mobile-placed.png web/local-match-round-win.png
