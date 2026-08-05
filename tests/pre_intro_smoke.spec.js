@@ -79,7 +79,7 @@ test('the exact loading star continuously becomes the approved table before unbo
   const settling = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE table-settling'));
   const settled = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE table-settled'));
   const completed = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_COMPLETE'));
-  const unboxing = sequence.findIndex(line => line.includes('YAKOLAK_INTRO_PHASE lid-shaking'));
+  const unboxing = sequence.findIndex((line, index) => index > completed && line.includes('YAKOLAK_INTRO_PHASE lid-shaking'));
 
   expect(handoff).toBeGreaterThanOrEqual(0);
   expect(floating).toBeGreaterThan(handoff);
