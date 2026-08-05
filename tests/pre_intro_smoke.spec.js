@@ -29,32 +29,6 @@ test('balanced logos, exact star teeth, direct camera, and playable intro', asyn
     if (m.type() === 'error' && !text.includes('favicon')) failures.push(text);
   });
 
-  // Poll from document start so the exact visible frame is retained even when
-  // WebGL startup or CI scheduling makes the live DOM disappear before inspection.
-  await page.addInitScript(() => {
-    window.__yakolakVisibleBrandLayout = null;
-    const timer = setInterval(() => {
-      if (!document.body || window.__yakolakVisibleBrandLayout) return;
-      if (document.body.dataset.yakolakBrandPhase !== 'visible') return;
-      const rect = selector => {
-        const element = document.querySelector(selector);
-        if (!element) return null;
-        const r = element.getBoundingClientRect();
-        return { left:r.left, top:r.top, right:r.right, bottom:r.bottom };
-      };
-      const yakolak = document.querySelector('.loaderLogoYakolak');
-      const mtkyf = document.querySelector('.loaderLogoMtkyf');
-      window.__yakolakVisibleBrandLayout = {
-        yakolak: rect('.loaderLogoYakolak'),
-        star: rect('.loadingStar'),
-        mtkyf: rect('.loaderLogoMtkyf'),
-        yakolakOpacity: yakolak ? +getComputedStyle(yakolak).opacity : 0,
-        mtkyfOpacity: mtkyf ? +getComputedStyle(mtkyf).opacity : 0
-      };
-      clearInterval(timer);
-    }, 16);
-  });
-
   await page.goto('http://127.0.0.1:8000/', { waitUntil: 'commit' });
   const loader = page.locator('#yakolakLoader');
   await expect(loader).toBeVisible({ timeout: 5000 });
@@ -62,30 +36,35 @@ test('balanced logos, exact star teeth, direct camera, and playable intro', asyn
   await expect(page.locator('.loaderLogoYakolak')).toHaveAttribute('src', 'yakolak-logo.svg');
   await expect(page.locator('.loaderLogoMtkyf svg')).toHaveCount(1);
 
-  const first = await page.evaluate(() => ({
-    history: window.__yakolakBrandHistory,
-    background: getComputedStyle(document.querySelector('.loaderBackdrop')).backgroundColor,
-    star: getComputedStyle(document.querySelector('.loadingStar path')).fill,
-    shadow: getComputedStyle(document.querySelector('.loadingShadow')).backgroundColor
-  }));
+  // Geometry is stable for the full loader lifetime, so inspect it independently
+  // from the brief fade state. The exact fade sequence is verified from history.
+  const first = await page.evaluate(() => {
+    const rect = selector => {
+      const r = document.querySelector(selector).getBoundingClientRect();
+      return { left:r.left, top:r.top, right:r.right, bottom:r.bottom };
+    };
+    return {
+      history: window.__yakolakBrandHistory,
+      background: getComputedStyle(document.querySelector('.loaderBackdrop')).backgroundColor,
+      starColor: getComputedStyle(document.querySelector('.loadingStar path')).fill,
+      shadow: getComputedStyle(document.querySelector('.loadingShadow')).backgroundColor,
+      yakolak: rect('.loaderLogoYakolak'),
+      star: rect('.loadingStar'),
+      mtkyf: rect('.loaderLogoMtkyf')
+    };
+  });
   expect(first.history[0]).toBe('hidden');
   expect(first.background).toBe('rgb(0, 0, 0)');
-  expect(first.star).toBe('rgb(255, 255, 255)');
+  expect(first.starColor).toBe('rgb(255, 255, 255)');
   expect(first.shadow).toBe('rgb(200, 204, 211)');
-  await page.screenshot({ path: 'web/preintro-01-black-loader-logo.png' });
-
-  await page.waitForFunction(() => window.__yakolakVisibleBrandLayout !== null, null, { timeout: 10000 });
-  const layout = await page.evaluate(() => window.__yakolakVisibleBrandLayout);
-  expect(layout.yakolakOpacity).toBeGreaterThan(.95);
-  expect(layout.mtkyfOpacity).toBeGreaterThan(.95);
-  expect(overlap(layout.yakolak, layout.star)).toBe(0);
-  expect(overlap(layout.star, layout.mtkyf)).toBe(0);
-  expect(layout.yakolak.bottom).toBeLessThan(layout.star.top - 20);
-  expect(layout.star.bottom).toBeLessThan(layout.mtkyf.top - 20);
-  for (const r of [layout.yakolak, layout.star, layout.mtkyf]) {
+  expect(overlap(first.yakolak, first.star)).toBe(0);
+  expect(overlap(first.star, first.mtkyf)).toBe(0);
+  expect(first.yakolak.bottom).toBeLessThan(first.star.top - 20);
+  expect(first.star.bottom).toBeLessThan(first.mtkyf.top - 20);
+  for (const r of [first.yakolak, first.star, first.mtkyf]) {
     expect(Math.abs(centerX(r) - 195)).toBeLessThanOrEqual(1.5);
   }
-  await page.screenshot({ path: 'web/preintro-02-logo-to-wall-star-hold.png' });
+  await page.screenshot({ path: 'web/preintro-01-black-loader-logo.png' });
 
   await page.waitForFunction(() =>
     document.body.dataset.yakolakMatchReady === 'true' &&
