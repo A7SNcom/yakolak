@@ -29,6 +29,38 @@ test('balanced logos, exact star teeth, direct camera, and playable intro', asyn
     if (m.type() === 'error' && !text.includes('favicon')) failures.push(text);
   });
 
+  // Record the exact frame where both brands finish fading in. The loader may
+  // finish before a slow WebGL test can query the live DOM, so this preserves
+  // the real visible geometry without changing or slowing the production motion.
+  await page.addInitScript(() => {
+    window.__yakolakVisibleBrandLayout = null;
+    const capture = () => {
+      if (document.body?.dataset.yakolakBrandPhase !== 'visible' || window.__yakolakVisibleBrandLayout) return;
+      const rect = selector => {
+        const element = document.querySelector(selector);
+        if (!element) return null;
+        const r = element.getBoundingClientRect();
+        return { left:r.left, top:r.top, right:r.right, bottom:r.bottom };
+      };
+      const yakolak = document.querySelector('.loaderLogoYakolak');
+      const mtkyf = document.querySelector('.loaderLogoMtkyf');
+      window.__yakolakVisibleBrandLayout = {
+        yakolak: rect('.loaderLogoYakolak'),
+        star: rect('.loadingStar'),
+        mtkyf: rect('.loaderLogoMtkyf'),
+        yakolakOpacity: yakolak ? +getComputedStyle(yakolak).opacity : 0,
+        mtkyfOpacity: mtkyf ? +getComputedStyle(mtkyf).opacity : 0
+      };
+    };
+    addEventListener('DOMContentLoaded', () => {
+      new MutationObserver(capture).observe(document.body, {
+        attributes: true,
+        attributeFilter: ['data-yakolak-brand-phase']
+      });
+      capture();
+    }, { once: true });
+  });
+
   await page.goto('http://127.0.0.1:8000/', { waitUntil: 'commit' });
   const loader = page.locator('#yakolakLoader');
   await expect(loader).toBeVisible({ timeout: 5000 });
@@ -48,20 +80,8 @@ test('balanced logos, exact star teeth, direct camera, and playable intro', asyn
   expect(first.shadow).toBe('rgb(200, 204, 211)');
   await page.screenshot({ path: 'web/preintro-01-black-loader-logo.png' });
 
-  await page.waitForFunction(() => document.body.dataset.yakolakBrandPhase === 'visible', null, { timeout: 7000 });
-  const layout = await page.evaluate(() => {
-    const rect = selector => {
-      const r = document.querySelector(selector).getBoundingClientRect();
-      return { left:r.left, top:r.top, right:r.right, bottom:r.bottom };
-    };
-    return {
-      yakolak: rect('.loaderLogoYakolak'),
-      star: rect('.loadingStar'),
-      mtkyf: rect('.loaderLogoMtkyf'),
-      yakolakOpacity: +getComputedStyle(document.querySelector('.loaderLogoYakolak')).opacity,
-      mtkyfOpacity: +getComputedStyle(document.querySelector('.loaderLogoMtkyf')).opacity
-    };
-  });
+  await page.waitForFunction(() => window.__yakolakVisibleBrandLayout !== null, null, { timeout: 10000 });
+  const layout = await page.evaluate(() => window.__yakolakVisibleBrandLayout);
   expect(layout.yakolakOpacity).toBeGreaterThan(.95);
   expect(layout.mtkyfOpacity).toBeGreaterThan(.95);
   expect(overlap(layout.yakolak, layout.star)).toBe(0);
