@@ -29,13 +29,13 @@ test('balanced logos, exact star teeth, direct camera, and playable intro', asyn
     if (m.type() === 'error' && !text.includes('favicon')) failures.push(text);
   });
 
-  // Record the exact frame where both brands finish fading in. The loader may
-  // finish before a slow WebGL test can query the live DOM, so this preserves
-  // the real visible geometry without changing or slowing the production motion.
+  // Poll from document start so the exact visible frame is retained even when
+  // WebGL startup or CI scheduling makes the live DOM disappear before inspection.
   await page.addInitScript(() => {
     window.__yakolakVisibleBrandLayout = null;
-    const capture = () => {
-      if (document.body?.dataset.yakolakBrandPhase !== 'visible' || window.__yakolakVisibleBrandLayout) return;
+    const timer = setInterval(() => {
+      if (!document.body || window.__yakolakVisibleBrandLayout) return;
+      if (document.body.dataset.yakolakBrandPhase !== 'visible') return;
       const rect = selector => {
         const element = document.querySelector(selector);
         if (!element) return null;
@@ -51,14 +51,8 @@ test('balanced logos, exact star teeth, direct camera, and playable intro', asyn
         yakolakOpacity: yakolak ? +getComputedStyle(yakolak).opacity : 0,
         mtkyfOpacity: mtkyf ? +getComputedStyle(mtkyf).opacity : 0
       };
-    };
-    addEventListener('DOMContentLoaded', () => {
-      new MutationObserver(capture).observe(document.body, {
-        attributes: true,
-        attributeFilter: ['data-yakolak-brand-phase']
-      });
-      capture();
-    }, { once: true });
+      clearInterval(timer);
+    }, 16);
   });
 
   await page.goto('http://127.0.0.1:8000/', { waitUntil: 'commit' });
