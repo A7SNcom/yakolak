@@ -44,13 +44,18 @@ test('a physical stone can be selected and played after the approved intro', asy
   expect(await page.evaluate(() => document.body.dataset.yakolakCamera)).toBe('level-centered');
   expect(await page.evaluate(() => document.body.dataset.yakolakMoves)).toBe('0');
 
-  const targets = await page.evaluate(() => ({
-    pieceX: Number(document.body.dataset.yakolakTestPieceX),
-    pieceY: Number(document.body.dataset.yakolakTestPieceY),
-    cellX: Number(document.body.dataset.yakolakTestCellX),
-    cellY: Number(document.body.dataset.yakolakTestCellY),
-    pieceName: document.body.dataset.yakolakTestPiece
-  }));
+  const targets = await page.evaluate(() => {
+    // Godot renders through the 720x1280 virtual viewport with stretch/aspect=expand.
+    // Convert its projected coordinates back into CSS canvas pixels.
+    const scale = Math.min(window.innerWidth / 720, window.innerHeight / 1280);
+    return {
+      pieceX: Number(document.body.dataset.yakolakTestPieceX) * scale,
+      pieceY: Number(document.body.dataset.yakolakTestPieceY) * scale,
+      cellX: Number(document.body.dataset.yakolakTestCellX) * scale,
+      cellY: Number(document.body.dataset.yakolakTestCellY) * scale,
+      pieceName: document.body.dataset.yakolakTestPiece
+    };
+  });
 
   expect(targets.pieceX).toBeGreaterThan(0);
   expect(targets.pieceX).toBeLessThan(390);
