@@ -96,6 +96,18 @@ jobs:
           kill "$server_pid" >/dev/null 2>&1 || true
           trap - EXIT
 
+      - name: Upload visual review capture
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yakolak-preintro-visual-capture
+          path: |
+            test-results/
+            web/preintro-*.png
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 3
+
       - name: Upload deployable preview artifact
         uses: actions/upload-artifact@v4
         with:
