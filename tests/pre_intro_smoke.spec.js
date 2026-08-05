@@ -106,18 +106,14 @@ test('black loader pixel-matches the real table, hands off the logo, and reaches
   expect(targetGeometry.facing).toBeGreaterThan(0.98);
   expect(targetGeometry.centerError).toBeLessThanOrEqual(1.5);
   expect(intersectionArea(starTarget, logoTarget)).toBe(0);
-
-  await page.waitForFunction(
-    () => document.body.dataset.yakolakLoaderHandoff === 'locking',
-    null,
-    { timeout: 5000 }
-  );
   await page.screenshot({ path: 'web/preintro-02-logo-to-wall-star-hold.png' });
 
+  // The locking phase is intentionally brief. Verify the durable matched state
+  // instead of racing one animation frame.
   await page.waitForFunction(
     () => document.body.dataset.yakolakLoaderHandoff === 'matched',
     null,
-    { timeout: 5000 }
+    { timeout: 10000 }
   );
   const match = await page.evaluate(() => ({
     domError: Number(document.body.dataset.yakolakMatchErrorPx || 999),

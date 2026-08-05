@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Create the approved YAKOLAK star tabletop from the existing table.svg footprint."""
+"""Create the approved YAKOLAK star tabletop from the exact table.svg footprint."""
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
 
@@ -104,32 +105,62 @@ def parse_svg() -> list[Point]:
     return points
 
 
+def side_normal(a: Point, b: Point) -> tuple[float, float, float]:
+    dx = b[0] - a[0]
+    dz = b[1] - a[1]
+    length = math.hypot(dx, dz)
+    if length <= 1e-9:
+        raise RuntimeError("Approved star table contains a zero-length edge")
+    # For a counter-clockwise XZ polygon, (dz, 0, -dx) points outward.
+    return dz / length, 0.0, -dx / length
+
+
 def write_obj(points: list[Point]) -> None:
     top_triangles = triangulate(points)
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     count = len(points)
     with OUTPUT.open("w", encoding="utf-8", newline="\n") as handle:
-        handle.write("# Approved YAKOLAK star table extruded from table.svg\n")
+        handle.write("# Approved YAKOLAK star table extruded from exact table.svg\n")
+        handle.write("# Explicit flat normals prevent the top from shading like a curved shell.\n")
         handle.write("o approved_star_table\n")
+        handle.write("s off\n")
         for x, z in points:
             handle.write(f"v {x:.6f} 0.000000 {z:.6f}\n")
         for x, z in points:
             handle.write(f"v {x:.6f} {THICKNESS:.6f} {z:.6f}\n")
+
+        # Normal indices: 1 top, 2 bottom, 3..(count+2) one outward normal per side.
+        handle.write("vn 0.000000 1.000000 0.000000\n")
+        handle.write("vn 0.000000 -1.000000 0.000000\n")
+        for index in range(count):
+            following = (index + 1) % count
+            nx, ny, nz = side_normal(points[index], points[following])
+            handle.write(f"vn {nx:.6f} {ny:.6f} {nz:.6f}\n")
+
         for a, b, c in top_triangles:
-            handle.write(f"f {a + count + 1} {c + count + 1} {b + count + 1}\n")
-            handle.write(f"f {a + 1} {b + 1} {c + 1}\n")
+            handle.write(
+                f"f {a + count + 1}//1 {c + count + 1}//1 {b + count + 1}//1\n"
+            )
+            handle.write(f"f {a + 1}//2 {b + 1}//2 {c + 1}//2\n")
+
         for index in range(count):
             following = (index + 1) % count
             bottom_a = index + 1
             bottom_b = following + 1
             top_a = index + count + 1
             top_b = following + count + 1
-            handle.write(f"f {bottom_a} {top_b} {bottom_b}\n")
-            handle.write(f"f {bottom_a} {top_a} {top_b}\n")
+            normal_index = index + 3
+            handle.write(
+                f"f {bottom_a}//{normal_index} {top_b}//{normal_index} {bottom_b}//{normal_index}\n"
+            )
+            handle.write(
+                f"f {bottom_a}//{normal_index} {top_a}//{normal_index} {top_b}//{normal_index}\n"
+            )
 
     print(
         f"table.obj: {len(points)} approved points, "
         f"{len(top_triangles) * 2 + len(points) * 2} triangles, "
+        f"{len(points) + 2} explicit flat normals, "
         f"span={TARGET_SPAN}, thickness={THICKNESS}"
     )
 
