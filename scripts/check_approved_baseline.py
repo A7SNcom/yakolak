@@ -28,8 +28,10 @@ REQUIRED: dict[str, tuple[str, ...]] = {
     "scripts/pre_intro_refinement.gd": (
         "svg-native-unmirrored",
         "direct-centered-lerp",
+        "direct-fixed-distance-look-at",
         "Quaternion(Vector3.RIGHT, deg_to_rad(90.0))",
-        "camera.position = start_position.lerp(end_position, t)",
+        "start_direction.lerp(end_direction, t)",
+        "camera.position = center + blended_direction * safe_distance",
         "camera.look_at(center, Vector3.UP)",
         "pixel-matched-2d-to-3d-v4",
     ),
@@ -70,6 +72,7 @@ FORBIDDEN: dict[str, tuple[str, ...]] = {
     ),
     "scripts/pre_intro_refinement.gd": (
         "direction.normalized().slerp",
+        "camera.position = start_position.lerp(end_position, t)",
     ),
 }
 
@@ -102,7 +105,7 @@ def main() -> int:
             print(f"- {failure}")
         return 1
 
-    print("YAKOLAK approved loader, exact shape orientation, direct camera motion, and gameplay contract preserved")
+    print("YAKOLAK approved loader, exact shape orientation, distance-safe camera motion, and gameplay contract preserved")
     return 0
 
 

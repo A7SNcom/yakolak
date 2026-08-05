@@ -2,7 +2,8 @@ extends Node
 
 # Final motion correction pass:
 # 1. Keep the Godot star in the same SVG orientation as the DOM star (no vertical mirror).
-# 2. Replace the old spherical camera orbit with one direct eased path that always looks at the table.
+# 2. Replace the old spherical camera orbit with one shortest, distance-preserving path
+#    that always looks at the same table center and never cuts through the tabletop.
 # 3. Reveal the wall logo only near the end of the camera move, after both loader logos fade away.
 
 const MATCH_HOLD_MS: float = 260.0
@@ -90,7 +91,7 @@ func _correct_svg_orientation_when_ready() -> bool:
 	preintro.set("match_camera_position", corrected_match_position)
 
 	# Make the final angle look at the same fixed center too. This removes the
-	# previous second rotation track entirely, so the camera follows one direct path.
+	# second independent rotation track: every frame derives orientation from one target.
 	var direct_final_position: Vector3 = preintro.get("final_camera_position") as Vector3
 	camera.position = direct_final_position
 	camera.look_at(corrected_center, Vector3.UP)
@@ -107,7 +108,7 @@ func _correct_svg_orientation_when_ready() -> bool:
 		wall_logo.visible = true
 		_set_wall_logo_alpha(0.0)
 
-	print("YAKOLAK_REFINEMENT_READY shape=svg-native-unmirrored camera=direct-look-at logos=balanced-fade")
+	print("YAKOLAK_REFINEMENT_READY shape=svg-native-unmirrored camera=direct-fixed-distance-look-at logos=balanced-fade")
 	return true
 
 
@@ -119,9 +120,24 @@ func _apply_direct_camera_move(elapsed: float) -> void:
 	var start_fov: float = float(preintro.get("match_camera_fov"))
 	var end_fov: float = float(preintro.get("final_camera_fov"))
 
-	# One direct translation and one fixed look target. There is no orbit arc and
-	# no independent quaternion track, so the view cannot spin around the table.
-	camera.position = start_position.lerp(end_position, t)
+	# A straight chord between the two camera points passes close to the table and
+	# creates the unwanted giant zoom. Blend the two shortest viewing directions,
+	# normalize once, and interpolate only their safe radial distances. The camera
+	# still follows a single direct motion and one fixed look target, with no spin.
+	var start_offset: Vector3 = start_position - center
+	var end_offset: Vector3 = end_position - center
+	var start_distance: float = maxf(start_offset.length(), 0.001)
+	var end_distance: float = maxf(end_offset.length(), 0.001)
+	var start_direction: Vector3 = start_offset / start_distance
+	var end_direction: Vector3 = end_offset / end_distance
+	var blended_direction: Vector3 = start_direction.lerp(end_direction, t)
+	if blended_direction.length_squared() < 0.000001:
+		blended_direction = start_direction
+	else:
+		blended_direction = blended_direction.normalized()
+	var safe_distance: float = lerpf(start_distance, end_distance, t)
+
+	camera.position = center + blended_direction * safe_distance
 	camera.look_at(center, Vector3.UP)
 	camera.fov = lerpf(start_fov, end_fov, t)
 
