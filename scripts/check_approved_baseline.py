@@ -21,6 +21,11 @@ REQUIRED: dict[str, tuple[str, ...]] = {
         "transform:scale(1.30,1)",
         "yakolak-logo.svg",
         "loaderLogoMtkyf",
+        "path:not(.cls-1){fill:#000!important}",
+        ".cls-1{fill:#fff!important}",
+        "original-black-white",
+        "white-to-material-crossfade",
+        "materialBridgeDuration=1200",
         "yakolak-upper-center-star-center-mtkyf-lower-center",
         "logos-fade-then-canonical-star",
         "table-svg-exact-path",
@@ -28,16 +33,28 @@ REQUIRED: dict[str, tuple[str, ...]] = {
         "yakolakLoaderHandoff='waiting'",
         "H('matched')",
     ),
+    "scripts/pre_intro_star_to_table.gd": (
+        "MORPH_MS: float = 980.0",
+        "CAMERA_ORBIT_MS: float = 1250.0",
+        "BOX_REVEAL_MS: float = 1100.0",
+        "BOX_START_DROP: float = 0.26",
+        "BOX_START_SCALE: float = 0.985",
+        "white-emission-to-material",
+        "soft-staggered-fade",
+        "node.transparency = 1.0",
+        "pixel-matched-soft-material-box-v4",
+    ),
     "scripts/pre_intro_refinement.gd": (
         "canonical-shared-svg",
-        "direct-safe-framed",
+        "direct-slow-safe-framed",
         "Quaternion(Vector3.RIGHT, deg_to_rad(90.0))",
         "direct_position: Vector3 = start_position.lerp(end_position, t)",
-        "camera.position = center + direct_direction * maxf(direct_offset.length(), safe_distance)",
+        "camera.position = center + direct_direction * safe_distance",
         "camera.look_at(center, Vector3.UP)",
         "_apply_safe_optical_framing()",
         "SAFE_WIDTH_RATIO: float = 0.90",
-        "pixel-matched-direct-safe-framing-v5",
+        "CAMERA_MOVE_MS: float = 1250.0",
+        "pixel-matched-direct-slow-safe-framing-v6",
     ),
     "tests/intro_smoke.spec.js": (
         "source: 'v130-loading-star-motion'",
@@ -57,15 +74,18 @@ REQUIRED: dict[str, tuple[str, ...]] = {
         "yakolakMatchErrorPx",
         "YAKOLAK_PREINTRO_PHASE camera-orbit",
         "canonical-shared-svg",
-        "direct-safe-framed",
+        "direct-slow-safe-framed",
+        "yakolakCameraDuration",
         "yakolakCameraMaxCoverage",
         "canonical-zero-degree-shared-contour",
-        "loaderLogoMtkyf",
+        "original-black-white",
+        "white-emission-to-material",
+        "soft-staggered-fade",
         "hidden-after-fade",
     ),
     "scripts/vercel-build.sh": (
         "npx playwright test tests/intro_smoke.spec.js",
-        "YAKOLAK 3.4 passed exact v130 canonical star geometry",
+        "YAKOLAK 3.5 passed preserved loader geometry",
     ),
 }
 
@@ -75,10 +95,12 @@ FORBIDDEN: dict[str, tuple[str, ...]] = {
         "rotate(-420deg)",
         "yakolakLoaderProgress",
         "--loading-shadow:#7182ff",
+        "loaderLogoMtkyf path{fill:#fff!important}",
     ),
     "scripts/pre_intro_refinement.gd": (
         "direction.normalized().slerp",
         "camera.position = start_position.lerp(end_position, t)",
+        "camera.position = center + direct_direction * maxf(direct_offset.length(), safe_distance)",
         "pixel-matched-2d-to-3d-v4",
         "direct-centered-lerp",
     ),
@@ -113,7 +135,7 @@ def main() -> int:
             print(f"- {failure}")
         return 1
 
-    print("YAKOLAK approved delayed logos, canonical teeth, safe direct camera motion, and gameplay contract preserved")
+    print("YAKOLAK approved original MTKYF palette, gradual material bridge, slow safe camera, soft box reveal, and gameplay contract preserved")
     return 0
 
 
