@@ -1,9 +1,10 @@
 extends Node
 
 # Applies the corrections already proven in the Three.js versions:
-# - exact XYZ Euler interpretation used by Three.js
+# - exact XYZ Euler interpretation only for the imported game models
 # - quaternion slerp for the two side bases instead of broken Euler mixing
-# - approved star table generated from table.svg
+# - approved horizontal star table generated from table.svg
+# The camera, table and lights keep Godot's normal transform semantics.
 
 const U: float = 0.04
 const R3: float = 135.0
@@ -22,8 +23,11 @@ const TABLE_TOP_Y: float = -0.04
 const ORDER: Array[String] = ["right", "left", "front", "back"]
 
 var intro: Node3D
+var camera: Camera3D
 var board: MeshInstance3D
 var lid: MeshInstance3D
+var tabletop: MeshInstance3D
+var pedestal: MeshInstance3D
 var bases: Dictionary = {}
 var initialized: bool = false
 var validated: bool = false
@@ -61,7 +65,10 @@ func _initialize_when_ready() -> bool:
 		return false
 	board = intro.get_node_or_null("Board") as MeshInstance3D
 	lid = intro.get_node_or_null("Lid") as MeshInstance3D
-	if board == null or lid == null:
+	camera = intro.get("camera") as Camera3D
+	if camera == null:
+		camera = intro.get_node_or_null("Camera3D") as Camera3D
+	if board == null or lid == null or camera == null:
 		return false
 	for direction: String in ORDER:
 		var base := intro.get_node_or_null("Base_%s" % direction) as MeshInstance3D
@@ -69,14 +76,35 @@ func _initialize_when_ready() -> bool:
 			return false
 		bases[direction] = base
 
-	# Godot defaults to YXZ; the original Three.js scene used XYZ.
+	# Three.js used XYZ only for the imported board, lid, bases and stones.
+	# Applying this to every Node3D previously corrupted the camera and lights.
+	board.rotation_order = EULER_ORDER_XYZ
+	lid.rotation_order = EULER_ORDER_XYZ
+	for direction: String in ORDER:
+		(bases[direction] as Node3D).rotation_order = EULER_ORDER_XYZ
 	for child: Node in intro.get_children():
-		if child is Node3D:
+		if child is Node3D and String(child.name).begins_with("Stone_"):
 			(child as Node3D).rotation_order = EULER_ORDER_XYZ
 
 	_replace_fallback_table_with_star_table()
-	_publish_marker("corrected")
+	_center_camera()
+	if not get_viewport().size_changed.is_connected(_center_camera):
+		get_viewport().size_changed.connect(_center_camera)
+	_publish_marker("corrected-level")
 	return true
+
+
+func _center_camera() -> void:
+	if camera == null:
+		return
+	camera.rotation_order = EULER_ORDER_YXZ
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var aspect: float = viewport_size.x / maxf(viewport_size.y, 1.0)
+	var distance: float = 17.6 if aspect < 0.8 else 19.4
+	camera.position = Vector3(distance, distance * 0.82, distance)
+	camera.look_at(Vector3(0.0, 0.35, 0.0), Vector3.UP)
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("document.body.dataset.yakolakCamera='level-centered';", true)
 
 
 func _replace_fallback_table_with_star_table() -> void:
@@ -95,10 +123,13 @@ func _replace_fallback_table_with_star_table() -> void:
 		_publish_error("table-missing")
 		return
 
-	var tabletop := MeshInstance3D.new()
+	tabletop = MeshInstance3D.new()
 	tabletop.name = "ApprovedStarTableSVG"
 	tabletop.mesh = table_resource as Mesh
 	tabletop.position = Vector3(0.0, TABLE_TOP_Y - TABLE_THICKNESS, 0.0)
+	tabletop.rotation = Vector3.ZERO
+	tabletop.rotation_order = EULER_ORDER_YXZ
+	tabletop.scale = Vector3.ONE
 	tabletop.material_override = _material(Color("#aeb2b6"), 0.72, 0.02)
 	tabletop.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	intro.add_child(tabletop)
@@ -108,17 +139,24 @@ func _replace_fallback_table_with_star_table() -> void:
 	pedestal_mesh.bottom_radius = 2.35
 	pedestal_mesh.height = 24.5
 	pedestal_mesh.radial_segments = 64
-	var pedestal := MeshInstance3D.new()
+	pedestal = MeshInstance3D.new()
 	pedestal.name = "ApprovedStarTablePedestal"
 	pedestal.mesh = pedestal_mesh
 	pedestal.position = Vector3(0.0, TABLE_TOP_Y - TABLE_THICKNESS - 12.25, 0.0)
+	pedestal.rotation = Vector3.ZERO
+	pedestal.rotation_order = EULER_ORDER_YXZ
+	pedestal.scale = Vector3.ONE
 	pedestal.material_override = _material(Color("#8f9499"), 0.82, 0.01)
 	pedestal.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	intro.add_child(pedestal)
 
 	if OS.has_feature("web"):
-		JavaScriptBridge.eval("document.body.dataset.yakolakTable='approved-star-svg';", true)
-	print("YAKOLAK_STAR_TABLE_APPLIED")
+		JavaScriptBridge.eval(
+			"document.body.dataset.yakolakTable='approved-star-svg';" +
+			"document.body.dataset.yakolakTableLevel='true';",
+			true
+		)
+	print("YAKOLAK_STAR_TABLE_APPLIED level=true centered=true")
 
 
 func _apply_corrected_wall(direction: String, elapsed: float) -> void:
@@ -184,7 +222,10 @@ func _snap_corrected_final() -> void:
 
 
 func _validate_geometry() -> void:
-	var valid: bool = intro.get_node_or_null("ApprovedStarTableSVG") != null
+	var table_level: bool = tabletop != null and absf(tabletop.global_basis.y.normalized().dot(Vector3.UP)) > 0.999
+	var table_centered: bool = tabletop != null and absf(tabletop.global_position.x) < 0.001 and absf(tabletop.global_position.z) < 0.001
+	var camera_level: bool = camera != null and absf(camera.global_basis.x.normalized().dot(Vector3.UP)) < 0.002
+	var valid: bool = table_level and table_centered and camera_level
 	for direction: String in ORDER:
 		var node := bases[direction] as Node3D
 		var expected := _position_from_pose(_base_final(direction))
@@ -192,9 +233,14 @@ func _validate_geometry() -> void:
 		valid = valid and absf(node.quaternion.dot(_quat_xyz(_base_final(direction)))) > 0.999
 	valid = valid and not lid.visible
 	if valid:
-		print("YAKOLAK_CORRECTED_GEOMETRY_READY lid=centered side_bases=quaternion table=star")
+		print("YAKOLAK_CORRECTED_GEOMETRY_READY lid=centered side_bases=quaternion table=level-star camera=level-centered")
 		if OS.has_feature("web"):
-			JavaScriptBridge.eval("document.body.dataset.yakolakGeometry='ready';", true)
+			JavaScriptBridge.eval(
+				"document.body.dataset.yakolakGeometry='ready';" +
+				"document.body.dataset.yakolakCamera='level-centered';" +
+				"document.body.dataset.yakolakTableLevel='true';",
+				true
+			)
 	else:
 		push_error("Corrected intro geometry validation failed")
 		_publish_error("geometry")
