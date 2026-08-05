@@ -9,6 +9,7 @@ var action_button: Button
 
 
 func _ready() -> void:
+	process_priority = 100
 	gameplay = get_parent().get_node_or_null("LocalMatchGameplay")
 	_build_button()
 	set_process(true)
