@@ -110,6 +110,12 @@ test('desktop completes a full local round and starts the next round', async ({ 
   expect(await page.evaluate(() => document.body.dataset.yakolakMatchComplete)).toBe('false');
   await page.screenshot({ path: 'web/local-match-desktop-round-win.png', fullPage: false, timeout: 60000 });
 
+  await page.waitForFunction(
+    () => document.body.dataset.yakolakRoundActionVisible === 'true' &&
+      document.getElementById('yakolak-round-action')?.style.display === 'block',
+    null,
+    { timeout: 5000 }
+  );
   await page.mouse.click(720, 450);
   await page.waitForFunction(
     () => document.body.dataset.yakolakRound === '2' &&
@@ -128,6 +134,7 @@ test('desktop completes a full local round and starts the next round', async ({ 
   expect(joined).toContain('YAKOLAK_TURN_CAMERA_READY player=right');
   expect(joined).toContain('YAKOLAK_TURN_CAMERA_READY player=back');
   expect(joined).toContain('YAKOLAK_ROUND_COMPLETE round=1 winner=right');
+  expect(joined).toContain('YAKOLAK_ROUND_ACTION_ACTIVATED');
   expect(joined).toContain('YAKOLAK_ROUND_RESET round=2 starter=back');
   expect(failures).toEqual([]);
 });
