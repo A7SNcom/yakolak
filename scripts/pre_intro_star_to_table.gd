@@ -17,6 +17,7 @@ const LOADER_COLOR: Color = Color("#3f3f3f")
 
 var intro: Node3D
 var corrections: Node
+var gameplay: Node
 var camera: Camera3D
 var tabletop: MeshInstance3D
 var pedestal: MeshInstance3D
@@ -51,6 +52,7 @@ func _ready() -> void:
 	process_priority = 200
 	intro = get_parent() as Node3D
 	corrections = intro.get_node_or_null("ExistingIntroCorrections")
+	gameplay = intro.get_node_or_null("PostIntroGameplay")
 	set_process(true)
 
 
@@ -81,7 +83,7 @@ func _prime_when_models_exist() -> bool:
 	pedestal = intro.get_node_or_null("ApprovedStarTablePedestal") as MeshInstance3D
 	var board := intro.get_node_or_null("Board") as GeometryInstance3D
 	var lid := intro.get_node_or_null("Lid") as GeometryInstance3D
-	if camera == null or tabletop == null or pedestal == null or board == null or lid == null:
+	if camera == null or tabletop == null or pedestal == null or board == null or lid == null or gameplay == null:
 		return false
 
 	game_nodes.clear()
@@ -102,6 +104,7 @@ func _prime_when_models_exist() -> bool:
 	# correction script gets one clean frame to snap and validate its baseline.
 	intro.set("playing", false)
 	intro.set_process_unhandled_input(false)
+	gameplay.set_process_input(false)
 	for node: GeometryInstance3D in game_nodes:
 		node.visible = false
 	tabletop.visible = false
@@ -255,6 +258,7 @@ func _finish_and_start_intro() -> void:
 	for node: GeometryInstance3D in game_nodes:
 		node.visible = true
 	intro.set_process_unhandled_input(true)
+	gameplay.set_process_input(true)
 	_publish_phase("complete")
 	print("YAKOLAK_PREINTRO_COMPLETE duration=%d star=loading-star table=approved-star-svg" % int(TOTAL_MS))
 	intro.call("_restart_intro")
@@ -284,10 +288,12 @@ func _publish_phase(phase: String) -> void:
 func _publish_web_state(state: String) -> void:
 	if not OS.has_feature("web"):
 		return
+	var intro_wait_script: String = "" if state == "complete" else "document.body.dataset.yakolakIntro='waiting-preintro';"
 	JavaScriptBridge.eval(
 		"document.body.dataset.yakolakPreIntro='" + state + "';" +
 		"document.body.dataset.yakolakPreIntroDuration='" + str(int(TOTAL_MS)) + "';" +
-		"document.body.dataset.yakolakPreIntroShape='loading-star-to-approved-table';",
+		"document.body.dataset.yakolakPreIntroShape='loading-star-to-approved-table';" +
+		intro_wait_script,
 		true
 	)
 
