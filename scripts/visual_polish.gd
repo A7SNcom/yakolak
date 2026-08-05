@@ -183,7 +183,7 @@ func _add_studio_architecture() -> void:
 		wall_logo = MeshInstance3D.new()
 		wall_logo.name = "StudioWallLogo"
 		wall_logo.mesh = logo_mesh
-		wall_logo.position = Vector3(-6.5, 11.5, -13.88)
+		wall_logo.position = Vector3(-6.5, 12.6, -13.88)
 		var logo_material := StandardMaterial3D.new()
 		logo_material.albedo_texture = texture
 		logo_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
