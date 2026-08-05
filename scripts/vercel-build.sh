@@ -5,7 +5,7 @@ GODOT_VERSION="4.7.1"
 GODOT_TAG="4.7.1-stable"
 RELEASE="https://github.com/godotengine/godot-builds/releases/download/${GODOT_TAG}"
 
-echo "Building YAKOLAK 3.4 — delayed identities, canonical star teeth, and safe direct camera"
+echo "Building YAKOLAK 3.5 — original MTKYF palette, gradual material bridge, slow camera, and soft box reveal"
 python3 scripts/check_approved_baseline.py
 
 curl --fail --location --retry 4 --connect-timeout 20 --max-time 180 \
@@ -48,17 +48,17 @@ sha256sum \
   generated/*.obj generated/YAKOLAK_INVERTED.svg
 
 set -o pipefail
-"$GODOT_BIN" --headless --editor --path . --quit-after 30 2>&1 | tee /tmp/yakolak34-import.log
-if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file|Could not parse|ERROR:" /tmp/yakolak34-import.log; then
+"$GODOT_BIN" --headless --editor --path . --quit-after 30 2>&1 | tee /tmp/yakolak35-import.log
+if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file|Could not parse|ERROR:" /tmp/yakolak35-import.log; then
   echo "Godot import or script validation failed."
   exit 1
 fi
 
 set +e
-"$GODOT_BIN" --headless --path . --export-release "Web" web/index.html 2>&1 | tee /tmp/yakolak34-export.log
+"$GODOT_BIN" --headless --path . --export-release "Web" web/index.html 2>&1 | tee /tmp/yakolak35-export.log
 export_status=${PIPESTATUS[0]}
 set -e
-if [ "$export_status" -ne 0 ] || grep -E "SCRIPT ERROR|Parse Error|Failed to load script|ERROR:" /tmp/yakolak34-export.log; then
+if [ "$export_status" -ne 0 ] || grep -E "SCRIPT ERROR|Parse Error|Failed to load script|ERROR:" /tmp/yakolak35-export.log; then
   echo "Godot Web export failed."
   exit 1
 fi
@@ -84,12 +84,19 @@ grep -q "100%{transform:rotate(24deg)}" web/index.html
 grep -q "transform:scale(1.30,1)" web/index.html
 grep -q "yakolak-logo.svg" web/index.html
 grep -q "loaderLogoMtkyf" web/index.html
+grep -q "path:not(.cls-1){fill:#000!important}" web/index.html
+grep -q "original-black-white" web/index.html
+grep -q "white-to-material-crossfade" web/index.html
+grep -q "materialBridgeDuration=1200" web/index.html
 grep -q "H('matched')" web/index.html
 grep -q "logos-fade-then-canonical-star" web/index.html
 grep -q "canonical-zero-degree-shared-contour" web/index.html
-grep -q "pixel-matched-direct-safe-framing-v5" scripts/pre_intro_refinement.gd
+grep -q "pixel-matched-soft-material-box-v4" scripts/pre_intro_star_to_table.gd
+grep -q "white-emission-to-material" scripts/pre_intro_star_to_table.gd
+grep -q "soft-staggered-fade" scripts/pre_intro_star_to_table.gd
+grep -q "pixel-matched-direct-slow-safe-framing-v6" scripts/pre_intro_refinement.gd
 grep -q "canonical-shared-svg" scripts/pre_intro_refinement.gd
-grep -q "direct-safe-framed" scripts/pre_intro_refinement.gd
+grep -q "direct-slow-safe-framed" scripts/pre_intro_refinement.gd
 grep -q "YAKOLAK_PIXEL_MATCH_READY" scripts/pre_intro_star_to_table.gd
 grep -q "StudioWallLogo" scripts/visual_polish.gd
 if grep -q "translateX(" web/index.html || grep -q "rotate(-420deg)" web/index.html; then
@@ -98,6 +105,10 @@ if grep -q "translateX(" web/index.html || grep -q "rotate(-420deg)" web/index.h
 fi
 if grep -q "yakolakLoaderProgress" web/index.html; then
   echo "Rejected progress-bar loader is still present."
+  exit 1
+fi
+if grep -q "loaderLogoMtkyf path{fill:#fff!important}" web/index.html; then
+  echo "Rejected flattened MTKYF palette is still present."
   exit 1
 fi
 
@@ -130,7 +141,7 @@ if ldd "$CHROMIUM_BIN" | grep -q "not found"; then
   exit 1
 fi
 
-python3 -m http.server 8000 --directory web >/tmp/yakolak34-server.log 2>&1 &
+python3 -m http.server 8000 --directory web >/tmp/yakolak35-server.log 2>&1 &
 server_pid=$!
 cleanup() {
   kill "$server_pid" >/dev/null 2>&1 || true
@@ -157,8 +168,8 @@ test -s web/intro-mobile-final.png
 test -s web/intro-desktop-motion.png
 test -s web/gameplay-mobile-selected.png
 test -s web/gameplay-mobile-placed.png
-echo "YAKOLAK 3.4 passed exact v130 canonical star geometry with the approved black/white palette"
-echo "YAKOLAK 3.4 passed delayed balanced identities, safe direct camera framing, and coordinated table tilt"
+echo "YAKOLAK 3.5 passed preserved loader geometry and original MTKYF black/white palette"
+echo "YAKOLAK 3.5 passed gradual white-to-material bridge, slow safe camera framing, and soft staggered box reveal"
 echo "YAKOLAK gameplay passed physical stone selection and legal board placement verification"
 du -h web/index.wasm web/index.pck web/yakolak-logo.svg visual-review/preintro-motion.webm \
   web/preintro-01-black-loader-logo.png web/preintro-02-logo-to-wall-star-hold.png \
