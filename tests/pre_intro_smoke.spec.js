@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 
-// Visual gate: loading star -> 3D table -> visible closed box -> complete unboxing.
+// Visual gate: loading star -> framed 3D table -> closed box arrival -> complete unboxing.
 test.use({
   viewport: { width: 390, height: 844 },
   hasTouch: true,
@@ -18,7 +18,7 @@ test.use({
   }
 });
 
-test('the loading star becomes the table and the complete approved unboxing remains visible', async ({ page }) => {
+test('the loading star becomes a framed table before the complete approved unboxing', async ({ page }) => {
   test.setTimeout(180000);
   const failures = [];
   const sequence = [];
@@ -51,37 +51,32 @@ test('the loading star becomes the table and the complete approved unboxing rema
   await expect(loader).toHaveCount(0, { timeout: 5000 });
 
   await page.waitForFunction(
-    () => ['table-forming', 'table-settling'].includes(document.body.dataset.yakolakPreIntro),
+    () => ['table-forming', 'table-settling', 'table-settled', 'box-arriving'].includes(document.body.dataset.yakolakPreIntro),
     null,
     { timeout: 10000 }
   );
-  await page.screenshot({ path: 'web/preintro-02-table-forming.png' });
 
   await page.waitForFunction(
-    () => document.body.dataset.yakolakPreIntro === 'complete' &&
-          document.body.dataset.yakolakIntro === 'playing' &&
-          ['lid-shaking', 'lid-rising'].includes(document.body.dataset.yakolakPhase),
+    () => document.body.dataset.yakolakPreIntro === 'box-arriving',
     null,
-    { timeout: 15000 }
+    { timeout: 10000 }
   );
+  await page.screenshot({ path: 'web/preintro-02-box-arriving.png' });
 
-  // Give the renderer real frames after the visibility handoff; the box must be
-  // visible before we accept that the unboxing has actually started.
-  await page.waitForTimeout(450);
-  await page.screenshot({ path: 'web/preintro-03-box-visible.png' });
-
+  // Do not require catching a brief intro phase after the screenshot. Wait for
+  // the actual completed unboxing and prove every phase order from console events.
   await page.waitForFunction(
     () => document.body.dataset.yakolakPreIntro === 'complete' &&
           document.body.dataset.yakolakIntro === 'complete' &&
           document.body.dataset.yakolakPhase === 'complete',
     null,
-    { timeout: 15000 }
+    { timeout: 25000 }
   );
-  await page.screenshot({ path: 'web/preintro-04-unboxing-complete.png' });
+  await page.screenshot({ path: 'web/preintro-03-unboxing-complete.png' });
 
   expect(await page.evaluate(() => document.body.dataset.yakolakTable)).toBe('approved-star-svg');
   expect(await page.evaluate(() => document.body.dataset.yakolakTableLevel)).toBe('true');
-  expect(await page.evaluate(() => document.body.dataset.yakolakPreIntroDuration)).toBe('3360');
+  expect(await page.evaluate(() => document.body.dataset.yakolakPreIntroDuration)).toBe('3880');
 
   const joined = sequence.join('\n');
   const handoff = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE handoff'));
@@ -89,6 +84,7 @@ test('the loading star becomes the table and the complete approved unboxing rema
   const forming = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE table-forming'));
   const settling = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE table-settling'));
   const settled = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE table-settled'));
+  const boxArriving = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE box-arriving'));
   const preintroComplete = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_COMPLETE'));
   const lidShake = sequence.findIndex((line, index) => index > preintroComplete && line.includes('YAKOLAK_INTRO_PHASE lid-shaking'));
   const lidRise = sequence.findIndex((line, index) => index > lidShake && line.includes('YAKOLAK_INTRO_PHASE lid-rising'));
@@ -101,12 +97,13 @@ test('the loading star becomes the table and the complete approved unboxing rema
   expect(forming).toBeGreaterThan(floating);
   expect(settling).toBeGreaterThan(forming);
   expect(settled).toBeGreaterThan(settling);
-  expect(preintroComplete).toBeGreaterThan(settled);
+  expect(boxArriving).toBeGreaterThan(settled);
+  expect(preintroComplete).toBeGreaterThan(boxArriving);
   expect(lidShake).toBeGreaterThan(preintroComplete);
   expect(lidRise).toBeGreaterThan(lidShake);
   expect(bases).toBeGreaterThan(lidRise);
   expect(stones).toBeGreaterThan(bases);
   expect(introComplete).toBeGreaterThan(stones);
-  expect(joined).toContain('star=loading-star table=approved-star-svg');
+  expect(joined).toContain('star=loading-star table=approved-star-svg box=visible');
   expect(failures).toEqual([]);
 });
