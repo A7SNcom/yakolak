@@ -1,13 +1,12 @@
 extends Node
 
 # Dedicated round continuation/rematch action.
-# Native Godot Control remains as fallback, while Web builds use a transparent DOM button
-# above the canvas so touch and mouse input are received reliably by every browser.
+# Native Godot Control remains as fallback. Web builds use a transparent DOM button
+# that writes a one-shot flag read by Godot, avoiding browser callback inconsistencies.
 
 var gameplay: Node
 var layer: CanvasLayer
 var action_button: Button
-var web_callback: Variant
 var web_visible: bool = false
 
 
@@ -24,10 +23,19 @@ func _process(_delta: float) -> void:
 		return
 	var should_show: bool = bool(gameplay.get("round_complete")) and not bool(gameplay.get("action_in_progress"))
 	action_button.visible = should_show
-	if OS.has_feature("web") and should_show != web_visible:
+	if not OS.has_feature("web"):
+		return
+	if should_show != web_visible:
 		web_visible = should_show
 		var display_value: String = "block" if should_show else "none"
-		JavaScriptBridge.eval("var b=document.getElementById('yakolak-round-action');if(b){b.style.display='%s';}" % display_value, true)
+		JavaScriptBridge.eval("var b=document.getElementById('yakolak-round-action');if(b){b.style.display='%s';}document.body.dataset.yakolakRoundActionVisible='%s';" % [display_value, "true" if should_show else "false"], true)
+		if should_show:
+			print("YAKOLAK_ROUND_ACTION_VISIBLE")
+	if should_show:
+		var requested: Variant = JavaScriptBridge.eval("document.body.dataset.yakolakRoundAction||''", true)
+		if str(requested) == "1":
+			JavaScriptBridge.eval("document.body.dataset.yakolakRoundAction='';", true)
+			_activate()
 
 
 func _build_button() -> void:
@@ -54,18 +62,9 @@ func _build_button() -> void:
 func _build_web_button() -> void:
 	if not OS.has_feature("web"):
 		return
-	web_callback = JavaScriptBridge.create_callback(_on_web_action)
-	var window: JavaScriptObject = JavaScriptBridge.get_interface("window")
-	if window == null:
-		return
-	window.set("yakolakRoundActionCallback", web_callback)
-	var script: String = "(function(){var b=document.getElementById('yakolak-round-action');if(!b){b=document.createElement('button');b.id='yakolak-round-action';b.type='button';b.setAttribute('aria-label','بدء الجولة التالية');b.style.cssText='position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,90vw);height:130px;z-index:2147483647;display:none;border:0;padding:0;background:transparent;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;';b.addEventListener('pointerdown',function(e){e.preventDefault();e.stopPropagation();if(window.yakolakRoundActionCallback){window.yakolakRoundActionCallback();}},{passive:false});document.body.appendChild(b);}})();"
+	var script: String = "(function(){document.body.dataset.yakolakRoundAction='';document.body.dataset.yakolakRoundActionVisible='false';var b=document.getElementById('yakolak-round-action');if(!b){b=document.createElement('button');b.id='yakolak-round-action';b.type='button';b.setAttribute('aria-label','بدء الجولة التالية');b.style.cssText='position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,90vw);height:130px;z-index:2147483647;display:none;border:0;padding:0;background:rgba(0,0,0,0.001);cursor:pointer;pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent;';var request=function(e){e.preventDefault();e.stopPropagation();document.body.dataset.yakolakRoundAction='1';};b.addEventListener('pointerdown',request,{passive:false});b.addEventListener('click',request,{passive:false});document.body.appendChild(b);}})();"
 	JavaScriptBridge.eval(script, true)
 	print("YAKOLAK_ROUND_ACTION_WEB_READY")
-
-
-func _on_web_action(_arguments: Array) -> void:
-	_activate()
 
 
 func _activate() -> void:
@@ -76,6 +75,6 @@ func _activate() -> void:
 	action_button.visible = false
 	if OS.has_feature("web"):
 		web_visible = false
-		JavaScriptBridge.eval("var b=document.getElementById('yakolak-round-action');if(b){b.style.display='none';}", true)
+		JavaScriptBridge.eval("var b=document.getElementById('yakolak-round-action');if(b){b.style.display='none';}document.body.dataset.yakolakRoundAction='';document.body.dataset.yakolakRoundActionVisible='false';", true)
 	print("YAKOLAK_ROUND_ACTION_BUTTON_ACTIVATED")
 	gameplay.call("_on_round_action")
