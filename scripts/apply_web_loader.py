@@ -14,16 +14,11 @@ STYLE = r"""
 #yakolakLoader.done{opacity:0;visibility:hidden;pointer-events:none}
 #yakolakLoader .rollingStage{position:relative;width:min(300px,72vw);height:112px;overflow:hidden;display:flex;align-items:center;justify-content:center}
 #yakolakLoader .rollingStage:after{content:"";position:absolute;left:12%;right:12%;bottom:22px;height:2px;border-radius:999px;background:rgba(63,63,63,.14)}
-#yakolakLoader .loaderStar{position:absolute;left:50%;bottom:24px;width:62px;height:62px;margin-left:-31px;transform-origin:50% 50%;filter:drop-shadow(0 8px 7px rgba(35,35,35,.16));animation:yakolak-star-roll 1.45s cubic-bezier(.45,.02,.55,.98) infinite}
+#yakolakLoader .loaderStar{position:absolute;left:50%;bottom:24px;width:62px;height:62px;margin-left:-31px;transform-origin:50% 50%;filter:drop-shadow(0 8px 7px rgba(35,35,35,.16));will-change:transform}
 #yakolakLoader .loaderStar path{fill:var(--yakolak-ink)}
 #status,#status-progress,#status-notice{display:none!important}
-@keyframes yakolak-star-roll{
-  0%{transform:translateX(-94px) rotate(-420deg)}
-  50%{transform:translateX(94px) rotate(420deg)}
-  100%{transform:translateX(-94px) rotate(-420deg)}
-}
-@media (max-width:480px){#yakolakLoader .rollingStage{width:250px}.loaderStar{width:56px!important;height:56px!important;margin-left:-28px!important}@keyframes yakolak-star-roll{0%{transform:translateX(-76px) rotate(-420deg)}50%{transform:translateX(76px) rotate(420deg)}100%{transform:translateX(-76px) rotate(-420deg)}}}
-@media (prefers-reduced-motion:reduce){#yakolakLoader .loaderStar{animation:yakolak-star-breathe 1s ease-in-out infinite}@keyframes yakolak-star-breathe{0%,100%{transform:scale(.88)}50%{transform:scale(1.05)}}}
+@keyframes yakolak-star-roll{0%{transform:translateX(-94px) rotate(-420deg)}50%{transform:translateX(94px) rotate(420deg)}100%{transform:translateX(-94px) rotate(-420deg)}}
+@media (max-width:480px){#yakolakLoader .rollingStage{width:250px}.loaderStar{width:56px!important;height:56px!important;margin-left:-28px!important}}
 </style>
 """
 
@@ -43,7 +38,25 @@ SCRIPT = r"""
 <script id="yakolak-rolling-star-loader-script">
 (()=>{
   const loader=document.getElementById('yakolakLoader');
+  const star=loader?.querySelector('.loaderStar');
   let released=false;
+  let rollingAnimation=null;
+
+  if(star?.animate){
+    const mobile=matchMedia('(max-width:480px)').matches;
+    const distance=mobile?76:94;
+    rollingAnimation=star.animate([
+      {transform:`translateX(${-distance}px) rotate(-420deg)`},
+      {transform:`translateX(${distance}px) rotate(420deg)`},
+      {transform:`translateX(${-distance}px) rotate(-420deg)`}
+    ],{
+      duration:1450,
+      iterations:Infinity,
+      easing:'cubic-bezier(.45,.02,.55,.98)'
+    });
+    star.dataset.rolling='true';
+  }
+
   window.__yakolakLoading={set(){}};
   const release=()=>{
     if(released)return;
@@ -51,7 +64,10 @@ SCRIPT = r"""
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
       loader?.classList.add('done');
       loader?.setAttribute('aria-busy','false');
-      setTimeout(()=>loader?.remove(),420);
+      setTimeout(()=>{
+        rollingAnimation?.cancel();
+        loader?.remove();
+      },420);
     }));
   };
   const inspect=()=>{
