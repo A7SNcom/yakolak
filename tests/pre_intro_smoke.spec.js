@@ -122,6 +122,6 @@ test('balanced logos, exact star teeth, direct camera, and playable intro', asyn
   expect(await page.evaluate(() => document.body.dataset.yakolakLoaderPalette)).toBe('black-white-light-gray-shadow');
   expect(await page.evaluate(() => document.body.dataset.yakolakHandoffSequencing)).toBe('balanced-logos-fade-then-star');
   expect(await page.evaluate(() => document.body.dataset.yakolakBrandLayout)).toBe('yakolak-top-star-center-mtkyf-bottom');
-  expect(events.join('\n')).toContain('shape=svg-native-unmirrored camera=direct-look-at logos=balanced-fade');
+  expect(events.join('\n')).toContain('shape=svg-native-unmirrored camera=direct-fixed-distance-look-at logos=balanced-fade');
   expect(failures).toEqual([]);
 });
