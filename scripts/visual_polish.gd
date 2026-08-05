@@ -1,59 +1,50 @@
 extends Node
 
-# Studio-grade visual pass for the Godot Web build.
-# Keeps the approved geometry and gameplay while fixing flat contrast, crushed
-# blacks, blown highlights, weak depth, and unnecessary mobile shadow cost.
-# It also keeps the transforming star facing the camera until it deliberately
-# rotates into the horizontal tabletop, so it never reads as a shell or blob.
+# Dark studio pass shared by the loading handoff, intro, and playable scene.
+# The wall logo uses the same SVG file as the DOM loader so the logo handoff
+# can be screen-space matched instead of approximated.
 
-const VISUAL_VERSION: String = "studio-neutral-v2"
-const BACKGROUND_COLOR: Color = Color("#202731")
-const FLOOR_COLOR: Color = Color("#2a313a")
-const TABLE_COLOR: Color = Color("#6f7478")
+const VISUAL_VERSION: String = "black-studio-v3"
+const LOGO_PATH: String = "res://generated/YAKOLAK_INVERTED.svg"
+const BACKGROUND_COLOR: Color = Color("#000000")
+const FLOOR_COLOR: Color = Color("#080a0d")
+const WALL_COLOR: Color = Color("#10141b")
+const TABLE_COLOR: Color = Color("#6d737b")
 const PEDESTAL_COLOR: Color = Color("#171b20")
 const BOX_COLOR: Color = Color("#20242a")
-const IVORY_COLOR: Color = Color("#d8d1c6")
-const GOLD_COLOR: Color = Color("#b77928")
-const GREEN_COLOR: Color = Color("#24745c")
-const BLUE_COLOR: Color = Color("#315ba4")
+const IVORY_COLOR: Color = Color("#ddd7ce")
+const GOLD_COLOR: Color = Color("#bd7d2e")
+const GREEN_COLOR: Color = Color("#267a61")
+const BLUE_COLOR: Color = Color("#3764b2")
 const PEDESTAL_HALF_HEIGHT: float = 12.25
 const PEDESTAL_HEIGHT_SCALE: float = 0.66
 const FLOOR_Y: float = -17.08
-const STAR_FLOAT_END_MS: float = 880.0
-const STAR_FORM_END_MS: float = 1680.0
 
 var intro: Node3D
-var preintro: Node
-var camera: Camera3D
-var tabletop: MeshInstance3D
 var initialized: bool = false
+var wall_logo: MeshInstance3D
 
 
 func _ready() -> void:
-	# Run after the pre-intro controller so this visual-only correction is the
-	# final transform applied for the frame.
-	process_priority = 250
+	process_priority = 150
 	intro = get_parent() as Node3D
-	preintro = intro.get_node_or_null("StarToTablePreIntro")
 	set_process(true)
 
 
 func _process(_delta: float) -> void:
-	if intro == null:
+	if initialized or intro == null:
 		return
-	if not initialized:
-		initialized = _apply_when_ready()
-		return
-	_keep_star_readable_during_handoff()
+	initialized = _apply_when_ready()
+	if initialized:
+		set_process(false)
 
 
 func _apply_when_ready() -> bool:
-	tabletop = intro.get_node_or_null("ApprovedStarTableSVG") as MeshInstance3D
+	var tabletop := intro.get_node_or_null("ApprovedStarTableSVG") as MeshInstance3D
 	var pedestal := intro.get_node_or_null("ApprovedStarTablePedestal") as MeshInstance3D
 	var board := intro.get_node_or_null("Board") as MeshInstance3D
 	var lid := intro.get_node_or_null("Lid") as MeshInstance3D
-	camera = intro.get("camera") as Camera3D
-	if tabletop == null or pedestal == null or board == null or lid == null or camera == null:
+	if tabletop == null or pedestal == null or board == null or lid == null:
 		return false
 
 	var directionals: Array[DirectionalLight3D] = []
@@ -101,75 +92,49 @@ func _apply_when_ready() -> bool:
 		_apply_material(stone, stone_color, roughness, metallic)
 		stone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
-	_apply_material(tabletop, TABLE_COLOR, 0.68, 0.08)
+	_apply_material(tabletop, TABLE_COLOR, 0.66, 0.08)
 	_apply_material(pedestal, PEDESTAL_COLOR, 0.58, 0.12)
 	_shorten_pedestal(pedestal)
-	_add_studio_floor()
+	_add_studio_architecture()
 	_publish_ready()
 	return true
-
-
-func _keep_star_readable_during_handoff() -> void:
-	if preintro == null:
-		preintro = intro.get_node_or_null("StarToTablePreIntro")
-	if preintro == null or not bool(preintro.get("initialized")) or bool(preintro.get("completed")):
-		return
-	var started_msec: int = int(preintro.get("started_msec"))
-	if started_msec <= 0:
-		return
-	var elapsed: float = float(Time.get_ticks_msec() - started_msec)
-	if elapsed > STAR_FORM_END_MS:
-		return
-
-	var view_direction: Vector3 = (camera.global_position - tabletop.global_position).normalized()
-	if view_direction.length_squared() < 0.9:
-		return
-	var face_camera: Quaternion = Quaternion(Vector3.UP, view_direction).normalized()
-	face_camera = (face_camera * Quaternion(Vector3.UP, deg_to_rad(8.0))).normalized()
-
-	if elapsed <= STAR_FLOAT_END_MS:
-		tabletop.quaternion = face_camera
-	else:
-		var t: float = _ease_in_out_cubic((elapsed - STAR_FLOAT_END_MS) / (STAR_FORM_END_MS - STAR_FLOAT_END_MS))
-		var final_rotation: Quaternion = preintro.get("final_rotation")
-		tabletop.quaternion = face_camera.slerp(final_rotation, t).normalized()
 
 
 func _apply_environment(environment: Environment) -> void:
 	environment.background_mode = Environment.BG_COLOR
 	environment.background_color = BACKGROUND_COLOR
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color("#b9c5d5")
-	environment.ambient_light_energy = 0.45
+	environment.ambient_light_color = Color("#aebbd0")
+	environment.ambient_light_energy = 0.36
 	environment.tonemap_mode = Environment.TONE_MAPPER_ACES
-	environment.tonemap_exposure = 0.82
+	environment.tonemap_exposure = 0.80
 	environment.adjustment_enabled = true
 	environment.adjustment_brightness = 1.0
-	environment.adjustment_contrast = 1.08
-	environment.adjustment_saturation = 0.92
+	environment.adjustment_contrast = 1.10
+	environment.adjustment_saturation = 0.94
 
 
 func _apply_lights(directionals: Array[DirectionalLight3D], omnis: Array[OmniLight3D]) -> void:
 	var key := directionals[0]
-	key.light_color = Color("#ffd9ad")
-	key.light_energy = 0.78
+	key.light_color = Color("#f4f6ff")
+	key.light_energy = 0.82
 	key.shadow_enabled = true
-	key.directional_shadow_max_distance = 46.0
+	key.directional_shadow_max_distance = 48.0
 	key.shadow_bias = 0.08
 
 	var fill := directionals[1]
-	fill.light_color = Color("#b9d0ff")
-	fill.light_energy = 0.38
+	fill.light_color = Color("#9eb8ff")
+	fill.light_energy = 0.30
 	fill.shadow_enabled = false
 
 	var rim := directionals[2]
-	rim.light_color = Color("#fff1d7")
-	rim.light_energy = 0.62
+	rim.light_color = Color("#ffffff")
+	rim.light_energy = 0.52
 	rim.shadow_enabled = false
 
 	for omni: OmniLight3D in omnis:
-		omni.light_color = Color("#ffc98b")
-		omni.light_energy = 0.10
+		omni.light_color = Color("#7182ff")
+		omni.light_energy = 0.08
 		omni.omni_range = 16.0
 		omni.shadow_enabled = false
 
@@ -178,6 +143,56 @@ func _shorten_pedestal(pedestal: MeshInstance3D) -> void:
 	var tabletop_y: float = pedestal.position.y + PEDESTAL_HALF_HEIGHT * pedestal.scale.y
 	pedestal.scale.y = PEDESTAL_HEIGHT_SCALE
 	pedestal.position.y = tabletop_y - PEDESTAL_HALF_HEIGHT * pedestal.scale.y
+
+
+func _add_studio_architecture() -> void:
+	if intro.get_node_or_null("StudioFloor") == null:
+		var floor_mesh := PlaneMesh.new()
+		floor_mesh.size = Vector2(72.0, 72.0)
+		var floor := MeshInstance3D.new()
+		floor.name = "StudioFloor"
+		floor.mesh = floor_mesh
+		floor.position = Vector3(0.0, FLOOR_Y, 0.0)
+		var floor_material := _new_material(FLOOR_COLOR, 1.0, 0.0)
+		floor_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		floor.material_override = floor_material
+		floor.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		intro.add_child(floor)
+
+	if intro.get_node_or_null("StudioBackWall") == null:
+		var wall_mesh := QuadMesh.new()
+		wall_mesh.size = Vector2(42.0, 24.0)
+		var wall := MeshInstance3D.new()
+		wall.name = "StudioBackWall"
+		wall.mesh = wall_mesh
+		wall.position = Vector3(0.0, 2.5, -14.0)
+		var wall_material := _new_material(WALL_COLOR, 1.0, 0.0)
+		wall_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		wall.material_override = wall_material
+		wall.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		intro.add_child(wall)
+
+	wall_logo = intro.get_node_or_null("StudioWallLogo") as MeshInstance3D
+	if wall_logo == null:
+		var texture := load(LOGO_PATH) as Texture2D
+		if texture == null:
+			push_error("YAKOLAK wall logo texture is missing")
+			return
+		var logo_mesh := QuadMesh.new()
+		logo_mesh.size = Vector2(8.0, 4.56)
+		wall_logo = MeshInstance3D.new()
+		wall_logo.name = "StudioWallLogo"
+		wall_logo.mesh = logo_mesh
+		wall_logo.position = Vector3(-5.2, 5.4, -13.88)
+		var logo_material := StandardMaterial3D.new()
+		logo_material.albedo_texture = texture
+		logo_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		logo_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		logo_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+		wall_logo.material_override = logo_material
+		wall_logo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		wall_logo.visible = false
+		intro.add_child(wall_logo)
 
 
 func _apply_material(instance: MeshInstance3D, color: Color, roughness: float, metallic: float) -> void:
@@ -193,22 +208,6 @@ func _apply_material(instance: MeshInstance3D, color: Color, roughness: float, m
 	instance.material_override = material
 
 
-func _add_studio_floor() -> void:
-	if intro.get_node_or_null("StudioFloor") != null:
-		return
-	var floor_mesh := PlaneMesh.new()
-	floor_mesh.size = Vector2(72.0, 72.0)
-	var floor := MeshInstance3D.new()
-	floor.name = "StudioFloor"
-	floor.mesh = floor_mesh
-	floor.position = Vector3(0.0, FLOOR_Y, 0.0)
-	var floor_material := _new_material(FLOOR_COLOR, 1.0, 0.0)
-	floor_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	floor.material_override = floor_material
-	floor.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	intro.add_child(floor)
-
-
 func _new_material(color: Color, roughness: float, metallic: float) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
@@ -218,20 +217,15 @@ func _new_material(color: Color, roughness: float, metallic: float) -> StandardM
 	return material
 
 
-func _ease_in_out_cubic(value: float) -> float:
-	var t: float = clampf(value, 0.0, 1.0)
-	return 4.0 * t * t * t if t < 0.5 else 1.0 - pow(-2.0 * t + 2.0, 3.0) / 2.0
-
-
 func _publish_ready() -> void:
-	print("YAKOLAK_VISUAL_POLISH_READY version=%s palette=studio-neutral lighting=balanced shadows=mobile pedestal=short star=facing-camera floor=unshaded" % VISUAL_VERSION)
+	print("YAKOLAK_VISUAL_POLISH_READY version=%s palette=black-studio lighting=balanced wall-logo=shared-svg" % VISUAL_VERSION)
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakVisual='" + VISUAL_VERSION + "';" +
 			"document.body.dataset.yakolakLighting='balanced-studio';" +
-			"document.body.dataset.yakolakPalette='professional-neutral';" +
+			"document.body.dataset.yakolakPalette='black-white-indigo';" +
 			"document.body.dataset.yakolakPedestal='short-proportional';" +
-			"document.body.dataset.yakolakStarFacing='camera-readable';" +
+			"document.body.dataset.yakolakWallLogo='shared-yakolak-svg';" +
 			"document.body.dataset.yakolakFloor='dark-unshaded';",
 			true
 		)

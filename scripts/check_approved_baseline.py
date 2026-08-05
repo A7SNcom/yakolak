@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail when the approved YAKOLAK 2.8 visual contract is accidentally changed."""
+"""Fail when the approved YAKOLAK loader/gameplay contract regresses."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -9,8 +9,9 @@ ROOT = Path(__file__).resolve().parents[1]
 REQUIRED: dict[str, tuple[str, ...]] = {
     "scripts/apply_web_loader.py": (
         "data-loader-source=\"v129-loading-star-motion\"",
-        "--loading-background:#ffffff",
-        "--loading-star:#3f3f3f",
+        "--loading-background:#000000",
+        "--loading-star:#ffffff",
+        "--loading-shadow:#7182ff",
         "--cycle:820ms",
         "animation:bounce var(--cycle) infinite",
         "animation:turn var(--cycle) linear infinite",
@@ -18,6 +19,8 @@ REQUIRED: dict[str, tuple[str, ...]] = {
         "translateY(36px) scale(1.17,.72)",
         "100%{transform:rotate(24deg)}",
         "transform:scale(1.28,1)",
+        "yakolak-logo.svg",
+        "yakolakLoaderHandoff='matched'",
     ),
     "tests/intro_smoke.spec.js": (
         "source: 'v129-loading-star-motion'",
@@ -33,9 +36,15 @@ REQUIRED: dict[str, tuple[str, ...]] = {
         "document.body.dataset.yakolakBaseColor)).toBe('161616')",
         "document.body.dataset.yakolakDuration)).toBe('5730')",
     ),
+    "tests/pre_intro_smoke.spec.js": (
+        "pixel-matched-2d-to-3d-v3",
+        "yakolakMatchErrorPx",
+        "YAKOLAK_PREINTRO_PHASE camera-orbit",
+        "shared-yakolak-svg",
+    ),
     "scripts/vercel-build.sh": (
         "npx playwright test tests/intro_smoke.spec.js",
-        "YAKOLAK 2.8 passed exact v129 loader and unchanged camera/table verification",
+        "YAKOLAK 2.8 passed exact v129 bounce geometry",
     ),
 }
 
@@ -71,13 +80,12 @@ def main() -> int:
                 failures.append(f"{relative_path}: forbidden regressive token {token!r}")
 
     if failures:
-        print("YAKOLAK 2.8 APPROVED BASELINE REGRESSION DETECTED")
+        print("YAKOLAK APPROVED CONTRACT REGRESSION DETECTED")
         for failure in failures:
             print(f"- {failure}")
-        print("Restore approved/yakolak-2.8-v129-loader or obtain explicit approval for a new baseline.")
         return 1
 
-    print("YAKOLAK 2.8 approved baseline preserved")
+    print("YAKOLAK approved loader, pixel-match, and gameplay contract preserved")
     return 0
 
 

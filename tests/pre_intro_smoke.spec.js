@@ -1,8 +1,5 @@
 const { test, expect } = require('@playwright/test');
 
-// Visual gate: exact loader -> polished table formation -> closed box arrival ->
-// deliberate box hold -> complete unboxing. Fast phases are verified from emitted
-// events, not by racing the browser dataset for a single short frame.
 test.use({
   viewport: { width: 390, height: 844 },
   hasTouch: true,
@@ -20,7 +17,7 @@ test.use({
   }
 });
 
-test('the polished loading-star journey reaches the complete playable intro', async ({ page }) => {
+test('black loader pixel-matches the real table, hands off the logo, and reaches playable intro', async ({ page }) => {
   test.setTimeout(180000);
   const failures = [];
   const sequence = [];
@@ -30,7 +27,7 @@ test('the polished loading-star journey reaches the complete playable intro', as
   page.on('console', message => {
     const text = message.text();
     console.log(`[browser:${message.type()}] ${text}`);
-    if (text.includes('YAKOLAK_PREINTRO_') || text.includes('YAKOLAK_INTRO_') || text.includes('YAKOLAK_VISUAL_')) sequence.push(text);
+    if (text.includes('YAKOLAK_PREINTRO_') || text.includes('YAKOLAK_INTRO_') || text.includes('YAKOLAK_VISUAL_') || text.includes('YAKOLAK_PIXEL_MATCH_')) sequence.push(text);
     if (message.type() === 'error' && !text.includes('favicon')) failures.push(`console: ${text}`);
   });
 
@@ -41,40 +38,62 @@ test('the polished loading-star journey reaches the complete playable intro', as
   expect(await loader.getAttribute('data-loader-source')).toBe('v129-loading-star-motion');
   expect(await page.locator('.loadingStar').getAttribute('viewBox')).toBe('0 0 802 798');
   expect(await page.locator('.loadingStar path').getAttribute('d')).toContain('M0,-191.393');
-  await page.screenshot({ path: 'web/preintro-01-loader.png' });
+  await expect(page.locator('.loaderLogo')).toHaveAttribute('src', 'yakolak-logo.svg');
+  await page.waitForTimeout(520);
+
+  const palette = await page.evaluate(() => {
+    const backdrop = document.querySelector('.loaderBackdrop');
+    const path = document.querySelector('.loadingStar path');
+    const shadow = document.querySelector('.loadingShadow');
+    const logo = document.querySelector('.loaderLogo');
+    return {
+      backdrop: backdrop ? getComputedStyle(backdrop).backgroundColor : '',
+      star: path ? getComputedStyle(path).fill : '',
+      shadow: shadow ? getComputedStyle(shadow).backgroundColor : '',
+      logoOpacity: logo ? Number(getComputedStyle(logo).opacity) : 0,
+      logoLoaded: Boolean(logo && logo.complete && logo.naturalWidth > 0)
+    };
+  });
+  expect(palette.backdrop).toBe('rgb(0, 0, 0)');
+  expect(palette.star).toBe('rgb(255, 255, 255)');
+  expect(palette.shadow).toBe('rgb(113, 130, 255)');
+  expect(palette.logoOpacity).toBeGreaterThan(0.45);
+  expect(palette.logoLoaded).toBe(true);
+  await page.screenshot({ path: 'web/preintro-01-black-loader-logo.png' });
 
   await page.waitForFunction(
-    () => document.body.dataset.yakolakVisual === 'studio-neutral-v2' &&
-          document.body.dataset.yakolakLighting === 'balanced-studio' &&
-          document.body.dataset.yakolakPalette === 'professional-neutral' &&
-          document.body.dataset.yakolakPedestal === 'short-proportional' &&
-          document.body.dataset.yakolakMotion === 'cinematic-continuous-v2' &&
-          document.body.dataset.yakolakPreIntroShape === 'loading-star-to-approved-table' &&
-          document.body.dataset.yakolakLoaderHandoff === 'continuous-star-to-table' &&
-          document.body.dataset.yakolakPreIntro !== 'waiting-for-handoff',
+    () => document.body.dataset.yakolakPreIntro === 'match-ready' &&
+          document.body.dataset.yakolakVisual === 'black-studio-v3' &&
+          document.body.dataset.yakolakWallLogo === 'shared-yakolak-svg' &&
+          window.__yakolakMatch?.star?.w > 200 &&
+          window.__yakolakMatch?.logo?.w > 40,
     null,
     { timeout: 70000 }
   );
-  await expect(loader).toHaveCount(0, { timeout: 5000 });
+  await page.screenshot({ path: 'web/preintro-02-match-ready.png' });
+
+  await page.waitForFunction(
+    () => document.body.dataset.yakolakLoaderHandoff === 'matched',
+    null,
+    { timeout: 5000 }
+  );
+  const match = await page.evaluate(() => ({
+    domError: Number(document.body.dataset.yakolakMatchErrorPx || 999),
+    centerError: Number(document.body.dataset.yakolakMatchCenterError || 999),
+    star: window.__yakolakMatch?.star || null,
+    logo: window.__yakolakMatch?.logo || null
+  }));
+  expect(match.domError).toBeLessThanOrEqual(1.5);
+  expect(match.centerError).toBeLessThanOrEqual(1.5);
+  expect(Math.abs((match.star.x + match.star.w / 2) - 195)).toBeLessThanOrEqual(1.5);
+  expect(Math.abs((match.star.y + match.star.h / 2) - 422)).toBeLessThanOrEqual(1.5);
+  await page.screenshot({ path: 'web/preintro-03-pixel-matched.png' });
 
   await expect.poll(
-    () => sequence.some(line => line.includes('YAKOLAK_PREINTRO_PHASE table-settled')),
+    () => sequence.some(line => line.includes('YAKOLAK_PREINTRO_PHASE camera-orbit')),
     { timeout: 10000 }
   ).toBe(true);
-  await page.screenshot({ path: 'web/preintro-02-table-transition.png' });
-
-  await expect.poll(
-    () => sequence.some(line => line.includes('YAKOLAK_PREINTRO_PHASE box-arriving')),
-    { timeout: 10000 }
-  ).toBe(true);
-  await page.waitForTimeout(320);
-  await page.screenshot({ path: 'web/preintro-03-box-arriving.png' });
-
-  await expect.poll(
-    () => sequence.some(line => line.includes('YAKOLAK_PREINTRO_PHASE box-settled')),
-    { timeout: 10000 }
-  ).toBe(true);
-  await page.screenshot({ path: 'web/preintro-04-box-settled.png' });
+  await page.screenshot({ path: 'web/preintro-04-camera-orbit.png' });
 
   await page.waitForFunction(
     () => document.body.dataset.yakolakPreIntro === 'complete' &&
@@ -88,40 +107,34 @@ test('the polished loading-star journey reaches the complete playable intro', as
 
   expect(await page.evaluate(() => document.body.dataset.yakolakTable)).toBe('approved-star-svg');
   expect(await page.evaluate(() => document.body.dataset.yakolakTableLevel)).toBe('true');
-  expect(await page.evaluate(() => document.body.dataset.yakolakPreIntroDuration)).toBe('3340');
+  expect(await page.evaluate(() => document.body.dataset.yakolakPreIntroDuration)).toBe('3150');
+  expect(await page.evaluate(() => document.body.dataset.yakolakMotion)).toBe('pixel-matched-2d-to-3d-v3');
+  expect(await page.evaluate(() => document.body.dataset.yakolakLoaderPalette)).toBe('black-white-indigo-shadow');
 
   const joined = sequence.join('\n');
   const visual = sequence.findIndex(line => line.includes('YAKOLAK_VISUAL_POLISH_READY'));
-  const handoff = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE handoff'));
-  const floating = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE star-floating'));
-  const forming = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE table-forming'));
+  const matchReady = sequence.findIndex(line => line.includes('YAKOLAK_PIXEL_MATCH_READY'));
+  const matched = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE matched'));
+  const morph = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE star-to-3d'));
   const settling = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE table-settling'));
-  const settled = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE table-settled'));
+  const orbit = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE camera-orbit'));
+  const cameraSettled = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE camera-settled'));
   const boxArriving = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE box-arriving'));
-  const boxSettled = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE box-settled'));
   const preintroComplete = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_COMPLETE'));
   const lidShake = sequence.findIndex((line, index) => index > preintroComplete && line.includes('YAKOLAK_INTRO_PHASE lid-shaking'));
-  const lidRise = sequence.findIndex((line, index) => index > lidShake && line.includes('YAKOLAK_INTRO_PHASE lid-rising'));
-  const bases = sequence.findIndex((line, index) => index > lidRise && line.includes('YAKOLAK_INTRO_PHASE bases-deploying'));
-  const stones = sequence.findIndex((line, index) => index > bases && line.includes('YAKOLAK_INTRO_PHASE stones-moving'));
-  const introComplete = sequence.findIndex((line, index) => index > stones && line.includes('YAKOLAK_INTRO_COMPLETE'));
+  const introComplete = sequence.findIndex((line, index) => index > lidShake && line.includes('YAKOLAK_INTRO_COMPLETE'));
 
   expect(visual).toBeGreaterThanOrEqual(0);
-  expect(handoff).toBeGreaterThan(visual);
-  expect(floating).toBeGreaterThan(handoff);
-  expect(forming).toBeGreaterThan(floating);
-  expect(settling).toBeGreaterThan(forming);
-  expect(settled).toBeGreaterThan(settling);
-  expect(boxArriving).toBeGreaterThan(settled);
-  expect(boxSettled).toBeGreaterThan(boxArriving);
-  expect(preintroComplete).toBeGreaterThan(boxSettled);
+  expect(matchReady).toBeGreaterThan(visual);
+  expect(matched).toBeGreaterThan(matchReady);
+  expect(morph).toBeGreaterThan(matched);
+  expect(settling).toBeGreaterThan(morph);
+  expect(orbit).toBeGreaterThan(settling);
+  expect(cameraSettled).toBeGreaterThan(orbit);
+  expect(boxArriving).toBeGreaterThan(cameraSettled);
+  expect(preintroComplete).toBeGreaterThan(boxArriving);
   expect(lidShake).toBeGreaterThan(preintroComplete);
-  expect(lidRise).toBeGreaterThan(lidShake);
-  expect(bases).toBeGreaterThan(lidRise);
-  expect(stones).toBeGreaterThan(bases);
-  expect(introComplete).toBeGreaterThan(stones);
-  expect(joined).toContain('motion=cinematic-continuous-v2');
-  expect(joined).toContain('palette=studio-neutral');
-  expect(joined).toContain('pedestal=short');
+  expect(introComplete).toBeGreaterThan(lidShake);
+  expect(joined).toContain('match=pixel-exact logo=wall camera=side');
   expect(failures).toEqual([]);
 });

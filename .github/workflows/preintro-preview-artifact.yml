@@ -16,91 +16,9 @@ jobs:
       - name: Checkout preview branch
         uses: actions/checkout@v4
 
-      - name: Download Godot 4.7.1 and Web templates
+      - name: Build Godot Web and verify pixel-matched motion
         shell: bash
-        run: |
-          set -euo pipefail
-          GODOT_VERSION="4.7.1"
-          GODOT_TAG="4.7.1-stable"
-          RELEASE="https://github.com/godotengine/godot-builds/releases/download/${GODOT_TAG}"
-          curl --fail --location --retry 4 "${RELEASE}/Godot_v${GODOT_TAG}_linux.x86_64.zip" -o /tmp/godot.zip
-          curl --fail --location --retry 4 "${RELEASE}/Godot_v${GODOT_TAG}_export_templates.tpz" -o /tmp/templates.tpz
-          mkdir -p /tmp/godot /tmp/templates
-          unzip -q /tmp/godot.zip -d /tmp/godot
-          unzip -q /tmp/templates.tpz -d /tmp/templates
-          GODOT_BIN="$(find /tmp/godot -maxdepth 1 -type f -name 'Godot_*' | head -n 1)"
-          chmod +x "$GODOT_BIN"
-          TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
-          mkdir -p "$TEMPLATE_DIR"
-          cp -R /tmp/templates/templates/. "$TEMPLATE_DIR/"
-          echo "GODOT_BIN=$GODOT_BIN" >> "$GITHUB_ENV"
-          "$GODOT_BIN" --version
-
-      - name: Prepare approved models
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf generated web .godot
-          mkdir -p generated web
-          python3 scripts/check_approved_baseline.py
-          python3 scripts/prepare_intro_assets.py
-          python3 scripts/prepare_table.py
-          for required in board_and_lid player_base piece_large piece_medium piece_small table; do
-            test -s "generated/${required}.obj"
-          done
-
-      - name: Validate Godot scripts and export Web build
-        shell: bash
-        run: |
-          set -euo pipefail
-          "$GODOT_BIN" --headless --editor --path . --quit-after 30 2>&1 | tee /tmp/import.log
-          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file|Could not parse|ERROR:" /tmp/import.log; then
-            exit 1
-          fi
-          "$GODOT_BIN" --headless --path . --export-release "Web" web/index.html 2>&1 | tee /tmp/export.log
-          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|ERROR:" /tmp/export.log; then
-            exit 1
-          fi
-          test -s web/index.html
-          test -s web/index.js
-          test -s web/index.wasm
-          test -s web/index.pck
-          python3 scripts/apply_web_loader.py
-
-      - name: Verify the visual and motion contract
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep -q "v129-loading-star-motion" web/index.html
-          grep -q "continuous-star-to-table" web/index.html
-          grep -q "translateY(36px) scale(1.17,.72)" web/index.html
-          grep -q "100%{transform:rotate(24deg)}" web/index.html
-          grep -q "loading-star-to-approved-table" scripts/pre_intro_star_to_table.gd
-          grep -q "cinematic-continuous-v2" scripts/pre_intro_star_to_table.gd
-          grep -q "studio-neutral-v2" scripts/visual_polish.gd
-          grep -q "intro.call(\"_restart_intro\")" scripts/pre_intro_star_to_table.gd
-          if grep -q "yakolakLoaderProgress" web/index.html; then
-            exit 1
-          fi
-          du -h web/index.html web/index.js web/index.wasm web/index.pck
-
-      - name: Verify motion, complete intro, and gameplay in Chromium
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm install --no-save --no-package-lock --no-audit --no-fund @playwright/test@1.55.0
-          npx playwright install --with-deps chromium
-          python3 -m http.server 8000 --directory web >/tmp/preintro-preview-server.log 2>&1 &
-          server_pid=$!
-          trap 'kill "$server_pid" >/dev/null 2>&1 || true' EXIT
-          sleep 1
-          npx playwright test \
-            tests/pre_intro_smoke.spec.js \
-            tests/intro_smoke.spec.js \
-            tests/gameplay_smoke.spec.js \
-            --workers=1 --reporter=line
-          kill "$server_pid" >/dev/null 2>&1 || true
-          trap - EXIT
+        run: bash scripts/vercel-build.sh
 
       - name: Upload visual review capture
         if: always()
@@ -140,6 +58,6 @@ jobs:
           git config user.email "actions@github.com"
           git checkout -b preview-star-to-table
           git add -A
-          git commit -m "Publish browser-tested polished star-to-table preview from ${GITHUB_SHA}"
+          git commit -m "Publish browser-tested pixel-matched intro from ${GITHUB_SHA}"
           git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push --force origin preview-star-to-table
