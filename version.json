@@ -1,6 +1,0 @@
-{
-  "version": "v125-white-wall-continuity",
-  "build": 125,
-  "updated_at": "2026-07-26",
-  "note": "Unifies the first loading view and main menu as one neutral white wall, removes the blue futuristic projection style, and reveals the table only after the player chooses a path."
-}

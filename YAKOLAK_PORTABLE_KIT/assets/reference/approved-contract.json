@@ -1,0 +1,202 @@
+{
+  "contractVersion": 1,
+  "status": "definitive",
+  "units": "arbitrary; uniform scaling only",
+  "rules": {
+    "players": [
+      2,
+      3,
+      4
+    ],
+    "colors": [
+      "white",
+      "blue",
+      "gold",
+      "green"
+    ],
+    "turnRing": [
+      "white",
+      "blue",
+      "gold",
+      "green"
+    ],
+    "introOrder": [
+      "white",
+      "gold",
+      "green",
+      "blue"
+    ],
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ],
+    "copiesPerSizePerColor": 3,
+    "totalPieces": 36,
+    "roundOptions": [
+      3,
+      5
+    ],
+    "turnDurationMs": 18000,
+    "scorePerWin": 1,
+    "scorePerDraw": 0,
+    "winningLines": [
+      [0, 1, 2],
+      [3, 4, 5],
+      [6, 7, 8],
+      [0, 3, 6],
+      [1, 4, 7],
+      [2, 5, 8],
+      [0, 4, 8],
+      [2, 4, 6]
+    ],
+    "winTypes": [
+      "same-size-line",
+      "graded-line",
+      "complete-cell"
+    ],
+    "normalDropRadius": 31,
+    "touchDropRadius": 42,
+    "dragHeight": 14
+  },
+  "materials": {
+    "palette": {
+      "wall": "#f7f7f4",
+      "floor": "#deddd7",
+      "table": "#aeb2b6",
+      "board": "#4a5562",
+      "white": "#f1eee6",
+      "blue": "#3769a5",
+      "gold": "#b78a44",
+      "green": "#2f856a",
+      "ink": "#3f3f3f"
+    },
+    "requirements": [
+      "neutral room and table",
+      "matte readable board",
+      "four colors remain distinguishable on mobile and desktop",
+      "white may use subtle procedural veining without external image URLs",
+      "table maps are optional but must not alter geometry or contact",
+      "no visual state may depend on material brightness alone"
+    ],
+    "lightingReferenceOnly": {
+      "normalizedRatios": {
+        "hemisphere": 0.62,
+        "key": 1.15,
+        "fill": 0.28,
+        "rim": 0.38
+      },
+      "note": "Ratios are visual references, not engine-specific light units."
+    }
+  },
+  "icons": {
+    "canonicalFile": "ui/loading-star.svg",
+    "semanticControls": [
+      "confirm",
+      "cancel",
+      "back",
+      "share",
+      "copy",
+      "invite",
+      "computer",
+      "online",
+      "help",
+      "mute",
+      "reduced-motion",
+      "retry",
+      "reconnect",
+      "warning",
+      "winner",
+      "tie",
+      "restart",
+      "exit"
+    ],
+    "requirements": [
+      "every icon has a text or accessible label",
+      "icons are not the sole indication of state",
+      "controls use one consistent vector family"
+    ]
+  },
+  "audio": {
+    "bundledCanonicalFiles": [],
+    "optionalCues": {
+      "ui-confirm": {"maxDurationMs": 250},
+      "ui-cancel": {"maxDurationMs": 250},
+      "invalid-action": {"maxDurationMs": 450},
+      "piece-place": {"maxDurationMs": 600},
+      "turn-start": {"maxDurationMs": 500},
+      "timer-warning": {"maxDurationMs": 800, "repeat": "limited"},
+      "win": {"maxDurationMs": 3000},
+      "draw": {"maxDurationMs": 1500},
+      "reconnect": {"maxDurationMs": 700},
+      "error": {"maxDurationMs": 700}
+    },
+    "requirements": [
+      "silence is a valid implementation",
+      "sound never carries unique gameplay information",
+      "music and effects are independently muteable"
+    ]
+  },
+  "motion": {
+    "loadingStarLoopMs": 820,
+    "loaderHoldMs": 280,
+    "roomRevealMs": 2200,
+    "postRevealHoldMs": 620,
+    "setupSurfaceTravelMs": 2050,
+    "setupChoiceExitMs": 520,
+    "setupPanelInMs": 460,
+    "setupPanelOutMs": 420,
+    "invitationRevealMs": 360,
+    "invitationJoinedMs": 420,
+    "stackOpenMs": 360,
+    "stackCloseMs": 360,
+    "invalidReturnMs": 300,
+    "piecePlacementMs": 520,
+    "tutorialPlacementMs": 460,
+    "tutorialStepPauseMs": 110,
+    "botThinkingMinMs": 420,
+    "botThinkingMaxMs": 740,
+    "skipHandoffMs": 520,
+    "winHighlightMs": 3000,
+    "winPulseCount": 5,
+    "scoreConfirmationMs": 900,
+    "drawConfirmationMs": 1200,
+    "roundResetMs": 620,
+    "overviewCameraMs": 520,
+    "unboxing": {
+      "lidShakeMs": 420,
+      "lidLiftMs": 900,
+      "lidLiftHeight": 740,
+      "baseDelayMs": 360,
+      "baseRiseMs": 260,
+      "baseTravelMs": 620,
+      "baseDropMs": 280,
+      "pieceLeadMs": 360,
+      "pieceTravelMs": 850,
+      "pieceArc": 30,
+      "stackStaggerMs": 42,
+      "finalSnapMs": 4010
+    },
+    "reducedMotion": {
+      "initialHoldMs": 120,
+      "roomRevealMs": 700,
+      "postRevealHoldMs": 180,
+      "setupSurfaceTravelMs": 850
+    }
+  },
+  "network": {
+    "normalPollMs": 900,
+    "maximumBackoffMs": 8000,
+    "requestTimeoutMs": 6500,
+    "inactiveRoomLifetimeHours": 8,
+    "authority": "local when no online seats; shared session service otherwise",
+    "requirements": [
+      "unique mutation IDs",
+      "monotonic revision",
+      "idempotent accepted results",
+      "full snapshot on conflict or reconnect",
+      "authoritative deadline",
+      "no automatic computer substitution after match start"
+    ]
+  }
+}

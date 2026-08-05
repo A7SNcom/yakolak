@@ -1,0 +1,24 @@
+name: Approved Baseline Guard
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  preserve-yakolak-2-8:
+    name: Preserve approved YAKOLAK 2.8
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify approved visual contract
+        run: python3 scripts/check_approved_baseline.py
