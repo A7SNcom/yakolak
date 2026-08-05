@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inject the approved Build 125 loading experience into the Godot Web export."""
+"""Inject the established rolling-star loading experience into Godot Web."""
 from __future__ import annotations
 
 import re
@@ -8,70 +8,56 @@ from pathlib import Path
 INDEX = Path(__file__).resolve().parents[1] / "web" / "index.html"
 
 STYLE = r"""
-<style id="yakolak-approved-loader-style">
-:root{--yakolak-wall:#f7f7f4;--yakolak-ink:#242421;--yakolak-muted:#77736c}
-#yakolakLoader{position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;background:var(--yakolak-wall);color:var(--yakolak-ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;transition:opacity .42s ease,visibility .42s ease}
+<style id="yakolak-rolling-star-loader-style">
+:root{--yakolak-wall:#f7f7f4;--yakolak-ink:#3f3f3f}
+#yakolakLoader{position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;background:var(--yakolak-wall);color:var(--yakolak-ink);transition:opacity .38s ease,visibility .38s ease}
 #yakolakLoader.done{opacity:0;visibility:hidden;pointer-events:none}
-#yakolakLoader .loaderPanel{width:min(520px,calc(100vw - 48px));direction:rtl;text-align:center}
-#yakolakLoader .loaderKicker{font-size:12px;font-weight:800;letter-spacing:.22em;color:var(--yakolak-muted);direction:ltr;margin-bottom:14px}
-#yakolakLoader .loaderBrand{font-size:54px;font-weight:950;line-height:1;margin-bottom:34px;color:var(--yakolak-ink)}
-#yakolakLoader progress{display:block;width:100%;height:4px;appearance:none;-webkit-appearance:none;border:0;border-radius:999px;background:#dedbd4;overflow:hidden}
-#yakolakLoader progress::-webkit-progress-bar{background:#dedbd4;border-radius:999px}
-#yakolakLoader progress::-webkit-progress-value{background:var(--yakolak-ink);border-radius:999px;transition:width .24s ease}
-#yakolakLoader progress::-moz-progress-bar{background:var(--yakolak-ink);border-radius:999px;transition:width .24s ease}
-#yakolakLoader .loaderMeta{display:flex;justify-content:space-between;align-items:center;margin-top:13px;font-size:12px;font-weight:700;color:var(--yakolak-muted);direction:rtl}
-#yakolakLoaderPercent{font-size:13px;color:var(--yakolak-ink);direction:ltr}
+#yakolakLoader .rollingStage{position:relative;width:min(300px,72vw);height:112px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+#yakolakLoader .rollingStage:after{content:"";position:absolute;left:12%;right:12%;bottom:22px;height:2px;border-radius:999px;background:rgba(63,63,63,.14)}
+#yakolakLoader .loaderStar{position:absolute;left:50%;bottom:24px;width:62px;height:62px;margin-left:-31px;transform-origin:50% 50%;filter:drop-shadow(0 8px 7px rgba(35,35,35,.16));animation:yakolak-star-roll 1.45s cubic-bezier(.45,.02,.55,.98) infinite}
+#yakolakLoader .loaderStar path{fill:var(--yakolak-ink)}
 #status,#status-progress,#status-notice{display:none!important}
+@keyframes yakolak-star-roll{
+  0%{transform:translateX(-94px) rotate(-420deg)}
+  50%{transform:translateX(94px) rotate(420deg)}
+  100%{transform:translateX(-94px) rotate(-420deg)}
+}
+@media (max-width:480px){#yakolakLoader .rollingStage{width:250px}.loaderStar{width:56px!important;height:56px!important;margin-left:-28px!important}@keyframes yakolak-star-roll{0%{transform:translateX(-76px) rotate(-420deg)}50%{transform:translateX(76px) rotate(420deg)}100%{transform:translateX(-76px) rotate(-420deg)}}}
+@media (prefers-reduced-motion:reduce){#yakolakLoader .loaderStar{animation:yakolak-star-breathe 1s ease-in-out infinite}@keyframes yakolak-star-breathe{0%,100%{transform:scale(.88)}50%{transform:scale(1.05)}}}
 </style>
 """
 
 MARKUP = r"""
-<div id="yakolakLoader" aria-busy="true" aria-describedby="yakolakLoaderStatus">
-  <div class="loaderPanel">
-    <div class="loaderKicker">YAKOLAK</div>
-    <div class="loaderBrand">ياكلك</div>
-    <progress id="yakolakLoaderProgress" value="3" max="100" aria-label="تحميل اللعبة">3%</progress>
-    <div class="loaderMeta"><span id="yakolakLoaderStatus">تهيئة اللعبة</span><strong id="yakolakLoaderPercent">3%</strong></div>
+<div id="yakolakLoader" data-loader-kind="rolling-star" aria-busy="true" aria-label="تحميل ياكلك">
+  <div class="rollingStage" aria-hidden="true">
+    <svg class="loaderStar" viewBox="0 0 802 798" role="img">
+      <g transform="matrix(4.166667,0,0,4.166667,484.7475,797.470417)">
+        <path d="M0,-191.393L-20.116,-183.832L-40.232,-191.393L-55.534,-176.304L-76.986,-175.028L-84.828,-155.02L-103.907,-145.13L-102.932,-123.662L-116.339,-106.867L-106.717,-87.651L-112.134,-66.855L-95.528,-53.214L-92.018,-32.013L-71.299,-26.306L-59.469,-8.364L-38.22,-11.578L-20.116,0L-2.012,-11.578L19.237,-8.364L31.067,-26.306L51.786,-32.013L55.296,-53.214L71.902,-66.855L66.486,-87.651L76.108,-106.867L62.7,-123.662L63.675,-145.13L44.596,-155.02L36.754,-175.028L15.302,-176.304L0,-191.393Z"/>
+      </g>
+    </svg>
   </div>
 </div>
 """
 
 SCRIPT = r"""
-<script id="yakolak-approved-loader-script">
+<script id="yakolak-rolling-star-loader-script">
 (()=>{
   const loader=document.getElementById('yakolakLoader');
-  const progress=document.getElementById('yakolakLoaderProgress');
-  const percent=document.getElementById('yakolakLoaderPercent');
-  const status=document.getElementById('yakolakLoaderStatus');
-  let value=3;
   let released=false;
-  const set=(next,label)=>{
-    value=Math.max(value,Math.min(100,Math.round(Number(next)||0)));
-    if(progress){progress.value=value;progress.textContent=value+'%'}
-    if(percent)percent.textContent=value+'%';
-    if(label&&status)status.textContent=label;
-  };
-  window.__yakolakLoading={set};
-  const timer=setInterval(()=>{
-    if(released)return;
-    if(value<35)set(value+4,'تحميل المجسمات');
-    else if(value<72)set(value+2,'تجهيز المشهد');
-    else if(value<91)set(value+1,'تشغيل اللعبة');
-  },180);
+  window.__yakolakLoading={set(){}};
   const release=()=>{
     if(released)return;
     released=true;
-    clearInterval(timer);
-    set(100,'جاهز');
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
       loader?.classList.add('done');
       loader?.setAttribute('aria-busy','false');
-      setTimeout(()=>loader?.remove(),480);
+      setTimeout(()=>loader?.remove(),420);
     }));
   };
   const inspect=()=>{
-    if(document.body.dataset.yakolakIntro==='playing'||document.body.dataset.yakolakIntro==='complete')release();
-    if(document.body.dataset.yakolakIntro==='error'&&status)status.textContent='تعذر تشغيل اللعبة';
+    const state=document.body.dataset.yakolakIntro;
+    if(state==='playing'||state==='complete')release();
+    if(state==='error')loader?.setAttribute('data-error','true');
   };
   new MutationObserver(inspect).observe(document.body,{attributes:true,attributeFilter:['data-yakolak-intro']});
   inspect();
@@ -82,15 +68,15 @@ SCRIPT = r"""
 
 def main() -> None:
     html = INDEX.read_text(encoding="utf-8")
-    if "yakolak-approved-loader-style" in html:
-        raise RuntimeError("Approved loader was already injected")
+    if "yakolak-rolling-star-loader-style" in html:
+        raise RuntimeError("Rolling-star loader was already injected")
     html = html.replace("</head>", STYLE + "\n</head>", 1)
     html, count = re.subn(r"(<body[^>]*>)", r"\1\n" + MARKUP, html, count=1, flags=re.IGNORECASE)
     if count != 1:
         raise RuntimeError("Could not locate the exported body element")
     html = html.replace("</body>", SCRIPT + "\n</body>", 1)
     INDEX.write_text(html, encoding="utf-8", newline="\n")
-    print("YAKOLAK_BUILD125_LOADER_INJECTED")
+    print("YAKOLAK_ROLLING_STAR_LOADER_INJECTED")
 
 
 if __name__ == "__main__":
