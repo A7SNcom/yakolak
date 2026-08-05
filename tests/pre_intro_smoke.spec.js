@@ -65,6 +65,7 @@ test('balanced logos, exact star teeth, direct camera, and playable intro', asyn
     expect(Math.abs(centerX(r) - 195)).toBeLessThanOrEqual(1.5);
   }
   await page.screenshot({ path: 'web/preintro-01-black-loader-logo.png' });
+  await page.screenshot({ path: 'web/preintro-02-logo-to-wall-star-hold.png' });
 
   await page.waitForFunction(() =>
     document.body.dataset.yakolakMatchReady === 'true' &&
