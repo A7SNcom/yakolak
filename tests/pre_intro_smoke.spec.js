@@ -1,8 +1,8 @@
 const { test, expect } = require('@playwright/test');
 
 // Visual gate: exact loader -> polished table formation -> closed box arrival ->
-// complete unboxing. Fast phases are verified from emitted events, not by racing
-// the browser dataset for a single short frame.
+// deliberate box hold -> complete unboxing. Fast phases are verified from emitted
+// events, not by racing the browser dataset for a single short frame.
 test.use({
   viewport: { width: 390, height: 844 },
   hasTouch: true,
@@ -47,6 +47,7 @@ test('the polished loading-star journey reaches the complete playable intro', as
     () => document.body.dataset.yakolakVisual === 'studio-neutral-v2' &&
           document.body.dataset.yakolakLighting === 'balanced-studio' &&
           document.body.dataset.yakolakPalette === 'professional-neutral' &&
+          document.body.dataset.yakolakPedestal === 'short-proportional' &&
           document.body.dataset.yakolakMotion === 'cinematic-continuous-v2' &&
           document.body.dataset.yakolakPreIntroShape === 'loading-star-to-approved-table' &&
           document.body.dataset.yakolakLoaderHandoff === 'continuous-star-to-table' &&
@@ -66,8 +67,14 @@ test('the polished loading-star journey reaches the complete playable intro', as
     () => sequence.some(line => line.includes('YAKOLAK_PREINTRO_PHASE box-arriving')),
     { timeout: 10000 }
   ).toBe(true);
-  await page.waitForTimeout(220);
+  await page.waitForTimeout(320);
   await page.screenshot({ path: 'web/preintro-03-box-arriving.png' });
+
+  await expect.poll(
+    () => sequence.some(line => line.includes('YAKOLAK_PREINTRO_PHASE box-settled')),
+    { timeout: 10000 }
+  ).toBe(true);
+  await page.screenshot({ path: 'web/preintro-04-box-settled.png' });
 
   await page.waitForFunction(
     () => document.body.dataset.yakolakPreIntro === 'complete' &&
@@ -77,11 +84,11 @@ test('the polished loading-star journey reaches the complete playable intro', as
     null,
     { timeout: 25000 }
   );
-  await page.screenshot({ path: 'web/preintro-04-unboxing-complete.png' });
+  await page.screenshot({ path: 'web/preintro-05-unboxing-complete.png' });
 
   expect(await page.evaluate(() => document.body.dataset.yakolakTable)).toBe('approved-star-svg');
   expect(await page.evaluate(() => document.body.dataset.yakolakTableLevel)).toBe('true');
-  expect(await page.evaluate(() => document.body.dataset.yakolakPreIntroDuration)).toBe('2880');
+  expect(await page.evaluate(() => document.body.dataset.yakolakPreIntroDuration)).toBe('3340');
 
   const joined = sequence.join('\n');
   const visual = sequence.findIndex(line => line.includes('YAKOLAK_VISUAL_POLISH_READY'));
@@ -91,6 +98,7 @@ test('the polished loading-star journey reaches the complete playable intro', as
   const settling = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE table-settling'));
   const settled = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE table-settled'));
   const boxArriving = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE box-arriving'));
+  const boxSettled = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE box-settled'));
   const preintroComplete = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_COMPLETE'));
   const lidShake = sequence.findIndex((line, index) => index > preintroComplete && line.includes('YAKOLAK_INTRO_PHASE lid-shaking'));
   const lidRise = sequence.findIndex((line, index) => index > lidShake && line.includes('YAKOLAK_INTRO_PHASE lid-rising'));
@@ -105,7 +113,8 @@ test('the polished loading-star journey reaches the complete playable intro', as
   expect(settling).toBeGreaterThan(forming);
   expect(settled).toBeGreaterThan(settling);
   expect(boxArriving).toBeGreaterThan(settled);
-  expect(preintroComplete).toBeGreaterThan(boxArriving);
+  expect(boxSettled).toBeGreaterThan(boxArriving);
+  expect(preintroComplete).toBeGreaterThan(boxSettled);
   expect(lidShake).toBeGreaterThan(preintroComplete);
   expect(lidRise).toBeGreaterThan(lidShake);
   expect(bases).toBeGreaterThan(lidRise);
@@ -113,5 +122,6 @@ test('the polished loading-star journey reaches the complete playable intro', as
   expect(introComplete).toBeGreaterThan(stones);
   expect(joined).toContain('motion=cinematic-continuous-v2');
   expect(joined).toContain('palette=studio-neutral');
+  expect(joined).toContain('pedestal=short');
   expect(failures).toEqual([]);
 });
