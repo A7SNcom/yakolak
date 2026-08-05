@@ -46,9 +46,13 @@ test('corrected intro keeps the camera and star table level and uses the rolling
   await expect(loader).toBeVisible();
   await expect(loader).toHaveAttribute('data-loader-kind', 'rolling-star');
   await expect(rollingStar).toBeVisible();
+  await expect(rollingStar).toHaveAttribute('data-rolling', 'true');
   await expect(loader.locator('progress')).toHaveCount(0);
-  const animationName = await rollingStar.evaluate(element => getComputedStyle(element).animationName);
-  expect(animationName).toContain('yakolak-star-roll');
+  expect(await rollingStar.evaluate(element => element.getAnimations().length)).toBeGreaterThan(0);
+  const firstTransform = await rollingStar.evaluate(element => getComputedStyle(element).transform);
+  await page.waitForTimeout(180);
+  const secondTransform = await rollingStar.evaluate(element => getComputedStyle(element).transform);
+  expect(secondTransform).not.toBe(firstTransform);
   await page.screenshot({ path: 'web/loader-mobile.png', fullPage: false, timeout: 120000 });
 
   await page.waitForFunction(
@@ -67,7 +71,6 @@ test('corrected intro keeps the camera and star table level and uses the rolling
   );
   await expect(loader).toHaveCount(0, { timeout: 5000 });
 
-  // The loader capture can be slow in SwiftShader, so replay before capturing motion.
   if (await page.evaluate(() => document.body.dataset.yakolakIntro === 'complete')) {
     await page.locator('canvas').click({ position: { x: 195, y: 422 } });
     await page.waitForFunction(
