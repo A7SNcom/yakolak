@@ -18,10 +18,11 @@ async function playMove(page, size, cell, expectedMoves, expectedNextPlayer) {
   await page.waitForFunction(
     ({ sizeName, cell }) => document.body.dataset.yakolakGameplay === 'ready' &&
       document.body.dataset.yakolakMatchState === 'turn' &&
+      document.body.dataset.yakolakTurnCameraVisible === 'true' &&
       document.body.dataset[`yakolakTest${sizeName}X`] &&
       document.body.dataset[`yakolakTestCell${cell}X`],
     { sizeName: cap(size), cell },
-    { timeout: 10000 }
+    { timeout: 20000 }
   );
 
   const points = await page.evaluate(({ sizeName, cell }) => {
@@ -34,30 +35,36 @@ async function playMove(page, size, cell, expectedMoves, expectedNextPlayer) {
     };
   }, { sizeName: cap(size), cell });
 
+  expect(points.pieceX).toBeGreaterThan(0);
+  expect(points.pieceX).toBeLessThan(390);
+  expect(points.pieceY).toBeGreaterThan(0);
+  expect(points.pieceY).toBeLessThan(844);
   await page.touchscreen.tap(points.pieceX, points.pieceY);
-  await page.waitForFunction(() => document.body.dataset.yakolakGameplay === 'piece-selected', null, { timeout: 5000 });
+  await page.waitForFunction(() => document.body.dataset.yakolakGameplay === 'piece-selected', null, { timeout: 15000 });
   await page.touchscreen.tap(points.cellX, points.cellY);
 
   if (expectedNextPlayer) {
     await page.waitForFunction(
       ({ moves, player }) => document.body.dataset.yakolakMoves === String(moves) &&
         document.body.dataset.yakolakCurrentPlayer === player &&
+        document.body.dataset.yakolakTurnCamera === player &&
+        document.body.dataset.yakolakTurnCameraVisible === 'true' &&
         document.body.dataset.yakolakMatchState === 'turn',
       { moves: expectedMoves, player: expectedNextPlayer },
-      { timeout: 10000 }
+      { timeout: 20000 }
     );
   } else {
     await page.waitForFunction(
       moves => document.body.dataset.yakolakMoves === String(moves) &&
         document.body.dataset.yakolakMatchState === 'round-complete',
       expectedMoves,
-      { timeout: 10000 }
+      { timeout: 20000 }
     );
   }
 }
 
-test('four local turns, official win detection, scoring, and next-round reset work', async ({ page }) => {
-  test.setTimeout(180000);
+test('four local turns, active camera framing, official win detection, scoring, and next-round reset work', async ({ page }) => {
+  test.setTimeout(360000);
   const failures = [];
   const logs = [];
   page.on('pageerror', error => failures.push(`pageerror: ${error.message}`));
@@ -73,6 +80,8 @@ test('four local turns, official win detection, scoring, and next-round reset wo
     () => document.body.dataset.yakolakIntro === 'complete' &&
       document.body.dataset.yakolakGameplay === 'ready' &&
       document.body.dataset.yakolakCurrentPlayer === 'right' &&
+      document.body.dataset.yakolakTurnCamera === 'right' &&
+      document.body.dataset.yakolakTurnCameraVisible === 'true' &&
       document.body.dataset.yakolakRound === '1',
     null,
     { timeout: 70000 }
@@ -98,14 +107,18 @@ test('four local turns, official win detection, scoring, and next-round reset wo
     () => document.body.dataset.yakolakRound === '2' &&
       document.body.dataset.yakolakMoves === '0' &&
       document.body.dataset.yakolakCurrentPlayer === 'back' &&
+      document.body.dataset.yakolakTurnCamera === 'back' &&
+      document.body.dataset.yakolakTurnCameraVisible === 'true' &&
       document.body.dataset.yakolakScoreRight === '1' &&
       document.body.dataset.yakolakMatchState === 'turn',
     null,
-    { timeout: 10000 }
+    { timeout: 20000 }
   );
 
   const joined = logs.join('\n');
   expect(joined).toContain('YAKOLAK_MATCH_READY players=4 rounds=3 timer=18000');
+  expect(joined).toContain('YAKOLAK_TURN_CAMERA_READY player=right');
+  expect(joined).toContain('YAKOLAK_TURN_CAMERA_READY player=back');
   expect(joined).toContain('YAKOLAK_ROUND_COMPLETE round=1 winner=right');
   expect(joined).toContain('YAKOLAK_ROUND_RESET round=2 starter=back');
   expect(failures).toEqual([]);
