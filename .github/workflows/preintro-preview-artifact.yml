@@ -11,7 +11,7 @@ permissions:
 jobs:
   build-web-preview:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - name: Checkout preview branch
         uses: actions/checkout@v4
@@ -67,7 +67,7 @@ jobs:
           test -s web/index.pck
           python3 scripts/apply_web_loader.py
 
-      - name: Verify the continuous star handoff contract
+      - name: Verify the visual and motion contract
         shell: bash
         run: |
           set -euo pipefail
@@ -76,13 +76,15 @@ jobs:
           grep -q "translateY(36px) scale(1.17,.72)" web/index.html
           grep -q "100%{transform:rotate(24deg)}" web/index.html
           grep -q "loading-star-to-approved-table" scripts/pre_intro_star_to_table.gd
+          grep -q "cinematic-continuous-v2" scripts/pre_intro_star_to_table.gd
+          grep -q "studio-neutral-v2" scripts/visual_polish.gd
           grep -q "intro.call(\"_restart_intro\")" scripts/pre_intro_star_to_table.gd
           if grep -q "yakolakLoaderProgress" web/index.html; then
             exit 1
           fi
           du -h web/index.html web/index.js web/index.wasm web/index.pck
 
-      - name: Verify the scene journey in Chromium
+      - name: Verify motion, complete intro, and gameplay in Chromium
         shell: bash
         run: |
           set -euo pipefail
@@ -92,7 +94,11 @@ jobs:
           server_pid=$!
           trap 'kill "$server_pid" >/dev/null 2>&1 || true' EXIT
           sleep 1
-          npx playwright test tests/pre_intro_smoke.spec.js --workers=1 --reporter=line
+          npx playwright test \
+            tests/pre_intro_smoke.spec.js \
+            tests/intro_smoke.spec.js \
+            tests/gameplay_smoke.spec.js \
+            --workers=1 --reporter=line
           kill "$server_pid" >/dev/null 2>&1 || true
           trap - EXIT
 
@@ -104,6 +110,8 @@ jobs:
           path: |
             test-results/
             web/preintro-*.png
+            web/intro-*.png
+            web/gameplay-*.png
           if-no-files-found: warn
           compression-level: 0
           retention-days: 3
@@ -132,6 +140,6 @@ jobs:
           git config user.email "actions@github.com"
           git checkout -b preview-star-to-table
           git add -A
-          git commit -m "Publish browser-tested star-to-table preview from ${GITHUB_SHA}"
+          git commit -m "Publish browser-tested polished star-to-table preview from ${GITHUB_SHA}"
           git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push --force origin preview-star-to-table
