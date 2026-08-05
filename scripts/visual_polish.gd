@@ -7,11 +7,11 @@ extends Node
 # rotates into the horizontal tabletop, so it never reads as a shell or blob.
 
 const VISUAL_VERSION: String = "studio-neutral-v2"
-const BACKGROUND_COLOR: Color = Color("#313943")
-const FLOOR_COLOR: Color = Color("#40474f")
-const TABLE_COLOR: Color = Color("#9a9186")
-const PEDESTAL_COLOR: Color = Color("#25292e")
-const BOX_COLOR: Color = Color("#282d34")
+const BACKGROUND_COLOR: Color = Color("#202731")
+const FLOOR_COLOR: Color = Color("#2a313a")
+const TABLE_COLOR: Color = Color("#6f7478")
+const PEDESTAL_COLOR: Color = Color("#171b20")
+const BOX_COLOR: Color = Color("#20242a")
 const IVORY_COLOR: Color = Color("#d8d1c6")
 const GOLD_COLOR: Color = Color("#b77928")
 const GREEN_COLOR: Color = Color("#24745c")
@@ -71,13 +71,13 @@ func _apply_when_ready() -> bool:
 
 	_apply_environment(world.environment)
 	_apply_lights(directionals, omnis)
-	_apply_material(board, BOX_COLOR, 0.36, 0.14)
-	_apply_material(lid, BOX_COLOR, 0.36, 0.14)
+	_apply_material(board, BOX_COLOR, 0.43, 0.10)
+	_apply_material(lid, BOX_COLOR, 0.43, 0.10)
 	for direction: String in ["right", "left", "front", "back"]:
 		var base := intro.get_node_or_null("Base_%s" % direction) as MeshInstance3D
 		if base == null:
 			return false
-		_apply_material(base, BOX_COLOR, 0.36, 0.14)
+		_apply_material(base, BOX_COLOR, 0.43, 0.10)
 
 	for child: Node in intro.get_children():
 		if not child is MeshInstance3D or not String(child.name).begins_with("Stone_"):
@@ -101,7 +101,7 @@ func _apply_when_ready() -> bool:
 		_apply_material(stone, stone_color, roughness, metallic)
 		stone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
-	_apply_material(tabletop, TABLE_COLOR, 0.78, 0.02)
+	_apply_material(tabletop, TABLE_COLOR, 0.68, 0.08)
 	_apply_material(pedestal, PEDESTAL_COLOR, 0.58, 0.12)
 	_shorten_pedestal(pedestal)
 	_add_studio_floor()
@@ -139,10 +139,10 @@ func _apply_environment(environment: Environment) -> void:
 	environment.background_mode = Environment.BG_COLOR
 	environment.background_color = BACKGROUND_COLOR
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color("#aebbd0")
-	environment.ambient_light_energy = 0.38
+	environment.ambient_light_color = Color("#b9c5d5")
+	environment.ambient_light_energy = 0.45
 	environment.tonemap_mode = Environment.TONE_MAPPER_ACES
-	environment.tonemap_exposure = 0.72
+	environment.tonemap_exposure = 0.82
 	environment.adjustment_enabled = true
 	environment.adjustment_brightness = 1.0
 	environment.adjustment_contrast = 1.08
@@ -152,24 +152,24 @@ func _apply_environment(environment: Environment) -> void:
 func _apply_lights(directionals: Array[DirectionalLight3D], omnis: Array[OmniLight3D]) -> void:
 	var key := directionals[0]
 	key.light_color = Color("#ffd9ad")
-	key.light_energy = 1.04
+	key.light_energy = 0.78
 	key.shadow_enabled = true
 	key.directional_shadow_max_distance = 46.0
 	key.shadow_bias = 0.08
 
 	var fill := directionals[1]
 	fill.light_color = Color("#b9d0ff")
-	fill.light_energy = 0.56
+	fill.light_energy = 0.38
 	fill.shadow_enabled = false
 
 	var rim := directionals[2]
 	rim.light_color = Color("#fff1d7")
-	rim.light_energy = 0.78
+	rim.light_energy = 0.62
 	rim.shadow_enabled = false
 
 	for omni: OmniLight3D in omnis:
 		omni.light_color = Color("#ffc98b")
-		omni.light_energy = 0.18
+		omni.light_energy = 0.10
 		omni.omni_range = 16.0
 		omni.shadow_enabled = false
 
@@ -202,7 +202,9 @@ func _add_studio_floor() -> void:
 	floor.name = "StudioFloor"
 	floor.mesh = floor_mesh
 	floor.position = Vector3(0.0, FLOOR_Y, 0.0)
-	floor.material_override = _new_material(FLOOR_COLOR, 0.94, 0.0)
+	var floor_material := _new_material(FLOOR_COLOR, 1.0, 0.0)
+	floor_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	floor.material_override = floor_material
 	floor.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	intro.add_child(floor)
 
@@ -222,13 +224,14 @@ func _ease_in_out_cubic(value: float) -> float:
 
 
 func _publish_ready() -> void:
-	print("YAKOLAK_VISUAL_POLISH_READY version=%s palette=studio-neutral lighting=balanced shadows=mobile pedestal=short star=facing-camera" % VISUAL_VERSION)
+	print("YAKOLAK_VISUAL_POLISH_READY version=%s palette=studio-neutral lighting=balanced shadows=mobile pedestal=short star=facing-camera floor=unshaded" % VISUAL_VERSION)
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakVisual='" + VISUAL_VERSION + "';" +
 			"document.body.dataset.yakolakLighting='balanced-studio';" +
 			"document.body.dataset.yakolakPalette='professional-neutral';" +
 			"document.body.dataset.yakolakPedestal='short-proportional';" +
-			"document.body.dataset.yakolakStarFacing='camera-readable';",
+			"document.body.dataset.yakolakStarFacing='camera-readable';" +
+			"document.body.dataset.yakolakFloor='dark-unshaded';",
 			true
 		)
