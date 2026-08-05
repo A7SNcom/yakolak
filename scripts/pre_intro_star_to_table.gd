@@ -5,23 +5,23 @@ extends Node
 # The 3D star stays face-on while it gains material and depth; only afterwards
 # do the camera and table rotate together, avoiding the old edge-on collapse.
 
-const MATCH_HOLD_MS: float = 260.0
-const MORPH_MS: float = 760.0
-const SETTLE_MS: float = 220.0
-const CAMERA_ORBIT_MS: float = 900.0
-const CAMERA_HOLD_MS: float = 140.0
+const MATCH_HOLD_MS: float = 220.0
+const MORPH_MS: float = 980.0
+const SETTLE_MS: float = 300.0
+const CAMERA_ORBIT_MS: float = 1250.0
+const CAMERA_HOLD_MS: float = 220.0
 const TABLE_TOTAL_MS: float = MATCH_HOLD_MS + MORPH_MS + SETTLE_MS + CAMERA_ORBIT_MS + CAMERA_HOLD_MS
-const BOX_REVEAL_MS: float = 650.0
-const BOX_HOLD_MS: float = 220.0
+const BOX_REVEAL_MS: float = 1100.0
+const BOX_HOLD_MS: float = 320.0
 const TOTAL_MS: float = TABLE_TOTAL_MS + BOX_REVEAL_MS + BOX_HOLD_MS
 
 const MATCH_CAMERA_DISTANCE: float = 54.0
 const MATCH_CAMERA_FOV: float = 42.0
-const BOX_START_DROP: float = 0.72
-const BOX_START_SCALE: float = 0.92
+const BOX_START_DROP: float = 0.26
+const BOX_START_SCALE: float = 0.985
 const PEDESTAL_HALF_HEIGHT: float = 12.25
 const WHITE_STAR: Color = Color("#ffffff")
-const MOTION_VERSION: String = "pixel-matched-2d-to-3d-v3"
+const MOTION_VERSION: String = "pixel-matched-soft-material-box-v4"
 
 var intro: Node3D
 var corrections: Node
@@ -54,6 +54,9 @@ var final_rotation: Quaternion
 var final_table_color: Color
 var final_table_roughness: float
 var final_table_metallic: float
+var final_table_emission_enabled: bool
+var final_table_emission: Color
+var final_table_emission_energy: float
 
 var orbit_center: Vector3
 var final_camera_position: Vector3
@@ -180,9 +183,10 @@ func _prepare_pixel_match() -> bool:
 	final_table_color = table_material.albedo_color
 	final_table_roughness = table_material.roughness
 	final_table_metallic = table_material.metallic
-	table_material.albedo_color = WHITE_STAR
-	table_material.roughness = 0.54
-	table_material.metallic = 0.0
+	final_table_emission_enabled = table_material.emission_enabled
+	final_table_emission = table_material.emission
+	final_table_emission_energy = table_material.emission_energy_multiplier
+	_apply_bridge_material(0.0)
 
 	face_camera_rotation = Quaternion(Vector3.RIGHT, deg_to_rad(-90.0)).normalized()
 	tabletop.position = final_table_position
@@ -204,8 +208,8 @@ func _prepare_pixel_match() -> bool:
 
 	magic_light = OmniLight3D.new()
 	magic_light.name = "StarToTableSoftLight"
-	magic_light.light_color = Color("#7182ff")
-	magic_light.light_energy = 0.12
+	magic_light.light_color = Color("#dbe3ff")
+	magic_light.light_energy = 0.08
 	magic_light.omni_range = 14.0
 	magic_light.shadow_enabled = false
 	magic_light.position = orbit_center + Vector3(0.0, 0.0, 2.0)
@@ -250,7 +254,8 @@ func _publish_match_geometry() -> bool:
 		var script := (
 			"window.__yakolakMatch={" +
 			"star:{x:" + str(star_rect.position.x) + ",y:" + str(star_rect.position.y) + ",w:" + str(star_rect.size.x) + ",h:" + str(star_rect.size.y) + "}," +
-			"logo:{x:" + str(logo_rect.position.x) + ",y:" + str(logo_rect.position.y) + ",w:" + str(logo_rect.size.x) + ",h:" + str(logo_rect.size.y) + "}" +
+			"logo:{x:" + str(logo_rect.position.x) + ",y:" + str(logo_rect.position.y) + ",w:" + str(logo_rect.size.x) + ",h:" + str(logo_rect.size.y) + "}," +
+			"starColor:'#" + final_table_color.to_html(false) + "'" +
 			"};" +
 			"document.body.dataset.yakolakMatchCenterError='" + str(center_error) + "';" +
 			"document.body.dataset.yakolakMatchFacing='" + str(facing) + "';" +
@@ -332,29 +337,25 @@ func _apply_table_and_camera(elapsed: float) -> void:
 
 	var morph_end: float = MATCH_HOLD_MS + MORPH_MS
 	if elapsed <= morph_end:
-		var t: float = _ease_in_out_cubic((elapsed - MATCH_HOLD_MS) / MORPH_MS)
+		var raw_t: float = clampf((elapsed - MATCH_HOLD_MS) / MORPH_MS, 0.0, 1.0)
+		var t: float = _smootherstep(raw_t)
 		tabletop.position = final_table_position
 		tabletop.quaternion = face_camera_rotation
-		tabletop.scale = final_table_scale * (1.0 + sin(t * PI) * 0.010)
-		var color_t: float = _smooth(clampf((t - 0.08) / 0.92, 0.0, 1.0))
-		table_material.albedo_color = WHITE_STAR.lerp(final_table_color, color_t)
-		table_material.roughness = lerpf(0.54, final_table_roughness, color_t)
-		table_material.metallic = lerpf(0.0, final_table_metallic, color_t)
+		tabletop.scale = final_table_scale * (1.0 + sin(t * PI) * 0.003)
+		_apply_bridge_material(t)
 		pedestal.visible = false
 		_set_pedestal_growth(0.0)
 		_apply_match_camera()
-		magic_light.light_energy = 0.12 * (1.0 - color_t)
+		magic_light.light_energy = 0.08 * (1.0 - t)
 		return
 
 	var settle_end: float = morph_end + SETTLE_MS
 	if elapsed <= settle_end:
-		var t: float = _ease_out_cubic((elapsed - morph_end) / SETTLE_MS)
+		var t: float = _smootherstep((elapsed - morph_end) / SETTLE_MS)
 		tabletop.position = final_table_position
 		tabletop.quaternion = face_camera_rotation
-		tabletop.scale = final_table_scale * lerpf(1.006, 1.0, t)
-		table_material.albedo_color = final_table_color
-		table_material.roughness = final_table_roughness
-		table_material.metallic = final_table_metallic
+		tabletop.scale = final_table_scale * lerpf(1.003, 1.0, t)
+		_restore_final_material()
 		pedestal.visible = false
 		_set_pedestal_growth(0.0)
 		_apply_match_camera()
@@ -363,13 +364,13 @@ func _apply_table_and_camera(elapsed: float) -> void:
 
 	var orbit_end: float = settle_end + CAMERA_ORBIT_MS
 	if elapsed <= orbit_end:
-		var t: float = _ease_in_out_cubic((elapsed - settle_end) / CAMERA_ORBIT_MS)
-		var table_t: float = _ease_in_out_cubic(clampf((t - 0.04) / 0.96, 0.0, 1.0))
+		var t: float = _smootherstep((elapsed - settle_end) / CAMERA_ORBIT_MS)
+		var table_t: float = _smootherstep(clampf((t - 0.03) / 0.94, 0.0, 1.0))
 		tabletop.position = final_table_position
 		tabletop.quaternion = face_camera_rotation.slerp(final_rotation, table_t).normalized()
 		tabletop.scale = final_table_scale
 		tabletop.visible = true
-		var pedestal_t: float = _ease_out_cubic(clampf((t - 0.28) / 0.72, 0.0, 1.0))
+		var pedestal_t: float = _smootherstep(clampf((t - 0.36) / 0.64, 0.0, 1.0))
 		pedestal.visible = pedestal_t > 0.001
 		_set_pedestal_growth(pedestal_t)
 		var start_offset: Vector3 = match_camera_position - orbit_center
@@ -385,18 +386,35 @@ func _apply_table_and_camera(elapsed: float) -> void:
 	_apply_final_camera()
 
 
+func _apply_bridge_material(value: float) -> void:
+	var t: float = clampf(value, 0.0, 1.0)
+	table_material.albedo_color = WHITE_STAR.lerp(final_table_color, t)
+	table_material.roughness = lerpf(0.54, final_table_roughness, t)
+	table_material.metallic = lerpf(0.0, final_table_metallic, t)
+	table_material.emission_enabled = true
+	table_material.emission = WHITE_STAR.lerp(final_table_color, t)
+	table_material.emission_energy_multiplier = lerpf(0.16, 0.0, t)
+
+
+func _restore_final_material() -> void:
+	table_material.albedo_color = final_table_color
+	table_material.roughness = final_table_roughness
+	table_material.metallic = final_table_metallic
+	table_material.emission_enabled = final_table_emission_enabled
+	table_material.emission = final_table_emission
+	table_material.emission_energy_multiplier = final_table_emission_energy
+
+
 func _apply_match_pose() -> void:
 	tabletop.position = final_table_position
 	tabletop.quaternion = face_camera_rotation
 	tabletop.scale = final_table_scale
 	tabletop.visible = true
-	table_material.albedo_color = WHITE_STAR
-	table_material.roughness = 0.54
-	table_material.metallic = 0.0
+	_apply_bridge_material(0.0)
 	pedestal.visible = false
 	_set_pedestal_growth(0.0)
 	_apply_match_camera()
-	magic_light.light_energy = 0.12
+	magic_light.light_energy = 0.08
 
 
 func _apply_match_camera() -> void:
@@ -426,27 +444,42 @@ func _begin_box_reveal() -> void:
 	intro.call("_apply_timeline", 0.0)
 	intro.set("playing", false)
 	box_final_poses.clear()
-	for node: GeometryInstance3D in game_nodes:
+	for index: int in game_nodes.size():
+		var node: GeometryInstance3D = game_nodes[index]
+		var delay_ms: float = 0.0
+		if index >= 2 and index < 6:
+			delay_ms = 70.0
+		elif index >= 6:
+			delay_ms = 130.0 + float((index - 6) % 12) * 6.0
 		box_final_poses[node] = {
 			"position": node.position,
 			"rotation": node.quaternion.normalized(),
 			"scale": node.scale,
+			"transparency": node.transparency,
+			"delay_ms": delay_ms,
 		}
 		node.position = node.position + Vector3(0.0, -BOX_START_DROP, 0.0)
 		node.scale = node.scale * BOX_START_SCALE
+		node.transparency = 1.0
 		node.visible = true
 	_publish_phase("box-arriving")
 
 
 func _apply_box_reveal(reveal_elapsed: float) -> void:
-	var t: float = _ease_in_out_cubic(reveal_elapsed / BOX_REVEAL_MS)
 	for node: GeometryInstance3D in game_nodes:
 		var pose: Dictionary = box_final_poses[node] as Dictionary
+		var delay_ms: float = float(pose["delay_ms"])
+		var local_duration: float = maxf(1.0, BOX_REVEAL_MS - delay_ms)
+		var raw_t: float = clampf((reveal_elapsed - delay_ms) / local_duration, 0.0, 1.0)
+		var t: float = _smootherstep(raw_t)
+		var fade_t: float = _smootherstep(clampf(raw_t / 0.78, 0.0, 1.0))
 		var final_position: Vector3 = pose["position"] as Vector3
 		var final_scale: Vector3 = pose["scale"] as Vector3
+		var final_transparency: float = float(pose["transparency"])
 		node.position = (final_position + Vector3(0.0, -BOX_START_DROP, 0.0)).lerp(final_position, t)
 		node.quaternion = pose["rotation"] as Quaternion
 		node.scale = (final_scale * BOX_START_SCALE).lerp(final_scale, t)
+		node.transparency = lerpf(1.0, final_transparency, fade_t)
 
 
 func _snap_table_final() -> void:
@@ -456,9 +489,7 @@ func _snap_table_final() -> void:
 	tabletop.visible = true
 	_set_pedestal_growth(1.0)
 	pedestal.visible = true
-	table_material.albedo_color = final_table_color
-	table_material.roughness = final_table_roughness
-	table_material.metallic = final_table_metallic
+	_restore_final_material()
 	if magic_light != null:
 		magic_light.light_energy = 0.0
 
@@ -470,6 +501,7 @@ func _snap_box_and_camera_final() -> void:
 		node.position = pose["position"] as Vector3
 		node.quaternion = pose["rotation"] as Quaternion
 		node.scale = pose["scale"] as Vector3
+		node.transparency = float(pose["transparency"])
 		node.visible = true
 
 
@@ -482,7 +514,7 @@ func _finish_and_start_intro() -> void:
 	intro.set_process_unhandled_input(true)
 	gameplay.set_process_input(true)
 	_publish_phase("complete")
-	print("YAKOLAK_PREINTRO_COMPLETE duration=%d motion=%s match=pixel-exact logo=wall camera=side box=visible" % [int(TOTAL_MS), MOTION_VERSION])
+	print("YAKOLAK_PREINTRO_COMPLETE duration=%d motion=%s match=pixel-exact logo=wall camera=side box=soft-staggered" % [int(TOTAL_MS), MOTION_VERSION])
 	intro.call("_restart_intro")
 	set_process(false)
 
@@ -515,22 +547,15 @@ func _publish_web_state(state: String) -> void:
 		"document.body.dataset.yakolakPreIntro='" + state + "';" +
 		"document.body.dataset.yakolakPreIntroDuration='" + str(int(TOTAL_MS)) + "';" +
 		"document.body.dataset.yakolakPreIntroShape='exact-svg-pixel-match';" +
+		"document.body.dataset.yakolakMaterialBridge='white-emission-to-material';" +
+		"document.body.dataset.yakolakBoxReveal='soft-staggered-fade';" +
+		"document.body.dataset.yakolakBoxRevealDuration='" + str(int(BOX_REVEAL_MS)) + "';" +
 		"document.body.dataset.yakolakMotion='" + MOTION_VERSION + "';" +
 		intro_wait_script,
 		true
 	)
 
 
-func _smooth(value: float) -> float:
+func _smootherstep(value: float) -> float:
 	var t: float = clampf(value, 0.0, 1.0)
-	return t * t * (3.0 - 2.0 * t)
-
-
-func _ease_out_cubic(value: float) -> float:
-	var t: float = clampf(value, 0.0, 1.0)
-	return 1.0 - pow(1.0 - t, 3.0)
-
-
-func _ease_in_out_cubic(value: float) -> float:
-	var t: float = clampf(value, 0.0, 1.0)
-	return 4.0 * t * t * t if t < 0.5 else 1.0 - pow(-2.0 * t + 2.0, 3.0) / 2.0
+	return t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
