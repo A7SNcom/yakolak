@@ -8,35 +8,39 @@ ROOT = Path(__file__).resolve().parents[1]
 
 REQUIRED: dict[str, tuple[str, ...]] = {
     "scripts/apply_web_loader.py": (
-        "data-loader-source=\"v129-loading-star-motion\"",
+        "data-loader-source=\"v130-loading-star-motion\"",
         "--loading-background:#000000",
         "--loading-star:#ffffff",
-        "--loading-shadow:#c8ccd3",
+        "--loading-shadow:#d7d9de",
         "--cycle:820ms",
         "animation:bounce var(--cycle) infinite",
         "animation:turn var(--cycle) linear infinite",
         "animation:shadow var(--cycle) infinite",
         "translateY(36px) scale(1.17,.72)",
         "100%{transform:rotate(24deg)}",
-        "transform:scale(1.28,1)",
+        "transform:scale(1.30,1)",
         "yakolak-logo.svg",
         "loaderLogoMtkyf",
-        "balanced-logos-fade-then-star",
+        "yakolak-upper-center-star-center-mtkyf-lower-center",
+        "logos-fade-then-canonical-star",
+        "table-svg-exact-path",
+        "canonical-zero-degree-shared-contour",
         "yakolakLoaderHandoff='waiting'",
         "H('matched')",
     ),
     "scripts/pre_intro_refinement.gd": (
-        "svg-native-unmirrored",
-        "direct-centered-lerp",
-        "direct-fixed-distance-look-at",
+        "canonical-shared-svg",
+        "direct-safe-framed",
         "Quaternion(Vector3.RIGHT, deg_to_rad(90.0))",
-        "start_direction.lerp(end_direction, t)",
-        "camera.position = center + blended_direction * safe_distance",
+        "direct_position: Vector3 = start_position.lerp(end_position, t)",
+        "camera.position = center + direct_direction * maxf(direct_offset.length(), safe_distance)",
         "camera.look_at(center, Vector3.UP)",
-        "pixel-matched-2d-to-3d-v4",
+        "_apply_safe_optical_framing()",
+        "SAFE_WIDTH_RATIO: float = 0.90",
+        "pixel-matched-direct-safe-framing-v5",
     ),
     "tests/intro_smoke.spec.js": (
-        "source: 'v129-loading-star-motion'",
+        "source: 'v130-loading-star-motion'",
         "bounceDuration: '0.82s'",
         "turnDuration: '0.82s'",
         "shadowDuration: '0.82s'",
@@ -52,14 +56,16 @@ REQUIRED: dict[str, tuple[str, ...]] = {
     "tests/pre_intro_smoke.spec.js": (
         "yakolakMatchErrorPx",
         "YAKOLAK_PREINTRO_PHASE camera-orbit",
-        "svg-native-unmirrored",
-        "direct-centered-lerp",
+        "canonical-shared-svg",
+        "direct-safe-framed",
+        "yakolakCameraMaxCoverage",
+        "canonical-zero-degree-shared-contour",
         "loaderLogoMtkyf",
         "hidden-after-fade",
     ),
     "scripts/vercel-build.sh": (
         "npx playwright test tests/intro_smoke.spec.js",
-        "YAKOLAK 2.8 passed exact v129 bounce geometry",
+        "YAKOLAK 3.4 passed exact v130 canonical star geometry",
     ),
 }
 
@@ -73,6 +79,8 @@ FORBIDDEN: dict[str, tuple[str, ...]] = {
     "scripts/pre_intro_refinement.gd": (
         "direction.normalized().slerp",
         "camera.position = start_position.lerp(end_position, t)",
+        "pixel-matched-2d-to-3d-v4",
+        "direct-centered-lerp",
     ),
 }
 
@@ -105,7 +113,7 @@ def main() -> int:
             print(f"- {failure}")
         return 1
 
-    print("YAKOLAK approved loader, exact shape orientation, distance-safe camera motion, and gameplay contract preserved")
+    print("YAKOLAK approved delayed logos, canonical teeth, safe direct camera motion, and gameplay contract preserved")
     return 0
 
 
