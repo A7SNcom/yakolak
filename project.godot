@@ -1,8 +1,8 @@
-; YAKOLAK 2.6 — corrected intro from existing approved versions
+; YAKOLAK 3.0 — approved intro with complete local match loop
 config_version=5
 
 [application]
-config/name="YAKOLAK 2.6 Corrected Intro"
+config/name="YAKOLAK 3.0 Local Match"
 run/main_scene="res://scenes/intro.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
