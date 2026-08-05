@@ -1,8 +1,8 @@
 extends Node
 
 # Dedicated round continuation/rematch action.
-# Native Godot Control remains as fallback. Web builds use a transparent DOM button
-# that writes a one-shot flag read by Godot, avoiding browser callback inconsistencies.
+# Native Godot Control remains as fallback. Web builds use a DOM action area and
+# a document-level capture listener, so even a tap in the first winning frame is kept.
 
 var gameplay: Node
 var layer: CanvasLayer
@@ -62,7 +62,7 @@ func _build_button() -> void:
 func _build_web_button() -> void:
 	if not OS.has_feature("web"):
 		return
-	var script: String = "(function(){document.body.dataset.yakolakRoundAction='';document.body.dataset.yakolakRoundActionVisible='false';var b=document.getElementById('yakolak-round-action');if(!b){b=document.createElement('button');b.id='yakolak-round-action';b.type='button';b.setAttribute('aria-label','بدء الجولة التالية');b.style.cssText='position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,90vw);height:130px;z-index:2147483647;display:none;border:0;padding:0;background:rgba(0,0,0,0.001);cursor:pointer;pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent;';var request=function(e){e.preventDefault();e.stopPropagation();document.body.dataset.yakolakRoundAction='1';};b.addEventListener('pointerdown',request,{passive:false});b.addEventListener('click',request,{passive:false});document.body.appendChild(b);}})();"
+	var script: String = "(function(){document.body.dataset.yakolakRoundAction='';document.body.dataset.yakolakRoundActionVisible='false';var request=function(e){var s=document.body.dataset.yakolakMatchState||'';if(s!=='round-complete'&&s!=='match-complete'){return;}e.preventDefault();e.stopPropagation();document.body.dataset.yakolakRoundAction='1';};if(!window.__yakolakRoundCapture){window.__yakolakRoundCapture=true;document.addEventListener('pointerdown',request,true);document.addEventListener('touchstart',request,{capture:true,passive:false});document.addEventListener('mousedown',request,true);}var b=document.getElementById('yakolak-round-action');if(!b){b=document.createElement('button');b.id='yakolak-round-action';b.type='button';b.setAttribute('aria-label','بدء الجولة التالية');b.style.cssText='position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,90vw);height:130px;z-index:2147483647;display:none;border:0;padding:0;background:rgba(0,0,0,0.001);cursor:pointer;pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent;';b.addEventListener('pointerdown',request,{passive:false});b.addEventListener('click',request,{passive:false});document.body.appendChild(b);}})();"
 	JavaScriptBridge.eval(script, true)
 	print("YAKOLAK_ROUND_ACTION_WEB_READY")
 
