@@ -5,7 +5,7 @@ GODOT_VERSION="4.7.1"
 GODOT_TAG="4.7.1-stable"
 RELEASE="https://github.com/godotengine/godot-builds/releases/download/${GODOT_TAG}"
 
-echo "Building YAKOLAK 2.7 — level star table and rolling-star loader"
+echo "Building YAKOLAK 2.8 — original v129 loading-star motion"
 
 curl --fail --location --retry 4 --connect-timeout 20 --max-time 180 \
   "${RELEASE}/Godot_v${GODOT_TAG}_linux.x86_64.zip" --output /tmp/godot.zip
@@ -42,17 +42,17 @@ sha256sum \
   generated/*.obj
 
 set -o pipefail
-"$GODOT_BIN" --headless --editor --path . --quit-after 30 2>&1 | tee /tmp/yakolak27-import.log
-if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file|Could not parse|ERROR:" /tmp/yakolak27-import.log; then
+"$GODOT_BIN" --headless --editor --path . --quit-after 30 2>&1 | tee /tmp/yakolak28-import.log
+if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file|Could not parse|ERROR:" /tmp/yakolak28-import.log; then
   echo "Godot import or script validation failed."
   exit 1
 fi
 
 set +e
-"$GODOT_BIN" --headless --path . --export-release "Web" web/index.html 2>&1 | tee /tmp/yakolak27-export.log
+"$GODOT_BIN" --headless --path . --export-release "Web" web/index.html 2>&1 | tee /tmp/yakolak28-export.log
 export_status=${PIPESTATUS[0]}
 set -e
-if [ "$export_status" -ne 0 ] || grep -E "SCRIPT ERROR|Parse Error|Failed to load script|ERROR:" /tmp/yakolak27-export.log; then
+if [ "$export_status" -ne 0 ] || grep -E "SCRIPT ERROR|Parse Error|Failed to load script|ERROR:" /tmp/yakolak28-export.log; then
   echo "Godot Web export failed."
   exit 1
 fi
@@ -62,9 +62,19 @@ test -s web/index.js
 test -s web/index.wasm
 test -s web/index.pck
 python3 scripts/apply_web_loader.py
-grep -q "yakolak-rolling-star-loader-style" web/index.html
-grep -q "data-loader-kind=\"rolling-star\"" web/index.html
-grep -q "yakolak-star-roll" web/index.html
+
+grep -q "yakolak-v129-loading-star-style" web/index.html
+grep -q "data-loader-source=\"v129-loading-star-motion\"" web/index.html
+grep -q "--cycle:820ms" web/index.html
+grep -q "animation:bounce var(--cycle) infinite" web/index.html
+grep -q "animation:turn var(--cycle) linear infinite" web/index.html
+grep -q "animation:shadow var(--cycle) infinite" web/index.html
+grep -q "translateY(36px) scale(1.17,.72)" web/index.html
+grep -q "100%{transform:rotate(24deg)}" web/index.html
+if grep -q "translateX(" web/index.html || grep -q "rotate(-420deg)" web/index.html; then
+  echo "Rejected invented horizontal star motion is still present."
+  exit 1
+fi
 if grep -q "yakolakLoaderProgress" web/index.html; then
   echo "Rejected progress-bar loader is still present."
   exit 1
@@ -99,7 +109,7 @@ if ldd "$CHROMIUM_BIN" | grep -q "not found"; then
   exit 1
 fi
 
-python3 -m http.server 8000 --directory web >/tmp/yakolak27-server.log 2>&1 &
+python3 -m http.server 8000 --directory web >/tmp/yakolak28-server.log 2>&1 &
 server_pid=$!
 cleanup() {
   kill "$server_pid" >/dev/null 2>&1 || true
@@ -111,9 +121,8 @@ PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1 \
 cleanup
 trap - EXIT
 
-test -s web/loader-mobile.png
 test -s web/intro-mobile-motion.png
 test -s web/intro-mobile-final.png
 test -s web/intro-desktop-motion.png
-echo "YAKOLAK 2.7 passed rolling-star loader and level camera/table verification"
-du -h web/index.wasm web/index.pck web/loader-mobile.png web/intro-mobile-motion.png web/intro-mobile-final.png web/intro-desktop-motion.png
+echo "YAKOLAK 2.8 passed exact v129 loader and unchanged camera/table verification"
+du -h web/index.wasm web/index.pck web/intro-mobile-motion.png web/intro-mobile-final.png web/intro-desktop-motion.png
