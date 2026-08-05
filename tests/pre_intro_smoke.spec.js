@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
-// Visual gate: loading star -> framed 3D table -> closed box arrival -> complete unboxing.
+// Visual gate: exact loader -> polished table formation -> closed box arrival ->
+// complete unboxing. The test also proves the studio palette is active.
 test.use({
   viewport: { width: 390, height: 844 },
   hasTouch: true,
@@ -18,7 +19,7 @@ test.use({
   }
 });
 
-test('the loading star becomes a framed table before the complete approved unboxing', async ({ page }) => {
+test('the polished loading-star journey reaches the complete playable intro', async ({ page }) => {
   test.setTimeout(180000);
   const failures = [];
   const sequence = [];
@@ -28,7 +29,7 @@ test('the loading star becomes a framed table before the complete approved unbox
   page.on('console', message => {
     const text = message.text();
     console.log(`[browser:${message.type()}] ${text}`);
-    if (text.includes('YAKOLAK_PREINTRO_') || text.includes('YAKOLAK_INTRO_')) sequence.push(text);
+    if (text.includes('YAKOLAK_PREINTRO_') || text.includes('YAKOLAK_INTRO_') || text.includes('YAKOLAK_VISUAL_')) sequence.push(text);
     if (message.type() === 'error' && !text.includes('favicon')) failures.push(`console: ${text}`);
   });
 
@@ -42,7 +43,11 @@ test('the loading star becomes a framed table before the complete approved unbox
   await page.screenshot({ path: 'web/preintro-01-loader.png' });
 
   await page.waitForFunction(
-    () => document.body.dataset.yakolakPreIntroShape === 'loading-star-to-approved-table' &&
+    () => document.body.dataset.yakolakVisual === 'studio-neutral-v2' &&
+          document.body.dataset.yakolakLighting === 'balanced-studio' &&
+          document.body.dataset.yakolakPalette === 'professional-neutral' &&
+          document.body.dataset.yakolakMotion === 'cinematic-continuous-v2' &&
+          document.body.dataset.yakolakPreIntroShape === 'loading-star-to-approved-table' &&
           document.body.dataset.yakolakLoaderHandoff === 'continuous-star-to-table' &&
           document.body.dataset.yakolakPreIntro !== 'waiting-for-handoff',
     null,
@@ -51,34 +56,36 @@ test('the loading star becomes a framed table before the complete approved unbox
   await expect(loader).toHaveCount(0, { timeout: 5000 });
 
   await page.waitForFunction(
-    () => ['table-forming', 'table-settling', 'table-settled', 'box-arriving'].includes(document.body.dataset.yakolakPreIntro),
+    () => document.body.dataset.yakolakPreIntro === 'table-settled',
     null,
     { timeout: 10000 }
   );
+  await page.screenshot({ path: 'web/preintro-02-table-settled.png' });
 
   await page.waitForFunction(
     () => document.body.dataset.yakolakPreIntro === 'box-arriving',
     null,
     { timeout: 10000 }
   );
-  await page.screenshot({ path: 'web/preintro-02-box-arriving.png' });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'web/preintro-03-box-arriving.png' });
 
-  // Do not require catching a brief intro phase after the screenshot. Wait for
-  // the actual completed unboxing and prove every phase order from console events.
   await page.waitForFunction(
     () => document.body.dataset.yakolakPreIntro === 'complete' &&
           document.body.dataset.yakolakIntro === 'complete' &&
-          document.body.dataset.yakolakPhase === 'complete',
+          document.body.dataset.yakolakPhase === 'complete' &&
+          document.body.dataset.yakolakGameplay === 'ready',
     null,
     { timeout: 25000 }
   );
-  await page.screenshot({ path: 'web/preintro-03-unboxing-complete.png' });
+  await page.screenshot({ path: 'web/preintro-04-unboxing-complete.png' });
 
   expect(await page.evaluate(() => document.body.dataset.yakolakTable)).toBe('approved-star-svg');
   expect(await page.evaluate(() => document.body.dataset.yakolakTableLevel)).toBe('true');
-  expect(await page.evaluate(() => document.body.dataset.yakolakPreIntroDuration)).toBe('3880');
+  expect(await page.evaluate(() => document.body.dataset.yakolakPreIntroDuration)).toBe('2880');
 
   const joined = sequence.join('\n');
+  const visual = sequence.findIndex(line => line.includes('YAKOLAK_VISUAL_POLISH_READY'));
   const handoff = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE handoff'));
   const floating = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE star-floating'));
   const forming = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE table-forming'));
@@ -92,7 +99,8 @@ test('the loading star becomes a framed table before the complete approved unbox
   const stones = sequence.findIndex((line, index) => index > bases && line.includes('YAKOLAK_INTRO_PHASE stones-moving'));
   const introComplete = sequence.findIndex((line, index) => index > stones && line.includes('YAKOLAK_INTRO_COMPLETE'));
 
-  expect(handoff).toBeGreaterThanOrEqual(0);
+  expect(visual).toBeGreaterThanOrEqual(0);
+  expect(handoff).toBeGreaterThan(visual);
   expect(floating).toBeGreaterThan(handoff);
   expect(forming).toBeGreaterThan(floating);
   expect(settling).toBeGreaterThan(forming);
@@ -104,6 +112,7 @@ test('the loading star becomes a framed table before the complete approved unbox
   expect(bases).toBeGreaterThan(lidRise);
   expect(stones).toBeGreaterThan(bases);
   expect(introComplete).toBeGreaterThan(stones);
-  expect(joined).toContain('star=loading-star table=approved-star-svg box=visible');
+  expect(joined).toContain('motion=cinematic-continuous-v2');
+  expect(joined).toContain('palette=studio-neutral');
   expect(failures).toEqual([]);
 });
