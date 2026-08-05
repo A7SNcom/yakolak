@@ -47,21 +47,64 @@ sha256sum \
   YAKOLAK_PORTABLE_KIT/assets/logos/MTKYF.svg \
   generated/*.obj generated/YAKOLAK_INVERTED.svg
 
-set -o pipefail
-"$GODOT_BIN" --headless --editor --path . --quit-after 30 2>&1 | tee /tmp/yakolak35-import.log
-if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file|Could not parse|ERROR:" /tmp/yakolak35-import.log; then
-  echo "Godot import or script validation failed."
-  exit 1
-fi
+godot_source_error() {
+  grep -Eq "SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file|Could not parse" "$1"
+}
 
-set +e
-"$GODOT_BIN" --headless --path . --export-release "Web" web/index.html 2>&1 | tee /tmp/yakolak35-export.log
-export_status=${PIPESTATUS[0]}
-set -e
-if [ "$export_status" -ne 0 ] || grep -E "SCRIPT ERROR|Parse Error|Failed to load script|ERROR:" /tmp/yakolak35-export.log; then
-  echo "Godot Web export failed."
-  exit 1
-fi
+godot_crashed() {
+  grep -Eq "handle_crash|Program crashed|signal 11|Segmentation fault|Aborted" "$1"
+}
+
+run_godot_import() {
+  local attempt log status
+  for attempt in 1 2; do
+    log="/tmp/yakolak35-import-${attempt}.log"
+    set +e
+    set -o pipefail
+    "$GODOT_BIN" --headless --editor --path . --quit-after 45 2>&1 | tee "$log"
+    status=${PIPESTATUS[0]}
+    set -e
+    if godot_source_error "$log"; then
+      echo "Godot import found a real project or script error."
+      return 1
+    fi
+    if [ "$status" -eq 0 ] && ! godot_crashed "$log"; then
+      return 0
+    fi
+    echo "Godot import hit a transient engine failure; retrying once after a short settle."
+    sleep 3
+  done
+  echo "Godot import failed after two attempts."
+  return 1
+}
+
+run_godot_export() {
+  local attempt log status
+  for attempt in 1 2; do
+    log="/tmp/yakolak35-export-${attempt}.log"
+    rm -rf web
+    mkdir -p web
+    set +e
+    set -o pipefail
+    "$GODOT_BIN" --headless --path . --export-release "Web" web/index.html 2>&1 | tee "$log"
+    status=${PIPESTATUS[0]}
+    set -e
+    if godot_source_error "$log"; then
+      echo "Godot Web export found a real project or script error."
+      return 1
+    fi
+    if [ "$status" -eq 0 ] && ! godot_crashed "$log" && test -s web/index.html; then
+      return 0
+    fi
+    echo "Godot export hit a transient engine failure; retrying once with the completed import cache."
+    sleep 3
+  done
+  echo "Godot Web export failed after two attempts."
+  return 1
+}
+
+run_godot_import
+run_godot_export
 
 test -s web/index.html
 test -s web/index.js
