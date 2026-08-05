@@ -3,7 +3,7 @@
   "buildCommand": "bash scripts/vercel-build.sh",
   "outputDirectory": "web",
   "framework": null,
-  "ignoreCommand": "exit 0",
+  "ignoreCommand": "printf 'Stage 2 paused until stage 1 approval\\n'; exit 0",
   "github": {
     "autoJobCancelation": true
   },
