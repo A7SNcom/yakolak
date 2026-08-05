@@ -102,7 +102,8 @@ test('four local turns, active camera framing, official win detection, scoring, 
   expect(await page.evaluate(() => document.body.dataset.yakolakMatchComplete)).toBe('false');
   await page.screenshot({ path: 'web/local-match-round-win.png', fullPage: false, timeout: 60000 });
 
-  await page.keyboard.press('Enter');
+  // Use the same interaction shown to mobile players: touch the victory overlay.
+  await page.touchscreen.tap(195, 422);
   await page.waitForFunction(
     () => document.body.dataset.yakolakRound === '2' &&
       document.body.dataset.yakolakMoves === '0' &&
