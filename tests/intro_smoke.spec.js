@@ -52,7 +52,7 @@ test('corrected intro keeps the camera and star table level and uses the rolling
   await page.screenshot({ path: 'web/loader-mobile.png', fullPage: false, timeout: 120000 });
 
   await page.waitForFunction(
-    () => document.body.dataset.yakolakIntro === 'playing',
+    () => ['playing', 'complete'].includes(document.body.dataset.yakolakIntro),
     null,
     { timeout: 60000 }
   );
@@ -67,6 +67,15 @@ test('corrected intro keeps the camera and star table level and uses the rolling
   );
   await expect(loader).toHaveCount(0, { timeout: 5000 });
 
+  // The loader capture can be slow in SwiftShader, so replay before capturing motion.
+  if (await page.evaluate(() => document.body.dataset.yakolakIntro === 'complete')) {
+    await page.locator('canvas').click({ position: { x: 195, y: 422 } });
+    await page.waitForFunction(
+      () => document.body.dataset.yakolakIntro === 'playing',
+      null,
+      { timeout: 5000 }
+    );
+  }
   await page.waitForTimeout(900);
   await page.screenshot({ path: 'web/intro-mobile-motion.png', fullPage: false, timeout: 120000 });
 
