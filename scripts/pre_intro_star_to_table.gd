@@ -2,8 +2,8 @@ extends Node
 
 # Pixel-matched 2D -> 3D handoff.
 # The DOM star and the Godot tabletop share the exact table.svg silhouette.
-# Godot projects the real 3D tabletop to screen coordinates, the DOM element
-# moves to that rectangle, then the two layers crossfade without a cut.
+# Godot projects the real 3D tabletop to screen coordinates, converts those
+# coordinates to the canvas CSS pixels, and only then hands them to the DOM.
 
 const MATCH_HOLD_MS: float = 260.0
 const MORPH_MS: float = 760.0
@@ -107,6 +107,7 @@ func _process(_delta: float) -> void:
 		return
 
 	if not box_reveal_started:
+		_publish_timeline_phase(TABLE_TOTAL_MS)
 		_begin_box_reveal()
 	var box_elapsed: float = elapsed - TABLE_TOTAL_MS
 	_apply_box_reveal(minf(box_elapsed, BOX_REVEAL_MS))
@@ -214,17 +215,33 @@ func _prepare_pixel_match() -> bool:
 
 
 func _publish_match_geometry() -> bool:
-	var star_rect: Rect2 = _projected_rect(tabletop)
-	var logo_rect: Rect2 = _projected_rect(wall_logo)
-	if star_rect.size.x < 32.0 or star_rect.size.y < 32.0 or logo_rect.size.x < 24.0:
+	var star_internal: Rect2 = _projected_rect(tabletop)
+	var logo_internal: Rect2 = _projected_rect(wall_logo)
+	if star_internal.size.x < 32.0 or star_internal.size.y < 32.0 or logo_internal.size.x < 24.0:
 		return false
 
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
-	var center_error: float = star_rect.get_center().distance_to(viewport_size * 0.5)
+	var canvas_rect: Rect2 = _canvas_css_rect()
+	if viewport_size.x < 1.0 or viewport_size.y < 1.0 or canvas_rect.size.x < 1.0 or canvas_rect.size.y < 1.0:
+		return false
+	var css_scale := Vector2(
+		canvas_rect.size.x / viewport_size.x,
+		canvas_rect.size.y / viewport_size.y
+	)
+	var star_rect := Rect2(
+		canvas_rect.position + star_internal.position * css_scale,
+		star_internal.size * css_scale
+	)
+	var logo_rect := Rect2(
+		canvas_rect.position + logo_internal.position * css_scale,
+		logo_internal.size * css_scale
+	)
+	var center_error: float = star_rect.get_center().distance_to(canvas_rect.get_center())
 	print(
-		"YAKOLAK_PIXEL_MATCH_READY star=(%.2f,%.2f %.2fx%.2f) center_error=%.3f logo=(%.2f,%.2f %.2fx%.2f)" % [
+		"YAKOLAK_PIXEL_MATCH_READY css=(%.2f,%.2f %.2fx%.2f) internal=(%.2f,%.2f %.2fx%.2f) center_error=%.3f scale=(%.5f,%.5f) logo=(%.2f,%.2f %.2fx%.2f)" % [
 			star_rect.position.x, star_rect.position.y, star_rect.size.x, star_rect.size.y,
-			center_error,
+			star_internal.position.x, star_internal.position.y, star_internal.size.x, star_internal.size.y,
+			center_error, css_scale.x, css_scale.y,
 			logo_rect.position.x, logo_rect.position.y, logo_rect.size.x, logo_rect.size.y,
 		]
 	)
@@ -235,11 +252,32 @@ func _publish_match_geometry() -> bool:
 			"star:{x:" + str(star_rect.position.x) + ",y:" + str(star_rect.position.y) + ",w:" + str(star_rect.size.x) + ",h:" + str(star_rect.size.y) + "}," +
 			"logo:{x:" + str(logo_rect.position.x) + ",y:" + str(logo_rect.position.y) + ",w:" + str(logo_rect.size.x) + ",h:" + str(logo_rect.size.y) + "}" +
 			"};" +
-			"document.body.dataset.yakolakMatchCenterError='" + str(center_error) + "';"
+			"document.body.dataset.yakolakMatchCenterError='" + str(center_error) + "';" +
+			"document.body.dataset.yakolakMatchReady='true';"
 		)
 		JavaScriptBridge.eval(script, true)
 	_publish_web_state("match-ready")
 	return true
+
+
+func _canvas_css_rect() -> Rect2:
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	if not OS.has_feature("web"):
+		return Rect2(Vector2.ZERO, viewport_size)
+	var raw: Variant = JavaScriptBridge.eval(
+		"JSON.stringify((()=>{const c=document.getElementById('canvas');const r=c?c.getBoundingClientRect():{left:0,top:0,width:window.innerWidth,height:window.innerHeight};return{x:r.left,y:r.top,w:r.width,h:r.height};})())",
+		true
+	)
+	var parsed: Variant = JSON.parse_string(str(raw))
+	if parsed is Dictionary:
+		var data := parsed as Dictionary
+		var rect := Rect2(
+			Vector2(float(data.get("x", 0.0)), float(data.get("y", 0.0))),
+			Vector2(float(data.get("w", 0.0)), float(data.get("h", 0.0)))
+		)
+		if rect.size.x > 1.0 and rect.size.y > 1.0:
+			return rect
+	return Rect2(Vector2.ZERO, viewport_size)
 
 
 func _projected_rect(instance: MeshInstance3D) -> Rect2:
@@ -436,13 +474,13 @@ func _publish_timeline_phase(elapsed: float) -> void:
 	if published_phase < 1 and elapsed >= MATCH_HOLD_MS:
 		published_phase = 1
 		_publish_phase("star-to-3d")
-	elif published_phase < 2 and elapsed >= MATCH_HOLD_MS + MORPH_MS:
+	if published_phase < 2 and elapsed >= MATCH_HOLD_MS + MORPH_MS:
 		published_phase = 2
 		_publish_phase("table-settling")
-	elif published_phase < 3 and elapsed >= MATCH_HOLD_MS + MORPH_MS + SETTLE_MS:
+	if published_phase < 3 and elapsed >= MATCH_HOLD_MS + MORPH_MS + SETTLE_MS:
 		published_phase = 3
 		_publish_phase("camera-orbit")
-	elif published_phase < 4 and elapsed >= MATCH_HOLD_MS + MORPH_MS + SETTLE_MS + CAMERA_ORBIT_MS:
+	if published_phase < 4 and elapsed >= MATCH_HOLD_MS + MORPH_MS + SETTLE_MS + CAMERA_ORBIT_MS:
 		published_phase = 4
 		_publish_phase("camera-settled")
 

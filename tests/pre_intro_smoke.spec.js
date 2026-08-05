@@ -62,7 +62,7 @@ test('black loader pixel-matches the real table, hands off the logo, and reaches
   await page.screenshot({ path: 'web/preintro-01-black-loader-logo.png' });
 
   await page.waitForFunction(
-    () => document.body.dataset.yakolakPreIntro === 'match-ready' &&
+    () => document.body.dataset.yakolakMatchReady === 'true' &&
           document.body.dataset.yakolakVisual === 'black-studio-v3' &&
           document.body.dataset.yakolakWallLogo === 'shared-yakolak-svg' &&
           window.__yakolakMatch?.star?.w > 200 &&
@@ -81,12 +81,19 @@ test('black loader pixel-matches the real table, hands off the logo, and reaches
     domError: Number(document.body.dataset.yakolakMatchErrorPx || 999),
     centerError: Number(document.body.dataset.yakolakMatchCenterError || 999),
     star: window.__yakolakMatch?.star || null,
-    logo: window.__yakolakMatch?.logo || null
+    logo: window.__yakolakMatch?.logo || null,
+    canvas: (() => {
+      const r = document.getElementById('canvas')?.getBoundingClientRect();
+      return r ? { x: r.left, y: r.top, w: r.width, h: r.height } : null;
+    })()
   }));
+  expect(match.canvas).not.toBeNull();
   expect(match.domError).toBeLessThanOrEqual(1.5);
   expect(match.centerError).toBeLessThanOrEqual(1.5);
-  expect(Math.abs((match.star.x + match.star.w / 2) - 195)).toBeLessThanOrEqual(1.5);
-  expect(Math.abs((match.star.y + match.star.h / 2) - 422)).toBeLessThanOrEqual(1.5);
+  expect(Math.abs((match.star.x + match.star.w / 2) - (match.canvas.x + match.canvas.w / 2))).toBeLessThanOrEqual(1.5);
+  expect(Math.abs((match.star.y + match.star.h / 2) - (match.canvas.y + match.canvas.h / 2))).toBeLessThanOrEqual(1.5);
+  expect(match.star.w).toBeLessThanOrEqual(match.canvas.w);
+  expect(match.star.h).toBeLessThanOrEqual(match.canvas.h);
   await page.screenshot({ path: 'web/preintro-03-pixel-matched.png' });
 
   await expect.poll(
