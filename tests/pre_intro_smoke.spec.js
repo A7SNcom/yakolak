@@ -6,6 +6,7 @@ test.use({
   viewport: { width: 390, height: 844 },
   hasTouch: true,
   isMobile: true,
+  video: 'on',
   launchOptions: {
     args: [
       '--use-gl=angle',
@@ -39,6 +40,7 @@ test('the exact loading star continuously becomes the approved table before unbo
   expect(await loader.getAttribute('data-loader-source')).toBe('v129-loading-star-motion');
   expect(await page.locator('.loadingStar').getAttribute('viewBox')).toBe('0 0 802 798');
   expect(await page.locator('.loadingStar path').getAttribute('d')).toContain('M0,-191.393');
+  await page.screenshot({ path: 'web/preintro-01-loader.png' });
 
   await page.waitForFunction(
     () => document.body.dataset.yakolakPreIntro === 'handoff' &&
@@ -49,12 +51,13 @@ test('the exact loading star continuously becomes the approved table before unbo
   expect(await page.evaluate(() => document.body.dataset.yakolakIntro)).not.toBe('complete');
 
   await page.waitForFunction(
-    () => ['table-forming', 'table-settling', 'table-settled', 'complete'].includes(document.body.dataset.yakolakPreIntro),
+    () => ['table-forming', 'table-settling'].includes(document.body.dataset.yakolakPreIntro),
     null,
     { timeout: 10000 }
   );
   await expect(loader).toHaveCount(0, { timeout: 5000 });
   expect(await page.evaluate(() => document.body.dataset.yakolakLoaderHandoff)).toBe('continuous-star-to-table');
+  await page.screenshot({ path: 'web/preintro-02-forming.png' });
 
   await page.waitForFunction(
     () => document.body.dataset.yakolakPreIntro === 'complete' &&
@@ -63,6 +66,7 @@ test('the exact loading star continuously becomes the approved table before unbo
     null,
     { timeout: 15000 }
   );
+  await page.screenshot({ path: 'web/preintro-03-unboxing.png' });
 
   expect(await page.evaluate(() => document.body.dataset.yakolakTable)).toBe('approved-star-svg');
   expect(await page.evaluate(() => document.body.dataset.yakolakTableLevel)).toBe('true');
