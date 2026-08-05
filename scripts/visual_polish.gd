@@ -3,6 +3,8 @@ extends Node
 # Studio-grade visual pass for the Godot Web build.
 # Keeps the approved geometry and gameplay while fixing flat contrast, crushed
 # blacks, blown highlights, weak depth, and unnecessary mobile shadow cost.
+# It also keeps the transforming star facing the camera until it deliberately
+# rotates into the horizontal tabletop, so it never reads as a shell or blob.
 
 const VISUAL_VERSION: String = "studio-neutral-v2"
 const BACKGROUND_COLOR: Color = Color("#313943")
@@ -17,31 +19,41 @@ const BLUE_COLOR: Color = Color("#315ba4")
 const PEDESTAL_HALF_HEIGHT: float = 12.25
 const PEDESTAL_HEIGHT_SCALE: float = 0.66
 const FLOOR_Y: float = -17.08
+const STAR_FLOAT_END_MS: float = 880.0
+const STAR_FORM_END_MS: float = 1680.0
 
 var intro: Node3D
+var preintro: Node
+var camera: Camera3D
+var tabletop: MeshInstance3D
 var initialized: bool = false
 
 
 func _ready() -> void:
-	process_priority = 150
+	# Run after the pre-intro controller so this visual-only correction is the
+	# final transform applied for the frame.
+	process_priority = 250
 	intro = get_parent() as Node3D
+	preintro = intro.get_node_or_null("StarToTablePreIntro")
 	set_process(true)
 
 
 func _process(_delta: float) -> void:
-	if initialized or intro == null:
+	if intro == null:
 		return
-	initialized = _apply_when_ready()
-	if initialized:
-		set_process(false)
+	if not initialized:
+		initialized = _apply_when_ready()
+		return
+	_keep_star_readable_during_handoff()
 
 
 func _apply_when_ready() -> bool:
-	var tabletop := intro.get_node_or_null("ApprovedStarTableSVG") as MeshInstance3D
+	tabletop = intro.get_node_or_null("ApprovedStarTableSVG") as MeshInstance3D
 	var pedestal := intro.get_node_or_null("ApprovedStarTablePedestal") as MeshInstance3D
 	var board := intro.get_node_or_null("Board") as MeshInstance3D
 	var lid := intro.get_node_or_null("Lid") as MeshInstance3D
-	if tabletop == null or pedestal == null or board == null or lid == null:
+	camera = intro.get("camera") as Camera3D
+	if tabletop == null or pedestal == null or board == null or lid == null or camera == null:
 		return false
 
 	var directionals: Array[DirectionalLight3D] = []
@@ -95,6 +107,32 @@ func _apply_when_ready() -> bool:
 	_add_studio_floor()
 	_publish_ready()
 	return true
+
+
+func _keep_star_readable_during_handoff() -> void:
+	if preintro == null:
+		preintro = intro.get_node_or_null("StarToTablePreIntro")
+	if preintro == null or not bool(preintro.get("initialized")) or bool(preintro.get("completed")):
+		return
+	var started_msec: int = int(preintro.get("started_msec"))
+	if started_msec <= 0:
+		return
+	var elapsed: float = float(Time.get_ticks_msec() - started_msec)
+	if elapsed > STAR_FORM_END_MS:
+		return
+
+	var view_direction: Vector3 = (camera.global_position - tabletop.global_position).normalized()
+	if view_direction.length_squared() < 0.9:
+		return
+	var face_camera: Quaternion = Quaternion(Vector3.UP, view_direction).normalized()
+	face_camera = (face_camera * Quaternion(Vector3.UP, deg_to_rad(8.0))).normalized()
+
+	if elapsed <= STAR_FLOAT_END_MS:
+		tabletop.quaternion = face_camera
+	else:
+		var t: float = _ease_in_out_cubic((elapsed - STAR_FLOAT_END_MS) / (STAR_FORM_END_MS - STAR_FLOAT_END_MS))
+		var final_rotation: Quaternion = preintro.get("final_rotation")
+		tabletop.quaternion = face_camera.slerp(final_rotation, t).normalized()
 
 
 func _apply_environment(environment: Environment) -> void:
@@ -178,13 +216,19 @@ func _new_material(color: Color, roughness: float, metallic: float) -> StandardM
 	return material
 
 
+func _ease_in_out_cubic(value: float) -> float:
+	var t: float = clampf(value, 0.0, 1.0)
+	return 4.0 * t * t * t if t < 0.5 else 1.0 - pow(-2.0 * t + 2.0, 3.0) / 2.0
+
+
 func _publish_ready() -> void:
-	print("YAKOLAK_VISUAL_POLISH_READY version=%s palette=studio-neutral lighting=balanced shadows=mobile pedestal=short" % VISUAL_VERSION)
+	print("YAKOLAK_VISUAL_POLISH_READY version=%s palette=studio-neutral lighting=balanced shadows=mobile pedestal=short star=facing-camera" % VISUAL_VERSION)
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakVisual='" + VISUAL_VERSION + "';" +
 			"document.body.dataset.yakolakLighting='balanced-studio';" +
 			"document.body.dataset.yakolakPalette='professional-neutral';" +
-			"document.body.dataset.yakolakPedestal='short-proportional';",
+			"document.body.dataset.yakolakPedestal='short-proportional';" +
+			"document.body.dataset.yakolakStarFacing='camera-readable';",
 			true
 		)
