@@ -65,7 +65,7 @@ python3 scripts/apply_web_loader.py
 
 grep -q "yakolak-v129-loading-star-style" web/index.html
 grep -q "data-loader-source=\"v129-loading-star-motion\"" web/index.html
-grep -q "--cycle:820ms" web/index.html
+grep -q -- "--cycle:820ms" web/index.html
 grep -q "animation:bounce var(--cycle) infinite" web/index.html
 grep -q "animation:turn var(--cycle) linear infinite" web/index.html
 grep -q "animation:shadow var(--cycle) infinite" web/index.html
