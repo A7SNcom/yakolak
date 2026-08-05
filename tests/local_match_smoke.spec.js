@@ -110,6 +110,11 @@ test('four local turns, active camera framing, official win detection, scoring, 
   );
   await page.touchscreen.tap(195, 422);
   await page.waitForFunction(
+    () => Number(document.body.dataset.yakolakRoundActionRequests || 0) >= 1,
+    null,
+    { timeout: 3000 }
+  );
+  await page.waitForFunction(
     () => document.body.dataset.yakolakRound === '2' &&
       document.body.dataset.yakolakMoves === '0' &&
       document.body.dataset.yakolakCurrentPlayer === 'back' &&
@@ -126,7 +131,7 @@ test('four local turns, active camera framing, official win detection, scoring, 
   expect(joined).toContain('YAKOLAK_TURN_CAMERA_READY player=right');
   expect(joined).toContain('YAKOLAK_TURN_CAMERA_READY player=back');
   expect(joined).toContain('YAKOLAK_ROUND_COMPLETE round=1 winner=right');
-  expect(joined).toContain('YAKOLAK_ROUND_ACTION_ACTIVATED');
+  expect(joined).toMatch(/YAKOLAK_ROUND_ACTION_(CALLBACK|FLAG_ACTIVATED)/);
   expect(joined).toContain('YAKOLAK_ROUND_RESET round=2 starter=back');
   expect(failures).toEqual([]);
 });
