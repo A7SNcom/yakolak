@@ -1,40 +1,306 @@
 #!/usr/bin/env python3
+"""Inject the balanced YAKOLAK loader and exact SVG-to-Godot handoff."""
 from __future__ import annotations
+
 import re
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[1]
-INDEX=ROOT/"web"/"index.html"
-MTKYF=ROOT/"YAKOLAK_PORTABLE_KIT"/"assets"/"logos"/"MTKYF.svg"
-STYLE=r'''<style id="yakolak-v129-loading-star-style">
-#yakolakLoader{--loading-background:#000000;--loading-star:#ffffff;--loading-shadow:#c8ccd3;--cycle:820ms;position:fixed;inset:0;z-index:2147483647;overflow:hidden;opacity:1;visibility:visible;pointer-events:auto;color:#fff}
-#yakolakLoader .loaderBackdrop{position:absolute;inset:0;background:var(--loading-background);opacity:1;transition:opacity 360ms cubic-bezier(.65,0,.35,1)}#yakolakLoader.matched .loaderBackdrop{opacity:0}
-#yakolakLoader .loaderBrand{position:fixed;left:50%;z-index:5;opacity:0;pointer-events:none;transform:translate(-50%,-50%) translateY(6px) scale(.992);transform-origin:center;will-change:transform,opacity}
-#yakolakLoader .loaderLogoYakolak{top:19%;width:clamp(132px,34vw,208px);height:auto;filter:drop-shadow(0 8px 24px rgba(255,255,255,.06))}
-#yakolakLoader .loaderLogoMtkyf{top:81%;width:clamp(108px,28vw,168px);aspect-ratio:134.76/63.85;filter:drop-shadow(0 8px 20px rgba(255,255,255,.05))}
-#yakolakLoader .loaderLogoMtkyf svg{display:block;width:100%;height:100%}#yakolakLoader .loaderLogoMtkyf path{fill:#fff!important}
-#yakolakLoader .boxLoading{position:fixed;left:50%;top:calc(50% + 8px);width:96px;height:132px;transform:translate(-50%,-50%);z-index:4}
-#yakolakLoader .starBounce{position:absolute;top:0;left:4px;width:88px;height:88px;transform-origin:50% 100%;animation:bounce var(--cycle) infinite;will-change:transform}
-#yakolakLoader .loadingStar{display:block;width:100%;height:100%;overflow:visible;transform-box:fill-box;transform-origin:center;animation:turn var(--cycle) linear infinite;will-change:transform}#yakolakLoader .loadingStar path{fill:var(--loading-star)}
-#yakolakLoader .loadingShadow{position:absolute;top:123px;left:13px;width:70px;height:8px;border-radius:50%;background:var(--loading-shadow);opacity:.22;filter:blur(7px);transform-origin:center;animation:shadow var(--cycle) infinite;will-change:transform,opacity}
-#yakolakLoader .handoffStar{position:fixed;z-index:6;margin:0;padding:0;pointer-events:none;transform-origin:center;will-change:left,top,width,height,opacity}#yakolakLoader .handoffStar svg{display:block;width:100%;height:100%;overflow:visible}#yakolakLoader .handoffStar path{fill:var(--loading-star)}
-#yakolakLoader .handoffShadow{position:fixed;z-index:5;border-radius:50%;pointer-events:none;background:var(--loading-shadow);filter:blur(12px);opacity:.34;will-change:left,top,width,height,opacity}
+
+ROOT = Path(__file__).resolve().parents[1]
+INDEX = ROOT / "web" / "index.html"
+MTKYF = ROOT / "YAKOLAK_PORTABLE_KIT" / "assets" / "logos" / "MTKYF.svg"
+
+STYLE = r'''
+<style id="yakolak-v129-loading-star-style">
+#yakolakLoader{
+  --loading-background:#000000;
+  --loading-star:#ffffff;
+  --loading-shadow:#c8ccd3;
+  --cycle:820ms;
+  position:fixed;inset:0;z-index:2147483647;overflow:hidden;
+  opacity:1;visibility:visible;pointer-events:auto;color:#fff
+}
+#yakolakLoader .loaderBackdrop{
+  position:absolute;inset:0;background:var(--loading-background);opacity:1;
+  transition:opacity 360ms cubic-bezier(.65,0,.35,1)
+}
+#yakolakLoader.matched .loaderBackdrop{opacity:0}
+#yakolakLoader .loaderBrand{
+  position:fixed;left:50%;z-index:5;opacity:0;pointer-events:none;
+  transform:translate(-50%,-50%) translateY(6px) scale(.992);
+  transform-origin:center;will-change:transform,opacity
+}
+#yakolakLoader .loaderLogoYakolak{
+  top:21%;width:clamp(132px,34vw,208px);height:auto;
+  filter:drop-shadow(0 8px 24px rgba(255,255,255,.06))
+}
+#yakolakLoader .loaderLogoMtkyf{
+  top:79%;width:clamp(108px,28vw,168px);aspect-ratio:134.76/63.85;
+  filter:drop-shadow(0 8px 20px rgba(255,255,255,.05))
+}
+#yakolakLoader .loaderLogoMtkyf svg{display:block;width:100%;height:100%}
+#yakolakLoader .loaderLogoMtkyf path{fill:#fff!important}
+#yakolakLoader .boxLoading{
+  position:fixed;left:50%;top:calc(50% + 8px);width:96px;height:132px;
+  transform:translate(-50%,-50%);z-index:4
+}
+#yakolakLoader .starBounce{
+  position:absolute;top:0;left:4px;width:88px;height:88px;
+  transform-origin:50% 100%;animation:bounce var(--cycle) infinite;
+  will-change:transform
+}
+#yakolakLoader .loadingStar{
+  display:block;width:100%;height:100%;overflow:visible;
+  transform-box:fill-box;transform-origin:center;
+  animation:turn var(--cycle) linear infinite;will-change:transform
+}
+#yakolakLoader .loadingStar path{fill:var(--loading-star)}
+#yakolakLoader .loadingShadow{
+  position:absolute;top:123px;left:13px;width:70px;height:8px;border-radius:50%;
+  background:var(--loading-shadow);opacity:.22;filter:blur(7px);
+  transform-origin:center;animation:shadow var(--cycle) infinite;
+  will-change:transform,opacity
+}
+#yakolakLoader .handoffStar{
+  position:fixed;z-index:6;margin:0;padding:0;pointer-events:none;
+  transform-origin:center;will-change:left,top,width,height,opacity
+}
+#yakolakLoader .handoffStar svg{display:block;width:100%;height:100%;overflow:visible}
+#yakolakLoader .handoffStar path{fill:var(--loading-star)}
+#yakolakLoader .handoffShadow{
+  position:fixed;z-index:5;border-radius:50%;pointer-events:none;
+  background:var(--loading-shadow);filter:blur(12px);opacity:.34;
+  will-change:left,top,width,height,opacity
+}
 #status,#status-progress,#status-notice{display:none!important}
-@keyframes bounce{0%{transform:translateY(0) scale(1,1);animation-timing-function:cubic-bezier(.55,.08,.68,.19)}43%{transform:translateY(33px) scale(1.01,.99);animation-timing-function:cubic-bezier(.2,.8,.3,1)}50%{transform:translateY(36px) scale(1.17,.72);animation-timing-function:cubic-bezier(.15,.75,.2,1)}58%{transform:translateY(30px) scale(.94,1.09);animation-timing-function:cubic-bezier(.22,.61,.36,1)}78%{transform:translateY(5px) scale(1.01,.99);animation-timing-function:cubic-bezier(.25,.1,.25,1)}100%{transform:translateY(0) scale(1,1)}}
-@keyframes turn{0%{transform:rotate(0deg)}43%{transform:rotate(10deg)}50%{transform:rotate(12deg)}58%{transform:rotate(14deg)}78%{transform:rotate(20deg)}100%{transform:rotate(24deg)}}
-@keyframes shadow{0%,100%{transform:scale(.66,.72);opacity:.18;animation-timing-function:cubic-bezier(.55,.08,.68,.19)}43%{transform:scale(1.02,.95);opacity:.30}50%{transform:scale(1.28,1);opacity:.42;animation-timing-function:cubic-bezier(.15,.75,.2,1)}58%{transform:scale(1.04,.94);opacity:.30}78%{transform:scale(.72,.76);opacity:.21}}
-@media (prefers-reduced-motion:reduce){#yakolakLoader{--cycle:1200ms}}</style>'''
-MARKUP=r'''<div id="yakolakLoader" data-loader-source="v129-loading-star-motion" aria-busy="true"><div class="loaderBackdrop"></div><img class="loaderBrand loaderLogoYakolak" src="yakolak-logo.svg" alt=""><div class="loaderBrand loaderLogoMtkyf">__MTKYF__</div><div class="boxLoading"><div class="starBounce"><svg class="loadingStar" viewBox="0 0 802 798" xmlns="http://www.w3.org/2000/svg"><g transform="matrix(4.166667,0,0,4.166667,484.7475,797.470417)"><path d="M0,-191.393L-20.116,-183.832L-40.232,-191.393L-55.534,-176.304L-76.986,-175.028L-84.828,-155.02L-103.907,-145.13L-102.932,-123.662L-116.339,-106.867L-106.717,-87.651L-112.134,-66.855L-95.528,-53.214L-92.018,-32.013L-71.299,-26.306L-59.469,-8.364L-38.22,-11.578L-20.116,0L-2.012,-11.578L19.237,-8.364L31.067,-26.306L51.786,-32.013L55.296,-53.214L71.902,-66.855L66.486,-87.651L76.108,-106.867L62.7,-123.662L63.675,-145.13L44.596,-155.02L36.754,-175.028L15.302,-176.304L0,-191.393Z"/></g></svg></div><div class="loadingShadow"></div></div></div>'''
-SCRIPT=r'''<script id="yakolak-v129-loading-star-script">(()=>{const L=document.getElementById('yakolakLoader'),B=L?.querySelector('.boxLoading'),S=L?.querySelector('.loadingStar'),brands=[...L?.querySelectorAll('.loaderBrand')||[]],shadow=L?.querySelector('.loadingShadow'),cycle=820,epoch=performance.now();let scheduled=false,released=false;document.body.dataset.yakolakLoader='v129-loading-star-motion';document.body.dataset.yakolakLoaderHandoff='waiting';document.body.dataset.yakolakLoaderPalette='black-white-light-gray-shadow';document.body.dataset.yakolakHandoffSequencing='balanced-logos-fade-then-star';document.body.dataset.yakolakBrandLayout='yakolak-top-star-center-mtkyf-bottom';document.body.dataset.yakolakBrandPhase='hidden';window.__yakolakHandoffHistory=['waiting'];window.__yakolakBrandHistory=['hidden'];window.__yakolakLoading={set(){}};const H=s=>{document.body.dataset.yakolakLoaderHandoff=s;window.__yakolakHandoffHistory.push(s)},P=s=>{document.body.dataset.yakolakBrandPhase=s;window.__yakolakBrandHistory.push(s)},px=v=>`${Math.max(0,Number(v)||0)}px`,err=(a,t)=>Math.max(Math.abs(a.left-t.x),Math.abs(a.top-t.y),Math.abs(a.width-t.w),Math.abs(a.height-t.h));setTimeout(()=>{if(released)return;P('entering');const a=brands.map((e,i)=>e.animate([{opacity:0,transform:'translate(-50%,-50%) translateY(6px) scale(.992)'},{opacity:1,transform:'translate(-50%,-50%) translateY(0) scale(1)'}],{duration:700,delay:i*80,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'}));Promise.all(a.map(x=>x.finished)).then(()=>{if(!released)P('visible')})},620);const match=(clone,hs,first,sf)=>{const m=window.__yakolakMatch;if(!m?.star)return;H('matching');const ease='cubic-bezier(.65,0,.35,1)',a=clone.animate([{left:px(first.left),top:px(first.top),width:px(first.width),height:px(first.height)},{left:px(m.star.x),top:px(m.star.y),width:px(m.star.w),height:px(m.star.h)}],{duration:980,easing:ease,fill:'forwards'}),b=hs.animate([{left:px(sf.left),top:px(sf.top),width:px(sf.width),height:px(sf.height),opacity:.34},{left:px(m.star.x+m.star.w*.22),top:px(m.star.y+m.star.h*.91),width:px(m.star.w*.56),height:px(Math.max(10,m.star.h*.055)),opacity:.18}],{duration:980,easing:ease,fill:'forwards'});Promise.all([a.finished,b.finished]).then(()=>{Object.assign(clone.style,{left:px(m.star.x),top:px(m.star.y),width:px(m.star.w),height:px(m.star.h)});document.body.dataset.yakolakMatchErrorPx=err(clone.getBoundingClientRect(),m.star).toFixed(2);H('matched');L.classList.add('matched');clone.animate([{opacity:1},{opacity:1},{opacity:0}],{duration:520,delay:80,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'});hs.animate([{opacity:.18},{opacity:0}],{duration:420,delay:80,easing:'ease-out',fill:'forwards'});L.setAttribute('aria-busy','false');setTimeout(()=>L.remove(),760)})};const lock=()=>{const m=window.__yakolakMatch;if(released||!m?.star||!S||!L)return;released=true;H('locking');const first=S.getBoundingClientRect(),clone=document.createElement('div');clone.className='handoffStar';clone.innerHTML=S.outerHTML;Object.assign(clone.style,{left:px(first.left),top:px(first.top),width:px(first.width),height:px(first.height)});const svg=clone.querySelector('.loadingStar');svg?.style.setProperty('animation','none');svg?.style.setProperty('transform','rotate(0deg)');const hs=document.createElement('div');hs.className='handoffShadow';const sf=shadow?.getBoundingClientRect()||{left:first.left+first.width*.15,top:first.bottom+8,width:first.width*.7,height:8};Object.assign(hs.style,{left:px(sf.left),top:px(sf.top),width:px(sf.width),height:px(sf.height)});L.append(hs,clone);if(B)B.style.visibility='hidden';P('leaving');const exits=brands.map((e,i)=>e.animate([{opacity:Number(getComputedStyle(e).opacity)||1,transform:'translate(-50%,-50%) translateY(0) scale(1)'},{opacity:0,transform:'translate(-50%,-50%) translateY(-4px) scale(.994)'}],{duration:500,delay:i*45,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'}));Promise.all(exits.map(x=>x.finished)).then(()=>{P('hidden-after-fade');match(clone,hs,first,sf)})};const schedule=()=>{if(scheduled||released)return;scheduled=true;const elapsed=performance.now()-epoch,phase=elapsed%cycle;setTimeout(lock,Math.max(Math.max(90,cycle-phase+24),Math.max(0,2400-elapsed)))};const inspect=()=>{const p=document.body.dataset.yakolakPreIntro;if(p==='match-ready')schedule();if(p==='error'||document.body.dataset.yakolakIntro==='error')L?.setAttribute('data-error','true')};new MutationObserver(inspect).observe(document.body,{attributes:true,attributeFilter:['data-yakolak-pre-intro','data-yakolak-intro']});inspect()})();</script>'''
-def main()->None:
-    html=INDEX.read_text(encoding="utf-8")
-    if "yakolak-v129-loading-star-style" in html: raise RuntimeError("loader already injected")
-    svg=MTKYF.read_text(encoding="utf-8").strip()
-    svg=re.sub(r"<\?xml[^>]*>\s*|<!DOCTYPE[^>]*>\s*","",svg)
-    markup=MARKUP.replace("__MTKYF__",svg)
-    html=html.replace("</head>",STYLE+"\n</head>",1)
-    html,count=re.subn(r"(<body[^>]*>)",r"\1\n"+markup,html,count=1,flags=re.I)
-    if count!=1: raise RuntimeError("body missing")
-    html=html.replace("</body>",SCRIPT+"\n</body>",1)
-    INDEX.write_text(html,encoding="utf-8",newline="\n")
+@keyframes bounce{
+  0%{transform:translateY(0) scale(1,1);animation-timing-function:cubic-bezier(.55,.08,.68,.19)}
+  43%{transform:translateY(33px) scale(1.01,.99);animation-timing-function:cubic-bezier(.2,.8,.3,1)}
+  50%{transform:translateY(36px) scale(1.17,.72);animation-timing-function:cubic-bezier(.15,.75,.2,1)}
+  58%{transform:translateY(30px) scale(.94,1.09);animation-timing-function:cubic-bezier(.22,.61,.36,1)}
+  78%{transform:translateY(5px) scale(1.01,.99);animation-timing-function:cubic-bezier(.25,.1,.25,1)}
+  100%{transform:translateY(0) scale(1,1)}
+}
+@keyframes turn{
+  0%{transform:rotate(0deg)}43%{transform:rotate(10deg)}
+  50%{transform:rotate(12deg)}58%{transform:rotate(14deg)}
+  78%{transform:rotate(20deg)}100%{transform:rotate(24deg)}
+}
+@keyframes shadow{
+  0%,100%{transform:scale(.66,.72);opacity:.18;animation-timing-function:cubic-bezier(.55,.08,.68,.19)}
+  43%{transform:scale(1.02,.95);opacity:.30}
+  50%{transform:scale(1.28,1);opacity:.42;animation-timing-function:cubic-bezier(.15,.75,.2,1)}
+  58%{transform:scale(1.04,.94);opacity:.30}
+  78%{transform:scale(.72,.76);opacity:.21}
+}
+@media (prefers-reduced-motion:reduce){#yakolakLoader{--cycle:1200ms}}
+</style>
+'''
+
+MARKUP = r'''
+<div id="yakolakLoader" data-loader-source="v129-loading-star-motion" aria-busy="true">
+  <div class="loaderBackdrop"></div>
+  <img class="loaderBrand loaderLogoYakolak" src="yakolak-logo.svg" alt="">
+  <div class="loaderBrand loaderLogoMtkyf">__MTKYF__</div>
+  <div class="boxLoading">
+    <div class="starBounce">
+      <svg class="loadingStar" viewBox="0 0 802 798" xmlns="http://www.w3.org/2000/svg">
+        <g transform="matrix(4.166667,0,0,4.166667,484.7475,797.470417)">
+          <path d="M0,-191.393L-20.116,-183.832L-40.232,-191.393L-55.534,-176.304L-76.986,-175.028L-84.828,-155.02L-103.907,-145.13L-102.932,-123.662L-116.339,-106.867L-106.717,-87.651L-112.134,-66.855L-95.528,-53.214L-92.018,-32.013L-71.299,-26.306L-59.469,-8.364L-38.22,-11.578L-20.116,0L-2.012,-11.578L19.237,-8.364L31.067,-26.306L51.786,-32.013L55.296,-53.214L71.902,-66.855L66.486,-87.651L76.108,-106.867L62.7,-123.662L63.675,-145.13L44.596,-155.02L36.754,-175.028L15.302,-176.304L0,-191.393Z"/>
+        </g>
+      </svg>
+    </div>
+    <div class="loadingShadow"></div>
+  </div>
+</div>
+'''
+
+SCRIPT = r'''
+<script id="yakolak-v129-loading-star-script">
+(()=>{
+  const L=document.getElementById('yakolakLoader');
+  const B=L?.querySelector('.boxLoading');
+  const S=L?.querySelector('.loadingStar');
+  const brands=[...(L?.querySelectorAll('.loaderBrand')||[])];
+  const shadow=L?.querySelector('.loadingShadow');
+  const cycle=820;
+  const epoch=performance.now();
+  const minimumVisibleHold=620;
+  let scheduled=false;
+  let released=false;
+  let matchReady=false;
+  let brandReady=false;
+  let brandVisibleAt=0;
+
+  document.body.dataset.yakolakLoader='v129-loading-star-motion';
+  document.body.dataset.yakolakLoaderHandoff='waiting';
+  document.body.dataset.yakolakLoaderPalette='black-white-light-gray-shadow';
+  document.body.dataset.yakolakHandoffSequencing='balanced-logos-fade-then-star';
+  document.body.dataset.yakolakBrandLayout='yakolak-top-star-center-mtkyf-bottom';
+  document.body.dataset.yakolakBrandPhase='hidden';
+  window.__yakolakHandoffHistory=['waiting'];
+  window.__yakolakBrandHistory=['hidden'];
+  window.__yakolakLoading={set(){}};
+
+  const H=state=>{
+    document.body.dataset.yakolakLoaderHandoff=state;
+    window.__yakolakHandoffHistory.push(state);
+  };
+  const P=state=>{
+    document.body.dataset.yakolakBrandPhase=state;
+    window.__yakolakBrandHistory.push(state);
+  };
+  const px=value=>`${Math.max(0,Number(value)||0)}px`;
+  const err=(actual,target)=>Math.max(
+    Math.abs(actual.left-target.x),Math.abs(actual.top-target.y),
+    Math.abs(actual.width-target.w),Math.abs(actual.height-target.h)
+  );
+
+  const match=(clone,handoffShadow,first,shadowFirst)=>{
+    const target=window.__yakolakMatch;
+    if(!target?.star)return;
+    H('matching');
+    const easing='cubic-bezier(.65,0,.35,1)';
+    const starMotion=clone.animate([
+      {left:px(first.left),top:px(first.top),width:px(first.width),height:px(first.height)},
+      {left:px(target.star.x),top:px(target.star.y),width:px(target.star.w),height:px(target.star.h)}
+    ],{duration:980,easing,fill:'forwards'});
+    const shadowMotion=handoffShadow.animate([
+      {left:px(shadowFirst.left),top:px(shadowFirst.top),width:px(shadowFirst.width),height:px(shadowFirst.height),opacity:.34},
+      {
+        left:px(target.star.x+target.star.w*.22),
+        top:px(target.star.y+target.star.h*.91),
+        width:px(target.star.w*.56),height:px(Math.max(10,target.star.h*.055)),opacity:.18
+      }
+    ],{duration:980,easing,fill:'forwards'});
+
+    Promise.all([starMotion.finished,shadowMotion.finished]).then(()=>{
+      Object.assign(clone.style,{
+        left:px(target.star.x),top:px(target.star.y),
+        width:px(target.star.w),height:px(target.star.h)
+      });
+      document.body.dataset.yakolakMatchErrorPx=err(clone.getBoundingClientRect(),target.star).toFixed(2);
+      H('matched');
+      L.classList.add('matched');
+      clone.animate([{opacity:1},{opacity:1},{opacity:0}],{
+        duration:520,delay:80,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'
+      });
+      handoffShadow.animate([{opacity:.18},{opacity:0}],{
+        duration:420,delay:80,easing:'ease-out',fill:'forwards'
+      });
+      L.setAttribute('aria-busy','false');
+      setTimeout(()=>L.remove(),760);
+    });
+  };
+
+  const lock=()=>{
+    const target=window.__yakolakMatch;
+    if(released||!target?.star||!S||!L)return;
+    released=true;
+    H('locking');
+
+    const first=S.getBoundingClientRect();
+    const clone=document.createElement('div');
+    clone.className='handoffStar';
+    clone.innerHTML=S.outerHTML;
+    Object.assign(clone.style,{
+      left:px(first.left),top:px(first.top),width:px(first.width),height:px(first.height)
+    });
+    const svg=clone.querySelector('.loadingStar');
+    svg?.style.setProperty('animation','none');
+    svg?.style.setProperty('transform','rotate(0deg)');
+
+    const handoffShadow=document.createElement('div');
+    handoffShadow.className='handoffShadow';
+    const shadowFirst=shadow?.getBoundingClientRect()||{
+      left:first.left+first.width*.15,top:first.bottom+8,width:first.width*.7,height:8
+    };
+    Object.assign(handoffShadow.style,{
+      left:px(shadowFirst.left),top:px(shadowFirst.top),
+      width:px(shadowFirst.width),height:px(shadowFirst.height)
+    });
+    L.append(handoffShadow,clone);
+    if(B)B.style.visibility='hidden';
+
+    P('leaving');
+    const exits=brands.map((element,index)=>element.animate([
+      {
+        opacity:Number(getComputedStyle(element).opacity)||1,
+        transform:'translate(-50%,-50%) translateY(0) scale(1)'
+      },
+      {opacity:0,transform:'translate(-50%,-50%) translateY(-4px) scale(.994)'}
+    ],{
+      duration:500,delay:index*45,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'
+    }));
+    Promise.all(exits.map(animation=>animation.finished)).then(()=>{
+      P('hidden-after-fade');
+      match(clone,handoffShadow,first,shadowFirst);
+    });
+  };
+
+  const schedule=()=>{
+    if(scheduled||released||!matchReady||!brandReady)return;
+    scheduled=true;
+    const now=performance.now();
+    const elapsed=now-epoch;
+    const holdLeft=Math.max(0,minimumVisibleHold-(now-brandVisibleAt));
+    const futureElapsed=elapsed+holdLeft;
+    const nextNaturalStop=Math.max(90,cycle-(futureElapsed%cycle)+24);
+    setTimeout(lock,holdLeft+nextNaturalStop);
+  };
+
+  setTimeout(()=>{
+    if(released)return;
+    P('entering');
+    const entries=brands.map((element,index)=>element.animate([
+      {opacity:0,transform:'translate(-50%,-50%) translateY(6px) scale(.992)'},
+      {opacity:1,transform:'translate(-50%,-50%) translateY(0) scale(1)'}
+    ],{
+      duration:700,delay:index*80,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'
+    }));
+    Promise.all(entries.map(animation=>animation.finished)).then(()=>{
+      if(released)return;
+      P('visible');
+      brandReady=true;
+      brandVisibleAt=performance.now();
+      schedule();
+    });
+  },620);
+
+  const inspect=()=>{
+    const phase=document.body.dataset.yakolakPreIntro;
+    if(phase==='match-ready'){
+      matchReady=true;
+      schedule();
+    }
+    if(phase==='error'||document.body.dataset.yakolakIntro==='error'){
+      L?.setAttribute('data-error','true');
+    }
+  };
+  new MutationObserver(inspect).observe(document.body,{
+    attributes:true,
+    attributeFilter:['data-yakolak-pre-intro','data-yakolak-intro']
+  });
+  inspect();
+})();
+</script>
+'''
+
+
+def main() -> None:
+    html = INDEX.read_text(encoding="utf-8")
+    if "yakolak-v129-loading-star-style" in html:
+        raise RuntimeError("loader already injected")
+    mtkyf_svg = MTKYF.read_text(encoding="utf-8").strip()
+    mtkyf_svg = re.sub(r"<\?xml[^>]*>\s*|<!DOCTYPE[^>]*>\s*", "", mtkyf_svg)
+    markup = MARKUP.replace("__MTKYF__", mtkyf_svg)
+    html = html.replace("</head>", STYLE + "\n</head>", 1)
+    html, count = re.subn(r"(<body[^>]*>)", r"\1\n" + markup, html, count=1, flags=re.I)
+    if count != 1:
+        raise RuntimeError("body missing")
+    html = html.replace("</body>", SCRIPT + "\n</body>", 1)
+    INDEX.write_text(html, encoding="utf-8", newline="\n")
     print("YAKOLAK_BALANCED_BRAND_LOADER_WITH_EXACT_SVG_HANDOFF_INJECTED")
-if __name__=="__main__": main()
+
+
+if __name__ == "__main__":
+    main()
