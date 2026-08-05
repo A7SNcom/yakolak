@@ -2,19 +2,19 @@ extends Node
 
 # Final motion correction pass:
 # 1. Keep the DOM and Godot stars on the same canonical SVG contour and orientation.
-# 2. Coordinate table tilt and camera travel as one direct move while dynamically
+# 2. Coordinate table tilt and camera travel as one slower direct move while dynamically
 #    preserving safe screen framing, preventing the old giant close-up.
 # 3. Reveal the wall identity only after both loader identities have faded away.
 
-const MATCH_HOLD_MS: float = 260.0
-const MORPH_MS: float = 760.0
-const SETTLE_MS: float = 220.0
-const CAMERA_MOVE_MS: float = 900.0
+const MATCH_HOLD_MS: float = 220.0
+const MORPH_MS: float = 980.0
+const SETTLE_MS: float = 300.0
+const CAMERA_MOVE_MS: float = 1250.0
 const CAMERA_START_MS: float = MATCH_HOLD_MS + MORPH_MS + SETTLE_MS
 const CAMERA_END_MS: float = CAMERA_START_MS + CAMERA_MOVE_MS
 const SAFE_WIDTH_RATIO: float = 0.90
 const SAFE_HEIGHT_RATIO: float = 0.76
-const MOTION_VERSION: String = "pixel-matched-direct-safe-framing-v5"
+const MOTION_VERSION: String = "pixel-matched-direct-slow-safe-framing-v6"
 
 var intro: Node3D
 var preintro: Node
@@ -122,20 +122,21 @@ func _correct_svg_orientation_when_ready() -> bool:
 		wall_logo.visible = true
 		_set_wall_logo_alpha(0.0)
 
-	print("YAKOLAK_REFINEMENT_READY shape=canonical-shared-svg camera=direct-safe-framed table=coordinated logos=balanced-fade")
+	print("YAKOLAK_REFINEMENT_READY shape=canonical-shared-svg camera=direct-slow-safe-framed table=coordinated logos=balanced-fade")
 	return true
 
 
 func _apply_direct_safe_move(elapsed: float) -> void:
-	var t: float = _smootherstep((elapsed - CAMERA_START_MS) / CAMERA_MOVE_MS)
+	var raw_t: float = clampf((elapsed - CAMERA_START_MS) / CAMERA_MOVE_MS, 0.0, 1.0)
+	var t: float = _smootherstep(raw_t)
 	var start_position: Vector3 = preintro.get("match_camera_position") as Vector3
 	var end_position: Vector3 = preintro.get("final_camera_position") as Vector3
 	var center: Vector3 = preintro.get("orbit_center") as Vector3
 	var start_fov: float = float(preintro.get("match_camera_fov"))
 	var end_fov: float = float(preintro.get("final_camera_fov"))
 
-	# Use the direct chord direction, but keep the radius at the linear safe distance.
-	# This removes the old orbit feeling without letting the camera cut toward the table.
+	# Follow the direct chord direction but interpolate one stable radial distance.
+	# Removing the old hard max switch prevents the mid-move speed kink.
 	var start_offset: Vector3 = start_position - center
 	var end_offset: Vector3 = end_position - center
 	var start_distance: float = maxf(start_offset.length(), 0.001)
@@ -144,13 +145,12 @@ func _apply_direct_safe_move(elapsed: float) -> void:
 	var direct_offset: Vector3 = direct_position - center
 	var direct_direction: Vector3 = direct_offset.normalized() if direct_offset.length_squared() > 0.000001 else start_offset.normalized()
 	var safe_distance: float = lerpf(start_distance, end_distance, t)
-	camera.position = center + direct_direction * maxf(direct_offset.length(), safe_distance)
+	camera.position = center + direct_direction * safe_distance
 	camera.look_at(center, Vector3.UP)
 	camera.fov = lerpf(start_fov, end_fov, t)
 
-	# Tilt ahead of the camera approach. This prevents a face-on large table from
-	# rushing toward the lens, while still reading as one continuous direct motion.
-	var table_t: float = _smootherstep(clampf(t / 0.72, 0.0, 1.0))
+	# Tilt on almost the same timeline as the camera, rather than finishing early.
+	var table_t: float = _smootherstep(clampf((raw_t - 0.04) / 0.92, 0.0, 1.0))
 	tabletop.quaternion = face_camera_rotation.slerp(final_rotation, table_t).normalized()
 	tabletop.scale = final_table_scale
 	_apply_safe_optical_framing()
@@ -159,10 +159,10 @@ func _apply_direct_safe_move(elapsed: float) -> void:
 	var fit_ratio: float = tabletop.scale.x / maxf(final_table_scale.x, 0.0001)
 	pedestal.scale.x = final_pedestal_scale.x * fit_ratio
 	pedestal.scale.z = final_pedestal_scale.z * fit_ratio
-	if t < 0.52:
+	if raw_t < 0.58:
 		pedestal.visible = false
 
-	_set_wall_logo_alpha(_smootherstep(clampf((t - 0.70) / 0.30, 0.0, 1.0)))
+	_set_wall_logo_alpha(_smootherstep(clampf((raw_t - 0.76) / 0.24, 0.0, 1.0)))
 
 
 func _apply_safe_optical_framing() -> void:
@@ -209,7 +209,8 @@ func _publish_contract() -> void:
 		return
 	JavaScriptBridge.eval(
 		"document.body.dataset.yakolakShapeOrientation='canonical-shared-svg';" +
-		"document.body.dataset.yakolakCameraMotion='direct-safe-framed';" +
+		"document.body.dataset.yakolakCameraMotion='direct-slow-safe-framed';" +
+		"document.body.dataset.yakolakCameraDuration='" + str(int(CAMERA_MOVE_MS)) + "';" +
 		"document.body.dataset.yakolakMotion='" + MOTION_VERSION + "';",
 		true
 	)
