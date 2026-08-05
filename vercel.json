@@ -4,9 +4,6 @@
   "outputDirectory": "web",
   "framework": null,
   "ignoreCommand": "exit 0",
-  "git": {
-    "deploymentEnabled": false
-  },
   "github": {
     "autoJobCancelation": true
   },
