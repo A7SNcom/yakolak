@@ -25,7 +25,7 @@ async function expectCanvasToFillViewport(page, width, height) {
   expect(Math.abs(box.height - height)).toBeLessThanOrEqual(2);
 }
 
-test('Godot intro preserves the level table and exact v129 loading-star motion', async ({ page }) => {
+test('Godot intro preserves the level table and exact v130 loading-star motion', async ({ page }) => {
   test.setTimeout(300000);
   const failures = [];
   const introLogs = [];
@@ -61,13 +61,13 @@ test('Godot intro preserves the level table and exact v129 loading-star motion',
       hasProgress: Boolean(loader?.querySelector('progress')),
       hasExactCompression: styles.includes('translateY(36px) scale(1.17,.72)'),
       hasExactTurn: styles.includes('100%{transform:rotate(24deg)}'),
-      hasExactShadow: styles.includes('transform:scale(1.28,1)'),
+      hasExactShadow: styles.includes('transform:scale(1.30,1)'),
       hasInventedHorizontalMotion: styles.includes('translateX(') || styles.includes('rotate(-420deg)')
     };
   });
 
   expect(loaderContract).toEqual({
-    source: 'v129-loading-star-motion',
+    source: 'v130-loading-star-motion',
     loaderVisible: true,
     bounceName: 'bounce',
     bounceDuration: '0.82s',
@@ -93,7 +93,7 @@ test('Godot intro preserves the level table and exact v129 loading-star motion',
           document.body.dataset.yakolakTable === 'approved-star-svg' &&
           document.body.dataset.yakolakTableLevel === 'true' &&
           document.body.dataset.yakolakCamera === 'level-centered' &&
-          document.body.dataset.yakolakLoader === 'v129-loading-star-motion',
+          document.body.dataset.yakolakLoader === 'v130-loading-star-motion',
     null,
     { timeout: 10000 }
   );
@@ -126,7 +126,7 @@ test('Godot intro preserves the level table and exact v129 loading-star motion',
   expect(await page.evaluate(() => document.body.dataset.yakolakTableLevel)).toBe('true');
   expect(await page.evaluate(() => document.body.dataset.yakolakCamera)).toBe('level-centered');
   expect(await page.evaluate(() => document.body.dataset.yakolakGeometry)).toBe('ready');
-  expect(await page.evaluate(() => document.body.dataset.yakolakLoader)).toBe('v129-loading-star-motion');
+  expect(await page.evaluate(() => document.body.dataset.yakolakLoader)).toBe('v130-loading-star-motion');
 
   const joined = introLogs.join('\n');
   expect(joined).toContain('YAKOLAK_INTRO_PHASE lid-shaking');
