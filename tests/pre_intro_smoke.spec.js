@@ -16,8 +16,8 @@ const overlap = (a, b) =>
   Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
 const centerX = r => (r.left + r.right) / 2;
 
-test('balanced delayed logos, canonical star teeth, safe direct camera, and playable intro', async ({ page }) => {
-  test.setTimeout(180000);
+test('balanced logos, gradual material bridge, slow camera, soft box, and playable intro', async ({ page }) => {
+  test.setTimeout(210000);
   const failures = [];
   const events = [];
   page.on('pageerror', e => failures.push(e.message));
@@ -41,11 +41,16 @@ test('balanced delayed logos, canonical star teeth, safe direct camera, and play
       const r = document.querySelector(selector).getBoundingClientRect();
       return { left:r.left, top:r.top, right:r.right, bottom:r.bottom };
     };
+    const mtkyf = document.querySelector('.loaderLogoMtkyf');
     return {
       history: window.__yakolakBrandHistory,
       background: getComputedStyle(document.querySelector('.loaderBackdrop')).backgroundColor,
       starColor: getComputedStyle(document.querySelector('.loadingStar path')).fill,
       shadow: getComputedStyle(document.querySelector('.loadingShadow')).backgroundColor,
+      mtkyfBack: getComputedStyle(mtkyf.querySelector('path:not(.cls-1)')).fill,
+      mtkyfFront: getComputedStyle(mtkyf.querySelector('.cls-1')).fill,
+      mtkyfPalette: document.body.dataset.yakolakMtkyfPalette,
+      visualBridge: document.body.dataset.yakolakVisualBridge,
       contour: document.body.dataset.yakolakContourSource,
       yakolak: rect('.loaderLogoYakolak'),
       star: rect('.loadingStar'),
@@ -56,6 +61,10 @@ test('balanced delayed logos, canonical star teeth, safe direct camera, and play
   expect(first.background).toBe('rgb(0, 0, 0)');
   expect(first.starColor).toBe('rgb(255, 255, 255)');
   expect(first.shadow).toBe('rgb(215, 217, 222)');
+  expect(first.mtkyfBack).toBe('rgb(0, 0, 0)');
+  expect(first.mtkyfFront).toBe('rgb(255, 255, 255)');
+  expect(first.mtkyfPalette).toBe('original-black-white');
+  expect(first.visualBridge).toBe('white-to-material-crossfade');
   expect(first.contour).toBe('table-svg-exact-path');
   expect(overlap(first.yakolak, first.star)).toBe(0);
   expect(overlap(first.star, first.mtkyf)).toBe(0);
@@ -75,8 +84,9 @@ test('balanced delayed logos, canonical star teeth, safe direct camera, and play
   await page.waitForFunction(() =>
     document.body.dataset.yakolakMatchReady === 'true' &&
     document.body.dataset.yakolakShapeOrientation === 'canonical-shared-svg' &&
-    document.body.dataset.yakolakCameraMotion === 'direct-safe-framed' &&
-    window.__yakolakMatch?.star?.w > 200,
+    document.body.dataset.yakolakCameraMotion === 'direct-slow-safe-framed' &&
+    window.__yakolakMatch?.star?.w > 200 &&
+    /^#[0-9a-f]{6}$/i.test(window.__yakolakMatch?.starColor || ''),
     null, { timeout: 70000 }
   );
 
@@ -95,6 +105,7 @@ test('balanced delayed logos, canonical star teeth, safe direct camera, and play
       handoff: window.__yakolakHandoffHistory,
       brands: window.__yakolakBrandHistory,
       teeth: document.body.dataset.yakolakTeethAlignment,
+      starColor: window.__yakolakMatch.starColor,
       star: window.__yakolakMatch.star,
       canvas: { x:c.left, y:c.top, w:c.width, h:c.height }
     };
@@ -103,6 +114,7 @@ test('balanced delayed logos, canonical star teeth, safe direct camera, and play
   expect(match.centerError).toBeLessThanOrEqual(1.5);
   expect(match.facing).toBeGreaterThan(.98);
   expect(match.teeth).toBe('canonical-zero-degree-shared-contour');
+  expect(match.starColor).toMatch(/^#[0-9a-f]{6}$/i);
   expect(match.handoff).toEqual(['waiting','locking','matching','matched']);
   expect(match.brands).toEqual(['hidden','entering','visible','leaving','hidden-after-fade']);
   expect(Math.abs(match.star.x + match.star.w/2 - (match.canvas.x + match.canvas.w/2))).toBeLessThanOrEqual(1.5);
@@ -111,23 +123,33 @@ test('balanced delayed logos, canonical star teeth, safe direct camera, and play
 
   await expect.poll(
     () => events.some(x => x.includes('YAKOLAK_PREINTRO_PHASE camera-orbit')),
-    { timeout: 10000 }
+    { timeout: 12000 }
   ).toBe(true);
-  expect(await page.evaluate(() => document.body.dataset.yakolakCameraMotion)).toBe('direct-safe-framed');
+  expect(await page.evaluate(() => document.body.dataset.yakolakCameraMotion)).toBe('direct-slow-safe-framed');
+  expect(await page.evaluate(() => document.body.dataset.yakolakCameraDuration)).toBe('1250');
   expect(await page.evaluate(() => document.body.dataset.yakolakShapeOrientation)).toBe('canonical-shared-svg');
+  expect(await page.evaluate(() => document.body.dataset.yakolakMaterialBridge)).toBe('white-emission-to-material');
   await expect.poll(
     () => page.evaluate(() => +(document.body.dataset.yakolakCameraMaxCoverage || 0)),
-    { timeout: 6000 }
+    { timeout: 8000 }
   ).toBeGreaterThan(0);
   const maxCoverage = await page.evaluate(() => +(document.body.dataset.yakolakCameraMaxCoverage || 99));
   expect(maxCoverage).toBeLessThanOrEqual(.905);
   await page.screenshot({ path: 'web/preintro-04-camera-orbit.png' });
 
   await page.waitForFunction(() =>
+    document.body.dataset.yakolakPreIntro === 'box-arriving' &&
+    document.body.dataset.yakolakBoxReveal === 'soft-staggered-fade' &&
+    document.body.dataset.yakolakBoxRevealDuration === '1100',
+    null, { timeout: 15000 }
+  );
+  expect(await page.evaluate(() => document.body.dataset.yakolakBoxReveal)).toBe('soft-staggered-fade');
+
+  await page.waitForFunction(() =>
     document.body.dataset.yakolakPreIntro === 'complete' &&
     document.body.dataset.yakolakIntro === 'complete' &&
     document.body.dataset.yakolakGameplay === 'ready',
-    null, { timeout: 25000 }
+    null, { timeout: 30000 }
   );
   await page.screenshot({ path: 'web/preintro-05-unboxing-complete.png' });
 
@@ -136,6 +158,7 @@ test('balanced delayed logos, canonical star teeth, safe direct camera, and play
   expect(await page.evaluate(() => document.body.dataset.yakolakLoaderPalette)).toBe('black-white-lighter-gray-shadow');
   expect(await page.evaluate(() => document.body.dataset.yakolakHandoffSequencing)).toBe('logos-fade-then-canonical-star');
   expect(await page.evaluate(() => document.body.dataset.yakolakBrandLayout)).toBe('yakolak-upper-center-star-center-mtkyf-lower-center');
-  expect(events.join('\n')).toContain('shape=canonical-shared-svg camera=direct-safe-framed table=coordinated logos=balanced-fade');
+  expect(events.join('\n')).toContain('shape=canonical-shared-svg camera=direct-slow-safe-framed table=coordinated logos=balanced-fade');
+  expect(events.join('\n')).toContain('box=soft-staggered');
   expect(failures).toEqual([]);
 });
