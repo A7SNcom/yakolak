@@ -5,7 +5,7 @@
 [ext_resource type="Script" path="res://scripts/gameplay_match.gd" id="3_gameplay"]
 [ext_resource type="Script" path="res://scripts/browser_verification_bridge.gd" id="4_verification"]
 [ext_resource type="Script" path="res://scripts/active_turn_camera.gd" id="5_turn_camera"]
-[ext_resource type="Script" path="res://scripts/round_action_input.gd" id="6_round_input"]
+[ext_resource type="Script" path="res://scripts/round_action_button.gd" id="6_round_action"]
 
 [node name="YAKOLAKIntro30" type="Node3D"]
 script = ExtResource("1_intro")
@@ -19,8 +19,8 @@ script = ExtResource("3_gameplay")
 [node name="ActiveTurnCamera" type="Node" parent="."]
 script = ExtResource("5_turn_camera")
 
-[node name="RoundActionInput" type="Node" parent="."]
-script = ExtResource("6_round_input")
+[node name="RoundActionButton" type="Node" parent="."]
+script = ExtResource("6_round_action")
 
 [node name="BrowserVerificationBridge" type="Node" parent="."]
 script = ExtResource("4_verification")
