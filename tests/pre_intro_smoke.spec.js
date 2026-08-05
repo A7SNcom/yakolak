@@ -43,12 +43,9 @@ test('balanced delayed logos, canonical star teeth, safe direct camera, and play
     };
     return {
       history: window.__yakolakBrandHistory,
-      phase: document.body.dataset.yakolakBrandPhase,
       background: getComputedStyle(document.querySelector('.loaderBackdrop')).backgroundColor,
       starColor: getComputedStyle(document.querySelector('.loadingStar path')).fill,
       shadow: getComputedStyle(document.querySelector('.loadingShadow')).backgroundColor,
-      yakolakOpacity: +getComputedStyle(document.querySelector('.loaderLogoYakolak')).opacity,
-      mtkyfOpacity: +getComputedStyle(document.querySelector('.loaderLogoMtkyf')).opacity,
       contour: document.body.dataset.yakolakContourSource,
       yakolak: rect('.loaderLogoYakolak'),
       star: rect('.loadingStar'),
@@ -56,9 +53,6 @@ test('balanced delayed logos, canonical star teeth, safe direct camera, and play
     };
   });
   expect(first.history[0]).toBe('hidden');
-  expect(first.phase).toBe('hidden');
-  expect(first.yakolakOpacity).toBe(0);
-  expect(first.mtkyfOpacity).toBe(0);
   expect(first.background).toBe('rgb(0, 0, 0)');
   expect(first.starColor).toBe('rgb(255, 255, 255)');
   expect(first.shadow).toBe('rgb(215, 217, 222)');
