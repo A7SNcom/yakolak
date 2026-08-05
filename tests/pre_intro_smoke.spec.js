@@ -40,33 +40,25 @@ test('the exact loading star continuously becomes the approved table before unbo
   expect(await loader.getAttribute('data-loader-source')).toBe('v129-loading-star-motion');
   expect(await page.locator('.loadingStar').getAttribute('viewBox')).toBe('0 0 802 798');
   expect(await page.locator('.loadingStar path').getAttribute('d')).toContain('M0,-191.393');
-  await page.screenshot({ path: 'web/preintro-01-loader.png' });
 
+  // The handoff is deliberately brief. Accept any later pre-intro state,
+  // then verify the exact timeline order from the emitted events below.
   await page.waitForFunction(
-    () => document.body.dataset.yakolakPreIntro === 'handoff' &&
-          document.body.dataset.yakolakPreIntroShape === 'loading-star-to-approved-table',
+    () => document.body.dataset.yakolakPreIntroShape === 'loading-star-to-approved-table' &&
+          document.body.dataset.yakolakLoaderHandoff === 'continuous-star-to-table' &&
+          document.body.dataset.yakolakPreIntro !== 'waiting-for-handoff',
     null,
     { timeout: 70000 }
   );
-  expect(await page.evaluate(() => document.body.dataset.yakolakIntro)).not.toBe('complete');
-
-  await page.waitForFunction(
-    () => ['table-forming', 'table-settling'].includes(document.body.dataset.yakolakPreIntro),
-    null,
-    { timeout: 10000 }
-  );
   await expect(loader).toHaveCount(0, { timeout: 5000 });
-  expect(await page.evaluate(() => document.body.dataset.yakolakLoaderHandoff)).toBe('continuous-star-to-table');
-  await page.screenshot({ path: 'web/preintro-02-forming.png' });
 
   await page.waitForFunction(
     () => document.body.dataset.yakolakPreIntro === 'complete' &&
           document.body.dataset.yakolakIntro === 'playing' &&
-          document.body.dataset.yakolakPhase === 'lid-shaking',
+          ['lid-shaking', 'lid-rising', 'bases-deploying', 'stones-moving'].includes(document.body.dataset.yakolakPhase),
     null,
     { timeout: 15000 }
   );
-  await page.screenshot({ path: 'web/preintro-03-unboxing.png' });
 
   expect(await page.evaluate(() => document.body.dataset.yakolakTable)).toBe('approved-star-svg');
   expect(await page.evaluate(() => document.body.dataset.yakolakTableLevel)).toBe('true');
@@ -79,7 +71,9 @@ test('the exact loading star continuously becomes the approved table before unbo
   const settling = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE table-settling'));
   const settled = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE table-settled'));
   const completed = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_COMPLETE'));
-  const unboxing = sequence.findIndex((line, index) => index > completed && line.includes('YAKOLAK_INTRO_PHASE lid-shaking'));
+  const unboxing = sequence.findIndex((line, index) =>
+    index > completed && line.includes('YAKOLAK_INTRO_PHASE lid-shaking')
+  );
 
   expect(handoff).toBeGreaterThanOrEqual(0);
   expect(floating).toBeGreaterThan(handoff);
