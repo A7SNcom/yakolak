@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/intro.gd" id="1_intro"]
 [ext_resource type="Script" path="res://scripts/intro_corrections.gd" id="2_corrections"]
 [ext_resource type="Script" path="res://scripts/gameplay.gd" id="3_gameplay"]
 [ext_resource type="Script" path="res://scripts/pre_intro_star_to_table.gd" id="4_preintro"]
 [ext_resource type="Script" path="res://scripts/visual_polish.gd" id="5_visual"]
+[ext_resource type="Script" path="res://scripts/pre_intro_refinement.gd" id="6_refinement"]
 
 [node name="YAKOLAKIntro26" type="Node3D"]
 script = ExtResource("1_intro")
@@ -17,6 +18,9 @@ script = ExtResource("5_visual")
 
 [node name="StarToTablePreIntro" type="Node" parent="."]
 script = ExtResource("4_preintro")
+
+[node name="StarToTableRefinement" type="Node" parent="."]
+script = ExtResource("6_refinement")
 
 [node name="PostIntroGameplay" type="Node" parent="."]
 script = ExtResource("3_gameplay")

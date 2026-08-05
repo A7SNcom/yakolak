@@ -23,7 +23,9 @@ const intersectionArea = (a, b) => {
   return width * height;
 };
 
-test('black loader pixel-matches the real table, hands off the logo, and reaches playable intro', async ({ page }) => {
+const centerX = rect => (rect.left + rect.right) / 2;
+
+test('balanced logos fade around an exact unmirrored star handoff and a direct camera move', async ({ page }) => {
   test.setTimeout(180000);
   const failures = [];
   const sequence = [];
@@ -33,7 +35,7 @@ test('black loader pixel-matches the real table, hands off the logo, and reaches
   page.on('console', message => {
     const text = message.text();
     console.log(`[browser:${message.type()}] ${text}`);
-    if (text.includes('YAKOLAK_PREINTRO_') || text.includes('YAKOLAK_INTRO_') || text.includes('YAKOLAK_VISUAL_') || text.includes('YAKOLAK_PIXEL_MATCH_')) sequence.push(text);
+    if (text.includes('YAKOLAK_PREINTRO_') || text.includes('YAKOLAK_INTRO_') || text.includes('YAKOLAK_VISUAL_') || text.includes('YAKOLAK_PIXEL_MATCH_') || text.includes('YAKOLAK_REFINEMENT_')) sequence.push(text);
     if (message.type() === 'error' && !text.includes('favicon')) failures.push(`console: ${text}`);
   });
 
@@ -44,82 +46,83 @@ test('black loader pixel-matches the real table, hands off the logo, and reaches
   expect(await loader.getAttribute('data-loader-source')).toBe('v129-loading-star-motion');
   expect(await page.locator('.loadingStar').getAttribute('viewBox')).toBe('0 0 802 798');
   expect(await page.locator('.loadingStar path').getAttribute('d')).toContain('M0,-191.393');
-  await expect(page.locator('.loaderLogo')).toHaveAttribute('src', 'yakolak-logo.svg');
-  await page.waitForTimeout(420);
+  await expect(page.locator('.loaderLogoYakolak')).toHaveAttribute('src', 'yakolak-logo.svg');
+  await expect(page.locator('.loaderLogoMtkyf svg')).toHaveCount(1);
 
-  const loaderState = await page.evaluate(() => {
-    const backdrop = document.querySelector('.loaderBackdrop');
-    const path = document.querySelector('.loadingStar path');
-    const shadow = document.querySelector('.loadingShadow');
-    const logo = document.querySelector('.loaderLogo');
-    const star = document.querySelector('.loadingStar');
-    const logoRect = logo?.getBoundingClientRect();
-    const starRect = star?.getBoundingClientRect();
+  await page.waitForTimeout(160);
+  const initial = await page.evaluate(() => ({
+    yakolakOpacity: Number(getComputedStyle(document.querySelector('.loaderLogoYakolak')).opacity),
+    mtkyfOpacity: Number(getComputedStyle(document.querySelector('.loaderLogoMtkyf')).opacity),
+    backdrop: getComputedStyle(document.querySelector('.loaderBackdrop')).backgroundColor,
+    starColor: getComputedStyle(document.querySelector('.loadingStar path')).fill,
+    shadow: getComputedStyle(document.querySelector('.loadingShadow')).backgroundColor
+  }));
+  expect(initial.yakolakOpacity).toBeLessThan(0.05);
+  expect(initial.mtkyfOpacity).toBeLessThan(0.05);
+  expect(initial.backdrop).toBe('rgb(0, 0, 0)');
+  expect(initial.starColor).toBe('rgb(255, 255, 255)');
+  expect(initial.shadow).toBe('rgb(200, 204, 211)');
+  await page.screenshot({ path: 'web/preintro-01-black-loader-logo.png' });
+
+  await page.waitForFunction(
+    () => document.body.dataset.yakolakBrandPhase === 'visible',
+    null,
+    { timeout: 5000 }
+  );
+  const layout = await page.evaluate(() => {
+    const toRect = element => {
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height };
+    };
     return {
-      backdrop: backdrop ? getComputedStyle(backdrop).backgroundColor : '',
-      starColor: path ? getComputedStyle(path).fill : '',
-      shadow: shadow ? getComputedStyle(shadow).backgroundColor : '',
-      logoOpacity: logo ? Number(getComputedStyle(logo).opacity) : 0,
-      logoLoaded: Boolean(logo && logo.complete && logo.naturalWidth > 0),
-      logoRect: logoRect ? { left: logoRect.left, top: logoRect.top, right: logoRect.right, bottom: logoRect.bottom } : null,
-      starRect: starRect ? { left: starRect.left, top: starRect.top, right: starRect.right, bottom: starRect.bottom } : null
+      yakolak: toRect(document.querySelector('.loaderLogoYakolak')),
+      star: toRect(document.querySelector('.loadingStar')),
+      mtkyf: toRect(document.querySelector('.loaderLogoMtkyf')),
+      yakolakOpacity: Number(getComputedStyle(document.querySelector('.loaderLogoYakolak')).opacity),
+      mtkyfOpacity: Number(getComputedStyle(document.querySelector('.loaderLogoMtkyf')).opacity)
     };
   });
-  expect(loaderState.backdrop).toBe('rgb(0, 0, 0)');
-  expect(loaderState.starColor).toBe('rgb(255, 255, 255)');
-  expect(loaderState.shadow).toBe('rgb(113, 130, 255)');
-  expect(loaderState.logoOpacity).toBeGreaterThan(0.2);
-  expect(loaderState.logoLoaded).toBe(true);
-  expect(loaderState.logoRect).not.toBeNull();
-  expect(loaderState.starRect).not.toBeNull();
-  expect(intersectionArea(loaderState.logoRect, loaderState.starRect)).toBe(0);
-  await page.screenshot({ path: 'web/preintro-01-black-loader-logo.png' });
+  expect(layout.yakolakOpacity).toBeGreaterThan(0.95);
+  expect(layout.mtkyfOpacity).toBeGreaterThan(0.95);
+  expect(intersectionArea(layout.yakolak, layout.star)).toBe(0);
+  expect(intersectionArea(layout.star, layout.mtkyf)).toBe(0);
+  expect(layout.yakolak.bottom).toBeLessThan(layout.star.top - 20);
+  expect(layout.star.bottom).toBeLessThan(layout.mtkyf.top - 20);
+  expect(Math.abs(centerX(layout.yakolak) - 195)).toBeLessThanOrEqual(1.5);
+  expect(Math.abs(centerX(layout.star) - 195)).toBeLessThanOrEqual(1.5);
+  expect(Math.abs(centerX(layout.mtkyf) - 195)).toBeLessThanOrEqual(1.5);
+  await page.screenshot({ path: 'web/preintro-02-logo-to-wall-star-hold.png' });
 
   await page.waitForFunction(
     () => document.body.dataset.yakolakMatchReady === 'true' &&
           document.body.dataset.yakolakVisual === 'black-studio-v3' &&
-          document.body.dataset.yakolakWallLogo === 'shared-yakolak-svg' &&
-          window.__yakolakMatch?.star?.w > 200 &&
-          window.__yakolakMatch?.logo?.w > 40,
+          document.body.dataset.yakolakShapeOrientation === 'svg-native-unmirrored' &&
+          document.body.dataset.yakolakCameraMotion === 'direct-centered-lerp' &&
+          window.__yakolakMatch?.star?.w > 200,
     null,
     { timeout: 70000 }
   );
 
   const targetGeometry = await page.evaluate(() => ({
     star: window.__yakolakMatch.star,
-    logo: window.__yakolakMatch.logo,
     facing: Number(document.body.dataset.yakolakMatchFacing || 0),
     centerError: Number(document.body.dataset.yakolakMatchCenterError || 999)
   }));
-  const starTarget = {
-    left: targetGeometry.star.x,
-    top: targetGeometry.star.y,
-    right: targetGeometry.star.x + targetGeometry.star.w,
-    bottom: targetGeometry.star.y + targetGeometry.star.h
-  };
-  const logoTarget = {
-    left: targetGeometry.logo.x,
-    top: targetGeometry.logo.y,
-    right: targetGeometry.logo.x + targetGeometry.logo.w,
-    bottom: targetGeometry.logo.y + targetGeometry.logo.h
-  };
   expect(targetGeometry.facing).toBeGreaterThan(0.98);
   expect(targetGeometry.centerError).toBeLessThanOrEqual(1.5);
-  expect(intersectionArea(starTarget, logoTarget)).toBe(0);
-  await page.screenshot({ path: 'web/preintro-02-logo-to-wall-star-hold.png' });
 
-  // The locking phase is intentionally brief. Verify the durable matched state
-  // instead of racing one animation frame.
   await page.waitForFunction(
-    () => document.body.dataset.yakolakLoaderHandoff === 'matched',
+    () => window.__yakolakHandoffHistory?.includes('matched') &&
+          window.__yakolakBrandHistory?.includes('hidden-after-fade'),
     null,
     { timeout: 10000 }
   );
   const match = await page.evaluate(() => ({
     domError: Number(document.body.dataset.yakolakMatchErrorPx || 999),
     centerError: Number(document.body.dataset.yakolakMatchCenterError || 999),
+    handoffHistory: window.__yakolakHandoffHistory,
+    brandHistory: window.__yakolakBrandHistory,
     star: window.__yakolakMatch?.star || null,
-    logo: window.__yakolakMatch?.logo || null,
     canvas: (() => {
       const r = document.getElementById('canvas')?.getBoundingClientRect();
       return r ? { x: r.left, y: r.top, w: r.width, h: r.height } : null;
@@ -128,16 +131,18 @@ test('black loader pixel-matches the real table, hands off the logo, and reaches
   expect(match.canvas).not.toBeNull();
   expect(match.domError).toBeLessThanOrEqual(1.5);
   expect(match.centerError).toBeLessThanOrEqual(1.5);
+  expect(match.handoffHistory).toEqual(['waiting', 'locking', 'matching', 'matched']);
+  expect(match.brandHistory).toEqual(['hidden', 'entering', 'visible', 'leaving', 'hidden-after-fade']);
   expect(Math.abs((match.star.x + match.star.w / 2) - (match.canvas.x + match.canvas.w / 2))).toBeLessThanOrEqual(1.5);
   expect(Math.abs((match.star.y + match.star.h / 2) - (match.canvas.y + match.canvas.h / 2))).toBeLessThanOrEqual(1.5);
-  expect(match.star.w).toBeLessThanOrEqual(match.canvas.w);
-  expect(match.star.h).toBeLessThanOrEqual(match.canvas.h);
   await page.screenshot({ path: 'web/preintro-03-pixel-matched.png' });
 
   await expect.poll(
     () => sequence.some(line => line.includes('YAKOLAK_PREINTRO_PHASE camera-orbit')),
     { timeout: 10000 }
   ).toBe(true);
+  expect(await page.evaluate(() => document.body.dataset.yakolakCameraMotion)).toBe('direct-centered-lerp');
+  expect(await page.evaluate(() => document.body.dataset.yakolakShapeOrientation)).toBe('svg-native-unmirrored');
   await page.screenshot({ path: 'web/preintro-04-camera-orbit.png' });
 
   await page.waitForFunction(
@@ -153,12 +158,13 @@ test('black loader pixel-matches the real table, hands off the logo, and reaches
   expect(await page.evaluate(() => document.body.dataset.yakolakTable)).toBe('approved-star-svg');
   expect(await page.evaluate(() => document.body.dataset.yakolakTableLevel)).toBe('true');
   expect(await page.evaluate(() => document.body.dataset.yakolakPreIntroDuration)).toBe('3150');
-  expect(await page.evaluate(() => document.body.dataset.yakolakMotion)).toBe('pixel-matched-2d-to-3d-v3');
-  expect(await page.evaluate(() => document.body.dataset.yakolakLoaderPalette)).toBe('black-white-indigo-shadow');
-  expect(await page.evaluate(() => document.body.dataset.yakolakHandoffSequencing)).toBe('logo-first-star-second');
+  expect(await page.evaluate(() => document.body.dataset.yakolakLoaderPalette)).toBe('black-white-light-gray-shadow');
+  expect(await page.evaluate(() => document.body.dataset.yakolakHandoffSequencing)).toBe('balanced-logos-fade-then-star');
+  expect(await page.evaluate(() => document.body.dataset.yakolakBrandLayout)).toBe('yakolak-top-star-center-mtkyf-bottom');
 
   const joined = sequence.join('\n');
   const visual = sequence.findIndex(line => line.includes('YAKOLAK_VISUAL_POLISH_READY'));
+  const refinement = sequence.findIndex(line => line.includes('YAKOLAK_REFINEMENT_READY'));
   const matchReady = sequence.findIndex(line => line.includes('YAKOLAK_PIXEL_MATCH_READY'));
   const matched = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE matched'));
   const morph = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE star-to-3d'));
@@ -171,7 +177,8 @@ test('black loader pixel-matches the real table, hands off the logo, and reaches
   const introComplete = sequence.findIndex((line, index) => index > lidShake && line.includes('YAKOLAK_INTRO_COMPLETE'));
 
   expect(visual).toBeGreaterThanOrEqual(0);
-  expect(matchReady).toBeGreaterThan(visual);
+  expect(refinement).toBeGreaterThan(visual);
+  expect(matchReady).toBeGreaterThan(refinement);
   expect(matched).toBeGreaterThan(matchReady);
   expect(morph).toBeGreaterThan(matched);
   expect(settling).toBeGreaterThan(morph);
@@ -181,6 +188,6 @@ test('black loader pixel-matches the real table, hands off the logo, and reaches
   expect(preintroComplete).toBeGreaterThan(boxArriving);
   expect(lidShake).toBeGreaterThan(preintroComplete);
   expect(introComplete).toBeGreaterThan(lidShake);
-  expect(joined).toContain('match=pixel-exact logo=wall camera=side');
+  expect(joined).toContain('shape=svg-native-unmirrored camera=direct-look-at logos=balanced-fade');
   expect(failures).toEqual([]);
 });

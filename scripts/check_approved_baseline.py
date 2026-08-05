@@ -11,7 +11,7 @@ REQUIRED: dict[str, tuple[str, ...]] = {
         "data-loader-source=\"v129-loading-star-motion\"",
         "--loading-background:#000000",
         "--loading-star:#ffffff",
-        "--loading-shadow:#7182ff",
+        "--loading-shadow:#c8ccd3",
         "--cycle:820ms",
         "animation:bounce var(--cycle) infinite",
         "animation:turn var(--cycle) linear infinite",
@@ -20,7 +20,18 @@ REQUIRED: dict[str, tuple[str, ...]] = {
         "100%{transform:rotate(24deg)}",
         "transform:scale(1.28,1)",
         "yakolak-logo.svg",
-        "yakolakLoaderHandoff='matched'",
+        "loaderLogoMtkyf",
+        "balanced-logos-fade-then-star",
+        "yakolakLoaderHandoff='waiting'",
+        "H('matched')",
+    ),
+    "scripts/pre_intro_refinement.gd": (
+        "svg-native-unmirrored",
+        "direct-centered-lerp",
+        "Quaternion(Vector3.RIGHT, deg_to_rad(90.0))",
+        "camera.position = start_position.lerp(end_position, t)",
+        "camera.look_at(center, Vector3.UP)",
+        "pixel-matched-2d-to-3d-v4",
     ),
     "tests/intro_smoke.spec.js": (
         "source: 'v129-loading-star-motion'",
@@ -37,10 +48,12 @@ REQUIRED: dict[str, tuple[str, ...]] = {
         "document.body.dataset.yakolakDuration)).toBe('5730')",
     ),
     "tests/pre_intro_smoke.spec.js": (
-        "pixel-matched-2d-to-3d-v3",
         "yakolakMatchErrorPx",
         "YAKOLAK_PREINTRO_PHASE camera-orbit",
-        "shared-yakolak-svg",
+        "svg-native-unmirrored",
+        "direct-centered-lerp",
+        "loaderLogoMtkyf",
+        "hidden-after-fade",
     ),
     "scripts/vercel-build.sh": (
         "npx playwright test tests/intro_smoke.spec.js",
@@ -53,6 +66,10 @@ FORBIDDEN: dict[str, tuple[str, ...]] = {
         "translateX(",
         "rotate(-420deg)",
         "yakolakLoaderProgress",
+        "--loading-shadow:#7182ff",
+    ),
+    "scripts/pre_intro_refinement.gd": (
+        "direction.normalized().slerp",
     ),
 }
 
@@ -85,7 +102,7 @@ def main() -> int:
             print(f"- {failure}")
         return 1
 
-    print("YAKOLAK approved loader, pixel-match, and gameplay contract preserved")
+    print("YAKOLAK approved loader, exact shape orientation, direct camera motion, and gameplay contract preserved")
     return 0
 
 

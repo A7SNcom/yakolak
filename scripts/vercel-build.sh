@@ -5,7 +5,7 @@ GODOT_VERSION="4.7.1"
 GODOT_TAG="4.7.1-stable"
 RELEASE="https://github.com/godotengine/godot-builds/releases/download/${GODOT_TAG}"
 
-echo "Building YAKOLAK 3.2 — pixel-matched 2D to 3D intro"
+echo "Building YAKOLAK 3.3 — balanced brand loader and direct camera transition"
 python3 scripts/check_approved_baseline.py
 
 curl --fail --location --retry 4 --connect-timeout 20 --max-time 180 \
@@ -34,6 +34,7 @@ for required in board_and_lid player_base piece_large piece_medium piece_small t
   test -s "generated/${required}.obj"
 done
 test -s generated/YAKOLAK_INVERTED.svg
+test -s YAKOLAK_PORTABLE_KIT/assets/logos/MTKYF.svg
 sha256sum \
   YAKOLAK_PORTABLE_KIT/assets/models/board-and-lid.stl \
   YAKOLAK_PORTABLE_KIT/assets/models/player-base.stl \
@@ -43,20 +44,21 @@ sha256sum \
   YAKOLAK_PORTABLE_KIT/assets/table/table.svg \
   YAKOLAK_PORTABLE_KIT/assets/ui/loading-star.svg \
   YAKOLAK_PORTABLE_KIT/assets/logos/YAKOLAK.svg \
+  YAKOLAK_PORTABLE_KIT/assets/logos/MTKYF.svg \
   generated/*.obj generated/YAKOLAK_INVERTED.svg
 
 set -o pipefail
-"$GODOT_BIN" --headless --editor --path . --quit-after 30 2>&1 | tee /tmp/yakolak32-import.log
-if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file|Could not parse|ERROR:" /tmp/yakolak32-import.log; then
+"$GODOT_BIN" --headless --editor --path . --quit-after 30 2>&1 | tee /tmp/yakolak33-import.log
+if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file|Could not parse|ERROR:" /tmp/yakolak33-import.log; then
   echo "Godot import or script validation failed."
   exit 1
 fi
 
 set +e
-"$GODOT_BIN" --headless --path . --export-release "Web" web/index.html 2>&1 | tee /tmp/yakolak32-export.log
+"$GODOT_BIN" --headless --path . --export-release "Web" web/index.html 2>&1 | tee /tmp/yakolak33-export.log
 export_status=${PIPESTATUS[0]}
 set -e
-if [ "$export_status" -ne 0 ] || grep -E "SCRIPT ERROR|Parse Error|Failed to load script|ERROR:" /tmp/yakolak32-export.log; then
+if [ "$export_status" -ne 0 ] || grep -E "SCRIPT ERROR|Parse Error|Failed to load script|ERROR:" /tmp/yakolak33-export.log; then
   echo "Godot Web export failed."
   exit 1
 fi
@@ -72,7 +74,7 @@ grep -q "yakolak-v129-loading-star-style" web/index.html
 grep -q "data-loader-source=\"v129-loading-star-motion\"" web/index.html
 grep -q -- "--loading-background:#000000" web/index.html
 grep -q -- "--loading-star:#ffffff" web/index.html
-grep -q -- "--loading-shadow:#7182ff" web/index.html
+grep -q -- "--loading-shadow:#c8ccd3" web/index.html
 grep -q -- "--cycle:820ms" web/index.html
 grep -q "animation:bounce var(--cycle) infinite" web/index.html
 grep -q "animation:turn var(--cycle) linear infinite" web/index.html
@@ -80,9 +82,12 @@ grep -q "animation:shadow var(--cycle) infinite" web/index.html
 grep -q "translateY(36px) scale(1.17,.72)" web/index.html
 grep -q "100%{transform:rotate(24deg)}" web/index.html
 grep -q "yakolak-logo.svg" web/index.html
-grep -q "yakolakLoaderHandoff='matched'" web/index.html
-grep -q "logo-first-star-second" web/index.html
-grep -q "pixel-matched-2d-to-3d-v3" scripts/pre_intro_star_to_table.gd
+grep -q "loaderLogoMtkyf" web/index.html
+grep -q "H('matched')" web/index.html
+grep -q "balanced-logos-fade-then-star" web/index.html
+grep -q "pixel-matched-2d-to-3d-v4" scripts/pre_intro_refinement.gd
+grep -q "svg-native-unmirrored" scripts/pre_intro_refinement.gd
+grep -q "direct-centered-lerp" scripts/pre_intro_refinement.gd
 grep -q "YAKOLAK_PIXEL_MATCH_READY" scripts/pre_intro_star_to_table.gd
 grep -q "StudioWallLogo" scripts/visual_polish.gd
 if grep -q "translateX(" web/index.html || grep -q "rotate(-420deg)" web/index.html; then
@@ -123,7 +128,7 @@ if ldd "$CHROMIUM_BIN" | grep -q "not found"; then
   exit 1
 fi
 
-python3 -m http.server 8000 --directory web >/tmp/yakolak32-server.log 2>&1 &
+python3 -m http.server 8000 --directory web >/tmp/yakolak33-server.log 2>&1 &
 server_pid=$!
 cleanup() {
   kill "$server_pid" >/dev/null 2>&1 || true
@@ -151,7 +156,7 @@ test -s web/intro-desktop-motion.png
 test -s web/gameplay-mobile-selected.png
 test -s web/gameplay-mobile-placed.png
 echo "YAKOLAK 2.8 passed exact v129 bounce geometry with approved black/white palette"
-echo "YAKOLAK 3.2 passed exact SVG pixel match, non-overlapping wall-logo handoff, and coordinated side-camera transition"
+echo "YAKOLAK 3.3 passed balanced two-logo fades, exact native SVG orientation, and direct centered camera transition"
 echo "YAKOLAK gameplay passed physical stone selection and legal board placement verification"
 du -h web/index.wasm web/index.pck web/yakolak-logo.svg visual-review/preintro-motion.webm \
   web/preintro-01-black-loader-logo.png web/preintro-02-logo-to-wall-star-hold.png \
