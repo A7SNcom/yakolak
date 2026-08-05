@@ -1,7 +1,8 @@
 const { test, expect } = require('@playwright/test');
 
 // Visual gate: exact loader -> polished table formation -> closed box arrival ->
-// complete unboxing. The test also proves the studio palette is active.
+// complete unboxing. Fast phases are verified from emitted events, not by racing
+// the browser dataset for a single short frame.
 test.use({
   viewport: { width: 390, height: 844 },
   hasTouch: true,
@@ -55,19 +56,17 @@ test('the polished loading-star journey reaches the complete playable intro', as
   );
   await expect(loader).toHaveCount(0, { timeout: 5000 });
 
-  await page.waitForFunction(
-    () => document.body.dataset.yakolakPreIntro === 'table-settled',
-    null,
+  await expect.poll(
+    () => sequence.some(line => line.includes('YAKOLAK_PREINTRO_PHASE table-settled')),
     { timeout: 10000 }
-  );
-  await page.screenshot({ path: 'web/preintro-02-table-settled.png' });
+  ).toBe(true);
+  await page.screenshot({ path: 'web/preintro-02-table-transition.png' });
 
-  await page.waitForFunction(
-    () => document.body.dataset.yakolakPreIntro === 'box-arriving',
-    null,
+  await expect.poll(
+    () => sequence.some(line => line.includes('YAKOLAK_PREINTRO_PHASE box-arriving')),
     { timeout: 10000 }
-  );
-  await page.waitForTimeout(300);
+  ).toBe(true);
+  await page.waitForTimeout(220);
   await page.screenshot({ path: 'web/preintro-03-box-arriving.png' });
 
   await page.waitForFunction(
