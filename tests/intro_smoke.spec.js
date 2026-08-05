@@ -25,9 +25,7 @@ async function expectCanvasToFillViewport(page, width, height) {
   expect(Math.abs(box.height - height)).toBeLessThanOrEqual(2);
 }
 
-test('accepted Three.js intro timeline runs completely in Godot', async ({ page }) => {
-  // SwiftShader can take tens of seconds to encode screenshots of the original
-  // high-polygon STL models. This timeout does not alter the 5730ms intro.
+test('corrected existing intro runs with star table and modern loader', async ({ page }) => {
   test.setTimeout(300000);
   const failures = [];
   const introLogs = [];
@@ -37,26 +35,39 @@ test('accepted Three.js intro timeline runs completely in Godot', async ({ page 
   page.on('console', message => {
     const text = message.text();
     console.log(`[browser:${message.type()}] ${text}`);
-    if (text.includes('YAKOLAK_INTRO_')) introLogs.push(text);
+    if (text.includes('YAKOLAK_')) introLogs.push(text);
     if (message.type() === 'error' && !text.includes('favicon')) failures.push(`console: ${text}`);
   });
 
   await page.goto('http://127.0.0.1:8000/', { waitUntil: 'domcontentloaded' });
+
+  const loader = page.locator('#yakolakLoader');
+  await expect(loader).toBeVisible();
+  await expect(loader.locator('.loaderBrand')).toHaveText('ياكلك');
+  await expect(loader.locator('.loaderKicker')).toHaveText('YAKOLAK');
+
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'playing',
     null,
     { timeout: 60000 }
   );
   await expectCanvasToFillViewport(page, 390, 844);
+  await page.waitForFunction(
+    () => document.body.dataset.yakolakCorrections === 'corrected' &&
+          document.body.dataset.yakolakTable === 'approved-star-svg',
+    null,
+    { timeout: 10000 }
+  );
+  await expect(loader).toHaveCount(0, { timeout: 5000 });
 
-  // Capture the animation while the lid and bases are moving, not only the final frame.
   await page.waitForTimeout(900);
   await page.screenshot({ path: 'web/intro-mobile-motion.png', fullPage: false, timeout: 120000 });
 
   await page.waitForFunction(
-    () => document.body.dataset.yakolakIntro === 'complete',
+    () => document.body.dataset.yakolakIntro === 'complete' &&
+          document.body.dataset.yakolakGeometry === 'ready',
     null,
-    { timeout: 15000 }
+    { timeout: 20000 }
   );
   await page.screenshot({ path: 'web/intro-mobile-final.png', fullPage: false, timeout: 120000 });
 
@@ -64,15 +75,18 @@ test('accepted Three.js intro timeline runs completely in Godot', async ({ page 
   expect(await page.evaluate(() => document.body.dataset.yakolakPieces)).toBe('36');
   expect(await page.evaluate(() => document.body.dataset.yakolakBaseColor)).toBe('161616');
   expect(await page.evaluate(() => document.body.dataset.yakolakDuration)).toBe('5730');
+  expect(await page.evaluate(() => document.body.dataset.yakolakTable)).toBe('approved-star-svg');
+  expect(await page.evaluate(() => document.body.dataset.yakolakGeometry)).toBe('ready');
 
   const joined = introLogs.join('\n');
   expect(joined).toContain('YAKOLAK_INTRO_PHASE lid-shaking');
   expect(joined).toContain('YAKOLAK_INTRO_PHASE lid-rising');
   expect(joined).toContain('YAKOLAK_INTRO_PHASE bases-deploying');
   expect(joined).toContain('YAKOLAK_INTRO_PHASE stones-moving');
+  expect(joined).toContain('YAKOLAK_STAR_TABLE_APPLIED');
+  expect(joined).toContain('YAKOLAK_CORRECTED_GEOMETRY_READY');
   expect(joined).toContain('YAKOLAK_INTRO_COMPLETE');
 
-  // The same scene must also fill a desktop viewport and replay on click.
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.waitForTimeout(500);
   await expectCanvasToFillViewport(page, 1440, 900);
