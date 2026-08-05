@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inject the exact loader from agent/v129-loading-star-motion into Godot Web."""
+"""Inject the exact v129 loader and hand its silhouette to the Godot pre-intro."""
 from __future__ import annotations
 
 import re
@@ -19,9 +19,15 @@ STYLE = r"""
   z-index:2147483647;
   overflow:hidden;
   background:var(--loading-background);
-  transition:opacity .38s ease,visibility .38s ease;
+  opacity:1;
+  visibility:visible;
+  transition:opacity .56s cubic-bezier(.22,.61,.36,1),visibility .56s linear;
 }
-#yakolakLoader.done{opacity:0;visibility:hidden;pointer-events:none}
+#yakolakLoader.handoff,#yakolakLoader.done{
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+}
 #yakolakLoader .boxLoading{
   position:absolute;
   inset:0;
@@ -136,27 +142,31 @@ SCRIPT = r"""
   const loader=document.getElementById('yakolakLoader');
   let released=false;
   document.body.dataset.yakolakLoader='v129-loading-star-motion';
+  document.body.dataset.yakolakLoaderHandoff='waiting';
   window.__yakolakLoading={set(){}};
 
-  const release=()=>{
+  const releaseToGodot=()=>{
     if(released)return;
     released=true;
+    document.body.dataset.yakolakLoaderHandoff='continuous-star-to-table';
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      loader?.classList.add('done');
+      loader?.classList.add('handoff');
       loader?.setAttribute('aria-busy','false');
-      setTimeout(()=>loader?.remove(),420);
+      setTimeout(()=>loader?.remove(),620);
     }));
   };
 
   const inspect=()=>{
-    const state=document.body.dataset.yakolakIntro;
-    if(state==='playing'||state==='complete')release();
-    if(state==='error')loader?.setAttribute('data-error','true');
+    const preIntro=document.body.dataset.yakolakPreIntro;
+    if(preIntro==='handoff')releaseToGodot();
+    if(preIntro==='error'||document.body.dataset.yakolakIntro==='error'){
+      loader?.setAttribute('data-error','true');
+    }
   };
 
   new MutationObserver(inspect).observe(document.body,{
     attributes:true,
-    attributeFilter:['data-yakolak-intro']
+    attributeFilter:['data-yakolak-pre-intro','data-yakolak-intro']
   });
   inspect();
 })();
@@ -180,7 +190,7 @@ def main() -> None:
         raise RuntimeError("Could not locate the exported body element")
     html = html.replace("</body>", SCRIPT + "\n</body>", 1)
     INDEX.write_text(html, encoding="utf-8", newline="\n")
-    print("YAKOLAK_V129_LOADING_STAR_INJECTED")
+    print("YAKOLAK_V129_LOADING_STAR_WITH_CONTINUOUS_TABLE_HANDOFF_INJECTED")
 
 
 if __name__ == "__main__":
