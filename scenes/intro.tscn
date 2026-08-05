@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/intro.gd" id="1_intro"]
 [ext_resource type="Script" path="res://scripts/intro_corrections.gd" id="2_corrections"]
 [ext_resource type="Script" path="res://scripts/gameplay_match.gd" id="3_gameplay"]
+[ext_resource type="Script" path="res://scripts/browser_verification_bridge.gd" id="4_verification"]
 
 [node name="YAKOLAKIntro30" type="Node3D"]
 script = ExtResource("1_intro")
@@ -12,3 +13,6 @@ script = ExtResource("2_corrections")
 
 [node name="LocalMatchGameplay" type="Node" parent="."]
 script = ExtResource("3_gameplay")
+
+[node name="BrowserVerificationBridge" type="Node" parent="."]
+script = ExtResource("4_verification")
