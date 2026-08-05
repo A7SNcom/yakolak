@@ -16,7 +16,7 @@ const cap = value => value[0].toUpperCase() + value.slice(1);
 
 async function playMove(page, size, cell, expectedMoves, expectedNextPlayer) {
   await page.waitForFunction(
-    ({ sizeName }) => document.body.dataset.yakolakGameplay === 'ready' &&
+    ({ sizeName, cell }) => document.body.dataset.yakolakGameplay === 'ready' &&
       document.body.dataset.yakolakMatchState === 'turn' &&
       document.body.dataset[`yakolakTest${sizeName}X`] &&
       document.body.dataset[`yakolakTestCell${cell}X`],
