@@ -25,7 +25,7 @@ async function expectCanvasToFillViewport(page, width, height) {
   expect(Math.abs(box.height - height)).toBeLessThanOrEqual(2);
 }
 
-test('corrected existing intro runs with star table and modern loader', async ({ page }) => {
+test('corrected intro keeps the camera and star table level and uses the rolling-star loader', async ({ page }) => {
   test.setTimeout(300000);
   const failures = [];
   const introLogs = [];
@@ -42,9 +42,14 @@ test('corrected existing intro runs with star table and modern loader', async ({
   await page.goto('http://127.0.0.1:8000/', { waitUntil: 'domcontentloaded' });
 
   const loader = page.locator('#yakolakLoader');
+  const rollingStar = loader.locator('.loaderStar');
   await expect(loader).toBeVisible();
-  await expect(loader.locator('.loaderBrand')).toHaveText('ياكلك');
-  await expect(loader.locator('.loaderKicker')).toHaveText('YAKOLAK');
+  await expect(loader).toHaveAttribute('data-loader-kind', 'rolling-star');
+  await expect(rollingStar).toBeVisible();
+  await expect(loader.locator('progress')).toHaveCount(0);
+  const animationName = await rollingStar.evaluate(element => getComputedStyle(element).animationName);
+  expect(animationName).toContain('yakolak-star-roll');
+  await page.screenshot({ path: 'web/loader-mobile.png', fullPage: false, timeout: 120000 });
 
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'playing',
@@ -53,8 +58,10 @@ test('corrected existing intro runs with star table and modern loader', async ({
   );
   await expectCanvasToFillViewport(page, 390, 844);
   await page.waitForFunction(
-    () => document.body.dataset.yakolakCorrections === 'corrected' &&
-          document.body.dataset.yakolakTable === 'approved-star-svg',
+    () => document.body.dataset.yakolakCorrections === 'corrected-level' &&
+          document.body.dataset.yakolakTable === 'approved-star-svg' &&
+          document.body.dataset.yakolakTableLevel === 'true' &&
+          document.body.dataset.yakolakCamera === 'level-centered',
     null,
     { timeout: 10000 }
   );
@@ -76,6 +83,8 @@ test('corrected existing intro runs with star table and modern loader', async ({
   expect(await page.evaluate(() => document.body.dataset.yakolakBaseColor)).toBe('161616');
   expect(await page.evaluate(() => document.body.dataset.yakolakDuration)).toBe('5730');
   expect(await page.evaluate(() => document.body.dataset.yakolakTable)).toBe('approved-star-svg');
+  expect(await page.evaluate(() => document.body.dataset.yakolakTableLevel)).toBe('true');
+  expect(await page.evaluate(() => document.body.dataset.yakolakCamera)).toBe('level-centered');
   expect(await page.evaluate(() => document.body.dataset.yakolakGeometry)).toBe('ready');
 
   const joined = introLogs.join('\n');
@@ -83,13 +92,14 @@ test('corrected existing intro runs with star table and modern loader', async ({
   expect(joined).toContain('YAKOLAK_INTRO_PHASE lid-rising');
   expect(joined).toContain('YAKOLAK_INTRO_PHASE bases-deploying');
   expect(joined).toContain('YAKOLAK_INTRO_PHASE stones-moving');
-  expect(joined).toContain('YAKOLAK_STAR_TABLE_APPLIED');
-  expect(joined).toContain('YAKOLAK_CORRECTED_GEOMETRY_READY');
+  expect(joined).toContain('YAKOLAK_STAR_TABLE_APPLIED level=true centered=true');
+  expect(joined).toContain('camera=level-centered');
   expect(joined).toContain('YAKOLAK_INTRO_COMPLETE');
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.waitForTimeout(500);
   await expectCanvasToFillViewport(page, 1440, 900);
+  expect(await page.evaluate(() => document.body.dataset.yakolakCamera)).toBe('level-centered');
   await page.locator('canvas').click({ position: { x: 720, y: 450 } });
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'playing',
