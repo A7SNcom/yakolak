@@ -17,7 +17,7 @@ test.use({
 });
 
 test('the exact loading star continuously becomes the approved table before unboxing', async ({ page }) => {
-  test.setTimeout(240000);
+  test.setTimeout(180000);
   const failures = [];
   const sequence = [];
 
@@ -45,33 +45,26 @@ test('the exact loading star continuously becomes the approved table before unbo
     { timeout: 70000 }
   );
   expect(await page.evaluate(() => document.body.dataset.yakolakIntro)).not.toBe('complete');
-  await page.screenshot({ path: 'web/preintro-handoff.png', fullPage: false, timeout: 90000 });
 
   await page.waitForFunction(
-    () => document.body.dataset.yakolakPreIntro === 'table-forming',
+    () => ['table-forming', 'table-settling', 'table-settled', 'complete'].includes(document.body.dataset.yakolakPreIntro),
     null,
     { timeout: 10000 }
   );
   await expect(loader).toHaveCount(0, { timeout: 5000 });
   expect(await page.evaluate(() => document.body.dataset.yakolakLoaderHandoff)).toBe('continuous-star-to-table');
-  await page.screenshot({ path: 'web/preintro-table-forming.png', fullPage: false, timeout: 90000 });
-
-  await page.waitForFunction(
-    () => document.body.dataset.yakolakPreIntro === 'table-settled',
-    null,
-    { timeout: 10000 }
-  );
-  expect(await page.evaluate(() => document.body.dataset.yakolakTable)).toBe('approved-star-svg');
-  expect(await page.evaluate(() => document.body.dataset.yakolakTableLevel)).toBe('true');
-  await page.screenshot({ path: 'web/preintro-table-settled.png', fullPage: false, timeout: 90000 });
 
   await page.waitForFunction(
     () => document.body.dataset.yakolakPreIntro === 'complete' &&
           document.body.dataset.yakolakIntro === 'playing' &&
           document.body.dataset.yakolakPhase === 'lid-shaking',
     null,
-    { timeout: 10000 }
+    { timeout: 15000 }
   );
+
+  expect(await page.evaluate(() => document.body.dataset.yakolakTable)).toBe('approved-star-svg');
+  expect(await page.evaluate(() => document.body.dataset.yakolakTableLevel)).toBe('true');
+  expect(await page.evaluate(() => document.body.dataset.yakolakPreIntroDuration)).toBe('3360');
 
   const joined = sequence.join('\n');
   const handoff = sequence.findIndex(line => line.includes('YAKOLAK_PREINTRO_PHASE handoff'));

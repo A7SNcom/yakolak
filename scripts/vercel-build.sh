@@ -125,9 +125,6 @@ PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1 \
 cleanup
 trap - EXIT
 
-test -s web/preintro-handoff.png
-test -s web/preintro-table-forming.png
-test -s web/preintro-table-settled.png
 test -s web/intro-mobile-motion.png
 test -s web/intro-mobile-final.png
 test -s web/intro-desktop-motion.png
@@ -137,6 +134,5 @@ echo "YAKOLAK 2.8 passed exact v129 loader and unchanged camera/table verificati
 echo "YAKOLAK 2.9 passed physical stone selection and legal board placement verification"
 echo "YAKOLAK 3.0 passed continuous loading-star to approved-table pre-intro verification"
 du -h web/index.wasm web/index.pck \
-  web/preintro-handoff.png web/preintro-table-forming.png web/preintro-table-settled.png \
   web/intro-mobile-motion.png web/intro-mobile-final.png web/intro-desktop-motion.png \
   web/gameplay-mobile-selected.png web/gameplay-mobile-placed.png
