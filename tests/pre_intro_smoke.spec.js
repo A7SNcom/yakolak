@@ -1,5 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
+// Final gate: the loader silhouette, 3D star, settled table, and approved unboxing
+// must remain one ordered journey without slowing or freezing the visible motion.
 test.use({
   viewport: { width: 390, height: 844 },
   hasTouch: true,
