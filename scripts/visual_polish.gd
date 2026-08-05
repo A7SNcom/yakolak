@@ -161,11 +161,11 @@ func _add_studio_architecture() -> void:
 
 	if intro.get_node_or_null("StudioBackWall") == null:
 		var wall_mesh := QuadMesh.new()
-		wall_mesh.size = Vector2(42.0, 24.0)
+		wall_mesh.size = Vector2(50.0, 30.0)
 		var wall := MeshInstance3D.new()
 		wall.name = "StudioBackWall"
 		wall.mesh = wall_mesh
-		wall.position = Vector3(0.0, 2.5, -14.0)
+		wall.position = Vector3(0.0, 3.0, -14.0)
 		var wall_material := _new_material(WALL_COLOR, 1.0, 0.0)
 		wall_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		wall.material_override = wall_material
@@ -179,11 +179,11 @@ func _add_studio_architecture() -> void:
 			push_error("YAKOLAK wall logo texture is missing")
 			return
 		var logo_mesh := QuadMesh.new()
-		logo_mesh.size = Vector2(8.0, 4.56)
+		logo_mesh.size = Vector2(7.4, 4.22)
 		wall_logo = MeshInstance3D.new()
 		wall_logo.name = "StudioWallLogo"
 		wall_logo.mesh = logo_mesh
-		wall_logo.position = Vector3(-5.2, 5.4, -13.88)
+		wall_logo.position = Vector3(-6.5, 11.5, -13.88)
 		var logo_material := StandardMaterial3D.new()
 		logo_material.albedo_texture = texture
 		logo_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA

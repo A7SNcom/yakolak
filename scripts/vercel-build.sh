@@ -25,8 +25,8 @@ mkdir -p "$TEMPLATE_DIR"
 cp -R /tmp/yakolak-templates/templates/. "$TEMPLATE_DIR/"
 "$GODOT_BIN" --version
 
-rm -rf generated web .godot
-mkdir -p generated web
+rm -rf generated web .godot visual-review
+mkdir -p generated web visual-review
 python3 scripts/prepare_intro_assets.py
 python3 scripts/prepare_table.py
 python3 scripts/prepare_logo.py
@@ -81,6 +81,7 @@ grep -q "translateY(36px) scale(1.17,.72)" web/index.html
 grep -q "100%{transform:rotate(24deg)}" web/index.html
 grep -q "yakolak-logo.svg" web/index.html
 grep -q "yakolakLoaderHandoff='matched'" web/index.html
+grep -q "logo-first-star-second" web/index.html
 grep -q "pixel-matched-2d-to-3d-v3" scripts/pre_intro_star_to_table.gd
 grep -q "YAKOLAK_PIXEL_MATCH_READY" scripts/pre_intro_star_to_table.gd
 grep -q "StudioWallLogo" scripts/visual_polish.gd
@@ -131,12 +132,17 @@ trap cleanup EXIT
 sleep 1
 PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1 \
   npx playwright test tests/pre_intro_smoke.spec.js --workers=1 --reporter=line
+preintro_video="$(find test-results -type f -name video.webm | head -n 1)"
+test -s "$preintro_video"
+cp "$preintro_video" visual-review/preintro-motion.webm
 PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1 \
   npx playwright test tests/intro_smoke.spec.js tests/gameplay_smoke.spec.js --workers=1 --reporter=line
 cleanup
 trap - EXIT
 
+test -s visual-review/preintro-motion.webm
 test -s web/preintro-01-black-loader-logo.png
+test -s web/preintro-02-logo-to-wall-star-hold.png
 test -s web/preintro-03-pixel-matched.png
 test -s web/preintro-04-camera-orbit.png
 test -s web/intro-mobile-motion.png
@@ -145,9 +151,10 @@ test -s web/intro-desktop-motion.png
 test -s web/gameplay-mobile-selected.png
 test -s web/gameplay-mobile-placed.png
 echo "YAKOLAK 2.8 passed exact v129 bounce geometry with approved black/white palette"
-echo "YAKOLAK 3.2 passed exact SVG pixel match, wall-logo handoff, and side-camera transition"
+echo "YAKOLAK 3.2 passed exact SVG pixel match, non-overlapping wall-logo handoff, and coordinated side-camera transition"
 echo "YAKOLAK gameplay passed physical stone selection and legal board placement verification"
-du -h web/index.wasm web/index.pck web/yakolak-logo.svg \
-  web/preintro-01-black-loader-logo.png web/preintro-03-pixel-matched.png web/preintro-04-camera-orbit.png \
+du -h web/index.wasm web/index.pck web/yakolak-logo.svg visual-review/preintro-motion.webm \
+  web/preintro-01-black-loader-logo.png web/preintro-02-logo-to-wall-star-hold.png \
+  web/preintro-03-pixel-matched.png web/preintro-04-camera-orbit.png \
   web/intro-mobile-motion.png web/intro-mobile-final.png web/intro-desktop-motion.png \
   web/gameplay-mobile-selected.png web/gameplay-mobile-placed.png

@@ -26,6 +26,7 @@ jobs:
         with:
           name: yakolak-preintro-visual-capture
           path: |
+            visual-review/
             test-results/
             web/preintro-*.png
             web/intro-*.png

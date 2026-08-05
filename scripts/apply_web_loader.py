@@ -28,27 +28,27 @@ STYLE = r"""
   inset:0;
   background:var(--loading-background);
   opacity:1;
-  transition:opacity 380ms cubic-bezier(.65,0,.35,1);
+  transition:opacity 420ms cubic-bezier(.65,0,.35,1);
 }
 #yakolakLoader.matched .loaderBackdrop{opacity:0}
 #yakolakLoader .loaderLogo{
   position:fixed;
   left:50%;
-  top:40%;
-  width:clamp(156px,42vw,248px);
+  top:39%;
+  width:clamp(166px,44vw,258px);
   height:auto;
-  z-index:3;
+  z-index:5;
   opacity:0;
   transform:translate(-50%,-50%) translateY(10px) scale(.985);
   transform-origin:center;
-  filter:drop-shadow(0 10px 24px rgba(113,130,255,.12));
+  filter:drop-shadow(0 10px 24px rgba(113,130,255,.14));
   animation:logoEnter 920ms cubic-bezier(.22,.61,.36,1) 160ms forwards;
   will-change:left,top,width,height,transform,opacity;
 }
 #yakolakLoader .boxLoading{
   position:fixed;
   left:50%;
-  top:57%;
+  top:58%;
   width:96px;
   height:132px;
   transform:translate(-50%,-50%);
@@ -198,6 +198,7 @@ SCRIPT = r"""
   document.body.dataset.yakolakLoader='v129-loading-star-motion';
   document.body.dataset.yakolakLoaderHandoff='waiting';
   document.body.dataset.yakolakLoaderPalette='black-white-indigo-shadow';
+  document.body.dataset.yakolakHandoffSequencing='logo-first-star-second';
   window.__yakolakLoading={set(){}};
 
   const px=value=>`${Math.max(0,Number(value)||0)}px`;
@@ -244,12 +245,16 @@ SCRIPT = r"""
       transform:'none',opacity:'1'
     });
 
-    const duration=920;
     const easing='cubic-bezier(.65,0,.35,1)';
+    const logoAnimation=logo.animate([
+      {left:px(logoFirst.left),top:px(logoFirst.top),width:px(logoFirst.width),height:px(logoFirst.height),opacity:1},
+      {left:px(match.logo.x),top:px(match.logo.y),width:px(match.logo.w),height:px(match.logo.h),opacity:1}
+    ],{duration:900,easing,fill:'forwards'});
+
     const starAnimation=starClone.animate([
       {left:px(first.left),top:px(first.top),width:px(first.width),height:px(first.height)},
       {left:px(match.star.x),top:px(match.star.y),width:px(match.star.w),height:px(match.star.h)}
-    ],{duration,easing,fill:'forwards'});
+    ],{duration:1040,delay:220,easing,fill:'forwards'});
 
     handoffShadow.animate([
       {left:px(shadowFirst.left),top:px(shadowFirst.top),width:px(shadowFirst.width),height:px(shadowFirst.height),opacity:.22},
@@ -258,14 +263,9 @@ SCRIPT = r"""
         top:px(match.star.y+match.star.h*.91),
         width:px(match.star.w*.56),height:px(Math.max(10,match.star.h*.055)),opacity:.12
       }
-    ],{duration,easing,fill:'forwards'});
+    ],{duration:1040,delay:220,easing,fill:'forwards'});
 
-    logo.animate([
-      {left:px(logoFirst.left),top:px(logoFirst.top),width:px(logoFirst.width),height:px(logoFirst.height),opacity:1},
-      {left:px(match.logo.x),top:px(match.logo.y),width:px(match.logo.w),height:px(match.logo.h),opacity:1}
-    ],{duration:1040,easing,fill:'forwards'});
-
-    starAnimation.finished.then(()=>{
+    Promise.all([logoAnimation.finished,starAnimation.finished]).then(()=>{
       Object.assign(starClone.style,{
         left:px(match.star.x),top:px(match.star.y),width:px(match.star.w),height:px(match.star.h)
       });
@@ -275,16 +275,16 @@ SCRIPT = r"""
       document.body.dataset.yakolakLoaderHandoff='matched';
       loader.classList.add('matched');
       starClone.animate([{opacity:1},{opacity:1},{opacity:0}],{
-        duration:520,delay:120,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'
+        duration:560,delay:120,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'
       });
       handoffShadow.animate([{opacity:.12},{opacity:0}],{
-        duration:420,delay:120,easing:'ease-out',fill:'forwards'
+        duration:440,delay:120,easing:'ease-out',fill:'forwards'
       });
-      logo.animate([{opacity:1},{opacity:0}],{
-        duration:280,delay:170,easing:'ease-out',fill:'forwards'
+      logo.animate([{opacity:1},{opacity:1},{opacity:0}],{
+        duration:460,delay:120,easing:'ease-out',fill:'forwards'
       });
       loader.setAttribute('aria-busy','false');
-      setTimeout(()=>loader.remove(),760);
+      setTimeout(()=>loader.remove(),840);
     });
   };
 

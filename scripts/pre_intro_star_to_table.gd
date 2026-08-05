@@ -2,8 +2,8 @@ extends Node
 
 # Pixel-matched 2D -> 3D handoff.
 # The DOM star and the Godot tabletop share the exact table.svg silhouette.
-# Godot projects the real 3D tabletop to screen coordinates, converts those
-# coordinates to the canvas CSS pixels, and only then hands them to the DOM.
+# The 3D star stays face-on while it gains material and depth; only afterwards
+# do the camera and table rotate together, avoiding the old edge-on collapse.
 
 const MATCH_HOLD_MS: float = 260.0
 const MORPH_MS: float = 760.0
@@ -55,6 +55,7 @@ var final_table_color: Color
 var final_table_roughness: float
 var final_table_metallic: float
 
+var orbit_center: Vector3
 var final_camera_position: Vector3
 var final_camera_rotation: Quaternion
 var final_camera_fov: float
@@ -183,8 +184,6 @@ func _prepare_pixel_match() -> bool:
 	table_material.roughness = 0.54
 	table_material.metallic = 0.0
 
-	# The table OBJ lies on XZ. Rotating -90 degrees around X makes the exact
-	# footprint face the screen while preserving its upright SVG orientation.
 	face_camera_rotation = Quaternion(Vector3.RIGHT, deg_to_rad(-90.0)).normalized()
 	tabletop.position = final_table_position
 	tabletop.quaternion = face_camera_rotation
@@ -195,10 +194,10 @@ func _prepare_pixel_match() -> bool:
 	wall_logo.visible = true
 
 	var local_center: Vector3 = tabletop.mesh.get_aabb().get_center()
-	var world_center: Vector3 = tabletop.global_transform * local_center
-	match_camera_position = world_center + Vector3(0.0, 0.0, MATCH_CAMERA_DISTANCE)
+	orbit_center = tabletop.global_transform * local_center
+	match_camera_position = orbit_center + Vector3(0.0, 0.0, MATCH_CAMERA_DISTANCE)
 	camera.position = match_camera_position
-	camera.look_at(world_center, Vector3.UP)
+	camera.look_at(orbit_center, Vector3.UP)
 	camera.fov = MATCH_CAMERA_FOV
 	match_camera_rotation = camera.quaternion.normalized()
 	match_camera_fov = camera.fov
@@ -209,7 +208,7 @@ func _prepare_pixel_match() -> bool:
 	magic_light.light_energy = 0.12
 	magic_light.omni_range = 14.0
 	magic_light.shadow_enabled = false
-	magic_light.position = world_center + Vector3(0.0, 0.0, 2.0)
+	magic_light.position = orbit_center + Vector3(0.0, 0.0, 2.0)
 	intro.add_child(magic_light)
 	return true
 
@@ -237,11 +236,12 @@ func _publish_match_geometry() -> bool:
 		logo_internal.size * css_scale
 	)
 	var center_error: float = star_rect.get_center().distance_to(canvas_rect.get_center())
+	var facing: float = _screen_facing()
 	print(
-		"YAKOLAK_PIXEL_MATCH_READY css=(%.2f,%.2f %.2fx%.2f) internal=(%.2f,%.2f %.2fx%.2f) center_error=%.3f scale=(%.5f,%.5f) logo=(%.2f,%.2f %.2fx%.2f)" % [
+		"YAKOLAK_PIXEL_MATCH_READY css=(%.2f,%.2f %.2fx%.2f) internal=(%.2f,%.2f %.2fx%.2f) center_error=%.3f facing=%.4f scale=(%.5f,%.5f) logo=(%.2f,%.2f %.2fx%.2f)" % [
 			star_rect.position.x, star_rect.position.y, star_rect.size.x, star_rect.size.y,
 			star_internal.position.x, star_internal.position.y, star_internal.size.x, star_internal.size.y,
-			center_error, css_scale.x, css_scale.y,
+			center_error, facing, css_scale.x, css_scale.y,
 			logo_rect.position.x, logo_rect.position.y, logo_rect.size.x, logo_rect.size.y,
 		]
 	)
@@ -253,6 +253,7 @@ func _publish_match_geometry() -> bool:
 			"logo:{x:" + str(logo_rect.position.x) + ",y:" + str(logo_rect.position.y) + ",w:" + str(logo_rect.size.x) + ",h:" + str(logo_rect.size.y) + "}" +
 			"};" +
 			"document.body.dataset.yakolakMatchCenterError='" + str(center_error) + "';" +
+			"document.body.dataset.yakolakMatchFacing='" + str(facing) + "';" +
 			"document.body.dataset.yakolakMatchReady='true';"
 		)
 		JavaScriptBridge.eval(script, true)
@@ -301,6 +302,12 @@ func _projected_rect(instance: MeshInstance3D) -> Rect2:
 	return Rect2(minimum, maximum - minimum)
 
 
+func _screen_facing() -> float:
+	var normal: Vector3 = tabletop.global_basis.y.normalized()
+	var to_camera: Vector3 = (camera.global_position - tabletop.global_position).normalized()
+	return absf(normal.dot(to_camera))
+
+
 func _dom_handoff_is_matched() -> bool:
 	if not OS.has_feature("web"):
 		return true
@@ -327,15 +334,14 @@ func _apply_table_and_camera(elapsed: float) -> void:
 	if elapsed <= morph_end:
 		var t: float = _ease_in_out_cubic((elapsed - MATCH_HOLD_MS) / MORPH_MS)
 		tabletop.position = final_table_position
-		tabletop.quaternion = face_camera_rotation.slerp(final_rotation, t).normalized()
-		tabletop.scale = final_table_scale * (1.0 + sin(t * PI) * 0.008)
-		var color_t: float = _smooth(clampf((t - 0.22) / 0.78, 0.0, 1.0))
+		tabletop.quaternion = face_camera_rotation
+		tabletop.scale = final_table_scale * (1.0 + sin(t * PI) * 0.010)
+		var color_t: float = _smooth(clampf((t - 0.08) / 0.92, 0.0, 1.0))
 		table_material.albedo_color = WHITE_STAR.lerp(final_table_color, color_t)
 		table_material.roughness = lerpf(0.54, final_table_roughness, color_t)
 		table_material.metallic = lerpf(0.0, final_table_metallic, color_t)
-		var pedestal_t: float = _ease_out_cubic(clampf((t - 0.42) / 0.58, 0.0, 1.0))
-		pedestal.visible = pedestal_t > 0.001
-		_set_pedestal_growth(pedestal_t)
+		pedestal.visible = false
+		_set_pedestal_growth(0.0)
 		_apply_match_camera()
 		magic_light.light_energy = 0.12 * (1.0 - color_t)
 		return
@@ -344,22 +350,33 @@ func _apply_table_and_camera(elapsed: float) -> void:
 	if elapsed <= settle_end:
 		var t: float = _ease_out_cubic((elapsed - morph_end) / SETTLE_MS)
 		tabletop.position = final_table_position
-		tabletop.quaternion = final_rotation
+		tabletop.quaternion = face_camera_rotation
 		tabletop.scale = final_table_scale * lerpf(1.006, 1.0, t)
-		pedestal.visible = true
-		_set_pedestal_growth(1.0)
 		table_material.albedo_color = final_table_color
 		table_material.roughness = final_table_roughness
 		table_material.metallic = final_table_metallic
+		pedestal.visible = false
+		_set_pedestal_growth(0.0)
 		_apply_match_camera()
 		magic_light.light_energy = 0.0
 		return
 
 	var orbit_end: float = settle_end + CAMERA_ORBIT_MS
 	if elapsed <= orbit_end:
-		_snap_table_final()
 		var t: float = _ease_in_out_cubic((elapsed - settle_end) / CAMERA_ORBIT_MS)
-		camera.position = match_camera_position.lerp(final_camera_position, t)
+		var table_t: float = _ease_in_out_cubic(clampf((t - 0.04) / 0.96, 0.0, 1.0))
+		tabletop.position = final_table_position
+		tabletop.quaternion = face_camera_rotation.slerp(final_rotation, table_t).normalized()
+		tabletop.scale = final_table_scale
+		tabletop.visible = true
+		var pedestal_t: float = _ease_out_cubic(clampf((t - 0.28) / 0.72, 0.0, 1.0))
+		pedestal.visible = pedestal_t > 0.001
+		_set_pedestal_growth(pedestal_t)
+		var start_offset: Vector3 = match_camera_position - orbit_center
+		var end_offset: Vector3 = final_camera_position - orbit_center
+		var direction: Vector3 = start_offset.normalized().slerp(end_offset.normalized(), t).normalized()
+		var distance: float = lerpf(start_offset.length(), end_offset.length(), t)
+		camera.position = orbit_center + direction * distance
 		camera.quaternion = match_camera_rotation.slerp(final_camera_rotation, t).normalized()
 		camera.fov = lerpf(match_camera_fov, final_camera_fov, t)
 		return

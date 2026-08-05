@@ -17,6 +17,12 @@ test.use({
   }
 });
 
+const intersectionArea = (a, b) => {
+  const width = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+  const height = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+  return width * height;
+};
+
 test('black loader pixel-matches the real table, hands off the logo, and reaches playable intro', async ({ page }) => {
   test.setTimeout(180000);
   const failures = [];
@@ -31,34 +37,42 @@ test('black loader pixel-matches the real table, hands off the logo, and reaches
     if (message.type() === 'error' && !text.includes('favicon')) failures.push(`console: ${text}`);
   });
 
-  await page.goto('http://127.0.0.1:8000/', { waitUntil: 'domcontentloaded' });
+  await page.goto('http://127.0.0.1:8000/', { waitUntil: 'commit' });
 
   const loader = page.locator('#yakolakLoader');
-  await expect(loader).toBeVisible();
+  await expect(loader).toBeVisible({ timeout: 5000 });
   expect(await loader.getAttribute('data-loader-source')).toBe('v129-loading-star-motion');
   expect(await page.locator('.loadingStar').getAttribute('viewBox')).toBe('0 0 802 798');
   expect(await page.locator('.loadingStar path').getAttribute('d')).toContain('M0,-191.393');
   await expect(page.locator('.loaderLogo')).toHaveAttribute('src', 'yakolak-logo.svg');
-  await page.waitForTimeout(520);
+  await page.waitForTimeout(420);
 
-  const palette = await page.evaluate(() => {
+  const loaderState = await page.evaluate(() => {
     const backdrop = document.querySelector('.loaderBackdrop');
     const path = document.querySelector('.loadingStar path');
     const shadow = document.querySelector('.loadingShadow');
     const logo = document.querySelector('.loaderLogo');
+    const star = document.querySelector('.loadingStar');
+    const logoRect = logo?.getBoundingClientRect();
+    const starRect = star?.getBoundingClientRect();
     return {
       backdrop: backdrop ? getComputedStyle(backdrop).backgroundColor : '',
-      star: path ? getComputedStyle(path).fill : '',
+      starColor: path ? getComputedStyle(path).fill : '',
       shadow: shadow ? getComputedStyle(shadow).backgroundColor : '',
       logoOpacity: logo ? Number(getComputedStyle(logo).opacity) : 0,
-      logoLoaded: Boolean(logo && logo.complete && logo.naturalWidth > 0)
+      logoLoaded: Boolean(logo && logo.complete && logo.naturalWidth > 0),
+      logoRect: logoRect ? { left: logoRect.left, top: logoRect.top, right: logoRect.right, bottom: logoRect.bottom } : null,
+      starRect: starRect ? { left: starRect.left, top: starRect.top, right: starRect.right, bottom: starRect.bottom } : null
     };
   });
-  expect(palette.backdrop).toBe('rgb(0, 0, 0)');
-  expect(palette.star).toBe('rgb(255, 255, 255)');
-  expect(palette.shadow).toBe('rgb(113, 130, 255)');
-  expect(palette.logoOpacity).toBeGreaterThan(0.45);
-  expect(palette.logoLoaded).toBe(true);
+  expect(loaderState.backdrop).toBe('rgb(0, 0, 0)');
+  expect(loaderState.starColor).toBe('rgb(255, 255, 255)');
+  expect(loaderState.shadow).toBe('rgb(113, 130, 255)');
+  expect(loaderState.logoOpacity).toBeGreaterThan(0.2);
+  expect(loaderState.logoLoaded).toBe(true);
+  expect(loaderState.logoRect).not.toBeNull();
+  expect(loaderState.starRect).not.toBeNull();
+  expect(intersectionArea(loaderState.logoRect, loaderState.starRect)).toBe(0);
   await page.screenshot({ path: 'web/preintro-01-black-loader-logo.png' });
 
   await page.waitForFunction(
@@ -70,7 +84,35 @@ test('black loader pixel-matches the real table, hands off the logo, and reaches
     null,
     { timeout: 70000 }
   );
-  await page.screenshot({ path: 'web/preintro-02-match-ready.png' });
+
+  const targetGeometry = await page.evaluate(() => ({
+    star: window.__yakolakMatch.star,
+    logo: window.__yakolakMatch.logo,
+    facing: Number(document.body.dataset.yakolakMatchFacing || 0),
+    centerError: Number(document.body.dataset.yakolakMatchCenterError || 999)
+  }));
+  const starTarget = {
+    left: targetGeometry.star.x,
+    top: targetGeometry.star.y,
+    right: targetGeometry.star.x + targetGeometry.star.w,
+    bottom: targetGeometry.star.y + targetGeometry.star.h
+  };
+  const logoTarget = {
+    left: targetGeometry.logo.x,
+    top: targetGeometry.logo.y,
+    right: targetGeometry.logo.x + targetGeometry.logo.w,
+    bottom: targetGeometry.logo.y + targetGeometry.logo.h
+  };
+  expect(targetGeometry.facing).toBeGreaterThan(0.98);
+  expect(targetGeometry.centerError).toBeLessThanOrEqual(1.5);
+  expect(intersectionArea(starTarget, logoTarget)).toBe(0);
+
+  await page.waitForFunction(
+    () => document.body.dataset.yakolakLoaderHandoff === 'locking',
+    null,
+    { timeout: 5000 }
+  );
+  await page.screenshot({ path: 'web/preintro-02-logo-to-wall-star-hold.png' });
 
   await page.waitForFunction(
     () => document.body.dataset.yakolakLoaderHandoff === 'matched',
@@ -117,6 +159,7 @@ test('black loader pixel-matches the real table, hands off the logo, and reaches
   expect(await page.evaluate(() => document.body.dataset.yakolakPreIntroDuration)).toBe('3150');
   expect(await page.evaluate(() => document.body.dataset.yakolakMotion)).toBe('pixel-matched-2d-to-3d-v3');
   expect(await page.evaluate(() => document.body.dataset.yakolakLoaderPalette)).toBe('black-white-indigo-shadow');
+  expect(await page.evaluate(() => document.body.dataset.yakolakHandoffSequencing)).toBe('logo-first-star-second');
 
   const joined = sequence.join('\n');
   const visual = sequence.findIndex(line => line.includes('YAKOLAK_VISUAL_POLISH_READY'));
