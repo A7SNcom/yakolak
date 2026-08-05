@@ -1,8 +1,8 @@
 extends Node
 
 # YAKOLAK 3.1 pre-intro: a restrained cinematic handoff from the exact loader
-# star to the approved table, followed by a smooth closed-box arrival.
-# Geometry and gameplay rules remain unchanged.
+# star to the approved table, followed by a smooth closed-box arrival and a
+# deliberate pause before the accepted unboxing begins.
 
 const HANDOFF_MS: float = 300.0
 const FLOAT_MS: float = 580.0
@@ -10,8 +10,9 @@ const FORM_MS: float = 800.0
 const SETTLE_MS: float = 380.0
 const HOLD_MS: float = 200.0
 const TABLE_TOTAL_MS: float = HANDOFF_MS + FLOAT_MS + FORM_MS + SETTLE_MS + HOLD_MS
-const BOX_REVEAL_MS: float = 620.0
-const TOTAL_MS: float = TABLE_TOTAL_MS + BOX_REVEAL_MS
+const BOX_REVEAL_MS: float = 760.0
+const BOX_HOLD_MS: float = 320.0
+const TOTAL_MS: float = TABLE_TOTAL_MS + BOX_REVEAL_MS + BOX_HOLD_MS
 
 const INITIAL_DEPTH: float = 8.8
 const INITIAL_SCALE: float = 0.048
@@ -102,7 +103,13 @@ func _process(_delta: float) -> void:
 
 	if not box_reveal_started:
 		_begin_box_reveal()
-	_apply_box_reveal(minf(elapsed - TABLE_TOTAL_MS, BOX_REVEAL_MS))
+	var box_elapsed: float = elapsed - TABLE_TOTAL_MS
+	_apply_box_reveal(minf(box_elapsed, BOX_REVEAL_MS))
+	if box_elapsed >= BOX_REVEAL_MS:
+		_snap_box_and_camera_final()
+		if published_phase < 5:
+			published_phase = 5
+			_publish_phase("box-settled")
 	if elapsed >= TOTAL_MS:
 		_finish_and_start_intro()
 
@@ -163,7 +170,7 @@ func _begin_transition() -> bool:
 		final_camera_position.z * STAGE_CAMERA_DISTANCE
 	)
 	camera.position = stage_camera_position
-	camera.look_at(Vector3(0.0, -6.4, 0.0), Vector3.UP)
+	camera.look_at(Vector3(0.0, -4.8, 0.0), Vector3.UP)
 	stage_camera_rotation = camera.quaternion.normalized()
 
 	wide_camera_position = Vector3(
@@ -172,7 +179,7 @@ func _begin_transition() -> bool:
 		final_camera_position.z * WIDE_CAMERA_DISTANCE
 	)
 	camera.position = wide_camera_position
-	camera.look_at(Vector3(0.0, -7.6, 0.0), Vector3.UP)
+	camera.look_at(Vector3(0.0, -5.7, 0.0), Vector3.UP)
 	wide_camera_rotation = camera.quaternion.normalized()
 	camera.fov = WIDE_CAMERA_FOV
 
