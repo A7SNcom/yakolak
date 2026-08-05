@@ -1,7 +1,15 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "bash scripts/vercel-build.sh",
   "outputDirectory": "web",
   "framework": null,
+  "ignoreCommand": "exit 0",
+  "git": {
+    "deploymentEnabled": false
+  },
+  "github": {
+    "autoJobCancelation": true
+  },
   "headers": [
     {
       "source": "/(.*)",
