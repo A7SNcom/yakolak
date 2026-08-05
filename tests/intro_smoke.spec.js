@@ -100,7 +100,7 @@ test('Godot intro preserves the level table and exact v129 loading-star motion',
   await expect(page.locator('#yakolakLoader')).toHaveCount(0, { timeout: 5000 });
 
   if (await page.evaluate(() => document.body.dataset.yakolakIntro === 'complete')) {
-    await page.locator('canvas').click({ position: { x: 195, y: 422 } });
+    await page.keyboard.press('R');
     await page.waitForFunction(
       () => document.body.dataset.yakolakIntro === 'playing',
       null,
@@ -141,7 +141,7 @@ test('Godot intro preserves the level table and exact v129 loading-star motion',
   await page.waitForTimeout(500);
   await expectCanvasToFillViewport(page, 1440, 900);
   expect(await page.evaluate(() => document.body.dataset.yakolakCamera)).toBe('level-centered');
-  await page.locator('canvas').click({ position: { x: 720, y: 450 } });
+  await page.keyboard.press('R');
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'playing',
     null,
