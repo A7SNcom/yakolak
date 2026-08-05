@@ -25,7 +25,7 @@ async function expectCanvasToFillViewport(page, width, height) {
   expect(Math.abs(box.height - height)).toBeLessThanOrEqual(2);
 }
 
-test('corrected intro keeps the camera and star table level and uses the rolling-star loader', async ({ page }) => {
+test('Godot intro preserves the level table and exact v129 loading-star motion', async ({ page }) => {
   test.setTimeout(300000);
   const failures = [];
   const introLogs = [];
@@ -41,19 +41,46 @@ test('corrected intro keeps the camera and star table level and uses the rolling
 
   await page.goto('http://127.0.0.1:8000/', { waitUntil: 'domcontentloaded' });
 
-  const loader = page.locator('#yakolakLoader');
-  const rollingStar = loader.locator('.loaderStar');
-  await expect(loader).toBeVisible();
-  await expect(loader).toHaveAttribute('data-loader-kind', 'rolling-star');
-  await expect(rollingStar).toBeVisible();
-  await expect(rollingStar).toHaveAttribute('data-rolling', 'true');
-  await expect(loader.locator('progress')).toHaveCount(0);
-  expect(await rollingStar.evaluate(element => element.getAnimations().length)).toBeGreaterThan(0);
-  const firstTransform = await rollingStar.evaluate(element => getComputedStyle(element).transform);
-  await page.waitForTimeout(180);
-  const secondTransform = await rollingStar.evaluate(element => getComputedStyle(element).transform);
-  expect(secondTransform).not.toBe(firstTransform);
-  await page.screenshot({ path: 'web/loader-mobile.png', fullPage: false, timeout: 120000 });
+  const loaderContract = await page.evaluate(() => {
+    const loader = document.getElementById('yakolakLoader');
+    const bounce = loader?.querySelector('.starBounce');
+    const star = loader?.querySelector('.loadingStar');
+    const shadow = loader?.querySelector('.loadingShadow');
+    const styles = Array.from(document.querySelectorAll('style'))
+      .map(style => style.textContent || '')
+      .join('\n');
+    return {
+      source: loader?.dataset.loaderSource || '',
+      loaderVisible: Boolean(loader && getComputedStyle(loader).visibility !== 'hidden'),
+      bounceName: bounce ? getComputedStyle(bounce).animationName : '',
+      bounceDuration: bounce ? getComputedStyle(bounce).animationDuration : '',
+      turnName: star ? getComputedStyle(star).animationName : '',
+      turnDuration: star ? getComputedStyle(star).animationDuration : '',
+      shadowName: shadow ? getComputedStyle(shadow).animationName : '',
+      shadowDuration: shadow ? getComputedStyle(shadow).animationDuration : '',
+      hasProgress: Boolean(loader?.querySelector('progress')),
+      hasExactCompression: styles.includes('translateY(36px) scale(1.17,.72)'),
+      hasExactTurn: styles.includes('100%{transform:rotate(24deg)}'),
+      hasExactShadow: styles.includes('transform:scale(1.28,1)'),
+      hasInventedHorizontalMotion: styles.includes('translateX(') || styles.includes('rotate(-420deg)')
+    };
+  });
+
+  expect(loaderContract).toEqual({
+    source: 'v129-loading-star-motion',
+    loaderVisible: true,
+    bounceName: 'bounce',
+    bounceDuration: '0.82s',
+    turnName: 'turn',
+    turnDuration: '0.82s',
+    shadowName: 'shadow',
+    shadowDuration: '0.82s',
+    hasProgress: false,
+    hasExactCompression: true,
+    hasExactTurn: true,
+    hasExactShadow: true,
+    hasInventedHorizontalMotion: false
+  });
 
   await page.waitForFunction(
     () => ['playing', 'complete'].includes(document.body.dataset.yakolakIntro),
@@ -65,11 +92,12 @@ test('corrected intro keeps the camera and star table level and uses the rolling
     () => document.body.dataset.yakolakCorrections === 'corrected-level' &&
           document.body.dataset.yakolakTable === 'approved-star-svg' &&
           document.body.dataset.yakolakTableLevel === 'true' &&
-          document.body.dataset.yakolakCamera === 'level-centered',
+          document.body.dataset.yakolakCamera === 'level-centered' &&
+          document.body.dataset.yakolakLoader === 'v129-loading-star-motion',
     null,
     { timeout: 10000 }
   );
-  await expect(loader).toHaveCount(0, { timeout: 5000 });
+  await expect(page.locator('#yakolakLoader')).toHaveCount(0, { timeout: 5000 });
 
   if (await page.evaluate(() => document.body.dataset.yakolakIntro === 'complete')) {
     await page.locator('canvas').click({ position: { x: 195, y: 422 } });
@@ -98,6 +126,7 @@ test('corrected intro keeps the camera and star table level and uses the rolling
   expect(await page.evaluate(() => document.body.dataset.yakolakTableLevel)).toBe('true');
   expect(await page.evaluate(() => document.body.dataset.yakolakCamera)).toBe('level-centered');
   expect(await page.evaluate(() => document.body.dataset.yakolakGeometry)).toBe('ready');
+  expect(await page.evaluate(() => document.body.dataset.yakolakLoader)).toBe('v129-loading-star-motion');
 
   const joined = introLogs.join('\n');
   expect(joined).toContain('YAKOLAK_INTRO_PHASE lid-shaking');
