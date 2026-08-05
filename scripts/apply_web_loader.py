@@ -21,7 +21,7 @@ STYLE = r'''
 }
 #yakolakLoader .loaderBackdrop{
   position:absolute;inset:0;background:var(--loading-background);opacity:1;
-  transition:opacity 380ms cubic-bezier(.65,0,.35,1)
+  transition:opacity 760ms cubic-bezier(.4,0,.2,1)
 }
 #yakolakLoader.matched .loaderBackdrop{opacity:0}
 #yakolakLoader .loaderBrand{
@@ -38,7 +38,8 @@ STYLE = r'''
   filter:drop-shadow(0 8px 20px rgba(255,255,255,.05))
 }
 #yakolakLoader .loaderLogoMtkyf svg{display:block;width:100%;height:100%}
-#yakolakLoader .loaderLogoMtkyf path{fill:#fff!important}
+#yakolakLoader .loaderLogoMtkyf path:not(.cls-1){fill:#000!important}
+#yakolakLoader .loaderLogoMtkyf .cls-1{fill:#fff!important}
 #yakolakLoader .boxLoading{
   position:fixed;left:50%;top:50%;width:96px;height:132px;
   transform:translate(-50%,-50%);z-index:4
@@ -126,6 +127,8 @@ SCRIPT = r'''
   const cycle=820;
   const epoch=performance.now();
   const minimumVisibleHold=780;
+  const materialBridgeDuration=1200;
+  const materialBridgeHoldRatio=220/materialBridgeDuration;
   let scheduled=false;
   let released=false;
   let matchReady=false;
@@ -139,6 +142,8 @@ SCRIPT = r'''
   document.body.dataset.yakolakBrandLayout='yakolak-upper-center-star-center-mtkyf-lower-center';
   document.body.dataset.yakolakBrandPhase='hidden';
   document.body.dataset.yakolakContourSource='table-svg-exact-path';
+  document.body.dataset.yakolakMtkyfPalette='original-black-white';
+  document.body.dataset.yakolakVisualBridge='white-to-material-crossfade';
   window.__yakolakHandoffHistory=['waiting'];
   window.__yakolakBrandHistory=['hidden'];
   window.__yakolakLoading={set(){}};
@@ -184,14 +189,31 @@ SCRIPT = r'''
       document.body.dataset.yakolakTeethAlignment='canonical-zero-degree-shared-contour';
       H('matched');
       L.classList.add('matched');
-      clone.animate([{opacity:1},{opacity:1},{opacity:0}],{
-        duration:460,delay:110,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'
+
+      const targetColor=target.starColor||'#8391aa';
+      const clonePath=clone.querySelector('.loadingStar path');
+      clonePath?.animate([
+        {fill:'#ffffff',offset:0},
+        {fill:'#ffffff',offset:materialBridgeHoldRatio},
+        {fill:targetColor,offset:1}
+      ],{duration:materialBridgeDuration,easing:'linear',fill:'forwards'});
+      clone.animate([
+        {opacity:1,offset:0},
+        {opacity:1,offset:materialBridgeHoldRatio},
+        {opacity:.70,offset:.56},
+        {opacity:0,offset:1}
+      ],{
+        duration:materialBridgeDuration,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'
       });
-      handoffShadow.animate([{opacity:.22},{opacity:0}],{
-        duration:380,delay:100,easing:'ease-out',fill:'forwards'
+      handoffShadow.animate([
+        {opacity:.22,offset:0},
+        {opacity:.15,offset:.44},
+        {opacity:0,offset:1}
+      ],{
+        duration:760,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'
       });
       L.setAttribute('aria-busy','false');
-      setTimeout(()=>L.remove(),720);
+      setTimeout(()=>L.remove(),materialBridgeDuration+140);
     });
   };
 
