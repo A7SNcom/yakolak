@@ -1,19 +1,26 @@
 extends Node
 
-# YAKOLAK 3.0 pre-intro: the exact v129 loading-star silhouette is handed
-# continuously to the approved 3D table mesh before the accepted box intro.
-# No board, lid, bases or stones are visible until the table has settled.
+# YAKOLAK 3.0 pre-intro: the exact v129 loading-star silhouette becomes the
+# approved table, then the closed box rises onto it before the accepted intro.
+# The approved unboxing itself is not modified.
 
 const HANDOFF_MS: float = 560.0
 const FLOAT_MS: float = 900.0
 const FORM_MS: float = 1120.0
 const SETTLE_MS: float = 520.0
 const HOLD_MS: float = 260.0
-const TOTAL_MS: float = HANDOFF_MS + FLOAT_MS + FORM_MS + SETTLE_MS + HOLD_MS
+const TABLE_TOTAL_MS: float = HANDOFF_MS + FLOAT_MS + FORM_MS + SETTLE_MS + HOLD_MS
+const BOX_REVEAL_MS: float = 520.0
+const TOTAL_MS: float = TABLE_TOTAL_MS + BOX_REVEAL_MS
 const INITIAL_DEPTH: float = 10.0
 const INITIAL_SCALE: float = 0.055
 const FLOAT_SCALE: float = 0.32
 const LOADER_COLOR: Color = Color("#3f3f3f")
+const STAGE_CAMERA_DISTANCE: float = 1.34
+const STAGE_CAMERA_LIFT: float = 0.9
+const STAGE_CAMERA_FOV: float = 49.0
+const BOX_START_DROP: float = 0.32
+const BOX_START_SCALE: float = 0.965
 
 var intro: Node3D
 var corrections: Node
@@ -27,6 +34,7 @@ var magic_light: OmniLight3D
 
 var primed: bool = false
 var initialized: bool = false
+var box_reveal_started: bool = false
 var completed: bool = false
 var started_msec: int = 0
 var published_phase: int = -1
@@ -45,10 +53,15 @@ var final_table_color: Color
 var final_table_roughness: float
 var final_table_metallic: float
 
+var final_camera_position: Vector3
+var final_camera_rotation: Quaternion
+var final_camera_fov: float
+var stage_camera_position: Vector3
+var stage_camera_rotation: Quaternion
+var box_final_poses: Dictionary = {}
+
 
 func _ready() -> void:
-	# The approved corrections run at priority 100. This controller waits for their
-	# validation, then takes over at priority 200 without changing their baseline.
 	process_priority = 200
 	intro = get_parent() as Node3D
 	corrections = intro.get_node_or_null("ExistingIntroCorrections")
@@ -71,8 +84,14 @@ func _process(_delta: float) -> void:
 		return
 
 	var elapsed: float = float(Time.get_ticks_msec() - started_msec)
-	_apply_motion(minf(elapsed, TOTAL_MS))
-	_publish_timeline_phase(elapsed)
+	if elapsed < TABLE_TOTAL_MS:
+		_apply_table_motion(elapsed)
+		_publish_timeline_phase(elapsed)
+		return
+
+	if not box_reveal_started:
+		_begin_box_reveal()
+	_apply_box_reveal(minf(elapsed - TABLE_TOTAL_MS, BOX_REVEAL_MS))
 	if elapsed >= TOTAL_MS:
 		_finish_and_start_intro()
 
@@ -100,8 +119,7 @@ func _prime_when_models_exist() -> bool:
 	if game_nodes.size() != 42:
 		return false
 
-	# Stop the auto-started intro under the opaque web loader. The approved
-	# correction script gets one clean frame to snap and validate its baseline.
+	# Stop the auto-started intro while the opaque HTML loader is still covering it.
 	intro.set("playing", false)
 	intro.set_process_unhandled_input(false)
 	gameplay.set_process_input(false)
@@ -125,18 +143,31 @@ func _begin_transition() -> bool:
 	final_pedestal_scale = pedestal.scale
 	final_rotation = tabletop.quaternion.normalized()
 
+	final_camera_position = camera.position
+	final_camera_rotation = camera.quaternion.normalized()
+	final_camera_fov = camera.fov
+	stage_camera_position = Vector3(
+		final_camera_position.x * STAGE_CAMERA_DISTANCE,
+		final_camera_position.y * STAGE_CAMERA_DISTANCE + STAGE_CAMERA_LIFT,
+		final_camera_position.z * STAGE_CAMERA_DISTANCE
+	)
+	camera.position = stage_camera_position
+	camera.look_at(Vector3(0.0, -0.65, 0.0), Vector3.UP)
+	stage_camera_rotation = camera.quaternion.normalized()
+	camera.fov = STAGE_CAMERA_FOV
+
 	table_material = (tabletop.material_override as StandardMaterial3D).duplicate() as StandardMaterial3D
 	tabletop.material_override = table_material
 	final_table_color = table_material.albedo_color
 	final_table_roughness = table_material.roughness
 	final_table_metallic = table_material.metallic
 	table_material.albedo_color = LOADER_COLOR
-	table_material.roughness = 0.78
+	table_material.roughness = 0.86
 	table_material.metallic = 0.0
 
 	var viewport_center: Vector2 = get_viewport().get_visible_rect().size * 0.5
 	initial_position = camera.project_position(viewport_center, INITIAL_DEPTH)
-	floating_position = Vector3(0.0, 3.4, 0.0)
+	floating_position = Vector3(0.0, 2.65, 0.0)
 
 	var camera_basis: Basis = camera.global_transform.basis.orthonormalized()
 	var facing_basis := Basis(
@@ -172,7 +203,7 @@ func _begin_transition() -> bool:
 	return true
 
 
-func _apply_motion(elapsed: float) -> void:
+func _apply_table_motion(elapsed: float) -> void:
 	if elapsed <= HANDOFF_MS:
 		tabletop.position = initial_position
 		tabletop.quaternion = initial_rotation
@@ -188,7 +219,7 @@ func _apply_motion(elapsed: float) -> void:
 		tabletop.quaternion = initial_rotation.slerp(floating_rotation, t).normalized()
 		tabletop.scale = Vector3.ONE * lerpf(INITIAL_SCALE, FLOAT_SCALE, t)
 		magic_light.position = tabletop.position + Vector3(0.0, 0.5, 0.0)
-		magic_light.light_energy = sin(t * PI) * 0.22
+		magic_light.light_energy = sin(t * PI) * 0.20
 		return
 
 	var form_end: float = float_end + FORM_MS
@@ -197,15 +228,15 @@ func _apply_motion(elapsed: float) -> void:
 		var elevated_final: Vector3 = final_table_position + Vector3(0.0, 0.18, 0.0)
 		tabletop.position = floating_position.lerp(elevated_final, t)
 		tabletop.quaternion = floating_rotation.slerp(final_rotation, t).normalized()
-		var table_scale: float = lerpf(FLOAT_SCALE, 1.035, t)
+		var table_scale: float = lerpf(FLOAT_SCALE, 1.025, t)
 		tabletop.scale = final_table_scale * table_scale
 
 		var color_t: float = _smooth(clampf((t - 0.08) / 0.92, 0.0, 1.0))
 		table_material.albedo_color = LOADER_COLOR.lerp(final_table_color, color_t)
-		table_material.roughness = lerpf(0.78, final_table_roughness, color_t)
+		table_material.roughness = lerpf(0.86, final_table_roughness, color_t)
 		table_material.metallic = lerpf(0.0, final_table_metallic, color_t)
 
-		var pedestal_t: float = _smooth(clampf((t - 0.26) / 0.74, 0.0, 1.0))
+		var pedestal_t: float = _smooth(clampf((t - 0.30) / 0.70, 0.0, 1.0))
 		pedestal.visible = pedestal_t > 0.001
 		pedestal.position = pedestal_start_position.lerp(final_pedestal_position, pedestal_t)
 		pedestal.scale = Vector3(
@@ -214,25 +245,60 @@ func _apply_motion(elapsed: float) -> void:
 			final_pedestal_scale.z
 		)
 		magic_light.position = tabletop.position + Vector3(0.0, 1.1, 0.0)
-		magic_light.light_energy = sin(t * PI) * 0.58
+		magic_light.light_energy = sin(t * PI) * 0.48
 		return
 
 	var settle_end: float = form_end + SETTLE_MS
 	if elapsed <= settle_end:
 		var t: float = clampf((elapsed - form_end) / SETTLE_MS, 0.0, 1.0)
 		var decay: float = 1.0 - t
-		var vertical_offset: float = 0.18 * decay + sin(t * PI * 2.0) * 0.055 * decay
+		var vertical_offset: float = 0.18 * decay + sin(t * PI * 2.0) * 0.045 * decay
 		tabletop.position = final_table_position + Vector3(0.0, vertical_offset, 0.0)
 		tabletop.quaternion = final_rotation
-		tabletop.scale = final_table_scale * (1.0 + sin(t * PI) * 0.025)
+		tabletop.scale = final_table_scale * (1.0 + sin(t * PI) * 0.018)
 		pedestal.visible = true
 		pedestal.position = final_pedestal_position
 		pedestal.scale = final_pedestal_scale
 		magic_light.position = final_table_position + Vector3(0.0, 1.1, 0.0)
-		magic_light.light_energy = 0.18 * decay
+		magic_light.light_energy = 0.14 * decay
 		return
 
 	_snap_table_final()
+
+
+func _begin_box_reveal() -> void:
+	box_reveal_started = true
+	_snap_table_final()
+
+	# Put every approved intro object at its exact accepted zero-time pose before it
+	# becomes visible. This prevents a one-frame flash of the previous final layout.
+	intro.call("_apply_timeline", 0.0)
+	intro.set("playing", false)
+	box_final_poses.clear()
+	for node: GeometryInstance3D in game_nodes:
+		box_final_poses[node] = {
+			"position": node.position,
+			"rotation": node.quaternion.normalized(),
+			"scale": node.scale,
+		}
+		node.position = node.position + Vector3(0.0, -BOX_START_DROP, 0.0)
+		node.scale = node.scale * BOX_START_SCALE
+		node.visible = true
+	_publish_phase("box-arriving")
+
+
+func _apply_box_reveal(reveal_elapsed: float) -> void:
+	var t: float = _smooth(reveal_elapsed / BOX_REVEAL_MS)
+	camera.position = stage_camera_position.lerp(final_camera_position, t)
+	camera.quaternion = stage_camera_rotation.slerp(final_camera_rotation, t).normalized()
+	camera.fov = lerpf(STAGE_CAMERA_FOV, final_camera_fov, t)
+	for node: GeometryInstance3D in game_nodes:
+		var pose: Dictionary = box_final_poses[node] as Dictionary
+		var final_position: Vector3 = pose["position"] as Vector3
+		var final_scale: Vector3 = pose["scale"] as Vector3
+		node.position = (final_position + Vector3(0.0, -BOX_START_DROP, 0.0)).lerp(final_position, t)
+		node.quaternion = pose["rotation"] as Quaternion
+		node.scale = (final_scale * BOX_START_SCALE).lerp(final_scale, t)
 
 
 func _snap_table_final() -> void:
@@ -250,17 +316,28 @@ func _snap_table_final() -> void:
 		magic_light.light_energy = 0.0
 
 
+func _snap_box_and_camera_final() -> void:
+	camera.position = final_camera_position
+	camera.quaternion = final_camera_rotation
+	camera.fov = final_camera_fov
+	for node: GeometryInstance3D in game_nodes:
+		var pose: Dictionary = box_final_poses[node] as Dictionary
+		node.position = pose["position"] as Vector3
+		node.quaternion = pose["rotation"] as Quaternion
+		node.scale = pose["scale"] as Vector3
+		node.visible = true
+
+
 func _finish_and_start_intro() -> void:
 	if completed:
 		return
 	completed = true
 	_snap_table_final()
-	for node: GeometryInstance3D in game_nodes:
-		node.visible = true
+	_snap_box_and_camera_final()
 	intro.set_process_unhandled_input(true)
 	gameplay.set_process_input(true)
 	_publish_phase("complete")
-	print("YAKOLAK_PREINTRO_COMPLETE duration=%d star=loading-star table=approved-star-svg" % int(TOTAL_MS))
+	print("YAKOLAK_PREINTRO_COMPLETE duration=%d star=loading-star table=approved-star-svg box=visible" % int(TOTAL_MS))
 	intro.call("_restart_intro")
 	set_process(false)
 
