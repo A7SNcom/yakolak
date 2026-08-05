@@ -6,12 +6,12 @@ on:
       - agent/yakolak-3.0-star-to-table-preintro
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-web-preview:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout preview branch
         uses: actions/checkout@v4
@@ -82,7 +82,21 @@ jobs:
           fi
           du -h web/index.html web/index.js web/index.wasm web/index.pck
 
-      - name: Upload deployable preview
+      - name: Verify the scene journey in Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-package-lock --no-audit --no-fund @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+          python3 -m http.server 8000 --directory web >/tmp/preintro-preview-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" >/dev/null 2>&1 || true' EXIT
+          sleep 1
+          npx playwright test tests/pre_intro_smoke.spec.js --workers=1 --reporter=line
+          kill "$server_pid" >/dev/null 2>&1 || true
+          trap - EXIT
+
+      - name: Upload deployable preview artifact
         uses: actions/upload-artifact@v4
         with:
           name: yakolak-preintro-web
@@ -90,3 +104,22 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 3
+
+      - name: Publish isolated preview branch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          publish_dir="$(mktemp -d)"
+          cp -a web/. "$publish_dir/"
+          touch "$publish_dir/.nojekyll"
+          cd "$publish_dir"
+          git init
+          git config user.name "YAKOLAK Preview Bot"
+          git config user.email "actions@github.com"
+          git checkout -b preview-star-to-table
+          git add -A
+          git commit -m "Publish browser-tested star-to-table preview from ${GITHUB_SHA}"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin preview-star-to-table
