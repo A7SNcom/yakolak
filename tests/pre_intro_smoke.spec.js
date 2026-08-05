@@ -137,13 +137,12 @@ test('balanced logos, gradual material bridge, slow camera, soft box, and playab
   expect(maxCoverage).toBeLessThanOrEqual(.905);
   await page.screenshot({ path: 'web/preintro-04-camera-orbit.png' });
 
-  await page.waitForFunction(() =>
-    document.body.dataset.yakolakPreIntro === 'box-arriving' &&
-    document.body.dataset.yakolakBoxReveal === 'soft-staggered-fade' &&
-    document.body.dataset.yakolakBoxRevealDuration === '1100',
-    null, { timeout: 15000 }
-  );
+  await expect.poll(
+    () => events.some(x => x.includes('YAKOLAK_PREINTRO_PHASE box-arriving')),
+    { timeout: 15000 }
+  ).toBe(true);
   expect(await page.evaluate(() => document.body.dataset.yakolakBoxReveal)).toBe('soft-staggered-fade');
+  expect(await page.evaluate(() => document.body.dataset.yakolakBoxRevealDuration)).toBe('1100');
 
   await page.waitForFunction(() =>
     document.body.dataset.yakolakPreIntro === 'complete' &&
