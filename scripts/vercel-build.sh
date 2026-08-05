@@ -118,7 +118,7 @@ cleanup() {
 trap cleanup EXIT
 sleep 1
 PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1 \
-  npx playwright test tests/intro_smoke.spec.js tests/gameplay_smoke.spec.js tests/local_match_smoke.spec.js --workers=1 --reporter=line
+  npx playwright test tests/intro_smoke.spec.js tests/gameplay_smoke.spec.js tests/local_match_smoke.spec.js tests/local_match_desktop_smoke.spec.js --workers=1 --reporter=line
 cleanup
 trap - EXIT
 
@@ -128,9 +128,11 @@ test -s web/intro-desktop-motion.png
 test -s web/gameplay-mobile-selected.png
 test -s web/gameplay-mobile-placed.png
 test -s web/local-match-round-win.png
+test -s web/local-match-desktop-round-win.png
 echo "YAKOLAK 2.8 passed exact v129 loader and unchanged camera/table verification"
 echo "YAKOLAK 2.9 passed physical stone selection and legal board placement verification"
-echo "YAKOLAK 3.0 passed ownership, turn order, official victory, scoring, and round reset verification"
+echo "YAKOLAK 3.0 passed mobile and desktop ownership, turn order, official victory, scoring, and round reset verification"
 du -h web/index.wasm web/index.pck \
   web/intro-mobile-motion.png web/intro-mobile-final.png web/intro-desktop-motion.png \
-  web/gameplay-mobile-selected.png web/gameplay-mobile-placed.png web/local-match-round-win.png
+  web/gameplay-mobile-selected.png web/gameplay-mobile-placed.png \
+  web/local-match-round-win.png web/local-match-desktop-round-win.png
