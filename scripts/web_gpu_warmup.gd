@@ -1,12 +1,12 @@
 extends Node
 
 # Forces every final material and the expensive closed-shell shadow pass to render
-# behind the HTML loader. The visible handoff is released only after frame pacing
-# has settled, moving first-use shader/upload stalls out of the actual animation.
+# behind the HTML loader. It then hides the warmup geometry and measures the real
+# post-warmup frame cadence before releasing the visible handoff.
 
-const MIN_WARMUP_FRAMES: int = 18
-const REQUIRED_STABLE_FRAMES: int = 12
-const MAX_WARMUP_FRAMES: int = 240
+const HEAVY_RENDER_FRAMES: int = 14
+const REQUIRED_POST_HIDE_STABLE_FRAMES: int = 12
+const MAX_POST_HIDE_FRAMES: int = 60
 const STABLE_FRAME_SECONDS: float = 1.0 / 28.0
 
 var intro: Node3D
@@ -16,9 +16,11 @@ var warm_nodes: Array[GeometryInstance3D] = []
 var completed: bool = false
 var released: bool = false
 var loader_requested_match: bool = false
-var warmup_frames: int = 0
+var heavy_render_started: bool = false
+var geometry_hidden: bool = false
+var heavy_render_frames: int = 0
+var post_hide_frames: int = 0
 var stable_frames: int = 0
-var deferred_render_pending: bool = false
 
 
 func _ready() -> void:
@@ -43,22 +45,28 @@ func _process(delta: float) -> void:
 	if warm_nodes.is_empty() and not _collect_warm_nodes():
 		return
 
-	if not deferred_render_pending:
-		deferred_render_pending = true
-		call_deferred("_force_hidden_render_pass")
+	if not heavy_render_started:
+		heavy_render_started = true
+		_show_warm_nodes()
+		return
+
+	if not geometry_hidden:
+		heavy_render_frames += 1
+		if heavy_render_frames >= HEAVY_RENDER_FRAMES:
+			_hide_warm_nodes()
+			geometry_hidden = true
+		return
 
 	var applied_scale: float = maxf(Engine.time_scale, 0.001)
 	var actual_frame_seconds: float = maxf(delta / applied_scale, 0.0001)
-	warmup_frames += 1
+	post_hide_frames += 1
 	if actual_frame_seconds <= STABLE_FRAME_SECONDS:
 		stable_frames += 1
 	else:
 		stable_frames = 0
 
-	var stable_ready: bool = warmup_frames >= MIN_WARMUP_FRAMES and stable_frames >= REQUIRED_STABLE_FRAMES
-	if stable_ready or warmup_frames >= MAX_WARMUP_FRAMES:
-		completed = true
-		call_deferred("_finish_hidden_render_pass")
+	if stable_frames >= REQUIRED_POST_HIDE_STABLE_FRAMES or post_hide_frames >= MAX_POST_HIDE_FRAMES:
+		_complete_warmup()
 
 
 func _collect_warm_nodes() -> bool:
@@ -73,10 +81,7 @@ func _collect_warm_nodes() -> bool:
 	return warm_nodes.size() == 42
 
 
-func _force_hidden_render_pass() -> void:
-	deferred_render_pending = false
-	if completed:
-		return
+func _show_warm_nodes() -> void:
 	for geometry: GeometryInstance3D in warm_nodes:
 		var node_name: String = String(geometry.name)
 		geometry.visible = true
@@ -85,17 +90,24 @@ func _force_hidden_render_pass() -> void:
 			if node_name == "Board" or node_name == "Lid" or node_name.begins_with("Base_")
 			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		)
+	print("YAKOLAK_GPU_WARMUP_RENDER_START nodes=%d heavy_frames=%d" % [warm_nodes.size(), HEAVY_RENDER_FRAMES])
 
 
-func _finish_hidden_render_pass() -> void:
+func _hide_warm_nodes() -> void:
 	for geometry: GeometryInstance3D in warm_nodes:
 		geometry.visible = false
 		geometry.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	print("YAKOLAK_GPU_WARMUP_COMPLETE frames=%d stable_frames=%d nodes=%d" % [warmup_frames, stable_frames, warm_nodes.size()])
+	print("YAKOLAK_GPU_WARMUP_RENDER_END heavy_frames=%d" % heavy_render_frames)
+
+
+func _complete_warmup() -> void:
+	completed = true
+	print("YAKOLAK_GPU_WARMUP_COMPLETE heavy_frames=%d settle_frames=%d stable_frames=%d nodes=%d" % [heavy_render_frames, post_hide_frames, stable_frames, warm_nodes.size()])
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakWarmup='complete';" +
-			"document.body.dataset.yakolakWarmupFrames='" + str(warmup_frames) + "';" +
+			"document.body.dataset.yakolakWarmupHeavyFrames='" + str(heavy_render_frames) + "';" +
+			"document.body.dataset.yakolakWarmupSettleFrames='" + str(post_hide_frames) + "';" +
 			"document.body.dataset.yakolakWarmupNodes='" + str(warm_nodes.size()) + "';",
 			true
 		)
