@@ -7,6 +7,7 @@ extends Node
 const TARGET_VISUAL_STEP_SECONDS: float = 1.0 / 60.0
 const MIN_TIME_SCALE: float = 0.34
 const SAMPLE_LIMIT: int = 24
+const LOCK_SAMPLE_COUNT: int = 12
 
 var intro: Node3D
 var warmup: Node
@@ -52,7 +53,12 @@ func _process(delta: float) -> void:
 func _lock_measured_scale() -> void:
 	var measured: float = TARGET_VISUAL_STEP_SECONDS
 	if not frame_samples.is_empty():
-		var ordered: Array[float] = frame_samples.duplicate()
+		# Warmup only completes after a stable streak. Measure that most recent
+		# streak, not the intentional shader-compilation hitches that came before it.
+		var start_index: int = maxi(0, frame_samples.size() - LOCK_SAMPLE_COUNT)
+		var ordered: Array[float] = []
+		for index: int in range(start_index, frame_samples.size()):
+			ordered.append(frame_samples[index])
 		ordered.sort()
 		var percentile_index: int = clampi(int(ceil(float(ordered.size()) * 0.90)) - 1, 0, ordered.size() - 1)
 		measured = maxf(float(ordered[percentile_index]), TARGET_VISUAL_STEP_SECONDS)
