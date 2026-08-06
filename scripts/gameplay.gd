@@ -98,6 +98,11 @@ func _input(event: InputEvent) -> void:
 
 	if not pressed:
 		return
+
+	# Before a match is enabled, leave the event to the setup/tutorial controls.
+	# Handling it here used to swallow every button tap on the post-intro screen.
+	if not initialized or not gameplay_ready or move_active:
+		return
 	get_viewport().set_input_as_handled()
 
 	var now: int = Time.get_ticks_msec()
@@ -106,8 +111,6 @@ func _input(event: InputEvent) -> void:
 	last_pointer_msec = now
 	last_pointer_position = pointer_position
 
-	if not initialized or not gameplay_ready or move_active:
-		return
 	_handle_pointer(pointer_position)
 
 

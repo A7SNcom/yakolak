@@ -1,0 +1,10 @@
+.godot/
+.vercel/
+generated/
+web/
+visual-review/
+test-results/
+node_modules/
+*.import
+*.translation
+*.uid

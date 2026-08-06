@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
 
 test.use({
   viewport: { width: 390, height: 844 },
@@ -33,11 +33,20 @@ test('a physical stone can be selected and played after the approved intro', asy
   await page.goto('http://127.0.0.1:8000/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'complete' &&
-          document.body.dataset.yakolakGameplay === 'ready' &&
+          document.body.dataset.yakolakSetup === 'visible' &&
+          typeof window.yakolakTestStartLocal === 'function',
+    null,
+    { timeout: 90000 }
+  );
+  await page.evaluate(() => window.yakolakTestStartLocal());
+  await page.waitForFunction(
+    () => document.body.dataset.yakolakGameplay === 'ready' &&
+          document.body.dataset.yakolakMatchState === 'turn' &&
+          document.body.dataset.yakolakCurrentPlayer === 'right' &&
           document.body.dataset.yakolakTestPieceX &&
           document.body.dataset.yakolakTestCellX,
     null,
-    { timeout: 70000 }
+    { timeout: 10000 }
   );
 
   expect(await page.evaluate(() => document.body.dataset.yakolakTable)).toBe('approved-star-svg');
@@ -78,8 +87,7 @@ test('a physical stone can be selected and played after the approved intro', asy
 
   await page.touchscreen.tap(targets.cellX, targets.cellY);
   await page.waitForFunction(
-    () => document.body.dataset.yakolakGameplay === 'ready' &&
-          document.body.dataset.yakolakMoves === '1',
+    () => document.body.dataset.yakolakMoves === '1',
     null,
     { timeout: 10000 }
   );
@@ -91,7 +99,7 @@ test('a physical stone can be selected and played after the approved intro', asy
   await page.screenshot({ path: 'web/gameplay-mobile-placed.png', fullPage: false, timeout: 60000 });
 
   const joined = gameplayLogs.join('\n');
-  expect(joined).toContain('YAKOLAK_GAMEPLAY_READY selectable=36 cells=9');
+  expect(joined).toContain('YAKOLAK_MATCH_READY players=2 rounds=3');
   expect(joined).toContain('YAKOLAK_PIECE_SELECTED');
   expect(joined).toContain('YAKOLAK_MOVE_STARTED cell=4 size=large');
   expect(joined).toContain('YAKOLAK_MOVE_COMPLETE move=1 cell=4 size=large dir=right');

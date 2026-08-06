@@ -5,8 +5,10 @@ GODOT_VERSION="4.7.1"
 GODOT_TAG="4.7.1-stable"
 RELEASE="https://github.com/godotengine/godot-builds/releases/download/${GODOT_TAG}"
 
-echo "Building YAKOLAK 3.6 — minimum-gated scenes, professional star settle, and closed rigid box drop"
+echo "Building YAKOLAK 3.7 — approved smooth intro with compact match setup"
 python3 scripts/check_approved_baseline.py
+node --check api/rooms.js
+node tests/online_rules.test.mjs
 
 curl --fail --location --retry 4 --connect-timeout 20 --max-time 180 \
   "${RELEASE}/Godot_v${GODOT_TAG}_linux.x86_64.zip" --output /tmp/godot.zip
@@ -104,6 +106,8 @@ run_godot_export() {
 }
 
 run_godot_import
+"$GODOT_BIN" --headless --path . --script res://tests/session_setup_headless.gd
+"$GODOT_BIN" --headless --path . --script res://tests/gameplay_session_headless.gd
 run_godot_export
 
 test -s web/index.html
@@ -219,8 +223,9 @@ test -s web/intro-mobile-final.png
 test -s web/intro-desktop-motion.png
 test -s web/gameplay-mobile-selected.png
 test -s web/gameplay-mobile-placed.png
-echo "YAKOLAK 3.6 passed governed loader and closed rigid box with the original MTKYF palette"
-echo "YAKOLAK 3.6 passed governed material/camera flow and one-piece closed-box sky drop before lid opening"
+echo "YAKOLAK 3.7 passed the approved loader and closed-box intro sequence"
+echo "YAKOLAK 3.6 passed governed loader and closed rigid box"
+echo "YAKOLAK 3.7 passed the compact player setup and authoritative online rules"
 echo "YAKOLAK gameplay passed physical stone selection and legal board placement verification"
 du -h web/index.wasm web/index.pck web/yakolak-logo.svg visual-review/preintro-motion.webm \
   web/preintro-01-black-loader-logo.png web/preintro-02-logo-to-wall-star-hold.png \

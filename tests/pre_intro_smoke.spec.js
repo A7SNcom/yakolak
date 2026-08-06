@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
 
 test.use({
   viewport: { width: 390, height: 844 },
@@ -168,7 +168,8 @@ test('balanced logos, gradual material bridge, slow camera, soft box, and playab
   await page.waitForFunction(() =>
     document.body.dataset.yakolakPreIntro === 'complete' &&
     document.body.dataset.yakolakIntro === 'complete' &&
-    document.body.dataset.yakolakGameplay === 'ready',
+    document.body.dataset.yakolakGameplay === 'setup' &&
+    document.body.dataset.yakolakSetup === 'visible',
     null, { timeout: 90000 }
   );
   await page.screenshot({ path: 'web/preintro-05-unboxing-complete.png' });
