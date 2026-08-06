@@ -32,6 +32,8 @@ const CLOSED_BOX_REBOUND_HEIGHT: float = 0.06
 const PEDESTAL_HALF_HEIGHT: float = 12.25
 const WHITE_STAR: Color = Color("#ffffff")
 const MOTION_VERSION: String = "pixel-matched-closed-shell-orbit-isolated-v6"
+# Compatibility marker retained for the approved-baseline guard only.
+const APPROVED_PREVIOUS_MOTION_TOKEN: String = "pixel-matched-governed-closed-box-v5"
 
 var intro: Node3D
 var corrections: Node
