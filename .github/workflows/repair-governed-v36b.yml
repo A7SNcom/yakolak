@@ -1,0 +1,54 @@
+name: Repair Governed V36 Applicator B
+
+on:
+  push:
+    branches:
+      - agent/yakolak-3.0-star-to-table-preintro
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/yakolak-3.0-star-to-table-preintro
+      - name: Repair applicator by structural lines
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          target = Path('.github/workflows/apply-governed-closed-box-v36.yml')
+          lines = target.read_text(encoding='utf-8').splitlines(keepends=True)
+          starts = [i for i, line in enumerate(lines) if "'''  const err=(actual,target)=>Math.max(" in line]
+          if len(starts) != 2:
+              raise SystemExit(f'expected two err literals, found {len(starts)}')
+
+          # Process the replacement literal first so indices above it do not shift.
+          second = starts[1]
+          m_index = next(i for i in range(second + 1, len(lines)) if 'const M=state=>{' in lines[i])
+          indent = lines[second].split("'''", 1)[0]
+          lines[second:m_index + 1] = [indent + "'''  const M=state=>{\n"]
+
+          first = starts[0]
+          match_index = next(i for i in range(first + 1, len(lines)) if "const match=(clone,handoffShadow,first,shadowFirst)=>{'''," in lines[i])
+          indent = lines[first].split("'''", 1)[0]
+          lines[first:match_index + 1] = [indent + "'''  const match=(clone,handoffShadow,first,shadowFirst)=>{''',\n"]
+
+          target.write_text(''.join(lines), encoding='utf-8', newline='\n')
+          for cleanup in [
+              '.github/workflows/repair-governed-v36.yml',
+              '.github/workflows/repair-governed-v36b.yml',
+          ]:
+              path = Path(cleanup)
+              if path.exists():
+                  path.unlink()
+          PY
+          git config user.name "YAKOLAK Motion Loop"
+          git config user.email "actions@github.com"
+          git add -A
+          git commit -m "إصلاح بنيوي لتطبيق تحسينات المشهد [repair-v36b-workflow]"
+          git push origin HEAD:agent/yakolak-3.0-star-to-table-preintro
