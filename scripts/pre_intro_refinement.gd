@@ -14,7 +14,7 @@ const CAMERA_START_MS: float = MATCH_HOLD_MS + MORPH_MS + SETTLE_MS
 const CAMERA_END_MS: float = CAMERA_START_MS + CAMERA_MOVE_MS
 const SAFE_WIDTH_RATIO: float = 0.90
 const SAFE_HEIGHT_RATIO: float = 0.76
-const MOTION_VERSION: String = "pixel-matched-direct-slow-safe-framing-v8-efficient"
+const MOTION_VERSION: String = "pixel-matched-direct-slow-safe-framing-v7"
 
 var intro: Node3D
 var preintro: Node
