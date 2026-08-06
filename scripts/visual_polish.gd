@@ -4,7 +4,7 @@ extends Node
 # The wall logo uses the same SVG file as the DOM loader so the logo handoff
 # can be screen-space matched instead of approximated.
 
-const VISUAL_VERSION: String = "black-studio-v4-shared-materials"
+const VISUAL_VERSION: String = "black-studio-v3"
 const LOGO_PATH: String = "res://generated/YAKOLAK_INVERTED.svg"
 const BACKGROUND_COLOR: Color = Color("#000000")
 const FLOOR_COLOR: Color = Color("#080a0d")
