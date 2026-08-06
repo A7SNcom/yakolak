@@ -502,16 +502,18 @@ func _restart_intro() -> void:
 
 
 func _set_internal_visibility(visible: bool) -> void:
+	# The four bases are structural side walls of the closed box and must never
+	# be hidden or spawned later. Only stones are delayed until the lid rises.
 	for direction: String in ORDER:
 		var base := bases[direction] as GeometryInstance3D
-		base.visible = visible
-		base.cast_shadow = (GeometryInstance3D.SHADOW_CASTING_SETTING_ON if visible else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+		base.visible = true
+		base.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	for piece: Dictionary in pieces:
 		var stone := piece["mesh"] as GeometryInstance3D
 		stone.visible = visible
 		stone.cast_shadow = (GeometryInstance3D.SHADOW_CASTING_SETTING_ON if visible else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
 	if OS.has_feature("web"):
-		JavaScriptBridge.eval("document.body.dataset.yakolakIntroContents='" + ("visible-after-lid-lift" if visible else "hidden-inside-closed-shell") + "';", true)
+		JavaScriptBridge.eval("document.body.dataset.yakolakIntroContents='" + ("stones-visible-after-lid-lift" if visible else "stones-hidden-inside-six-part-shell") + "';", true)
 
 
 func _apply_timeline(elapsed: float) -> void:

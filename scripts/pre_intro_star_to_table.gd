@@ -82,6 +82,9 @@ var closed_box_root: Node3D
 var closed_box_landed: bool = false
 var board_node: GeometryInstance3D
 var lid_node: GeometryInstance3D
+# The physical closed box is exactly six visible parts: floor, four side walls, and lid.
+var shell_nodes: Array[GeometryInstance3D] = []
+# Only the 36 stones are internal content; the four side bases are box walls.
 var interior_nodes: Array[GeometryInstance3D] = []
 
 
@@ -152,21 +155,24 @@ func _prime_when_models_exist() -> bool:
 		return false
 
 	game_nodes.clear()
+	shell_nodes.clear()
 	interior_nodes.clear()
 	game_nodes.append(board_node)
 	game_nodes.append(lid_node)
+	shell_nodes.append(board_node)
+	shell_nodes.append(lid_node)
 	for direction: String in ["right", "left", "front", "back"]:
 		var base := intro.get_node_or_null("Base_%s" % direction) as GeometryInstance3D
 		if base == null:
 			return false
 		game_nodes.append(base)
-		interior_nodes.append(base)
+		shell_nodes.append(base)
 	for child: Node in intro.get_children():
 		if child is GeometryInstance3D and String(child.name).begins_with("Stone_"):
 			var stone := child as GeometryInstance3D
 			game_nodes.append(stone)
 			interior_nodes.append(stone)
-	if game_nodes.size() != 42:
+	if game_nodes.size() != 42 or shell_nodes.size() != 6 or interior_nodes.size() != 36:
 		return false
 
 	intro.set("playing", false)
@@ -437,7 +443,7 @@ func _hide_orbit_geometry() -> void:
 
 func _set_closed_shell_visibility() -> void:
 	for node: GeometryInstance3D in game_nodes:
-		var shell_part: bool = node == board_node or node == lid_node
+		var shell_part: bool = node in shell_nodes
 		node.visible = shell_part
 		node.cast_shadow = (GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shell_part else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
 
@@ -498,17 +504,17 @@ func _begin_closed_box_drop() -> void:
 	closed_box_landed = false
 	_snap_table_final()
 	_apply_final_camera()
-	# Build a physically closed shell before the first visible drop frame.
-	# Internal bases/stones stay hidden and shadowless until the lid actually
-	# begins to rise in the original unboxing timeline.
+	# Assemble the real closed box before its first visible drop frame:
+	# board + four side bases/walls + lid. Only the 36 stones remain hidden.
 	intro.call("_apply_timeline", 0.0)
 	intro.set("playing", false)
 	_set_closed_shell_visibility()
 	closed_box_root = Node3D.new()
 	closed_box_root.name = "ClosedBoxDropRoot"
 	intro.add_child(closed_box_root)
-	for node: GeometryInstance3D in game_nodes:
+	for node: GeometryInstance3D in shell_nodes:
 		node.reparent(closed_box_root, true)
+	print("YAKOLAK_CLOSED_BOX_READY shell_parts=%d stones_hidden=%d assembly=prebuilt" % [shell_nodes.size(), interior_nodes.size()])
 	closed_box_root.position = Vector3(0.0, CLOSED_BOX_START_HEIGHT, 0.0)
 	closed_box_root.rotation = Vector3.ZERO
 	closed_box_root.scale = Vector3.ONE
@@ -538,7 +544,7 @@ func _snap_closed_box_landed() -> void:
 	closed_box_landed = true
 	if closed_box_root != null:
 		closed_box_root.position = Vector3.ZERO
-		for node: GeometryInstance3D in game_nodes:
+		for node: GeometryInstance3D in shell_nodes:
 			node.reparent(intro, true)
 		_set_closed_shell_visibility()
 		closed_box_root.queue_free()
@@ -572,7 +578,7 @@ func _finish_and_start_intro() -> void:
 	intro.set_process_unhandled_input(true)
 	gameplay.set_process_input(true)
 	_publish_phase("complete")
-	print("YAKOLAK_PREINTRO_COMPLETE duration=%d motion=%s match=pixel-exact logo=wall camera=side box=closed-shell-only lid=exit-only orbit=isolated" % [int(TOTAL_MS), MOTION_VERSION])
+	print("YAKOLAK_PREINTRO_COMPLETE duration=%d motion=%s match=pixel-exact logo=wall camera=side box=closed-six-part-shell lid=exit-only orbit=isolated" % [int(TOTAL_MS), MOTION_VERSION])
 	intro.call("_restart_intro")
 	set_process(false)
 
@@ -613,8 +619,10 @@ func _publish_web_state(state: String) -> void:
 		"document.body.dataset.yakolakBoxRevealDuration='" + str(int(CLOSED_BOX_DROP_MS)) + "';" +
 		"document.body.dataset.yakolakBoxLandedHold='" + str(int(CLOSED_BOX_LANDED_HOLD_MS)) + "';" +
 		"document.body.dataset.yakolakBoxLidPolicy='present-during-drop-exit-only';" +
-		"document.body.dataset.yakolakClosedBoxVisibleParts='board,lid';" +
-		"document.body.dataset.yakolakInternalContentPolicy='hidden-until-lid-lift';" +
+		"document.body.dataset.yakolakClosedBoxVisibleParts='board,base-right,base-left,base-front,base-back,lid';" +
+		"document.body.dataset.yakolakClosedBoxShellCount='6';" +
+		"document.body.dataset.yakolakClosedBoxAssembly='prebuilt-before-first-drop-frame';" +
+		"document.body.dataset.yakolakInternalContentPolicy='stones-hidden-until-lid-lift';" +
 		"document.body.dataset.yakolakOrbitIsolation='game-hidden-shadows-off-pedestal-delayed';" +
 		"window.__yakolakPreIntroPhases=window.__yakolakPreIntroPhases||[];" +
 		"window.__yakolakPreIntroPhases.push({state:'" + state + "',at:performance.now()});" +
