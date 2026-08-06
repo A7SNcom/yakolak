@@ -14,6 +14,8 @@ const CAMERA_START_MS: float = MATCH_HOLD_MS + MORPH_MS + SETTLE_MS
 const CAMERA_END_MS: float = CAMERA_START_MS + CAMERA_MOVE_MS
 const SAFE_WIDTH_RATIO: float = 0.90
 const SAFE_HEIGHT_RATIO: float = 0.76
+const CAMERA_FIT_MARGIN: float = 1.006
+const MAX_CAMERA_FIT_PASSES: int = 4
 const MOTION_VERSION: String = "pixel-matched-direct-slow-safe-framing-v7"
 
 var intro: Node3D
@@ -27,10 +29,15 @@ var orientation_corrected: bool = false
 var published: bool = false
 var coverage_published: bool = false
 var max_screen_coverage: float = 0.0
+var final_screen_coverage: float = 0.0
 var final_table_scale: Vector3
 var final_pedestal_scale: Vector3
 var final_rotation: Quaternion
 var face_camera_rotation: Quaternion
+var approved_final_camera_position: Vector3
+var responsive_final_camera_position: Vector3
+var responsive_final_camera_rotation: Quaternion
+var final_camera_fov: float
 
 
 func _ready() -> void:
@@ -97,6 +104,8 @@ func _correct_svg_orientation_when_ready() -> bool:
 	final_table_scale = preintro.get("final_table_scale") as Vector3
 	final_pedestal_scale = preintro.get("final_pedestal_scale") as Vector3
 	final_rotation = preintro.get("final_rotation") as Quaternion
+	approved_final_camera_position = preintro.get("final_camera_position") as Vector3
+	final_camera_fov = float(preintro.get("final_camera_fov"))
 
 	# Recalculate from the corrected contour so both stars share one optical center.
 	var local_center: Vector3 = tabletop.mesh.get_aabb().get_center()
@@ -105,14 +114,25 @@ func _correct_svg_orientation_when_ready() -> bool:
 	preintro.set("orbit_center", corrected_center)
 	preintro.set("match_camera_position", corrected_match_position)
 
-	# Both endpoint rotations use the same fixed look target. The transition therefore
-	# cannot acquire a second roll or spin track.
-	var direct_final_position: Vector3 = preintro.get("final_camera_position") as Vector3
-	camera.position = direct_final_position
+	# Build a responsive final camera endpoint with the canonical table scale intact.
+	# Small screens move the camera farther away instead of shrinking the table and
+	# restoring it later, which eliminates the abrupt pre-box zoom/crop.
+	tabletop.quaternion = final_rotation
+	tabletop.scale = final_table_scale
+	camera.position = approved_final_camera_position
+	camera.fov = final_camera_fov
 	camera.look_at(corrected_center, Vector3.UP)
-	preintro.set("final_camera_rotation", camera.quaternion.normalized())
+	final_screen_coverage = _fit_camera_to_safe_framing()
+	responsive_final_camera_position = camera.position
+	responsive_final_camera_rotation = camera.quaternion.normalized()
+	preintro.set("final_camera_position", responsive_final_camera_position)
+	preintro.set("final_camera_rotation", responsive_final_camera_rotation)
 
+	# Return to the exact matched 2D pose before the visible handoff begins.
+	tabletop.quaternion = face_camera_rotation
+	tabletop.scale = final_table_scale
 	camera.position = corrected_match_position
+	camera.fov = float(preintro.get("match_camera_fov"))
 	camera.look_at(corrected_center, Vector3.UP)
 	preintro.set("match_camera_rotation", camera.quaternion.normalized())
 
@@ -153,40 +173,51 @@ func _apply_direct_safe_move(elapsed: float) -> void:
 	# Tilt on almost the same timeline as the camera, rather than finishing early.
 	var table_t: float = _smootherstep(clampf((raw_t - 0.04) / 0.92, 0.0, 1.0))
 	tabletop.quaternion = face_camera_rotation.slerp(final_rotation, table_t).normalized()
+	# The approved geometry scale is fixed for the entire transition. Responsive
+	# fitting is camera-only so there can be no hidden scale restoration jump.
 	tabletop.scale = final_table_scale
-	_apply_safe_optical_framing()
+	_fit_camera_to_safe_framing()
 
-	# Keep the pedestal footprint attached to the temporarily fitted tabletop.
-	var fit_ratio: float = tabletop.scale.x / maxf(final_table_scale.x, 0.0001)
-	pedestal.scale.x = final_pedestal_scale.x * fit_ratio
-	pedestal.scale.z = final_pedestal_scale.z * fit_ratio
+	pedestal.scale.x = final_pedestal_scale.x
+	pedestal.scale.z = final_pedestal_scale.z
 	if raw_t < 0.58:
 		pedestal.visible = false
 
 	_set_wall_logo_alpha(_smootherstep(clampf((raw_t - 0.76) / 0.24, 0.0, 1.0)))
 
 
-func _apply_safe_optical_framing() -> void:
+func _fit_camera_to_safe_framing() -> float:
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	if viewport_size.x < 1.0 or viewport_size.y < 1.0:
-		return
-	var projected: Rect2 = preintro.call("_projected_rect", tabletop) as Rect2
-	if projected.size.x < 1.0 or projected.size.y < 1.0:
-		return
-	var width_ratio: float = projected.size.x / viewport_size.x
-	var height_ratio: float = projected.size.y / viewport_size.y
-	var fit: float = minf(
-		1.0,
-		minf(
-			SAFE_WIDTH_RATIO / maxf(width_ratio, 0.0001),
-			SAFE_HEIGHT_RATIO / maxf(height_ratio, 0.0001)
+		return 0.0
+
+	var center: Vector3 = preintro.get("orbit_center") as Vector3
+	for _pass: int in range(MAX_CAMERA_FIT_PASSES):
+		var projected: Rect2 = preintro.call("_projected_rect", tabletop) as Rect2
+		if projected.size.x < 1.0 or projected.size.y < 1.0:
+			return 0.0
+		var width_ratio: float = projected.size.x / viewport_size.x
+		var height_ratio: float = projected.size.y / viewport_size.y
+		var required_distance_scale: float = maxf(
+			width_ratio / SAFE_WIDTH_RATIO,
+			height_ratio / SAFE_HEIGHT_RATIO
 		)
-	)
-	if fit < 0.999:
-		tabletop.scale = final_table_scale * fit
-	var fitted_width: float = width_ratio * fit
-	var fitted_height: float = height_ratio * fit
-	max_screen_coverage = maxf(max_screen_coverage, maxf(fitted_width, fitted_height))
+		if required_distance_scale <= 1.0005:
+			break
+		var offset: Vector3 = camera.position - center
+		if offset.length_squared() <= 0.000001:
+			break
+		camera.position = center + offset * required_distance_scale * CAMERA_FIT_MARGIN
+		camera.look_at(center, Vector3.UP)
+
+	var fitted: Rect2 = preintro.call("_projected_rect", tabletop) as Rect2
+	if fitted.size.x < 1.0 or fitted.size.y < 1.0:
+		return 0.0
+	var fitted_width: float = fitted.size.x / viewport_size.x
+	var fitted_height: float = fitted.size.y / viewport_size.y
+	var coverage: float = maxf(fitted_width, fitted_height)
+	max_screen_coverage = maxf(max_screen_coverage, coverage)
+	return coverage
 
 
 func _restore_final_geometry() -> void:
@@ -194,6 +225,18 @@ func _restore_final_geometry() -> void:
 	tabletop.scale = final_table_scale
 	pedestal.scale.x = final_pedestal_scale.x
 	pedestal.scale.z = final_pedestal_scale.z
+
+	# Refit against the current mobile viewport because browser bars/orientation can
+	# alter the usable canvas during loading. The endpoint remains continuous and
+	# the table never changes scale.
+	camera.position = responsive_final_camera_position
+	camera.fov = final_camera_fov
+	camera.look_at(preintro.get("orbit_center") as Vector3, Vector3.UP)
+	final_screen_coverage = _fit_camera_to_safe_framing()
+	responsive_final_camera_position = camera.position
+	responsive_final_camera_rotation = camera.quaternion.normalized()
+	preintro.set("final_camera_position", responsive_final_camera_position)
+	preintro.set("final_camera_rotation", responsive_final_camera_rotation)
 
 
 func _set_wall_logo_alpha(value: float) -> void:
@@ -211,6 +254,8 @@ func _publish_contract() -> void:
 		"document.body.dataset.yakolakShapeOrientation='canonical-shared-svg';" +
 		"document.body.dataset.yakolakCameraMotion='direct-slow-safe-framed';" +
 		"document.body.dataset.yakolakCameraDuration='" + str(int(CAMERA_MOVE_MS)) + "';" +
+		"document.body.dataset.yakolakResponsiveFraming='camera-distance-only';" +
+		"document.body.dataset.yakolakTableScalePolicy='fixed-approved-scale';" +
 		"document.body.dataset.yakolakMotion='" + MOTION_VERSION + "';",
 		true
 	)
@@ -223,7 +268,8 @@ func _publish_max_coverage() -> void:
 	if not OS.has_feature("web"):
 		return
 	JavaScriptBridge.eval(
-		"document.body.dataset.yakolakCameraMaxCoverage='" + str(max_screen_coverage) + "';",
+		"document.body.dataset.yakolakCameraMaxCoverage='" + str(max_screen_coverage) + "';" +
+		"document.body.dataset.yakolakCameraFinalCoverage='" + str(final_screen_coverage) + "';",
 		true
 	)
 
