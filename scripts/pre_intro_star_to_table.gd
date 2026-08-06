@@ -31,7 +31,7 @@ const CLOSED_BOX_IMPACT_DEPTH: float = 0.10
 const CLOSED_BOX_REBOUND_HEIGHT: float = 0.06
 const PEDESTAL_HALF_HEIGHT: float = 12.25
 const WHITE_STAR: Color = Color("#ffffff")
-const MOTION_VERSION: String = "pixel-matched-governed-closed-box-v5"
+const MOTION_VERSION: String = "pixel-matched-closed-shell-orbit-isolated-v6"
 
 var intro: Node3D
 var corrections: Node
@@ -78,6 +78,9 @@ var match_camera_rotation: Quaternion
 var match_camera_fov: float
 var closed_box_root: Node3D
 var closed_box_landed: bool = false
+var board_node: GeometryInstance3D
+var lid_node: GeometryInstance3D
+var interior_nodes: Array[GeometryInstance3D] = []
 
 
 func _ready() -> void:
@@ -141,22 +144,26 @@ func _prime_when_models_exist() -> bool:
 	camera = intro.get("camera") as Camera3D
 	tabletop = intro.get_node_or_null("ApprovedStarTableSVG") as MeshInstance3D
 	pedestal = intro.get_node_or_null("ApprovedStarTablePedestal") as MeshInstance3D
-	var board := intro.get_node_or_null("Board") as GeometryInstance3D
-	var lid := intro.get_node_or_null("Lid") as GeometryInstance3D
-	if camera == null or tabletop == null or pedestal == null or board == null or lid == null or gameplay == null:
+	board_node = intro.get_node_or_null("Board") as GeometryInstance3D
+	lid_node = intro.get_node_or_null("Lid") as GeometryInstance3D
+	if camera == null or tabletop == null or pedestal == null or board_node == null or lid_node == null or gameplay == null:
 		return false
 
 	game_nodes.clear()
-	game_nodes.append(board)
-	game_nodes.append(lid)
+	interior_nodes.clear()
+	game_nodes.append(board_node)
+	game_nodes.append(lid_node)
 	for direction: String in ["right", "left", "front", "back"]:
 		var base := intro.get_node_or_null("Base_%s" % direction) as GeometryInstance3D
 		if base == null:
 			return false
 		game_nodes.append(base)
+		interior_nodes.append(base)
 	for child: Node in intro.get_children():
 		if child is GeometryInstance3D and String(child.name).begins_with("Stone_"):
-			game_nodes.append(child as GeometryInstance3D)
+			var stone := child as GeometryInstance3D
+			game_nodes.append(stone)
+			interior_nodes.append(stone)
 	if game_nodes.size() != 42:
 		return false
 
@@ -165,6 +172,7 @@ func _prime_when_models_exist() -> bool:
 	gameplay.set_process_input(false)
 	for node: GeometryInstance3D in game_nodes:
 		node.visible = false
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	tabletop.visible = false
 	pedestal.visible = false
 	_publish_web_state("waiting-for-match")
@@ -345,6 +353,9 @@ func _start_matched_handoff() -> void:
 
 
 func _apply_table_and_camera(elapsed: float) -> void:
+	# Hard isolation: no box, stones, bases or their shadows may enter the
+	# camera frustum during the top-to-final orbit.
+	_hide_orbit_geometry()
 	if elapsed <= MATCH_HOLD_MS:
 		_apply_match_pose()
 		return
@@ -384,9 +395,11 @@ func _apply_table_and_camera(elapsed: float) -> void:
 		tabletop.quaternion = face_camera_rotation.slerp(final_rotation, table_t).normalized()
 		tabletop.scale = final_table_scale
 		tabletop.visible = true
-		var pedestal_t: float = _smootherstep(clampf((t - 0.36) / 0.64, 0.0, 1.0))
-		pedestal.visible = pedestal_t > 0.001
-		_set_pedestal_growth(pedestal_t)
+		# The black pedestal previously crossed the moving camera for a few
+		# frames and looked like a duplicate mesh. Keep it fully absent until
+		# the camera is stationary.
+		pedestal.visible = false
+		_set_pedestal_growth(0.0)
 		var start_offset: Vector3 = match_camera_position - orbit_center
 		var end_offset: Vector3 = final_camera_position - orbit_center
 		var direction: Vector3 = start_offset.normalized().slerp(end_offset.normalized(), t).normalized()
@@ -396,8 +409,35 @@ func _apply_table_and_camera(elapsed: float) -> void:
 		camera.fov = lerpf(match_camera_fov, final_camera_fov, t)
 		return
 
+	# Reveal the support only after the camera has reached its final transform.
+	# This uses the governed camera hold and cannot contaminate the orbit.
+	var support_end: float = orbit_end + CAMERA_HOLD_MS
+	if elapsed <= support_end:
+		_apply_final_camera()
+		tabletop.position = final_table_position
+		tabletop.quaternion = final_rotation
+		tabletop.scale = final_table_scale
+		tabletop.visible = true
+		var support_t: float = _smootherstep((elapsed - orbit_end) / CAMERA_HOLD_MS)
+		pedestal.visible = support_t > 0.18
+		_set_pedestal_growth(support_t)
+		return
+
 	_snap_table_final()
 	_apply_final_camera()
+
+
+func _hide_orbit_geometry() -> void:
+	for node: GeometryInstance3D in game_nodes:
+		node.visible = false
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+func _set_closed_shell_visibility() -> void:
+	for node: GeometryInstance3D in game_nodes:
+		var shell_part: bool = node == board_node or node == lid_node
+		node.visible = shell_part
+		node.cast_shadow = (GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shell_part else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
 
 
 func _apply_bridge_material(value: float) -> void:
@@ -456,15 +496,16 @@ func _begin_closed_box_drop() -> void:
 	closed_box_landed = false
 	_snap_table_final()
 	_apply_final_camera()
-	# Timeline zero is the accepted fully closed product: board, lid, walls and
-	# contained stones are assembled before the entrance begins.
+	# Build a physically closed shell before the first visible drop frame.
+	# Internal bases/stones stay hidden and shadowless until the lid actually
+	# begins to rise in the original unboxing timeline.
 	intro.call("_apply_timeline", 0.0)
 	intro.set("playing", false)
+	_set_closed_shell_visibility()
 	closed_box_root = Node3D.new()
 	closed_box_root.name = "ClosedBoxDropRoot"
 	intro.add_child(closed_box_root)
 	for node: GeometryInstance3D in game_nodes:
-		node.visible = true
 		node.reparent(closed_box_root, true)
 	closed_box_root.position = Vector3(0.0, CLOSED_BOX_START_HEIGHT, 0.0)
 	closed_box_root.rotation = Vector3.ZERO
@@ -497,6 +538,7 @@ func _snap_closed_box_landed() -> void:
 		closed_box_root.position = Vector3.ZERO
 		for node: GeometryInstance3D in game_nodes:
 			node.reparent(intro, true)
+		_set_closed_shell_visibility()
 		closed_box_root.queue_free()
 		closed_box_root = null
 
@@ -516,8 +558,7 @@ func _snap_table_final() -> void:
 func _snap_box_and_camera_final() -> void:
 	_apply_final_camera()
 	_snap_closed_box_landed()
-	for node: GeometryInstance3D in game_nodes:
-		node.visible = true
+	_set_closed_shell_visibility()
 
 
 func _finish_and_start_intro() -> void:
@@ -529,7 +570,7 @@ func _finish_and_start_intro() -> void:
 	intro.set_process_unhandled_input(true)
 	gameplay.set_process_input(true)
 	_publish_phase("complete")
-	print("YAKOLAK_PREINTRO_COMPLETE duration=%d motion=%s match=pixel-exact logo=wall camera=side box=closed-rigid-drop lid=exit-only" % [int(TOTAL_MS), MOTION_VERSION])
+	print("YAKOLAK_PREINTRO_COMPLETE duration=%d motion=%s match=pixel-exact logo=wall camera=side box=closed-shell-only lid=exit-only orbit=isolated" % [int(TOTAL_MS), MOTION_VERSION])
 	intro.call("_restart_intro")
 	set_process(false)
 
@@ -570,6 +611,9 @@ func _publish_web_state(state: String) -> void:
 		"document.body.dataset.yakolakBoxRevealDuration='" + str(int(CLOSED_BOX_DROP_MS)) + "';" +
 		"document.body.dataset.yakolakBoxLandedHold='" + str(int(CLOSED_BOX_LANDED_HOLD_MS)) + "';" +
 		"document.body.dataset.yakolakBoxLidPolicy='present-during-drop-exit-only';" +
+		"document.body.dataset.yakolakClosedBoxVisibleParts='board,lid';" +
+		"document.body.dataset.yakolakInternalContentPolicy='hidden-until-lid-lift';" +
+		"document.body.dataset.yakolakOrbitIsolation='game-hidden-shadows-off-pedestal-delayed';" +
 		"window.__yakolakPreIntroPhases=window.__yakolakPreIntroPhases||[];" +
 		"window.__yakolakPreIntroPhases.push({state:'" + state + "',at:performance.now()});" +
 		"document.body.dataset.yakolakMotion='" + MOTION_VERSION + "';" +

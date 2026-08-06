@@ -77,6 +77,7 @@ var started_msec: int = 0
 var playing: bool = false
 var published_stage: int = -1
 var failed: bool = false
+var contents_revealed: bool = false
 
 
 func _ready() -> void:
@@ -96,6 +97,9 @@ func _process(_delta: float) -> void:
 	if not playing:
 		return
 	var elapsed: float = float(Time.get_ticks_msec() - started_msec)
+	if not contents_revealed and elapsed >= LID_SHAKE + 40.0:
+		contents_revealed = true
+		_set_internal_visibility(true)
 	_apply_timeline(minf(elapsed, TOTAL_TIME))
 	_publish_timeline_stage(elapsed)
 	if elapsed >= TOTAL_TIME:
@@ -486,10 +490,28 @@ func _restart_intro() -> void:
 	started_msec = Time.get_ticks_msec()
 	playing = true
 	published_stage = -1
+	contents_revealed = false
+	board.visible = true
 	lid.visible = true
+	board.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	lid.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	_set_internal_visibility(false)
 	_apply_timeline(0.0)
 	_publish_phase("lid-shaking")
 	published_stage = 0
+
+
+func _set_internal_visibility(visible: bool) -> void:
+	for direction: String in ORDER:
+		var base := bases[direction] as GeometryInstance3D
+		base.visible = visible
+		base.cast_shadow = (GeometryInstance3D.SHADOW_CASTING_SETTING_ON if visible else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+	for piece: Dictionary in pieces:
+		var stone := piece["mesh"] as GeometryInstance3D
+		stone.visible = visible
+		stone.cast_shadow = (GeometryInstance3D.SHADOW_CASTING_SETTING_ON if visible else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("document.body.dataset.yakolakIntroContents='" + ("visible-after-lid-lift" if visible else "hidden-inside-closed-shell") + "';", true)
 
 
 func _apply_timeline(elapsed: float) -> void:
@@ -563,6 +585,7 @@ func _piece_at(piece: Dictionary, elapsed: float) -> Dictionary:
 
 
 func _snap_final() -> void:
+	_set_internal_visibility(true)
 	_apply_pose(board, _base_final("board"))
 	for direction: String in ORDER:
 		_apply_pose(bases[direction] as Node3D, _base_final(direction))

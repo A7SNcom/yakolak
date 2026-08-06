@@ -153,6 +153,9 @@ test('balanced logos, gradual material bridge, slow camera, soft box, and playab
   expect(await page.evaluate(() => document.body.dataset.yakolakBoxRevealDuration)).toBe('1200');
   expect(await page.evaluate(() => document.body.dataset.yakolakBoxLandedHold)).toBe('420');
   expect(await page.evaluate(() => document.body.dataset.yakolakBoxLidPolicy)).toBe('present-during-drop-exit-only');
+  expect(await page.evaluate(() => document.body.dataset.yakolakClosedBoxVisibleParts)).toBe('board,lid');
+  expect(await page.evaluate(() => document.body.dataset.yakolakInternalContentPolicy)).toBe('hidden-until-lid-lift');
+  expect(await page.evaluate(() => document.body.dataset.yakolakOrbitIsolation)).toBe('game-hidden-shadows-off-pedestal-delayed');
   expect(await page.evaluate(() => document.body.dataset.yakolakSceneFlow)).toBe('star>material>camera>closed-box-drop>lid-open');
 
   await page.waitForFunction(() =>
@@ -186,6 +189,6 @@ test('balanced logos, gradual material bridge, slow camera, soft box, and playab
   expect(await page.evaluate(() => document.body.dataset.yakolakHandoffSequencing)).toBe('logos-fade-then-canonical-star');
   expect(await page.evaluate(() => document.body.dataset.yakolakBrandLayout)).toBe('yakolak-upper-center-star-center-mtkyf-lower-center');
   expect(events.join('\n')).toContain('shape=canonical-shared-svg camera=direct-slow-safe-framed table=coordinated logos=balanced-fade');
-  expect(events.join('\n')).toContain('box=closed-rigid-drop lid=exit-only');
+  expect(events.join('\n')).toContain('box=closed-shell-only lid=exit-only orbit=isolated');
   expect(failures).toEqual([]);
 });
