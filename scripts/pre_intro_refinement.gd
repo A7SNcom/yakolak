@@ -14,7 +14,7 @@ const CAMERA_START_MS: float = MATCH_HOLD_MS + MORPH_MS + SETTLE_MS
 const CAMERA_END_MS: float = CAMERA_START_MS + CAMERA_MOVE_MS
 const SAFE_WIDTH_RATIO: float = 0.90
 const SAFE_HEIGHT_RATIO: float = 0.76
-const MOTION_VERSION: String = "pixel-matched-direct-slow-safe-framing-v7"
+const MOTION_VERSION: String = "pixel-matched-direct-slow-safe-framing-v8-efficient"
 
 var intro: Node3D
 var preintro: Node
@@ -25,6 +25,7 @@ var wall_logo: MeshInstance3D
 var wall_logo_material: StandardMaterial3D
 var orientation_corrected: bool = false
 var published: bool = false
+var coverage_published: bool = false
 var max_screen_coverage: float = 0.0
 var final_table_scale: Vector3
 var final_pedestal_scale: Vector3
@@ -48,8 +49,8 @@ func _process(_delta: float) -> void:
 		if not orientation_corrected:
 			return
 
-	_publish_contract()
 	if not published:
+		_publish_contract()
 		published = true
 
 	if bool(preintro.get("completed")):
@@ -73,6 +74,7 @@ func _process(_delta: float) -> void:
 		_restore_final_geometry()
 		_set_wall_logo_alpha(1.0)
 		_publish_max_coverage()
+		set_process(false)
 		return
 
 	_apply_direct_safe_move(elapsed)
@@ -185,7 +187,6 @@ func _apply_safe_optical_framing() -> void:
 	var fitted_width: float = width_ratio * fit
 	var fitted_height: float = height_ratio * fit
 	max_screen_coverage = maxf(max_screen_coverage, maxf(fitted_width, fitted_height))
-	_publish_max_coverage()
 
 
 func _restore_final_geometry() -> void:
@@ -216,6 +217,9 @@ func _publish_contract() -> void:
 
 
 func _publish_max_coverage() -> void:
+	if coverage_published:
+		return
+	coverage_published = true
 	if not OS.has_feature("web"):
 		return
 	JavaScriptBridge.eval(
