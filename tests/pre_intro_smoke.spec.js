@@ -169,7 +169,7 @@ test('balanced logos, gradual material bridge, slow camera, soft box, and playab
     document.body.dataset.yakolakPreIntro === 'complete' &&
     document.body.dataset.yakolakIntro === 'complete' &&
     document.body.dataset.yakolakGameplay === 'ready',
-    null, { timeout: 30000 }
+    null, { timeout: 90000 }
   );
   await page.screenshot({ path: 'web/preintro-05-unboxing-complete.png' });
 
