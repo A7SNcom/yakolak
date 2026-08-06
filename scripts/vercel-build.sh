@@ -5,7 +5,7 @@ GODOT_VERSION="4.7.1"
 GODOT_TAG="4.7.1-stable"
 RELEASE="https://github.com/godotengine/godot-builds/releases/download/${GODOT_TAG}"
 
-echo "Building YAKOLAK 3.5 — original MTKYF palette, gradual material bridge, slow camera, and soft box reveal"
+echo "Building YAKOLAK 3.6 — minimum-gated scenes, professional star settle, and closed rigid box drop"
 python3 scripts/check_approved_baseline.py
 
 curl --fail --location --retry 4 --connect-timeout 20 --max-time 180 \
@@ -131,13 +131,21 @@ grep -q "path:not(.cls-1){fill:#000!important}" web/index.html
 grep -q "original-black-white" web/index.html
 grep -q "white-to-material-crossfade" web/index.html
 grep -q "materialBridgeDuration=1200" web/index.html
+grep -q "minimumLoaderMs=2600" web/index.html
+grep -q "motionWarmupMs=260" web/index.html
+grep -q "motionSettleMs=220" web/index.html
+grep -q "minimum-gated-v1" web/index.html
 grep -q "H('matched')" web/index.html
 grep -q "logos-fade-then-canonical-star" web/index.html
 grep -q "canonical-zero-degree-shared-contour" web/index.html
-grep -q "pixel-matched-soft-material-box-v4" scripts/pre_intro_star_to_table.gd
+grep -q "pixel-matched-governed-closed-box-v5" scripts/pre_intro_star_to_table.gd
 grep -q "white-emission-to-material" scripts/pre_intro_star_to_table.gd
-grep -q "soft-staggered-fade" scripts/pre_intro_star_to_table.gd
-grep -q "pixel-matched-direct-slow-safe-framing-v6" scripts/pre_intro_refinement.gd
+grep -q "closed-rigid-body-drop" scripts/pre_intro_star_to_table.gd
+grep -q "ClosedBoxDropRoot" scripts/pre_intro_star_to_table.gd
+grep -q "node.reparent(closed_box_root, true)" scripts/pre_intro_star_to_table.gd
+grep -q "present-during-drop-exit-only" scripts/pre_intro_star_to_table.gd
+grep -q "governed_elapsed_ms" scripts/pre_intro_refinement.gd
+grep -q "pixel-matched-direct-slow-safe-framing-v7" scripts/pre_intro_refinement.gd
 grep -q "canonical-shared-svg" scripts/pre_intro_refinement.gd
 grep -q "direct-slow-safe-framed" scripts/pre_intro_refinement.gd
 grep -q "YAKOLAK_PIXEL_MATCH_READY" scripts/pre_intro_star_to_table.gd
@@ -211,8 +219,8 @@ test -s web/intro-mobile-final.png
 test -s web/intro-desktop-motion.png
 test -s web/gameplay-mobile-selected.png
 test -s web/gameplay-mobile-placed.png
-echo "YAKOLAK 3.5 passed preserved loader geometry and original MTKYF black/white palette"
-echo "YAKOLAK 3.5 passed gradual white-to-material bridge, slow safe camera framing, and soft staggered box reveal"
+echo "YAKOLAK 3.6 passed governed loader and closed rigid box with the original MTKYF palette"
+echo "YAKOLAK 3.6 passed governed material/camera flow and one-piece closed-box sky drop before lid opening"
 echo "YAKOLAK gameplay passed physical stone selection and legal board placement verification"
 du -h web/index.wasm web/index.pck web/yakolak-logo.svg visual-review/preintro-motion.webm \
   web/preintro-01-black-loader-logo.png web/preintro-02-logo-to-wall-star-hold.png \

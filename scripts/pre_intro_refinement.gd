@@ -6,7 +6,7 @@ extends Node
 #    preserving safe screen framing, preventing the old giant close-up.
 # 3. Reveal the wall identity only after both loader identities have faded away.
 
-const MATCH_HOLD_MS: float = 220.0
+const MATCH_HOLD_MS: float = 260.0
 const MORPH_MS: float = 980.0
 const SETTLE_MS: float = 300.0
 const CAMERA_MOVE_MS: float = 1250.0
@@ -14,7 +14,7 @@ const CAMERA_START_MS: float = MATCH_HOLD_MS + MORPH_MS + SETTLE_MS
 const CAMERA_END_MS: float = CAMERA_START_MS + CAMERA_MOVE_MS
 const SAFE_WIDTH_RATIO: float = 0.90
 const SAFE_HEIGHT_RATIO: float = 0.76
-const MOTION_VERSION: String = "pixel-matched-direct-slow-safe-framing-v6"
+const MOTION_VERSION: String = "pixel-matched-direct-slow-safe-framing-v7"
 
 var intro: Node3D
 var preintro: Node
@@ -63,10 +63,9 @@ func _process(_delta: float) -> void:
 		_set_wall_logo_alpha(0.0)
 		return
 
-	var started_msec: int = int(preintro.get("started_msec"))
-	if started_msec <= 0:
+	var elapsed: float = float(preintro.get("governed_elapsed_ms"))
+	if elapsed < 0.0:
 		return
-	var elapsed: float = float(Time.get_ticks_msec() - started_msec)
 	if elapsed < CAMERA_START_MS:
 		_set_wall_logo_alpha(0.0)
 		return

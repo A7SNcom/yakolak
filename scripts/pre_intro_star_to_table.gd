@@ -5,23 +5,33 @@ extends Node
 # The 3D star stays face-on while it gains material and depth; only afterwards
 # do the camera and table rotate together, avoiding the old edge-on collapse.
 
-const MATCH_HOLD_MS: float = 220.0
-const MORPH_MS: float = 980.0
-const SETTLE_MS: float = 300.0
-const CAMERA_ORBIT_MS: float = 1250.0
-const CAMERA_HOLD_MS: float = 220.0
+const MIN_MATCH_HOLD_MS: float = 260.0
+const MIN_MORPH_MS: float = 980.0
+const MIN_SETTLE_MS: float = 300.0
+const MIN_CAMERA_ORBIT_MS: float = 1250.0
+const MIN_CAMERA_HOLD_MS: float = 220.0
+const MIN_CLOSED_BOX_DROP_MS: float = 1200.0
+const MIN_CLOSED_BOX_LANDED_HOLD_MS: float = 420.0
+const MAX_TIMELINE_STEP_MS: float = 50.0
+
+const MATCH_HOLD_MS: float = MIN_MATCH_HOLD_MS
+const MORPH_MS: float = MIN_MORPH_MS
+const SETTLE_MS: float = MIN_SETTLE_MS
+const CAMERA_ORBIT_MS: float = MIN_CAMERA_ORBIT_MS
+const CAMERA_HOLD_MS: float = MIN_CAMERA_HOLD_MS
 const TABLE_TOTAL_MS: float = MATCH_HOLD_MS + MORPH_MS + SETTLE_MS + CAMERA_ORBIT_MS + CAMERA_HOLD_MS
-const BOX_REVEAL_MS: float = 1100.0
-const BOX_HOLD_MS: float = 320.0
-const TOTAL_MS: float = TABLE_TOTAL_MS + BOX_REVEAL_MS + BOX_HOLD_MS
+const CLOSED_BOX_DROP_MS: float = MIN_CLOSED_BOX_DROP_MS
+const CLOSED_BOX_LANDED_HOLD_MS: float = MIN_CLOSED_BOX_LANDED_HOLD_MS
+const TOTAL_MS: float = TABLE_TOTAL_MS + CLOSED_BOX_DROP_MS + CLOSED_BOX_LANDED_HOLD_MS
 
 const MATCH_CAMERA_DISTANCE: float = 54.0
 const MATCH_CAMERA_FOV: float = 42.0
-const BOX_START_DROP: float = 0.26
-const BOX_START_SCALE: float = 0.985
+const CLOSED_BOX_START_HEIGHT: float = 8.4
+const CLOSED_BOX_IMPACT_DEPTH: float = 0.10
+const CLOSED_BOX_REBOUND_HEIGHT: float = 0.06
 const PEDESTAL_HALF_HEIGHT: float = 12.25
 const WHITE_STAR: Color = Color("#ffffff")
-const MOTION_VERSION: String = "pixel-matched-soft-material-box-v4"
+const MOTION_VERSION: String = "pixel-matched-governed-closed-box-v5"
 
 var intro: Node3D
 var corrections: Node
@@ -43,6 +53,7 @@ var box_reveal_started: bool = false
 var completed: bool = false
 var match_wait_frames: int = 0
 var started_msec: int = 0
+var governed_elapsed_ms: float = 0.0
 var published_phase: int = -1
 
 var final_table_position: Vector3
@@ -65,7 +76,8 @@ var final_camera_fov: float
 var match_camera_position: Vector3
 var match_camera_rotation: Quaternion
 var match_camera_fov: float
-var box_final_poses: Dictionary = {}
+var closed_box_root: Node3D
+var closed_box_landed: bool = false
 
 
 func _ready() -> void:
@@ -104,7 +116,8 @@ func _process(_delta: float) -> void:
 			_start_matched_handoff()
 		return
 
-	var elapsed: float = float(Time.get_ticks_msec() - started_msec)
+	governed_elapsed_ms += minf(maxf(_delta, 0.0) * 1000.0, MAX_TIMELINE_STEP_MS)
+	var elapsed: float = governed_elapsed_ms
 	if elapsed < TABLE_TOTAL_MS:
 		_apply_table_and_camera(elapsed)
 		_publish_timeline_phase(elapsed)
@@ -112,14 +125,14 @@ func _process(_delta: float) -> void:
 
 	if not box_reveal_started:
 		_publish_timeline_phase(TABLE_TOTAL_MS)
-		_begin_box_reveal()
+		_begin_closed_box_drop()
 	var box_elapsed: float = elapsed - TABLE_TOTAL_MS
-	_apply_box_reveal(minf(box_elapsed, BOX_REVEAL_MS))
-	if box_elapsed >= BOX_REVEAL_MS:
-		_snap_box_and_camera_final()
+	_apply_closed_box_drop(minf(box_elapsed, CLOSED_BOX_DROP_MS))
+	if box_elapsed >= CLOSED_BOX_DROP_MS:
+		_snap_closed_box_landed()
 		if published_phase < 6:
 			published_phase = 6
-			_publish_phase("box-settled")
+			_publish_phase("box-closed-landed")
 	if elapsed >= TOTAL_MS:
 		_finish_and_start_intro()
 
@@ -326,6 +339,7 @@ func _dom_handoff_is_matched() -> bool:
 func _start_matched_handoff() -> void:
 	handoff_started = true
 	started_msec = Time.get_ticks_msec()
+	governed_elapsed_ms = 0.0
 	published_phase = 0
 	_publish_phase("matched")
 
@@ -437,49 +451,54 @@ func _set_pedestal_growth(value: float) -> void:
 	pedestal.position = final_pedestal_position + Vector3(0.0, y_offset, 0.0)
 
 
-func _begin_box_reveal() -> void:
+func _begin_closed_box_drop() -> void:
 	box_reveal_started = true
+	closed_box_landed = false
 	_snap_table_final()
 	_apply_final_camera()
+	# Timeline zero is the accepted fully closed product: board, lid, walls and
+	# contained stones are assembled before the entrance begins.
 	intro.call("_apply_timeline", 0.0)
 	intro.set("playing", false)
-	box_final_poses.clear()
-	for index: int in game_nodes.size():
-		var node: GeometryInstance3D = game_nodes[index]
-		var delay_ms: float = 0.0
-		if index >= 2 and index < 6:
-			delay_ms = 70.0
-		elif index >= 6:
-			delay_ms = 130.0 + float((index - 6) % 12) * 6.0
-		box_final_poses[node] = {
-			"position": node.position,
-			"rotation": node.quaternion.normalized(),
-			"scale": node.scale,
-			"transparency": node.transparency,
-			"delay_ms": delay_ms,
-		}
-		node.position = node.position + Vector3(0.0, -BOX_START_DROP, 0.0)
-		node.scale = node.scale * BOX_START_SCALE
-		node.transparency = 1.0
-		node.visible = true
-	_publish_phase("box-arriving")
-
-
-func _apply_box_reveal(reveal_elapsed: float) -> void:
+	closed_box_root = Node3D.new()
+	closed_box_root.name = "ClosedBoxDropRoot"
+	intro.add_child(closed_box_root)
 	for node: GeometryInstance3D in game_nodes:
-		var pose: Dictionary = box_final_poses[node] as Dictionary
-		var delay_ms: float = float(pose["delay_ms"])
-		var local_duration: float = maxf(1.0, BOX_REVEAL_MS - delay_ms)
-		var raw_t: float = clampf((reveal_elapsed - delay_ms) / local_duration, 0.0, 1.0)
-		var t: float = _smootherstep(raw_t)
-		var fade_t: float = _smootherstep(clampf(raw_t / 0.78, 0.0, 1.0))
-		var final_position: Vector3 = pose["position"] as Vector3
-		var final_scale: Vector3 = pose["scale"] as Vector3
-		var final_transparency: float = float(pose["transparency"])
-		node.position = (final_position + Vector3(0.0, -BOX_START_DROP, 0.0)).lerp(final_position, t)
-		node.quaternion = pose["rotation"] as Quaternion
-		node.scale = (final_scale * BOX_START_SCALE).lerp(final_scale, t)
-		node.transparency = lerpf(1.0, final_transparency, fade_t)
+		node.visible = true
+		node.reparent(closed_box_root, true)
+	closed_box_root.position = Vector3(0.0, CLOSED_BOX_START_HEIGHT, 0.0)
+	closed_box_root.rotation = Vector3.ZERO
+	closed_box_root.scale = Vector3.ONE
+	_publish_phase("box-closed-descending")
+
+
+func _apply_closed_box_drop(drop_elapsed: float) -> void:
+	if closed_box_root == null or closed_box_landed:
+		return
+	var raw_t: float = clampf(drop_elapsed / CLOSED_BOX_DROP_MS, 0.0, 1.0)
+	var y: float
+	if raw_t < 0.78:
+		var fall_t: float = _ease_in_cubic(raw_t / 0.78)
+		y = lerpf(CLOSED_BOX_START_HEIGHT, -CLOSED_BOX_IMPACT_DEPTH, fall_t)
+	elif raw_t < 0.90:
+		var rebound_t: float = _ease_out_cubic((raw_t - 0.78) / 0.12)
+		y = lerpf(-CLOSED_BOX_IMPACT_DEPTH, CLOSED_BOX_REBOUND_HEIGHT, rebound_t)
+	else:
+		var settle_t: float = _smootherstep((raw_t - 0.90) / 0.10)
+		y = lerpf(CLOSED_BOX_REBOUND_HEIGHT, 0.0, settle_t)
+	closed_box_root.position = Vector3(0.0, y, 0.0)
+
+
+func _snap_closed_box_landed() -> void:
+	if closed_box_landed:
+		return
+	closed_box_landed = true
+	if closed_box_root != null:
+		closed_box_root.position = Vector3.ZERO
+		for node: GeometryInstance3D in game_nodes:
+			node.reparent(intro, true)
+		closed_box_root.queue_free()
+		closed_box_root = null
 
 
 func _snap_table_final() -> void:
@@ -496,12 +515,8 @@ func _snap_table_final() -> void:
 
 func _snap_box_and_camera_final() -> void:
 	_apply_final_camera()
+	_snap_closed_box_landed()
 	for node: GeometryInstance3D in game_nodes:
-		var pose: Dictionary = box_final_poses[node] as Dictionary
-		node.position = pose["position"] as Vector3
-		node.quaternion = pose["rotation"] as Quaternion
-		node.scale = pose["scale"] as Vector3
-		node.transparency = float(pose["transparency"])
 		node.visible = true
 
 
@@ -514,7 +529,7 @@ func _finish_and_start_intro() -> void:
 	intro.set_process_unhandled_input(true)
 	gameplay.set_process_input(true)
 	_publish_phase("complete")
-	print("YAKOLAK_PREINTRO_COMPLETE duration=%d motion=%s match=pixel-exact logo=wall camera=side box=soft-staggered" % [int(TOTAL_MS), MOTION_VERSION])
+	print("YAKOLAK_PREINTRO_COMPLETE duration=%d motion=%s match=pixel-exact logo=wall camera=side box=closed-rigid-drop lid=exit-only" % [int(TOTAL_MS), MOTION_VERSION])
 	intro.call("_restart_intro")
 	set_process(false)
 
@@ -548,12 +563,29 @@ func _publish_web_state(state: String) -> void:
 		"document.body.dataset.yakolakPreIntroDuration='" + str(int(TOTAL_MS)) + "';" +
 		"document.body.dataset.yakolakPreIntroShape='exact-svg-pixel-match';" +
 		"document.body.dataset.yakolakMaterialBridge='white-emission-to-material';" +
-		"document.body.dataset.yakolakBoxReveal='soft-staggered-fade';" +
-		"document.body.dataset.yakolakBoxRevealDuration='" + str(int(BOX_REVEAL_MS)) + "';" +
+		"document.body.dataset.yakolakTimingPolicy='minimum-gated-v1';" +
+		"document.body.dataset.yakolakSceneMinimums='match:260,morph:980,settle:300,camera:1250,cameraHold:220,closedBoxDrop:1200,closedBoxHold:420';" +
+		"document.body.dataset.yakolakSceneFlow='star>material>camera>closed-box-drop>lid-open';" +
+		"document.body.dataset.yakolakBoxReveal='closed-rigid-body-drop';" +
+		"document.body.dataset.yakolakBoxRevealDuration='" + str(int(CLOSED_BOX_DROP_MS)) + "';" +
+		"document.body.dataset.yakolakBoxLandedHold='" + str(int(CLOSED_BOX_LANDED_HOLD_MS)) + "';" +
+		"document.body.dataset.yakolakBoxLidPolicy='present-during-drop-exit-only';" +
+		"window.__yakolakPreIntroPhases=window.__yakolakPreIntroPhases||[];" +
+		"window.__yakolakPreIntroPhases.push({state:'" + state + "',at:performance.now()});" +
 		"document.body.dataset.yakolakMotion='" + MOTION_VERSION + "';" +
 		intro_wait_script,
 		true
 	)
+
+
+func _ease_in_cubic(value: float) -> float:
+	var t: float = clampf(value, 0.0, 1.0)
+	return t * t * t
+
+
+func _ease_out_cubic(value: float) -> float:
+	var t: float = clampf(value, 0.0, 1.0)
+	return 1.0 - pow(1.0 - t, 3.0)
 
 
 func _smootherstep(value: float) -> float:

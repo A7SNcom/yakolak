@@ -51,6 +51,9 @@ test('balanced logos, gradual material bridge, slow camera, soft box, and playab
       mtkyfFront: getComputedStyle(mtkyf.querySelector('.cls-1')).fill,
       mtkyfPalette: document.body.dataset.yakolakMtkyfPalette,
       visualBridge: document.body.dataset.yakolakVisualBridge,
+      timingPolicy: document.body.dataset.yakolakTimingPolicy,
+      loaderMinimumMs: document.body.dataset.yakolakLoaderMinimumMs,
+      motionHistory: window.__yakolakStarMotionHistory,
       contour: document.body.dataset.yakolakContourSource,
       yakolak: rect('.loaderLogoYakolak'),
       star: rect('.loadingStar'),
@@ -65,6 +68,9 @@ test('balanced logos, gradual material bridge, slow camera, soft box, and playab
   expect(first.mtkyfFront).toBe('rgb(255, 255, 255)');
   expect(first.mtkyfPalette).toBe('original-black-white');
   expect(first.visualBridge).toBe('white-to-material-crossfade');
+  expect(first.timingPolicy).toBe('minimum-gated-v1');
+  expect(first.loaderMinimumMs).toBe('2600');
+  expect(first.motionHistory[0]).toBe('resting');
   expect(first.contour).toBe('table-svg-exact-path');
   expect(overlap(first.yakolak, first.star)).toBe(0);
   expect(overlap(first.star, first.mtkyf)).toBe(0);
@@ -107,7 +113,8 @@ test('balanced logos, gradual material bridge, slow camera, soft box, and playab
       teeth: document.body.dataset.yakolakTeethAlignment,
       starColor: window.__yakolakMatch.starColor,
       star: window.__yakolakMatch.star,
-      canvas: { x:c.left, y:c.top, w:c.width, h:c.height }
+      canvas: { x:c.left, y:c.top, w:c.width, h:c.height },
+      motionHistory: window.__yakolakStarMotionHistory
     };
   });
   expect(match.domError).toBeLessThanOrEqual(1.5);
@@ -117,6 +124,7 @@ test('balanced logos, gradual material bridge, slow camera, soft box, and playab
   expect(match.starColor).toMatch(/^#[0-9a-f]{6}$/i);
   expect(match.handoff).toEqual(['waiting','locking','matching','matched']);
   expect(match.brands).toEqual(['hidden','entering','visible','leaving','hidden-after-fade']);
+  expect(match.motionHistory).toEqual(['resting','warming','running','settling','rested']);
   expect(Math.abs(match.star.x + match.star.w/2 - (match.canvas.x + match.canvas.w/2))).toBeLessThanOrEqual(1.5);
   expect(Math.abs(match.star.y + match.star.h/2 - (match.canvas.y + match.canvas.h/2))).toBeLessThanOrEqual(1.5);
   await page.screenshot({ path: 'web/preintro-03-pixel-matched.png' });
@@ -138,11 +146,14 @@ test('balanced logos, gradual material bridge, slow camera, soft box, and playab
   await page.screenshot({ path: 'web/preintro-04-camera-orbit.png' });
 
   await expect.poll(
-    () => events.some(x => x.includes('YAKOLAK_PREINTRO_PHASE box-arriving')),
+    () => events.some(x => x.includes('YAKOLAK_PREINTRO_PHASE box-closed-descending')),
     { timeout: 15000 }
   ).toBe(true);
-  expect(await page.evaluate(() => document.body.dataset.yakolakBoxReveal)).toBe('soft-staggered-fade');
-  expect(await page.evaluate(() => document.body.dataset.yakolakBoxRevealDuration)).toBe('1100');
+  expect(await page.evaluate(() => document.body.dataset.yakolakBoxReveal)).toBe('closed-rigid-body-drop');
+  expect(await page.evaluate(() => document.body.dataset.yakolakBoxRevealDuration)).toBe('1200');
+  expect(await page.evaluate(() => document.body.dataset.yakolakBoxLandedHold)).toBe('420');
+  expect(await page.evaluate(() => document.body.dataset.yakolakBoxLidPolicy)).toBe('present-during-drop-exit-only');
+  expect(await page.evaluate(() => document.body.dataset.yakolakSceneFlow)).toBe('star>material>camera>closed-box-drop>lid-open');
 
   await page.waitForFunction(() =>
     document.body.dataset.yakolakPreIntro === 'complete' &&
@@ -152,12 +163,29 @@ test('balanced logos, gradual material bridge, slow camera, soft box, and playab
   );
   await page.screenshot({ path: 'web/preintro-05-unboxing-complete.png' });
 
+  const governedPhases = await page.evaluate(() => window.__yakolakPreIntroPhases || []);
+  const phaseAt = state => governedPhases.find(entry => entry.state === state)?.at;
+  const orderedStates = [
+    'matched','star-to-3d','table-settling','camera-orbit',
+    'camera-settled','box-closed-descending','box-closed-landed','complete'
+  ];
+  for (let index = 1; index < orderedStates.length; index += 1) {
+    expect(phaseAt(orderedStates[index])).toBeGreaterThan(phaseAt(orderedStates[index - 1]));
+  }
+  expect(phaseAt('star-to-3d') - phaseAt('matched')).toBeGreaterThanOrEqual(210);
+  expect(phaseAt('table-settling') - phaseAt('star-to-3d')).toBeGreaterThanOrEqual(920);
+  expect(phaseAt('camera-orbit') - phaseAt('table-settling')).toBeGreaterThanOrEqual(250);
+  expect(phaseAt('camera-settled') - phaseAt('camera-orbit')).toBeGreaterThanOrEqual(1180);
+  expect(phaseAt('box-closed-descending') - phaseAt('camera-settled')).toBeGreaterThanOrEqual(170);
+  expect(phaseAt('box-closed-landed') - phaseAt('box-closed-descending')).toBeGreaterThanOrEqual(1130);
+  expect(phaseAt('complete') - phaseAt('box-closed-landed')).toBeGreaterThanOrEqual(360);
+
   expect(await page.evaluate(() => document.body.dataset.yakolakTable)).toBe('approved-star-svg');
   expect(await page.evaluate(() => document.body.dataset.yakolakTableLevel)).toBe('true');
   expect(await page.evaluate(() => document.body.dataset.yakolakLoaderPalette)).toBe('black-white-lighter-gray-shadow');
   expect(await page.evaluate(() => document.body.dataset.yakolakHandoffSequencing)).toBe('logos-fade-then-canonical-star');
   expect(await page.evaluate(() => document.body.dataset.yakolakBrandLayout)).toBe('yakolak-upper-center-star-center-mtkyf-lower-center');
   expect(events.join('\n')).toContain('shape=canonical-shared-svg camera=direct-slow-safe-framed table=coordinated logos=balanced-fade');
-  expect(events.join('\n')).toContain('box=soft-staggered');
+  expect(events.join('\n')).toContain('box=closed-rigid-drop lid=exit-only');
   expect(failures).toEqual([]);
 });

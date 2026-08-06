@@ -47,19 +47,19 @@ STYLE = r'''
 #yakolakLoader .starBounce{
   position:absolute;top:0;left:4px;width:88px;height:88px;
   transform-origin:50% 100%;animation:bounce var(--cycle) infinite;
-  will-change:transform
+  animation-play-state:paused;will-change:transform
 }
 #yakolakLoader .loadingStar{
   display:block;width:100%;height:100%;overflow:visible;
   transform-box:fill-box;transform-origin:center;
-  animation:turn var(--cycle) linear infinite;will-change:transform
+  animation:turn var(--cycle) linear infinite;animation-play-state:paused;will-change:transform
 }
 #yakolakLoader .loadingStar path{fill:var(--loading-star)}
 #yakolakLoader .loadingShadow{
   position:absolute;top:123px;left:12px;width:72px;height:9px;border-radius:50%;
   background:var(--loading-shadow);opacity:.28;filter:blur(6px);
   transform-origin:center;animation:shadow var(--cycle) infinite;
-  will-change:transform,opacity
+  animation-play-state:paused;will-change:transform,opacity
 }
 #yakolakLoader .handoffStar{
   position:fixed;z-index:6;margin:0;padding:0;pointer-events:none;
@@ -126,13 +126,19 @@ SCRIPT = r'''
   const shadow=L?.querySelector('.loadingShadow');
   const cycle=820;
   const epoch=performance.now();
-  const minimumVisibleHold=780;
+  const initialRestMs=220;
+  const motionWarmupMs=260;
+  const motionSettleMs=220;
+  const minimumLoaderMs=2600;
+  const minimumVisibleHold=900;
   const materialBridgeDuration=1200;
-  const materialBridgeHoldRatio=220/materialBridgeDuration;
+  const materialBridgeHoldRatio=260/materialBridgeDuration;
   let scheduled=false;
   let released=false;
   let matchReady=false;
   let brandReady=false;
+  let motionReady=false;
+  let motionStartedAt=0;
   let brandVisibleAt=0;
 
   document.body.dataset.yakolakLoader='v130-loading-star-motion';
@@ -144,8 +150,14 @@ SCRIPT = r'''
   document.body.dataset.yakolakContourSource='table-svg-exact-path';
   document.body.dataset.yakolakMtkyfPalette='original-black-white';
   document.body.dataset.yakolakVisualBridge='white-to-material-crossfade';
+  document.body.dataset.yakolakTimingPolicy='minimum-gated-v1';
+  document.body.dataset.yakolakLoaderMinimumMs=String(minimumLoaderMs);
+  document.body.dataset.yakolakBounceWarmupMs=String(motionWarmupMs);
+  document.body.dataset.yakolakBounceSettleMs=String(motionSettleMs);
+  document.body.dataset.yakolakStarMotion='resting';
   window.__yakolakHandoffHistory=['waiting'];
   window.__yakolakBrandHistory=['hidden'];
+  window.__yakolakStarMotionHistory=['resting'];
   window.__yakolakLoading={set(){}};
 
   const H=state=>{
@@ -161,6 +173,77 @@ SCRIPT = r'''
     Math.abs(actual.left-target.x),Math.abs(actual.top-target.y),
     Math.abs(actual.width-target.w),Math.abs(actual.height-target.h)
   );
+
+  const M=state=>{
+    document.body.dataset.yakolakStarMotion=state;
+    window.__yakolakStarMotionHistory.push(state);
+  };
+
+  const startMotion=()=>{
+    if(released||motionReady||!bounce||!S||!shadow)return;
+    M('warming');
+    const warmups=[
+      bounce.animate([
+        {transform:'translateY(0) scale(1,1)',offset:0},
+        {transform:'translateY(1.6px) scale(1.014,.986)',offset:.58},
+        {transform:'translateY(0) scale(1,1)',offset:1}
+      ],{duration:motionWarmupMs,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'}),
+      S.animate([
+        {transform:'rotate(0deg)',offset:0},
+        {transform:'rotate(1.2deg)',offset:.58},
+        {transform:'rotate(0deg)',offset:1}
+      ],{duration:motionWarmupMs,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'}),
+      shadow.animate([
+        {transform:'scale(.66,.72)',opacity:.26,offset:0},
+        {transform:'scale(.72,.74)',opacity:.30,offset:.58},
+        {transform:'scale(.66,.72)',opacity:.26,offset:1}
+      ],{duration:motionWarmupMs,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'})
+    ];
+    Promise.all(warmups.map(animation=>animation.finished)).then(()=>{
+      if(released)return;
+      warmups.forEach(animation=>animation.cancel());
+      bounce.style.animationPlayState='running';
+      S.style.animationPlayState='running';
+      shadow.style.animationPlayState='running';
+      motionReady=true;
+      motionStartedAt=performance.now();
+      M('running');
+      schedule();
+    });
+  };
+
+  const settleMotion=()=>{
+    if(!bounce||!S||!shadow)return Promise.resolve();
+    M('settling');
+    const bounceFrom=getComputedStyle(bounce).transform;
+    const starFrom=getComputedStyle(S).transform;
+    const shadowFrom=getComputedStyle(shadow).transform;
+    const shadowOpacity=Number(getComputedStyle(shadow).opacity)||.26;
+    bounce.style.animationPlayState='paused';
+    S.style.animationPlayState='paused';
+    shadow.style.animationPlayState='paused';
+    const settles=[
+      bounce.animate([
+        {transform:bounceFrom},
+        {transform:'translateY(0) scale(1,1)'}
+      ],{duration:motionSettleMs,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'}),
+      S.animate([
+        {transform:starFrom},
+        {transform:'rotate(0deg)'}
+      ],{duration:motionSettleMs,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'}),
+      shadow.animate([
+        {transform:shadowFrom,opacity:shadowOpacity},
+        {transform:'scale(.66,.72)',opacity:.26}
+      ],{duration:motionSettleMs,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'})
+    ];
+    return Promise.all(settles.map(animation=>animation.finished)).then(()=>{
+      bounce.style.transform='translateY(0) scale(1,1)';
+      S.style.transform='rotate(0deg)';
+      shadow.style.transform='scale(.66,.72)';
+      shadow.style.opacity='.26';
+      M('rested');
+    });
+  };
 
   const match=(clone,handoffShadow,first,shadowFirst)=>{
     const target=window.__yakolakMatch;
@@ -269,19 +352,23 @@ SCRIPT = r'''
     if(released||!window.__yakolakMatch?.star||!S||!L)return;
     released=true;
     H('locking');
-    createCanonicalHandoff();
+    settleMotion().then(createCanonicalHandoff);
   };
 
   const schedule=()=>{
-    if(scheduled||released||!matchReady||!brandReady)return;
+    if(scheduled||released||!matchReady||!brandReady||!motionReady)return;
     scheduled=true;
     const now=performance.now();
-    const elapsed=now-epoch;
-    const holdLeft=Math.max(0,minimumVisibleHold-(now-brandVisibleAt));
-    const futureElapsed=elapsed+holdLeft;
-    const nextCanonicalRest=Math.max(90,cycle-(futureElapsed%cycle)+18);
+    const loopElapsed=Math.max(0,now-motionStartedAt);
+    const brandHoldLeft=Math.max(0,minimumVisibleHold-(now-brandVisibleAt));
+    const sceneHoldLeft=Math.max(0,minimumLoaderMs-(now-epoch));
+    const holdLeft=Math.max(brandHoldLeft,sceneHoldLeft);
+    const futureLoopElapsed=loopElapsed+holdLeft;
+    const nextCanonicalRest=Math.max(90,cycle-(futureLoopElapsed%cycle)+18);
     setTimeout(lock,holdLeft+nextCanonicalRest);
   };
+
+  setTimeout(startMotion,initialRestMs);
 
   setTimeout(()=>{
     if(released)return;

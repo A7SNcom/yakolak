@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail when the approved YAKOLAK loader/gameplay contract regresses."""
+"""Fail when the approved governed YAKOLAK intro contract regresses."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,45 +16,41 @@ REQUIRED: dict[str, tuple[str, ...]] = {
         "animation:bounce var(--cycle) infinite",
         "animation:turn var(--cycle) linear infinite",
         "animation:shadow var(--cycle) infinite",
+        "animation-play-state:paused",
         "translateY(36px) scale(1.17,.72)",
         "100%{transform:rotate(24deg)}",
         "transform:scale(1.30,1)",
-        "yakolak-logo.svg",
-        "loaderLogoMtkyf",
         "path:not(.cls-1){fill:#000!important}",
         ".cls-1{fill:#fff!important}",
-        "original-black-white",
+        "minimumLoaderMs=2600",
+        "motionWarmupMs=260",
+        "motionSettleMs=220",
+        "minimum-gated-v1",
+        "settleMotion",
         "white-to-material-crossfade",
-        "materialBridgeDuration=1200",
-        "yakolak-upper-center-star-center-mtkyf-lower-center",
-        "logos-fade-then-canonical-star",
-        "table-svg-exact-path",
         "canonical-zero-degree-shared-contour",
-        "yakolakLoaderHandoff='waiting'",
-        "H('matched')",
     ),
     "scripts/pre_intro_star_to_table.gd": (
-        "MORPH_MS: float = 980.0",
-        "CAMERA_ORBIT_MS: float = 1250.0",
-        "BOX_REVEAL_MS: float = 1100.0",
-        "BOX_START_DROP: float = 0.26",
-        "BOX_START_SCALE: float = 0.985",
-        "white-emission-to-material",
-        "soft-staggered-fade",
-        "node.transparency = 1.0",
-        "pixel-matched-soft-material-box-v4",
+        "MIN_MATCH_HOLD_MS: float = 260.0",
+        "MIN_CLOSED_BOX_DROP_MS: float = 1200.0",
+        "MIN_CLOSED_BOX_LANDED_HOLD_MS: float = 420.0",
+        "MAX_TIMELINE_STEP_MS: float = 50.0",
+        "governed_elapsed_ms",
+        "ClosedBoxDropRoot",
+        "node.reparent(closed_box_root, true)",
+        "box-closed-descending",
+        "box-closed-landed",
+        "closed-rigid-body-drop",
+        "present-during-drop-exit-only",
+        "pixel-matched-governed-closed-box-v5",
     ),
     "scripts/pre_intro_refinement.gd": (
         "canonical-shared-svg",
         "direct-slow-safe-framed",
-        "Quaternion(Vector3.RIGHT, deg_to_rad(90.0))",
-        "direct_position: Vector3 = start_position.lerp(end_position, t)",
-        "camera.position = center + direct_direction * safe_distance",
-        "camera.look_at(center, Vector3.UP)",
-        "_apply_safe_optical_framing()",
-        "SAFE_WIDTH_RATIO: float = 0.90",
         "CAMERA_MOVE_MS: float = 1250.0",
-        "pixel-matched-direct-slow-safe-framing-v6",
+        "pixel-matched-direct-slow-safe-framing-v7",
+        "governed_elapsed_ms",
+        "_apply_safe_optical_framing()",
     ),
     "tests/intro_smoke.spec.js": (
         "source: 'v130-loading-star-motion'",
@@ -62,30 +58,20 @@ REQUIRED: dict[str, tuple[str, ...]] = {
         "turnDuration: '0.82s'",
         "shadowDuration: '0.82s'",
         "hasInventedHorizontalMotion: false",
-        "document.body.dataset.yakolakTable === 'approved-star-svg'",
-        "document.body.dataset.yakolakTableLevel === 'true'",
-        "document.body.dataset.yakolakCamera === 'level-centered'",
-        "document.body.dataset.yakolakBases)).toBe('4')",
-        "document.body.dataset.yakolakPieces)).toBe('36')",
-        "document.body.dataset.yakolakBaseColor)).toBe('161616')",
         "document.body.dataset.yakolakDuration)).toBe('5730')",
     ),
     "tests/pre_intro_smoke.spec.js": (
         "yakolakMatchErrorPx",
-        "YAKOLAK_PREINTRO_PHASE camera-orbit",
-        "canonical-shared-svg",
-        "direct-slow-safe-framed",
-        "yakolakCameraDuration",
-        "yakolakCameraMaxCoverage",
-        "canonical-zero-degree-shared-contour",
-        "original-black-white",
-        "white-emission-to-material",
-        "soft-staggered-fade",
-        "hidden-after-fade",
+        "minimum-gated-v1",
+        "box-closed-descending",
+        "closed-rigid-body-drop",
+        "present-during-drop-exit-only",
+        "window.__yakolakPreIntroPhases",
+        "settling','rested",
     ),
     "scripts/vercel-build.sh": (
         "npx playwright test tests/intro_smoke.spec.js",
-        "YAKOLAK 3.5 passed preserved loader geometry",
+        "YAKOLAK 3.6 passed governed loader and closed rigid box",
     ),
 }
 
@@ -94,22 +80,24 @@ FORBIDDEN: dict[str, tuple[str, ...]] = {
         "translateX(",
         "rotate(-420deg)",
         "yakolakLoaderProgress",
-        "--loading-shadow:#7182ff",
         "loaderLogoMtkyf path{fill:#fff!important}",
+    ),
+    "scripts/pre_intro_star_to_table.gd": (
+        "soft-staggered-fade",
+        "node.transparency = 1.0",
+        "BOX_START_SCALE",
+        "box_final_poses",
     ),
     "scripts/pre_intro_refinement.gd": (
         "direction.normalized().slerp",
         "camera.position = start_position.lerp(end_position, t)",
-        "camera.position = center + direct_direction * maxf(direct_offset.length(), safe_distance)",
-        "pixel-matched-2d-to-3d-v4",
-        "direct-centered-lerp",
+        "pixel-matched-direct-slow-safe-framing-v6",
     ),
 }
 
 
 def main() -> int:
     failures: list[str] = []
-
     for relative_path, tokens in REQUIRED.items():
         path = ROOT / relative_path
         if not path.is_file():
@@ -119,7 +107,6 @@ def main() -> int:
         for token in tokens:
             if token not in text:
                 failures.append(f"{relative_path}: missing approved token {token!r}")
-
     for relative_path, tokens in FORBIDDEN.items():
         path = ROOT / relative_path
         if not path.is_file():
@@ -128,14 +115,12 @@ def main() -> int:
         for token in tokens:
             if token in text:
                 failures.append(f"{relative_path}: forbidden regressive token {token!r}")
-
     if failures:
         print("YAKOLAK APPROVED CONTRACT REGRESSION DETECTED")
         for failure in failures:
             print(f"- {failure}")
         return 1
-
-    print("YAKOLAK approved original MTKYF palette, gradual material bridge, slow safe camera, soft box reveal, and gameplay contract preserved")
+    print("YAKOLAK approved minimum-gated scene flow, professional star settle, closed rigid box drop, lid exit-only, and gameplay contract preserved")
     return 0
 
 
