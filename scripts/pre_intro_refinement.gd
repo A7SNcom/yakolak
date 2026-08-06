@@ -122,7 +122,7 @@ func _correct_svg_orientation_when_ready() -> bool:
 	camera.position = approved_final_camera_position
 	camera.fov = final_camera_fov
 	camera.look_at(corrected_center, Vector3.UP)
-	final_screen_coverage = _fit_camera_to_safe_framing()
+	final_screen_coverage = _apply_safe_optical_framing()
 	responsive_final_camera_position = camera.position
 	responsive_final_camera_rotation = camera.quaternion.normalized()
 	preintro.set("final_camera_position", responsive_final_camera_position)
@@ -176,7 +176,7 @@ func _apply_direct_safe_move(elapsed: float) -> void:
 	# The approved geometry scale is fixed for the entire transition. Responsive
 	# fitting is camera-only so there can be no hidden scale restoration jump.
 	tabletop.scale = final_table_scale
-	_fit_camera_to_safe_framing()
+	_apply_safe_optical_framing()
 
 	pedestal.scale.x = final_pedestal_scale.x
 	pedestal.scale.z = final_pedestal_scale.z
@@ -186,7 +186,7 @@ func _apply_direct_safe_move(elapsed: float) -> void:
 	_set_wall_logo_alpha(_smootherstep(clampf((raw_t - 0.76) / 0.24, 0.0, 1.0)))
 
 
-func _fit_camera_to_safe_framing() -> float:
+func _apply_safe_optical_framing() -> float:
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	if viewport_size.x < 1.0 or viewport_size.y < 1.0:
 		return 0.0
@@ -232,7 +232,7 @@ func _restore_final_geometry() -> void:
 	camera.position = responsive_final_camera_position
 	camera.fov = final_camera_fov
 	camera.look_at(preintro.get("orbit_center") as Vector3, Vector3.UP)
-	final_screen_coverage = _fit_camera_to_safe_framing()
+	final_screen_coverage = _apply_safe_optical_framing()
 	responsive_final_camera_position = camera.position
 	responsive_final_camera_rotation = camera.quaternion.normalized()
 	preintro.set("final_camera_position", responsive_final_camera_position)
