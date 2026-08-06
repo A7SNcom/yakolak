@@ -80,6 +80,8 @@ var match_camera_rotation: Quaternion
 var match_camera_fov: float
 var closed_box_root: Node3D
 var closed_box_landed: bool = false
+var corrections_was_processing: bool = true
+var closed_shell_local_transforms: Dictionary = {}
 var board_node: GeometryInstance3D
 var lid_node: GeometryInstance3D
 # The physical closed box is exactly six visible parts: floor, four side walls, and lid.
@@ -504,25 +506,53 @@ func _begin_closed_box_drop() -> void:
 	closed_box_landed = false
 	_snap_table_final()
 	_apply_final_camera()
-	# Assemble the real closed box before its first visible drop frame:
-	# board + four side bases/walls + lid. Only the 36 stones remain hidden.
-	intro.call("_apply_timeline", 0.0)
+	# The only source of truth for a closed box is the exact first frame of
+	# the accepted unboxing timeline. ExistingIntroCorrections normally snaps
+	# stopped scenes to the open gameplay layout, so suspend it before applying
+	# timeline zero and keep it suspended for the whole rigid-body drop.
 	intro.set("playing", false)
+	corrections_was_processing = corrections != null and corrections.is_processing()
+	if corrections != null:
+		corrections.set_process(false)
+	intro.call("_apply_timeline", 0.0)
 	_set_closed_shell_visibility()
 	closed_box_root = Node3D.new()
 	closed_box_root.name = "ClosedBoxDropRoot"
 	intro.add_child(closed_box_root)
+	closed_shell_local_transforms.clear()
 	for node: GeometryInstance3D in shell_nodes:
 		node.reparent(closed_box_root, true)
-	print("YAKOLAK_CLOSED_BOX_READY shell_parts=%d stones_hidden=%d assembly=prebuilt" % [shell_nodes.size(), interior_nodes.size()])
+		closed_shell_local_transforms[String(node.name)] = node.transform
+	var rigid: bool = _closed_shell_is_rigid()
+	if not rigid:
+		push_error("Closed box lost its timeline-zero pose before the first drop frame")
+		_publish_web_state("error")
+	print("YAKOLAK_CLOSED_BOX_POSE_LOCK source=intro-timeline-zero corrections=suspended shell_parts=%d stones_hidden=%d rigid=%s" % [shell_nodes.size(), interior_nodes.size(), str(rigid).to_lower()])
 	closed_box_root.position = Vector3(0.0, CLOSED_BOX_START_HEIGHT, 0.0)
 	closed_box_root.rotation = Vector3.ZERO
 	closed_box_root.scale = Vector3.ONE
 	_publish_phase("box-closed-descending")
 
 
+func _closed_shell_is_rigid() -> bool:
+	if closed_shell_local_transforms.size() != shell_nodes.size():
+		return false
+	for node: GeometryInstance3D in shell_nodes:
+		var key: String = String(node.name)
+		if not closed_shell_local_transforms.has(key):
+			return false
+		var reference: Transform3D = closed_shell_local_transforms[key]
+		if not node.transform.is_equal_approx(reference):
+			return false
+	return true
+
+
 func _apply_closed_box_drop(drop_elapsed: float) -> void:
 	if closed_box_root == null or closed_box_landed:
+		return
+	if not _closed_shell_is_rigid():
+		push_error("A closed-box part moved independently during the drop")
+		_publish_web_state("error")
 		return
 	var raw_t: float = clampf(drop_elapsed / CLOSED_BOX_DROP_MS, 0.0, 1.0)
 	var y: float
@@ -578,8 +608,15 @@ func _finish_and_start_intro() -> void:
 	intro.set_process_unhandled_input(true)
 	gameplay.set_process_input(true)
 	_publish_phase("complete")
-	print("YAKOLAK_PREINTRO_COMPLETE duration=%d motion=%s match=pixel-exact logo=wall camera=side box=closed-six-part-shell lid=exit-only orbit=isolated" % [int(TOTAL_MS), MOTION_VERSION])
+	print("YAKOLAK_PREINTRO_COMPLETE duration=%d motion=%s match=pixel-exact logo=wall camera=side box=timeline-zero-locked lid=exit-only orbit=isolated" % [int(TOTAL_MS), MOTION_VERSION])
+	# Start the real unboxing at its own frame zero before allowing the correction
+	# pass to write transforms again. This removes the broken open->close jump.
 	intro.call("_restart_intro")
+	if corrections != null:
+		corrections.set_process(corrections_was_processing)
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("document.body.dataset.yakolakClosedBoxCorrections='restored-for-unboxing';", true)
+	print("YAKOLAK_CLOSED_BOX_POSE_LOCK_RELEASED corrections=restored-after-intro-zero")
 	set_process(false)
 
 
@@ -622,6 +659,9 @@ func _publish_web_state(state: String) -> void:
 		"document.body.dataset.yakolakClosedBoxVisibleParts='board,base-right,base-left,base-front,base-back,lid';" +
 		"document.body.dataset.yakolakClosedBoxShellCount='6';" +
 		"document.body.dataset.yakolakClosedBoxAssembly='prebuilt-before-first-drop-frame';" +
+		"document.body.dataset.yakolakClosedBoxPoseSource='intro-timeline-zero';" +
+		"document.body.dataset.yakolakClosedBoxCorrections='suspended-during-drop';" +
+		"document.body.dataset.yakolakClosedBoxRigidity='locked-local-transforms';" +
 		"document.body.dataset.yakolakInternalContentPolicy='stones-hidden-until-lid-lift';" +
 		"document.body.dataset.yakolakOrbitIsolation='game-hidden-shadows-off-pedestal-delayed';" +
 		"window.__yakolakPreIntroPhases=window.__yakolakPreIntroPhases||[];" +
