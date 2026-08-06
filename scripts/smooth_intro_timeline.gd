@@ -5,7 +5,7 @@ extends Node
 # skipping is removed. ExistingIntroCorrections continues to run afterwards with
 # the same governed elapsed time, preserving its approved quaternion corrections.
 
-const MAX_VISUAL_STEP_MS: float = 1000.0 / 60.0
+const MAX_VISUAL_STEP_MS: float = 1000.0 / 30.0
 const LID_CONTENT_REVEAL_MS: float = 590.0
 const TOTAL_TIME_MS: float = 5730.0
 
@@ -54,10 +54,11 @@ func _take_control() -> void:
 	intro.set_process(false)
 	_sync_original_clock()
 	intro.call("_apply_timeline", 0.0)
-	print("YAKOLAK_SMOOTH_TIMELINE_START max_step_ms=%.3f" % MAX_VISUAL_STEP_MS)
+	print("YAKOLAK_SMOOTH_TIMELINE_START max_step_ms=%.3f fallback_fps=30" % MAX_VISUAL_STEP_MS)
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakIntroClock='governed-visual';" +
+			"document.body.dataset.yakolakIntroFallbackFps='30';" +
 			"document.body.dataset.yakolakIntroMaxStepMs='" + str(MAX_VISUAL_STEP_MS) + "';",
 			true
 		)
