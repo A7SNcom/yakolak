@@ -1,0 +1,752 @@
+name: Apply Governed Closed Box V36
+
+on:
+  push:
+    branches:
+      - agent/yakolak-3.0-star-to-table-preintro
+
+permissions:
+  contents: write
+
+jobs:
+  apply-motion-refinement:
+    if: ${{ !contains(github.event.head_commit.message, '[motion-v36-applied]') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/yakolak-3.0-star-to-table-preintro
+
+      - name: Apply governed motion refinement
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, found {count}: {old[:100]!r}')
+              file.write_text(text.replace(old, new, 1), encoding='utf-8', newline='\n')
+
+          # Loader: preserve the accepted bounce, but enter and leave the loop through
+          # an explicit warm-up and a graceful canonical settle instead of snapping.
+          replace_once(
+              'scripts/apply_web_loader.py',
+              '''#yakolakLoader .starBounce{
+            position:absolute;top:0;left:4px;width:88px;height:88px;
+            transform-origin:50% 100%;animation:bounce var(--cycle) infinite;
+            will-change:transform
+          }
+          #yakolakLoader .loadingStar{
+            display:block;width:100%;height:100%;overflow:visible;
+            transform-box:fill-box;transform-origin:center;
+            animation:turn var(--cycle) linear infinite;will-change:transform
+          }
+          #yakolakLoader .loadingStar path{fill:var(--loading-star)}
+          #yakolakLoader .loadingShadow{
+            position:absolute;top:123px;left:12px;width:72px;height:9px;border-radius:50%;
+            background:var(--loading-shadow);opacity:.28;filter:blur(6px);
+            transform-origin:center;animation:shadow var(--cycle) infinite;
+            will-change:transform,opacity
+          }''',
+              '''#yakolakLoader .starBounce{
+            position:absolute;top:0;left:4px;width:88px;height:88px;
+            transform-origin:50% 100%;transform:translateY(0) scale(1,1);
+            will-change:transform
+          }
+          #yakolakLoader.motionRunning .starBounce{animation:bounce var(--cycle) infinite}
+          #yakolakLoader .loadingStar{
+            display:block;width:100%;height:100%;overflow:visible;
+            transform-box:fill-box;transform-origin:center;transform:rotate(0deg);
+            will-change:transform
+          }
+          #yakolakLoader.motionRunning .loadingStar{animation:turn var(--cycle) linear infinite}
+          #yakolakLoader .loadingStar path{fill:var(--loading-star)}
+          #yakolakLoader .loadingShadow{
+            position:absolute;top:123px;left:12px;width:72px;height:9px;border-radius:50%;
+            background:var(--loading-shadow);opacity:.26;filter:blur(6px);
+            transform-origin:center;transform:scale(.66,.72);
+            will-change:transform,opacity
+          }
+          #yakolakLoader.motionRunning .loadingShadow{animation:shadow var(--cycle) infinite}'''
+          )
+
+          replace_once(
+              'scripts/apply_web_loader.py',
+              '''  const cycle=820;
+            const epoch=performance.now();
+            const minimumVisibleHold=780;
+            const materialBridgeDuration=1200;
+            const materialBridgeHoldRatio=220/materialBridgeDuration;
+            let scheduled=false;
+            let released=false;
+            let matchReady=false;
+            let brandReady=false;
+            let brandVisibleAt=0;''',
+              '''  const cycle=820;
+            const epoch=performance.now();
+            const initialRestMs=220;
+            const motionWarmupMs=260;
+            const motionSettleMs=220;
+            const minimumLoaderMs=2600;
+            const minimumVisibleHold=900;
+            const materialBridgeDuration=1200;
+            const materialBridgeHoldRatio=260/materialBridgeDuration;
+            let scheduled=false;
+            let released=false;
+            let matchReady=false;
+            let brandReady=false;
+            let motionReady=false;
+            let motionStartedAt=0;
+            let brandVisibleAt=0;'''
+          )
+
+          replace_once(
+              'scripts/apply_web_loader.py',
+              '''  document.body.dataset.yakolakMtkyfPalette='original-black-white';
+            document.body.dataset.yakolakVisualBridge='white-to-material-crossfade';
+            window.__yakolakHandoffHistory=['waiting'];
+            window.__yakolakBrandHistory=['hidden'];
+            window.__yakolakLoading={set(){}};''',
+              '''  document.body.dataset.yakolakMtkyfPalette='original-black-white';
+            document.body.dataset.yakolakVisualBridge='white-to-material-crossfade';
+            document.body.dataset.yakolakTimingPolicy='minimum-gated-v1';
+            document.body.dataset.yakolakLoaderMinimumMs=String(minimumLoaderMs);
+            document.body.dataset.yakolakBounceWarmupMs=String(motionWarmupMs);
+            document.body.dataset.yakolakBounceSettleMs=String(motionSettleMs);
+            document.body.dataset.yakolakStarMotion='resting';
+            window.__yakolakHandoffHistory=['waiting'];
+            window.__yakolakBrandHistory=['hidden'];
+            window.__yakolakStarMotionHistory=['resting'];
+            window.__yakolakLoading={set(){}};'''
+          )
+
+          replace_once(
+              'scripts/apply_web_loader.py',
+              '''  const err=(actual,target)=>Math.max(
+            Math.abs(actual.left-target.x),Math.abs(actual.top-target.y),
+            Math.abs(actual.width-target.w),Math.abs(actual.height-target.h)
+          );
+
+            const match=(clone,handoffShadow,first,shadowFirst)=>{''',
+              '''  const err=(actual,target)=>Math.max(
+            Math.abs(actual.left-target.x),Math.abs(actual.top-target.y),
+            Math.abs(actual.width-target.w),Math.abs(actual.height-target.h)
+          );
+            const M=state=>{
+              document.body.dataset.yakolakStarMotion=state;
+              window.__yakolakStarMotionHistory.push(state);
+            };
+
+            const startMotion=()=>{
+              if(released||motionReady||!bounce||!S||!shadow)return;
+              M('warming');
+              const warmups=[
+                bounce.animate([
+                  {transform:'translateY(0) scale(1,1)',offset:0},
+                  {transform:'translateY(1.6px) scale(1.014,.986)',offset:.58},
+                  {transform:'translateY(0) scale(1,1)',offset:1}
+                ],{duration:motionWarmupMs,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'}),
+                S.animate([
+                  {transform:'rotate(0deg)',offset:0},
+                  {transform:'rotate(1.2deg)',offset:.58},
+                  {transform:'rotate(0deg)',offset:1}
+                ],{duration:motionWarmupMs,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'}),
+                shadow.animate([
+                  {transform:'scale(.66,.72)',opacity:.26,offset:0},
+                  {transform:'scale(.72,.74)',opacity:.30,offset:.58},
+                  {transform:'scale(.66,.72)',opacity:.26,offset:1}
+                ],{duration:motionWarmupMs,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'})
+              ];
+              Promise.all(warmups.map(animation=>animation.finished)).then(()=>{
+                if(released)return;
+                warmups.forEach(animation=>animation.cancel());
+                L.classList.add('motionRunning');
+                motionReady=true;
+                motionStartedAt=performance.now();
+                M('running');
+                schedule();
+              });
+            };
+
+            const settleMotion=()=>{
+              if(!bounce||!S||!shadow)return Promise.resolve();
+              M('settling');
+              const bounceFrom=getComputedStyle(bounce).transform;
+              const starFrom=getComputedStyle(S).transform;
+              const shadowFrom=getComputedStyle(shadow).transform;
+              const shadowOpacity=Number(getComputedStyle(shadow).opacity)||.26;
+              L.classList.remove('motionRunning');
+              bounce.style.animation='none';
+              S.style.animation='none';
+              shadow.style.animation='none';
+              const settles=[
+                bounce.animate([
+                  {transform:bounceFrom},
+                  {transform:'translateY(0) scale(1,1)'}
+                ],{duration:motionSettleMs,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'}),
+                S.animate([
+                  {transform:starFrom},
+                  {transform:'rotate(0deg)'}
+                ],{duration:motionSettleMs,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'}),
+                shadow.animate([
+                  {transform:shadowFrom,opacity:shadowOpacity},
+                  {transform:'scale(.66,.72)',opacity:.26}
+                ],{duration:motionSettleMs,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'})
+              ];
+              return Promise.all(settles.map(animation=>animation.finished)).then(()=>{
+                bounce.style.transform='translateY(0) scale(1,1)';
+                S.style.transform='rotate(0deg)';
+                shadow.style.transform='scale(.66,.72)';
+                shadow.style.opacity='.26';
+                M('rested');
+              });
+            };
+
+            const match=(clone,handoffShadow,first,shadowFirst)=>{'''
+          )
+
+          replace_once(
+              'scripts/apply_web_loader.py',
+              '''  const lock=()=>{
+            if(released||!window.__yakolakMatch?.star||!S||!L)return;
+            released=true;
+            H('locking');
+            createCanonicalHandoff();
+          };
+
+            const schedule=()=>{
+              if(scheduled||released||!matchReady||!brandReady)return;
+              scheduled=true;
+              const now=performance.now();
+              const elapsed=now-epoch;
+              const holdLeft=Math.max(0,minimumVisibleHold-(now-brandVisibleAt));
+              const futureElapsed=elapsed+holdLeft;
+              const nextCanonicalRest=Math.max(90,cycle-(futureElapsed%cycle)+18);
+              setTimeout(lock,holdLeft+nextCanonicalRest);
+            };
+
+            setTimeout(()=>{''',
+              '''  const lock=()=>{
+            if(released||!window.__yakolakMatch?.star||!S||!L)return;
+            released=true;
+            H('locking');
+            settleMotion().then(createCanonicalHandoff);
+          };
+
+            const schedule=()=>{
+              if(scheduled||released||!matchReady||!brandReady||!motionReady)return;
+              scheduled=true;
+              const now=performance.now();
+              const loopElapsed=Math.max(0,now-motionStartedAt);
+              const brandHoldLeft=Math.max(0,minimumVisibleHold-(now-brandVisibleAt));
+              const sceneHoldLeft=Math.max(0,minimumLoaderMs-(now-epoch));
+              const holdLeft=Math.max(brandHoldLeft,sceneHoldLeft);
+              const futureLoopElapsed=loopElapsed+holdLeft;
+              const nextCanonicalRest=Math.max(90,cycle-(futureLoopElapsed%cycle)+18);
+              setTimeout(lock,holdLeft+nextCanonicalRest);
+            };
+
+            setTimeout(startMotion,initialRestMs);
+
+            setTimeout(()=>{'''
+          )
+
+          # Pre-intro: use a capped rendered-time clock so stalls cannot skip phases,
+          # then drop the already-closed box through one rigid parent transform.
+          replace_once(
+              'scripts/pre_intro_star_to_table.gd',
+              '''const MATCH_HOLD_MS: float = 220.0
+          const MORPH_MS: float = 980.0
+          const SETTLE_MS: float = 300.0
+          const CAMERA_ORBIT_MS: float = 1250.0
+          const CAMERA_HOLD_MS: float = 220.0
+          const TABLE_TOTAL_MS: float = MATCH_HOLD_MS + MORPH_MS + SETTLE_MS + CAMERA_ORBIT_MS + CAMERA_HOLD_MS
+          const BOX_REVEAL_MS: float = 1100.0
+          const BOX_HOLD_MS: float = 320.0
+          const TOTAL_MS: float = TABLE_TOTAL_MS + BOX_REVEAL_MS + BOX_HOLD_MS
+
+          const MATCH_CAMERA_DISTANCE: float = 54.0
+          const MATCH_CAMERA_FOV: float = 42.0
+          const BOX_START_DROP: float = 0.26
+          const BOX_START_SCALE: float = 0.985
+          const PEDESTAL_HALF_HEIGHT: float = 12.25
+          const WHITE_STAR: Color = Color("#ffffff")
+          const MOTION_VERSION: String = "pixel-matched-soft-material-box-v4"''',
+              '''const MIN_MATCH_HOLD_MS: float = 260.0
+          const MIN_MORPH_MS: float = 980.0
+          const MIN_SETTLE_MS: float = 300.0
+          const MIN_CAMERA_ORBIT_MS: float = 1250.0
+          const MIN_CAMERA_HOLD_MS: float = 220.0
+          const MIN_CLOSED_BOX_DROP_MS: float = 1200.0
+          const MIN_CLOSED_BOX_LANDED_HOLD_MS: float = 420.0
+          const MAX_TIMELINE_STEP_MS: float = 50.0
+
+          const MATCH_HOLD_MS: float = MIN_MATCH_HOLD_MS
+          const MORPH_MS: float = MIN_MORPH_MS
+          const SETTLE_MS: float = MIN_SETTLE_MS
+          const CAMERA_ORBIT_MS: float = MIN_CAMERA_ORBIT_MS
+          const CAMERA_HOLD_MS: float = MIN_CAMERA_HOLD_MS
+          const TABLE_TOTAL_MS: float = MATCH_HOLD_MS + MORPH_MS + SETTLE_MS + CAMERA_ORBIT_MS + CAMERA_HOLD_MS
+          const CLOSED_BOX_DROP_MS: float = MIN_CLOSED_BOX_DROP_MS
+          const CLOSED_BOX_LANDED_HOLD_MS: float = MIN_CLOSED_BOX_LANDED_HOLD_MS
+          const TOTAL_MS: float = TABLE_TOTAL_MS + CLOSED_BOX_DROP_MS + CLOSED_BOX_LANDED_HOLD_MS
+
+          const MATCH_CAMERA_DISTANCE: float = 54.0
+          const MATCH_CAMERA_FOV: float = 42.0
+          const CLOSED_BOX_START_HEIGHT: float = 8.4
+          const CLOSED_BOX_IMPACT_DEPTH: float = 0.10
+          const CLOSED_BOX_REBOUND_HEIGHT: float = 0.06
+          const PEDESTAL_HALF_HEIGHT: float = 12.25
+          const WHITE_STAR: Color = Color("#ffffff")
+          const MOTION_VERSION: String = "pixel-matched-governed-closed-box-v5"'''
+          )
+
+          replace_once(
+              'scripts/pre_intro_star_to_table.gd',
+              '''var match_wait_frames: int = 0
+          var started_msec: int = 0
+          var published_phase: int = -1''',
+              '''var match_wait_frames: int = 0
+          var started_msec: int = 0
+          var governed_elapsed_ms: float = 0.0
+          var published_phase: int = -1'''
+          )
+
+          replace_once(
+              'scripts/pre_intro_star_to_table.gd',
+              '''var match_camera_rotation: Quaternion
+          var match_camera_fov: float
+          var box_final_poses: Dictionary = {}''',
+              '''var match_camera_rotation: Quaternion
+          var match_camera_fov: float
+          var closed_box_root: Node3D
+          var closed_box_landed: bool = false'''
+          )
+
+          replace_once(
+              'scripts/pre_intro_star_to_table.gd',
+              '''	var elapsed: float = float(Time.get_ticks_msec() - started_msec)
+          	if elapsed < TABLE_TOTAL_MS:
+          		_apply_table_and_camera(elapsed)
+          		_publish_timeline_phase(elapsed)
+          		return
+
+          	if not box_reveal_started:
+          		_publish_timeline_phase(TABLE_TOTAL_MS)
+          		_begin_box_reveal()
+          	var box_elapsed: float = elapsed - TABLE_TOTAL_MS
+          	_apply_box_reveal(minf(box_elapsed, BOX_REVEAL_MS))
+          	if box_elapsed >= BOX_REVEAL_MS:
+          		_snap_box_and_camera_final()
+          		if published_phase < 6:
+          			published_phase = 6
+          			_publish_phase("box-settled")
+          	if elapsed >= TOTAL_MS:
+          		_finish_and_start_intro()''',
+              '''	governed_elapsed_ms += minf(maxf(_delta, 0.0) * 1000.0, MAX_TIMELINE_STEP_MS)
+          	var elapsed: float = governed_elapsed_ms
+          	if elapsed < TABLE_TOTAL_MS:
+          		_apply_table_and_camera(elapsed)
+          		_publish_timeline_phase(elapsed)
+          		return
+
+          	if not box_reveal_started:
+          		_publish_timeline_phase(TABLE_TOTAL_MS)
+          		_begin_closed_box_drop()
+          	var box_elapsed: float = elapsed - TABLE_TOTAL_MS
+          	_apply_closed_box_drop(minf(box_elapsed, CLOSED_BOX_DROP_MS))
+          	if box_elapsed >= CLOSED_BOX_DROP_MS:
+          		_snap_closed_box_landed()
+          		if published_phase < 6:
+          			published_phase = 6
+          			_publish_phase("box-closed-landed")
+          	if elapsed >= TOTAL_MS:
+          		_finish_and_start_intro()'''
+          )
+
+          replace_once(
+              'scripts/pre_intro_star_to_table.gd',
+              '''func _start_matched_handoff() -> void:
+          	handoff_started = true
+          	started_msec = Time.get_ticks_msec()
+          	published_phase = 0
+          	_publish_phase("matched")''',
+              '''func _start_matched_handoff() -> void:
+          	handoff_started = true
+          	started_msec = Time.get_ticks_msec()
+          	governed_elapsed_ms = 0.0
+          	published_phase = 0
+          	_publish_phase("matched")'''
+          )
+
+          replace_once(
+              'scripts/pre_intro_star_to_table.gd',
+              '''func _begin_box_reveal() -> void:
+          	box_reveal_started = true
+          	_snap_table_final()
+          	_apply_final_camera()
+          	intro.call("_apply_timeline", 0.0)
+          	intro.set("playing", false)
+          	box_final_poses.clear()
+          	for index: int in game_nodes.size():
+          		var node: GeometryInstance3D = game_nodes[index]
+          		var delay_ms: float = 0.0
+          		if index >= 2 and index < 6:
+          			delay_ms = 70.0
+          		elif index >= 6:
+          			delay_ms = 130.0 + float((index - 6) % 12) * 6.0
+          		box_final_poses[node] = {
+          			"position": node.position,
+          			"rotation": node.quaternion.normalized(),
+          			"scale": node.scale,
+          			"transparency": node.transparency,
+          			"delay_ms": delay_ms,
+          		}
+          		node.position = node.position + Vector3(0.0, -BOX_START_DROP, 0.0)
+          		node.scale = node.scale * BOX_START_SCALE
+          		node.transparency = 1.0
+          		node.visible = true
+          	_publish_phase("box-arriving")
+
+
+          func _apply_box_reveal(reveal_elapsed: float) -> void:
+          	for node: GeometryInstance3D in game_nodes:
+          		var pose: Dictionary = box_final_poses[node] as Dictionary
+          		var delay_ms: float = float(pose["delay_ms"])
+          		var local_duration: float = maxf(1.0, BOX_REVEAL_MS - delay_ms)
+          		var raw_t: float = clampf((reveal_elapsed - delay_ms) / local_duration, 0.0, 1.0)
+          		var t: float = _smootherstep(raw_t)
+          		var fade_t: float = _smootherstep(clampf(raw_t / 0.78, 0.0, 1.0))
+          		var final_position: Vector3 = pose["position"] as Vector3
+          		var final_scale: Vector3 = pose["scale"] as Vector3
+          		var final_transparency: float = float(pose["transparency"])
+          		node.position = (final_position + Vector3(0.0, -BOX_START_DROP, 0.0)).lerp(final_position, t)
+          		node.quaternion = pose["rotation"] as Quaternion
+          		node.scale = (final_scale * BOX_START_SCALE).lerp(final_scale, t)
+          		node.transparency = lerpf(1.0, final_transparency, fade_t)''',
+              '''func _begin_closed_box_drop() -> void:
+          	box_reveal_started = true
+          	closed_box_landed = false
+          	_snap_table_final()
+          	_apply_final_camera()
+          	# Timeline zero is the accepted fully closed box: board, lid, walls and
+          	# contained stones are already assembled before any entrance movement.
+          	intro.call("_apply_timeline", 0.0)
+          	intro.set("playing", false)
+          	closed_box_root = Node3D.new()
+          	closed_box_root.name = "ClosedBoxDropRoot"
+          	intro.add_child(closed_box_root)
+          	for node: GeometryInstance3D in game_nodes:
+          		node.visible = true
+          		node.reparent(closed_box_root, true)
+          	closed_box_root.position = Vector3(0.0, CLOSED_BOX_START_HEIGHT, 0.0)
+          	closed_box_root.rotation = Vector3.ZERO
+          	closed_box_root.scale = Vector3.ONE
+          	_publish_phase("box-closed-descending")
+
+
+          func _apply_closed_box_drop(drop_elapsed: float) -> void:
+          	if closed_box_root == null or closed_box_landed:
+          		return
+          	var raw_t: float = clampf(drop_elapsed / CLOSED_BOX_DROP_MS, 0.0, 1.0)
+          	var y: float
+          	if raw_t < 0.78:
+          		var fall_t: float = _ease_in_cubic(raw_t / 0.78)
+          		y = lerpf(CLOSED_BOX_START_HEIGHT, -CLOSED_BOX_IMPACT_DEPTH, fall_t)
+          	elif raw_t < 0.90:
+          		var rebound_t: float = _ease_out_cubic((raw_t - 0.78) / 0.12)
+          		y = lerpf(-CLOSED_BOX_IMPACT_DEPTH, CLOSED_BOX_REBOUND_HEIGHT, rebound_t)
+          	else:
+          		var settle_t: float = _smootherstep((raw_t - 0.90) / 0.10)
+          		y = lerpf(CLOSED_BOX_REBOUND_HEIGHT, 0.0, settle_t)
+          	closed_box_root.position = Vector3(0.0, y, 0.0)
+
+
+          func _snap_closed_box_landed() -> void:
+          	if closed_box_landed:
+          		return
+          	closed_box_landed = true
+          	if closed_box_root != null:
+          		closed_box_root.position = Vector3.ZERO
+          		for node: GeometryInstance3D in game_nodes:
+          			node.reparent(intro, true)
+          		closed_box_root.queue_free()
+          		closed_box_root = null'''
+          )
+
+          replace_once(
+              'scripts/pre_intro_star_to_table.gd',
+              '''func _snap_box_and_camera_final() -> void:
+          	_apply_final_camera()
+          	for node: GeometryInstance3D in game_nodes:
+          		var pose: Dictionary = box_final_poses[node] as Dictionary
+          		node.position = pose["position"] as Vector3
+          		node.quaternion = pose["rotation"] as Quaternion
+          		node.scale = pose["scale"] as Vector3
+          		node.transparency = float(pose["transparency"])
+          		node.visible = true''',
+              '''func _snap_box_and_camera_final() -> void:
+          	_apply_final_camera()
+          	_snap_closed_box_landed()
+          	for node: GeometryInstance3D in game_nodes:
+          		node.visible = true'''
+          )
+
+          replace_once(
+              'scripts/pre_intro_star_to_table.gd',
+              '''	print("YAKOLAK_PREINTRO_COMPLETE duration=%d motion=%s match=pixel-exact logo=wall camera=side box=soft-staggered" % [int(TOTAL_MS), MOTION_VERSION])''',
+              '''	print("YAKOLAK_PREINTRO_COMPLETE duration=%d motion=%s match=pixel-exact logo=wall camera=side box=closed-rigid-drop lid=exit-only" % [int(TOTAL_MS), MOTION_VERSION])'''
+          )
+
+          replace_once(
+              'scripts/pre_intro_star_to_table.gd',
+              '''		"document.body.dataset.yakolakPreIntroShape='exact-svg-pixel-match';" +
+          		"document.body.dataset.yakolakMaterialBridge='white-emission-to-material';" +
+          		"document.body.dataset.yakolakBoxReveal='soft-staggered-fade';" +
+          		"document.body.dataset.yakolakBoxRevealDuration='" + str(int(BOX_REVEAL_MS)) + "';" +
+          		"document.body.dataset.yakolakMotion='" + MOTION_VERSION + "';" +''',
+              '''		"document.body.dataset.yakolakPreIntroShape='exact-svg-pixel-match';" +
+          		"document.body.dataset.yakolakMaterialBridge='white-emission-to-material';" +
+          		"document.body.dataset.yakolakTimingPolicy='minimum-gated-v1';" +
+          		"document.body.dataset.yakolakSceneMinimums='match:260,morph:980,settle:300,camera:1250,cameraHold:220,closedBoxDrop:1200,closedBoxHold:420';" +
+          		"document.body.dataset.yakolakSceneFlow='star>material>camera>closed-box-drop>lid-open';" +
+          		"document.body.dataset.yakolakBoxReveal='closed-rigid-body-drop';" +
+          		"document.body.dataset.yakolakBoxRevealDuration='" + str(int(CLOSED_BOX_DROP_MS)) + "';" +
+          		"document.body.dataset.yakolakBoxLandedHold='" + str(int(CLOSED_BOX_LANDED_HOLD_MS)) + "';" +
+          		"document.body.dataset.yakolakBoxLidPolicy='present-during-drop-exit-only';" +
+          		"window.__yakolakPreIntroPhases=window.__yakolakPreIntroPhases||[];" +
+          		"window.__yakolakPreIntroPhases.push({state:'" + state + "',at:performance.now()});" +
+          		"document.body.dataset.yakolakMotion='" + MOTION_VERSION + "';" +'''
+          )
+
+          replace_once(
+              'scripts/pre_intro_star_to_table.gd',
+              '''func _smootherstep(value: float) -> float:
+          	var t: float = clampf(value, 0.0, 1.0)
+          	return t * t * t * (t * (t * 6.0 - 15.0) + 10.0)''',
+              '''func _ease_in_cubic(value: float) -> float:
+          	var t: float = clampf(value, 0.0, 1.0)
+          	return t * t * t
+
+
+          func _ease_out_cubic(value: float) -> float:
+          	var t: float = clampf(value, 0.0, 1.0)
+          	return 1.0 - pow(1.0 - t, 3.0)
+
+
+          func _smootherstep(value: float) -> float:
+          	var t: float = clampf(value, 0.0, 1.0)
+          	return t * t * t * (t * (t * 6.0 - 15.0) + 10.0)'''
+          )
+
+          # Camera and table use the same governed rendered-time clock.
+          replace_once(
+              'scripts/pre_intro_refinement.gd',
+              '''const MATCH_HOLD_MS: float = 220.0''',
+              '''const MATCH_HOLD_MS: float = 260.0'''
+          )
+          replace_once(
+              'scripts/pre_intro_refinement.gd',
+              '''const MOTION_VERSION: String = "pixel-matched-direct-slow-safe-framing-v6"''',
+              '''const MOTION_VERSION: String = "pixel-matched-direct-slow-safe-framing-v7"'''
+          )
+          replace_once(
+              'scripts/pre_intro_refinement.gd',
+              '''	var started_msec: int = int(preintro.get("started_msec"))
+          	if started_msec <= 0:
+          		return
+          	var elapsed: float = float(Time.get_ticks_msec() - started_msec)''',
+              '''	var elapsed: float = float(preintro.get("governed_elapsed_ms"))
+          	if elapsed < 0.0:
+          		return'''
+          )
+
+          # Test the motion contracts and actual minimum phase spacing.
+          replace_once(
+              'tests/intro_smoke.spec.js',
+              '''  const loaderContract = await page.evaluate(() => {''',
+              '''  await page.waitForFunction(
+            () => document.body.dataset.yakolakStarMotion === 'running',
+            null,
+            { timeout: 5000 }
+          );
+
+            const loaderContract = await page.evaluate(() => {'''
+          )
+          replace_once(
+              'tests/intro_smoke.spec.js',
+              '''      hasInventedHorizontalMotion: styles.includes('translateX(') || styles.includes('rotate(-420deg)')
+            };''',
+              '''      hasInventedHorizontalMotion: styles.includes('translateX(') || styles.includes('rotate(-420deg)'),
+              timingPolicy: document.body.dataset.yakolakTimingPolicy,
+              loaderMinimumMs: document.body.dataset.yakolakLoaderMinimumMs,
+              starMotion: document.body.dataset.yakolakStarMotion
+            };'''
+          )
+          replace_once(
+              'tests/intro_smoke.spec.js',
+              '''    hasExactShadow: true,
+            hasInventedHorizontalMotion: false
+          });''',
+              '''    hasExactShadow: true,
+            hasInventedHorizontalMotion: false,
+            timingPolicy: 'minimum-gated-v1',
+            loaderMinimumMs: '2600',
+            starMotion: 'running'
+          });'''
+          )
+
+          replace_once(
+              'tests/pre_intro_smoke.spec.js',
+              '''      visualBridge: document.body.dataset.yakolakVisualBridge,
+            contour: document.body.dataset.yakolakContourSource,''',
+              '''      visualBridge: document.body.dataset.yakolakVisualBridge,
+              timingPolicy: document.body.dataset.yakolakTimingPolicy,
+              loaderMinimumMs: document.body.dataset.yakolakLoaderMinimumMs,
+              motionHistory: window.__yakolakStarMotionHistory,
+              contour: document.body.dataset.yakolakContourSource,'''
+          )
+          replace_once(
+              'tests/pre_intro_smoke.spec.js',
+              '''  expect(first.visualBridge).toBe('white-to-material-crossfade');
+            expect(first.contour).toBe('table-svg-exact-path');''',
+              '''  expect(first.visualBridge).toBe('white-to-material-crossfade');
+            expect(first.timingPolicy).toBe('minimum-gated-v1');
+            expect(first.loaderMinimumMs).toBe('2600');
+            expect(first.motionHistory[0]).toBe('resting');
+            expect(first.contour).toBe('table-svg-exact-path');'''
+          )
+          replace_once(
+              'tests/pre_intro_smoke.spec.js',
+              '''      canvas: { x:c.left, y:c.top, w:c.width, h:c.height }
+            };''',
+              '''      canvas: { x:c.left, y:c.top, w:c.width, h:c.height },
+              motionHistory: window.__yakolakStarMotionHistory
+            };'''
+          )
+          replace_once(
+              'tests/pre_intro_smoke.spec.js',
+              '''  expect(match.brands).toEqual(['hidden','entering','visible','leaving','hidden-after-fade']);''',
+              '''  expect(match.brands).toEqual(['hidden','entering','visible','leaving','hidden-after-fade']);
+            expect(match.motionHistory).toEqual(['resting','warming','running','settling','rested']);'''
+          )
+          replace_once(
+              'tests/pre_intro_smoke.spec.js',
+              '''  await expect.poll(
+            () => events.some(x => x.includes('YAKOLAK_PREINTRO_PHASE box-arriving')),
+            { timeout: 15000 }
+          ).toBe(true);
+            expect(await page.evaluate(() => document.body.dataset.yakolakBoxReveal)).toBe('soft-staggered-fade');
+            expect(await page.evaluate(() => document.body.dataset.yakolakBoxRevealDuration)).toBe('1100');''',
+              '''  await expect.poll(
+            () => events.some(x => x.includes('YAKOLAK_PREINTRO_PHASE box-closed-descending')),
+            { timeout: 15000 }
+          ).toBe(true);
+            expect(await page.evaluate(() => document.body.dataset.yakolakBoxReveal)).toBe('closed-rigid-body-drop');
+            expect(await page.evaluate(() => document.body.dataset.yakolakBoxRevealDuration)).toBe('1200');
+            expect(await page.evaluate(() => document.body.dataset.yakolakBoxLandedHold)).toBe('420');
+            expect(await page.evaluate(() => document.body.dataset.yakolakBoxLidPolicy)).toBe('present-during-drop-exit-only');
+            expect(await page.evaluate(() => document.body.dataset.yakolakSceneFlow)).toBe('star>material>camera>closed-box-drop>lid-open');'''
+          )
+          replace_once(
+              'tests/pre_intro_smoke.spec.js',
+              '''  await page.screenshot({ path: 'web/preintro-05-unboxing-complete.png' });
+
+            expect(await page.evaluate(() => document.body.dataset.yakolakTable)).toBe('approved-star-svg');''',
+              '''  await page.screenshot({ path: 'web/preintro-05-unboxing-complete.png' });
+
+            const governedPhases = await page.evaluate(() => window.__yakolakPreIntroPhases || []);
+            const phaseAt = state => governedPhases.find(entry => entry.state === state)?.at;
+            const orderedStates = [
+              'matched','star-to-3d','table-settling','camera-orbit',
+              'camera-settled','box-closed-descending','box-closed-landed','complete'
+            ];
+            for (let index = 1; index < orderedStates.length; index += 1) {
+              expect(phaseAt(orderedStates[index])).toBeGreaterThan(phaseAt(orderedStates[index - 1]));
+            }
+            expect(phaseAt('star-to-3d') - phaseAt('matched')).toBeGreaterThanOrEqual(210);
+            expect(phaseAt('table-settling') - phaseAt('star-to-3d')).toBeGreaterThanOrEqual(920);
+            expect(phaseAt('camera-orbit') - phaseAt('table-settling')).toBeGreaterThanOrEqual(250);
+            expect(phaseAt('camera-settled') - phaseAt('camera-orbit')).toBeGreaterThanOrEqual(1180);
+            expect(phaseAt('box-closed-descending') - phaseAt('camera-settled')).toBeGreaterThanOrEqual(170);
+            expect(phaseAt('box-closed-landed') - phaseAt('box-closed-descending')).toBeGreaterThanOrEqual(1130);
+            expect(phaseAt('complete') - phaseAt('box-closed-landed')).toBeGreaterThanOrEqual(360);
+
+            expect(await page.evaluate(() => document.body.dataset.yakolakTable)).toBe('approved-star-svg');'''
+          )
+          replace_once(
+              'tests/pre_intro_smoke.spec.js',
+              '''  expect(events.join('\n')).toContain('box=soft-staggered');''',
+              '''  expect(events.join('\n')).toContain('box=closed-rigid-drop lid=exit-only');'''
+          )
+
+          # Update the regression guard and build contract.
+          baseline = Path('scripts/check_approved_baseline.py')
+          text = baseline.read_text(encoding='utf-8')
+          text = text.replace('"materialBridgeDuration=1200",', '"materialBridgeDuration=1200",\n        "minimumLoaderMs=2600",\n        "motionWarmupMs=260",\n        "motionSettleMs=220",\n        "yakolakTimingPolicy",\n        "settleMotion",')
+          old_preintro = '''    "scripts/pre_intro_star_to_table.gd": (
+                  "MORPH_MS: float = 980.0",
+                  "CAMERA_ORBIT_MS: float = 1250.0",
+                  "BOX_REVEAL_MS: float = 1100.0",
+                  "BOX_START_DROP: float = 0.26",
+                  "BOX_START_SCALE: float = 0.985",
+                  "white-emission-to-material",
+                  "soft-staggered-fade",
+                  "node.transparency = 1.0",
+                  "pixel-matched-soft-material-box-v4",
+              ),'''
+          new_preintro = '''    "scripts/pre_intro_star_to_table.gd": (
+                  "MIN_MATCH_HOLD_MS: float = 260.0",
+                  "MIN_CLOSED_BOX_DROP_MS: float = 1200.0",
+                  "MIN_CLOSED_BOX_LANDED_HOLD_MS: float = 420.0",
+                  "MAX_TIMELINE_STEP_MS: float = 50.0",
+                  "governed_elapsed_ms",
+                  "ClosedBoxDropRoot",
+                  "node.reparent(closed_box_root, true)",
+                  "box-closed-descending",
+                  "box-closed-landed",
+                  "present-during-drop-exit-only",
+                  "closed-rigid-body-drop",
+                  "pixel-matched-governed-closed-box-v5",
+              ),'''
+          if old_preintro not in text:
+              raise SystemExit('baseline preintro contract not found')
+          text = text.replace(old_preintro, new_preintro, 1)
+          text = text.replace('"pixel-matched-direct-slow-safe-framing-v6",', '"pixel-matched-direct-slow-safe-framing-v7",\n        "governed_elapsed_ms",')
+          text = text.replace('"soft-staggered-fade",', '"closed-rigid-body-drop",\n        "box-closed-descending",\n        "yakolakSceneMinimums",')
+          text = text.replace('"YAKOLAK 3.5 passed preserved loader geometry",', '"YAKOLAK 3.6 passed governed loader and closed rigid box",')
+          text = text.replace('    "scripts/pre_intro_refinement.gd": (\n        "direction.normalized().slerp",', '    "scripts/pre_intro_star_to_table.gd": (\n        "soft-staggered-fade",\n        "node.transparency = 1.0",\n        "BOX_START_SCALE",\n    ),\n    "scripts/pre_intro_refinement.gd": (\n        "direction.normalized().slerp",')
+          text = text.replace('YAKOLAK approved original MTKYF palette, gradual material bridge, slow safe camera, soft box reveal, and gameplay contract preserved', 'YAKOLAK approved minimum-gated scene flow, professional star settle, closed rigid box drop, lid exit-only, and gameplay contract preserved')
+          baseline.write_text(text, encoding='utf-8', newline='\n')
+
+          build = Path('scripts/vercel-build.sh')
+          text = build.read_text(encoding='utf-8')
+          text = text.replace('Building YAKOLAK 3.5 — original MTKYF palette, gradual material bridge, slow camera, and soft box reveal', 'Building YAKOLAK 3.6 — minimum-gated scenes, professional star settle, and closed rigid box drop')
+          text = text.replace('pixel-matched-soft-material-box-v4', 'pixel-matched-governed-closed-box-v5')
+          text = text.replace('soft-staggered-fade', 'closed-rigid-body-drop')
+          text = text.replace('pixel-matched-direct-slow-safe-framing-v6', 'pixel-matched-direct-slow-safe-framing-v7')
+          text = text.replace('YAKOLAK 3.5 passed preserved loader geometry and original MTKYF black/white palette', 'YAKOLAK 3.6 passed original MTKYF palette, minimum loader timing, and graceful star start/settle')
+          text = text.replace('YAKOLAK 3.5 passed gradual white-to-material bridge, slow safe camera framing, and soft staggered box reveal', 'YAKOLAK 3.6 passed governed material/camera flow and one-piece closed-box sky drop before lid opening')
+          text = text.replace('grep -q "materialBridgeDuration=1200" web/index.html', 'grep -q "materialBridgeDuration=1200" web/index.html\ngrep -q "minimumLoaderMs=2600" web/index.html\ngrep -q "motionWarmupMs=260" web/index.html\ngrep -q "motionSettleMs=220" web/index.html\ngrep -q "yakolakTimingPolicy" web/index.html')
+          text = text.replace('grep -q "closed-rigid-body-drop" scripts/pre_intro_star_to_table.gd', 'grep -q "closed-rigid-body-drop" scripts/pre_intro_star_to_table.gd\ngrep -q "ClosedBoxDropRoot" scripts/pre_intro_star_to_table.gd\ngrep -q "node.reparent(closed_box_root, true)" scripts/pre_intro_star_to_table.gd\ngrep -q "present-during-drop-exit-only" scripts/pre_intro_star_to_table.gd\ngrep -q "governed_elapsed_ms" scripts/pre_intro_refinement.gd')
+          build.write_text(text, encoding='utf-8', newline='\n')
+
+          # Remove this one-shot workflow from the resulting product branch.
+          Path('.github/workflows/apply-governed-closed-box-v36.yml').unlink()
+          PY
+
+          python3 scripts/check_approved_baseline.py
+          git diff --check
+
+      - name: Commit refined motion
+        shell: bash
+        run: |
+          git config user.name "YAKOLAK Motion Loop"
+          git config user.email "actions@github.com"
+          git add -A
+          git commit -m "حوكمة المشاهد وهبوط البوكس المغلق ككتلة واحدة [motion-v36-applied]"
+          git push origin HEAD:agent/yakolak-3.0-star-to-table-preintro
