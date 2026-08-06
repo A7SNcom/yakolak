@@ -4,7 +4,7 @@ extends Node
 # The wall logo uses the same SVG file as the DOM loader so the logo handoff
 # can be screen-space matched instead of approximated.
 
-const VISUAL_VERSION: String = "black-studio-v3"
+const VISUAL_VERSION: String = "black-studio-v4-shared-materials"
 const LOGO_PATH: String = "res://generated/YAKOLAK_INVERTED.svg"
 const BACKGROUND_COLOR: Color = Color("#000000")
 const FLOOR_COLOR: Color = Color("#080a0d")
@@ -23,6 +23,7 @@ const FLOOR_Y: float = -17.08
 var intro: Node3D
 var initialized: bool = false
 var wall_logo: MeshInstance3D
+var material_cache: Dictionary = {}
 
 
 func _ready() -> void:
@@ -196,6 +197,11 @@ func _add_studio_architecture() -> void:
 
 
 func _apply_material(instance: MeshInstance3D, color: Color, roughness: float, metallic: float) -> void:
+	var key: String = "%s|%.4f|%.4f" % [color.to_html(true), roughness, metallic]
+	if material_cache.has(key):
+		instance.material_override = material_cache[key] as StandardMaterial3D
+		return
+
 	var material: StandardMaterial3D
 	if instance.material_override is StandardMaterial3D:
 		material = (instance.material_override as StandardMaterial3D).duplicate() as StandardMaterial3D
@@ -205,6 +211,7 @@ func _apply_material(instance: MeshInstance3D, color: Color, roughness: float, m
 	material.roughness = roughness
 	material.metallic = metallic
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	material_cache[key] = material
 	instance.material_override = material
 
 
@@ -218,7 +225,7 @@ func _new_material(color: Color, roughness: float, metallic: float) -> StandardM
 
 
 func _publish_ready() -> void:
-	print("YAKOLAK_VISUAL_POLISH_READY version=%s palette=black-studio lighting=balanced wall-logo=shared-svg" % VISUAL_VERSION)
+	print("YAKOLAK_VISUAL_POLISH_READY version=%s palette=black-studio lighting=balanced wall-logo=shared-svg materials=%d" % [VISUAL_VERSION, material_cache.size()])
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakVisual='" + VISUAL_VERSION + "';" +
@@ -226,6 +233,7 @@ func _publish_ready() -> void:
 			"document.body.dataset.yakolakPalette='black-white-indigo';" +
 			"document.body.dataset.yakolakPedestal='short-proportional';" +
 			"document.body.dataset.yakolakWallLogo='shared-yakolak-svg';" +
-			"document.body.dataset.yakolakFloor='dark-unshaded';",
+			"document.body.dataset.yakolakFloor='dark-unshaded';" +
+			"document.body.dataset.yakolakMaterialInstances='shared-by-style';",
 			true
 		)
