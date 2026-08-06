@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
+		<title>YAKOLAK 2.6 Corrected Intro</title>
+		<style>
+html, body, #canvas {
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+body {
+	color: white;
+	background-color: black;
+	overflow: hidden;
+	touch-action: none;
+}
+
+#canvas {
+	display: block;
+}
+
+#canvas:focus {
+	outline: none;
+}
+
+#status, #status-splash, #status-progress {
+	position: absolute;
+	left: 0;
+	right: 0;
+}
+
+#status, #status-splash {
+	top: 0;
+	bottom: 0;
+}
+
+#status {
+	background-color: #242424;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	visibility: hidden;
+}
+
+#status-splash {
+	max-height: 100%;
+	max-width: 100%;
+	margin: auto;
+}
+
+#status-splash.show-image--false {
+	display: none;
+}
+
+#status-splash.fullsize--true {
+	height: 100%;
+	width: 100%;
+	object-fit: contain;
+}
+
+#status-splash.use-filter--false {
+	image-rendering: pixelated;
+}
+
+#status-progress, #status-notice {
+	display: none;
+}
+
+#status-progress {
+	bottom: 10%;
+	width: 50%;
+	margin: 0 auto;
+}
+
+#status-notice {
+	background-color: #5b3943;
+	border-radius: 0.5rem;
+	border: 1px solid #9b3943;
+	color: #e0e0e0;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	line-height: 1.3;
+	margin: 0 2rem;
+	overflow: hidden;
+	padding: 1rem;
+	text-align: center;
+	z-index: 1;
+}
+		</style>
+		<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><meta name="theme-color" content="#000000"><meta name="description" content="YAKOLAK Godot Web preview with balanced brand loader, exact 2D to 3D shape matching, and playable stone placement"><style>html,body{width:100%;height:100%;margin:0!important;padding:0!important;overflow:hidden!important;background:#000!important}#canvas{display:block!important;width:100vw!important;height:100dvh!important;margin:0!important}</style>
+	
+<style id="yakolak-v130-loading-star-style">
+#yakolakLoader{
+  --loading-background:#000000;
+  --loading-star:#ffffff;
+  --loading-shadow:#d7d9de;
+  --cycle:820ms;
+  position:fixed;inset:0;z-index:2147483647;overflow:hidden;
+  opacity:1;visibility:visible;pointer-events:auto;color:#fff
+}
+#yakolakLoader .loaderBackdrop{
+  position:absolute;inset:0;background:var(--loading-background);opacity:1;
+  transition:opacity 760ms cubic-bezier(.4,0,.2,1)
+}
+#yakolakLoader.matched .loaderBackdrop{opacity:0}
+#yakolakLoader .loaderBrand{
+  position:fixed;left:50%;z-index:5;opacity:0;pointer-events:none;
+  transform:translate(-50%,-50%) translateY(7px) scale(.99);
+  transform-origin:center;will-change:transform,opacity
+}
+#yakolakLoader .loaderLogoYakolak{
+  top:18.5%;width:clamp(126px,31vw,190px);height:auto;
+  filter:drop-shadow(0 8px 24px rgba(255,255,255,.06))
+}
+#yakolakLoader .loaderLogoMtkyf{
+  top:81.5%;width:clamp(98px,24vw,150px);aspect-ratio:134.76/63.85;
+  filter:drop-shadow(0 8px 20px rgba(255,255,255,.05))
+}
+#yakolakLoader .loaderLogoMtkyf svg{display:block;width:100%;height:100%}
+#yakolakLoader .loaderLogoMtkyf path:not(.cls-1){fill:#000!important}
+#yakolakLoader .loaderLogoMtkyf .cls-1{fill:#fff!important}
+#yakolakLoader .boxLoading{
+  position:fixed;left:50%;top:50%;width:96px;height:132px;
+  transform:translate(-50%,-50%);z-index:4
+}
+#yakolakLoader .starBounce{
+  position:absolute;top:0;left:4px;width:88px;height:88px;
+  transform-origin:50% 100%;animation:bounce var(--cycle) infinite;
+  animation-play-state:paused;will-change:transform
+}
+#yakolakLoader .loadingStar{
+  display:block;width:100%;height:100%;overflow:visible;
+  transform-box:fill-box;transform-origin:center;
+  animation:turn var(--cycle) linear infinite;animation-play-state:paused;will-change:transform
+}
+#yakolakLoader .loadingStar path{fill:var(--loading-star)}
+#yakolakLoader .loadingShadow{
+  position:absolute;top:123px;left:12px;width:72px;height:9px;border-radius:50%;
+  background:var(--loading-shadow);opacity:.28;filter:blur(6px);
+  transform-origin:center;animation:shadow var(--cycle) infinite;
+  animation-play-state:paused;will-change:transform,opacity
+}
+#yakolakLoader .handoffStar{
+  position:fixed;z-index:6;margin:0;padding:0;pointer-events:none;
+  transform-origin:center;will-change:left,top,width,height,opacity
+}
+#yakolakLoader .handoffStar svg{display:block;width:100%;height:100%;overflow:visible;transform:none!important}
+#yakolakLoader .handoffStar path{fill:var(--loading-star)}
+#yakolakLoader .handoffShadow{
+  position:fixed;z-index:5;border-radius:50%;pointer-events:none;
+  background:var(--loading-shadow);filter:blur(10px);opacity:.40;
+  will-change:left,top,width,height,opacity
+}
+#status,#status-progress,#status-notice{display:none!important}
+@keyframes bounce{
+  0%{transform:translateY(0) scale(1,1);animation-timing-function:cubic-bezier(.55,.08,.68,.19)}
+  43%{transform:translateY(33px) scale(1.01,.99);animation-timing-function:cubic-bezier(.2,.8,.3,1)}
+  50%{transform:translateY(36px) scale(1.17,.72);animation-timing-function:cubic-bezier(.15,.75,.2,1)}
+  58%{transform:translateY(30px) scale(.94,1.09);animation-timing-function:cubic-bezier(.22,.61,.36,1)}
+  78%{transform:translateY(5px) scale(1.01,.99);animation-timing-function:cubic-bezier(.25,.1,.25,1)}
+  100%{transform:translateY(0) scale(1,1)}
+}
+@keyframes turn{
+  0%{transform:rotate(0deg)}43%{transform:rotate(10deg)}
+  50%{transform:rotate(12deg)}58%{transform:rotate(14deg)}
+  78%{transform:rotate(20deg)}100%{transform:rotate(24deg)}
+}
+@keyframes shadow{
+  0%,100%{transform:scale(.66,.72);opacity:.26;animation-timing-function:cubic-bezier(.55,.08,.68,.19)}
+  43%{transform:scale(1.02,.95);opacity:.38}
+  50%{transform:scale(1.30,1);opacity:.54;animation-timing-function:cubic-bezier(.15,.75,.2,1)}
+  58%{transform:scale(1.04,.94);opacity:.40}
+  78%{transform:scale(.72,.76);opacity:.30}
+}
+@media (prefers-reduced-motion:reduce){#yakolakLoader{--cycle:1200ms}}
+</style>
+
+</head>
+	<body>
+
+<div id="yakolakLoader" data-loader-source="v130-loading-star-motion" aria-busy="true">
+  <div class="loaderBackdrop"></div>
+  <img class="loaderBrand loaderLogoYakolak" src="yakolak-logo.svg" alt="">
+  <div class="loaderBrand loaderLogoMtkyf"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 134.76 63.85"><defs><style>.cls-1{fill:#fff;}</style></defs><g id="Layer_2" data-name="Layer 2"><g id="Layer_1-2" data-name="Layer 1"><path d="M134.76,50.82h-.1a10,10,0,0,1,.1,1.24V57c0,.22,0,.43,0,.65a4,4,0,0,1-2.84,3.86,3.9,3.9,0,0,1-4.33-1.34,4,4,0,0,1-1.36,1.1,4.1,4.1,0,0,1-1.86.44,3.9,3.9,0,0,1-1.67-.36,4.12,4.12,0,0,1-1.42-1.1,4.17,4.17,0,0,1-1.21,1,4,4,0,0,1-1.88.48,4.11,4.11,0,0,1-2.25-.7,3.93,3.93,0,0,1-1.46-1.75h0a8.69,8.69,0,0,1-6.1,2.46h0a8.52,8.52,0,0,1-6-2.52v0a4.1,4.1,0,0,1-1.81,1.6,10.21,10.21,0,0,1-4.26.93h-.09a8.39,8.39,0,0,1-7.63-4.79,4.21,4.21,0,0,1-2.13.59h0a4.3,4.3,0,0,1-2.43-.73,4.36,4.36,0,0,1-2.4.73h-4v2a4.11,4.11,0,0,1-4.1,4.33h0a4,4,0,0,1-2.87-1.14,4.37,4.37,0,0,1-1.24-3.17c0-1.24,0-2.49,0-3.75V51.4l-1.37,1.46-1.62,1.71v5a4.07,4.07,0,0,1-4,4.28h-.09a4.08,4.08,0,0,1-2.85-1.12,4.28,4.28,0,0,1-1.26-3.09c0-1.9,0-3.47,0-5a.4.4,0,0,0,0-.11l-3.18-3.4-.28-.3H52.21l-.9.89-1.08,1.06,2.53,2.57a1.25,1.25,0,0,0,1,.46h.05a4,4,0,0,1,.57,7.92,13.53,13.53,0,0,1-1.74.13,7.5,7.5,0,0,1-3.74-.93,7.93,7.93,0,0,1-1.61-1.22c-.93-.92-1.85-1.85-2.77-2.78,0,.28,0,.55,0,.82a4.08,4.08,0,0,1-4.12,4.07h-.1a4,4,0,0,1-4-4.2c0-2.93,0-5.87,0-8.79H33v8.69a4.13,4.13,0,0,1-6.24,3.73,4.18,4.18,0,0,1-2-3.23c0-.45,0-.86,0-1.23v-8H22q0,4.29,0,8.59A4.5,4.5,0,0,1,20.41,63a4.21,4.21,0,0,1-6.76-3.42c0-1.09,0-2.18,0-3.26a4.25,4.25,0,0,1-2.64.94,4.31,4.31,0,0,1-2.6-1v3.29A4.05,4.05,0,0,1,6,63.42,4.18,4.18,0,0,1,1.62,63,4.15,4.15,0,0,1,0,59.59V29.05a4.87,4.87,0,0,1,.37-1.66,5,5,0,0,1,4.58-3H5A4.61,4.61,0,0,1,9.51,27.6,2.17,2.17,0,0,0,11,29.05h9.66a11.22,11.22,0,0,1,4.39-10.24A11.81,11.81,0,0,1,28.35,17a4.43,4.43,0,0,1-1.42-3.12c0-.77,0-1.51,0-2.25a4.45,4.45,0,0,1,4.41-4.26h2.13a4.44,4.44,0,0,1,4.41,4.31c0,.79,0,1.48,0,2.15a4.49,4.49,0,0,1-1.55,3.29h0a11.22,11.22,0,0,1,7.21,11.9h1.72l10-9c.39-.37.79-.72,1.18-1.08a4.62,4.62,0,0,1,6.5.32,4.19,4.19,0,0,1,.28.34,2.18,2.18,0,0,1-.14-.34,5.7,5.7,0,0,1,1.78-6.34l5-4.13,1.1-.9c2.78-2.27,5.55-4.54,8.34-6.8A4.67,4.67,0,0,1,82.8,0a4.58,4.58,0,0,1,3.08,1.71,4.72,4.72,0,0,1-.75,6.55l-6.81,5.51c2.18,0,4.33,0,6.49,0a9.22,9.22,0,0,1,6.85,2.78,8.85,8.85,0,0,1,2.67,6.33V26l5.33-5.33h0a4.18,4.18,0,0,1-3.15-4c0-.72,0-1.43,0-2.09a4.22,4.22,0,0,1,4.14-4.11c.63,0,1.24,0,1.86,0a4.23,4.23,0,0,1,2.35.78,4.56,4.56,0,0,1,2.53-.78H109a4.25,4.25,0,0,1,4.22,4.13c0,.56,0,1.17,0,1.91a4.22,4.22,0,0,1-2.56,3.92l-1.76.35a5.26,5.26,0,0,1,.47,2.22c0,1.41,0,2.83,0,4.26L110.57,26c1.77-1.78,3.53-3.57,5.32-5.34a11,11,0,0,1,18.84,8.36h0Z"/><path class="cls-1" d="M68.54,20.23H84.8a2.91,2.91,0,0,1,3,2.82,17.15,17.15,0,0,1,0,2,7.08,7.08,0,0,1-6.93,6.42c-1.71,0-3.41,0-5.12,0H68.09a2.31,2.31,0,0,0-2.4,1.62A2.23,2.23,0,0,0,67.92,36c4.12,0,8.24,0,12.36,0a9.9,9.9,0,0,0,6.34-2.18c.44-.34.85-.72,1.3-1.09,0,.13.1.23.13.33a4.17,4.17,0,0,0,7,1.64c1.82-1.86,3.69-3.67,5.54-5.51l2-2c0,.28,0,.45,0,.62,0,1.14.05,2.29,0,3.43a4.77,4.77,0,0,0,4.83,4.84A5.93,5.93,0,0,0,112,34c1.12-1.17,2.29-2.29,3.49-3.5l.21.64a8.48,8.48,0,0,0,12.93,4.14,8.62,8.62,0,0,0,1.86-12,8.45,8.45,0,0,0-12.83-.9c-2.8,2.8-5.57,5.62-8.36,8.43a3,3,0,0,1-.55.46,1.43,1.43,0,0,1-1.51.15c-.49-.26-.47-.75-.47-1.22,0-2.45,0-4.89,0-7.34a2.43,2.43,0,0,0-1.5-2.33,2.32,2.32,0,0,0-2.64.61L95,28.83c-.68.68-1.34,1.39-2,2.05a1,1,0,0,1-.8.23c-.19-.06-.29-.44-.38-.7a1.53,1.53,0,0,1,0-.48V22.79a6.38,6.38,0,0,0-1.94-4.54,6.71,6.71,0,0,0-5-2c-4.36,0-8.72,0-13.08,0l-.6,0,.57-.49L83.51,6.17a2.19,2.19,0,0,0,.38-2.95A2,2,0,0,0,81,3l-8.33,6.8c-2,1.67-4.09,3.34-6.12,5a3.11,3.11,0,0,0-1,3.48A2.93,2.93,0,0,0,68.54,20.23ZM123.77,24a4.41,4.41,0,1,1-4.43,4.41A4.44,4.44,0,0,1,123.77,24Z"/><path class="cls-1" d="M12.11,36q16.22,0,32.43,0a6.86,6.86,0,0,0,4.74-1.84Q55.07,29,60.88,23.77a2,2,0,1,0-2.68-3c-.65.57-1.28,1.17-1.93,1.75L47,30.85a2.82,2.82,0,0,1-1.88.78c-1.64,0-3.28,0-4.92,0,0,0,0,0-.06-.06a8.67,8.67,0,0,0-2.63-11,9.11,9.11,0,0,0-10.85.19,8.59,8.59,0,0,0-2.47,10.91h-.63c-3.8,0-7.6,0-11.39,0a5.05,5.05,0,0,1-5.1-3.42A2.06,2.06,0,0,0,5,26.82a2.35,2.35,0,0,0-2.21,1.43,2.39,2.39,0,0,0,.14,2.13A9.8,9.8,0,0,0,12.11,36ZM32.87,23a4.66,4.66,0,0,1,4.05,4.27,4.69,4.69,0,0,1-5.11,4.63,4.57,4.57,0,0,1-4.09-2.69,10.64,10.64,0,0,1-.46-1.7A4.89,4.89,0,0,1,32.87,23Z"/><path class="cls-1" d="M31.42,15.55h1.93a1.87,1.87,0,0,0,1.95-1.89c0-.66,0-1.32,0-2a1.85,1.85,0,0,0-1.86-1.82H31.36a1.89,1.89,0,0,0-1.86,1.78c0,.69,0,1.39,0,2.08A1.92,1.92,0,0,0,31.42,15.55Z"/><path class="cls-1" d="M107.41,18.08h1.44a1.68,1.68,0,0,0,1.8-1.77c0-.58,0-1.16,0-1.74a1.67,1.67,0,0,0-1.71-1.66H107.4a1.71,1.71,0,0,0-1.8,1.78c0,.54,0,1.09,0,1.64A1.67,1.67,0,0,0,107.41,18.08Z"/><path class="cls-1" d="M100.72,18.08c.27,0,.55,0,.82,0h0c.29,0,.58,0,.87,0a1.68,1.68,0,0,0,1.73-1.69c0-.62,0-1.25,0-1.87a1.7,1.7,0,0,0-1.67-1.61c-.58,0-1.15,0-1.73,0a1.65,1.65,0,0,0-1.64,1.62c0,.64,0,1.28,0,1.92A1.66,1.66,0,0,0,100.72,18.08Z"/><path class="cls-1" d="M55.85,35.55a6,6,0,0,0,1.07.59A7.72,7.72,0,0,0,58,35.57a14.94,14.94,0,0,0,1.23-1.16,1.62,1.62,0,0,0,.1-2.22c-.42-.49-.87-.95-1.33-1.4a1.47,1.47,0,0,0-1.94-.07,20.13,20.13,0,0,0-1.5,1.42,1.56,1.56,0,0,0,0,2.07A16.61,16.61,0,0,0,55.85,35.55Z"/><path class="cls-1" d="M59.24,27.88a1.54,1.54,0,0,0,0,2.14c.41.45.83.89,1.27,1.31a1.5,1.5,0,0,0,2.1.08c.44-.38.86-.77,1.26-1.19a1.64,1.64,0,0,0,0-2.34,9.6,9.6,0,0,0-1-1.09,9.12,9.12,0,0,0-1.19-.71,5.82,5.82,0,0,0-1.09.54A14.37,14.37,0,0,0,59.24,27.88Z"/><path class="cls-1" d="M3,61a1.84,1.84,0,0,0,2,.21,1.76,1.76,0,0,0,1-1.75c0-2.76,0-5.51,0-8.27v-.61a.79.79,0,0,1,.19.08c1,1,2,2.1,3,3.14,1.29,1.33,2.24,1.3,3.55,0,1-1,2.11-2,3.17-2.93v.43q0,4.06,0,8.15a1.79,1.79,0,0,0,1.39,1.88,1.84,1.84,0,0,0,2.3-2q0-6.15,0-12.29a2.2,2.2,0,0,0-1.39-2.19,2.43,2.43,0,0,0-2.63.67c-1,1.07-2,2.14-3.05,3.2L11,50.38c-.17-.21-.28-.37-.41-.5-1.4-1.48-2.8-3-4.22-4.42a2.33,2.33,0,0,0-2.65-.62,2,2,0,0,0-1.37,2q0,6.35,0,12.68A1.79,1.79,0,0,0,3,61Z"/><path class="cls-1" d="M40.29,61.35a1.75,1.75,0,0,0,1.81-1.82,11.91,11.91,0,0,0,0-1.58,2.16,2.16,0,0,1,.94-2.11,3.92,3.92,0,0,0,.37-.34c.48-.43.69-.42,1.15,0C46,57,47.45,58.48,48.91,59.92a4.94,4.94,0,0,0,1.12.85,6.34,6.34,0,0,0,4,.51,1.58,1.58,0,0,0,1.3-1.78,1.54,1.54,0,0,0-1.6-1.45,3.6,3.6,0,0,1-2.66-1.16q-1.76-1.77-3.49-3.56c-.52-.53-.5-.92,0-1.45s.9-.86,1.35-1.3c.94-.92,1.9-1.83,2.83-2.77a1.82,1.82,0,0,0,.31-2.28,1.66,1.66,0,0,0-1.94-.81,2.66,2.66,0,0,0-1.1.64c-2.28,2.19-4.55,4.41-6.82,6.61l-.16,0v-.71c0-1.59,0-3.17,0-4.76a1.7,1.7,0,0,0-1.76-1.81,1.74,1.74,0,0,0-1.77,1.82q0,6.5,0,13A1.71,1.71,0,0,0,40.29,61.35Z"/><path class="cls-1" d="M117.23,58.89a1.57,1.57,0,0,0,1.71.11,1.7,1.7,0,0,0,.92-1.58c0-1.87,0-3.74,0-5.61a1.44,1.44,0,0,1,1.45-1.6c.83,0,1.36.62,1.37,1.6,0,1.74,0,3.47,0,5.21a3.87,3.87,0,0,0,.08.9,1.65,1.65,0,0,0,2.4,1.09,1.76,1.76,0,0,0,1-1.72c0-1.85,0-3.7,0-5.55a1.43,1.43,0,0,1,1.94-1.46,1.55,1.55,0,0,1,1,1.58c0,1.79,0,3.58,0,5.37a2.73,2.73,0,0,0,.35,1.28,1.54,1.54,0,0,0,1.79.6,1.67,1.67,0,0,0,1.19-1.68c0-1,0-2,0-2.94h0V51.94a5,5,0,0,0-7.57-4.34.63.63,0,0,1-.76,0,5,5,0,0,0-7.56,4c-.07,2,0,3.92,0,5.88A1.58,1.58,0,0,0,117.23,58.89Z"/><path class="cls-1" d="M73.4,61.36a1.79,1.79,0,0,0,1.77-2c0-1,0-1.92,0-2.89S75.56,55,76.63,55H81.5a1.75,1.75,0,0,0,1.77-1.31,1.78,1.78,0,0,0-1.79-2.25c-1.66,0-3.32,0-5,0a1.14,1.14,0,0,1-1.16-.52,1.61,1.61,0,0,1,1.42-2.53c1.83,0,3.66,0,5.49,0a1.86,1.86,0,0,0,1.9-1.9,1.81,1.81,0,0,0-1.93-1.8c-2.16,0-4.34,0-6.5,0a4.05,4.05,0,0,0-4.1,4.22c0,1.72,0,3.43,0,5.15h0c0,1.77,0,3.55,0,5.32A1.74,1.74,0,0,0,73.4,61.36Z"/><path class="cls-1" d="M23.4,48.31h2.1c1.2,0,1.59.37,1.6,1.58v8.44c0,.45,0,.91,0,1.36a1.72,1.72,0,0,0,2.4,1.52,1.77,1.77,0,0,0,1.1-1.81V49.84c0-1.07.46-1.52,1.52-1.53.77,0,1.54,0,2.32,0a1.8,1.8,0,0,0,1.81-2.06,1.83,1.83,0,0,0-1.91-1.57H28.92c-1.85,0-3.7,0-5.55,0a1.81,1.81,0,1,0,0,3.62Z"/><path class="cls-1" d="M55.34,48.05l4.4,4.72a2.37,2.37,0,0,1,.69,1.78c0,1.65,0,3.29,0,4.93a1.75,1.75,0,1,0,3.49,0q0-2.49,0-5a2.12,2.12,0,0,1,.63-1.58l2.33-2.47c.84-.89,1.7-1.76,2.52-2.68a1.82,1.82,0,1,0-2.72-2.42l-2.11,2.22c-.77.82-1.54,1.64-2.34,2.47l-.36-.33-4.07-4.33A1.82,1.82,0,1,0,55,47.71C55.13,47.83,55.24,47.94,55.34,48.05Z"/><path class="cls-1" d="M108.36,59.21a6.18,6.18,0,0,0,6.29-6.15,6.22,6.22,0,1,0-12.44,0A6.15,6.15,0,0,0,108.36,59.21Zm.08-9.07a2.92,2.92,0,1,1-3,2.93A3,3,0,0,1,108.44,50.14Z"/><path class="cls-1" d="M96.21,59.2a7.91,7.91,0,0,0,3.29-.71,1.68,1.68,0,0,0,.93-2.2,1.62,1.62,0,0,0-2.17-.84,11.81,11.81,0,0,1-1.4.42,2.82,2.82,0,0,1-3-1.13,2.68,2.68,0,0,1-.17-3.09,2.75,2.75,0,0,1,2.85-1.45,10.43,10.43,0,0,1,1.79.45,1.65,1.65,0,0,0,1.23-3,7.58,7.58,0,0,0-4-.72A6.23,6.23,0,0,0,90,53.34,6.12,6.12,0,0,0,96.21,59.2Z"/><path class="cls-1" d="M86.36,55a1.94,1.94,0,0,0,2-2,2,2,0,0,0-2-2,2,2,0,0,0-2,2.07A1.89,1.89,0,0,0,86.36,55Z"/></g></g></svg></div>
+  <div class="boxLoading">
+    <div class="starBounce">
+      <svg class="loadingStar" viewBox="0 0 802 798" xmlns="http://www.w3.org/2000/svg">
+        <g transform="matrix(4.166667,0,0,4.166667,484.7475,797.470417)">
+          <path d="M0,-191.393L-20.116,-183.832L-40.232,-191.393L-55.534,-176.304L-76.986,-175.028L-84.828,-155.02L-103.907,-145.13L-102.932,-123.662L-116.339,-106.867L-106.717,-87.651L-112.134,-66.855L-95.528,-53.214L-92.018,-32.013L-71.299,-26.306L-59.469,-8.364L-38.22,-11.578L-20.116,0L-2.012,-11.578L19.237,-8.364L31.067,-26.306L51.786,-32.013L55.296,-53.214L71.902,-66.855L66.486,-87.651L76.108,-106.867L62.7,-123.662L63.675,-145.13L44.596,-155.02L36.754,-175.028L15.302,-176.304L0,-191.393Z"/>
+        </g>
+      </svg>
+    </div>
+    <div class="loadingShadow"></div>
+  </div>
+</div>
+
+		<canvas id="canvas">
+			Your browser does not support the canvas tag.
+		</canvas>
+
+		<noscript>
+			Your browser does not support JavaScript.
+		</noscript>
+
+		<div id="status">
+			<img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="index.png" alt="">
+			<progress id="status-progress"></progress>
+			<div id="status-notice"></div>
+		</div>
+
+		<script src="index.js"></script>
+		<script>
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":4018936,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_THREADS_ENABLED = false;
+const engine = new Engine(GODOT_CONFIG);
+
+(function () {
+	const statusOverlay = document.getElementById('status');
+	const statusProgress = document.getElementById('status-progress');
+	const statusNotice = document.getElementById('status-notice');
+
+	let initializing = true;
+	let statusMode = '';
+
+	function setStatusMode(mode) {
+		if (statusMode === mode || !initializing) {
+			return;
+		}
+		if (mode === 'hidden') {
+			statusOverlay.remove();
+			initializing = false;
+			return;
+		}
+		statusOverlay.style.visibility = 'visible';
+		statusProgress.style.display = mode === 'progress' ? 'block' : 'none';
+		statusNotice.style.display = mode === 'notice' ? 'block' : 'none';
+		statusMode = mode;
+	}
+
+	function setStatusNotice(text) {
+		while (statusNotice.lastChild) {
+			statusNotice.removeChild(statusNotice.lastChild);
+		}
+		const lines = text.split('\n');
+		lines.forEach((line) => {
+			statusNotice.appendChild(document.createTextNode(line));
+			statusNotice.appendChild(document.createElement('br'));
+		});
+	}
+
+	function displayFailureNotice(err) {
+		console.error(err);
+		if (err instanceof Error) {
+			setStatusNotice(err.message);
+		} else if (typeof err === 'string') {
+			setStatusNotice(err);
+		} else {
+			setStatusNotice('An unknown error occurred.');
+		}
+		setStatusMode('notice');
+		initializing = false;
+	}
+
+	const missing = Engine.getMissingFeatures({
+		threads: GODOT_THREADS_ENABLED,
+	});
+
+	if (missing.length !== 0) {
+		if (GODOT_CONFIG['serviceWorker'] && GODOT_CONFIG['ensureCrossOriginIsolationHeaders'] && 'serviceWorker' in navigator) {
+			let serviceWorkerRegistrationPromise;
+			try {
+				serviceWorkerRegistrationPromise = navigator.serviceWorker.getRegistration();
+			} catch (err) {
+				serviceWorkerRegistrationPromise = Promise.reject(new Error('Service worker registration failed.'));
+			}
+			// There's a chance that installing the service worker would fix the issue
+			Promise.race([
+				serviceWorkerRegistrationPromise.then((registration) => {
+					if (registration != null) {
+						return Promise.reject(new Error('Service worker already exists.'));
+					}
+					return registration;
+				}).then(() => engine.installServiceWorker()),
+				// For some reason, `getRegistration()` can stall
+				new Promise((resolve) => {
+					setTimeout(() => resolve(), 2000);
+				}),
+			]).then(() => {
+				// Reload if there was no error.
+				window.location.reload();
+			}).catch((err) => {
+				console.error('Error while registering service worker:', err);
+			});
+		} else {
+			// Display the message as usual
+			const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
+			displayFailureNotice(missingMsg + missing.join('\n'));
+		}
+	} else {
+		setStatusMode('progress');
+		engine.startGame({
+			'onProgress': function (current, total) {
+				if (current > 0 && total > 0) {
+					statusProgress.value = current;
+					statusProgress.max = total;
+				} else {
+					statusProgress.removeAttribute('value');
+					statusProgress.removeAttribute('max');
+				}
+			},
+		}).then(() => {
+			setStatusMode('hidden');
+		}, displayFailureNotice);
+	}
+}());
+		</script>
+	
+<script id="yakolak-v130-loading-star-script">
+(()=>{
+  const L=document.getElementById('yakolakLoader');
+  const B=L?.querySelector('.boxLoading');
+  const bounce=L?.querySelector('.starBounce');
+  const S=L?.querySelector('.loadingStar');
+  const brands=[...(L?.querySelectorAll('.loaderBrand')||[])];
+  const shadow=L?.querySelector('.loadingShadow');
+  const cycle=820;
+  const epoch=performance.now();
+  const initialRestMs=220;
+  const motionWarmupMs=260;
+  const motionSettleMs=220;
+  const minimumLoaderMs=2600;
+  const minimumVisibleHold=900;
+  const materialBridgeDuration=1200;
+  const materialBridgeHoldRatio=260/materialBridgeDuration;
+  let scheduled=false;
+  let released=false;
+  let matchReady=false;
+  let brandReady=false;
+  let motionReady=false;
+  let motionStartedAt=0;
+  let brandVisibleAt=0;
+
+  document.body.dataset.yakolakLoader='v130-loading-star-motion';
+  document.body.dataset.yakolakLoaderHandoff='waiting';
+  document.body.dataset.yakolakLoaderPalette='black-white-lighter-gray-shadow';
+  document.body.dataset.yakolakHandoffSequencing='logos-fade-then-canonical-star';
+  document.body.dataset.yakolakBrandLayout='yakolak-upper-center-star-center-mtkyf-lower-center';
+  document.body.dataset.yakolakBrandPhase='hidden';
+  document.body.dataset.yakolakContourSource='table-svg-exact-path';
+  document.body.dataset.yakolakMtkyfPalette='original-black-white';
+  document.body.dataset.yakolakVisualBridge='white-to-material-crossfade';
+  document.body.dataset.yakolakTimingPolicy='minimum-gated-v1';
+  document.body.dataset.yakolakLoaderMinimumMs=String(minimumLoaderMs);
+  document.body.dataset.yakolakBounceWarmupMs=String(motionWarmupMs);
+  document.body.dataset.yakolakBounceSettleMs=String(motionSettleMs);
+  document.body.dataset.yakolakStarMotion='resting';
+  window.__yakolakHandoffHistory=['waiting'];
+  window.__yakolakBrandHistory=['hidden'];
+  window.__yakolakStarMotionHistory=['resting'];
+  window.__yakolakLoading={set(){}};
+
+  const H=state=>{
+    document.body.dataset.yakolakLoaderHandoff=state;
+    window.__yakolakHandoffHistory.push(state);
+  };
+  const P=state=>{
+    document.body.dataset.yakolakBrandPhase=state;
+    window.__yakolakBrandHistory.push(state);
+  };
+  const px=value=>`${Math.max(0,Number(value)||0)}px`;
+  const err=(actual,target)=>Math.max(
+    Math.abs(actual.left-target.x),Math.abs(actual.top-target.y),
+    Math.abs(actual.width-target.w),Math.abs(actual.height-target.h)
+  );
+
+  const M=state=>{
+    document.body.dataset.yakolakStarMotion=state;
+    window.__yakolakStarMotionHistory.push(state);
+  };
+
+  const startMotion=()=>{
+    if(released||motionReady||!bounce||!S||!shadow)return;
+    M('warming');
+    const warmups=[
+      bounce.animate([
+        {transform:'translateY(0) scale(1,1)',offset:0},
+        {transform:'translateY(1.6px) scale(1.014,.986)',offset:.58},
+        {transform:'translateY(0) scale(1,1)',offset:1}
+      ],{duration:motionWarmupMs,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'}),
+      S.animate([
+        {transform:'rotate(0deg)',offset:0},
+        {transform:'rotate(1.2deg)',offset:.58},
+        {transform:'rotate(0deg)',offset:1}
+      ],{duration:motionWarmupMs,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'}),
+      shadow.animate([
+        {transform:'scale(.66,.72)',opacity:.26,offset:0},
+        {transform:'scale(.72,.74)',opacity:.30,offset:.58},
+        {transform:'scale(.66,.72)',opacity:.26,offset:1}
+      ],{duration:motionWarmupMs,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'})
+    ];
+    Promise.all(warmups.map(animation=>animation.finished)).then(()=>{
+      if(released)return;
+      warmups.forEach(animation=>animation.cancel());
+      bounce.style.animationPlayState='running';
+      S.style.animationPlayState='running';
+      shadow.style.animationPlayState='running';
+      motionReady=true;
+      motionStartedAt=performance.now();
+      M('running');
+      schedule();
+    });
+  };
+
+  const settleMotion=()=>{
+    if(!bounce||!S||!shadow)return Promise.resolve();
+    M('settling');
+    const bounceFrom=getComputedStyle(bounce).transform;
+    const starFrom=getComputedStyle(S).transform;
+    const shadowFrom=getComputedStyle(shadow).transform;
+    const shadowOpacity=Number(getComputedStyle(shadow).opacity)||.26;
+    bounce.style.animationPlayState='paused';
+    S.style.animationPlayState='paused';
+    shadow.style.animationPlayState='paused';
+    const settles=[
+      bounce.animate([
+        {transform:bounceFrom},
+        {transform:'translateY(0) scale(1,1)'}
+      ],{duration:motionSettleMs,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'}),
+      S.animate([
+        {transform:starFrom},
+        {transform:'rotate(0deg)'}
+      ],{duration:motionSettleMs,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'}),
+      shadow.animate([
+        {transform:shadowFrom,opacity:shadowOpacity},
+        {transform:'scale(.66,.72)',opacity:.26}
+      ],{duration:motionSettleMs,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'})
+    ];
+    return Promise.all(settles.map(animation=>animation.finished)).then(()=>{
+      bounce.style.transform='translateY(0) scale(1,1)';
+      S.style.transform='rotate(0deg)';
+      shadow.style.transform='scale(.66,.72)';
+      shadow.style.opacity='.26';
+      M('rested');
+    });
+  };
+
+  const match=(clone,handoffShadow,first,shadowFirst)=>{
+    const target=window.__yakolakMatch;
+    if(!target?.star)return;
+    H('matching');
+    const easing='cubic-bezier(.65,0,.35,1)';
+    const starMotion=clone.animate([
+      {left:px(first.left),top:px(first.top),width:px(first.width),height:px(first.height),transform:'rotate(0deg)'},
+      {left:px(target.star.x),top:px(target.star.y),width:px(target.star.w),height:px(target.star.h),transform:'rotate(0deg)'}
+    ],{duration:1040,easing,fill:'forwards'});
+    const shadowMotion=handoffShadow.animate([
+      {left:px(shadowFirst.left),top:px(shadowFirst.top),width:px(shadowFirst.width),height:px(shadowFirst.height),opacity:.40},
+      {
+        left:px(target.star.x+target.star.w*.22),
+        top:px(target.star.y+target.star.h*.91),
+        width:px(target.star.w*.56),height:px(Math.max(10,target.star.h*.055)),opacity:.22
+      }
+    ],{duration:1040,easing,fill:'forwards'});
+
+    Promise.all([starMotion.finished,shadowMotion.finished]).then(()=>{
+      Object.assign(clone.style,{
+        left:px(target.star.x),top:px(target.star.y),
+        width:px(target.star.w),height:px(target.star.h),transform:'rotate(0deg)'
+      });
+      document.body.dataset.yakolakMatchErrorPx=err(clone.getBoundingClientRect(),target.star).toFixed(2);
+      document.body.dataset.yakolakTeethAlignment='canonical-zero-degree-shared-contour';
+      H('matched');
+      L.classList.add('matched');
+
+      const targetColor=target.starColor||'#8391aa';
+      const clonePath=clone.querySelector('.loadingStar path');
+      clonePath?.animate([
+        {fill:'#ffffff',offset:0},
+        {fill:'#ffffff',offset:materialBridgeHoldRatio},
+        {fill:targetColor,offset:1}
+      ],{duration:materialBridgeDuration,easing:'linear',fill:'forwards'});
+      clone.animate([
+        {opacity:1,offset:0},
+        {opacity:1,offset:materialBridgeHoldRatio},
+        {opacity:.70,offset:.56},
+        {opacity:0,offset:1}
+      ],{
+        duration:materialBridgeDuration,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'
+      });
+      handoffShadow.animate([
+        {opacity:.22,offset:0},
+        {opacity:.15,offset:.44},
+        {opacity:0,offset:1}
+      ],{
+        duration:760,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'
+      });
+      L.setAttribute('aria-busy','false');
+      setTimeout(()=>L.remove(),materialBridgeDuration+140);
+    });
+  };
+
+  const createCanonicalHandoff=()=>{
+    const target=window.__yakolakMatch;
+    if(!target?.star||!S||!L)return;
+    if(bounce){
+      bounce.style.animation='none';
+      bounce.style.transform='translateY(0) scale(1,1)';
+    }
+    S.style.animation='none';
+    S.style.transform='rotate(0deg)';
+
+    requestAnimationFrame(()=>{
+      const first=S.getBoundingClientRect();
+      const clone=document.createElement('div');
+      clone.className='handoffStar';
+      clone.innerHTML=S.outerHTML;
+      Object.assign(clone.style,{
+        left:px(first.left),top:px(first.top),width:px(first.width),height:px(first.height),transform:'rotate(0deg)'
+      });
+      const svg=clone.querySelector('.loadingStar');
+      svg?.style.setProperty('animation','none');
+      svg?.style.setProperty('transform','none','important');
+
+      const handoffShadow=document.createElement('div');
+      handoffShadow.className='handoffShadow';
+      const shadowFirst=shadow?.getBoundingClientRect()||{
+        left:first.left+first.width*.15,top:first.bottom+8,width:first.width*.7,height:9
+      };
+      Object.assign(handoffShadow.style,{
+        left:px(shadowFirst.left),top:px(shadowFirst.top),
+        width:px(shadowFirst.width),height:px(shadowFirst.height)
+      });
+      L.append(handoffShadow,clone);
+      if(B)B.style.visibility='hidden';
+
+      P('leaving');
+      const exits=brands.map((element,index)=>element.animate([
+        {opacity:Number(getComputedStyle(element).opacity)||1,transform:'translate(-50%,-50%) translateY(0) scale(1)'},
+        {opacity:0,transform:'translate(-50%,-50%) translateY(-5px) scale(.992)'}
+      ],{
+        duration:520,delay:index*35,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'
+      }));
+      Promise.all(exits.map(animation=>animation.finished)).then(()=>{
+        P('hidden-after-fade');
+        match(clone,handoffShadow,first,shadowFirst);
+      });
+    });
+  };
+
+  const lock=()=>{
+    if(released||!window.__yakolakMatch?.star||!S||!L)return;
+    released=true;
+    H('locking');
+    settleMotion().then(createCanonicalHandoff);
+  };
+
+  const schedule=()=>{
+    if(scheduled||released||!matchReady||!brandReady||!motionReady)return;
+    scheduled=true;
+    const now=performance.now();
+    const loopElapsed=Math.max(0,now-motionStartedAt);
+    const brandHoldLeft=Math.max(0,minimumVisibleHold-(now-brandVisibleAt));
+    const sceneHoldLeft=Math.max(0,minimumLoaderMs-(now-epoch));
+    const holdLeft=Math.max(brandHoldLeft,sceneHoldLeft);
+    const futureLoopElapsed=loopElapsed+holdLeft;
+    const nextCanonicalRest=Math.max(90,cycle-(futureLoopElapsed%cycle)+18);
+    setTimeout(lock,holdLeft+nextCanonicalRest);
+  };
+
+  setTimeout(startMotion,initialRestMs);
+
+  setTimeout(()=>{
+    if(released)return;
+    P('entering');
+    const entries=brands.map((element,index)=>element.animate([
+      {opacity:0,transform:'translate(-50%,-50%) translateY(7px) scale(.99)'},
+      {opacity:1,transform:'translate(-50%,-50%) translateY(0) scale(1)'}
+    ],{
+      duration:640,delay:index*90,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'
+    }));
+    Promise.all(entries.map(animation=>animation.finished)).then(()=>{
+      if(released)return;
+      P('visible');
+      brandReady=true;
+      brandVisibleAt=performance.now();
+      schedule();
+    });
+  },900);
+
+  const inspect=()=>{
+    const phase=document.body.dataset.yakolakPreIntro;
+    if(phase==='match-ready'){
+      matchReady=true;
+      schedule();
+    }
+    if(phase==='error'||document.body.dataset.yakolakIntro==='error'){
+      L?.setAttribute('data-error','true');
+    }
+  };
+  new MutationObserver(inspect).observe(document.body,{
+    attributes:true,
+    attributeFilter:['data-yakolak-pre-intro','data-yakolak-intro']
+  });
+  inspect();
+})();
+</script>
+
+</body>
+</html>
+
