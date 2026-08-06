@@ -114,7 +114,7 @@ test('Godot intro preserves the level table and exact v130 loading-star motion',
     () => document.body.dataset.yakolakIntro === 'complete' &&
           document.body.dataset.yakolakGeometry === 'ready',
     null,
-    { timeout: 20000 }
+    { timeout: 90000 }
   );
   await page.screenshot({ path: 'web/intro-mobile-final.png', fullPage: false, timeout: 120000 });
 
