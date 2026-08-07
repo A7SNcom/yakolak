@@ -1,8 +1,8 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://scripts/intro.gd" id="1_intro"]
 [ext_resource type="Script" path="res://scripts/intro_corrections.gd" id="2_corrections"]
-[ext_resource type="Script" path="res://scripts/gameplay_session_passplay.gd" id="3_gameplay"]
+[ext_resource type="Script" path="res://scripts/gameplay_match_web.gd" id="3_gameplay"]
 [ext_resource type="Script" path="res://scripts/pre_intro_star_to_table.gd" id="4_preintro"]
 [ext_resource type="Script" path="res://scripts/visual_polish.gd" id="5_visual"]
 [ext_resource type="Script" path="res://scripts/pre_intro_refinement.gd" id="6_refinement"]
@@ -12,6 +12,8 @@
 [ext_resource type="Script" path="res://scripts/session_setup.gd" id="10_setup"]
 [ext_resource type="Script" path="res://scripts/online_session.gd" id="11_online"]
 [ext_resource type="Script" path="res://scripts/session_setup_guard.gd" id="12_setup_guard"]
+[ext_resource type="Script" path="res://scripts/active_turn_camera.gd" id="13_turn_camera"]
+[ext_resource type="Script" path="res://scripts/browser_verification_bridge.gd" id="14_verification"]
 
 [node name="YAKOLAKIntro26" type="Node3D"]
 script = ExtResource("1_intro")
@@ -46,5 +48,11 @@ script = ExtResource("12_setup_guard")
 [node name="OnlineSession" type="Node" parent="."]
 script = ExtResource("11_online")
 
-[node name="PostIntroGameplay" type="Node" parent="."]
+[node name="LocalMatchGameplay" type="Node" parent="."]
 script = ExtResource("3_gameplay")
+
+[node name="ActiveTurnCamera" type="Node" parent="."]
+script = ExtResource("13_turn_camera")
+
+[node name="BrowserVerificationBridge" type="Node" parent="."]
+script = ExtResource("14_verification")
