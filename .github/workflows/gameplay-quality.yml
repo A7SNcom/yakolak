@@ -2,6 +2,12 @@ name: YAKOLAK full quality check
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/gameplay-quality.yml
+      - qa/full-flow-trigger.txt
 
 concurrency:
   group: yakolak-full-quality
