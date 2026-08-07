@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.use({
-  viewport: { width: 390, height: 844 },
+  viewport: { width: 393, height: 852 },
   hasTouch: true,
   isMobile: true,
   launchOptions: {
@@ -34,10 +34,31 @@ test('a physical stone can be selected and played after the approved intro', asy
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'complete' &&
           document.body.dataset.yakolakSetup === 'visible' &&
-          typeof window.yakolakTestStartLocal === 'function',
+          typeof window.yakolakTestStartLocal === 'function' &&
+          typeof window.yakolakTestShowSetup === 'function',
     null,
     { timeout: 90000 }
   );
+  await page.evaluate(() => window.yakolakTestShowSetup());
+  await page.waitForFunction(
+    () => document.body.dataset.yakolakArabicFont === 'ready' &&
+          Number(document.body.dataset.yakolakSetupCardWidth) > 0,
+    null,
+    { timeout: 10000 }
+  );
+  // Safari's browser chrome can reduce the live canvas substantially.  This
+  // is the exact failure mode the setup must survive, not just a tall desktop
+  // emulation viewport.
+  await page.setViewportSize({ width: 393, height: 555 });
+  await page.waitForFunction(
+    () => Number(document.body.dataset.yakolakSetupCardWidth) >= window.innerWidth - 36 &&
+          Number(document.body.dataset.yakolakSetupCardHeight) >= window.innerHeight - 40 &&
+          Number(document.body.dataset.yakolakSetupTextPx) >= 16 &&
+          document.body.dataset.yakolakArabicFont === 'ready',
+    null,
+    { timeout: 10000 }
+  );
+  await page.screenshot({ path: 'web/setup-ios-short-viewport.png', fullPage: false, timeout: 60000 });
   await page.evaluate(() => window.yakolakTestStartLocal());
   await page.waitForFunction(
     () => document.body.dataset.yakolakGameplay === 'ready' &&
@@ -62,18 +83,20 @@ test('a physical stone can be selected and played after the approved intro', asy
       pieceY: Number(document.body.dataset.yakolakTestPieceY) * scale,
       cellX: Number(document.body.dataset.yakolakTestCellX) * scale,
       cellY: Number(document.body.dataset.yakolakTestCellY) * scale,
-      pieceName: document.body.dataset.yakolakTestPiece
+      pieceName: document.body.dataset.yakolakTestPiece,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight
     };
   });
 
   expect(targets.pieceX).toBeGreaterThan(0);
-  expect(targets.pieceX).toBeLessThan(390);
+  expect(targets.pieceX).toBeLessThan(targets.viewportWidth);
   expect(targets.pieceY).toBeGreaterThan(0);
-  expect(targets.pieceY).toBeLessThan(844);
+  expect(targets.pieceY).toBeLessThan(targets.viewportHeight);
   expect(targets.cellX).toBeGreaterThan(0);
-  expect(targets.cellX).toBeLessThan(390);
+  expect(targets.cellX).toBeLessThan(targets.viewportWidth);
   expect(targets.cellY).toBeGreaterThan(0);
-  expect(targets.cellY).toBeLessThan(844);
+  expect(targets.cellY).toBeLessThan(targets.viewportHeight);
 
   await page.touchscreen.tap(targets.pieceX, targets.pieceY);
   await page.waitForFunction(

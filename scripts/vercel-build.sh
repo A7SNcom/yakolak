@@ -221,6 +221,7 @@ test -s web/preintro-04-camera-orbit.png
 test -s web/intro-mobile-motion.png
 test -s web/intro-mobile-final.png
 test -s web/intro-desktop-motion.png
+test -s web/setup-ios-short-viewport.png
 test -s web/gameplay-mobile-selected.png
 test -s web/gameplay-mobile-placed.png
 echo "YAKOLAK 3.7 passed the approved loader and closed-box intro sequence"

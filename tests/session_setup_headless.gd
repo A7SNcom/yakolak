@@ -22,6 +22,7 @@ func _run() -> void:
 
 	setup.show_after_intro()
 	_expect(setup.showing, "setup is visible after the intro")
+	_expect(setup.ARABIC_FONT.has_char(0x0623), "the embedded font includes Arabic glyphs")
 	_expect(setup._active_count() == 1, "only أنا is active by default")
 	_expect(str(setup.seats[0]["label"]) == "أنا", "the first seat is أنا")
 

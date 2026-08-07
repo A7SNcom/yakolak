@@ -5,6 +5,8 @@ extends Node
 
 signal configuration_ready(configuration: Dictionary)
 
+const ARABIC_FONT = preload("res://assets/fonts/DejaVuSans.ttf")
+
 const PALETTE: Array[Dictionary] = [
 	{"id": "marble", "name": "أبيض", "direction": "right", "color": Color("#f4f4f1")},
 	{"id": "blue", "name": "أزرق", "direction": "back", "color": Color("#173fa8")},
@@ -30,6 +32,11 @@ var showing: bool = false
 var joining_room_code: String = ""
 var online_error_text: String = ""
 var web_start_callback: Variant
+var web_show_setup_callback: Variant
+var active_screen: String = ""
+var canvas_scale: float = 1.0
+var canvas_css_size: Vector2 = Vector2.ZERO
+var layout_refresh_pending: bool = false
 
 
 func _ready() -> void:
@@ -40,6 +47,7 @@ func _ready() -> void:
 	_build_web_test_hook()
 	if not get_viewport().size_changed.is_connected(_layout_card):
 		get_viewport().size_changed.connect(_layout_card)
+	_layout_card.call_deferred()
 
 
 func show_after_intro() -> void:
@@ -60,6 +68,7 @@ func reset_for_intro() -> void:
 	tutorial_requested = false
 	joining_room_code = ""
 	online_error_text = ""
+	active_screen = ""
 	if root != null:
 		root.visible = false
 	_clear_body()
@@ -83,6 +92,8 @@ func _build_shell() -> void:
 	root = Control.new()
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	root.add_theme_font_override("font", ARABIC_FONT)
 	root.visible = false
 	layer.add_child(root)
 
@@ -108,10 +119,62 @@ func _layout_card() -> void:
 	if root == null or card == null:
 		return
 	var viewport: Vector2 = get_viewport().get_visible_rect().size
-	var width: float = minf(460.0, maxf(300.0, viewport.x - 28.0))
-	var height: float = minf(650.0, maxf(300.0, viewport.y - 38.0))
+	var metrics := _canvas_metrics(viewport)
+	canvas_scale = float(metrics["scale"])
+	canvas_css_size = metrics["css_size"] as Vector2
+	var compact_screen: bool = canvas_css_size.x < 760.0 or canvas_css_size.y > canvas_css_size.x
+	var width_css: float = maxf(260.0, canvas_css_size.x - 28.0)
+	var height_css: float = maxf(320.0, canvas_css_size.y - 28.0)
+	if not compact_screen:
+		width_css = minf(width_css, 560.0)
+		height_css = minf(height_css, 760.0)
+	var width: float = minf(viewport.x - _ui_length(14.0), width_css / canvas_scale)
+	var height: float = minf(viewport.y - _ui_length(14.0), height_css / canvas_scale)
 	card.position = Vector2((viewport.x - width) * 0.5, (viewport.y - height) * 0.5)
 	card.size = Vector2(width, height)
+	if showing and not layout_refresh_pending:
+		layout_refresh_pending = true
+		call_deferred("_rebuild_active_screen")
+
+
+func _canvas_metrics(viewport: Vector2) -> Dictionary:
+	var css_size: Vector2 = viewport
+	if OS.has_feature("web"):
+		var raw: Variant = JavaScriptBridge.eval(
+			"JSON.stringify((()=>{const c=document.getElementById('canvas');const r=c?c.getBoundingClientRect():{width:innerWidth,height:innerHeight};return{w:r.width||innerWidth,h:r.height||innerHeight};})())",
+			true
+		)
+		var decoded: Variant = JSON.parse_string(str(raw))
+		if decoded is Dictionary:
+			var values: Dictionary = decoded as Dictionary
+			css_size = Vector2(float(values.get("w", viewport.x)), float(values.get("h", viewport.y)))
+	var scale_x: float = css_size.x / maxf(viewport.x, 1.0)
+	var scale_y: float = css_size.y / maxf(viewport.y, 1.0)
+	var scale: float = clampf(minf(scale_x, scale_y), 0.20, 4.0)
+	return {"css_size": css_size, "scale": scale}
+
+
+func _ui_length(css_pixels: float) -> float:
+	return css_pixels / maxf(canvas_scale, 0.20)
+
+
+func _ui_font_size(css_points: int) -> int:
+	return maxi(12, int(round(float(css_points) / maxf(canvas_scale, 0.20))))
+
+
+func _rebuild_active_screen() -> void:
+	layout_refresh_pending = false
+	if not showing:
+		return
+	match active_screen:
+		"question":
+			_show_knowledge_question()
+		"tutorial":
+			_show_tutorial()
+		"invitation":
+			_show_invitation(joining_room_code)
+		"setup":
+			_show_setup()
 
 
 func _card_style() -> StyleBoxFlat:
@@ -119,10 +182,10 @@ func _card_style() -> StyleBoxFlat:
 	style.bg_color = Color("#151719f5")
 	style.border_color = Color("#ffffff2e")
 	style.set_border_width_all(1)
-	style.set_corner_radius_all(22)
+	style.set_corner_radius_all(int(round(_ui_length(22.0))))
 	style.shadow_color = Color(0, 0, 0, 0.45)
-	style.shadow_size = 18
-	style.shadow_offset = Vector2(0, 8)
+	style.shadow_size = int(round(_ui_length(18.0)))
+	style.shadow_offset = Vector2(0, _ui_length(8.0))
 	return style
 
 
@@ -134,9 +197,10 @@ func _clear_body() -> void:
 
 
 func _show_knowledge_question() -> void:
+	active_screen = "question"
 	_clear_body()
 	var content := _stack(false)
-	content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 24)
+	content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, int(round(_ui_length(24.0))))
 	body.add_child(content)
 	content.add_child(_label("هل تعرف اللعبة؟", 28, HORIZONTAL_ALIGNMENT_CENTER))
 	content.add_child(_spacer(16.0))
@@ -151,9 +215,10 @@ func _show_knowledge_question() -> void:
 
 
 func _show_invitation(code: String) -> void:
+	active_screen = "invitation"
 	_clear_body()
 	var content := _stack(false)
-	content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 24)
+	content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, int(round(_ui_length(24.0))))
 	body.add_child(content)
 	content.add_child(_label("دعوة لعبة", 28, HORIZONTAL_ALIGNMENT_CENTER))
 	content.add_child(_label("الغرفة " + code, 18, HORIZONTAL_ALIGNMENT_CENTER, Color("#cfd5d8")))
@@ -172,9 +237,10 @@ func _open_join_setup(code: String) -> void:
 
 
 func _show_tutorial() -> void:
+	active_screen = "tutorial"
 	_clear_body()
 	var content := _stack(false)
-	content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 24)
+	content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, int(round(_ui_length(24.0))))
 	body.add_child(content)
 	content.add_child(_label("نتعلم بأول حركة", 26, HORIZONTAL_ALIGNMENT_CENTER))
 	content.add_child(_spacer(10.0))
@@ -196,6 +262,7 @@ func _open_setup(with_tutorial: bool) -> void:
 
 
 func _show_setup() -> void:
+	active_screen = "setup"
 	_clear_body()
 	var scroll := ScrollContainer.new()
 	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 14)
@@ -204,11 +271,11 @@ func _show_setup() -> void:
 	body.add_child(scroll)
 
 	var margin := MarginContainer.new()
-	margin.custom_minimum_size = Vector2(maxf(card.size.x - 46.0, 260.0), 0.0)
-	margin.add_theme_constant_override("margin_left", 8)
-	margin.add_theme_constant_override("margin_right", 8)
-	margin.add_theme_constant_override("margin_top", 10)
-	margin.add_theme_constant_override("margin_bottom", 16)
+	margin.custom_minimum_size = Vector2(maxf(card.size.x - _ui_length(44.0), _ui_length(260.0)), 0.0)
+	margin.add_theme_constant_override("margin_left", int(round(_ui_length(10.0))))
+	margin.add_theme_constant_override("margin_right", int(round(_ui_length(10.0))))
+	margin.add_theme_constant_override("margin_top", int(round(_ui_length(12.0))))
+	margin.add_theme_constant_override("margin_bottom", int(round(_ui_length(18.0))))
 	scroll.add_child(margin)
 
 	var content := _stack(true)
@@ -229,7 +296,7 @@ func _show_setup() -> void:
 	if joining_room_code.is_empty():
 		var player_controls := HBoxContainer.new()
 		player_controls.alignment = BoxContainer.ALIGNMENT_CENTER
-		player_controls.add_theme_constant_override("separation", 8)
+		player_controls.add_theme_constant_override("separation", int(round(_ui_length(8.0))))
 		var add_player := _button("＋ لاعب", Color.WHITE, Color("#255f50"))
 		add_player.disabled = _active_count() >= 4
 		add_player.pressed.connect(_add_player)
@@ -244,7 +311,7 @@ func _show_setup() -> void:
 	if joining_room_code.is_empty():
 		var rounds_row := HBoxContainer.new()
 		rounds_row.layout_direction = Control.LAYOUT_DIRECTION_RTL
-		rounds_row.add_theme_constant_override("separation", 12)
+		rounds_row.add_theme_constant_override("separation", int(round(_ui_length(12.0))))
 		var rounds_label := _label("الأشواط", 18, HORIZONTAL_ALIGNMENT_RIGHT)
 		rounds_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		rounds_row.add_child(rounds_label)
@@ -252,7 +319,8 @@ func _show_setup() -> void:
 		rounds_picker.add_item("٣ أشواط", 3)
 		rounds_picker.add_item("٥ أشواط", 5)
 		rounds_picker.select(0 if rounds == 3 else 1)
-		rounds_picker.custom_minimum_size = Vector2(128, 42)
+		rounds_picker.custom_minimum_size = Vector2(_ui_length(132.0), _ui_length(46.0))
+		_apply_picker_font(rounds_picker)
 		rounds_picker.item_selected.connect(_on_rounds_selected.bind(rounds_picker))
 		rounds_row.add_child(rounds_picker)
 		content.add_child(rounds_row)
@@ -260,39 +328,42 @@ func _show_setup() -> void:
 
 	var needs_second_player: bool = joining_room_code.is_empty() and _active_count() < 2
 	var start := _button("انضم للغرفة" if not joining_room_code.is_empty() else ("أضف لاعبًا أو بوتًا" if needs_second_player else "ابدأ اللعب"), Color("#0e1313"), Color("#f1f0ea"))
-	start.add_theme_font_size_override("font_size", 21)
+	start.add_theme_font_size_override("font_size", _ui_font_size(18))
 	start.disabled = needs_second_player
 	start.pressed.connect(_emit_configuration)
 	content.add_child(start)
+	_publish_setup_metrics.call_deferred()
 
 
 func _seat_row(seat_index: int) -> Control:
 	var seat: Dictionary = seats[seat_index]
 	var panel := PanelContainer.new()
 	panel.add_theme_stylebox_override("panel", _seat_style())
-	panel.custom_minimum_size = Vector2(0, 108)
+	panel.custom_minimum_size = Vector2(0, _ui_length(98.0))
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 7)
+	box.add_theme_constant_override("separation", int(round(_ui_length(8.0))))
 	panel.add_child(box)
 
 	var headline := HBoxContainer.new()
 	headline.layout_direction = Control.LAYOUT_DIRECTION_RTL
-	var title := _label(str(seat["label"]), 18, HORIZONTAL_ALIGNMENT_RIGHT)
+	var title := _label(str(seat["label"]), 17, HORIZONTAL_ALIGNMENT_RIGHT)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	headline.add_child(title)
-	var dot := _label("●", 19, HORIZONTAL_ALIGNMENT_LEFT, _palette_color(str(seat["color"])))
+	var dot := _label("●", 18, HORIZONTAL_ALIGNMENT_LEFT, _palette_color(str(seat["color"])))
 	headline.add_child(dot)
 	box.add_child(headline)
 
 	var choices := HBoxContainer.new()
 	choices.layout_direction = Control.LAYOUT_DIRECTION_RTL
-	choices.add_theme_constant_override("separation", 8)
+	choices.add_theme_constant_override("separation", int(round(_ui_length(8.0))))
 	var color_picker := OptionButton.new()
-	color_picker.custom_minimum_size = Vector2(118, 38)
+	color_picker.custom_minimum_size = Vector2(0, _ui_length(44.0))
+	color_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for color_data: Dictionary in PALETTE:
 		color_picker.add_item(str(color_data["name"]))
 	color_picker.select(_palette_index(str(seat["color"])))
 	color_picker.item_selected.connect(_on_color_selected.bind(seat_index))
+	_apply_picker_font(color_picker)
 	choices.add_child(color_picker)
 	if seat_index == 0:
 		# "أنا" is always the person holding this device.  Keeping that seat
@@ -301,11 +372,12 @@ func _seat_row(seat_index: int) -> Control:
 	else:
 		var mode_picker := OptionButton.new()
 		mode_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		mode_picker.custom_minimum_size = Vector2(0, 38)
+		mode_picker.custom_minimum_size = Vector2(0, _ui_length(44.0))
 		for mode_data: Dictionary in MODE_OPTIONS:
 			mode_picker.add_item(str(mode_data["name"]))
 		mode_picker.select(_mode_index(str(seat["mode"])))
 		mode_picker.item_selected.connect(_on_mode_selected.bind(seat_index))
+		_apply_picker_font(mode_picker)
 		choices.add_child(mode_picker)
 	box.add_child(choices)
 	return panel
@@ -314,17 +386,17 @@ func _seat_row(seat_index: int) -> Control:
 func _seat_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#212426")
-	style.set_corner_radius_all(14)
-	style.content_margin_left = 12
-	style.content_margin_right = 12
-	style.content_margin_top = 9
-	style.content_margin_bottom = 9
+	style.set_corner_radius_all(int(round(_ui_length(16.0))))
+	style.content_margin_left = _ui_length(14.0)
+	style.content_margin_right = _ui_length(14.0)
+	style.content_margin_top = _ui_length(10.0)
+	style.content_margin_bottom = _ui_length(10.0)
 	return style
 
 
 func _stack(expand: bool) -> VBoxContainer:
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
+	box.add_theme_constant_override("separation", int(round(_ui_length(10.0))))
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	if expand:
 		box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -337,7 +409,8 @@ func _label(text_value: String, size: int, alignment: HorizontalAlignment, color
 	label.horizontal_alignment = alignment
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_font_override("font", ARABIC_FONT)
+	label.add_theme_font_size_override("font_size", _ui_font_size(size))
 	label.add_theme_color_override("font_color", color)
 	label.layout_direction = Control.LAYOUT_DIRECTION_RTL
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -349,8 +422,9 @@ func _button(text_value: String, foreground: Color, background: Color) -> Button
 	var button := Button.new()
 	button.text = text_value
 	button.layout_direction = Control.LAYOUT_DIRECTION_RTL
-	button.custom_minimum_size = Vector2(0, 48)
-	button.add_theme_font_size_override("font_size", 18)
+	button.custom_minimum_size = Vector2(0, _ui_length(50.0))
+	button.add_theme_font_override("font", ARABIC_FONT)
+	button.add_theme_font_size_override("font_size", _ui_font_size(17))
 	button.add_theme_color_override("font_color", foreground)
 	button.add_theme_stylebox_override("normal", _button_style(background))
 	button.add_theme_stylebox_override("hover", _button_style(background.lightened(0.10)))
@@ -361,16 +435,41 @@ func _button(text_value: String, foreground: Color, background: Color) -> Button
 func _button_style(background: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = background
-	style.set_corner_radius_all(14)
-	style.content_margin_left = 12
-	style.content_margin_right = 12
+	style.set_corner_radius_all(int(round(_ui_length(14.0))))
+	style.content_margin_left = _ui_length(14.0)
+	style.content_margin_right = _ui_length(14.0)
 	return style
 
 
 func _spacer(height: float) -> Control:
 	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, height)
+	spacer.custom_minimum_size = Vector2(0, _ui_length(height))
 	return spacer
+
+
+func _apply_picker_font(picker: OptionButton) -> void:
+	picker.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	picker.add_theme_font_override("font", ARABIC_FONT)
+	picker.add_theme_font_size_override("font_size", _ui_font_size(16))
+	var menu: PopupMenu = picker.get_popup()
+	menu.add_theme_font_override("font", ARABIC_FONT)
+	menu.add_theme_font_size_override("font_size", _ui_font_size(16))
+
+
+func _publish_setup_metrics() -> void:
+	if not OS.has_feature("web") or not showing or active_screen != "setup":
+		return
+	var arabic_ready: bool = ARABIC_FONT.has_char(0x0623) and ARABIC_FONT.has_char(0x0644) and ARABIC_FONT.has_char(0x064A)
+	var card_width_css: float = card.size.x * canvas_scale
+	var card_height_css: float = card.size.y * canvas_scale
+	var body_font_css: float = float(_ui_font_size(17)) * canvas_scale
+	JavaScriptBridge.eval(
+		"document.body.dataset.yakolakArabicFont='" + ("ready" if arabic_ready else "missing") + "';" +
+		"document.body.dataset.yakolakSetupCardWidth='" + str(snappedf(card_width_css, 0.1)) + "';" +
+		"document.body.dataset.yakolakSetupCardHeight='" + str(snappedf(card_height_css, 0.1)) + "';" +
+		"document.body.dataset.yakolakSetupTextPx='" + str(snappedf(body_font_css, 0.1)) + "';",
+		true
+	)
 
 
 func _active_count() -> int:
@@ -484,9 +583,16 @@ func _build_web_test_hook() -> void:
 	if not OS.has_feature("web"):
 		return
 	web_start_callback = JavaScriptBridge.create_callback(_on_web_start_local)
+	web_show_setup_callback = JavaScriptBridge.create_callback(_on_web_show_setup)
 	var window: JavaScriptObject = JavaScriptBridge.get_interface("window")
 	if window != null:
 		window.set("yakolakTestStartLocal", web_start_callback)
+		window.set("yakolakTestShowSetup", web_show_setup_callback)
+
+
+func _on_web_show_setup(_arguments: Array) -> void:
+	if showing:
+		_open_setup(false)
 
 
 func _on_web_start_local(_arguments: Array) -> void:
