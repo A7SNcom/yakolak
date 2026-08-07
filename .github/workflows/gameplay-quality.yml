@@ -10,6 +10,7 @@ on:
       - qa/full-flow-trigger.txt
       - export_presets.cfg
       - web/**
+      - tests/runtime_game_smoke.spec.js
 
 concurrency:
   group: yakolak-browser-truth
@@ -28,7 +29,7 @@ jobs:
         run: |
           npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0
           npx playwright install --with-deps chromium
-      - name: Verify published web flow
+      - name: Verify published game runtime
         run: |
           python3 -m http.server 8000 --directory web >/tmp/yakolak-browser.log 2>&1 &
-          npx playwright test tests/gameplay_smoke.spec.js --workers=1 --reporter=line
+          npx playwright test tests/runtime_game_smoke.spec.js --workers=1 --reporter=line
