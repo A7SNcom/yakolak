@@ -1,6 +1,6 @@
 extends SceneTree
 
-# Fast UI-state coverage that does not need a GPU/browser.  Browser smoke
+# Fast UI-state coverage that does not need a GPU/browser. Browser smoke
 # tests cover actual tapping; this protects the player count and colour swap
 # rules before a Web export is made.
 
@@ -23,7 +23,8 @@ func _run() -> void:
 	setup.show_after_intro()
 	_expect(setup.showing, "setup is visible after the intro")
 	_expect(str(setup.active_screen) == "question", "the first post-intro screen is the knowledge question")
-	_expect(setup.ARABIC_FONT.has_char(0x0623), "the embedded font includes Arabic glyphs")
+	var embedded_font := load("res://assets/fonts/DejaVuSans.ttf") as FontFile
+	_expect(embedded_font != null and embedded_font.has_char(0x0623), "the embedded font includes Arabic glyphs")
 	_expect(setup._active_count() == 1, "only أنا is active by default")
 	_expect(str(setup.seats[0]["label"]) == "أنا", "the first seat is أنا")
 	setup._open_setup(true)
