@@ -43,12 +43,12 @@ jobs:
         run: bash scripts/vercel-fast-build.sh
       - name: Install browser runner
         run: |
-          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0
+          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0 pngjs@7.0.0
           npx playwright install --with-deps chromium
-      - name: Verify second round before publishing
+      - name: Verify real turn handoff and round safety before publishing
         run: |
           python3 -m http.server 8000 --directory web >/tmp/yakolak-browser.log 2>&1 &
-          npx playwright test tests/round_transition_smoke.spec.js --workers=1 --reporter=line
+          npx playwright test tests/gameplay_smoke.spec.js tests/round_transition_smoke.spec.js --workers=1 --reporter=line
       - name: Publish tested web files back to main
         run: |
           git fetch origin main
@@ -63,5 +63,5 @@ jobs:
             echo "Web output unchanged."
             exit 0
           fi
-          git commit -m "[web-ready] نشر نسخة مختبرة حتى الجولة الثانية"
+          git commit -m "[web-ready] نشر نسخة مختبرة حتى انتقال الدور الثاني"
           git push origin HEAD:main
