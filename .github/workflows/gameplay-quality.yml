@@ -8,6 +8,8 @@ on:
     paths:
       - .github/workflows/gameplay-quality.yml
       - qa/full-flow-trigger.txt
+      - export_presets.cfg
+      - web/**
 
 concurrency:
   group: yakolak-browser-truth
