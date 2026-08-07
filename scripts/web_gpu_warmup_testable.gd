@@ -6,7 +6,7 @@ var automation_fast: bool = false
 func _ready() -> void:
 	super._ready()
 	if OS.has_feature("web"):
-		automation_fast = bool(JavaScriptBridge.eval("Boolean(navigator.webdriver)", true))
+		automation_fast = bool(JavaScriptBridge.eval("Boolean(navigator.webdriver || new URLSearchParams(location.search).get('yakolakTestFast') === '1')", true))
 
 
 func _process(delta: float) -> void:
