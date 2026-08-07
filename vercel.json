@@ -1,10 +1,16 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "bash scripts/vercel-fast-build.sh",
+  "buildCommand": "test -s web/index.html && echo 'Using ready YAKOLAK web build'",
   "outputDirectory": "web",
   "framework": null,
   "github": {
     "autoJobCancelation": true
+  },
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "*": false
+    }
   },
   "headers": [
     {

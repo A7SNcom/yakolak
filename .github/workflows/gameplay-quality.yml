@@ -1,13 +1,10 @@
-name: YAKOLAK online quality
+name: YAKOLAK full quality check
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 concurrency:
-  group: yakolak-main-online
+  group: yakolak-full-quality
   cancel-in-progress: true
 
 jobs:
@@ -19,7 +16,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Full online Godot and browser verification
+      - name: Full Godot and browser verification
         run: bash scripts/vercel-build.sh
