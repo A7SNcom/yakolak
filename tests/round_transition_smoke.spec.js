@@ -18,7 +18,7 @@ test.use({
 });
 
 test('music is bundled and next-round tap keeps the board alive', async ({ page }) => {
-  test.setTimeout(240000);
+  test.setTimeout(90000);
   const failures = [];
   const songRequests = [];
   page.on('pageerror', error => failures.push(`pageerror: ${error.message}`));
@@ -31,7 +31,7 @@ test('music is bundled and next-round tap keeps the board alive', async ({ page 
     if (message.type() === 'error' && !text.includes('favicon')) failures.push(`console: ${text}`);
   });
 
-  await page.goto('http://127.0.0.1:8000/', { waitUntil: 'domcontentloaded' });
+  await page.goto('http://127.0.0.1:8000/?yakolakTestFast=1', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'complete' &&
           document.body.dataset.yakolakSetup === 'visible' &&
@@ -39,11 +39,9 @@ test('music is bundled and next-round tap keeps the board alive', async ({ page 
           typeof window.yakolakTestStartPassPlay === 'function' &&
           typeof window.yakolakTestForceRoundComplete === 'function',
     null,
-    { timeout: 170000 }
+    { timeout: 60000 }
   );
 
-  // The MP3 must live inside the downloaded Godot PCK. No separate song.mp3
-  // network request is allowed after the page starts.
   expect(songRequests).toEqual([]);
 
   await page.setViewportSize({ width: 393, height: 555 });
