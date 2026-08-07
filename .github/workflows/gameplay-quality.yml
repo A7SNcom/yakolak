@@ -12,6 +12,7 @@ on:
       - "web/**"
       - tests/runtime_game_smoke.spec.js
       - tests/natural_flow_smoke.spec.js
+      - tests/round_transition_smoke.spec.js
 
 concurrency:
   group: yakolak-browser-truth
@@ -30,7 +31,7 @@ jobs:
         run: |
           npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0
           npx playwright install --with-deps chromium
-      - name: Verify natural intro to match flow
+      - name: Verify intro through second round on mobile
         run: |
           python3 -m http.server 8000 --directory web >/tmp/yakolak-browser.log 2>&1 &
-          npx playwright test tests/natural_flow_smoke.spec.js --workers=1 --reporter=line
+          npx playwright test tests/round_transition_smoke.spec.js --workers=1 --reporter=line
