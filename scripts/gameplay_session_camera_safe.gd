@@ -1,9 +1,12 @@
 extends "res://scripts/gameplay_session_roundsafe.gd"
 
 # Safe shared-device turn camera.
-# Position and FOV are animated, but the camera orientation is recalculated from
-# the live position every frame so it can never interpolate through an invalid
-# quaternion or look away from the board during a player-to-player handoff.
+# Position and FOV are animated while the camera keeps looking at the board.
+# The studio back wall is hidden only while a turn camera is behind it, because
+# otherwise that opaque wall sits between the camera and the entire game scene.
+
+const STUDIO_BACK_WALL_Z: float = -14.0
+const STUDIO_WALL_SAFE_Z: float = -13.2
 
 var turn_camera_start_position: Vector3 = Vector3.ZERO
 var turn_camera_target_position: Vector3 = Vector3.ZERO
@@ -50,6 +53,13 @@ func _transition_to_current_player() -> void:
 	camera.current = true
 	_ensure_game_scene_visible()
 
+	# The single studio wall lives at z=-14. A back-side player camera ends at
+	# z=-18.5 (or farther on portrait), so the wall would completely occlude the
+	# board. Keep it hidden for the whole crossing whenever either endpoint is
+	# behind the wall. It is restored after reaching a safe side again.
+	var crosses_back_wall: bool = turn_camera_start_position.z < STUDIO_WALL_SAFE_Z or turn_camera_target_position.z < STUDIO_WALL_SAFE_Z
+	_set_studio_backdrop_visible(not crosses_back_wall)
+
 	if camera_tween != null and camera_tween.is_valid():
 		camera_tween.kill()
 	camera_tween = create_tween()
@@ -78,6 +88,9 @@ func _finish_camera_transition() -> void:
 		camera.current = true
 		camera.look_at(turn_camera_focus, Vector3.UP)
 		_ensure_game_scene_visible()
+		# Back-side cameras must keep the wall hidden. Other sides can safely use
+		# the approved studio wall again as their background.
+		_set_studio_backdrop_visible(camera.position.z >= STUDIO_WALL_SAFE_Z)
 		_publish_camera_health("finished")
 	turn_camera_active = false
 	super._finish_camera_transition()
@@ -87,11 +100,24 @@ func _finish_camera_transition() -> void:
 func _ensure_game_scene_visible() -> void:
 	if intro == null:
 		return
-	for node_name: String in ["Board", "OriginalFallbackTableTop", "ApprovedStarTableSVG", "ApprovedStarTablePedestal"]:
+	for node_name: String in ["Board", "ApprovedStarTableSVG", "ApprovedStarTablePedestal", "StudioFloor"]:
 		var geometry := intro.get_node_or_null(node_name) as GeometryInstance3D
 		if geometry != null:
 			geometry.visible = true
 	_sync_active_sides()
+
+
+func _set_studio_backdrop_visible(value: bool) -> void:
+	if intro == null:
+		return
+	var wall := intro.get_node_or_null("StudioBackWall") as GeometryInstance3D
+	if wall != null:
+		wall.visible = value
+	var logo := intro.get_node_or_null("StudioWallLogo") as GeometryInstance3D
+	if logo != null:
+		logo.visible = value
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("document.body.dataset.yakolakStudioBackdrop='%s';" % ("visible" if value else "hidden-for-camera"), true)
 
 
 func _publish_camera_health(stage: String) -> void:
@@ -107,16 +133,23 @@ func _publish_camera_health(stage: String) -> void:
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	var focus_inside: bool = focus_screen.x >= 0.0 and focus_screen.x <= viewport_size.x and focus_screen.y >= 0.0 and focus_screen.y <= viewport_size.y
 	var board := intro.get_node_or_null("Board") as GeometryInstance3D
-	var board_visible: bool = board != null and board.visible
+	var board_visible: bool = board != null and board.is_visible_in_tree()
+	var wall := intro.get_node_or_null("StudioBackWall") as GeometryInstance3D
+	var wall_visible: bool = wall != null and wall.is_visible_in_tree()
+	var viewport_camera: Camera3D = get_viewport().get_camera_3d()
+	var viewport_owns_camera: bool = viewport_camera == camera
 	JavaScriptBridge.eval(
 		"document.body.dataset.yakolakCameraStage='%s';" % stage +
 		"document.body.dataset.yakolakCameraCurrent='%s';" % ("true" if camera.current else "false") +
+		"document.body.dataset.yakolakViewportCamera='%s';" % ("true" if viewport_owns_camera else "false") +
 		"document.body.dataset.yakolakCameraFacing='%.5f';" % facing +
 		"document.body.dataset.yakolakCameraFocusInside='%s';" % ("true" if focus_inside else "false") +
-		"document.body.dataset.yakolakBoardVisible='%s';" % ("true" if board_visible else "false"),
+		"document.body.dataset.yakolakCameraZ='%.3f';" % camera.position.z +
+		"document.body.dataset.yakolakBoardVisible='%s';" % ("true" if board_visible else "false") +
+		"document.body.dataset.yakolakBackWallVisible='%s';" % ("true" if wall_visible else "false"),
 		true
 	)
-	print("YAKOLAK_TURN_CAMERA_SAFE stage=%s dir=%s current=%s board=%s facing=%.5f focus_inside=%s" % [stage, turn_camera_direction, str(camera.current), str(board_visible), facing, str(focus_inside)])
+	print("YAKOLAK_TURN_CAMERA_SAFE stage=%s dir=%s current=%s viewport_camera=%s board=%s wall=%s camera_z=%.3f wall_z=%.1f facing=%.5f focus_inside=%s" % [stage, turn_camera_direction, str(camera.current), str(viewport_owns_camera), str(board_visible), str(wall_visible), camera.position.z, STUDIO_BACK_WALL_Z, facing, str(focus_inside)])
 
 
 func _publish_test_targets() -> void:
