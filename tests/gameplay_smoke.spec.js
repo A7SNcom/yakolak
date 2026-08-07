@@ -121,15 +121,14 @@ test('a physical stone can be selected and played after the approved intro', asy
 
   await page.touchscreen.tap(targets.cellX, targets.cellY);
   await page.waitForFunction(
-    () => document.body.dataset.yakolakMoves === '1',
+    () => Number(document.body.dataset.yakolakMoves || 0) >= 1,
     null,
     { timeout: 10000 }
   );
 
-  expect(await page.evaluate(() => document.body.dataset.yakolakLastCell)).toBe('4');
-  expect(await page.evaluate(() => document.body.dataset.yakolakLastSize)).toBe('large');
-  expect(await page.evaluate(() => document.body.dataset.yakolakLastSide)).toBe('right');
-  expect(await page.evaluate(() => document.body.dataset.yakolakSelected)).toBe('');
+  // The bot is intentionally allowed to answer immediately.  Its move may
+  // overwrite the shared "last move" dataset before Playwright gets another
+  // timeslice, so verify the human move from the immutable browser log below.
   expect(await page.evaluate(() => document.body.dataset.yakolakTray)).toBe('closed');
   await page.screenshot({ path: 'web/gameplay-mobile-placed.png', fullPage: false, timeout: 60000 });
 
