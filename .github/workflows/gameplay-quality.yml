@@ -22,5 +22,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install project dependency
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
       - name: Full Godot and browser verification
         run: bash scripts/vercel-build.sh
