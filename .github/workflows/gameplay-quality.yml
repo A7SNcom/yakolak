@@ -1,4 +1,4 @@
-name: YAKOLAK full quality check
+name: YAKOLAK browser truth check
 
 on:
   workflow_dispatch:
@@ -10,19 +10,23 @@ on:
       - qa/full-flow-trigger.txt
 
 concurrency:
-  group: yakolak-full-quality
+  group: yakolak-browser-truth
   cancel-in-progress: true
 
 jobs:
-  full-smoke:
+  browser-flow:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install project dependency
-        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
-      - name: Full Godot and browser verification
-        run: bash scripts/vercel-build.sh
+      - name: Install browser runner
+        run: |
+          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Verify published web flow
+        run: |
+          python3 -m http.server 8000 --directory web >/tmp/yakolak-browser.log 2>&1 &
+          npx playwright test tests/gameplay_smoke.spec.js --workers=1 --reporter=line
