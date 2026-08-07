@@ -9,7 +9,7 @@ on:
       - .github/workflows/gameplay-quality.yml
       - qa/full-flow-trigger.txt
       - export_presets.cfg
-      - web/**
+      - "web/**"
       - tests/runtime_game_smoke.spec.js
 
 concurrency:
