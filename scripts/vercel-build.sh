@@ -63,7 +63,7 @@ run_godot_import() {
     log="/tmp/yakolak35-import-${attempt}.log"
     set +e
     set -o pipefail
-    "$GODOT_BIN" --headless --editor --path . --quit-after 45 2>&1 | tee "$log"
+    "$GODOT_BIN" --headless --path . --import 2>&1 | tee "$log"
     status=${PIPESTATUS[0]}
     set -e
     if godot_source_error "$log"; then
