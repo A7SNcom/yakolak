@@ -6,7 +6,7 @@ var automation_fast: bool = false
 func _ready() -> void:
 	super._ready()
 	if OS.has_feature("web"):
-		automation_fast = bool(JavaScriptBridge.eval("Boolean(navigator.webdriver)", true))
+		automation_fast = bool(JavaScriptBridge.eval("Boolean(navigator.webdriver || new URLSearchParams(location.search).get('yakolakTestFast') === '1')", true))
 
 
 func _process(delta: float) -> void:
@@ -34,9 +34,6 @@ func _process(delta: float) -> void:
 		if _dom_handoff_is_matched():
 			_start_matched_handoff()
 		return
-
-	# CI uses software rendering; advance the visual clock by a deterministic
-	# amount per frame so functional tests do not spend minutes on the intro.
 	governed_elapsed_ms += 500.0
 	var elapsed: float = governed_elapsed_ms
 	if elapsed < TABLE_TOTAL_MS:
