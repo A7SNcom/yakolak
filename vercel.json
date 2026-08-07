@@ -1,7 +1,11 @@
 {
-  "buildCommand": "bash scripts/vercel-build-entry.sh",
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "bash scripts/vercel-fast-build.sh",
   "outputDirectory": "web",
   "framework": null,
+  "github": {
+    "autoJobCancelation": true
+  },
   "headers": [
     {
       "source": "/(.*)",
