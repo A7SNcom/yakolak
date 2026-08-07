@@ -6,7 +6,7 @@ var automation_fast: bool = false
 func _ready() -> void:
 	super._ready()
 	if OS.has_feature("web"):
-		automation_fast = bool(JavaScriptBridge.eval("Boolean(navigator.webdriver)", true))
+		automation_fast = bool(JavaScriptBridge.eval("Boolean(navigator.webdriver || new URLSearchParams(location.search).get('yakolakTestFast') === '1')", true))
 
 
 func _process(delta: float) -> void:
@@ -20,7 +20,6 @@ func _process(delta: float) -> void:
 			_take_control()
 		else:
 			return
-
 	governed_elapsed_ms = minf(governed_elapsed_ms + 500.0, TOTAL_TIME_MS)
 	_sync_original_clock()
 	if not bool(intro.get("contents_revealed")) and governed_elapsed_ms >= LID_CONTENT_REVEAL_MS:
