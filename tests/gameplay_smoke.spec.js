@@ -4,6 +4,7 @@ test.use({
   viewport: { width: 393, height: 852 },
   hasTouch: true,
   isMobile: true,
+  deviceScaleFactor: 3,
   launchOptions: {
     args: [
       '--use-gl=angle',
