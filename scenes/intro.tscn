@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/intro.gd" id="1_intro"]
 [ext_resource type="Script" path="res://scripts/intro_corrections.gd" id="2_corrections"]
-[ext_resource type="Script" path="res://scripts/gameplay_session_passplay.gd" id="3_gameplay"]
+[ext_resource type="Script" path="res://scripts/gameplay_session_roundsafe.gd" id="3_gameplay"]
 [ext_resource type="Script" path="res://scripts/pre_intro_star_to_table.gd" id="4_preintro"]
 [ext_resource type="Script" path="res://scripts/visual_polish.gd" id="5_visual"]
 [ext_resource type="Script" path="res://scripts/pre_intro_refinement.gd" id="6_refinement"]
