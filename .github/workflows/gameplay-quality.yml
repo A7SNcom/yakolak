@@ -1,13 +1,13 @@
-name: YAKOLAK gameplay quality
+name: YAKOLAK online quality
 
 on:
-  pull_request:
+  push:
     branches:
-      - perf/perfect-intro-v1-smooth
+      - main
   workflow_dispatch:
 
 concurrency:
-  group: yakolak-quality-${{ github.event.pull_request.number || github.ref }}
+  group: yakolak-main-online
   cancel-in-progress: true
 
 jobs:
@@ -21,5 +21,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Full Godot and browser verification
+      - name: Full online Godot and browser verification
         run: bash scripts/vercel-build.sh
