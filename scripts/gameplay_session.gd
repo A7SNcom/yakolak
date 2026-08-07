@@ -808,6 +808,7 @@ func _finish_camera_transition() -> void:
 	turn_deadline_msec = 0
 	_update_hud()
 	_publish_gameplay_state("ready" if gameplay_ready else "waiting")
+	_publish_match_state("turn")
 	_publish_test_targets.call_deferred()
 
 
