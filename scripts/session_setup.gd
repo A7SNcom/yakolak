@@ -21,6 +21,7 @@ const MODE_OPTIONS: Array[Dictionary] = [
 ]
 
 var intro: Node3D
+var online: Node
 var layer: CanvasLayer
 var root: Control
 var card: PanelContainer
@@ -37,11 +38,20 @@ var active_screen: String = ""
 var canvas_scale: float = 1.0
 var canvas_css_size: Vector2 = Vector2.ZERO
 var layout_refresh_pending: bool = false
+var join_available_colors: Array[String] = []
+var room_preview_ready: bool = false
+var room_preview_code: String = ""
 
 
 func _ready() -> void:
 	process_priority = 60
 	intro = get_parent() as Node3D
+	online = intro.get_node_or_null("OnlineSession")
+	if online != null:
+		if not online.is_connected("room_previewed", Callable(self, "_on_room_previewed")):
+			online.connect("room_previewed", Callable(self, "_on_room_previewed"))
+		if not online.is_connected("room_preview_failed", Callable(self, "_on_room_preview_failed")):
+			online.connect("room_preview_failed", Callable(self, "_on_room_preview_failed"))
 	_reset_seats()
 	_build_shell()
 	_build_web_test_hook()
@@ -58,6 +68,7 @@ func show_after_intro() -> void:
 	_publish_setup_state("visible")
 	joining_room_code = _room_code_from_url()
 	if not joining_room_code.is_empty():
+		_request_room_preview(joining_room_code)
 		_show_invitation(joining_room_code)
 	else:
 		_show_knowledge_question()
@@ -68,6 +79,9 @@ func reset_for_intro() -> void:
 	tutorial_requested = false
 	joining_room_code = ""
 	online_error_text = ""
+	join_available_colors.clear()
+	room_preview_ready = false
+	room_preview_code = ""
 	active_screen = ""
 	if root != null:
 		root.visible = false
@@ -169,8 +183,6 @@ func _rebuild_active_screen() -> void:
 	match active_screen:
 		"question":
 			_show_knowledge_question()
-		"tutorial":
-			_show_tutorial()
 		"invitation":
 			_show_invitation(joining_room_code)
 		"setup":
@@ -207,11 +219,11 @@ func _show_knowledge_question() -> void:
 	var yes := _button("نعم، أعرفها", Color("#f2f0e9"), Color("#26282a"))
 	yes.pressed.connect(_open_setup.bind(false))
 	content.add_child(yes)
-	var no := _button("لا، أبغى أتعلم", Color.WHITE, Color("#245c50"))
-	no.pressed.connect(_show_tutorial)
+	var no := _button("لا، أبغى أتعلم عليها", Color.WHITE, Color("#245c50"))
+	# v112's useful tutorial was action-led: enter the real match and guide the
+	# first move there.  Do not insert another reading screen before setup.
+	no.pressed.connect(_open_setup.bind(true))
 	content.add_child(no)
-	content.add_child(_spacer(8.0))
-	content.add_child(_label("اختيار سريع ثم نلعب.", 15, HORIZONTAL_ALIGNMENT_CENTER, Color("#b8bcc0")))
 
 
 func _show_invitation(code: String) -> void:
@@ -222,10 +234,67 @@ func _show_invitation(code: String) -> void:
 	body.add_child(content)
 	content.add_child(_label("دعوة لعبة", 28, HORIZONTAL_ALIGNMENT_CENTER))
 	content.add_child(_label("الغرفة " + code, 18, HORIZONTAL_ALIGNMENT_CENTER, Color("#cfd5d8")))
+	if not online_error_text.is_empty():
+		content.add_child(_label(online_error_text, 15, HORIZONTAL_ALIGNMENT_CENTER, Color("#f2aaa3")))
 	content.add_child(_spacer(12.0))
-	var join := _button("انضم واختر لونك", Color.WHITE, Color("#245c50"))
-	join.pressed.connect(_open_join_setup.bind(code))
+	var join_label: String = "انضم" if room_preview_ready else ("إعادة" if not online_error_text.is_empty() else "…")
+	var join := _button(join_label, Color.WHITE, Color("#245c50"))
+	join.disabled = not room_preview_ready and online_error_text.is_empty()
+	if room_preview_ready:
+		join.pressed.connect(_open_join_setup.bind(code))
+	else:
+		join.pressed.connect(_retry_room_preview.bind(code))
 	content.add_child(join)
+
+
+func _request_room_preview(code: String) -> void:
+	room_preview_code = code
+	room_preview_ready = false
+	join_available_colors.clear()
+	if online == null:
+		online = intro.get_node_or_null("OnlineSession")
+	if online == null:
+		online_error_text = "تعذر الاتصال."
+		return
+	online.call("preview_room", code)
+
+
+func _retry_room_preview(code: String) -> void:
+	online_error_text = ""
+	_request_room_preview(code)
+	_show_invitation(code)
+
+
+func _on_room_previewed(preview: Dictionary) -> void:
+	if str(preview.get("code", "")) != room_preview_code:
+		return
+	join_available_colors.clear()
+	var available_values: Array = preview.get("availableColors", []) as Array
+	for value: Variant in available_values:
+		join_available_colors.append(str(value))
+	if str(preview.get("status", "waiting")) != "waiting" or join_available_colors.is_empty():
+		room_preview_ready = false
+		online_error_text = "الغرفة غير متاحة."
+	else:
+		room_preview_ready = true
+		online_error_text = ""
+		if active_screen == "setup" and not join_available_colors.has(str(seats[0]["color"])):
+			var first: Dictionary = seats[0]
+			first["color"] = join_available_colors[0]
+			seats[0] = first
+	if active_screen == "setup":
+		_show_setup()
+	else:
+		_show_invitation(joining_room_code)
+
+
+func _on_room_preview_failed(_code: String) -> void:
+	room_preview_ready = false
+	online_error_text = "تعذر الاتصال. حاول مرة أخرى."
+	if active_screen == "setup":
+		_show_setup()
+	else:
+		_show_invitation(joining_room_code)
 
 
 func _open_join_setup(code: String) -> void:
@@ -233,30 +302,19 @@ func _open_join_setup(code: String) -> void:
 	online_error_text = ""
 	tutorial_requested = false
 	_reset_seats()
+	if not join_available_colors.is_empty():
+		var first: Dictionary = seats[0]
+		first["color"] = join_available_colors[0]
+		seats[0] = first
 	_show_setup()
-
-
-func _show_tutorial() -> void:
-	active_screen = "tutorial"
-	_clear_body()
-	var content := _stack(false)
-	content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, int(round(_ui_length(24.0))))
-	body.add_child(content)
-	content.add_child(_label("نتعلم بأول حركة", 26, HORIZONTAL_ALIGNMENT_CENTER))
-	content.add_child(_spacer(10.0))
-	content.add_child(_label("١. اختر حجرًا من طقمك\n٢. اضغط خانة مضيئة\n٣. كوّن صفًا أو أحجامًا متدرجة أو ثلاث قطع في خانة", 18, HORIZONTAL_ALIGNMENT_RIGHT, Color("#e8e9e9")))
-	content.add_child(_spacer(16.0))
-	var begin := _button("ابدأ الإعداد", Color.WHITE, Color("#245c50"))
-	begin.pressed.connect(_open_setup.bind(true))
-	content.add_child(begin)
-	var skip := _button("تخطي التعليم", Color("#d8dcdf"), Color("#2b2e31"))
-	skip.pressed.connect(_open_setup.bind(false))
-	content.add_child(skip)
 
 
 func _open_setup(with_tutorial: bool) -> void:
 	joining_room_code = ""
 	online_error_text = ""
+	join_available_colors.clear()
+	room_preview_ready = false
+	room_preview_code = ""
 	tutorial_requested = with_tutorial
 	_show_setup()
 
@@ -281,9 +339,8 @@ func _show_setup() -> void:
 	var content := _stack(true)
 	margin.add_child(content)
 	content.add_child(_label("اختر لونك" if not joining_room_code.is_empty() else "اللاعبون", 25, HORIZONTAL_ALIGNMENT_RIGHT))
-	content.add_child(_label("اختَر لونًا متاحًا في الغرفة" if not joining_room_code.is_empty() else "اختر اللون وطريقة كل لاعب", 15, HORIZONTAL_ALIGNMENT_RIGHT, Color("#b8bcc0")))
 	if joining_room_code.is_empty():
-		content.add_child(_label("عدد اللاعبين: %d" % _active_count(), 16, HORIZONTAL_ALIGNMENT_RIGHT, Color("#d9dddf")))
+		content.add_child(_label("%d / 4" % _active_count(), 16, HORIZONTAL_ALIGNMENT_RIGHT, Color("#d9dddf")))
 	if not online_error_text.is_empty():
 		content.add_child(_label(online_error_text, 15, HORIZONTAL_ALIGNMENT_RIGHT, Color("#f2aaa3")))
 	content.add_child(_spacer(8.0))
@@ -327,9 +384,9 @@ func _show_setup() -> void:
 	content.add_child(_spacer(12.0))
 
 	var needs_second_player: bool = joining_room_code.is_empty() and _active_count() < 2
-	var start := _button("انضم للغرفة" if not joining_room_code.is_empty() else ("أضف لاعبًا أو بوتًا" if needs_second_player else "ابدأ اللعب"), Color("#0e1313"), Color("#f1f0ea"))
+	var start := _button("انضم للغرفة" if not joining_room_code.is_empty() else ("أضف لاعبًا" if needs_second_player else "ابدأ اللعب"), Color("#0e1313"), Color("#f1f0ea"))
 	start.add_theme_font_size_override("font_size", _ui_font_size(18))
-	start.disabled = needs_second_player
+	start.disabled = needs_second_player or (not joining_room_code.is_empty() and not room_preview_ready)
 	start.pressed.connect(_emit_configuration)
 	content.add_child(start)
 	_publish_setup_metrics.call_deferred()
@@ -361,6 +418,8 @@ func _seat_row(seat_index: int) -> Control:
 	color_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for color_data: Dictionary in PALETTE:
 		color_picker.add_item(str(color_data["name"]))
+		if not joining_room_code.is_empty() and room_preview_ready and not join_available_colors.has(str(color_data["id"])):
+			color_picker.set_item_disabled(color_picker.item_count - 1, true)
 	color_picker.select(_palette_index(str(seat["color"])))
 	color_picker.item_selected.connect(_on_color_selected.bind(seat_index))
 	_apply_picker_font(color_picker)
@@ -481,10 +540,13 @@ func _active_count() -> int:
 
 
 func _add_player() -> void:
+	var online_match: bool = _active_secondary_players_are_online()
 	for index: int in range(seats.size()):
 		var seat: Dictionary = seats[index]
 		if not bool(seat["active"]):
 			seat["active"] = true
+			if index > 0 and online_match:
+				seat["mode"] = "online"
 			seats[index] = seat
 			_show_setup()
 			return
@@ -525,9 +587,41 @@ func _on_color_selected(choice: int, seat_index: int) -> void:
 func _on_mode_selected(choice: int, seat_index: int) -> void:
 	if choice < 0 or choice >= MODE_OPTIONS.size() or seat_index < 0 or seat_index >= seats.size():
 		return
+	var requested: String = str(MODE_OPTIONS[choice]["id"])
 	var seat: Dictionary = seats[seat_index]
-	seat["mode"] = str(MODE_OPTIONS[choice]["id"])
+	seat["mode"] = requested
 	seats[seat_index] = seat
+	# The existing online protocol is a room-wide mode.  Keep the picker from
+	# offering a mixed configuration that the server cannot actually play.
+	# Local + bot remains freely mixable; choosing an invite makes every remote
+	# seat an invite, and leaving invite mode returns the other seats to local.
+	if requested == "online":
+		for index: int in range(1, seats.size()):
+			var other: Dictionary = seats[index]
+			if bool(other["active"]):
+				other["mode"] = "online"
+				seats[index] = other
+	else:
+		for index: int in range(1, seats.size()):
+			if index == seat_index:
+				continue
+			var other: Dictionary = seats[index]
+			if bool(other["active"]) and str(other["mode"]) == "online":
+				other["mode"] = "local"
+				seats[index] = other
+	_show_setup()
+
+
+func _active_secondary_players_are_online() -> bool:
+	var found: bool = false
+	for index: int in range(1, seats.size()):
+		var seat: Dictionary = seats[index]
+		if not bool(seat["active"]):
+			continue
+		found = true
+		if str(seat["mode"]) != "online":
+			return false
+	return found
 
 
 func _on_rounds_selected(choice: int, picker: OptionButton) -> void:
@@ -561,8 +655,10 @@ func show_online_error(error_code: String) -> void:
 	showing = true
 	root.visible = true
 	joining_room_code = _room_code_from_url() if joining_room_code.is_empty() else joining_room_code
-	online_error_text = "اللون محجوز، اختر لونًا آخر." if error_code == "color_taken" else "تعذر الدخول للغرفة. حاول مرة أخرى."
+	online_error_text = "اللون محجوز، اختر لونًا آخر." if error_code == "color_taken" else "تعذر الاتصال. حاول مرة أخرى."
 	_show_setup()
+	if error_code == "color_taken" and not joining_room_code.is_empty():
+		_request_room_preview(joining_room_code)
 
 
 func show_setup_error(message: String) -> void:

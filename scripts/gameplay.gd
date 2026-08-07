@@ -7,7 +7,9 @@ extends Node
 const U: float = 0.04
 const PIECE_LAYER: int = 1
 const TARGET_LAYER: int = 2
-const DROP_RADIUS: float = 31.0
+# Match the visible target.  31 overlapped adjacent 48-unit cells and made a
+# single mobile tap able to ray-hit the wrong cell.
+const DROP_RADIUS: float = 23.0
 const MOVE_DURATION: float = 520.0
 const MOVE_ARC: float = 18.0
 const SELECT_LIFT: float = 8.0

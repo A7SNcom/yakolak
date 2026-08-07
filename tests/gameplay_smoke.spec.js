@@ -65,6 +65,7 @@ test('a physical stone can be selected and played after the approved intro', asy
     () => document.body.dataset.yakolakGameplay === 'ready' &&
           document.body.dataset.yakolakMatchState === 'turn' &&
           document.body.dataset.yakolakCurrentPlayer === 'right' &&
+          document.body.dataset.yakolakHudArabicFont === 'ready' &&
           document.body.dataset.yakolakTestPieceX &&
           document.body.dataset.yakolakTestCellX,
     null,
@@ -74,6 +75,14 @@ test('a physical stone can be selected and played after the approved intro', asy
   expect(await page.evaluate(() => document.body.dataset.yakolakTable)).toBe('approved-star-svg');
   expect(await page.evaluate(() => document.body.dataset.yakolakCamera)).toBe('level-centered');
   expect(await page.evaluate(() => document.body.dataset.yakolakMoves)).toBe('0');
+  expect(await page.evaluate(() => document.body.dataset.yakolakTurnRemaining)).toBe('0');
+  const hud = await page.evaluate(() => ({
+    fontPx: Number(document.body.dataset.yakolakHudTextPx),
+    width: Number(document.body.dataset.yakolakHudWidth),
+    viewportWidth: window.innerWidth
+  }));
+  expect(hud.fontPx).toBeGreaterThanOrEqual(17);
+  expect(hud.width).toBeGreaterThanOrEqual(hud.viewportWidth - 30);
 
   const targets = await page.evaluate(() => {
     // Godot renders through the 720x1280 virtual viewport with stretch/aspect=expand.
@@ -107,6 +116,7 @@ test('a physical stone can be selected and played after the approved intro', asy
   );
   expect(await page.evaluate(() => document.body.dataset.yakolakSelected)).toBe(targets.pieceName);
   expect(await page.evaluate(() => document.body.dataset.yakolakSelectedSize)).toBe('large');
+  expect(await page.evaluate(() => document.body.dataset.yakolakTray)).toBe('open');
   await page.screenshot({ path: 'web/gameplay-mobile-selected.png', fullPage: false, timeout: 60000 });
 
   await page.touchscreen.tap(targets.cellX, targets.cellY);
@@ -120,6 +130,7 @@ test('a physical stone can be selected and played after the approved intro', asy
   expect(await page.evaluate(() => document.body.dataset.yakolakLastSize)).toBe('large');
   expect(await page.evaluate(() => document.body.dataset.yakolakLastSide)).toBe('right');
   expect(await page.evaluate(() => document.body.dataset.yakolakSelected)).toBe('');
+  expect(await page.evaluate(() => document.body.dataset.yakolakTray)).toBe('closed');
   await page.screenshot({ path: 'web/gameplay-mobile-placed.png', fullPage: false, timeout: 60000 });
 
   const joined = gameplayLogs.join('\n');

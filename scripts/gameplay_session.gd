@@ -28,9 +28,18 @@ const COLOR_NAMES: Dictionary = {
 	"gold": "ذهبي",
 	"green": "أخضر",
 }
-const TURN_DURATION_MS: int = 18000
+const ARABIC_FONT = preload("res://assets/fonts/DejaVuSans.ttf")
+const BOT_ROUND_SKILL: Array[float] = [0.94, 0.56, 0.86, 0.68, 0.78]
+const BOT_DIRECTION_POWER: Dictionary = {
+	"right": 0.74,
+	"back": 0.88,
+	"left": 0.66,
+	"front": 0.80,
+}
 const CAMERA_TRANSITION: float = 0.48
 const ROUND_RESET_DURATION: float = 0.56
+const TRAY_OPEN_DURATION: float = 0.28
+const TRAY_LIFT_STEP: float = 19.0
 
 var setup: Node
 var online: Node
@@ -48,7 +57,6 @@ var match_complete: bool = false
 var round_winner: String = ""
 var winning_piece_indices: Array[int] = []
 var action_in_progress: bool = false
-var last_hud_second: int = -1
 var tutorial_active: bool = false
 var tutorial_complete: bool = false
 var bot_due_msec: int = 0
@@ -66,12 +74,18 @@ var online_target_players: int = 0
 var pending_online_configuration: Dictionary = {}
 var restoring_online: bool = false
 var online_cancelled: bool = false
+var tray_open: bool = false
+var tray_side: int = 0
+var tray_indices: Array[int] = []
+var tray_tween: Tween
+var intro_runtime_suspended: bool = false
 
 var hud_layer: CanvasLayer
 var turn_label: Label
 var score_label: Label
 var result_button: Button
 var turn_style: StyleBoxFlat
+var hud_canvas_scale: float = 1.0
 
 
 func _ready() -> void:
@@ -97,8 +111,8 @@ func _process(delta: float) -> void:
 	if camera_transition or round_complete or move_active:
 		return
 
-	var now: int = Time.get_ticks_msec()
 	if _current_mode() == "bot":
+		var now: int = Time.get_ticks_msec()
 		if not bot_scheduled:
 			bot_scheduled = true
 			bot_due_msec = now + 540
@@ -110,27 +124,29 @@ func _process(delta: float) -> void:
 			_perform_bot_move()
 		return
 
-	if gameplay_ready and turn_deadline_msec > 0:
-		var remaining: int = maxi(turn_deadline_msec - now, 0)
-		var seconds: int = int(ceil(float(remaining) / 1000.0))
-		if seconds != last_hud_second:
-			last_hud_second = seconds
-			_update_hud()
-			_publish_match_state("turn")
-		if remaining <= 0:
-			_handle_timeout()
-			return
-
 func _input(event: InputEvent) -> void:
 	if not match_initialized:
 		return
 	var pointer_press: bool = false
+	var pointer_position: Vector2 = Vector2.ZERO
 	if event is InputEventScreenTouch:
-		pointer_press = (event as InputEventScreenTouch).pressed
+		var touch_event := event as InputEventScreenTouch
+		pointer_press = touch_event.pressed
+		pointer_position = touch_event.position
 	elif event is InputEventMouseButton:
 		var mouse_event := event as InputEventMouseButton
 		pointer_press = mouse_event.pressed and mouse_event.button_index == MOUSE_BUTTON_LEFT
-	if round_complete or _current_mode() != "local" or not gameplay_ready or move_active or camera_transition:
+		pointer_position = mouse_event.position
+	if round_complete:
+		# _input runs before Control GUI input.  Let the visible round-action
+		# button receive taps inside its rect; consume only taps outside it so
+		# Intro's replay hook cannot restart the animation behind the result.
+		if pointer_press and result_button != null and result_button.visible and result_button.get_global_rect().has_point(pointer_position):
+			return
+		if pointer_press:
+			get_viewport().set_input_as_handled()
+		return
+	if _current_mode() != "local" or not gameplay_ready or move_active or camera_transition:
 		# Web touch input can be followed by a synthetic mouse event.  Once a
 		# match owns input, consume that duplicate too; otherwise Intro's
 		# unhandled-input replay hook restarts the animation mid-move.
@@ -148,6 +164,9 @@ func _enable_gameplay() -> void:
 	_hide_markers()
 	_capture_home_state()
 	_publish_gameplay_state("setup")
+	# Let the final approved intro frame finish first, then stop its correction
+	# workers and resize callbacks from touching the live gameplay camera.
+	call_deferred("_suspend_intro_runtime")
 	if setup == null or online == null:
 		_connect_setup()
 	if online != null and bool(online.call("restore_from_location")):
@@ -164,6 +183,8 @@ func _enable_gameplay() -> void:
 
 
 func _reset_for_intro() -> void:
+	_resume_intro_runtime()
+	_reset_tray_state()
 	super._reset_for_intro()
 	match_initialized = false
 	waiting_for_setup = false
@@ -184,7 +205,6 @@ func _reset_for_intro() -> void:
 	bot_scheduled = false
 	bot_due_msec = 0
 	camera_transition = false
-	last_hud_second = -1
 	home_transforms.clear()
 	home_materials.clear()
 	online_active = false
@@ -203,6 +223,44 @@ func _reset_for_intro() -> void:
 	if setup != null:
 		setup.call("reset_for_intro")
 	_update_hud()
+
+
+func _suspend_intro_runtime() -> void:
+	if intro == null or bool(intro.get("playing")):
+		return
+	var viewport: Viewport = get_viewport()
+	var intro_fit := Callable(intro, "_fit_camera")
+	if viewport.size_changed.is_connected(intro_fit):
+		viewport.size_changed.disconnect(intro_fit)
+	var corrections: Node = intro.get_node_or_null("ExistingIntroCorrections")
+	if corrections != null:
+		var correction_fit := Callable(corrections, "_center_camera")
+		if viewport.size_changed.is_connected(correction_fit):
+			viewport.size_changed.disconnect(correction_fit)
+		corrections.set_process(false)
+	var smooth: Node = intro.get_node_or_null("SmoothIntroTimeline")
+	if smooth != null:
+		smooth.set_process(false)
+	intro_runtime_suspended = true
+
+
+func _resume_intro_runtime() -> void:
+	if not intro_runtime_suspended or intro == null:
+		return
+	var viewport: Viewport = get_viewport()
+	var intro_fit := Callable(intro, "_fit_camera")
+	if not viewport.size_changed.is_connected(intro_fit):
+		viewport.size_changed.connect(intro_fit)
+	var corrections: Node = intro.get_node_or_null("ExistingIntroCorrections")
+	if corrections != null:
+		var correction_fit := Callable(corrections, "_center_camera")
+		if not viewport.size_changed.is_connected(correction_fit):
+			viewport.size_changed.connect(correction_fit)
+		corrections.set_process(true)
+	var smooth: Node = intro.get_node_or_null("SmoothIntroTimeline")
+	if smooth != null:
+		smooth.set_process(true)
+	intro_runtime_suspended = false
 
 
 func _on_configuration_ready(configuration: Dictionary) -> void:
@@ -243,6 +301,7 @@ func _on_configuration_ready(configuration: Dictionary) -> void:
 	scores.clear()
 	for player: Dictionary in players:
 		scores[str(player["direction"])] = 0
+	_sync_active_sides()
 	if result_button != null:
 		result_button.visible = false
 	_start_turn()
@@ -307,20 +366,33 @@ func _start_online_join(configuration: Dictionary, code: String) -> void:
 
 
 func _on_online_error(code: String) -> void:
+	if tray_open:
+		_close_piece_tray(-1, true)
+	elif selected_index >= 0:
+		super._clear_selection()
 	online_active = false
 	online_waiting = false
 	match_initialized = false
+	gameplay_ready = false
+	waiting_for_setup = true
+	turn_deadline_msec = 0
+	if turn_label != null:
+		turn_label.text = ""
+	if score_label != null:
+		score_label.text = ""
 	if restoring_online:
 		restoring_online = false
-		waiting_for_setup = true
+		pending_online_configuration.clear()
+		if online != null:
+			online.call("deactivate", true)
 		if setup != null:
-			setup.call("show_after_intro")
+			setup.call("reset_for_intro")
+			setup.call_deferred("show_after_intro")
 		return
 	if not str(pending_online_configuration.get("online_join_code", "")).is_empty() and setup != null:
 		setup.call("show_online_error", code)
-	else:
-		turn_label.text = "الأونلاين غير متاح الآن"
-		score_label.text = "اختر نفس الجهاز أو بوت ثم ابدأ."
+	elif setup != null:
+		setup.call("show_setup_error", "تعذر الأونلاين. حاول مرة أخرى.")
 	pending_online_configuration.clear()
 
 
@@ -356,6 +428,7 @@ func _apply_online_room(remote: Dictionary) -> void:
 		})
 		var remote_scores: Dictionary = remote.get("scores", {}) as Dictionary
 		scores[direction] = int(remote_scores.get(seat, 0))
+	_sync_active_sides()
 
 	match_initialized = true
 	total_rounds = int(remote.get("targetRounds", 3))
@@ -419,6 +492,7 @@ func _apply_online_room(remote: Dictionary) -> void:
 
 
 func _apply_online_board(board: Dictionary) -> void:
+	_reset_tray_state()
 	occupied_slots.clear()
 	move_count = 0
 	selected_index = -1
@@ -455,6 +529,25 @@ func _apply_online_board(board: Dictionary) -> void:
 			move_count += 1
 
 
+func _sync_active_sides() -> void:
+	var active: Dictionary = {}
+	for player: Dictionary in players:
+		active[str(player.get("direction", ""))] = true
+	for index: int in range(piece_records.size()):
+		var record: Dictionary = piece_records[index] as Dictionary
+		var direction: String = str(record.get("dir", ""))
+		var enabled: bool = active.has(direction)
+		var piece: MeshInstance3D = record["mesh"] as MeshInstance3D
+		piece.visible = enabled
+		for child: Node in piece.get_children():
+			if child is StaticBody3D and child.has_meta("piece_index"):
+				(child as StaticBody3D).collision_layer = PIECE_LAYER if enabled else 0
+	for direction: String in COLOR_TO_DIRECTION.values():
+		var base: Node3D = intro.get_node_or_null("Base_%s" % direction) as Node3D
+		if base != null:
+			base.visible = active.has(direction)
+
+
 func _find_unplayed_piece(direction: String, size_name: String) -> int:
 	for index: int in range(piece_records.size()):
 		var record: Dictionary = piece_records[index] as Dictionary
@@ -464,6 +557,8 @@ func _find_unplayed_piece(direction: String, size_name: String) -> int:
 
 
 func _begin_move(cell: int) -> void:
+	if tray_open:
+		_close_piece_tray(selected_index, false)
 	if online_active:
 		if selected_index < 0 or online == null:
 			return
@@ -475,7 +570,137 @@ func _begin_move(cell: int) -> void:
 	super._begin_move(cell)
 
 
+func _select_piece(piece_index: int) -> void:
+	# Bots already know the exact piece they chose.  Human players tap one of
+	# three nested physical stacks, so fan that stack open before placement.
+	if _current_mode() == "bot" or home_transforms.size() != piece_records.size():
+		super._select_piece(piece_index)
+		return
+	_open_piece_tray(piece_index)
+
+
+func _open_piece_tray(piece_index: int) -> void:
+	if piece_index < 0 or piece_index >= piece_records.size():
+		return
+	var tapped: Dictionary = piece_records[piece_index] as Dictionary
+	var direction: String = str(tapped.get("dir", ""))
+	var side: int = int(tapped.get("side", 0))
+	var available: Array[int] = []
+	for size_name: String in ["large", "medium", "small"]:
+		for index: int in range(piece_records.size()):
+			var record: Dictionary = piece_records[index] as Dictionary
+			if bool(record.get("played", false)):
+				continue
+			if str(record.get("dir", "")) == direction and int(record.get("side", 0)) == side and str(record.get("type", "")) == size_name:
+				available.append(index)
+				break
+	if available.is_empty():
+		return
+	if tray_open:
+		_close_piece_tray(-1, true)
+	tray_open = true
+	tray_side = side
+	tray_indices = available
+	if tray_tween != null and tray_tween.is_valid():
+		tray_tween.kill()
+	tray_tween = create_tween()
+	tray_tween.set_parallel(true)
+	for order: int in range(tray_indices.size()):
+		var index: int = tray_indices[order]
+		var record: Dictionary = piece_records[index] as Dictionary
+		var piece: MeshInstance3D = record["mesh"] as MeshInstance3D
+		piece.material_override = home_materials[index]
+		var target: Vector3 = home_transforms[index].origin + Vector3.UP * (float(order) * TRAY_LIFT_STEP * U)
+		tray_tween.tween_property(piece, "position", target, TRAY_OPEN_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_select_tray_piece(tray_indices[0])
+	_publish_tray_state("open")
+
+
+func _select_tray_piece(piece_index: int) -> void:
+	if not tray_open or not tray_indices.has(piece_index):
+		return
+	for index: int in tray_indices:
+		var tray_record: Dictionary = piece_records[index] as Dictionary
+		var tray_piece: MeshInstance3D = tray_record["mesh"] as MeshInstance3D
+		tray_piece.material_override = home_materials[index]
+	selected_index = piece_index
+	var record: Dictionary = piece_records[selected_index] as Dictionary
+	var mesh_instance: MeshInstance3D = record["mesh"] as MeshInstance3D
+	selected_home_position = home_transforms[selected_index].origin
+	selected_original_material = home_materials[selected_index]
+	mesh_instance.material_override = _selection_material(selected_original_material)
+	_update_legal_markers(str(record["type"]), _piece_color(record))
+	_publish_selection(record)
+
+
+func _close_piece_tray(skip_index: int = -1, immediate: bool = false) -> void:
+	if not tray_open:
+		return
+	var closing: Array[int] = tray_indices.duplicate()
+	tray_open = false
+	tray_indices.clear()
+	if tray_tween != null and tray_tween.is_valid():
+		tray_tween.kill()
+	tray_tween = null
+	var close_tween: Tween
+	if not immediate:
+		close_tween = create_tween()
+		close_tween.set_parallel(true)
+		tray_tween = close_tween
+	for index: int in closing:
+		if index == skip_index:
+			continue
+		var record: Dictionary = piece_records[index] as Dictionary
+		var piece: MeshInstance3D = record["mesh"] as MeshInstance3D
+		piece.material_override = home_materials[index]
+		if bool(record.get("played", false)):
+			continue
+		if immediate:
+			piece.position = home_transforms[index].origin
+		else:
+			close_tween.tween_property(piece, "position", home_transforms[index].origin, TRAY_OPEN_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	if skip_index < 0:
+		selected_index = -1
+		selected_original_material = null
+		_hide_markers()
+		_publish_gameplay_state("ready")
+	_publish_tray_state("closed")
+
+
+func _reset_tray_state() -> void:
+	if tray_tween != null and tray_tween.is_valid():
+		tray_tween.kill()
+	tray_tween = null
+	tray_open = false
+	tray_side = 0
+	tray_indices.clear()
+	_publish_tray_state("closed")
+
+
+func _clear_selection() -> void:
+	if tray_open:
+		_close_piece_tray(-1, false)
+		return
+	super._clear_selection()
+
+
+func _publish_tray_state(state: String) -> void:
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("document.body.dataset.yakolakTray='" + state + "';", true)
+
+
 func _handle_pointer(screen_position: Vector2) -> void:
+	# Raised tray pieces win the tap before board targets behind them, otherwise
+	# changing size can accidentally place the previously selected stone.
+	if tray_open:
+		var tray_hit: Dictionary = _ray_pick(screen_position, PIECE_LAYER)
+		if not tray_hit.is_empty():
+			var tray_collider: Object = tray_hit["collider"] as Object
+			if tray_collider != null and tray_collider.has_meta("piece_index"):
+				var tray_piece_index: int = int(tray_collider.get_meta("piece_index"))
+				if tray_indices.has(tray_piece_index):
+					_select_tray_piece(tray_piece_index)
+					return
 	if selected_index >= 0:
 		var target_hit: Dictionary = _ray_pick(screen_position, TARGET_LAYER)
 		if not target_hit.is_empty():
@@ -504,7 +729,10 @@ func _handle_pointer(screen_position: Vector2) -> void:
 				_flash_result("لا توجد خانة لهذا الحجم")
 				_publish_match_state("no-legal-cell")
 				return
-			_select_piece(piece_index)
+			if tray_open and tray_indices.has(piece_index):
+				_select_tray_piece(piece_index)
+			else:
+				_open_piece_tray(piece_index)
 			return
 
 	if selected_index >= 0:
@@ -536,14 +764,15 @@ func _start_turn() -> void:
 	bot_due_msec = 0
 	gameplay_ready = false
 	turn_deadline_msec = 0
-	last_hud_second = -1
 	_clear_selection()
 	_update_hud()
 	_transition_to_current_player()
 
 
 func _transition_to_current_player() -> void:
-	if camera == null:
+	# Keep a human's viewpoint stable while a bot/remote player acts.  Shared
+	# device humans still get their own physical side when their turn begins.
+	if camera == null or _current_mode() != "local":
 		_finish_camera_transition()
 		return
 	var direction: String = _current_direction()
@@ -570,25 +799,16 @@ func _finish_camera_transition() -> void:
 	if online_active:
 		gameplay_ready = _current_mode() == "local"
 		turn_deadline_msec = 0
-		last_hud_second = -1
 		_update_hud()
 		_publish_gameplay_state("ready" if gameplay_ready else "waiting")
 		return
-	gameplay_ready = true
-	turn_deadline_msec = Time.get_ticks_msec() + TURN_DURATION_MS
-	last_hud_second = -1
+	gameplay_ready = _current_mode() == "local"
+	# Local, bot, and online use the same untimed rules.  The old 18-second
+	# local-only timeout made identical moves behave differently by mode.
+	turn_deadline_msec = 0
 	_update_hud()
-	_publish_gameplay_state("ready")
+	_publish_gameplay_state("ready" if gameplay_ready else "waiting")
 	_publish_test_targets.call_deferred()
-
-
-func _handle_timeout() -> void:
-	if round_complete or move_active:
-		return
-	gameplay_ready = false
-	_clear_selection()
-	_publish_match_state("timeout")
-	_advance_turn_or_draw()
 
 
 func _advance_turn_or_draw() -> void:
@@ -751,6 +971,7 @@ func _return_to_setup() -> void:
 	move_active = false
 	move_piece_index = -1
 	move_cell = -1
+	_reset_tray_state()
 	selected_index = -1
 	selected_original_material = null
 	occupied_slots.clear()
@@ -784,6 +1005,7 @@ func _reset_board_for_round() -> void:
 	move_active = false
 	move_piece_index = -1
 	move_cell = -1
+	_reset_tray_state()
 	selected_index = -1
 	selected_original_material = null
 	_hide_markers()
@@ -832,6 +1054,7 @@ func _perform_bot_move() -> void:
 
 func _best_bot_move(direction: String) -> Dictionary:
 	var candidates: Array[Dictionary] = []
+	var order: int = 0
 	for index: int in range(piece_records.size()):
 		var record: Dictionary = piece_records[index] as Dictionary
 		if bool(record.get("played", false)) or str(record.get("dir", "")) != direction:
@@ -840,20 +1063,65 @@ func _best_bot_move(direction: String) -> Dictionary:
 		for cell: int in range(CELL_COORDS.size()):
 			if not _is_legal_cell(cell, size_name):
 				continue
-			if _would_win(direction, cell, size_name):
-				return {"piece_index": index, "cell": cell}
 			var score: int = 0
-			if cell == 4:
-				score += 22
-			elif cell in [0, 2, 6, 8]:
-				score += 10
+			if _would_win(direction, cell, size_name):
+				score += 10000
 			if _blocks_immediate_win(cell, size_name, direction):
-				score += 80
-			candidates.append({"piece_index": index, "cell": cell, "score": score})
+				score += 5200
+			score += _bot_line_score(direction, cell, size_name)
+			if cell == 4:
+				score += 18
+			elif cell in [0, 2, 6, 8]:
+				score += 7
+			match size_name:
+				"large": score += 8
+				"medium": score += 5
+				_: score += 3
+			candidates.append({"piece_index": index, "cell": cell, "score": score, "order": order})
+			order += 1
 	if candidates.is_empty():
 		return {}
-	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["score"]) > int(b["score"]))
-	return candidates[0]
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var score_a: int = int(a["score"])
+		var score_b: int = int(b["score"])
+		return score_a > score_b if score_a != score_b else int(a["order"]) < int(b["order"])
+	)
+	# Older builds deliberately strengthened and weakened the bot by round.
+	# Keep that character without RNG: weaker rounds choose the next ranked
+	# legal move, so the same board always produces the same decision.
+	var rank: int = mini(_bot_choice_rank(direction), candidates.size() - 1)
+	return candidates[rank]
+
+
+func _bot_line_score(direction: String, cell: int, size_name: String) -> int:
+	var score: int = 0
+	for line_value: Variant in WIN_LINES:
+		var line: Array = line_value as Array
+		if line.find(cell) < 0:
+			continue
+		var owned: int = 1
+		for line_cell_value: Variant in line:
+			var line_cell: int = int(line_cell_value)
+			if line_cell == cell:
+				continue
+			if _piece_direction(_piece_at(line_cell, size_name)) == direction:
+				owned += 1
+		score += owned * 18
+	return score
+
+
+func _bot_choice_rank(direction: String) -> int:
+	var round_index: int = (round_number - 1) % BOT_ROUND_SKILL.size()
+	var strength: float = clampf(
+		BOT_ROUND_SKILL[round_index] * float(BOT_DIRECTION_POWER.get(direction, 0.75)),
+		0.35,
+		0.97
+	)
+	if strength >= 0.62:
+		return 0
+	if strength >= 0.45:
+		return 1
+	return 2
 
 
 func _blocks_immediate_win(cell: int, size_name: String, owner: String) -> bool:
@@ -971,7 +1239,7 @@ func _build_hud() -> void:
 	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	turn_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	turn_label.layout_direction = Control.LAYOUT_DIRECTION_RTL
-	turn_label.add_theme_font_size_override("font_size", 21)
+	turn_label.add_theme_font_override("font", ARABIC_FONT)
 	turn_label.add_theme_color_override("font_color", Color.WHITE)
 	turn_label.add_theme_stylebox_override("normal", turn_style)
 	turn_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -986,8 +1254,9 @@ func _build_hud() -> void:
 	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	score_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	score_label.layout_direction = Control.LAYOUT_DIRECTION_RTL
-	score_label.add_theme_font_size_override("font_size", 16)
-	score_label.add_theme_color_override("font_color", Color("#1d2124"))
+	score_label.add_theme_font_override("font", ARABIC_FONT)
+	score_label.add_theme_color_override("font_color", Color("#f3f4f4"))
+	score_label.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.02, 0.92))
 	score_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud_layer.add_child(score_label)
 
@@ -999,13 +1268,16 @@ func _build_hud() -> void:
 	result_button.offset_bottom = 62
 	result_button.text = ""
 	result_button.layout_direction = Control.LAYOUT_DIRECTION_RTL
-	result_button.add_theme_font_size_override("font_size", 23)
+	result_button.add_theme_font_override("font", ARABIC_FONT)
 	result_button.add_theme_color_override("font_color", Color.WHITE)
 	result_button.add_theme_stylebox_override("normal", _result_style(Color("#15181aec")))
 	result_button.add_theme_stylebox_override("hover", _result_style(Color("#285e51")))
 	result_button.pressed.connect(_on_round_action)
 	result_button.visible = false
 	hud_layer.add_child(result_button)
+	if not get_viewport().size_changed.is_connected(_layout_hud):
+		get_viewport().size_changed.connect(_layout_hud)
+	_layout_hud()
 	_update_hud()
 
 
@@ -1014,8 +1286,79 @@ func _result_style(background: Color) -> StyleBoxFlat:
 	style.bg_color = background
 	style.border_color = Color("#ffffff35")
 	style.set_border_width_all(1)
-	style.set_corner_radius_all(20)
+	style.set_corner_radius_all(int(round(_hud_length(20.0))))
 	return style
+
+
+func _layout_hud() -> void:
+	if turn_label == null or score_label == null or result_button == null:
+		return
+	var viewport: Vector2 = get_viewport().get_visible_rect().size
+	var css_size: Vector2 = viewport
+	if OS.has_feature("web"):
+		var raw: Variant = JavaScriptBridge.eval(
+			"JSON.stringify((()=>{const c=document.getElementById('canvas');const r=c?c.getBoundingClientRect():{width:innerWidth,height:innerHeight};return{w:r.width||innerWidth,h:r.height||innerHeight};})())",
+			true
+		)
+		var decoded: Variant = JSON.parse_string(str(raw))
+		if decoded is Dictionary:
+			var values: Dictionary = decoded as Dictionary
+			css_size = Vector2(float(values.get("w", viewport.x)), float(values.get("h", viewport.y)))
+	var scale_x: float = css_size.x / maxf(viewport.x, 1.0)
+	var scale_y: float = css_size.y / maxf(viewport.y, 1.0)
+	hud_canvas_scale = clampf(minf(scale_x, scale_y), 0.20, 4.0)
+
+	var margin: float = _hud_length(12.0)
+	var turn_top: float = _hud_length(12.0)
+	turn_label.offset_left = margin
+	turn_label.offset_top = turn_top
+	turn_label.offset_right = -margin
+	turn_label.offset_bottom = turn_top + _hud_length(50.0)
+	turn_label.add_theme_font_size_override("font_size", _hud_font_size(18))
+	turn_style.set_corner_radius_all(int(round(_hud_length(15.0))))
+	turn_style.content_margin_left = _hud_length(14.0)
+	turn_style.content_margin_right = _hud_length(14.0)
+
+	score_label.offset_left = margin
+	score_label.offset_top = _hud_length(68.0)
+	score_label.offset_right = -margin
+	score_label.offset_bottom = _hud_length(96.0)
+	score_label.add_theme_font_size_override("font_size", _hud_font_size(15))
+	score_label.add_theme_constant_override("outline_size", maxi(1, int(round(_hud_length(3.0)))))
+
+	var result_width_css: float = minf(360.0, maxf(260.0, css_size.x - 32.0))
+	var result_width: float = result_width_css / hud_canvas_scale
+	var result_height: float = _hud_length(116.0)
+	result_button.offset_left = -result_width * 0.5
+	result_button.offset_top = -result_height * 0.5
+	result_button.offset_right = result_width * 0.5
+	result_button.offset_bottom = result_height * 0.5
+	result_button.add_theme_font_size_override("font_size", _hud_font_size(20))
+	result_button.add_theme_stylebox_override("normal", _result_style(Color("#15181aec")))
+	result_button.add_theme_stylebox_override("hover", _result_style(Color("#285e51")))
+	_publish_hud_metrics(viewport)
+
+
+func _hud_length(css_pixels: float) -> float:
+	return css_pixels / maxf(hud_canvas_scale, 0.20)
+
+
+func _hud_font_size(css_points: int) -> int:
+	return maxi(12, int(round(float(css_points) / maxf(hud_canvas_scale, 0.20))))
+
+
+func _publish_hud_metrics(viewport: Vector2) -> void:
+	if not OS.has_feature("web"):
+		return
+	var arabic_ready: bool = ARABIC_FONT.has_char(0x0623) and ARABIC_FONT.has_char(0x0644) and ARABIC_FONT.has_char(0x064A)
+	var text_css: float = float(_hud_font_size(18)) * hud_canvas_scale
+	var width_css: float = maxf(0.0, viewport.x - _hud_length(24.0)) * hud_canvas_scale
+	JavaScriptBridge.eval(
+		"document.body.dataset.yakolakHudArabicFont='" + ("ready" if arabic_ready else "missing") + "';" +
+		"document.body.dataset.yakolakHudTextPx='" + str(snappedf(text_css, 0.1)) + "';" +
+		"document.body.dataset.yakolakHudWidth='" + str(snappedf(width_css, 0.1)) + "';",
+		true
+	)
 
 
 func _update_hud() -> void:
@@ -1030,17 +1373,14 @@ func _update_hud() -> void:
 		turn_label.text = "الغرفة جاهزة · بانتظار اللاعبين"
 		score_label.text = "%d/%d جاهزون" % [players.size(), online_target_players]
 		return
-	var seconds: int = 0
-	if turn_deadline_msec > 0 and not round_complete:
-		seconds = int(ceil(float(maxi(turn_deadline_msec - Time.get_ticks_msec(), 0)) / 1000.0))
 	var tutorial_hint: String = ""
 	if tutorial_active and not tutorial_complete and _current_mode() == "local":
 		tutorial_hint = " · اختر حجرًا ثم خانة مضيئة"
 	elif _current_mode() == "bot":
-		tutorial_hint = " · البوت يفكر"
+		tutorial_hint = " · يفكر…"
 	elif _current_mode() == "online":
-		tutorial_hint = " · بانتظار اللاعب"
-	turn_label.text = "الجولة %d/%d · دور %s%s%s" % [round_number, total_rounds, str(player.get("color_name", "")), (" · %dث" % seconds if seconds > 0 else ""), tutorial_hint]
+		tutorial_hint = " · انتظار…"
+	turn_label.text = "الجولة %d/%d · %s%s" % [round_number, total_rounds, str(player.get("color_name", "")), tutorial_hint]
 	var score_parts: Array[String] = []
 	for entry: Dictionary in players:
 		var direction: String = str(entry["direction"])

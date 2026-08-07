@@ -6,6 +6,8 @@ extends Node
 signal room_state_changed(room: Dictionary, identity: Dictionary)
 signal online_error(code: String)
 signal invite_ready(url: String)
+signal room_previewed(room: Dictionary)
+signal room_preview_failed(code: String)
 
 const POLL_MS: int = 900
 
@@ -83,6 +85,16 @@ func join_match(code: String, color: String) -> void:
 	identity.clear()
 	active = false
 	_request_post("join", {"action": "join", "code": code, "color": color})
+
+
+func preview_room(code: String) -> void:
+	if not OS.has_feature("web"):
+		room_preview_failed.emit("online_unavailable")
+		return
+	if busy:
+		room_preview_failed.emit("online_busy")
+		return
+	_request_post("preview", {"action": "preview", "code": code})
 
 
 func submit_move(cell: int, size_name: String) -> void:
@@ -171,8 +183,12 @@ func _consume_bridge_event() -> void:
 		return
 	var event: Dictionary = parsed as Dictionary
 	var data: Dictionary = event.get("data", {}) as Dictionary
+	var kind: String = str(event.get("kind", ""))
 	if not bool(event.get("ok", false)):
 		var error_code: String = str(data.get("error", "online_server_error"))
+		if kind == "preview":
+			room_preview_failed.emit(error_code)
+			return
 		if error_code == "version_conflict" and data.get("room", null) is Dictionary:
 			_accept_room(data["room"] as Dictionary)
 		else:
@@ -180,7 +196,13 @@ func _consume_bridge_event() -> void:
 		return
 	if bool(data.get("unchanged", false)):
 		return
-	var kind: String = str(event.get("kind", ""))
+	if kind == "preview":
+		var preview: Dictionary = data.get("room", {}) as Dictionary
+		if preview.is_empty():
+			room_preview_failed.emit("online_server_error")
+		else:
+			room_previewed.emit(preview.duplicate(true))
+		return
 	if kind == "create" or kind == "join":
 		var received_room: Dictionary = data.get("room", {}) as Dictionary
 		if received_room.is_empty():
