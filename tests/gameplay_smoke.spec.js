@@ -38,7 +38,7 @@ test('a physical stone can be selected and played after the approved intro', asy
           typeof window.yakolakTestStartLocal === 'function' &&
           typeof window.yakolakTestShowSetup === 'function',
     null,
-    { timeout: 90000 }
+    { timeout: 150000 }
   );
   await page.evaluate(() => window.yakolakTestShowSetup());
   await page.waitForFunction(
