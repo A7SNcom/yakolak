@@ -41,7 +41,15 @@ jobs:
         env:
           YAKOLAK_KEEP_IMPORT_CACHE: "1"
         run: bash scripts/vercel-fast-build.sh
-      - name: Publish ready web files back to main
+      - name: Install browser runner
+        run: |
+          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Verify second round before publishing
+        run: |
+          python3 -m http.server 8000 --directory web >/tmp/yakolak-browser.log 2>&1 &
+          npx playwright test tests/round_transition_smoke.spec.js --workers=1 --reporter=line
+      - name: Publish tested web files back to main
         run: |
           git fetch origin main
           if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
@@ -55,5 +63,5 @@ jobs:
             echo "Web output unchanged."
             exit 0
           fi
-          git commit -m "[web-ready] نشر آخر نسخة جاهزة"
+          git commit -m "[web-ready] نشر نسخة مختبرة حتى الجولة الثانية"
           git push origin HEAD:main
