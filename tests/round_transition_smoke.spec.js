@@ -17,10 +17,14 @@ test.use({
   }
 });
 
-test('next-round tap cannot restart the intro or lose the board', async ({ page }) => {
+test('music is bundled and next-round tap keeps the board alive', async ({ page }) => {
   test.setTimeout(240000);
   const failures = [];
+  const songRequests = [];
   page.on('pageerror', error => failures.push(`pageerror: ${error.message}`));
+  page.on('request', request => {
+    if (request.url().includes('song.mp3')) songRequests.push(request.url());
+  });
   page.on('console', message => {
     const text = message.text();
     console.log(`[browser:${message.type()}] ${text}`);
@@ -31,11 +35,16 @@ test('next-round tap cannot restart the intro or lose the board', async ({ page 
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'complete' &&
           document.body.dataset.yakolakSetup === 'visible' &&
+          document.body.dataset.yakolakMusic === 'playing' &&
           typeof window.yakolakTestStartPassPlay === 'function' &&
           typeof window.yakolakTestForceRoundComplete === 'function',
     null,
     { timeout: 170000 }
   );
+
+  // The MP3 must live inside the downloaded Godot PCK. No separate song.mp3
+  // network request is allowed after the page starts.
+  expect(songRequests).toEqual([]);
 
   await page.setViewportSize({ width: 393, height: 555 });
   await page.evaluate(() => window.yakolakTestStartPassPlay());
@@ -43,7 +52,8 @@ test('next-round tap cannot restart the intro or lose the board', async ({ page 
     () => document.body.dataset.yakolakGameplay === 'ready' &&
           document.body.dataset.yakolakMatchState === 'turn' &&
           document.body.dataset.yakolakRound === '1' &&
-          document.body.dataset.yakolakIntroReplay === 'locked',
+          document.body.dataset.yakolakIntroReplay === 'locked' &&
+          document.body.dataset.yakolakMusic === 'playing',
     null,
     { timeout: 15000 }
   );
@@ -72,11 +82,13 @@ test('next-round tap cannot restart the intro or lose the board', async ({ page 
           document.body.dataset.yakolakGameplay === 'ready' &&
           document.body.dataset.yakolakCurrentPlayer === 'back' &&
           document.body.dataset.yakolakIntro === 'complete' &&
-          document.body.dataset.yakolakIntroReplay === 'locked',
+          document.body.dataset.yakolakIntroReplay === 'locked' &&
+          document.body.dataset.yakolakMusic === 'playing',
     null,
     { timeout: 15000 }
   );
 
+  expect(songRequests).toEqual([]);
   expect(failures).toEqual([]);
-  console.log('YAKOLAK_ROUND_2_OK intro-stays-complete board-ready');
+  console.log('YAKOLAK_ROUND_2_OK music-bundled intro-stays-complete board-ready');
 });
