@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/intro.gd" id="1_intro"]
 [ext_resource type="Script" path="res://scripts/intro_corrections.gd" id="2_corrections"]
@@ -11,6 +11,7 @@
 [ext_resource type="Script" path="res://scripts/smooth_intro_timeline.gd" id="9_smooth"]
 [ext_resource type="Script" path="res://scripts/session_setup.gd" id="10_setup"]
 [ext_resource type="Script" path="res://scripts/online_session.gd" id="11_online"]
+[ext_resource type="Script" path="res://scripts/session_setup_guard.gd" id="12_setup_guard"]
 
 [node name="YAKOLAKIntro26" type="Node3D"]
 script = ExtResource("1_intro")
@@ -38,6 +39,9 @@ script = ExtResource("6_refinement")
 
 [node name="SessionSetup" type="Node" parent="."]
 script = ExtResource("10_setup")
+
+[node name="SessionSetupGuard" type="Node" parent="."]
+script = ExtResource("12_setup_guard")
 
 [node name="OnlineSession" type="Node" parent="."]
 script = ExtResource("11_online")
