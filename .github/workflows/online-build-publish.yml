@@ -25,6 +25,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install small server dependency
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
       - name: Restore Godot caches
         uses: actions/cache@v4
         with:
