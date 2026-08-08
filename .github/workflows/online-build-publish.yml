@@ -53,6 +53,8 @@ jobs:
           key: yakolak-godot-4.7.1-${{ hashFiles('project.godot', 'export_presets.cfg') }}
           restore-keys: |
             yakolak-godot-4.7.1-
+      - name: Drop stale compiled scene cache
+        run: rm -rf .godot/exported
       - name: Build latest web version online
         env:
           YAKOLAK_KEEP_IMPORT_CACHE: "1"
