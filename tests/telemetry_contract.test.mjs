@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { __testing } from '../api/_telemetry.js';
+import { __testing as observedTesting } from '../api/rooms-observed.js';
 
 const monitor = fs.readFileSync(new URL('../scripts/telemetry_monitor.gd', import.meta.url), 'utf8');
 const consoleCapture = fs.readFileSync(new URL('../scripts/telemetry_console_capture.gd', import.meta.url), 'utf8');
@@ -42,6 +43,23 @@ assert.equal(normalized.seat, 'p2');
 assert.equal(normalized.roomVersion, 7);
 assert.match(normalized.detailsJson, /\[redacted\]/);
 assert.doesNotMatch(normalized.detailsJson, /must-not-leak/);
+
+// Production regression: successful Turso mutations once returned
+// room.code="undefined". The observed transport must repair only malformed
+// identity while preserving the real unsanitized client payload.
+const secretToken = 'client-secret-must-stay-intact';
+const brokenMutation = JSON.stringify({
+  ok: true,
+  token: secretToken,
+  seat: 'p1',
+  room: { code: 'undefined', version: 3, moveNumber: 1 },
+});
+const repairedMutation = observedTesting.repairCapturedRoomIdentity(brokenMutation, '64');
+const repairedPayload = JSON.parse(String(repairedMutation));
+assert.equal(repairedPayload.room.code, '64');
+assert.equal(repairedPayload.token, secretToken);
+const alreadyValid = JSON.stringify({ ok: true, room: { code: '21', version: 4 } });
+assert.equal(observedTesting.repairCapturedRoomIdentity(alreadyValid, '64'), alreadyValid, 'a valid different room code must never be silently rewritten');
 
 for (const marker of [
   'window.__yakolakTraceId',
@@ -87,6 +105,7 @@ assert.ok(observedServer.includes("eventName: 'server.rooms.exchange'"), 'server
 assert.ok(observedServer.includes('[YAKOLAK_ROOM_TRACE]'), 'server exchanges must be searchable in Vercel logs');
 assert.ok(observedServer.includes('sanitizeTelemetryValue'), 'server recorder must redact secrets before storage/logging');
 assert.ok(observedServer.includes('TELEMETRY_DEADLINE_MS'), 'server telemetry must never be allowed to stall gameplay indefinitely');
+assert.ok(observedServer.includes('repairCapturedRoomIdentity'), 'server transport must repair malformed post-mutation room identity');
 assert.ok(endpoint.includes('writeTelemetryBatch'), 'telemetry endpoint must persist client batches');
 assert.ok(endpoint.includes('[YAKOLAK_TRACE]'), 'client telemetry must also be searchable in Vercel runtime logs');
 
