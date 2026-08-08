@@ -85,9 +85,10 @@ test('black-box telemetry records online traffic and sends trace ids without lea
     await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ ok: false, error: 'invalid_action' }) });
   });
 
-  await page.goto('http://127.0.0.1:8000/?yakolakTestFast=1', { waitUntil: 'domcontentloaded' });
+  await page.goto('http://127.0.0.1:8000/?yakolakTestFast=1&yakolakTelemetryTest=1', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'complete' &&
+          document.body.dataset.yakolakTelemetryMode === 'live' &&
           typeof window.yakolakTestStartOnline === 'function' &&
           typeof window.yakolakTestPlayOneMove === 'function' &&
           typeof window.yakolakTelemetry === 'function' &&
