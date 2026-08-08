@@ -19,6 +19,8 @@ func _monitor_script() -> String:
   window.__yakolakTelemetryInstalled = true;
 
   const originalFetch = window.fetch.bind(window);
+  const params = new URL(location.href).searchParams;
+  const NETWORK_ENABLED = params.get('yakolakTestFast') !== '1' || params.get('yakolakTelemetryTest') === '1';
   const TRACE_KEY = 'yakolak-telemetry-trace-v1';
   const REDACT = /(token|authorization|cookie|secret|password|credential|auth|hash)/i;
   const nowIso = () => new Date().toISOString();
@@ -31,6 +33,7 @@ func _monitor_script() -> String:
   }
   window.__yakolakTraceId = traceId;
   document.body.dataset.yakolakTraceId = traceId;
+  document.body.dataset.yakolakTelemetryMode = NETWORK_ENABLED ? 'live' : 'test-local-only';
 
   let sequence = 0;
   let queue = [];
@@ -96,13 +99,17 @@ func _monitor_script() -> String:
         queue.splice(0, excess);
         dropped += excess;
       }
-      if (queue.length >= 12) void flush(false);
+      if (NETWORK_ENABLED && queue.length >= 12) void flush(false);
     } catch (_) {}
   };
   window.yakolakTelemetry = record;
 
   const flush = async (beacon = false) => {
     if (flushing || queue.length === 0) return;
+    if (!NETWORK_ENABLED) {
+      queue = queue.slice(-240);
+      return;
+    }
     flushing = true;
     const batch = queue.splice(0, 50);
     if (dropped > 0) {
@@ -123,7 +130,6 @@ func _monitor_script() -> String:
           method: 'POST',
           cache: 'no-store',
           credentials: 'same-origin',
-          keepalive: true,
           headers: { 'content-type': 'application/json', 'x-yakolak-telemetry': '1', 'x-yakolak-trace': traceId },
           body,
         });
@@ -136,7 +142,7 @@ func _monitor_script() -> String:
     }
   };
   window.__yakolakTelemetryFlush = () => flush(false);
-  setInterval(() => void flush(false), 2000);
+  setInterval(() => { if (NETWORK_ENABLED) void flush(false); }, 2000);
 
   const safeJson = text => {
     if (!text || typeof text !== 'string') return null;
@@ -254,7 +260,7 @@ func _monitor_script() -> String:
   addEventListener('pageshow', event => record('browser.pageshow', 'info', { persisted: !!event.persisted, state: collectState() }, { source: 'browser' }));
   addEventListener('pagehide', event => {
     record('browser.pagehide', 'info', { persisted: !!event.persisted, state: collectState() }, { source: 'browser' });
-    void flush(true);
+    if (NETWORK_ENABLED) void flush(true);
   });
   document.addEventListener('visibilitychange', () => record('browser.visibility', 'info', collectState(), { source: 'browser' }));
 
