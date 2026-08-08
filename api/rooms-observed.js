@@ -28,6 +28,14 @@ function safeRoom(value) {
   return /^\d{2}$/.test(room) ? room : '';
 }
 
+function finishResponse(originalEnd, chunk, encoding, callback) {
+  if (chunk == null) return originalEnd();
+  if (typeof encoding === 'function') return originalEnd(chunk, encoding);
+  if (typeof callback === 'function') return originalEnd(chunk, encoding, callback);
+  if (typeof encoding === 'string') return originalEnd(chunk, encoding);
+  return originalEnd(chunk);
+}
+
 export default async function handler(req, res) {
   const started = performance.now();
   const body = requestBody(req);
@@ -123,5 +131,5 @@ export default async function handler(req, res) {
   }
 
   res.end = originalEnd;
-  return originalEnd(captured, capturedEncoding, capturedCallback);
+  return finishResponse(originalEnd, captured, capturedEncoding, capturedCallback);
 }
