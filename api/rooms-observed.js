@@ -30,6 +30,29 @@ function safeRoom(value) {
   return /^\d{2}$/.test(room) ? room : '';
 }
 
+// Turso result rows expose fields through a row object that is not guaranteed
+// to survive object spreading. rooms.js used to construct the post-mutation
+// pseudo-row with {...row}; on production this dropped room_code and produced
+// {room:{code:"undefined"}} after an otherwise successful move. Repair only a
+// missing/malformed identity at this transport boundary. Never rewrite one
+// valid room code into another, and never sanitize the actual client payload.
+function repairCapturedRoomIdentity(value, requestedRoom) {
+  if (value == null || !requestedRoom) return value;
+  try {
+    const wasBuffer = Buffer.isBuffer(value);
+    const text = wasBuffer ? value.toString('utf8') : String(value);
+    if (!text) return value;
+    const payload = JSON.parse(text);
+    if (!payload || typeof payload !== 'object' || !payload.room || typeof payload.room !== 'object') return value;
+    if (safeRoom(payload.room.code)) return value;
+    payload.room.code = requestedRoom;
+    const repaired = JSON.stringify(payload);
+    return wasBuffer ? Buffer.from(repaired, 'utf8') : repaired;
+  } catch {
+    return value;
+  }
+}
+
 function finishResponse(originalEnd, chunk, encoding, callback) {
   if (chunk == null) return originalEnd();
   if (typeof encoding === 'function') return originalEnd(chunk, encoding);
@@ -89,6 +112,7 @@ export default async function handler(req, res) {
     }
   }
 
+  captured = repairCapturedRoomIdentity(captured, requestedRoom);
   const payload = parseResponseBody(captured);
   const room = payload?.room || null;
   const roomCode = safeRoom(room?.code || requestedRoom);
@@ -150,3 +174,8 @@ export default async function handler(req, res) {
   res.end = originalEnd;
   return finishResponse(originalEnd, captured, capturedEncoding, capturedCallback);
 }
+
+export const __testing = {
+  repairCapturedRoomIdentity,
+  safeRoom,
+};
