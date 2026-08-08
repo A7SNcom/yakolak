@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Prepare the original YAKOLAK intro meshes for Godot.
+"""Prepare the original YAKOLAK Three.js meshes for Godot.
 
-This intentionally mirrors the pivot rules used by the accepted Three.js intro:
-- board/lid and player base: full bounding-box centre pivot (`center(g)`)
+This intentionally mirrors the pivot rules used by the accepted Three.js game:
+- board/lid, player base, and legacy score marker p.stl: full bounding-box centre pivot (`center(g)`)
 - stones: X/Y centre and Z bottom pivot (`bottom(g)`)
 
 No substitute geometry, axis conversion, rescaling, or artistic reinterpretation
@@ -132,7 +132,7 @@ def write_obj(source_name: str, destination_name: str, pivot: PivotMode) -> None
     destination = OUT / destination_name
     destination.parent.mkdir(parents=True, exist_ok=True)
     with destination.open("w", encoding="utf-8", newline="\n") as handle:
-        handle.write(f"# Original YAKOLAK Three.js intro source: {source_name}\n")
+        handle.write(f"# Original YAKOLAK Three.js source: {source_name}\n")
         handle.write(f"# Pivot rule: {pivot}; scale and axes preserved.\n")
         handle.write(f"o {destination.stem}\n")
         for x, y, z in vertices:
@@ -161,6 +161,7 @@ def main() -> None:
     write_obj("piece-large.stl", "piece_large.obj", "bottom_z")
     write_obj("piece-medium.stl", "piece_medium.obj", "bottom_z")
     write_obj("piece-small.stl", "piece_small.obj", "bottom_z")
+    write_obj("score-marker.stl", "score_marker.obj", "center")
     print("YAKOLAK_25_ORIGINAL_INTRO_ASSETS_READY")
 
 
