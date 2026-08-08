@@ -69,10 +69,10 @@ jobs:
         run: |
           npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0 pngjs@7.0.0
           npx playwright install --with-deps chromium
-      - name: Verify gameplay, clean restart, setup and online recovery before publishing
+      - name: Verify gameplay, clean restart, setup, online recovery and black-box telemetry before publishing
         run: |
           python3 -m http.server 8000 --directory web >/tmp/yakolak-browser.log 2>&1 &
-          npx playwright test tests/gameplay_smoke.spec.js tests/round_transition_smoke.spec.js tests/session_clean_restart_smoke.spec.js tests/online_resilience_smoke.spec.js tests/setup_spatial_smoke.spec.js --workers=1 --reporter=line
+          npx playwright test tests/gameplay_smoke.spec.js tests/round_transition_smoke.spec.js tests/session_clean_restart_smoke.spec.js tests/online_resilience_smoke.spec.js tests/telemetry_smoke.spec.js tests/setup_spatial_smoke.spec.js --workers=1 --reporter=line
       - name: Publish tested web files back to main
         run: |
           git fetch origin main
