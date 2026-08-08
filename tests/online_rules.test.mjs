@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import { __testing } from '../api/rooms.js';
 
-const { applyMove, createState, joinState, rematchState } = __testing;
+const { PROTOCOL, applyMove, createState, joinState, normalizeCode, rematchState } = __testing;
+
+assert.equal(PROTOCOL, 5);
+assert.equal(normalizeCode('42'), '42');
+assert.equal(normalizeCode('٤٢'), '42');
+assert.equal(normalizeCode('۴۲'), '42');
+assert.equal(normalizeCode('غرفة ٤٢'), '42');
+assert.equal(createState('marble', 2, 3).protocol, 5);
 
 function room() {
   return joinState(createState('marble', 2, 3), 'p2', 'blue');
