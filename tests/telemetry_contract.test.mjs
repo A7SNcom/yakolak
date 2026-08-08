@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import { __testing } from '../api/_telemetry.js';
 
 const monitor = fs.readFileSync(new URL('../scripts/telemetry_monitor.gd', import.meta.url), 'utf8');
+const consoleCapture = fs.readFileSync(new URL('../scripts/telemetry_console_capture.gd', import.meta.url), 'utf8');
 const watchdog = fs.readFileSync(new URL('../scripts/telemetry_watchdog.gd', import.meta.url), 'utf8');
 const route = fs.readFileSync(new URL('../scripts/rooms_observer_route.gd', import.meta.url), 'utf8');
 const endpoint = fs.readFileSync(new URL('../api/telemetry.js', import.meta.url), 'utf8');
@@ -62,6 +63,16 @@ for (const marker of [
 }
 
 for (const marker of [
+  "browser.console.error",
+  "browser.console.warn",
+  "browser.console.runtime",
+  "console.error =",
+  "console.warn =",
+]) {
+  assert.ok(consoleCapture.includes(marker), `console capture is missing ${marker}`);
+}
+
+for (const marker of [
   "game.integrity.residue_detected",
   "game.integrity.move_counter_regressed",
   "gameplay.waiting_too_long",
@@ -75,17 +86,21 @@ assert.ok(route.includes("url.pathname = '/api/rooms-observed'"), 'online rooms 
 assert.ok(observedServer.includes("eventName: 'server.rooms.exchange'"), 'server must persist every room exchange');
 assert.ok(observedServer.includes('[YAKOLAK_ROOM_TRACE]'), 'server exchanges must be searchable in Vercel logs');
 assert.ok(observedServer.includes('sanitizeTelemetryValue'), 'server recorder must redact secrets before storage/logging');
+assert.ok(observedServer.includes('TELEMETRY_DEADLINE_MS'), 'server telemetry must never be allowed to stall gameplay indefinitely');
 assert.ok(endpoint.includes('writeTelemetryBatch'), 'telemetry endpoint must persist client batches');
 assert.ok(endpoint.includes('[YAKOLAK_TRACE]'), 'client telemetry must also be searchable in Vercel runtime logs');
 
 assert.ok(scene.includes('res://scripts/rooms_observer_route.gd'), 'server observer route must run in the main scene');
 assert.ok(scene.includes('res://scripts/telemetry_monitor.gd'), 'telemetry monitor must run in the main scene');
+assert.ok(scene.includes('res://scripts/telemetry_console_capture.gd'), 'Godot console capture must run in the main scene');
 assert.ok(scene.includes('res://scripts/telemetry_watchdog.gd'), 'semantic watchdog must run in the main scene');
 assert.ok(scene.indexOf('RoomsObserverRoute') < scene.indexOf('TelemetryMonitor'), 'server routing must be installed before browser fetch monitoring');
-assert.ok(scene.indexOf('TelemetryMonitor') < scene.indexOf('TelemetryWatchdog'), 'raw telemetry must start before semantic watchdog');
+assert.ok(scene.indexOf('TelemetryMonitor') < scene.indexOf('TelemetryConsoleCapture'), 'raw telemetry must start before console capture');
+assert.ok(scene.indexOf('TelemetryConsoleCapture') < scene.indexOf('TelemetryWatchdog'), 'console capture must start before semantic watchdog');
 assert.ok(scene.indexOf('TelemetryWatchdog') < scene.indexOf('OnlineSession'), 'watchdog must start before online transport');
 assert.ok(preset.includes('res://scripts/rooms_observer_route.gd'), 'server observer route must be exported to web');
 assert.ok(preset.includes('res://scripts/telemetry_monitor.gd'), 'telemetry monitor must be exported to web');
+assert.ok(preset.includes('res://scripts/telemetry_console_capture.gd'), 'console capture must be exported to web');
 assert.ok(preset.includes('res://scripts/telemetry_watchdog.gd'), 'semantic watchdog must be exported to web');
 
 console.log('YAKOLAK_TELEMETRY_CONTRACT_OK');
