@@ -42,6 +42,7 @@ jobs:
       - name: Verify online rules, stability, Arabic UI and telemetry contracts
         run: |
           node --check api/rooms.js
+          node --check api/rooms-observed.js
           node --check api/_telemetry.js
           node --check api/telemetry.js
           node tests/online_rules.test.mjs
