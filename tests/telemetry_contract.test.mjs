@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import { __testing } from '../api/_telemetry.js';
 
 const monitor = fs.readFileSync(new URL('../scripts/telemetry_monitor.gd', import.meta.url), 'utf8');
+const route = fs.readFileSync(new URL('../scripts/rooms_observer_route.gd', import.meta.url), 'utf8');
 const endpoint = fs.readFileSync(new URL('../api/telemetry.js', import.meta.url), 'utf8');
+const observedServer = fs.readFileSync(new URL('../api/rooms-observed.js', import.meta.url), 'utf8');
 const scene = fs.readFileSync(new URL('../scenes/intro.tscn', import.meta.url), 'utf8');
 const preset = fs.readFileSync(new URL('../export_presets.cfg', import.meta.url), 'utf8');
 
@@ -58,10 +60,18 @@ for (const marker of [
   assert.ok(monitor.includes(marker), `telemetry monitor is missing ${marker}`);
 }
 
-assert.ok(endpoint.includes('writeTelemetryBatch'), 'telemetry endpoint must persist batches');
-assert.ok(endpoint.includes('[YAKOLAK_TRACE]'), 'telemetry must also be searchable in Vercel runtime logs');
+assert.ok(route.includes("url.pathname = '/api/rooms-observed'"), 'online rooms must pass through the server-side recorder');
+assert.ok(observedServer.includes("eventName: 'server.rooms.exchange'"), 'server must persist every room exchange');
+assert.ok(observedServer.includes('[YAKOLAK_ROOM_TRACE]'), 'server exchanges must be searchable in Vercel logs');
+assert.ok(observedServer.includes('sanitizeTelemetryValue'), 'server recorder must redact secrets before storage/logging');
+assert.ok(endpoint.includes('writeTelemetryBatch'), 'telemetry endpoint must persist client batches');
+assert.ok(endpoint.includes('[YAKOLAK_TRACE]'), 'client telemetry must also be searchable in Vercel runtime logs');
+
+assert.ok(scene.includes('res://scripts/rooms_observer_route.gd'), 'server observer route must run in the main scene');
 assert.ok(scene.includes('res://scripts/telemetry_monitor.gd'), 'telemetry monitor must run in the main scene');
+assert.ok(scene.indexOf('RoomsObserverRoute') < scene.indexOf('TelemetryMonitor'), 'server routing must be installed before browser fetch monitoring');
 assert.ok(scene.indexOf('TelemetryMonitor') < scene.indexOf('OnlineSession'), 'telemetry must start before online transport');
+assert.ok(preset.includes('res://scripts/rooms_observer_route.gd'), 'server observer route must be exported to web');
 assert.ok(preset.includes('res://scripts/telemetry_monitor.gd'), 'telemetry monitor must be exported to web');
 
 console.log('YAKOLAK_TELEMETRY_CONTRACT_OK');
