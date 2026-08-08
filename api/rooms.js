@@ -1,14 +1,16 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomInt } from 'node:crypto';
 import { createClient } from '@tursodatabase/serverless/compat';
 
-const TABLE = 'yakolak_online_rooms_v4';
+const TABLE = 'yakolak_online_rooms_v5';
+const PROTOCOL = 5;
 const COLORS = ['marble', 'blue', 'gold', 'green'];
 const SIZES = ['small', 'medium', 'large'];
 const LINES = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
-const ROOM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const ROOM_TTL_MS = 8 * 60 * 60 * 1000;
+const ROOM_TTL_MS = 3 * 60 * 60 * 1000;
+const WAITING_REUSE_MS = 20 * 60 * 1000;
+const FINISHED_REUSE_MS = 15 * 60 * 1000;
 const MAX_BODY_BYTES = 8_000;
-const ROOM_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/;
+const ROOM_PATTERN = /^\d{2}$/;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,96}$/;
 let client;
 let tableReady;
@@ -34,6 +36,7 @@ async function ensureTable(db) {
   tableReady ||= db.execute(`
     CREATE TABLE IF NOT EXISTS ${TABLE} (
       room_code TEXT PRIMARY KEY,
+      create_key TEXT NOT NULL UNIQUE,
       auth_json TEXT NOT NULL,
       state_json TEXT NOT NULL,
       version INTEGER NOT NULL DEFAULT 1,
@@ -54,21 +57,26 @@ function parseBody(req) {
   return JSON.parse(raw);
 }
 
+function asciiDigits(value) {
+  const arabic = '٠١٢٣٤٥٦٧٨٩';
+  const persian = '۰۱۲۳۴۵۶۷۸۹';
+  return String(value || '').replace(/[٠-٩]/g, digit => String(arabic.indexOf(digit))).replace(/[۰-۹]/g, digit => String(persian.indexOf(digit)));
+}
+
 function normalizeCode(value) {
-  return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+  return asciiDigits(value).replace(/\D/g, '').slice(0, 2);
 }
 
-function roomCode() {
-  const bytes = randomBytes(6);
-  return Array.from(bytes, byte => ROOM_ALPHABET[byte % ROOM_ALPHABET.length]).join('');
-}
-
-function sessionToken() {
-  return randomBytes(32).toString('base64url');
+function roomCode(index) {
+  return String(index).padStart(2, '0');
 }
 
 function tokenHash(token) {
-  return createHash('sha256').update(token).digest('hex');
+  return createHash('sha256').update(String(token || '')).digest('hex');
+}
+
+function validCredential(value) {
+  return TOKEN_PATTERN.test(String(value || ''));
 }
 
 function bearer(req) {
@@ -135,7 +143,7 @@ function createState(hostColor, targetPlayers, targetRounds) {
   if (!validPlayers(targetPlayers)) throw new Error('invalid_player_count');
   if (!validRounds(targetRounds)) throw new Error('invalid_round_count');
   return {
-    protocol: 4,
+    protocol: PROTOCOL,
     status: 'waiting',
     targetPlayers: Number(targetPlayers),
     targetRounds: Number(targetRounds),
@@ -162,13 +170,11 @@ function joinState(state, seat, color) {
   if (state.players.length >= state.targetPlayers) throw new Error('room_full');
   if (state.players.some(player => player.color === color)) throw new Error('color_taken');
   const players = [...state.players, { seat, color }];
-  const scores = { ...state.scores, [seat]: 0 };
-  const rematch = { ...state.rematch, [seat]: false };
   return {
     ...state,
     players,
-    scores,
-    rematch,
+    scores: { ...state.scores, [seat]: 0 },
+    rematch: { ...state.rematch, [seat]: false },
     status: players.length === state.targetPlayers ? 'playing' : 'waiting'
   };
 }
@@ -259,7 +265,7 @@ function authEntries(row) {
 }
 
 function seatFor(row, token) {
-  if (!TOKEN_PATTERN.test(token)) return null;
+  if (!validCredential(token)) return null;
   const hash = tokenHash(token);
   return authEntries(row).find(entry => entry.hash === hash)?.seat || null;
 }
@@ -272,6 +278,22 @@ async function readRoom(db, code) {
   return result.rows?.[0] || null;
 }
 
+async function readCreateRequest(db, createKey) {
+  const result = await db.execute({
+    sql: `SELECT * FROM ${TABLE} WHERE create_key = ? AND expires_at > ? LIMIT 1`,
+    args: [createKey, new Date().toISOString()]
+  });
+  return result.rows?.[0] || null;
+}
+
+async function cleanupReusableRooms(db) {
+  const now = Date.now();
+  await db.execute({
+    sql: `DELETE FROM ${TABLE} WHERE expires_at <= ? OR status = 'cancelled' OR (status = 'waiting' AND updated_at < ?) OR (status = 'finished' AND updated_at < ?)`,
+    args: [new Date(now).toISOString(), new Date(now - WAITING_REUSE_MS).toISOString(), new Date(now - FINISHED_REUSE_MS).toISOString()]
+  });
+}
+
 async function updateRoom(db, row, state, expectedVersion, auth = null) {
   const result = await db.execute({
     sql: `UPDATE ${TABLE} SET auth_json = ?, state_json = ?, status = ?, version = version + 1, updated_at = ?, expires_at = ? WHERE room_code = ? AND version = ?`,
@@ -281,38 +303,62 @@ async function updateRoom(db, row, state, expectedVersion, auth = null) {
   return { ...row, version: expectedVersion + 1, state_json: JSON.stringify(state), status: state.status };
 }
 
-async function createRoom(db, color, targetPlayers, targetRounds) {
-  const token = sessionToken();
-  const seat = 'p1';
+async function createRoom(db, color, targetPlayers, targetRounds, clientToken, requestId) {
+  if (!validCredential(clientToken) || !validCredential(requestId)) throw new Error('invalid_session');
+  const createKey = tokenHash(requestId);
+  const token = String(clientToken);
+  const existing = await readCreateRequest(db, createKey);
+  if (existing) {
+    if (seatFor(existing, token) !== 'p1') throw new Error('unauthorized');
+    return { token, seat: 'p1', room: publicRoom(existing) };
+  }
+
+  await cleanupReusableRooms(db);
   const state = createState(color, targetPlayers, targetRounds);
   const now = new Date().toISOString();
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    const code = roomCode();
+  const start = randomInt(0, 100);
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const code = roomCode((start + attempt) % 100);
     try {
       await db.execute({
-        sql: `INSERT INTO ${TABLE} (room_code, auth_json, state_json, version, status, created_at, updated_at, expires_at) VALUES (?, ?, ?, 1, 'waiting', ?, ?, ?)`,
-        args: [code, JSON.stringify([{ seat, hash: tokenHash(token) }]), JSON.stringify(state), now, now, isoAfter(ROOM_TTL_MS)]
+        sql: `INSERT INTO ${TABLE} (room_code, create_key, auth_json, state_json, version, status, created_at, updated_at, expires_at) VALUES (?, ?, ?, ?, 1, 'waiting', ?, ?, ?)`,
+        args: [code, createKey, JSON.stringify([{ seat: 'p1', hash: tokenHash(token), joinKey: createKey }]), JSON.stringify(state), now, now, isoAfter(ROOM_TTL_MS)]
       });
-      return { token, seat, room: { code, version: 1, ...state } };
+      return { token, seat: 'p1', room: { code, version: 1, ...state } };
     } catch (error) {
-      if (!String(error?.message || '').toLowerCase().includes('unique')) throw error;
+      const message = String(error?.message || '').toLowerCase();
+      if (!message.includes('unique')) throw error;
+      const retryExisting = await readCreateRequest(db, createKey);
+      if (retryExisting) {
+        if (seatFor(retryExisting, token) !== 'p1') throw new Error('unauthorized');
+        return { token, seat: 'p1', room: publicRoom(retryExisting) };
+      }
     }
   }
   throw new Error('room_code_exhausted');
 }
 
-async function joinRoom(db, code, color) {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+async function joinRoom(db, code, color, clientToken, requestId) {
+  if (!validCredential(clientToken) || !validCredential(requestId)) throw new Error('invalid_session');
+  const token = String(clientToken);
+  const joinKey = tokenHash(requestId);
+  for (let attempt = 0; attempt < 6; attempt += 1) {
     const row = await readRoom(db, code);
     if (!row) throw new Error('room_not_found');
+    const auth = authEntries(row);
+    const prior = auth.find(entry => entry.joinKey === joinKey);
+    if (prior) {
+      if (prior.hash !== tokenHash(token)) throw new Error('unauthorized');
+      return { token, seat: prior.seat, room: publicRoom(row) };
+    }
+
     const state = JSON.parse(String(row.state_json));
     const seat = ['p2', 'p3', 'p4'].find(candidate => !state.players.some(player => player.seat === candidate));
     if (!seat) throw new Error('room_full');
     const next = joinState(state, seat, color);
-    const token = sessionToken();
     const result = await db.execute({
       sql: `UPDATE ${TABLE} SET auth_json = ?, state_json = ?, status = ?, version = version + 1, updated_at = ?, expires_at = ? WHERE room_code = ? AND version = ?`,
-      args: [JSON.stringify([...authEntries(row), { seat, hash: tokenHash(token) }]), JSON.stringify(next), next.status, new Date().toISOString(), isoAfter(ROOM_TTL_MS), code, Number(row.version)]
+      args: [JSON.stringify([...auth, { seat, hash: tokenHash(token), joinKey }]), JSON.stringify(next), next.status, new Date().toISOString(), isoAfter(ROOM_TTL_MS), code, Number(row.version)]
     });
     if (Number(result.rowsAffected || 0) === 1) return { token, seat, room: { code, version: Number(row.version) + 1, ...next } };
   }
@@ -321,17 +367,24 @@ async function joinRoom(db, code, color) {
 
 function preview(row) {
   const state = JSON.parse(String(row.state_json));
-  return { code: String(row.room_code), status: state.status, targetPlayers: state.targetPlayers, targetRounds: state.targetRounds, players: state.players, availableColors: COLORS.filter(color => !state.players.some(player => player.color === color)) };
+  return {
+    code: String(row.room_code),
+    status: state.status,
+    targetPlayers: state.targetPlayers,
+    targetRounds: state.targetRounds,
+    players: state.players,
+    availableColors: COLORS.filter(color => !state.players.some(player => player.color === color))
+  };
 }
 
 function statusFor(error) {
   const code = error?.message;
   if (code === 'payload_too_large') return 413;
-  if (code === 'database_not_configured') return 503;
   if (code === 'room_not_found') return 404;
   if (code === 'unauthorized') return 401;
+  if (code === 'room_code_exhausted') return 503;
   if (['not_your_turn', 'room_full', 'room_not_waiting', 'version_conflict', 'color_taken', 'room_not_playing', 'round_not_finished', 'occupied_slot', 'no_piece_remaining'].includes(code)) return 409;
-  if (['invalid_color', 'invalid_player_count', 'invalid_round_count', 'invalid_move', 'invalid_room_code', 'invalid_payload', 'invalid_action', 'invalid_seat'].includes(code)) return 400;
+  if (['invalid_color', 'invalid_player_count', 'invalid_round_count', 'invalid_move', 'invalid_room_code', 'invalid_payload', 'invalid_action', 'invalid_seat', 'invalid_session'].includes(code)) return 400;
   return 500;
 }
 
@@ -360,11 +413,15 @@ export default async function handler(req, res) {
       }
       return json(res, 200, { ok: true, seat, room: publicRoom(row) });
     }
+
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'method_not_allowed' });
     let body;
     try { body = parseBody(req); } catch { throw new Error('invalid_payload'); }
     const action = String(body.action || '');
-    if (action === 'create') return json(res, 201, { ok: true, ...(await createRoom(db, String(body.color || ''), Number(body.targetPlayers), Number(body.targetRounds))) });
+
+    if (action === 'create') {
+      return json(res, 201, { ok: true, ...(await createRoom(db, String(body.color || ''), Number(body.targetPlayers), Number(body.targetRounds), String(body.clientToken || ''), String(body.requestId || ''))) });
+    }
     if (action === 'preview') {
       const code = normalizeCode(body.code);
       if (!ROOM_PATTERN.test(code)) throw new Error('invalid_room_code');
@@ -375,8 +432,9 @@ export default async function handler(req, res) {
     if (action === 'join') {
       const code = normalizeCode(body.code);
       if (!ROOM_PATTERN.test(code)) throw new Error('invalid_room_code');
-      return json(res, 200, { ok: true, ...(await joinRoom(db, code, String(body.color || ''))) });
+      return json(res, 200, { ok: true, ...(await joinRoom(db, code, String(body.color || ''), String(body.clientToken || ''), String(body.requestId || ''))) });
     }
+
     const code = normalizeCode(body.code);
     if (!ROOM_PATTERN.test(code)) throw new Error('invalid_room_code');
     const row = await readRoom(db, code);
@@ -384,7 +442,10 @@ export default async function handler(req, res) {
     const seat = seatFor(row, bearer(req));
     if (!seat) throw new Error('unauthorized');
     const expectedVersion = Number(body.version);
-    if (!Number.isInteger(expectedVersion) || expectedVersion !== Number(row.version)) return json(res, 409, { ok: false, error: 'version_conflict', room: publicRoom(row) });
+    if (!Number.isInteger(expectedVersion) || expectedVersion !== Number(row.version)) {
+      return json(res, 409, { ok: false, error: 'version_conflict', room: publicRoom(row) });
+    }
+
     const state = JSON.parse(String(row.state_json));
     let next;
     if (action === 'move') next = applyMove(state, seat, body);
@@ -401,13 +462,13 @@ export default async function handler(req, res) {
   }
 }
 
-// Exported only for the deterministic rules test.  The Vercel handler above
-// remains the only HTTP entry point and still owns authentication/state.
 export const __testing = {
+  PROTOCOL,
   applyMove,
   createState,
   emptyBoard,
   joinState,
+  normalizeCode,
   rematchState,
   winner
 };
