@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import { __testing } from '../api/_telemetry.js';
 
 const monitor = fs.readFileSync(new URL('../scripts/telemetry_monitor.gd', import.meta.url), 'utf8');
+const watchdog = fs.readFileSync(new URL('../scripts/telemetry_watchdog.gd', import.meta.url), 'utf8');
 const route = fs.readFileSync(new URL('../scripts/rooms_observer_route.gd', import.meta.url), 'utf8');
 const endpoint = fs.readFileSync(new URL('../api/telemetry.js', import.meta.url), 'utf8');
 const observedServer = fs.readFileSync(new URL('../api/rooms-observed.js', import.meta.url), 'utf8');
@@ -60,6 +61,16 @@ for (const marker of [
   assert.ok(monitor.includes(marker), `telemetry monitor is missing ${marker}`);
 }
 
+for (const marker of [
+  "game.integrity.residue_detected",
+  "game.integrity.move_counter_regressed",
+  "gameplay.waiting_too_long",
+  "online.reconnect_too_long",
+  "game.integrity.missing_current_player",
+]) {
+  assert.ok(watchdog.includes(marker), `telemetry watchdog is missing ${marker}`);
+}
+
 assert.ok(route.includes("url.pathname = '/api/rooms-observed'"), 'online rooms must pass through the server-side recorder');
 assert.ok(observedServer.includes("eventName: 'server.rooms.exchange'"), 'server must persist every room exchange');
 assert.ok(observedServer.includes('[YAKOLAK_ROOM_TRACE]'), 'server exchanges must be searchable in Vercel logs');
@@ -69,9 +80,12 @@ assert.ok(endpoint.includes('[YAKOLAK_TRACE]'), 'client telemetry must also be s
 
 assert.ok(scene.includes('res://scripts/rooms_observer_route.gd'), 'server observer route must run in the main scene');
 assert.ok(scene.includes('res://scripts/telemetry_monitor.gd'), 'telemetry monitor must run in the main scene');
+assert.ok(scene.includes('res://scripts/telemetry_watchdog.gd'), 'semantic watchdog must run in the main scene');
 assert.ok(scene.indexOf('RoomsObserverRoute') < scene.indexOf('TelemetryMonitor'), 'server routing must be installed before browser fetch monitoring');
-assert.ok(scene.indexOf('TelemetryMonitor') < scene.indexOf('OnlineSession'), 'telemetry must start before online transport');
+assert.ok(scene.indexOf('TelemetryMonitor') < scene.indexOf('TelemetryWatchdog'), 'raw telemetry must start before semantic watchdog');
+assert.ok(scene.indexOf('TelemetryWatchdog') < scene.indexOf('OnlineSession'), 'watchdog must start before online transport');
 assert.ok(preset.includes('res://scripts/rooms_observer_route.gd'), 'server observer route must be exported to web');
 assert.ok(preset.includes('res://scripts/telemetry_monitor.gd'), 'telemetry monitor must be exported to web');
+assert.ok(preset.includes('res://scripts/telemetry_watchdog.gd'), 'semantic watchdog must be exported to web');
 
 console.log('YAKOLAK_TELEMETRY_CONTRACT_OK');
