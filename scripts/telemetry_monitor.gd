@@ -40,15 +40,20 @@ func _monitor_script() -> String:
   let dropped = 0;
 
   const roomFromUrl = () => {
-    try { return (new URL(location.href).searchParams.get('room') || '').replace(/\D/g, '').slice(0, 2); }
+    try { return (new URL(location.href).searchParams.get('room') || '').replace(/[^0-9]/g, '').slice(0, 2); }
     catch (_) { return ''; }
   };
   context.room = roomFromUrl();
 
+  const cleanText = value => Array.from(String(value)).filter(character => {
+    const code = character.charCodeAt(0);
+    return code >= 32 && code !== 127;
+  }).join('').slice(0, 1200);
+
   const clean = (value, depth = 0) => {
     if (depth > 5) return '[depth-limit]';
     if (value == null || typeof value === 'boolean' || typeof value === 'number') return value;
-    if (typeof value === 'string') return value.replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 1200);
+    if (typeof value === 'string') return cleanText(value);
     if (Array.isArray(value)) return value.slice(0, 64).map(item => clean(item, depth + 1));
     if (typeof value === 'object') {
       const out = {};
@@ -57,12 +62,12 @@ func _monitor_script() -> String:
       }
       return out;
     }
-    return String(value).slice(0, 1200);
+    return cleanText(value);
   };
 
   const absorbRoom = payload => {
     try {
-      if (payload && payload.room && /^\d{2}$/.test(String(payload.room.code || ''))) context.room = String(payload.room.code);
+      if (payload && payload.room && /^[0-9]{2}$/.test(String(payload.room.code || ''))) context.room = String(payload.room.code);
       if (payload && /^p[1-4]$/.test(String(payload.seat || ''))) context.seat = String(payload.seat);
     } catch (_) {}
   };
@@ -135,7 +140,7 @@ func _monitor_script() -> String:
 
   const safeJson = text => {
     if (!text || typeof text !== 'string') return null;
-    try { return clean(JSON.parse(text)); } catch (_) { return text.slice(0, 1200); }
+    try { return clean(JSON.parse(text)); } catch (_) { return cleanText(text); }
   };
   const requestPath = value => {
     try { const url = new URL(value, location.href); return `${url.pathname}${url.search}`.slice(0, 900); }
