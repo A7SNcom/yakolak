@@ -1,25 +1,29 @@
 extends "res://scripts/gameplay_session_camera_safe.gd"
 
 # Gameplay presentation: true Thmanyah Sans hierarchy, a minimal floating menu,
-# and physical score stars inspired by the accepted Three.js scoring behavior.
-# Score/result overlays stay out of the player's sightline so the board remains
-# the primary interface at all times.
+# and the original Three.js p.stl score marker. Score/result overlays stay out
+# of the player's sightline so the board remains the primary interface.
 
 const THMANYAH_REGULAR = preload("res://assets/fonts/thmanyahsans-Regular.otf")
 const THMANYAH_LIGHT = preload("res://assets/fonts/thmanyahsans-Light.otf")
 const THMANYAH_MEDIUM = preload("res://assets/fonts/thmanyahsans-Medium.otf")
 const THMANYAH_BOLD = preload("res://assets/fonts/thmanyahsans-Bold.otf")
-const SCORE_STAR_SCALE: float = 0.052
-const SCORE_STAR_LANE_DISTANCE: float = 4.30
-const SCORE_STAR_DROP_HEIGHT: float = 7.0
-const SCORE_STAR_DROP_SECONDS: float = 0.68
-const SCORE_STAR_OFFSETS: Array[float] = [0.0, -0.62, 0.62, -1.24, 1.24]
-const SCORE_AXES: Dictionary = {
-	"right": Vector3(1.0, 0.0, 0.0),
-	"left": Vector3(-1.0, 0.0, 0.0),
-	"front": Vector3(0.0, 0.0, 1.0),
-	"back": Vector3(0.0, 0.0, -1.0),
-}
+const SCORE_MARKER_MESH = preload("res://generated/score_marker.obj")
+
+# Exact legacy Three.js score-row geometry from v092.
+const LEGACY_UNIT: float = 0.04
+const SCORE_RADIUS: float = 85.0 * LEGACY_UNIT
+const SCORE_GAP: float = 11.0 * LEGACY_UNIT
+const SCORE_HEIGHT: float = 7.0 * LEGACY_UNIT
+const SCORE_SIDES: Array[int] = [0, -1, 1, -2, 2, -3, 3]
+
+# Previously approved presentation: short vertical drop, tiny contact bounce,
+# then the original marker stays on the table as the score itself.
+const SCORE_DROP_DISTANCE: float = 30.0 * LEGACY_UNIT
+const SCORE_BOUNCE_HEIGHT: float = 2.0 * LEGACY_UNIT
+const SCORE_DROP_SECONDS: float = 0.42
+const SCORE_BOUNCE_UP_SECONDS: float = 0.08
+const SCORE_SETTLE_SECONDS: float = 0.12
 
 var quick_layer: CanvasLayer
 var quick_root: Control
@@ -28,7 +32,7 @@ var quick_panel: PanelContainer
 var quick_round_button: Button
 var quick_sound_button: Button
 var quick_pointer_block_until: int = 0
-var score_star_root: Node3D
+var score_marker_root: Node3D
 var rendered_score_counts: Dictionary = {}
 var local_round_auto_due_msec: int = 0
 var hud_visibility_state: String = ""
@@ -39,16 +43,16 @@ func _ready() -> void:
 	super._ready()
 	_apply_thmanyah_to_hud()
 	_build_quick_menu()
-	call_deferred("_ensure_score_star_root")
+	call_deferred("_ensure_score_marker_root")
 	_layout_hud()
 	_sync_hud_visibility()
 	_sync_quick_menu()
-	_publish_score_star_state()
+	_publish_score_marker_state()
 
 
 func _process(delta: float) -> void:
 	super._process(delta)
-	_sync_score_stars()
+	_sync_score_markers()
 	_sync_hud_visibility()
 	_sync_quick_menu()
 	_maybe_auto_advance_round()
@@ -232,8 +236,7 @@ func _on_round_action() -> void:
 
 
 func _show_round_result() -> void:
-	# Keep the board itself as the result presentation. A physical score star
-	# lands in front of the winner; no score sheet or modal covers the game.
+	# No textual result sheet. The legacy p.stl marker is the result display.
 	if result_button != null:
 		result_button.visible = false
 	local_round_auto_due_msec = 0
@@ -299,35 +302,35 @@ func _sync_quick_menu() -> void:
 		JavaScriptBridge.eval("document.body.dataset.yakolakQuickMenu='" + state + "';", true)
 
 
-func _ensure_score_star_root() -> void:
-	if score_star_root != null or intro == null:
+func _ensure_score_marker_root() -> void:
+	if score_marker_root != null or intro == null:
 		return
-	var existing := intro.get_node_or_null("GameplayScoreStars") as Node3D
+	var existing := intro.get_node_or_null("GameplayScoreMarkers") as Node3D
 	if existing != null:
-		score_star_root = existing
+		score_marker_root = existing
 		return
-	score_star_root = Node3D.new()
-	score_star_root.name = "GameplayScoreStars"
-	intro.add_child(score_star_root)
+	score_marker_root = Node3D.new()
+	score_marker_root.name = "GameplayScoreMarkers"
+	intro.add_child(score_marker_root)
 
 
-func _sync_score_stars() -> void:
-	_ensure_score_star_root()
-	if score_star_root == null:
+func _sync_score_markers() -> void:
+	_ensure_score_marker_root()
+	if score_marker_root == null:
 		return
 	if not match_initialized:
-		if score_star_root.get_child_count() > 0 or not rendered_score_counts.is_empty():
-			_clear_score_stars()
+		if score_marker_root.get_child_count() > 0 or not rendered_score_counts.is_empty():
+			_clear_score_markers()
 		return
 
 	var must_rebuild: bool = false
-	for direction_value: Variant in SCORE_AXES.keys():
+	for direction_value: Variant in ["right", "left", "front", "back"]:
 		var direction: String = str(direction_value)
 		if int(scores.get(direction, 0)) < int(rendered_score_counts.get(direction, 0)):
 			must_rebuild = true
 			break
 	if must_rebuild:
-		_clear_score_stars()
+		_clear_score_markers()
 
 	for player: Dictionary in players:
 		var direction: String = str(player.get("direction", ""))
@@ -336,62 +339,79 @@ func _sync_score_stars() -> void:
 		var current: int = int(scores.get(direction, 0))
 		var rendered: int = int(rendered_score_counts.get(direction, 0))
 		while rendered < current:
-			if not _spawn_score_star(direction, rendered):
+			if not _spawn_score_marker(direction, rendered):
 				break
 			rendered += 1
 		rendered_score_counts[direction] = rendered
 
 
-func _spawn_score_star(direction: String, score_index: int) -> bool:
-	if intro == null or score_star_root == null:
-		return false
-	var source := intro.get_node_or_null("ApprovedStarTableSVG") as MeshInstance3D
-	if source == null or source.mesh == null:
-		return false
-	var axis: Vector3 = SCORE_AXES.get(direction, Vector3(1.0, 0.0, 0.0)) as Vector3
-	var tangent := Vector3(-axis.z, 0.0, axis.x)
-	var offset: float = SCORE_STAR_OFFSETS[score_index % SCORE_STAR_OFFSETS.size()]
-	var landing := axis * SCORE_STAR_LANE_DISTANCE + tangent * offset + Vector3(0.0, 0.16, 0.0)
+func _legacy_score_transform(direction: String, score_index: int) -> Dictionary:
+	var side: int = SCORE_SIDES[score_index % SCORE_SIDES.size()]
+	match direction:
+		"front":
+			return {"position": Vector3(float(side) * SCORE_GAP, SCORE_HEIGHT, SCORE_RADIUS), "rotation": Vector3(-90.0, 0.0, 0.0)}
+		"back":
+			return {"position": Vector3(float(side) * SCORE_GAP, SCORE_HEIGHT, -SCORE_RADIUS), "rotation": Vector3(-90.0, 0.0, 0.0)}
+		"right":
+			return {"position": Vector3(SCORE_RADIUS, SCORE_HEIGHT, float(side) * SCORE_GAP), "rotation": Vector3(-90.0, 0.0, 90.0)}
+		_:
+			return {"position": Vector3(-SCORE_RADIUS, SCORE_HEIGHT, float(side) * SCORE_GAP), "rotation": Vector3(-90.0, 0.0, 90.0)}
 
+
+func _spawn_score_marker(direction: String, score_index: int) -> bool:
+	if intro == null or score_marker_root == null or SCORE_MARKER_MESH == null:
+		return false
+	var transform: Dictionary = _legacy_score_transform(direction, score_index)
+	var landing: Vector3 = transform["position"] as Vector3
+	var rotation: Vector3 = transform["rotation"] as Vector3
+
+	# Exact material from the recovered Three.js pPointMat.
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color("#d8dde0")
-	material.roughness = 0.46
-	material.metallic = 0.24
+	material.albedo_color = Color("#bfc2c7")
+	material.roughness = 0.62
+	material.metallic = 0.08
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 
-	var star := MeshInstance3D.new()
-	star.name = "ScoreStar_%s_%d" % [direction, score_index + 1]
-	star.mesh = source.mesh
-	star.material_override = material
-	star.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-	star.position = landing + Vector3.UP * SCORE_STAR_DROP_HEIGHT
-	star.scale = Vector3.ONE * 0.010
-	star.quaternion = (Quaternion(Vector3.RIGHT, deg_to_rad(22.0)) * Quaternion(Vector3.UP, deg_to_rad(28.0)) * source.quaternion).normalized()
-	score_star_root.add_child(star)
+	var marker := MeshInstance3D.new()
+	marker.name = "ScoreMarker_%s_%d" % [direction, score_index + 1]
+	marker.mesh = SCORE_MARKER_MESH as Mesh
+	marker.material_override = material
+	marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	marker.scale = Vector3.ONE * LEGACY_UNIT
+	marker.rotation_degrees = rotation
+	marker.position = landing + Vector3.UP * SCORE_DROP_DISTANCE
+	score_marker_root.add_child(marker)
 
+	# Only the already-approved motion is added around the exact old geometry,
+	# row, orientation, size and material: straight down, tiny bounce, settle.
 	var tween: Tween = create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(star, "position", landing, SCORE_STAR_DROP_SECONDS).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN)
-	tween.tween_property(star, "scale", Vector3.ONE * SCORE_STAR_SCALE, SCORE_STAR_DROP_SECONDS).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	tween.tween_property(star, "quaternion", source.quaternion, SCORE_STAR_DROP_SECONDS).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_publish_score_star_state()
+	tween.tween_property(marker, "position", landing, SCORE_DROP_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_property(marker, "position", landing + Vector3.UP * SCORE_BOUNCE_HEIGHT, SCORE_BOUNCE_UP_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(marker, "position", landing, SCORE_SETTLE_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_publish_score_marker_state()
 	return true
 
 
-func _clear_score_stars() -> void:
-	if score_star_root != null:
-		for child: Node in score_star_root.get_children():
-			score_star_root.remove_child(child)
+func _clear_score_markers() -> void:
+	if score_marker_root != null:
+		for child: Node in score_marker_root.get_children():
+			score_marker_root.remove_child(child)
 			child.queue_free()
 	rendered_score_counts.clear()
-	_publish_score_star_state()
+	_publish_score_marker_state()
 
 
-func _publish_score_star_state() -> void:
+func _publish_score_marker_state() -> void:
 	if not OS.has_feature("web"):
 		return
-	var count: int = score_star_root.get_child_count() if score_star_root != null else 0
-	JavaScriptBridge.eval("document.body.dataset.yakolakScoreStars='%d';" % count, true)
+	var count: int = score_marker_root.get_child_count() if score_marker_root != null else 0
+	JavaScriptBridge.eval(
+		"document.body.dataset.yakolakScoreMarkers='%d';" % count +
+		"document.body.dataset.yakolakScoreMarkerModel='legacy-p-stl';" +
+		"document.body.dataset.yakolakScoreMarkerPlacement='v092';" +
+		"document.body.dataset.yakolakScoreStars='0';",
+		true
+	)
 
 
 func _publish_result_overlay_state() -> void:
@@ -405,6 +425,6 @@ func _publish_result_overlay_state() -> void:
 
 func _return_to_setup() -> void:
 	local_round_auto_due_msec = 0
-	_clear_score_stars()
+	_clear_score_markers()
 	super._return_to_setup()
 	_sync_hud_visibility()
