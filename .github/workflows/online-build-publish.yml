@@ -39,11 +39,15 @@ jobs:
           node-version: 22
       - name: Install small server dependency
         run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
-      - name: Verify online rules, stability and Arabic UI contracts
+      - name: Verify online rules, stability, Arabic UI and telemetry contracts
         run: |
+          node --check api/rooms.js
+          node --check api/_telemetry.js
+          node --check api/telemetry.js
           node tests/online_rules.test.mjs
           node tests/online_reliability_contract.test.mjs
           node tests/arabic_ui_contract.test.mjs
+          node tests/telemetry_contract.test.mjs
       - name: Restore Godot caches
         uses: actions/cache@v4
         with:
