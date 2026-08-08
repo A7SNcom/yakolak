@@ -3,7 +3,7 @@ extends Node
 # Browser-only deterministic hook used by Playwright. It is inert for normal
 # players and only exists when the explicit yakolakTestFast query flag is set.
 
-var online: Node
+var gameplay: Node
 var start_callback: Variant
 
 
@@ -13,8 +13,8 @@ func _ready() -> void:
 	var enabled: Variant = JavaScriptBridge.eval("new URL(location.href).searchParams.get('yakolakTestFast')==='1'", true)
 	if not bool(enabled):
 		return
-	online = get_parent().get_node_or_null("OnlineSession")
-	if online == null:
+	gameplay = get_parent().get_node_or_null("PostIntroGameplay")
+	if gameplay == null:
 		return
 	start_callback = JavaScriptBridge.create_callback(_start_online_test)
 	var window: JavaScriptObject = JavaScriptBridge.get_interface("window")
@@ -23,9 +23,9 @@ func _ready() -> void:
 
 
 func _start_online_test(_arguments: Array) -> void:
-	if online == null:
+	if gameplay == null:
 		return
-	online.call("host_match", {
+	gameplay.call("_start_online_host", {
 		"rounds": 3,
 		"players": [
 			{"active": true, "color": "marble", "mode": "local", "label": "أنا", "direction": "right"},
