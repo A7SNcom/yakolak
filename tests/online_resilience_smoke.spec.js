@@ -23,7 +23,7 @@ function baseRoom(code) {
   return {
     code,
     version: 2,
-    protocol: 4,
+    protocol: 5,
     status: 'playing',
     targetPlayers: 2,
     targetRounds: 3,
@@ -47,11 +47,11 @@ function baseRoom(code) {
   };
 }
 
-test('online move is queued behind polling, survives a network failure, and restores after reload', async ({ page }) => {
+test('online move preempts polling, survives a network failure, and restores the same two-digit room after reload', async ({ page }) => {
   test.setTimeout(150000);
 
-  const code = 'ABC234';
-  const token = 'abcdefghijklmnopqrstuvwxyzABCDEFGH1234567890_-';
+  const code = '42';
+  let token = '';
   let room = baseRoom(code);
   let pollCount = 0;
   let movePosts = 0;
@@ -71,7 +71,7 @@ test('online move is queued behind polling, survives a network failure, and rest
       if (pollCount === 1) {
         firstPollStartedResolve();
         await releaseFirstPoll;
-        await route.fulfill({ status: 204, body: '' });
+        try { await route.fulfill({ status: 204, body: '' }); } catch {}
         return;
       }
       if (since !== room.version) {
@@ -88,6 +88,9 @@ test('online move is queued behind polling, survives a network failure, and rest
 
     const body = JSON.parse(request.postData() || '{}');
     if (body.action === 'create') {
+      token = String(body.clientToken || '');
+      expect(token.length).toBeGreaterThanOrEqual(32);
+      expect(String(body.requestId || '').length).toBeGreaterThanOrEqual(32);
       await route.fulfill({
         status: 201,
         contentType: 'application/json',
@@ -147,14 +150,14 @@ test('online move is queued behind polling, survives a network failure, and rest
     { timeout: 15000 }
   );
 
-  // The poll is intentionally held open. The move must be queued, not dropped.
+  // The first poll is deliberately never answered. A real move must cancel it
+  // and reach the API immediately instead of waiting for the poll timeout.
   await page.evaluate(() => window.yakolakTestPlayOneMove());
-  await page.waitForTimeout(250);
-  expect(movePosts).toBe(0);
+  await expect.poll(() => movePosts, { timeout: 2500 }).toBeGreaterThanOrEqual(1);
   releaseFirstPollResolve();
 
-  // First mutation gets a synthetic 503. The client must reconcile and retry
-  // without returning to setup or losing the match.
+  // First mutation gets a synthetic 503. The client must keep the match alive,
+  // refresh authoritative state and retry the exact same intent safely.
   await page.waitForFunction(
     () => Number(document.body.dataset.yakolakMoves || 0) >= 1 &&
           document.body.dataset.yakolakCurrentPlayer === 'back' &&
@@ -169,9 +172,6 @@ test('online move is queued behind polling, survives a network failure, and rest
   expect(saved).toContain('p1');
   expect(saved).toContain(token);
 
-  // A browser refresh must restore the same identity and the authoritative
-  // post-move turn. That turn can only be "back" after the saved move was
-  // accepted, so it also proves the refreshed client consumed the new room.
   await page.goto(`http://127.0.0.1:8000/?room=${code}&yakolakTestFast=1`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'complete' &&
