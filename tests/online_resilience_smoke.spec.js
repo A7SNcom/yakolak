@@ -169,12 +169,14 @@ test('online move is queued behind polling, survives a network failure, and rest
   expect(saved).toContain('p1');
   expect(saved).toContain(token);
 
-  // A browser refresh must restore the same identity and authoritative state.
+  // A browser refresh must restore the same identity and the authoritative
+  // post-move turn. That turn can only be "back" after the saved move was
+  // accepted, so it also proves the refreshed client consumed the new room.
   await page.goto(`http://127.0.0.1:8000/?room=${code}&yakolakTestFast=1`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'complete' &&
-          Number(document.body.dataset.yakolakMoves || 0) >= 1 &&
-          document.body.dataset.yakolakCurrentPlayer === 'back',
+          document.body.dataset.yakolakCurrentPlayer === 'back' &&
+          Number(document.body.dataset.yakolakPlayers || 0) === 2,
     null,
     { timeout: 60000 }
   );
