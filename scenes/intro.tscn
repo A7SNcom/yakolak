@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://scripts/intro.gd" id="1_intro"]
 [ext_resource type="Script" path="res://scripts/intro_corrections.gd" id="2_corrections"]
@@ -14,6 +14,7 @@
 [ext_resource type="Script" path="res://scripts/session_setup_guard.gd" id="12_setup_guard"]
 [ext_resource type="Script" path="res://scripts/background_music.gd" id="13_music"]
 [ext_resource type="Script" path="res://scripts/gameplay_camera_zoom.gd" id="14_zoom"]
+[ext_resource type="Script" path="res://scripts/online_resilience_test_bridge.gd" id="15_online_test"]
 
 [node name="YAKOLAKIntro26" type="Node3D"]
 script = ExtResource("1_intro")
@@ -50,6 +51,9 @@ script = ExtResource("12_setup_guard")
 
 [node name="OnlineSession" type="Node" parent="."]
 script = ExtResource("11_online")
+
+[node name="OnlineResilienceTestBridge" type="Node" parent="."]
+script = ExtResource("15_online_test")
 
 [node name="PostIntroGameplay" type="Node" parent="."]
 script = ExtResource("3_gameplay")
