@@ -17,7 +17,7 @@ test.use({
   }
 });
 
-test('winner gets a physical score star and the next local round starts without a result overlay', async ({ page }) => {
+test('winner gets the original p.stl score marker and the next local round starts without a result overlay', async ({ page }) => {
   test.setTimeout(120000);
   const failures = [];
   const songRequests = [];
@@ -53,7 +53,9 @@ test('winner gets a physical score star and the next local round starts without 
           document.body.dataset.yakolakIntroReplay === 'locked' &&
           document.body.dataset.yakolakMusic === 'playing' &&
           document.body.dataset.yakolakScoreHud === 'hidden' &&
-          document.body.dataset.yakolakResultOverlay === 'hidden',
+          document.body.dataset.yakolakResultOverlay === 'hidden' &&
+          document.body.dataset.yakolakScoreMarkerModel === 'legacy-p-stl' &&
+          document.body.dataset.yakolakScoreMarkerPlacement === 'v092',
     null,
     { timeout: 15000 }
   );
@@ -63,7 +65,8 @@ test('winner gets a physical score star and the next local round starts without 
     () => document.body.dataset.yakolakMatchState === 'round-complete' &&
           document.body.dataset.yakolakResultOverlay === 'hidden' &&
           document.body.dataset.yakolakScoreHud === 'hidden' &&
-          Number(document.body.dataset.yakolakScoreStars || 0) === 1,
+          document.body.dataset.yakolakScoreStars === '0' &&
+          Number(document.body.dataset.yakolakScoreMarkers || 0) === 1,
     null,
     { timeout: 5000 }
   );
@@ -76,12 +79,13 @@ test('winner gets a physical score star and the next local round starts without 
           document.body.dataset.yakolakIntro === 'complete' &&
           document.body.dataset.yakolakIntroReplay === 'locked' &&
           document.body.dataset.yakolakMusic === 'playing' &&
-          Number(document.body.dataset.yakolakScoreStars || 0) === 1,
+          document.body.dataset.yakolakScoreStars === '0' &&
+          Number(document.body.dataset.yakolakScoreMarkers || 0) === 1,
     null,
     { timeout: 15000 }
   );
 
   expect(songRequests).toEqual([]);
   expect(failures).toEqual([]);
-  console.log('YAKOLAK_PHYSICAL_SCORE_STAR_OK overlay-hidden auto-round-2 board-ready');
+  console.log('YAKOLAK_LEGACY_SCORE_MARKER_OK p-stl v092-placement overlay-hidden auto-round-2 board-ready');
 });
