@@ -1,7 +1,56 @@
 extends "res://scripts/session_setup_redesign.gd"
 
-# Prevent layout-triggered screen rebuild loops. Each question lays itself out
-# once; viewport resize only recomputes the two-container geometry and framing.
+# Final split-screen setup polish: real Thmanyah Sans hierarchy using distinct
+# weights, while viewport resize only recomputes geometry and never rebuilds a
+# question. The board remains centered in the lower half throughout setup.
+
+const THMANYAH_LIGHT = preload("res://assets/fonts/thmanyahsans-Light.otf")
+const THMANYAH_MEDIUM = preload("res://assets/fonts/thmanyahsans-Medium.otf")
+const THMANYAH_BOLD = preload("res://assets/fonts/thmanyahsans-Bold.otf")
+
+
+func _font_for_ui(size: int) -> Font:
+	if size >= 22:
+		return THMANYAH_BOLD
+	if size <= 14:
+		return THMANYAH_LIGHT
+	return THMANYAH_MEDIUM
+
+
+func _label(text_value: String, size: int, alignment: HorizontalAlignment, color: Color = Color.WHITE) -> Label:
+	var label: Label = super._label(text_value, size, alignment, color)
+	label.add_theme_font_override("font", _font_for_ui(size))
+	return label
+
+
+func _button(text_value: String, foreground: Color, background: Color) -> Button:
+	var button: Button = super._button(text_value, foreground, background)
+	button.add_theme_font_override("font", THMANYAH_MEDIUM)
+	return button
+
+
+func _big_choice(text_value: String) -> Button:
+	var button: Button = super._big_choice(text_value)
+	button.add_theme_font_override("font", THMANYAH_BOLD)
+	return button
+
+
+func _apply_picker_font(picker: OptionButton) -> void:
+	super._apply_picker_font(picker)
+	picker.add_theme_font_override("font", THMANYAH_MEDIUM)
+	var menu: PopupMenu = picker.get_popup()
+	menu.add_theme_font_override("font", THMANYAH_MEDIUM)
+
+
+func _publish_setup_metrics() -> void:
+	super._publish_setup_metrics()
+	if OS.has_feature("web") and showing:
+		JavaScriptBridge.eval(
+			"document.body.dataset.yakolakSetupFontWeights='light,medium,bold';" +
+			"document.body.dataset.yakolakSetupFontFamily='thmanyah-sans';",
+			true
+		)
+
 
 func _layout_card() -> void:
 	if root == null or card == null:

@@ -17,8 +17,8 @@ test.use({
   }
 });
 
-test('music is bundled and next-round tap keeps the board alive', async ({ page }) => {
-  test.setTimeout(90000);
+test('winner gets a physical score star and the next local round starts without a result overlay', async ({ page }) => {
+  test.setTimeout(120000);
   const failures = [];
   const songRequests = [];
   page.on('pageerror', error => failures.push(`pageerror: ${error.message}`));
@@ -35,7 +35,7 @@ test('music is bundled and next-round tap keeps the board alive', async ({ page 
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'complete' &&
           document.body.dataset.yakolakSetup === 'visible' &&
-          document.body.dataset.yakolakMusic === 'playing' &&
+          document.body.dataset.yakolakHudVisibility === 'hidden' &&
           typeof window.yakolakTestStartPassPlay === 'function' &&
           typeof window.yakolakTestForceRoundComplete === 'function',
     null,
@@ -51,7 +51,9 @@ test('music is bundled and next-round tap keeps the board alive', async ({ page 
           document.body.dataset.yakolakMatchState === 'turn' &&
           document.body.dataset.yakolakRound === '1' &&
           document.body.dataset.yakolakIntroReplay === 'locked' &&
-          document.body.dataset.yakolakMusic === 'playing',
+          document.body.dataset.yakolakMusic === 'playing' &&
+          document.body.dataset.yakolakScoreHud === 'hidden' &&
+          document.body.dataset.yakolakResultOverlay === 'hidden',
     null,
     { timeout: 15000 }
   );
@@ -59,20 +61,12 @@ test('music is bundled and next-round tap keeps the board alive', async ({ page 
   await page.evaluate(() => window.yakolakTestForceRoundComplete());
   await page.waitForFunction(
     () => document.body.dataset.yakolakMatchState === 'round-complete' &&
-          document.body.dataset.yakolakRoundButtonX &&
-          document.body.dataset.yakolakRoundButtonY,
+          document.body.dataset.yakolakResultOverlay === 'hidden' &&
+          document.body.dataset.yakolakScoreHud === 'hidden' &&
+          Number(document.body.dataset.yakolakScoreStars || 0) === 1,
     null,
     { timeout: 5000 }
   );
-
-  const button = await page.evaluate(() => {
-    const scale = Math.min(window.innerWidth / 720, window.innerHeight / 1280);
-    return {
-      x: Number(document.body.dataset.yakolakRoundButtonX) * scale,
-      y: Number(document.body.dataset.yakolakRoundButtonY) * scale
-    };
-  });
-  await page.touchscreen.tap(button.x, button.y);
 
   await page.waitForFunction(
     () => document.body.dataset.yakolakRound === '2' &&
@@ -81,12 +75,13 @@ test('music is bundled and next-round tap keeps the board alive', async ({ page 
           document.body.dataset.yakolakCurrentPlayer === 'back' &&
           document.body.dataset.yakolakIntro === 'complete' &&
           document.body.dataset.yakolakIntroReplay === 'locked' &&
-          document.body.dataset.yakolakMusic === 'playing',
+          document.body.dataset.yakolakMusic === 'playing' &&
+          Number(document.body.dataset.yakolakScoreStars || 0) === 1,
     null,
     { timeout: 15000 }
   );
 
   expect(songRequests).toEqual([]);
   expect(failures).toEqual([]);
-  console.log('YAKOLAK_ROUND_2_OK music-bundled intro-stays-complete board-ready');
+  console.log('YAKOLAK_PHYSICAL_SCORE_STAR_OK overlay-hidden auto-round-2 board-ready');
 });

@@ -22,13 +22,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Fetch pinned Thmanyah Sans UI font
+      - name: Fetch pinned Thmanyah Sans UI font weights
         run: |
           mkdir -p assets/fonts
-          curl -L --fail --retry 3 --retry-delay 2 \
-            -o assets/fonts/thmanyahsans-Regular.otf \
-            https://raw.githubusercontent.com/islamic-center-regensburg/izr-mobile-app/1f9055ae105e6679d95f919b95b355baa5bfb43d/assets/fonts/Thmanyah/thmanyahsans/otf/thmanyahsans-Regular.otf
+          BASE=https://raw.githubusercontent.com/islamic-center-regensburg/izr-mobile-app/1f9055ae105e6679d95f919b95b355baa5bfb43d/assets/fonts/Thmanyah/thmanyahsans/otf
+          curl -L --fail --retry 3 --retry-delay 2 -o assets/fonts/thmanyahsans-Regular.otf "$BASE/thmanyahsans-Regular.otf"
+          curl -L --fail --retry 3 --retry-delay 2 -o assets/fonts/thmanyahsans-Light.otf "$BASE/thmanyahsans-Light.otf"
+          curl -L --fail --retry 3 --retry-delay 2 -o assets/fonts/thmanyahsans-Medium.otf "$BASE/thmanyahsans-Medium.otf"
+          curl -L --fail --retry 3 --retry-delay 2 -o assets/fonts/thmanyahsans-Bold.otf "$BASE/thmanyahsans-Bold.otf"
           test "$(git hash-object assets/fonts/thmanyahsans-Regular.otf)" = "ca891297805da60b4b4e6d3a6f02cd7c0f2f33b7"
+          test "$(git hash-object assets/fonts/thmanyahsans-Light.otf)" = "aebd416113380e9e96bbe9bfbc5c4a008b2f7b67"
+          test "$(git hash-object assets/fonts/thmanyahsans-Medium.otf)" = "87fdec346be83a9dcc9eed5ea8aa04cc5a87faef"
+          test "$(git hash-object assets/fonts/thmanyahsans-Bold.otf)" = "349937a73e14f681a3d4cb95e966aa7cec35bcc3"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -69,7 +74,7 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f web assets/fonts/thmanyahsans-Regular.otf
+          git add -f web assets/fonts/thmanyahsans-*.otf
           if git diff --cached --quiet; then
             echo "Web output unchanged."
             exit 0
