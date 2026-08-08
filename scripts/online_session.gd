@@ -1,8 +1,8 @@
 extends Node
 
-# Resilient web transport around the server-authoritative /api/rooms endpoint.
-# The server owns legality/state. This node owns retries, reconciliation and
-# browser lifecycle recovery so a short network hiccup never destroys a match.
+# Server-authoritative online transport. Gameplay mutations always outrank
+# background polling, bootstrap requests are idempotent/retried, and transient
+# network failures never destroy an active match.
 
 signal room_state_changed(room: Dictionary, identity: Dictionary)
 signal online_error(code: String)
@@ -11,13 +11,14 @@ signal room_previewed(room: Dictionary)
 signal room_preview_failed(code: String)
 signal connection_state_changed(state: String, detail: String)
 
-const POLL_MS: int = 900
-const REQUEST_TIMEOUT_MS: int = 9000
-const RETRY_BASE_MS: int = 700
-const RETRY_MAX_MS: int = 8000
-const WAKE_CHECK_MS: int = 450
-const MAX_MUTATION_RETRIES: int = 4
-const ROOM_ALPHABET: String = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+const PROTOCOL: int = 5
+const POLL_MS: int = 700
+const REQUEST_TIMEOUT_MS: int = 6500
+const RETRY_BASE_MS: int = 450
+const RETRY_MAX_MS: int = 4000
+const WAKE_CHECK_MS: int = 400
+const MAX_MUTATION_RETRIES: int = 12
+const MAX_BOOTSTRAP_RETRIES: int = 8
 
 var room: Dictionary = {}
 var identity: Dictionary = {}
@@ -35,18 +36,19 @@ var consecutive_failures: int = 0
 var reconnecting: bool = false
 var next_wake_check_msec: int = 0
 
-# A user action must never be dropped just because a background poll is in
-# flight. One gameplay action at a time is enough because the game itself locks
-# input while a move/rematch is being submitted.
 var queued_action_kind: String = ""
 var queued_action_payload: Dictionary = {}
 
-# Mutations are reconciled with authoritative state after a timeout/network
-# error. Versioned writes make a retry safe: if the first request actually won,
-# the follow-up poll observes it instead of applying the move twice.
 var pending_mutation_kind: String = ""
 var pending_mutation_payload: Dictionary = {}
 var pending_mutation_attempts: int = 0
+
+# create/join are safe to retry because the client supplies a stable token and
+# request id. The server recognizes the same request and returns the same seat.
+var bootstrap_kind: String = ""
+var bootstrap_payload: Dictionary = {}
+var bootstrap_attempts: int = 0
+var next_bootstrap_retry_msec: int = 0
 
 
 func _ready() -> void:
@@ -67,17 +69,21 @@ func _process(_delta: float) -> void:
 		next_wake_check_msec = now + WAKE_CHECK_MS
 		_consume_browser_wake()
 
-	# Drain stale/late browser events even while idle. Request ids make them safe.
 	if _consume_bridge_event():
 		return
 
 	if busy:
-		if request_started_msec > 0 and now - request_started_msec >= REQUEST_TIMEOUT_MS + 1200:
+		if request_started_msec > 0 and now - request_started_msec >= REQUEST_TIMEOUT_MS + 900:
 			var timed_out_kind: String = inflight_kind
 			var timed_out_payload: Dictionary = inflight_payload.duplicate(true)
 			_abort_active_request()
 			_clear_inflight()
 			_handle_request_failure(timed_out_kind, timed_out_payload, "online_timeout", 0)
+		return
+
+	if not bootstrap_kind.is_empty() and not active:
+		if now >= next_bootstrap_retry_msec:
+			_request_post(bootstrap_kind, bootstrap_payload)
 		return
 
 	if not active or room.is_empty():
@@ -94,24 +100,23 @@ func host_match(configuration: Dictionary) -> void:
 	if configured_players.size() < 2:
 		online_error.emit("invalid_player_count")
 		return
-	if busy:
-		online_error.emit("online_busy")
-		return
-	_reset_transport_state(false)
+	_reset_transport_state(true)
 	var host: Dictionary = configured_players[0] as Dictionary
-	_request_post("create", {
+	_start_bootstrap("create", {
 		"action": "create",
 		"color": str(host.get("color", "")),
 		"targetPlayers": configured_players.size(),
 		"targetRounds": int(configuration.get("rounds", 3)),
+		"clientToken": _new_secret(32),
+		"requestId": _new_secret(24),
 	})
 
 
 func restore_from_location() -> bool:
 	if not OS.has_feature("web") or active or busy:
 		return false
-	var code_value: Variant = JavaScriptBridge.eval("String(new URL(location.href).searchParams.get('room')||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6)", true)
-	var code: String = str(code_value)
+	var raw_code: Variant = JavaScriptBridge.eval("String(new URL(location.href).searchParams.get('room')||'')", true)
+	var code: String = _normalize_code(str(raw_code))
 	if not _valid_room_code(code):
 		return false
 	var code_json: String = JSON.stringify(code)
@@ -139,11 +144,14 @@ func join_match(code: String, color: String) -> void:
 	if not _valid_room_code(normalized):
 		online_error.emit("invalid_room_code")
 		return
-	if busy:
-		online_error.emit("online_busy")
-		return
-	_reset_transport_state(false)
-	_request_post("join", {"action": "join", "code": normalized, "color": color})
+	_reset_transport_state(true)
+	_start_bootstrap("join", {
+		"action": "join",
+		"code": normalized,
+		"color": color,
+		"clientToken": _new_secret(32),
+		"requestId": _new_secret(24),
+	})
 
 
 func preview_room(code: String) -> void:
@@ -199,6 +207,8 @@ func leave() -> void:
 
 func deactivate(clear_saved: bool = false) -> void:
 	var code: String = str(identity.get("code", room.get("code", "")))
+	if clear_saved and active and not room.is_empty():
+		_send_leave_keepalive()
 	_abort_active_request()
 	active = false
 	busy = false
@@ -206,6 +216,7 @@ func deactivate(clear_saved: bool = false) -> void:
 	_clear_inflight()
 	_clear_queued_action()
 	_clear_pending_mutation()
+	_clear_bootstrap()
 	_hide_invite_button()
 	_hide_connection_status()
 	if clear_saved and OS.has_feature("web") and not code.is_empty():
@@ -222,18 +233,39 @@ func _reset_transport_state(clear_saved: bool) -> void:
 		deactivate(clear_saved)
 	else:
 		_abort_active_request()
-		busy = false
 		_clear_inflight()
 		_clear_queued_action()
 		_clear_pending_mutation()
+		_clear_bootstrap()
 		consecutive_failures = 0
 		reconnecting = false
 		next_poll_msec = 0
 		_hide_connection_status()
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("window.__yakolakOnlineQueue=[];", true)
+
+
+func _start_bootstrap(kind: String, payload: Dictionary) -> void:
+	bootstrap_kind = kind
+	bootstrap_payload = payload.duplicate(true)
+	bootstrap_attempts = 0
+	next_bootstrap_retry_msec = 0
+	_request_post(kind, bootstrap_payload)
+
+
+func _clear_bootstrap() -> void:
+	bootstrap_kind = ""
+	bootstrap_payload.clear()
+	bootstrap_attempts = 0
+	next_bootstrap_retry_msec = 0
 
 
 func _queue_or_send(kind: String, payload: Dictionary) -> void:
-	if busy:
+	if busy and inflight_kind == "poll":
+		# A real player action must never wait behind a slow background poll.
+		_abort_active_request()
+		_clear_inflight()
+	elif busy:
 		queued_action_kind = kind
 		queued_action_payload = payload.duplicate(true)
 		return
@@ -250,8 +282,6 @@ func _flush_queued_action() -> bool:
 		payload["code"] = str(room.get("code", payload.get("code", "")))
 		payload["version"] = int(room.get("version", payload.get("version", 0)))
 	if kind == "move" and not _can_apply_move_intent(payload):
-		# Authoritative state changed while the poll was in flight. Re-emit the
-		# current room so gameplay unlocks/waits correctly instead of freezing.
 		_accept_room(room)
 		return false
 	_request_post(kind, payload)
@@ -309,13 +339,17 @@ func _mutation_already_applied(kind: String, payload: Dictionary) -> bool:
 	if seat.is_empty():
 		return false
 	if kind == "move":
-		var last_move: Dictionary = room.get("lastMove", {}) as Dictionary
+		var last_move_value: Variant = room.get("lastMove", {})
+		if not last_move_value is Dictionary:
+			return false
+		var last_move: Dictionary = last_move_value as Dictionary
 		return str(last_move.get("seat", "")) == seat and int(last_move.get("cell", -1)) == int(payload.get("cell", -2)) and str(last_move.get("size", "")) == str(payload.get("size", "!"))
 	if kind == "rematch":
 		if str(room.get("status", "")) == "playing":
 			return true
-		var rematch: Dictionary = room.get("rematch", {}) as Dictionary
-		return bool(rematch.get(seat, false))
+		var rematch_value: Variant = room.get("rematch", {})
+		if rematch_value is Dictionary:
+			return bool((rematch_value as Dictionary).get(seat, false))
 	return false
 
 
@@ -360,7 +394,7 @@ func _poll() -> void:
 	var code_json: String = JSON.stringify(code)
 	var version: int = int(room.get("version", 0))
 	var token_json: String = JSON.stringify(token)
-	var script: String = "(async()=>{const id=" + str(active_request_id) + ",kind='poll',q=window.__yakolakOnlineQueue=window.__yakolakOnlineQueue||[],cs=window.__yakolakOnlineControllers=window.__yakolakOnlineControllers||{},c=new AbortController();cs[id]=c;const t=setTimeout(()=>c.abort()," + str(REQUEST_TIMEOUT_MS) + ");try{const r=await fetch('/api/rooms?code='+encodeURIComponent(" + code_json + ")+'&since=" + str(version) + "',{cache:'no-store',credentials:'same-origin',signal:c.signal,headers:{accept:'application/json',authorization:'Bearer '+" + token_json + "}});const d=r.status===204?{unchanged:true}:await r.json().catch(()=>({ok:false,error:'online_server_error'}));q.push({id,kind,ok:r.ok,status:r.status,data:d});}catch(e){q.push({id,kind,ok:false,status:0,data:{error:e&&e.name==='AbortError'?'online_timeout':'online_server_error'}});}finally{clearTimeout(t);delete cs[id];if(q.length>24)q.splice(0,q.length-24);}})();"
+	var script: String = "(async()=>{const id=" + str(active_request_id) + ",kind='poll',q=window.__yakolakOnlineQueue=window.__yakolakOnlineQueue||[],cs=window.__yakolakOnlineControllers=window.__yakolakOnlineControllers||{},c=new AbortController();cs[id]=c;const t=setTimeout(()=>c.abort()," + str(REQUEST_TIMEOUT_MS) + ");try{const r=await fetch('/api/rooms?code='+encodeURIComponent(" + code_json + ")+'&since=" + str(version) + "',{cache:'no-store',credentials:'same-origin',signal:c.signal,headers:{accept:'application/json',authorization:'Bearer '+" + token_json + "}});const d=r.status===204?{unchanged:true}:await r.json().catch(()=>({ok:false,error:'online_server_error'}));q.push({id,kind,ok:r.ok,status:r.status,data:d});}catch(e){q.push({id,kind,ok:false,status:0,data:{error:e&&e.name==='AbortError'?'online_timeout':'online_server_error'}});}finally{clearTimeout(t);delete cs[id];if(q.length>32)q.splice(0,q.length-32);}})();"
 	JavaScriptBridge.eval(script, true)
 
 
@@ -374,7 +408,7 @@ func _request_post(kind: String, payload: Dictionary) -> void:
 	var payload_json: String = JSON.stringify(payload)
 	var token_json: String = JSON.stringify(str(identity.get("token", "")))
 	var kind_json: String = JSON.stringify(kind)
-	var script: String = "(async()=>{const id=" + str(active_request_id) + ",kind=" + kind_json + ",q=window.__yakolakOnlineQueue=window.__yakolakOnlineQueue||[],cs=window.__yakolakOnlineControllers=window.__yakolakOnlineControllers||{},c=new AbortController();cs[id]=c;const t=setTimeout(()=>c.abort()," + str(REQUEST_TIMEOUT_MS) + ");try{const p=" + payload_json + ";const r=await fetch('/api/rooms',{method:'POST',cache:'no-store',credentials:'same-origin',signal:c.signal,headers:{accept:'application/json','content-type':'application/json',authorization:'Bearer '+" + token_json + "},body:JSON.stringify(p)});const d=await r.json().catch(()=>({ok:false,error:'online_server_error'}));q.push({id,kind,ok:r.ok,status:r.status,data:d});}catch(e){q.push({id,kind,ok:false,status:0,data:{error:e&&e.name==='AbortError'?'online_timeout':'online_server_error'}});}finally{clearTimeout(t);delete cs[id];if(q.length>24)q.splice(0,q.length-24);}})();"
+	var script: String = "(async()=>{const id=" + str(active_request_id) + ",kind=" + kind_json + ",q=window.__yakolakOnlineQueue=window.__yakolakOnlineQueue||[],cs=window.__yakolakOnlineControllers=window.__yakolakOnlineControllers||{},c=new AbortController();cs[id]=c;const t=setTimeout(()=>c.abort()," + str(REQUEST_TIMEOUT_MS) + ");try{const p=" + payload_json + ";const r=await fetch('/api/rooms',{method:'POST',cache:'no-store',credentials:'same-origin',signal:c.signal,headers:{accept:'application/json','content-type':'application/json',authorization:'Bearer '+" + token_json + "},body:JSON.stringify(p)});const d=await r.json().catch(()=>({ok:false,error:'online_server_error'}));q.push({id,kind,ok:r.ok,status:r.status,data:d});}catch(e){q.push({id,kind,ok:false,status:0,data:{error:e&&e.name==='AbortError'?'online_timeout':'online_server_error'}});}finally{clearTimeout(t);delete cs[id];if(q.length>32)q.splice(0,q.length-32);}})();"
 	JavaScriptBridge.eval(script, true)
 
 
@@ -389,6 +423,7 @@ func _begin_request(kind: String, payload: Dictionary) -> void:
 
 func _clear_inflight() -> void:
 	busy = false
+	active_request_id = 0
 	request_started_msec = 0
 	inflight_kind = ""
 	inflight_payload.clear()
@@ -409,15 +444,15 @@ func _consume_bridge_event() -> bool:
 		return true
 	var event: Dictionary = parsed as Dictionary
 	var event_id: int = int(event.get("id", 0))
-	if event_id != active_request_id:
-		# Late result from an aborted/expired request. Never let it overwrite the
-		# currently authoritative request.
+	if active_request_id <= 0 or event_id != active_request_id:
 		return true
 	var kind: String = inflight_kind
 	var payload: Dictionary = inflight_payload.duplicate(true)
 	_clear_inflight()
+	var data: Dictionary = {}
 	var data_value: Variant = event.get("data", {})
-	var data: Dictionary = data_value as Dictionary if data_value is Dictionary else {}
+	if data_value is Dictionary:
+		data = data_value as Dictionary
 	var status: int = int(event.get("status", 0))
 	if not bool(event.get("ok", false)):
 		_handle_request_failure(kind, payload, str(data.get("error", "online_server_error")), status, data)
@@ -432,22 +467,24 @@ func _consume_bridge_event() -> bool:
 		return true
 
 	if kind == "preview":
-		var preview: Dictionary = data.get("room", {}) as Dictionary
-		if preview.is_empty():
-			room_preview_failed.emit("online_server_error")
+		var preview_value: Variant = data.get("room", {})
+		if preview_value is Dictionary and not (preview_value as Dictionary).is_empty():
+			room_previewed.emit((preview_value as Dictionary).duplicate(true))
 		else:
-			room_previewed.emit(preview.duplicate(true))
+			room_preview_failed.emit("online_server_error")
 		return true
 
 	if kind == "create" or kind == "join":
-		var received_room: Dictionary = data.get("room", {}) as Dictionary
-		var received_token: String = str(data.get("token", ""))
+		var received_value: Variant = data.get("room", {})
+		var received_room: Dictionary = received_value as Dictionary if received_value is Dictionary else {}
+		var received_token: String = str(data.get("token", payload.get("clientToken", "")))
 		var received_seat: String = str(data.get("seat", ""))
 		if received_room.is_empty() or received_token.is_empty() or received_seat.is_empty() or not _valid_room_code(str(received_room.get("code", ""))):
 			_fatal_error("online_server_error")
 			return true
-		identity = {"token": received_token, "seat": received_seat, "code": str(received_room.get("code", ""))}
+		identity = {"token": received_token, "seat": received_seat, "code": _normalize_code(str(received_room.get("code", "")))}
 		active = true
+		_clear_bootstrap()
 		_store_identity()
 		_accept_room(received_room)
 		if kind == "create":
@@ -458,8 +495,9 @@ func _consume_bridge_event() -> bool:
 
 	if kind == pending_mutation_kind:
 		_clear_pending_mutation()
-	if data.get("room", null) is Dictionary:
-		_accept_room(data["room"] as Dictionary)
+	var room_value: Variant = data.get("room", null)
+	if room_value is Dictionary:
+		_accept_room(room_value as Dictionary)
 	if kind == "leave":
 		deactivate(true)
 		return true
@@ -484,25 +522,30 @@ func _handle_request_failure(kind: String, payload: Dictionary, error_code: Stri
 			_flush_queued_action()
 		return
 
-	# These are gameplay/state conflicts, not connection failures. Refresh the
-	# authoritative room and let the player continue rather than ejecting them.
 	if kind == "move" or kind == "rematch":
 		if ["not_your_turn", "occupied_slot", "no_piece_remaining", "room_not_playing", "round_not_finished"].has(error_code):
 			_mark_connected()
-			_accept_room(room)
 			next_poll_msec = 0
+			_accept_room(room)
 			return
 
 	if _is_transient_failure(error_code, status):
-		if active and (kind == "poll" or kind == "move" or kind == "rematch" or kind == "leave"):
+		if active and ["poll", "move", "rematch", "leave"].has(kind):
 			if kind == "move" or kind == "rematch":
 				_remember_pending_mutation(kind, payload)
+			elif kind == "leave":
+				queued_action_kind = "leave"
+				queued_action_payload = payload.duplicate(true)
 			_mark_reconnecting(error_code)
 			next_poll_msec = Time.get_ticks_msec() + _retry_delay_ms()
 			return
-		# Creating/joining cannot be blindly retried because a lost response may
-		# already have created a seat/token. Fail visibly and let the user retry.
-		if kind == "create" or kind == "join":
+		if (kind == "create" or kind == "join") and kind == bootstrap_kind:
+			bootstrap_attempts += 1
+			if bootstrap_attempts < MAX_BOOTSTRAP_RETRIES:
+				_mark_reconnecting(error_code)
+				next_bootstrap_retry_msec = Time.get_ticks_msec() + _retry_delay_ms()
+				return
+			_clear_bootstrap()
 			online_error.emit(error_code)
 			return
 
@@ -510,13 +553,13 @@ func _handle_request_failure(kind: String, payload: Dictionary, error_code: Stri
 
 
 func _is_transient_failure(error_code: String, status: int) -> bool:
-	return status == 0 or status == 408 or status == 425 or status == 429 or status >= 500 or ["online_server_error", "online_timeout"].has(error_code)
+	return status == 0 or status == 408 or status == 425 or status == 429 or status >= 500 or ["online_server_error", "online_timeout", "online_unavailable"].has(error_code)
 
 
 func _retry_delay_ms() -> int:
 	var power: int = mini(maxi(consecutive_failures - 1, 0), 4)
 	var delay: int = mini(RETRY_BASE_MS * (1 << power), RETRY_MAX_MS)
-	return delay + randi_range(0, 220)
+	return delay + randi_range(0, 180)
 
 
 func _mark_reconnecting(detail: String) -> void:
@@ -536,7 +579,7 @@ func _mark_connected() -> void:
 
 
 func _fatal_error(code: String) -> void:
-	var clear_saved: bool = ["unauthorized", "room_not_found", "invalid_room_code"].has(code)
+	var clear_saved: bool = ["unauthorized", "room_not_found", "invalid_room_code", "online_protocol_mismatch"].has(code)
 	deactivate(clear_saved)
 	online_error.emit(code)
 
@@ -550,7 +593,7 @@ func _accept_room(next_room: Dictionary) -> void:
 		return
 	room = next_room.duplicate(true)
 	room["code"] = code
-	if int(room.get("protocol", 4)) != 4:
+	if int(room.get("protocol", PROTOCOL)) != PROTOCOL:
 		_fatal_error("online_protocol_mismatch")
 		return
 	if str(room.get("status", "")) == "playing":
@@ -565,36 +608,68 @@ func _accept_room(next_room: Dictionary) -> void:
 func _store_identity() -> void:
 	if identity.is_empty():
 		return
-	var value_json: String = JSON.stringify(identity)
+	var identity_json: String = JSON.stringify(identity)
 	var code_json: String = JSON.stringify(str(identity.get("code", "")))
-	JavaScriptBridge.eval("try{const c=" + code_json + ",k='yakolak-online:'+c,v=JSON.stringify(" + value_json + ");sessionStorage.setItem(k,v);localStorage.setItem(k,v);history.replaceState(null,'',location.pathname+'?room='+encodeURIComponent(c));}catch(e){}", true)
+	JavaScriptBridge.eval("try{const c=" + code_json + ",k='yakolak-online:'+c,v=" + identity_json + ";sessionStorage.setItem(k,JSON.stringify(v));localStorage.setItem(k,JSON.stringify(v));history.replaceState(null,'',location.pathname+'?room='+encodeURIComponent(c));}catch(e){}", true)
 
 
 func _consume_browser_wake() -> void:
 	var wake_value: Variant = JavaScriptBridge.eval("Boolean(window.__yakolakOnlineWake&&(window.__yakolakOnlineWake=false,true))", true)
-	if bool(wake_value) and active:
+	if not bool(wake_value):
+		return
+	if active:
 		next_poll_msec = 0
+	elif not bootstrap_kind.is_empty():
+		next_bootstrap_retry_msec = 0
 
 
 func _normalize_code(value: String) -> String:
-	var upper: String = value.to_upper()
 	var result: String = ""
-	for index: int in range(upper.length()):
-		var character: String = upper.substr(index, 1)
-		if ROOM_ALPHABET.contains(character):
-			result += character
-		if result.length() >= 6:
+	for index: int in range(value.length()):
+		var character: String = value.substr(index, 1)
+		var digit: String = character
+		match character:
+			"٠", "۰": digit = "0"
+			"١", "۱": digit = "1"
+			"٢", "۲": digit = "2"
+			"٣", "۳": digit = "3"
+			"٤", "۴": digit = "4"
+			"٥", "۵": digit = "5"
+			"٦", "۶": digit = "6"
+			"٧", "۷": digit = "7"
+			"٨", "۸": digit = "8"
+			"٩", "۹": digit = "9"
+		if digit >= "0" and digit <= "9":
+			result += digit
+		if result.length() >= 2:
 			break
 	return result
 
 
 func _valid_room_code(code: String) -> bool:
-	if code.length() != 6:
+	if code.length() != 2:
 		return false
-	for index: int in range(code.length()):
-		if not ROOM_ALPHABET.contains(code.substr(index, 1)):
+	for index: int in range(2):
+		var character: String = code.substr(index, 1)
+		if character < "0" or character > "9":
 			return false
 	return true
+
+
+func _arabic_digits(value: String) -> String:
+	var result: String = value
+	var western: Array[String] = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+	var arabic: Array[String] = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"]
+	for index: int in range(10):
+		result = result.replace(western[index], arabic[index])
+	return result
+
+
+func _new_secret(bytes: int) -> String:
+	if not OS.has_feature("web"):
+		return ""
+	var script: String = "(()=>{const a=new Uint8Array(" + str(bytes) + ");crypto.getRandomValues(a);return Array.from(a,b=>b.toString(16).padStart(2,'0')).join('');})()"
+	return str(JavaScriptBridge.eval(script, true))
 
 
 func _invite_url(code: String) -> String:
@@ -604,14 +679,26 @@ func _invite_url(code: String) -> String:
 
 func _show_invite_button(url: String, code: String) -> void:
 	var url_json: String = JSON.stringify(url)
-	var code_json: String = JSON.stringify(code)
-	var script: String = "(function(){let b=document.getElementById('yakolak-invite-copy');if(!b){b=document.createElement('button');b.id='yakolak-invite-copy';b.type='button';b.style.cssText='position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:2147483000;border:1px solid #ffffff55;border-radius:14px;padding:12px 16px;background:#151719f2;color:#fff;font:700 16px system-ui;direction:rtl;touch-action:manipulation';document.body.appendChild(b);}const u=" + url_json + ";b.textContent='دعوة: '+" + code_json + "+' · نسخ الرابط';b.onclick=async()=>{try{await navigator.clipboard.writeText(u);b.textContent='تم نسخ الرابط';setTimeout(()=>b.textContent='دعوة: '+" + code_json + "+' · نسخ الرابط',1300);}catch(e){prompt('انسخ الرابط',u);}};b.style.display='block';})();"
+	var code_json: String = JSON.stringify(_arabic_digits(code))
+	var script: String = "(function(){let b=document.getElementById('yakolak-invite-copy');if(!b){b=document.createElement('button');b.id='yakolak-invite-copy';b.type='button';b.style.cssText='position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:2147483000;border:1px solid #ffffff55;border-radius:14px;padding:12px 16px;background:#151719f2;color:#fff;font:700 16px system-ui;direction:rtl;touch-action:manipulation';document.body.appendChild(b);}const u=" + url_json + ",c=" + code_json + ";b.textContent='الغرفة '+c+' · نسخ الدعوة';b.onclick=async()=>{try{await navigator.clipboard.writeText(u);b.textContent='تم نسخ الدعوة';setTimeout(()=>b.textContent='الغرفة '+c+' · نسخ الدعوة',1300);}catch(e){prompt('انسخ رابط الدعوة',u);}};b.style.display='block';})();"
 	JavaScriptBridge.eval(script, true)
 
 
 func _hide_invite_button() -> void:
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("var b=document.getElementById('yakolak-invite-copy');if(b){b.remove();}", true)
+
+
+func _send_leave_keepalive() -> void:
+	if not OS.has_feature("web"):
+		return
+	var code: String = _normalize_code(str(room.get("code", "")))
+	var token: String = str(identity.get("token", ""))
+	if not _valid_room_code(code) or token.is_empty():
+		return
+	var payload: Dictionary = {"action": "leave", "code": code, "version": int(room.get("version", 0))}
+	var script: String = "(()=>{try{fetch('/api/rooms',{method:'POST',keepalive:true,cache:'no-store',credentials:'same-origin',headers:{'content-type':'application/json',authorization:'Bearer '+" + JSON.stringify(token) + "},body:JSON.stringify(" + JSON.stringify(payload) + ")}).catch(()=>{});}catch(e){}})();"
+	JavaScriptBridge.eval(script, true)
 
 
 func _show_connection_status(text: String) -> void:
