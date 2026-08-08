@@ -1,4 +1,4 @@
-[gd_scene load_steps=19 format=3]
+[gd_scene load_steps=20 format=3]
 
 [ext_resource type="Script" path="res://scripts/intro.gd" id="1_intro"]
 [ext_resource type="Script" path="res://scripts/intro_corrections.gd" id="2_corrections"]
@@ -17,6 +17,7 @@
 [ext_resource type="Script" path="res://scripts/online_resilience_test_bridge.gd" id="15_online_test"]
 [ext_resource type="Script" path="res://scripts/telemetry_monitor.gd" id="16_telemetry"]
 [ext_resource type="Script" path="res://scripts/rooms_observer_route.gd" id="17_rooms_observer"]
+[ext_resource type="Script" path="res://scripts/telemetry_watchdog.gd" id="18_watchdog"]
 
 [node name="YAKOLAKIntro26" type="Node3D"]
 script = ExtResource("1_intro")
@@ -56,6 +57,9 @@ script = ExtResource("17_rooms_observer")
 
 [node name="TelemetryMonitor" type="Node" parent="."]
 script = ExtResource("16_telemetry")
+
+[node name="TelemetryWatchdog" type="Node" parent="."]
+script = ExtResource("18_watchdog")
 
 [node name="OnlineSession" type="Node" parent="."]
 script = ExtResource("11_online")
