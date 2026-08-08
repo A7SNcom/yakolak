@@ -22,6 +22,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Fetch pinned Thmanyah Sans UI font
+        run: |
+          mkdir -p assets/fonts
+          curl -L --fail --retry 3 --retry-delay 2 \
+            -o assets/fonts/thmanyahsans-Regular.otf \
+            https://raw.githubusercontent.com/islamic-center-regensburg/izr-mobile-app/1f9055ae105e6679d95f919b95b355baa5bfb43d/assets/fonts/Thmanyah/thmanyahsans/otf/thmanyahsans-Regular.otf
+          test "$(git hash-object assets/fonts/thmanyahsans-Regular.otf)" = "ca891297805da60b4b4e6d3a6f02cd7c0f2f33b7"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -49,10 +56,10 @@ jobs:
         run: |
           npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0 pngjs@7.0.0
           npx playwright install --with-deps chromium
-      - name: Verify gameplay and online recovery before publishing
+      - name: Verify gameplay, split setup and online recovery before publishing
         run: |
           python3 -m http.server 8000 --directory web >/tmp/yakolak-browser.log 2>&1 &
-          npx playwright test tests/gameplay_smoke.spec.js tests/round_transition_smoke.spec.js tests/online_resilience_smoke.spec.js --workers=1 --reporter=line
+          npx playwright test tests/gameplay_smoke.spec.js tests/round_transition_smoke.spec.js tests/online_resilience_smoke.spec.js tests/setup_spatial_smoke.spec.js --workers=1 --reporter=line
       - name: Publish tested web files back to main
         run: |
           git fetch origin main
@@ -62,7 +69,7 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f web
+          git add -f web assets/fonts/thmanyahsans-Regular.otf
           if git diff --cached --quiet; then
             echo "Web output unchanged."
             exit 0

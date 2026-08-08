@@ -1,0 +1,76 @@
+import { test, expect } from '@playwright/test';
+
+test.use({
+  viewport: { width: 390, height: 844 },
+  deviceScaleFactor: 1,
+  launchOptions: {
+    args: [
+      '--use-gl=angle',
+      '--use-angle=swiftshader',
+      '--enable-webgl',
+      '--enable-unsafe-swiftshader',
+      '--ignore-gpu-blocklist',
+      '--disable-dev-shm-usage'
+    ]
+  }
+});
+
+test('setup stays compact above the always-visible board and gameplay keeps a floating menu', async ({ page }) => {
+  test.setTimeout(120000);
+  const failures = [];
+  page.on('pageerror', error => failures.push(`pageerror: ${error.message}`));
+  page.on('requestfailed', request => failures.push(`requestfailed: ${request.url()} ${request.failure()?.errorText || ''}`));
+  page.on('console', message => {
+    const text = message.text();
+    if (message.type() === 'error' && !text.includes('favicon')) failures.push(`console: ${text}`);
+  });
+
+  await page.goto('http://127.0.0.1:8000/?yakolakTestFast=1', { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(
+    () => document.body.dataset.yakolakIntro === 'complete' &&
+          document.body.dataset.yakolakSetup === 'visible' &&
+          typeof window.yakolakTestShowSetup === 'function' &&
+          typeof window.yakolakTestStartPassPlay === 'function',
+    null,
+    { timeout: 60000 }
+  );
+
+  await page.evaluate(() => window.yakolakTestShowSetup());
+  await page.waitForFunction(
+    () => document.body.dataset.yakolakSetupLayout === 'split-wizard-v1' &&
+          document.body.dataset.yakolakSetupWizard === 'color' &&
+          document.body.dataset.yakolakArabicFont === 'thmanyah' &&
+          document.body.dataset.yakolakSetupScrollable === 'false' &&
+          Number.isFinite(Number(document.body.dataset.yakolakBoardSetupYRatio)),
+    null,
+    { timeout: 15000 }
+  );
+
+  const setup = await page.evaluate(() => ({
+    boardY: Number(document.body.dataset.yakolakBoardSetupYRatio),
+    cardBottom: Number(document.body.dataset.yakolakSetupCardBottomRatio),
+    font: document.body.dataset.yakolakArabicFont,
+    layout: document.body.dataset.yakolakSetupLayout,
+    scrollable: document.body.dataset.yakolakSetupScrollable
+  }));
+
+  expect(setup.font).toBe('thmanyah');
+  expect(setup.layout).toBe('split-wizard-v1');
+  expect(setup.scrollable).toBe('false');
+  expect(setup.cardBottom).toBeLessThan(0.50);
+  expect(setup.boardY).toBeGreaterThan(0.58);
+  expect(setup.boardY).toBeLessThan(0.88);
+  expect(setup.boardY - setup.cardBottom).toBeGreaterThan(0.10);
+
+  await page.evaluate(() => window.yakolakTestStartPassPlay());
+  await page.waitForFunction(
+    () => document.body.dataset.yakolakGameplay === 'ready' &&
+          document.body.dataset.yakolakQuickMenu === 'ready' &&
+          document.body.dataset.yakolakGameplayFont === 'thmanyah',
+    null,
+    { timeout: 20000 }
+  );
+
+  expect(failures).toEqual([]);
+  console.log(`YAKOLAK_SPLIT_SETUP_OK card=${setup.cardBottom.toFixed(3)} board=${setup.boardY.toFixed(3)}`);
+});
