@@ -1,6 +1,8 @@
 import roomsHandler from './rooms.js';
 import { getTelemetryClient, sanitizeTelemetryValue, writeTelemetry } from './_telemetry.js';
 
+const TELEMETRY_DEADLINE_MS = 300;
+
 function requestBody(req) {
   try {
     if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) return sanitizeTelemetryValue(req.body);
@@ -34,6 +36,20 @@ function finishResponse(originalEnd, chunk, encoding, callback) {
   if (typeof callback === 'function') return originalEnd(chunk, encoding, callback);
   if (typeof encoding === 'string') return originalEnd(chunk, encoding);
   return originalEnd(chunk);
+}
+
+async function persistWithDeadline(db, event, req) {
+  let timer;
+  try {
+    await Promise.race([
+      writeTelemetry(db, event, req),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('telemetry_deadline')), TELEMETRY_DEADLINE_MS);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 export default async function handler(req, res) {
@@ -91,44 +107,45 @@ export default async function handler(req, res) {
     thrown: thrown ? { name: thrown.name || '', message: thrown.message || String(thrown) } : null,
   };
 
+  const event = {
+    traceId,
+    requestId,
+    roomCode,
+    seat,
+    source: 'server',
+    level,
+    eventName: 'server.rooms.exchange',
+    roomVersion: room?.version ?? null,
+    roundNumber: room?.round ?? null,
+    moveNumber: room?.moveNumber ?? null,
+    details,
+  };
+
   try {
     const db = getTelemetryClient();
-    if (db) {
-      await writeTelemetry(db, {
-        traceId,
-        requestId,
-        roomCode,
-        seat,
-        source: 'server',
-        level,
-        eventName: 'server.rooms.exchange',
-        roomVersion: room?.version ?? null,
-        roundNumber: room?.round ?? null,
-        moveNumber: room?.moveNumber ?? null,
-        details,
-      }, req);
-    }
-    const summary = {
-      trace: traceId,
-      request: requestId,
-      room: roomCode,
-      seat,
-      action,
-      status,
-      durationMs,
-      version: room?.version ?? null,
-      round: room?.round ?? null,
-      move: room?.moveNumber ?? null,
-      requestBody: body,
-      response: payload,
-    };
-    const line = JSON.stringify(summary);
-    if (level === 'error') console.error('[YAKOLAK_ROOM_TRACE]', line);
-    else if (level === 'warn') console.warn('[YAKOLAK_ROOM_TRACE]', line);
-    else console.log('[YAKOLAK_ROOM_TRACE]', line);
+    if (db) await persistWithDeadline(db, event, req);
   } catch (telemetryError) {
-    console.error('[YAKOLAK_ROOM_TRACE_WRITE_FAILED]', telemetryError?.message || telemetryError);
+    console.warn('[YAKOLAK_ROOM_TRACE_WRITE_SKIPPED]', telemetryError?.message || telemetryError);
   }
+
+  const summary = {
+    trace: traceId,
+    request: requestId,
+    room: roomCode,
+    seat,
+    action,
+    status,
+    durationMs,
+    version: room?.version ?? null,
+    round: room?.round ?? null,
+    move: room?.moveNumber ?? null,
+    requestBody: body,
+    response: payload,
+  };
+  const line = JSON.stringify(summary);
+  if (level === 'error') console.error('[YAKOLAK_ROOM_TRACE]', line);
+  else if (level === 'warn') console.warn('[YAKOLAK_ROOM_TRACE]', line);
+  else console.log('[YAKOLAK_ROOM_TRACE]', line);
 
   res.end = originalEnd;
   return finishResponse(originalEnd, captured, capturedEncoding, capturedCallback);
