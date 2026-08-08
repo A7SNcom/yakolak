@@ -3,6 +3,8 @@ extends Node
 # Routes only the online room endpoint through the observed server wrapper.
 # Installed before TelemetryMonitor so the browser recorder still sees the
 # public /api/rooms URL while the actual network call is audited server-side.
+# It also gives first-time invite links a harmless empty identity object so
+# OnlineSession never asks Godot to parse an empty string as JSON.
 
 func _ready() -> void:
 	if not OS.has_feature("web"):
@@ -12,6 +14,21 @@ func _ready() -> void:
 (() => {
   if (window.__yakolakRoomsObserverRouteInstalled) return;
   window.__yakolakRoomsObserverRouteInstalled = true;
+
+  // A fresh guest has a ?room=XX URL but no saved identity yet. The online
+  // session intentionally falls through to preview/join when the object has no
+  // token/seat; storing {} only prevents JSON.parse_string('') from producing
+  // a noisy Godot error before that normal flow begins.
+  try {
+    const room = String(new URL(location.href).searchParams.get('room') || '').replace(/\D/g, '').slice(0, 2);
+    if (/^\d{2}$/.test(room)) {
+      const key = 'yakolak-online:' + room;
+      if (!sessionStorage.getItem(key) && !localStorage.getItem(key)) {
+        sessionStorage.setItem(key, '{}');
+      }
+    }
+  } catch (_) {}
+
   const previousFetch = window.fetch.bind(window);
   window.fetch = function(input, init) {
     try {
