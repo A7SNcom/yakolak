@@ -39,7 +39,7 @@ func _ready() -> void:
 	super._ready()
 	_apply_thmanyah_to_hud()
 	_build_quick_menu()
-	_ensure_score_star_root()
+	call_deferred("_ensure_score_star_root")
 	_layout_hud()
 	_sync_hud_visibility()
 	_sync_quick_menu()
