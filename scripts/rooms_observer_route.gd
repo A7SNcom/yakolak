@@ -20,8 +20,9 @@ func _ready() -> void:
   // token/seat; storing {} only prevents JSON.parse_string('') from producing
   // a noisy Godot error before that normal flow begins.
   try {
-    const room = String(new URL(location.href).searchParams.get('room') || '').replace(/\D/g, '').slice(0, 2);
-    if (/^\d{2}$/.test(room)) {
+    const rawRoom = String(new URL(location.href).searchParams.get('room') || '');
+    const room = Array.from(rawRoom).filter(ch => ch >= '0' && ch <= '9').join('').slice(0, 2);
+    if (room.length === 2) {
       const key = 'yakolak-online:' + room;
       if (!sessionStorage.getItem(key) && !localStorage.getItem(key)) {
         sessionStorage.setItem(key, '{}');
