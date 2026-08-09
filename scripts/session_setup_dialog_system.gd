@@ -297,28 +297,32 @@ func _collect_focusable_controls(node: Node, output: Array[Control]) -> void:
 func _install_web_keyboard_guard() -> void:
 	if not OS.has_feature("web"):
 		return
-	# Godot's stable JavaScriptBridge contract requires retaining the callback
-	# reference; keep it on this node for the whole setup lifetime.
+	# Register the Godot callback directly as a DOM listener. Passing the retained
+	# JavaScriptBridge callback into addEventListener is more reliable than
+	# assigning the callback to a dynamic window property and invoking it via eval.
 	web_window = JavaScriptBridge.get_interface("window")
-	web_escape_callback = JavaScriptBridge.create_callback(_on_web_escape)
+	web_escape_callback = JavaScriptBridge.create_callback(_on_web_keydown)
 	if web_window != null:
-		web_window.__yakolakDialogEscape = web_escape_callback
+		web_window.addEventListener("keydown", web_escape_callback, true)
 	JavaScriptBridge.eval(
-		"if(!window.__yakolakDialogKeyGuard){" +
-		"window.__yakolakDialogKeyGuard=function(e){" +
-		"if(document.body.dataset.yakolakSetup!=='visible'){return;}" +
-		"if(e.key==='Tab'){e.preventDefault();return;}" +
-		"if(e.key==='Escape'){e.preventDefault();e.stopPropagation();" +
-		"if(typeof window.__yakolakDialogEscape==='function'){window.__yakolakDialogEscape('escape');}}" +
-		"};window.addEventListener('keydown',window.__yakolakDialogKeyGuard,true);}",
+		"if(!window.__yakolakDialogTabGuard){" +
+		"window.__yakolakDialogTabGuard=function(e){" +
+		"if(document.body.dataset.yakolakSetup==='visible'&&e.key==='Tab'){e.preventDefault();}" +
+		"};window.addEventListener('keydown',window.__yakolakDialogTabGuard,true);}",
 		true
 	)
 
 
-func _on_web_escape(_args: Array) -> void:
-	if not showing:
+func _on_web_keydown(args: Array) -> void:
+	if args.is_empty():
 		return
-	if active_screen != "room_entry":
+	var js_event := args[0] as JavaScriptObject
+	if js_event == null or str(js_event.key) != "Escape":
+		return
+	JavaScriptBridge.eval("document.body.dataset.yakolakDialogEscapeSeen='escape';", true)
+	js_event.preventDefault()
+	js_event.stopPropagation()
+	if showing and active_screen != "room_entry":
 		_dialog_cancel()
 
 
