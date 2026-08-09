@@ -21,7 +21,7 @@
 [ext_resource type="Script" path="res://scripts/telemetry_console_capture.gd" id="19_console_capture"]
 [ext_resource type="Script" path="res://scripts/gameplay_session_polish.gd" id="20_polish_dependency"]
 [ext_resource type="Script" path="res://scripts/diagnostics_gate.gd" id="21_diagnostics"]
-[ext_resource type="Script" path="res://scripts/gameplay_session_power_smooth.gd" id="22_gameplay"]
+[ext_resource type="Script" path="res://scripts/gameplay_session_efficient.gd" id="22_gameplay"]
 
 [node name="YAKOLAKIntro26" type="Node3D"]
 script = ExtResource("1_intro")

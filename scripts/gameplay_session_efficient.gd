@@ -33,12 +33,12 @@ const SELECTION_LIGHT_ENERGY: float = 1.90
 const SELECTION_DARK_COLOR := Color(0.012, 0.014, 0.018, 1.0)
 const SELECTION_LIGHT_COLOR := Color(1.0, 0.985, 0.94, 1.0)
 
-# Gameplay should spend power only when pixels are actually moving. Static
-# board states render at 30 fps, while every interaction/tween/manual move
-# immediately returns to the approved 60 fps. Geometry, materials, lighting,
-# viewport resolution and effects are untouched.
-const EFF_IDLE_FPS: int = 30
+# Keep one stable 60-fps cadence whenever pixels move. A static board no longer
+# drops the whole renderer to 30 fps (which can feel like a hitch on wake-up);
+# instead Godot's low-processor mode sleeps between on-demand redraws. Geometry,
+# materials, lighting, viewport resolution and effects are untouched.
 const EFF_ACTIVE_FPS: int = 60
+const EFF_IDLE_SLEEP_USEC: int = 6900
 const EFF_IDLE_PROCESS_INTERVAL: float = 0.050
 const EFF_INPUT_BOOST_MS: int = 700
 const EFF_SCORE_BOOST_MS: int = 900
@@ -96,7 +96,7 @@ func _process(delta: float) -> void:
 
 func _input(event: InputEvent) -> void:
 	# Wake the renderer before any user-driven visual reaction. Mouse motion is
-	# included so hover/desktop interaction never feels like a 30-fps interface.
+	# included so hover/desktop interaction always returns to full-rate rendering.
 	if (
 		event is InputEventScreenTouch
 		or event is InputEventScreenDrag
@@ -126,16 +126,23 @@ func _eff_requires_full_rate(now: int) -> bool:
 
 
 func _eff_apply_frame_budget(full_rate: bool) -> void:
-	var target_fps: int = EFF_ACTIVE_FPS if full_rate else EFF_IDLE_FPS
-	if Engine.max_fps != target_fps:
-		Engine.max_fps = target_fps
+	if Engine.max_fps != EFF_ACTIVE_FPS:
+		Engine.max_fps = EFF_ACTIVE_FPS
+
+	var low_power: bool = not full_rate
+	if OS.low_processor_usage_mode != low_power:
+		OS.low_processor_usage_mode = low_power
+	if OS.low_processor_usage_mode_sleep_usec != EFF_IDLE_SLEEP_USEC:
+		OS.low_processor_usage_mode_sleep_usec = EFF_IDLE_SLEEP_USEC
+
 	var profile: int = 1 if full_rate else 0
 	if profile == _eff_frame_profile:
 		return
 	_eff_frame_profile = profile
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
-			"document.body.dataset.yakolakGameplayFrameBudget='" + ("motion-60" if full_rate else "idle-30") + "';" +
+			"document.body.dataset.yakolakGameplayFrameBudget='" + ("motion-60" if full_rate else "idle-on-demand") + "';" +
+			"document.body.dataset.yakolakGameplayPowerMode='" + ("awake" if full_rate else "low-processor") + "';" +
 			"document.body.dataset.yakolakGameplayVisualQuality='unchanged';",
 			true
 		)
