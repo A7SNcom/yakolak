@@ -78,7 +78,15 @@ test('first real move hands the same-device game to player two without a black s
   const songRequests = [];
 
   page.on('pageerror', error => failures.push(`pageerror: ${error.message}`));
-  page.on('requestfailed', request => failures.push(`requestfailed: ${request.url()} ${request.failure()?.errorText || ''}`));
+  page.on('requestfailed', request => {
+    const url = request.url();
+    const errorText = request.failure()?.errorText || '';
+    // Chromium can cancel one duplicate/speculative WASM fetch after Godot has
+    // already booted from the successful request. Keep real WASM/network
+    // failures fatal; ignore only this exact harmless cancellation.
+    if (url.endsWith('/index.wasm') && errorText === 'net::ERR_ABORTED') return;
+    failures.push(`requestfailed: ${url} ${errorText}`);
+  });
   page.on('request', request => {
     if (request.url().includes('song.mp3')) songRequests.push(request.url());
   });
