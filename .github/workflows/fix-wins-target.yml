@@ -1,0 +1,106 @@
+name: One-time fix wins target semantics
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch rounds to mean wins required
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected exactly one match, got {count}: {old!r}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          replace_once(
+              'scripts/gameplay_session.gd',
+              'match_complete = round_number >= total_rounds',
+              'match_complete = winner != "" and int(scores.get(winner, 0)) >= total_rounds',
+          )
+          replace_once(
+              'scripts/gameplay_session.gd',
+              'turn_label.text = "الجولة %d/%d · %s%s" % [round_number, total_rounds, str(player.get("color_name", "")), tutorial_hint]',
+              'turn_label.text = "الجولة %d · للفوز %d أشواط · %s%s" % [round_number, total_rounds, str(player.get("color_name", "")), tutorial_hint]',
+          )
+          replace_once(
+              'scripts/gameplay_session.gd',
+              '"document.body.dataset.yakolakRoundCount=\'%d\';" % total_rounds +',
+              '"document.body.dataset.yakolakRoundCount=\'%d\';" % total_rounds +\n\t\t"document.body.dataset.yakolakWinsToWin=\'%d\';" % total_rounds +',
+          )
+
+          replace_once(
+              'scripts/gameplay_match.gd',
+              'match_complete = round_number >= MATCH_ROUNDS',
+              'match_complete = winner != "" and int(scores.get(winner, 0)) >= MATCH_ROUNDS',
+          )
+          replace_once(
+              'scripts/gameplay_match.gd',
+              'turn_label.text = "الجولة %d/%d  ·  دور %s  ·  %dث" % [round_number, MATCH_ROUNDS, _player_name(direction), seconds]',
+              'turn_label.text = "الجولة %d  ·  للفوز %d أشواط  ·  دور %s  ·  %dث" % [round_number, MATCH_ROUNDS, _player_name(direction), seconds]',
+          )
+
+          replace_once(
+              'scripts/session_setup.gd',
+              'var rounds_label := _label("الأشواط", 18, HORIZONTAL_ALIGNMENT_RIGHT)',
+              'var rounds_label := _label("أشواط للفوز", 18, HORIZONTAL_ALIGNMENT_RIGHT)',
+          )
+          replace_once(
+              'scripts/session_setup.gd',
+              'rounds_picker.add_item("٣ أشواط", 3)',
+              'rounds_picker.add_item("٣ أشواط للفوز", 3)',
+          )
+          replace_once(
+              'scripts/session_setup.gd',
+              'rounds_picker.add_item("٥ أشواط", 5)',
+              'rounds_picker.add_item("٥ أشواط للفوز", 5)',
+          )
+
+          replace_once(
+              'api/rooms.js',
+              'const matchComplete = completedRounds >= Number(state.targetRounds);',
+              'const matchComplete = Boolean(seat) && Number(scores[seat] || 0) >= Number(state.targetRounds);',
+          )
+
+          test_path = Path('tests/online_rules.test.mjs')
+          test_text = test_path.read_text(encoding='utf-8')
+          anchor = "assert.equal(nextRound.scores.p1, 1);\n\nconsole.log('YAKOLAK_ONLINE_RULES_OK');"
+          block = """assert.equal(nextRound.scores.p1, 1);\n\nfunction winCurrentStarter(state) {\n  const winnerSeat = state.players[state.turnIndex].seat;\n  const loserSeat = winnerSeat === 'p1' ? 'p2' : 'p1';\n  state = move(state, winnerSeat, 0, 'small');\n  state = move(state, loserSeat, 8, 'large');\n  state = move(state, winnerSeat, 1, 'small');\n  state = move(state, loserSeat, 7, 'medium');\n  state = move(state, winnerSeat, 2, 'small');\n  assert.equal(state.status, 'finished');\n  return state;\n}\n\nfunction advanceAfterBothPlayers(state) {\n  state = rematchState(state, 'p1');\n  state = rematchState(state, 'p2');\n  return state;\n}\n\nlet raceToThree = room();\nfor (let round = 1; round <= 4; round += 1) {\n  raceToThree = winCurrentStarter(raceToThree);\n  assert.equal(raceToThree.matchComplete, false, `round ${round} must not end a race-to-3 match before anyone has 3 wins`);\n  raceToThree = advanceAfterBothPlayers(raceToThree);\n}\nraceToThree = winCurrentStarter(raceToThree);\nassert.equal(raceToThree.round, 5);\nassert.equal(raceToThree.scores.p1, 3);\nassert.equal(raceToThree.scores.p2, 2);\nassert.equal(raceToThree.matchComplete, true);\nassert.equal(raceToThree.matchWinner?.seat, 'p1');\nassert.equal(raceToThree.matchWinner?.wins, 3);\n\nconsole.log('YAKOLAK_ONLINE_RULES_OK');"""
+          if test_text.count(anchor) != 1:
+              raise SystemExit('tests/online_rules.test.mjs: expected test anchor exactly once')
+          test_path.write_text(test_text.replace(anchor, block, 1), encoding='utf-8')
+          PY
+
+      - name: Verify patched rule contract
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          node --check api/rooms.js
+          node tests/online_rules.test.mjs
+          grep -F 'match_complete = winner != "" and int(scores.get(winner, 0)) >= total_rounds' scripts/gameplay_session.gd
+          grep -F 'أشواط للفوز' scripts/session_setup.gd
+
+      - name: Commit patch to main and remove this one-time workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/fix-wins-target.yml
+          git add scripts/gameplay_session.gd scripts/gameplay_match.gd scripts/session_setup.gd api/rooms.js tests/online_rules.test.mjs
+          git commit -m "[wins-target] الأشواط تعني انتصارات مطلوبة للفوز"
+          git push origin HEAD:main
