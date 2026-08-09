@@ -19,7 +19,15 @@ test('setup stays compact, uses real Thmanyah weights, and leaves no empty gamep
   test.setTimeout(120000);
   const failures = [];
   page.on('pageerror', error => failures.push(`pageerror: ${error.message}`));
-  page.on('requestfailed', request => failures.push(`requestfailed: ${request.url()} ${request.failure()?.errorText || ''}`));
+  page.on('requestfailed', request => {
+    const url = request.url();
+    const errorText = request.failure()?.errorText || '';
+    // Chromium can cancel one duplicate/speculative WASM fetch after Godot has
+    // already booted from the successful request. This is harmless and is
+    // treated the same way as the main gameplay browser smoke test.
+    if (url.endsWith('/index.wasm') && errorText === 'net::ERR_ABORTED') return;
+    failures.push(`requestfailed: ${url} ${errorText}`);
+  });
   page.on('console', message => {
     const text = message.text();
     if (message.type() === 'error' && !text.includes('favicon')) failures.push(`console: ${text}`);
