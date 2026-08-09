@@ -24,14 +24,16 @@ var _eff_score_left: int = -1
 var _eff_score_front: int = -1
 var _eff_score_back: int = -1
 
-# Selection treatment: preserve the stone's real material and draw one opaque,
-# adaptive high-contrast contour. One crisp shell is both clearer and cheaper
-# than a transparent multi-pass halo.
-const SELECTION_DARK_GROW: float = 0.42
-const SELECTION_LIGHT_GROW: float = 0.48
-const SELECTION_LIGHT_ENERGY: float = 1.90
-const SELECTION_DARK_COLOR := Color(0.012, 0.014, 0.018, 1.0)
-const SELECTION_LIGHT_COLOR := Color(1.0, 0.985, 0.94, 1.0)
+# Premium selection treatment: preserve the stone exactly, then draw two crisp
+# opaque contours. A thin dark keyline separates the stone from every possible
+# background, while the brighter outer edge makes the selection unmistakable.
+# Both passes are static and affect only the selected stone: no pulsing, alpha
+# halo or per-frame shader work.
+const SELECTION_KEYLINE_GROW: float = 0.18
+const SELECTION_ACCENT_GROW: float = 0.46
+const SELECTION_ACCENT_ENERGY: float = 1.35
+const SELECTION_KEYLINE_COLOR := Color(0.012, 0.015, 0.020, 1.0)
+const SELECTION_ACCENT_COLOR := Color(0.94, 0.975, 1.0, 1.0)
 
 # Keep one stable 60-fps cadence whenever pixels move. A static board no longer
 # drops the whole renderer to 30 fps (which can feel like a hitch on wake-up);
@@ -319,35 +321,39 @@ func _sync_score_markers() -> void:
 
 
 func _selection_material(source: Material) -> StandardMaterial3D:
-	# Keep the approved real stone material from the parent, but replace every
-	# inherited outline/halo pass with a single clean inverted-hull contour.
+	# The parent already duplicates the real stone material. Replace its inherited
+	# one-pass outline with a double-contrast inverted hull: dark separation next
+	# to the stone + a restrained luminous outer edge. This remains readable on
+	# white, black and colored stones without looking like a thick plastic shell.
 	var result: StandardMaterial3D = super._selection_material(source)
-	var base_color: Color = result.albedo_color
-	var luminance: float = base_color.r * 0.2126 + base_color.g * 0.7152 + base_color.b * 0.0722
-	var use_dark_outline: bool = luminance > 0.62
-	var outline_color: Color = SELECTION_DARK_COLOR if use_dark_outline else SELECTION_LIGHT_COLOR
-	var outline_grow: float = SELECTION_DARK_GROW if use_dark_outline else SELECTION_LIGHT_GROW
 
-	var outline := StandardMaterial3D.new()
-	outline.albedo_color = outline_color
-	outline.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	outline.cull_mode = BaseMaterial3D.CULL_FRONT
-	outline.grow = true
-	outline.grow_amount = outline_grow
-	outline.roughness = 1.0
-	if not use_dark_outline:
-		outline.emission_enabled = true
-		outline.emission = outline_color
-		outline.emission_energy_multiplier = SELECTION_LIGHT_ENERGY
+	var keyline := StandardMaterial3D.new()
+	keyline.albedo_color = SELECTION_KEYLINE_COLOR
+	keyline.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	keyline.cull_mode = BaseMaterial3D.CULL_FRONT
+	keyline.grow = true
+	keyline.grow_amount = SELECTION_KEYLINE_GROW
+	keyline.roughness = 1.0
 
-	# Deliberately replace the parent's next_pass chain so no fuzzy transparent
-	# halo survives from older selection treatments.
-	result.next_pass = outline
+	var accent := StandardMaterial3D.new()
+	accent.albedo_color = SELECTION_ACCENT_COLOR
+	accent.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	accent.cull_mode = BaseMaterial3D.CULL_FRONT
+	accent.grow = true
+	accent.grow_amount = SELECTION_ACCENT_GROW
+	accent.roughness = 1.0
+	accent.emission_enabled = true
+	accent.emission = SELECTION_ACCENT_COLOR
+	accent.emission_energy_multiplier = SELECTION_ACCENT_ENERGY
+
+	keyline.next_pass = accent
+	result.next_pass = keyline
 
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
-			"document.body.dataset.yakolakSelectionOutlineProfile='single-crisp-adaptive';" +
-			"document.body.dataset.yakolakSelectionHalo='none';",
+			"document.body.dataset.yakolakSelectionOutlineProfile='double-contrast-crisp';" +
+			"document.body.dataset.yakolakSelectionHalo='none';" +
+			"document.body.dataset.yakolakSelectionOutlineLayers='2';",
 			true
 		)
 	return result
