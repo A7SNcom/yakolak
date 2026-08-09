@@ -45,19 +45,34 @@ test('setup stays hidden through closed-box handoff and opens only after unboxin
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'complete' &&
           document.body.dataset.yakolakSetup === 'visible' &&
-          document.body.dataset.yakolakSetupGate === 'open',
+          document.body.dataset.yakolakSetupGate === 'open' &&
+          document.body.dataset.yakolakSetupDirection === 'rtl' &&
+          document.body.dataset.yakolakSetupMotion === 'soft-panel-and-table-v3',
     null,
     { timeout: 90000 }
   );
+  await page.waitForTimeout(850);
 
   const metrics = await page.evaluate(() => ({
-    width: Number(document.body.dataset.yakolakSetupPolishedWidth || 0),
-    height: Number(document.body.dataset.yakolakSetupPolishedHeight || 0),
-    ui: document.body.dataset.yakolakSetupUi || ''
+    left: Number(document.body.dataset.yakolakSetupCardLeftRatio),
+    top: Number(document.body.dataset.yakolakSetupCardTopRatio),
+    right: Number(document.body.dataset.yakolakSetupCardRightRatio),
+    bottom: Number(document.body.dataset.yakolakSetupCardBottomRatio),
+    touch: Number(document.body.dataset.yakolakSetupTouchMin),
+    layout: document.body.dataset.yakolakSetupLayoutMode || '',
+    direction: document.body.dataset.yakolakSetupDirection || '',
+    motion: document.body.dataset.yakolakSetupMotion || ''
   }));
-  expect(metrics.width).toBeGreaterThanOrEqual(350);
-  expect(metrics.width).toBeLessThanOrEqual(500);
-  expect(metrics.height).toBeGreaterThanOrEqual(280);
-  expect(metrics.ui).toBe('setup-guard-polish-v1');
+
+  expect(metrics.left).toBeGreaterThanOrEqual(0);
+  expect(metrics.top).toBeGreaterThanOrEqual(0);
+  expect(metrics.right).toBeLessThanOrEqual(1);
+  expect(metrics.bottom).toBeLessThanOrEqual(1);
+  expect(metrics.right - metrics.left).toBeGreaterThan(0.2);
+  expect(metrics.bottom - metrics.top).toBeGreaterThan(0.1);
+  expect(metrics.touch).toBeGreaterThanOrEqual(48);
+  expect(metrics.layout).toBe('portrait-stack');
+  expect(metrics.direction).toBe('rtl');
+  expect(metrics.motion).toBe('soft-panel-and-table-v3');
   expect(failures).toEqual([]);
 });
