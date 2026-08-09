@@ -169,19 +169,40 @@ func _piece_mesh_radius(piece_index: int) -> float:
 	return maxf(aabb.size.x, aabb.size.y) * 0.5
 
 
-func _piece_test_surface_point(piece_index: int) -> Vector3:
-	# Browser checks must aim at the visible top of the real stone, not its
-	# bottom plane. With an oblique camera, projecting z=0 can legitimately put
-	# the ray behind a lower outer ring even when testing a taller inner stone.
-	if piece_index < 0 or piece_index >= piece_records.size():
-		return Vector3.ZERO
-	var mesh_instance: MeshInstance3D = (piece_records[piece_index] as Dictionary).get("mesh") as MeshInstance3D
-	if mesh_instance == null or mesh_instance.mesh == null:
-		return Vector3.ZERO
+func _visible_piece_test_pointer(piece_index: int, candidate_indices: Array[int]) -> Vector2:
+	# Test automation must click a pixel where the requested stone is actually
+	# the frontmost rendered surface. A fixed local angle can be hidden by a
+	# different nested ring from one camera angle while exposed from another.
+	if camera == null or piece_index < 0 or piece_index >= piece_records.size():
+		return Vector2(-1.0, -1.0)
+	var record: Dictionary = piece_records[piece_index] as Dictionary
+	var mesh_instance: MeshInstance3D = record.get("mesh") as MeshInstance3D
+	if mesh_instance == null or mesh_instance.mesh == null or not mesh_instance.is_visible_in_tree():
+		return Vector2(-1.0, -1.0)
+
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	var aabb: AABB = mesh_instance.mesh.get_aabb()
 	var radius: float = maxf(aabb.size.x, aabb.size.y) * 0.5
 	var top_z: float = aabb.position.z + aabb.size.z
-	return Vector3(radius * 0.90, 0.0, top_z)
+	var radial_factors: Array[float] = [0.88, 0.76]
+
+	# Probe around the complete visible ring. We keep only a point for which the
+	# production picker itself resolves this exact piece as the nearest real mesh.
+	for radial_factor: float in radial_factors:
+		for angle_index: int in range(16):
+			var angle: float = TAU * float(angle_index) / 16.0
+			var local_target := Vector3(
+				cos(angle) * radius * radial_factor,
+				sin(angle) * radius * radial_factor,
+				top_z
+			)
+			var internal_point: Vector2 = camera.unproject_position(mesh_instance.to_global(local_target))
+			if internal_point.x < 1.0 or internal_point.y < 1.0 or internal_point.x > viewport_size.x - 1.0 or internal_point.y > viewport_size.y - 1.0:
+				continue
+			if _mesh_piece_at_pointer(internal_point, candidate_indices) == piece_index:
+				return internal_point
+
+	return Vector2(-1.0, -1.0)
 
 
 func _publish_piece_test_targets() -> void:
@@ -194,28 +215,33 @@ func _publish_piece_test_targets() -> void:
 		return
 	var css_scale := Vector2(canvas_rect.size.x / viewport_size.x, canvas_rect.size.y / viewport_size.y)
 	var script: String = ""
+	var all_current_candidates: Array[int] = _current_piece_candidates()
 
-	# Publish one real browser target for every size in every neighboring stack.
-	# Targets use each mesh's visible top surface; the browser then clicks/taps
-	# those exact CSS pixels and asserts the exact Stone_* identity.
+	# Publish one genuinely exposed browser target for every size in every
+	# neighboring stack. During an open tray, only that tray competes because
+	# that is exactly what the production pointer handler does.
 	for side: int in [-1, 0, 1]:
 		var available: Array[int] = _available_stack_indices(direction, side)
+		var pick_candidates: Array[int] = tray_indices if tray_open and tray_side == side else all_current_candidates
 		for size_name: String in ["small", "medium", "large"]:
 			var index: int = -1
 			for candidate: int in available:
 				if str((piece_records[candidate] as Dictionary).get("type", "")) == size_name:
 					index = candidate
 					break
-			if index < 0:
-				continue
-			var mesh_instance: MeshInstance3D = (piece_records[index] as Dictionary).get("mesh") as MeshInstance3D
-			if mesh_instance == null:
-				continue
-			var world_target: Vector3 = mesh_instance.to_global(_piece_test_surface_point(index))
-			var internal_point: Vector2 = camera.unproject_position(world_target)
-			var css_point: Vector2 = canvas_rect.position + internal_point * css_scale
 			var size_cap: String = size_name.capitalize()
 			var side_cap: String = "Minus1" if side < 0 else ("Plus1" if side > 0 else "0")
+			var internal_point := Vector2(-1.0, -1.0)
+			if index >= 0:
+				internal_point = _visible_piece_test_pointer(index, pick_candidates)
+			if internal_point.x < 0.0 or internal_point.y < 0.0:
+				script += "document.body.dataset.yakolakTestSide%s%sX='0';" % [side_cap, size_cap]
+				script += "document.body.dataset.yakolakTestSide%s%sY='0';" % [side_cap, size_cap]
+				if side == 0:
+					script += "document.body.dataset.yakolakTest%sX='0';" % size_cap
+					script += "document.body.dataset.yakolakTest%sY='0';" % size_cap
+				continue
+			var css_point: Vector2 = canvas_rect.position + internal_point * css_scale
 			script += "document.body.dataset.yakolakTestSide%s%sX='%s';" % [side_cap, size_cap, str(css_point.x)]
 			script += "document.body.dataset.yakolakTestSide%s%sY='%s';" % [side_cap, size_cap, str(css_point.y)]
 			# Preserve the existing center-stack test contract used by other checks.
