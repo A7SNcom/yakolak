@@ -2,7 +2,7 @@ extends Node
 
 # Player-controlled camera zoom for gameplay.
 # Two-finger pinch works on touch devices; mouse wheel / magnify gestures work on desktop.
-# The chosen zoom level is preserved when the turn camera moves to the next player.
+# The chosen zoom level is preserved continuously while the turn camera moves.
 
 const MIN_FOV: float = 34.0
 const MAX_FOV: float = 78.0
@@ -42,6 +42,8 @@ func _process(_delta: float) -> void:
 	previous_match_initialized = true
 	var transition_active: bool = bool(gameplay.get("camera_transition"))
 	if previous_transition and not transition_active:
+		# The camera transition now targets the effective zoomed FOV itself.
+		# Keep this as an idempotent safety restore for old/external transitions.
 		call_deferred("_restore_user_zoom")
 	previous_transition = transition_active
 
@@ -150,10 +152,14 @@ func _base_turn_fov() -> float:
 	return maxf(float(value), 1.0)
 
 
+func effective_fov_for_base(base_fov: float) -> float:
+	return clampf(maxf(base_fov, 1.0) * user_zoom_ratio, MIN_FOV, MAX_FOV)
+
+
 func _restore_user_zoom() -> void:
 	if not _gameplay_zoom_available() or camera == null:
 		return
-	camera.fov = clampf(_base_turn_fov() * user_zoom_ratio, MIN_FOV, MAX_FOV)
+	camera.fov = effective_fov_for_base(_base_turn_fov())
 	_publish_zoom_state()
 
 
@@ -170,6 +176,7 @@ func _publish_zoom_state() -> void:
 		return
 	JavaScriptBridge.eval(
 		"document.body.dataset.yakolakCameraZoomFov='%.2f';" % camera.fov +
+		"document.body.dataset.yakolakCameraZoomRatio='%.6f';" % user_zoom_ratio +
 		"document.body.dataset.yakolakCameraZoomEnabled='true';",
 		true
 	)
