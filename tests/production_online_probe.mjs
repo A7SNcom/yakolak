@@ -48,13 +48,12 @@ async function leaveQuietly(code, version, token) {
 
 async function verifyWaitingGuestLeave() {
   const hostToken = secret();
-  const hostRequest = secret(24);
   let code = '';
   let version = 0;
   try {
     const created = await post({
-      action: 'create', color: 'marble', targetPlayers: 3, targetRounds: 3,
-      clientToken: hostToken, requestId: hostRequest,
+      action: 'create', color: 'marble', targetPlayers: 4, targetRounds: 3,
+      clientToken: hostToken, requestId: secret(24),
     });
     code = created.room.code;
     version = Number(created.room.version);
@@ -64,15 +63,27 @@ async function verifyWaitingGuestLeave() {
     const joined = await post({
       action: 'join', code, color: 'blue', clientToken: guestToken, requestId: secret(24),
     });
-    version = Number(joined.room.version);
+    const staleGuestVersion = Number(joined.room.version);
+    version = staleGuestVersion;
     assertRoomIdentity(joined, code);
     assert.equal(joined.room.status, 'waiting');
 
-    const left = await post({ action: 'leave', code, version }, guestToken);
+    // Advance the authoritative room version while p2 still holds the older
+    // version. An explicit authenticated leave must still succeed.
+    const thirdToken = secret();
+    const third = await post({
+      action: 'join', code, color: 'gold', clientToken: thirdToken, requestId: secret(24),
+    });
+    version = Number(third.room.version);
+    assertRoomIdentity(third, code);
+    assert.equal(third.room.status, 'waiting');
+    assert.ok(version > staleGuestVersion);
+
+    const left = await post({ action: 'leave', code, version: staleGuestVersion }, guestToken);
     version = Number(left.room.version);
     assertRoomIdentity(left, code);
     assert.equal(left.room.status, 'waiting');
-    assert.deepEqual(left.room.players.map(player => player.seat), ['p1']);
+    assert.deepEqual(left.room.players.map(player => player.seat), ['p1', 'p3']);
 
     const hostView = await poll(code, hostToken, 0);
     assertRoomIdentity(hostView, code);
