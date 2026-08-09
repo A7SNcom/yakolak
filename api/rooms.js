@@ -12,6 +12,7 @@ const ROOM_TTL_MS = 3 * 60 * 60 * 1000;
 const WAITING_REUSE_MS = 20 * 60 * 1000;
 const FINISHED_MATCH_REUSE_MS = 15 * 60 * 1000;
 const PLAYER_STALE_MS = 60 * 1000;
+const PRESENCE_WRITE_INTERVAL_MS = 5 * 1000;
 const RATE_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT = 24;
 const MAX_BODY_BYTES = 8_000;
@@ -19,6 +20,7 @@ const ROOM_PATTERN = /^\d{2}$/;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,96}$/;
 let client;
 let tablesReady;
+const presenceTouchCache = new Map();
 
 function json(res, status, payload) {
   res.statusCode = status;
@@ -388,16 +390,27 @@ async function updateRoom(db, row, state, expectedVersion, auth = null) {
   return updated;
 }
 
-async function touchPresence(db, code, seat) {
+async function touchPresence(db, code, seat, force = false) {
   if (!ROOM_PATTERN.test(String(code || '')) || !/^p[1-4]$/.test(String(seat || ''))) return;
+  const key = `${code}:${seat}`;
+  const now = Date.now();
+  const previous = Number(presenceTouchCache.get(key) || 0);
+  if (!force && now - previous < PRESENCE_WRITE_INTERVAL_MS) return;
   await db.execute({
     sql: `INSERT INTO ${PRESENCE_TABLE} (room_code, seat, last_seen) VALUES (?, ?, ?)
           ON CONFLICT(room_code, seat) DO UPDATE SET last_seen = excluded.last_seen`,
-    args: [code, seat, new Date().toISOString()]
+    args: [code, seat, new Date(now).toISOString()]
   });
+  presenceTouchCache.set(key, now);
+  if (presenceTouchCache.size > 512) {
+    for (const [cacheKey, touchedAt] of presenceTouchCache) {
+      if (now - Number(touchedAt) > ROOM_TTL_MS) presenceTouchCache.delete(cacheKey);
+    }
+  }
 }
 
 async function removePresence(db, code, seat) {
+  presenceTouchCache.delete(`${code}:${seat}`);
   await db.execute({ sql: `DELETE FROM ${PRESENCE_TABLE} WHERE room_code = ? AND seat = ?`, args: [code, seat] });
 }
 
@@ -449,7 +462,7 @@ async function createRoom(db, color, targetPlayers, targetRounds, clientToken, r
   const existing = await readCreateRequest(db, createKey);
   if (existing) {
     if (seatFor(existing, token) !== 'p1') throw new Error('unauthorized');
-    await touchPresence(db, String(existing.room_code), 'p1');
+    await touchPresence(db, String(existing.room_code), 'p1', true);
     return { token, seat: 'p1', room: publicRoom(existing) };
   }
 
@@ -464,7 +477,7 @@ async function createRoom(db, color, targetPlayers, targetRounds, clientToken, r
         sql: `INSERT INTO ${TABLE} (room_code, create_key, auth_json, state_json, version, status, created_at, updated_at, expires_at) VALUES (?, ?, ?, ?, 1, 'waiting', ?, ?, ?)`,
         args: [code, createKey, JSON.stringify([{ seat: 'p1', hash: tokenHash(token), joinKey: createKey }]), JSON.stringify(state), now, now, isoAfter(ROOM_TTL_MS)]
       });
-      await touchPresence(db, code, 'p1');
+      await touchPresence(db, code, 'p1', true);
       return { token, seat: 'p1', room: { code, version: 1, ...state } };
     } catch (error) {
       const message = String(error?.message || '').toLowerCase();
@@ -472,7 +485,7 @@ async function createRoom(db, color, targetPlayers, targetRounds, clientToken, r
       const retryExisting = await readCreateRequest(db, createKey);
       if (retryExisting) {
         if (seatFor(retryExisting, token) !== 'p1') throw new Error('unauthorized');
-        await touchPresence(db, String(retryExisting.room_code), 'p1');
+        await touchPresence(db, String(retryExisting.room_code), 'p1', true);
         return { token, seat: 'p1', room: publicRoom(retryExisting) };
       }
     }
@@ -491,7 +504,7 @@ async function joinRoom(db, code, color, clientToken, requestId) {
     const prior = auth.find(entry => entry.joinKey === joinKey);
     if (prior) {
       if (prior.hash !== tokenHash(token)) throw new Error('unauthorized');
-      await touchPresence(db, code, prior.seat);
+      await touchPresence(db, code, prior.seat, true);
       return { token, seat: prior.seat, room: publicRoom(row) };
     }
 
@@ -504,7 +517,7 @@ async function joinRoom(db, code, color, clientToken, requestId) {
       args: [JSON.stringify([...auth, { seat, hash: tokenHash(token), joinKey }]), JSON.stringify(next), next.status, new Date().toISOString(), isoAfter(ROOM_TTL_MS), code, Number(row.version)]
     });
     if (Number(result.rowsAffected || 0) === 1) {
-      await touchPresence(db, code, seat);
+      await touchPresence(db, code, seat, true);
       return { token, seat, room: { code, version: Number(row.version) + 1, ...next } };
     }
   }
@@ -594,8 +607,12 @@ export default async function handler(req, res) {
     await touchPresence(db, code, seat);
     row = await reconcileRoomPresence(db, row);
 
-    const expectedVersion = Number(body.version);
-    if (!Number.isInteger(expectedVersion) || expectedVersion !== Number(row.version)) {
+    let expectedVersion = Number(body.version);
+    if (action === 'leave') {
+      // Leaving is an authenticated intent and must not be lost just because a
+      // concurrent presence reconciliation advanced the room version.
+      expectedVersion = Number(row.version);
+    } else if (!Number.isInteger(expectedVersion) || expectedVersion !== Number(row.version)) {
       return json(res, 409, { ok: false, error: 'version_conflict', room: publicRoom(row) });
     }
 
@@ -603,7 +620,8 @@ export default async function handler(req, res) {
     let next;
     if (action === 'move') next = applyMove(state, seat, body);
     else if (action === 'rematch') {
-      const activeSeats = await connectedSeats(db, code);
+      const playerSeats = new Set(state.players.map(player => player.seat));
+      const activeSeats = (await connectedSeats(db, code)).filter(activeSeat => playerSeats.has(activeSeat));
       const requiredSeats = state.matchComplete ? state.players.map(player => player.seat) : activeSeats;
       next = rematchState(state, seat, requiredSeats.length ? requiredSeats : [seat]);
     }
@@ -624,6 +642,7 @@ export default async function handler(req, res) {
 export const __testing = {
   PROTOCOL,
   PLAYER_STALE_MS,
+  PRESENCE_WRITE_INTERVAL_MS,
   applyMove,
   createState,
   emptyBoard,
