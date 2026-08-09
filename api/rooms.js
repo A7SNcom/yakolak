@@ -298,8 +298,6 @@ function reconcilePresenceState(state, connectedSeats) {
   if (!connected.size) return state;
 
   if (state.status === 'waiting') {
-    // Never evict the host automatically. A stale guest, however, must not
-    // reserve a seat/color forever and turn into a ghost player when the lobby fills.
     const players = state.players.filter(player => player.seat === 'p1' || connected.has(player.seat));
     if (players.length === state.players.length) return state;
     const keptSeats = new Set(players.map(player => player.seat));
@@ -528,12 +526,17 @@ async function joinRoom(db, code, color, clientToken, requestId) {
     const seat = ['p2', 'p3', 'p4'].find(candidate => !state.players.some(player => player.seat === candidate));
     if (!seat) throw new Error('room_full');
     const next = joinState(state, seat, color);
+
+    // Register provisional presence before exposing the seat in room state.
+    // Otherwise a simultaneous host poll can see the new seat without a
+    // presence row and immediately prune it as a stale waiting-room ghost.
+    await touchPresence(db, code, seat, true);
+
     const result = await db.execute({
       sql: `UPDATE ${TABLE} SET auth_json = ?, state_json = ?, status = ?, version = version + 1, updated_at = ?, expires_at = ? WHERE room_code = ? AND version = ?`,
       args: [JSON.stringify([...auth, { seat, hash: tokenHash(token), joinKey }]), JSON.stringify(next), next.status, new Date().toISOString(), isoAfter(ROOM_TTL_MS), code, Number(row.version)]
     });
     if (Number(result.rowsAffected || 0) === 1) {
-      await touchPresence(db, code, seat, true);
       return { token, seat, room: { code, version: Number(row.version) + 1, ...next } };
     }
   }
@@ -626,8 +629,6 @@ export default async function handler(req, res) {
 
     let expectedVersion = Number(body.version);
     if (action === 'leave') {
-      // Leaving is an authenticated intent and must not be lost just because a
-      // concurrent presence reconciliation advanced the room version.
       expectedVersion = Number(row.version);
     } else if (!Number.isInteger(expectedVersion) || expectedVersion !== Number(row.version)) {
       return json(res, 409, { ok: false, error: 'version_conflict', room: publicRoom(row) });
