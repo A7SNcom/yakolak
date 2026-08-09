@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: yakolak-main-publish
+  group: yakolak-main-${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[web-ready]') && 'web-ready' || 'source' }}
   cancel-in-progress: true
 
 jobs:
