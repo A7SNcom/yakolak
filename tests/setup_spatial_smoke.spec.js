@@ -129,7 +129,7 @@ test('setup survives the full phone/orientation/desktop matrix without clipping 
       expect(setup.cardLeft, viewport.name).toBeGreaterThan(0.30);
       expect(setup.boardX, viewport.name).toBeLessThan(setup.cardLeft - 0.02);
     } else {
-      expect(setup.layoutMode, viewport.name).toBe('stack-split');
+      expect(setup.layoutMode, viewport.name).toBe('portrait-stack');
       expect(setup.cardBottom, viewport.name).toBeLessThan(0.50);
       expect(setup.boardY - setup.cardBottom, viewport.name).toBeGreaterThan(0.08);
     }
