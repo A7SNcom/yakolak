@@ -103,6 +103,35 @@ function validCredential(value) {
   return TOKEN_PATTERN.test(String(value || ''));
 }
 
+function validMutationId(value) {
+  return TOKEN_PATTERN.test(String(value || ''));
+}
+
+function mutationEntries(state) {
+  return Array.isArray(state?._mutations) ? state._mutations : [];
+}
+
+function mutationApplied(state, seat, kind, mutationId) {
+  if (!validMutationId(mutationId)) return false;
+  return mutationEntries(state).some(entry =>
+    entry && entry.id === mutationId && entry.seat === seat && entry.kind === kind
+  );
+}
+
+function recordMutation(state, seat, kind, mutationId) {
+  if (!validMutationId(mutationId) || mutationApplied(state, seat, kind, mutationId)) return state;
+  return {
+    ...state,
+    _mutations: [...mutationEntries(state), { id: String(mutationId), seat: String(seat), kind: String(kind) }]
+  };
+}
+
+function publicState(state) {
+  const visible = structuredClone(state || {});
+  delete visible._mutations;
+  return visible;
+}
+
 function bearer(req) {
   return String(req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
 }
@@ -189,6 +218,7 @@ function createState(hostColor, targetPlayers, targetRounds) {
     matchWinners: [],
     rematch: { p1: false },
     skippedSeat: null,
+    _mutations: [],
   };
 }
 
@@ -315,7 +345,8 @@ function reconcilePresenceState(state, connectedSeats) {
 }
 
 function publicRoom(row, state = null) {
-  return { code: String(row.room_code), version: Number(row.version), ...(state || JSON.parse(String(row.state_json))) };
+  const visible = publicState(state || JSON.parse(String(row.state_json)));
+  return { code: String(row.room_code), version: Number(row.version), ...visible };
 }
 
 function authEntries(row) {
@@ -480,7 +511,7 @@ async function createRoom(db, color, targetPlayers, targetRounds, clientToken, r
         args: [code, createKey, JSON.stringify([{ seat: 'p1', hash: tokenHash(token), joinKey: createKey }]), JSON.stringify(state), now, now, isoAfter(ROOM_TTL_MS)]
       });
       await touchPresence(db, code, 'p1', true);
-      return { token, seat: 'p1', room: { code, version: 1, ...state } };
+      return { token, seat: 'p1', room: { code, version: 1, ...publicState(state) } };
     } catch (error) {
       const message = String(error?.message || '').toLowerCase();
       if (!message.includes('unique')) throw error;
@@ -525,7 +556,7 @@ async function joinRoom(db, code, color, clientToken, requestId) {
       args: [JSON.stringify([...auth, { seat, hash: tokenHash(token), joinKey }]), JSON.stringify(next), next.status, new Date().toISOString(), isoAfter(ROOM_TTL_MS), code, Number(row.version)]
     });
     if (Number(result.rowsAffected || 0) === 1) {
-      return { token, seat, room: { code, version: Number(row.version) + 1, ...next } };
+      return { token, seat, room: { code, version: Number(row.version) + 1, ...publicState(next) } };
     }
   }
   throw new Error('version_conflict');
@@ -550,7 +581,7 @@ function statusFor(error) {
   if (code === 'rate_limited') return 429;
   if (code === 'room_code_exhausted') return 503;
   if (['not_your_turn', 'room_full', 'room_not_waiting', 'version_conflict', 'color_taken', 'room_not_playing', 'round_not_finished', 'occupied_slot', 'no_piece_remaining'].includes(code)) return 409;
-  if (['invalid_color', 'invalid_player_count', 'invalid_round_count', 'invalid_move', 'invalid_room_code', 'invalid_payload', 'invalid_action', 'invalid_seat', 'invalid_session'].includes(code)) return 400;
+  if (['invalid_color', 'invalid_player_count', 'invalid_round_count', 'invalid_move', 'invalid_room_code', 'invalid_payload', 'invalid_action', 'invalid_seat', 'invalid_session', 'invalid_mutation_id'].includes(code)) return 400;
   return 500;
 }
 
@@ -615,22 +646,52 @@ export default async function handler(req, res) {
     await touchPresence(db, code, seat);
     row = await reconcileRoomPresence(db, row);
 
+    const state = JSON.parse(String(row.state_json));
+    const mutationKind = action === 'move' || action === 'rematch' ? action : '';
+    const mutationId = String(body.mutationId || '');
+
+    // Compatibility during the web rollout: clients that already send a stable
+    // mutation id get exactly-once semantics immediately. Once the rebuilt web
+    // bundle is live, the endpoint can make this field mandatory without a
+    // temporary production outage for the previous compiled client.
+    if (mutationKind && validMutationId(mutationId) && mutationApplied(state, seat, mutationKind, mutationId)) {
+      return json(res, 200, { ok: true, seat, room: publicRoom(row, state), duplicate: true });
+    }
+
     let expectedVersion = Number(body.version);
     if (action === 'leave') {
       expectedVersion = Number(row.version);
     } else if (!Number.isInteger(expectedVersion) || expectedVersion !== Number(row.version)) {
-      return json(res, 409, { ok: false, error: 'version_conflict', room: publicRoom(row) });
+      return json(res, 409, { ok: false, error: 'version_conflict', room: publicRoom(row, state) });
     }
 
-    const state = JSON.parse(String(row.state_json));
     let next;
     if (action === 'move') next = applyMove(state, seat, body);
     else if (action === 'rematch') next = rematchState(state, seat);
     else if (action === 'leave') next = leaveState(state, seat);
     else throw new Error('invalid_action');
 
+    if (mutationKind && validMutationId(mutationId)) {
+      next = recordMutation(next, seat, mutationKind, mutationId);
+    }
+
     const auth = action === 'leave' ? authEntries(row).filter(entry => entry.seat !== seat) : null;
-    const updated = await updateRoom(db, row, next, expectedVersion, auth);
+    let updated;
+    try {
+      updated = await updateRoom(db, row, next, expectedVersion, auth);
+    } catch (error) {
+      if (error?.message === 'version_conflict' && mutationKind && validMutationId(mutationId)) {
+        const latest = await readRoom(db, code);
+        if (latest) {
+          const latestState = JSON.parse(String(latest.state_json));
+          if (mutationApplied(latestState, seat, mutationKind, mutationId)) {
+            return json(res, 200, { ok: true, seat, room: publicRoom(latest, latestState), duplicate: true });
+          }
+          return json(res, 409, { ok: false, error: 'version_conflict', room: publicRoom(latest, latestState) });
+        }
+      }
+      throw error;
+    }
     if (action === 'leave') await removePresence(db, code, seat);
     return json(res, 200, { ok: true, seat, room: publicRoom(updated, next) });
   } catch (error) {
@@ -650,10 +711,14 @@ export const __testing = {
   joinState,
   leaveState,
   materializeUpdatedRow,
+  mutationApplied,
   normalizeCode,
   preview,
   publicRoom,
+  publicState,
   reconcilePresenceState,
+  recordMutation,
   rematchState,
+  validMutationId,
   winner
 };
