@@ -62,12 +62,18 @@ func _nested_piece_at_pointer(screen_position: Vector2) -> int:
 	var best_index: int = -1
 	var best_normalized_radius: float = INF
 	var visited: Dictionary = {}
+	var current_direction: String = _current_direction()
 
+	# Only the active player's three stacks participate in semantic ring
+	# picking. Opposite-side stacks can overlap the same screen pixels in a
+	# perspective view and previously stole the first tap from the visible ring.
 	for record_value: Variant in piece_records:
 		var record: Dictionary = record_value as Dictionary
 		if bool(record.get("played", false)):
 			continue
 		var direction: String = str(record.get("dir", ""))
+		if direction != current_direction:
+			continue
 		var side: int = int(record.get("side", 0))
 		var stack_key: String = "%s:%d" % [direction, side]
 		if visited.has(stack_key):
