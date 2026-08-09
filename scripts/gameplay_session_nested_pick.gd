@@ -1,25 +1,26 @@
 extends "res://scripts/gameplay_session_polish.gd"
 
-# Nested stone selection must follow the visible ring the user taps, not the
-# first collision surface returned by the physics ray. The large piece wraps
-# around the smaller pieces, so a normal ray can legitimately hit "large"
-# while the pointer visually sits in the medium/small region.
+# Piece selection is resolved against the rendered stone triangles, not against
+# physics proxy boxes. L/M/S are nested rings: a solid AABB has no knowledge of
+# the visible holes and can therefore report a large/near box when the player
+# actually tapped the medium/small stone behind that empty space.
+#
+# This picker is intentionally shared by the closed stack and the raised tray.
+# Mouse and touch already arrive here as the same viewport position, so one
+# screen ray now has one meaning regardless of input device, camera angle or FOV.
 
-const STACK_PICK_MARGIN: float = 1.10
+var _pick_face_cache: Dictionary = {}
 
 
 func _handle_pointer(screen_position: Vector2) -> void:
-	# Once the tray is raised, keep the existing direct-piece behaviour so a
-	# second tap can switch sizes without ambiguity.
+	# Once the tray is raised, switching sizes must still use the exact rendered
+	# geometry. Do not fall back to PIECE_LAYER AABBs here: the nested proxy boxes
+	# overlap even when the visible rings do not.
 	if tray_open:
-		var tray_hit: Dictionary = _ray_pick(screen_position, PIECE_LAYER)
-		if not tray_hit.is_empty():
-			var tray_collider: Object = tray_hit["collider"] as Object
-			if tray_collider != null and tray_collider.has_meta("piece_index"):
-				var tray_piece_index: int = int(tray_collider.get_meta("piece_index"))
-				if tray_indices.has(tray_piece_index):
-					_select_tray_piece(tray_piece_index)
-					return
+		var tray_piece_index: int = _mesh_piece_at_pointer(screen_position, tray_indices)
+		if tray_piece_index >= 0:
+			_select_tray_piece(tray_piece_index)
+			return
 
 	if selected_index >= 0:
 		var target_hit: Dictionary = _ray_pick(screen_position, TARGET_LAYER)
@@ -33,21 +34,21 @@ func _handle_pointer(screen_position: Vector2) -> void:
 					_publish_invalid(cell)
 				return
 
-	# Resolve the intended nested ring geometrically in the stack's own plane.
-	# This deliberately does not trust the first physics surface, because the
-	# outer large model can occlude the medium/small models from the camera.
-	var piece_index: int = _nested_piece_at_pointer(screen_position)
+	# Only unplayed stones owned by the active player may compete for the ray.
+	# If two neighboring stacks overlap in screen space, the nearest real mesh
+	# intersection wins; a stone behind another visible stone cannot steal it.
+	var piece_index: int = _mesh_piece_at_pointer(screen_position, _current_piece_candidates())
 	if browser_automation:
-		print("YAKOLAK_NESTED_PICK pointer=(%.2f,%.2f) resolved=%d" % [screen_position.x, screen_position.y, piece_index])
+		print("YAKOLAK_MESH_PICK pointer=(%.2f,%.2f) resolved=%d" % [screen_position.x, screen_position.y, piece_index])
 	if piece_index >= 0:
 		var record: Dictionary = piece_records[piece_index] as Dictionary
 		if bool(record.get("played", false)):
 			return
-		if str(record["dir"]) != _current_direction():
+		if str(record.get("dir", "")) != _current_direction():
 			_flash_result("هذا الشوك ليس للدور الحالي")
 			_publish_match_state("wrong-owner")
 			return
-		if not _has_legal_cell_for_size(str(record["type"])):
+		if not _has_legal_cell_for_size(str(record.get("type", ""))):
 			_flash_result("لا توجد خانة لهذا الحجم")
 			_publish_match_state("no-legal-cell")
 			return
@@ -58,56 +59,93 @@ func _handle_pointer(screen_position: Vector2) -> void:
 		_clear_selection()
 
 
-func _nested_piece_at_pointer(screen_position: Vector2) -> int:
-	if camera == null:
-		return -1
-	var best_index: int = -1
-	var best_normalized_radius: float = INF
-	var visited: Dictionary = {}
-	var current_direction: String = _current_direction()
-
-	# Only the active player's three stacks participate in semantic ring
-	# picking. Opposite-side stacks can overlap the same screen pixels in a
-	# perspective view and previously stole the first tap from the visible ring.
-	for record_value: Variant in piece_records:
-		var record: Dictionary = record_value as Dictionary
+func _current_piece_candidates() -> Array[int]:
+	var result: Array[int] = []
+	var direction: String = _current_direction()
+	for index: int in range(piece_records.size()):
+		var record: Dictionary = piece_records[index] as Dictionary
 		if bool(record.get("played", false)):
 			continue
-		var direction: String = str(record.get("dir", ""))
-		if direction != current_direction:
+		if str(record.get("dir", "")) != direction:
 			continue
-		var side: int = int(record.get("side", 0))
-		var stack_key: String = "%s:%d" % [direction, side]
-		if visited.has(stack_key):
+		var mesh_instance: MeshInstance3D = record.get("mesh") as MeshInstance3D
+		if mesh_instance == null or not mesh_instance.is_visible_in_tree():
 			continue
-		visited[stack_key] = true
+		result.append(index)
+	return result
 
-		var available: Array[int] = _available_stack_indices(direction, side)
-		if available.is_empty():
+
+func _mesh_piece_at_pointer(screen_position: Vector2, candidate_indices: Array[int]) -> int:
+	if camera == null:
+		return -1
+
+	var world_origin: Vector3 = camera.project_ray_origin(screen_position)
+	var world_direction: Vector3 = camera.project_ray_normal(screen_position).normalized()
+	if world_direction.length_squared() <= 0.000001:
+		return -1
+
+	var best_index: int = -1
+	var best_distance_squared: float = INF
+
+	for index: int in candidate_indices:
+		if index < 0 or index >= piece_records.size():
 			continue
-		var reference_index: int = _largest_stack_index(available)
-		if reference_index < 0:
+		var record: Dictionary = piece_records[index] as Dictionary
+		if bool(record.get("played", false)):
 			continue
-		var reference: MeshInstance3D = (piece_records[reference_index] as Dictionary).get("mesh") as MeshInstance3D
-		if reference == null or reference.mesh == null:
+		var mesh_instance: MeshInstance3D = record.get("mesh") as MeshInstance3D
+		if mesh_instance == null or mesh_instance.mesh == null or not mesh_instance.is_visible_in_tree():
 			continue
 
-		var local_hit: Vector3 = _pointer_on_piece_plane(reference, screen_position)
-		if not is_finite(local_hit.x):
+		var faces: PackedVector3Array = _piece_pick_faces(index)
+		if faces.size() < 3:
 			continue
-		var radial: float = Vector2(local_hit.x, local_hit.y).length()
-		var outer_radius: float = _piece_mesh_radius(reference_index)
-		if outer_radius <= 0.0 or radial > outer_radius * STACK_PICK_MARGIN:
+
+		# Transform the same camera ray into each stone's local space. This makes
+		# the test independent of the stone orientation and of camera angle/zoom.
+		var inverse: Transform3D = mesh_instance.global_transform.affine_inverse()
+		var local_origin: Vector3 = inverse * world_origin
+		var local_direction: Vector3 = inverse.basis * world_direction
+		if local_direction.length_squared() <= 0.000001:
 			continue
-		var normalized: float = radial / outer_radius
-		if normalized >= best_normalized_radius:
-			continue
-		var intended: int = _size_index_for_radial(available, radial)
-		if intended >= 0:
-			best_index = intended
-			best_normalized_radius = normalized
+
+		for face_index: int in range(0, faces.size() - 2, 3):
+			var hit: Variant = Geometry3D.ray_intersects_triangle(
+				local_origin,
+				local_direction,
+				faces[face_index],
+				faces[face_index + 1],
+				faces[face_index + 2]
+			)
+			if hit == null:
+				continue
+			var local_hit: Vector3 = hit
+			var world_hit: Vector3 = mesh_instance.global_transform * local_hit
+			var forward_distance: float = (world_hit - world_origin).dot(world_direction)
+			if forward_distance <= 0.00001:
+				continue
+			var distance_squared: float = world_origin.distance_squared_to(world_hit)
+			if distance_squared < best_distance_squared:
+				best_distance_squared = distance_squared
+				best_index = index
 
 	return best_index
+
+
+func _piece_pick_faces(piece_index: int) -> PackedVector3Array:
+	if piece_index < 0 or piece_index >= piece_records.size():
+		return PackedVector3Array()
+	var record: Dictionary = piece_records[piece_index] as Dictionary
+	var cache_key: String = str(record.get("type", ""))
+	if _pick_face_cache.has(cache_key):
+		var cached: PackedVector3Array = _pick_face_cache[cache_key]
+		return cached
+	var mesh_instance: MeshInstance3D = record.get("mesh") as MeshInstance3D
+	if mesh_instance == null or mesh_instance.mesh == null:
+		return PackedVector3Array()
+	var faces: PackedVector3Array = mesh_instance.mesh.get_faces()
+	_pick_face_cache[cache_key] = faces
+	return faces
 
 
 func _available_stack_indices(direction: String, side: int) -> Array[int]:
@@ -121,17 +159,6 @@ func _available_stack_indices(direction: String, side: int) -> Array[int]:
 	return result
 
 
-func _largest_stack_index(indices: Array[int]) -> int:
-	var result: int = -1
-	var largest: float = -1.0
-	for index: int in indices:
-		var radius: float = _piece_mesh_radius(index)
-		if radius > largest:
-			largest = radius
-			result = index
-	return result
-
-
 func _piece_mesh_radius(piece_index: int) -> float:
 	if piece_index < 0 or piece_index >= piece_records.size():
 		return 0.0
@@ -142,96 +169,49 @@ func _piece_mesh_radius(piece_index: int) -> float:
 	return maxf(aabb.size.x, aabb.size.y) * 0.5
 
 
-func _pointer_on_piece_plane(reference: MeshInstance3D, screen_position: Vector2) -> Vector3:
-	var origin: Vector3 = camera.project_ray_origin(screen_position)
-	var direction: Vector3 = camera.project_ray_normal(screen_position)
-	if absf(direction.y) < 0.00001:
-		return Vector3(INF, INF, INF)
-	var plane_y: float = reference.global_position.y
-	var t: float = (plane_y - origin.y) / direction.y
-	if t <= 0.0:
-		return Vector3(INF, INF, INF)
-	var world_hit: Vector3 = origin + direction * t
-	return reference.to_local(world_hit)
-
-
-func _size_index_for_radial(indices: Array[int], radial: float) -> int:
-	var ranked: Array[Dictionary] = []
-	for index: int in indices:
-		ranked.append({
-			"index": index,
-			"radius": _piece_mesh_radius(index),
-		})
-	ranked.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["radius"]) < float(b["radius"]))
-	if ranked.is_empty():
-		return -1
-	if ranked.size() == 1:
-		return int(ranked[0]["index"])
-
-	# Boundaries sit halfway between neighboring physical radii. With all three
-	# pieces available this gives intuitive concentric zones: inner small,
-	# middle medium, outer large. Missing/played sizes naturally collapse zones.
-	for rank: int in range(ranked.size() - 1):
-		var boundary: float = (float(ranked[rank]["radius"]) + float(ranked[rank + 1]["radius"])) * 0.5
-		if radial <= boundary:
-			return int(ranked[rank]["index"])
-	return int(ranked[ranked.size() - 1]["index"])
-
-
 func _publish_piece_test_targets() -> void:
 	if camera == null:
 		return
 	var direction: String = _current_direction()
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
-	var viewport_center: Vector2 = viewport_size * 0.5
-	var best_stack: Array[int] = []
-	var best_distance: float = INF
-
-	for side: int in [-1, 0, 1]:
-		var available: Array[int] = _available_stack_indices(direction, side)
-		if available.is_empty():
-			continue
-		var reference_index: int = _largest_stack_index(available)
-		var reference: MeshInstance3D = (piece_records[reference_index] as Dictionary).get("mesh") as MeshInstance3D
-		if reference == null:
-			continue
-		var point: Vector2 = camera.unproject_position(reference.global_position)
-		var visible: bool = point.x >= 0.0 and point.x <= viewport_size.x and point.y >= 0.0 and point.y <= viewport_size.y
-		var distance: float = point.distance_squared_to(viewport_center) + (0.0 if visible else 100000000.0)
-		if distance < best_distance:
-			best_distance = distance
-			best_stack = available
-
-	if best_stack.is_empty():
-		return
-
-	# Camera3D returns Godot viewport coordinates, while Playwright clicks in CSS
-	# pixels. Convert exactly the same way as the intro pixel-match code; this is
-	# test-only telemetry and does not alter real pointer handling.
 	var canvas_rect: Rect2 = _gameplay_canvas_css_rect()
 	if canvas_rect.size.x < 1.0 or canvas_rect.size.y < 1.0 or viewport_size.x < 1.0 or viewport_size.y < 1.0:
 		return
 	var css_scale := Vector2(canvas_rect.size.x / viewport_size.x, canvas_rect.size.y / viewport_size.y)
 	var script: String = ""
-	for size_name: String in ["small", "medium", "large"]:
-		var index: int = -1
-		for candidate: int in best_stack:
-			if str((piece_records[candidate] as Dictionary).get("type", "")) == size_name:
-				index = candidate
-				break
-		if index < 0:
-			continue
-		var mesh_instance: MeshInstance3D = (piece_records[index] as Dictionary).get("mesh") as MeshInstance3D
-		var radius: float = _piece_mesh_radius(index)
-		# Target 90% of the physical radius along local +X. The semantic picker
-		# interprets this point in the same local plane, so the test exercises a
-		# real browser click even if the large collision shell sits in front.
-		var world_target: Vector3 = mesh_instance.to_global(Vector3(radius * 0.90, 0.0, 0.0))
-		var internal_point: Vector2 = camera.unproject_position(world_target)
-		var css_point: Vector2 = canvas_rect.position + internal_point * css_scale
-		var cap: String = size_name.capitalize()
-		script += "document.body.dataset.yakolakTest%sX='%s';" % [cap, str(css_point.x)]
-		script += "document.body.dataset.yakolakTest%sY='%s';" % [cap, str(css_point.y)]
+
+	# Publish one real browser target for every size in every neighboring stack.
+	# The points sit on the exposed outer portion of each rendered mesh; tests
+	# then click/tap those exact CSS pixels and assert the exact Stone_* identity.
+	for side: int in [-1, 0, 1]:
+		var available: Array[int] = _available_stack_indices(direction, side)
+		for size_name: String in ["small", "medium", "large"]:
+			var index: int = -1
+			for candidate: int in available:
+				if str((piece_records[candidate] as Dictionary).get("type", "")) == size_name:
+					index = candidate
+					break
+			if index < 0:
+				continue
+			var mesh_instance: MeshInstance3D = (piece_records[index] as Dictionary).get("mesh") as MeshInstance3D
+			if mesh_instance == null:
+				continue
+			var radius: float = _piece_mesh_radius(index)
+			var world_target: Vector3 = mesh_instance.to_global(Vector3(radius * 0.90, 0.0, 0.0))
+			var internal_point: Vector2 = camera.unproject_position(world_target)
+			var css_point: Vector2 = canvas_rect.position + internal_point * css_scale
+			var size_cap: String = size_name.capitalize()
+			var side_cap: String = "Minus1" if side < 0 else ("Plus1" if side > 0 else "0")
+			script += "document.body.dataset.yakolakTestSide%s%sX='%s';" % [side_cap, size_cap, str(css_point.x)]
+			script += "document.body.dataset.yakolakTestSide%s%sY='%s';" % [side_cap, size_cap, str(css_point.y)]
+			# Preserve the existing center-stack test contract used by other checks.
+			if side == 0:
+				script += "document.body.dataset.yakolakTest%sX='%s';" % [size_cap, str(css_point.x)]
+				script += "document.body.dataset.yakolakTest%sY='%s';" % [size_cap, str(css_point.y)]
+
+	script += "document.body.dataset.yakolakPiecePickModel='mesh-triangle-frontmost';"
+	script += "document.body.dataset.yakolakPiecePickInputParity='shared-screen-ray';"
+	script += "document.body.dataset.yakolakPiecePickDirection='" + direction + "';"
 	JavaScriptBridge.eval(script, true)
 
 
