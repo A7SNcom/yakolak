@@ -33,7 +33,12 @@ static func copies_per_size() -> int:
 
 
 static func is_valid_wins_to_match(value: int) -> bool:
-	return (contract().get("winsToMatchOptions", []) as Array).has(value)
+	# JSON numeric values are parsed as floats by Godot. Compare by normalized
+	# integer value so the shared [3, 5] contract is identical to Node's view.
+	for option: Variant in contract().get("winsToMatchOptions", []) as Array:
+		if int(option) == value:
+			return true
+	return false
 
 
 static func normalize_wins_to_match(value: int) -> int:
