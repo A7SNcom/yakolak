@@ -1,8 +1,8 @@
-[gd_scene load_steps=23 format=3]
+[gd_scene load_steps=24 format=3]
 
 [ext_resource type="Script" path="res://scripts/intro.gd" id="1_intro"]
 [ext_resource type="Script" path="res://scripts/intro_corrections.gd" id="2_corrections"]
-[ext_resource type="Script" path="res://scripts/gameplay_session_efficient.gd" id="3_gameplay"]
+[ext_resource type="Script" path="res://scripts/gameplay_session_nested_pick.gd" id="3_nested_dependency"]
 [ext_resource type="Script" path="res://scripts/pre_intro_hidden_drop.gd" id="4_preintro"]
 [ext_resource type="Script" path="res://scripts/visual_polish.gd" id="5_visual"]
 [ext_resource type="Script" path="res://scripts/pre_intro_refinement.gd" id="6_refinement"]
@@ -21,6 +21,7 @@
 [ext_resource type="Script" path="res://scripts/telemetry_console_capture.gd" id="19_console_capture"]
 [ext_resource type="Script" path="res://scripts/gameplay_session_polish.gd" id="20_polish_dependency"]
 [ext_resource type="Script" path="res://scripts/diagnostics_gate.gd" id="21_diagnostics"]
+[ext_resource type="Script" path="res://scripts/gameplay_session_efficient.gd" id="22_gameplay"]
 
 [node name="YAKOLAKIntro26" type="Node3D"]
 script = ExtResource("1_intro")
@@ -74,7 +75,7 @@ script = ExtResource("11_online")
 script = ExtResource("15_online_test")
 
 [node name="PostIntroGameplay" type="Node" parent="."]
-script = ExtResource("3_gameplay")
+script = ExtResource("22_gameplay")
 
 [node name="GameplayCameraZoom" type="Node" parent="."]
 script = ExtResource("14_zoom")
