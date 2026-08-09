@@ -42,7 +42,11 @@ const EFF_ACTIVE_FPS: int = 60
 const EFF_IDLE_PROCESS_INTERVAL: float = 0.050
 const EFF_INPUT_BOOST_MS: int = 700
 const EFF_SCORE_BOOST_MS: int = 900
-const EFF_MAX_MOVE_STEP_SECONDS: float = 1.0 / 30.0
+# A catastrophic hitch should not teleport the stone, but the animation must
+# still finish promptly on a genuinely slow device. 15 Hz is the safety floor:
+# it halves a 120-150 ms hitch while keeping a 520 ms move near one second even
+# on a ~7 fps software-rendered browser.
+const EFF_MAX_MOVE_STEP_SECONDS: float = 1.0 / 15.0
 
 var _eff_idle_process_accumulator: float = 0.0
 var _eff_boost_until_msec: int = 0
