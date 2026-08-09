@@ -8,7 +8,7 @@ function secret(bytes = 32) {
   return randomBytes(bytes).toString('hex');
 }
 
-async function post(body, token = '') {
+async function postRaw(body, token = '') {
   const response = await fetch(endpoint, {
     method: 'POST',
     cache: 'no-store',
@@ -20,8 +20,13 @@ async function post(body, token = '') {
     body: JSON.stringify(body),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(`${body.action}:${response.status}:${data.error || 'unknown'}`);
-  return data;
+  return { status: response.status, ok: response.ok, data };
+}
+
+async function post(body, token = '') {
+  const result = await postRaw(body, token);
+  if (!result.ok) throw new Error(`${body.action}:${result.status}:${result.data.error || 'unknown'}`);
+  return result.data;
 }
 
 async function poll(code, token, since = 0) {
@@ -39,6 +44,7 @@ function assertRoomIdentity(payload, expectedCode) {
   assert.match(String(payload?.room?.code || ''), /^\d{2}$/);
   assert.equal(String(payload.room.code), expectedCode);
   assert.ok(Number.isInteger(Number(payload.room.version)) && Number(payload.room.version) > 0);
+  assert.equal(Object.hasOwn(payload.room, '_mutations'), false, 'internal mutation receipts must never leak to clients');
 }
 
 async function leaveQuietly(code, version, token) {
@@ -94,7 +100,7 @@ async function verifyWaitingGuestLeave() {
   }
 }
 
-async function verifyRealMatch() {
+async function verifyRealMatchAndExactlyOnce() {
   const p1Token = secret();
   const p2Token = secret();
   let code = '';
@@ -115,27 +121,81 @@ async function verifyRealMatch() {
     assertRoomIdentity(state, code);
     assert.equal(state.room.status, 'playing');
 
-    const moves = [
-      [p1Token, 0, 'small'],
-      [p2Token, 8, 'large'],
-      [p1Token, 1, 'small'],
-      [p2Token, 7, 'medium'],
-      [p1Token, 2, 'small'],
-    ];
-    for (const [token, cell, size] of moves) {
-      state = await post({ action: 'move', code, version, cell, size }, token);
-      version = Number(state.room.version);
-      assertRoomIdentity(state, code);
-    }
+    // Lost/delayed response simulation: the same mutation is sent twice at the
+    // same time. Both callers must converge on one authoritative move/version.
+    const firstVersion = version;
+    const firstMutation = secret(24);
+    const firstMove = { action: 'move', code, version: firstVersion, cell: 0, size: 'small', mutationId: firstMutation };
+    const sameMutationResults = await Promise.all([
+      postRaw(firstMove, p1Token),
+      postRaw(firstMove, p1Token),
+    ]);
+    assert.deepEqual(sameMutationResults.map(result => result.status).sort(), [200, 200]);
+    for (const result of sameMutationResults) assertRoomIdentity(result.data, code);
+    const firstAuthoritative = sameMutationResults[0].data.room.version >= sameMutationResults[1].data.room.version
+      ? sameMutationResults[0].data : sameMutationResults[1].data;
+    version = Number(firstAuthoritative.room.version);
+    assert.equal(version, firstVersion + 1, 'duplicate same mutation must increment room only once');
+    assert.equal(firstAuthoritative.room.moveNumber, 1);
+    assert.equal(firstAuthoritative.room.turnIndex, 1);
+
+    // Opponent moves before the delayed first response is retried. A stale
+    // replay must still be recognized by mutationId even though lastMove changed.
+    const secondMutation = secret(24);
+    state = await post({ action: 'move', code, version, cell: 8, size: 'large', mutationId: secondMutation }, p2Token);
+    version = Number(state.room.version);
+    assert.equal(state.room.moveNumber, 2);
+    assert.equal(state.room.turnIndex, 0);
+
+    const replayAfterInterveningMove = await post(firstMove, p1Token);
+    assertRoomIdentity(replayAfterInterveningMove, code);
+    assert.equal(Number(replayAfterInterveningMove.room.version), version);
+    assert.equal(replayAfterInterveningMove.room.moveNumber, 2);
+    assert.equal(replayAfterInterveningMove.room.turnIndex, 0);
+
+    // Pressure / repeated click / duplicated-tab / simultaneous-player test:
+    // two p1 intents and an out-of-turn p2 intent race on the same version.
+    // Exactly one authoritative transition may win.
+    const raceVersion = version;
+    const raceResults = await Promise.all([
+      postRaw({ action: 'move', code, version: raceVersion, cell: 1, size: 'small', mutationId: secret(24) }, p1Token),
+      postRaw({ action: 'move', code, version: raceVersion, cell: 1, size: 'small', mutationId: secret(24) }, p1Token),
+      postRaw({ action: 'move', code, version: raceVersion, cell: 7, size: 'medium', mutationId: secret(24) }, p2Token),
+    ]);
+    assert.equal(raceResults.filter(result => result.status === 200).length, 1, 'only one concurrent transition may commit');
+    assert.ok(raceResults.filter(result => result.status === 409).length >= 2);
+
+    const afterRace = await poll(code, p1Token, 0);
+    assertRoomIdentity(afterRace, code);
+    version = Number(afterRace.room.version);
+    assert.equal(version, raceVersion + 1);
+    assert.equal(afterRace.room.moveNumber, 3);
+    assert.equal(afterRace.room.board['1'].small, 'marble');
+    assert.equal(afterRace.room.turnIndex, 1);
+
+    // Continue normally and verify turn order/winner were not corrupted by race.
+    state = await post({ action: 'move', code, version, cell: 7, size: 'medium', mutationId: secret(24) }, p2Token);
+    version = Number(state.room.version);
+    state = await post({ action: 'move', code, version, cell: 2, size: 'small', mutationId: secret(24) }, p1Token);
+    version = Number(state.room.version);
+    assertRoomIdentity(state, code);
     assert.equal(state.room.status, 'finished');
     assert.equal(state.room.winner?.seat, 'p1');
+    assert.equal(state.room.moveNumber, 5);
 
-    state = await post({ action: 'rematch', code, version }, p1Token);
+    const p1RematchMutation = secret(24);
+    const p1RematchVersion = version;
+    state = await post({ action: 'rematch', code, version, mutationId: p1RematchMutation }, p1Token);
     version = Number(state.room.version);
     assertRoomIdentity(state, code);
     assert.equal(state.room.status, 'finished');
 
-    state = await post({ action: 'rematch', code, version }, p2Token);
+    // Duplicate rematch is also idempotent and cannot cast an extra future vote.
+    const duplicateRematch = await post({ action: 'rematch', code, version: p1RematchVersion, mutationId: p1RematchMutation }, p1Token);
+    assert.equal(Number(duplicateRematch.room.version), version);
+    assert.equal(duplicateRematch.room.status, 'finished');
+
+    state = await post({ action: 'rematch', code, version, mutationId: secret(24) }, p2Token);
     version = Number(state.room.version);
     assertRoomIdentity(state, code);
     assert.equal(state.room.status, 'playing');
@@ -147,5 +207,5 @@ async function verifyRealMatch() {
 }
 
 await verifyWaitingGuestLeave();
-await verifyRealMatch();
+await verifyRealMatchAndExactlyOnce();
 console.log('YAKOLAK_PRODUCTION_ONLINE_PROBE_OK', base);
