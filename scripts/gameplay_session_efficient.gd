@@ -8,6 +8,16 @@ var _eff_quick_key: String = ""
 var _eff_waiting_key: String = ""
 var _eff_score_key: String = ""
 
+# Selection treatment: keep the stone's real material, then use a thin,
+# high-contrast inverted-hull edge plus one soft halo pass. This is clearer
+# than the old thick flat shell without adding any per-frame animation work.
+const SELECTION_CORE_GROW: float = 0.30
+const SELECTION_HALO_GROW: float = 0.62
+const SELECTION_CORE_ENERGY: float = 1.55
+const SELECTION_HALO_ENERGY: float = 0.72
+const SELECTION_HALO_ALPHA: float = 0.16
+const SELECTION_HALO_COLOR := Color(0.46, 0.86, 1.0, 1.0)
+
 
 func _sync_hud_visibility() -> void:
 	var key: String = "%s|%s|%s" % [str(match_initialized), str(online_active), str(online_waiting)]
@@ -60,3 +70,46 @@ func _sync_score_markers() -> void:
 		return
 	_eff_score_key = key
 	super._sync_score_markers()
+
+
+func _selection_material(source: Material) -> StandardMaterial3D:
+	# Start from the approved material-preserving implementation, but replace
+	# its coarse single shell with a crisp core + restrained halo.
+	var result: StandardMaterial3D = super._selection_material(source)
+	var base_color: Color = result.albedo_color
+	var luminance: float = base_color.r * 0.2126 + base_color.g * 0.7152 + base_color.b * 0.0722
+	var core_color: Color = Color(0.025, 0.028, 0.035, 1.0) if luminance > 0.62 else Color(0.985, 0.995, 1.0, 1.0)
+
+	var core := StandardMaterial3D.new()
+	core.albedo_color = core_color
+	core.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	core.cull_mode = BaseMaterial3D.CULL_FRONT
+	core.grow = true
+	core.grow_amount = SELECTION_CORE_GROW
+	core.roughness = 1.0
+	core.emission_enabled = true
+	core.emission = core_color
+	core.emission_energy_multiplier = SELECTION_CORE_ENERGY
+
+	var halo := StandardMaterial3D.new()
+	halo.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	halo.albedo_color = Color(SELECTION_HALO_COLOR.r, SELECTION_HALO_COLOR.g, SELECTION_HALO_COLOR.b, SELECTION_HALO_ALPHA)
+	halo.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	halo.cull_mode = BaseMaterial3D.CULL_FRONT
+	halo.grow = true
+	halo.grow_amount = SELECTION_HALO_GROW
+	halo.roughness = 1.0
+	halo.emission_enabled = true
+	halo.emission = SELECTION_HALO_COLOR
+	halo.emission_energy_multiplier = SELECTION_HALO_ENERGY
+
+	core.next_pass = halo
+	result.next_pass = core
+
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval(
+			"document.body.dataset.yakolakSelectionOutlineProfile='crisp-soft-halo';" +
+			"document.body.dataset.yakolakSelectionHalo='soft-cyan';",
+			true
+		)
+	return result
