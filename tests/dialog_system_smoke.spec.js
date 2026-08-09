@@ -128,6 +128,14 @@ test('dialog keyboard path starts focused, loops with Tab and honors Escape', as
   await page.keyboard.press('Enter');
   await waitStage(page, 'setup:count');
   await page.keyboard.press('Escape');
+  await page.waitForTimeout(150);
+  const escapeBridge = await page.evaluate(() => ({
+    seen: document.body.dataset.yakolakDialogEscapeSeen || 'none',
+    stage: document.body.dataset.yakolakDialogStage || 'none',
+    callback: typeof window.yakolakDialogCancel,
+  }));
+  console.log(`YAKOLAK_DIALOG_ESCAPE ${JSON.stringify(escapeBridge)}`);
+  expect(escapeBridge.seen).toBe('godot');
   await waitStage(page, 'room_entry');
 
   // The mandatory root cannot be dismissed into an unusable game state.
