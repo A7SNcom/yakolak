@@ -346,10 +346,40 @@ function authEntries(row) {
   }
 }
 
+// Online ownership has one source of truth: active seats come from state.players,
+// while auth_json privately maps exactly one credential hash to exactly one seat.
+// Colors never grant control; a credential can act only through its owned seat.
+function seatOwnership(state, auth) {
+  const players = Array.isArray(state?.players) ? state.players : [];
+  const activeSeats = new Set();
+  for (const player of players) {
+    const seat = String(player?.seat || '');
+    if (!/^p[1-4]$/.test(seat) || activeSeats.has(seat)) throw new Error('identity_conflict');
+    activeSeats.add(seat);
+  }
+
+  const activeAuth = (Array.isArray(auth) ? auth : []).filter(entry => activeSeats.has(String(entry?.seat || '')));
+  const seatToHash = new Map();
+  const hashToSeat = new Map();
+  for (const entry of activeAuth) {
+    const seat = String(entry?.seat || '');
+    const hash = String(entry?.hash || '');
+    if (!hash) throw new Error('identity_conflict');
+    const previousHash = seatToHash.get(seat);
+    if (previousHash && previousHash !== hash) throw new Error('identity_conflict');
+    const previousSeat = hashToSeat.get(hash);
+    if (previousSeat && previousSeat !== seat) throw new Error('identity_conflict');
+    seatToHash.set(seat, hash);
+    hashToSeat.set(hash, seat);
+  }
+  for (const seat of activeSeats) if (!seatToHash.has(seat)) throw new Error('identity_conflict');
+  return { auth: activeAuth, seatToHash, hashToSeat };
+}
+
 function seatFor(row, token) {
   if (!validCredential(token)) return null;
-  const hash = tokenHash(token);
-  return authEntries(row).find(entry => entry.hash === hash)?.seat || null;
+  const state = JSON.parse(String(row.state_json || '{}'));
+  return seatOwnership(state, authEntries(row)).hashToSeat.get(tokenHash(token)) || null;
 }
 
 async function readRoom(db, code) {
@@ -473,23 +503,35 @@ async function createRoom(db, color, targetPlayers, targetRounds, clientToken, r
 async function joinRoom(db, code, color, clientToken, requestId) {
   if (!validCredential(clientToken) || !validCredential(requestId)) throw new Error('invalid_session');
   const token = String(clientToken);
+  const tokenDigest = tokenHash(token);
   const joinKey = tokenHash(requestId);
   for (let attempt = 0; attempt < 6; attempt += 1) {
     const row = await readRoom(db, code);
     if (!row) throw new Error('room_not_found');
-    const auth = authEntries(row);
+    const state = JSON.parse(String(row.state_json));
+    const ownership = seatOwnership(state, authEntries(row));
+    const auth = ownership.auth;
+
+    // Ownership outranks request idempotency. Re-entering with the same
+    // credential can never reserve another seat or change the seat's color.
+    const ownedSeat = ownership.hashToSeat.get(tokenDigest) || null;
+    if (ownedSeat) {
+      await touchPresence(db, code, ownedSeat, true);
+      return { token, seat: ownedSeat, room: publicRoom(row) };
+    }
+
     const prior = auth.find(entry => entry.joinKey === joinKey);
     if (prior) {
-      if (prior.hash !== tokenHash(token)) throw new Error('unauthorized');
+      if (prior.hash !== tokenDigest) throw new Error('unauthorized');
       await touchPresence(db, code, prior.seat, true);
       return { token, seat: prior.seat, room: publicRoom(row) };
     }
-    const state = JSON.parse(String(row.state_json));
+
     const seat = ['p2', 'p3', 'p4'].find(candidate => !state.players.some(player => player.seat === candidate));
     if (!seat) throw new Error('room_full');
     const next = joinState(state, seat, color);
     await touchPresence(db, code, seat, true);
-    const result = await db.execute({ sql: `UPDATE ${TABLE} SET auth_json = ?, state_json = ?, status = ?, version = version + 1, updated_at = ?, expires_at = ? WHERE room_code = ? AND version = ?`, args: [JSON.stringify([...auth, { seat, hash: tokenHash(token), joinKey }]), JSON.stringify(next), next.status, new Date().toISOString(), isoAfter(ROOM_TTL_MS), code, Number(row.version)] });
+    const result = await db.execute({ sql: `UPDATE ${TABLE} SET auth_json = ?, state_json = ?, status = ?, version = version + 1, updated_at = ?, expires_at = ? WHERE room_code = ? AND version = ?`, args: [JSON.stringify([...auth, { seat, hash: tokenDigest, joinKey }]), JSON.stringify(next), next.status, new Date().toISOString(), isoAfter(ROOM_TTL_MS), code, Number(row.version)] });
     if (Number(result.rowsAffected || 0) === 1) return { token, seat, room: { code, version: Number(row.version) + 1, ...publicState(next) } };
   }
   throw new Error('version_conflict');
@@ -508,7 +550,7 @@ function statusFor(error) {
   if (code === 'unauthorized') return 401;
   if (code === 'rate_limited') return 429;
   if (code === 'room_code_exhausted') return 503;
-  if (['not_your_turn', 'room_full', 'room_not_waiting', 'version_conflict', 'color_taken', 'room_not_playing', 'round_not_finished', 'occupied_slot', 'no_piece_remaining'].includes(code)) return 409;
+  if (['not_your_turn', 'room_full', 'room_not_waiting', 'version_conflict', 'color_taken', 'room_not_playing', 'round_not_finished', 'occupied_slot', 'no_piece_remaining', 'identity_conflict'].includes(code)) return 409;
   if (['invalid_color', 'invalid_player_count', 'invalid_round_count', 'invalid_move', 'invalid_room_code', 'invalid_payload', 'invalid_action', 'invalid_seat', 'invalid_session', 'invalid_mutation_id'].includes(code)) return 400;
   return 500;
 }
@@ -584,4 +626,4 @@ export default async function handler(req, res) {
   }
 }
 
-export const __testing = { PROTOCOL, PLAYER_STALE_MS, PRESENCE_WRITE_INTERVAL_MS, applyMove, createState, emptyBoard, hasLegalMove, joinState, leaveState, materializeUpdatedRow, mutationApplied, normalizeCode, preview, publicRoom, publicState, reconcilePresenceState, recordMutation, rematchState, validMutationId, validatePlacement, winner, winningPatterns: rulesWinningPatterns };
+export const __testing = { PROTOCOL, PLAYER_STALE_MS, PRESENCE_WRITE_INTERVAL_MS, applyMove, createState, emptyBoard, hasLegalMove, joinState, leaveState, materializeUpdatedRow, mutationApplied, normalizeCode, preview, publicRoom, publicState, reconcilePresenceState, recordMutation, rematchState, seatOwnership, validMutationId, validatePlacement, winner, winningPatterns: rulesWinningPatterns };
