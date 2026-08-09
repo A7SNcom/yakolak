@@ -355,7 +355,7 @@ func _finish_round(winner: String, winning: Array[int]) -> void:
 	if winner != "":
 		scores[winner] = int(scores.get(winner, 0)) + 1
 		_highlight_winning_pieces(winning)
-	match_complete = round_number >= MATCH_ROUNDS
+	match_complete = winner != "" and int(scores.get(winner, 0)) >= MATCH_ROUNDS
 	_update_hud()
 	_show_round_result()
 	_publish_match_state("match-complete" if match_complete else "round-complete")
@@ -587,7 +587,7 @@ func _update_hud() -> void:
 	var seconds: int = 18
 	if turn_deadline_msec > 0 and not round_complete:
 		seconds = int(ceil(float(maxi(turn_deadline_msec - Time.get_ticks_msec(), 0)) / 1000.0))
-	turn_label.text = "الجولة %d/%d  ·  دور %s  ·  %dث" % [round_number, MATCH_ROUNDS, _player_name(direction), seconds]
+	turn_label.text = "الجولة %d  ·  للفوز %d أشواط  ·  دور %s  ·  %dث" % [round_number, MATCH_ROUNDS, _player_name(direction), seconds]
 	score_label.text = "أبيض %d   ·   أزرق %d   ·   ذهبي %d   ·   أخضر %d" % [
 		int(scores.get("right", 0)), int(scores.get("back", 0)),
 		int(scores.get("left", 0)), int(scores.get("front", 0)),

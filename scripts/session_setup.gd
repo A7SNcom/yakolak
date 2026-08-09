@@ -369,12 +369,12 @@ func _show_setup() -> void:
 		var rounds_row := HBoxContainer.new()
 		rounds_row.layout_direction = Control.LAYOUT_DIRECTION_RTL
 		rounds_row.add_theme_constant_override("separation", int(round(_ui_length(12.0))))
-		var rounds_label := _label("الأشواط", 18, HORIZONTAL_ALIGNMENT_RIGHT)
+		var rounds_label := _label("أشواط للفوز", 18, HORIZONTAL_ALIGNMENT_RIGHT)
 		rounds_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		rounds_row.add_child(rounds_label)
 		var rounds_picker := OptionButton.new()
-		rounds_picker.add_item("٣ أشواط", 3)
-		rounds_picker.add_item("٥ أشواط", 5)
+		rounds_picker.add_item("٣ أشواط للفوز", 3)
+		rounds_picker.add_item("٥ أشواط للفوز", 5)
 		rounds_picker.select(0 if rounds == 3 else 1)
 		rounds_picker.custom_minimum_size = Vector2(_ui_length(132.0), _ui_length(46.0))
 		_apply_picker_font(rounds_picker)

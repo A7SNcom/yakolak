@@ -211,7 +211,7 @@ function finishRound(state, { color = null, seat = null, draw = false, lastMove 
   const scores = { ...state.scores };
   if (seat) scores[seat] = Number(scores[seat] || 0) + 1;
   const completedRounds = Number(state.completedRounds || 0) + 1;
-  const matchComplete = completedRounds >= Number(state.targetRounds);
+  const matchComplete = Boolean(seat) && Number(scores[seat] || 0) >= Number(state.targetRounds);
   const leaders = matchComplete
     ? state.players.filter(player => Number(scores[player.seat] || 0) === Math.max(...Object.values(scores).map(Number)))
     : [];

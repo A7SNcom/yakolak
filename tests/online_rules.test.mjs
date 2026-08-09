@@ -59,4 +59,36 @@ assert.equal(nextRound.round, 2);
 assert.deepEqual(nextRound.board['4'], {});
 assert.equal(nextRound.scores.p1, 1);
 
+function winCurrentStarter(state) {
+  const winnerSeat = state.players[state.turnIndex].seat;
+  const loserSeat = winnerSeat === 'p1' ? 'p2' : 'p1';
+  state = move(state, winnerSeat, 0, 'small');
+  state = move(state, loserSeat, 8, 'large');
+  state = move(state, winnerSeat, 1, 'small');
+  state = move(state, loserSeat, 7, 'medium');
+  state = move(state, winnerSeat, 2, 'small');
+  assert.equal(state.status, 'finished');
+  return state;
+}
+
+function advanceAfterBothPlayers(state) {
+  state = rematchState(state, 'p1');
+  state = rematchState(state, 'p2');
+  return state;
+}
+
+let raceToThree = room();
+for (let round = 1; round <= 4; round += 1) {
+  raceToThree = winCurrentStarter(raceToThree);
+  assert.equal(raceToThree.matchComplete, false, `round ${round} must not end a race-to-3 match before anyone has 3 wins`);
+  raceToThree = advanceAfterBothPlayers(raceToThree);
+}
+raceToThree = winCurrentStarter(raceToThree);
+assert.equal(raceToThree.round, 5);
+assert.equal(raceToThree.scores.p1, 3);
+assert.equal(raceToThree.scores.p2, 2);
+assert.equal(raceToThree.matchComplete, true);
+assert.equal(raceToThree.matchWinner?.seat, 'p1');
+assert.equal(raceToThree.matchWinner?.wins, 3);
+
 console.log('YAKOLAK_ONLINE_RULES_OK');

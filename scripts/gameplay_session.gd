@@ -897,7 +897,7 @@ func _finish_round(winner: String, winning: Array[int]) -> void:
 	if winner != "":
 		scores[winner] = int(scores.get(winner, 0)) + 1
 		_highlight_winning_pieces(winning)
-	match_complete = round_number >= total_rounds
+	match_complete = winner != "" and int(scores.get(winner, 0)) >= total_rounds
 	_update_hud()
 	_show_round_result()
 	_publish_match_state("match-complete" if match_complete else "round-complete")
@@ -1381,7 +1381,7 @@ func _update_hud() -> void:
 		tutorial_hint = " · يفكر…"
 	elif _current_mode() == "online":
 		tutorial_hint = " · انتظار…"
-	turn_label.text = "الجولة %d/%d · %s%s" % [round_number, total_rounds, str(player.get("color_name", "")), tutorial_hint]
+	turn_label.text = "الجولة %d · للفوز %d أشواط · %s%s" % [round_number, total_rounds, str(player.get("color_name", "")), tutorial_hint]
 	var score_parts: Array[String] = []
 	for entry: Dictionary in players:
 		var direction: String = str(entry["direction"])
@@ -1410,6 +1410,7 @@ func _publish_match_state(state: String) -> void:
 		"document.body.dataset.yakolakCurrentPlayer='%s';" % _current_direction() +
 		"document.body.dataset.yakolakRound='%d';" % round_number +
 		"document.body.dataset.yakolakRoundCount='%d';" % total_rounds +
+		"document.body.dataset.yakolakWinsToWin='%d';" % total_rounds +
 		"document.body.dataset.yakolakTurnRemaining='%d';" % remaining +
 		"document.body.dataset.yakolakWinner='%s';" % round_winner +
 		"document.body.dataset.yakolakPlayers='%d';" % players.size(),
