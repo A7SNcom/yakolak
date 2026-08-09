@@ -15,18 +15,23 @@ func _ready() -> void:
   if (window.__yakolakRoomsObserverRouteInstalled) return;
   window.__yakolakRoomsObserverRouteInstalled = true;
 
-  // A fresh guest has a ?room=XX URL but no saved identity yet. The online
-  // session intentionally falls through to preview/join when the object has no
-  // token/seat; storing {} only prevents JSON.parse_string('') from producing
-  // a noisy Godot error before that normal flow begins.
+  // A fresh guest has a ?room=XX URL but no saved identity yet. Normalize
+  // Arabic-Indic and Persian digits too, because the visible game is Arabic.
   try {
     const rawRoom = String(new URL(location.href).searchParams.get('room') || '');
-    const room = Array.from(rawRoom).filter(ch => ch >= '0' && ch <= '9').join('').slice(0, 2);
+    const arabic = '٠١٢٣٤٥٦٧٨٩';
+    const persian = '۰۱۲۳۴۵۶۷۸۹';
+    const room = Array.from(rawRoom).map(ch => {
+      const ai = arabic.indexOf(ch);
+      if (ai >= 0) return String(ai);
+      const pi = persian.indexOf(ch);
+      if (pi >= 0) return String(pi);
+      return ch;
+    }).filter(ch => ch >= '0' && ch <= '9').join('').slice(0, 2);
     if (room.length === 2) {
       const key = 'yakolak-online:' + room;
-      if (!sessionStorage.getItem(key) && !localStorage.getItem(key)) {
-        sessionStorage.setItem(key, '{}');
-      }
+      localStorage.removeItem(key);
+      if (!sessionStorage.getItem(key)) sessionStorage.setItem(key, '{}');
     }
   } catch (_) {}
 
