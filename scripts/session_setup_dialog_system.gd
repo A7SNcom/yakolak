@@ -189,13 +189,17 @@ func _dialog_cancel() -> void:
 		_:
 			navigated = false
 	if navigated:
-		# A cancel action rebuilds the content tree. Force focus restoration after
-		# that rebuild so keyboard users never remain on a hidden/removed control.
+		# Cancel rebuilds the content tree. Restore focus only after the rebuilt
+		# controls have survived two real frames, avoiding stale hidden owners.
 		dialog_focus_pending = false
 		call_deferred("_restore_dialog_focus_after_navigation")
 
 
 func _restore_dialog_focus_after_navigation() -> void:
+	if not showing:
+		return
+	await get_tree().process_frame
+	await get_tree().process_frame
 	if not showing:
 		return
 	dialog_focus_pending = false
@@ -340,6 +344,20 @@ func _publish_dialog_contract(controls: Array[Control]) -> void:
 		focused = "input"
 	elif focus_owner is BaseButton:
 		focused = "button"
+
+	var primary: Control = null
+	for control: Control in controls:
+		if control != dialog_close_button:
+			primary = control
+			break
+	var focus_role := "none"
+	if focus_owner != null and focus_owner == dialog_close_button:
+		focus_role = "close"
+	elif focus_owner != null and primary != null and focus_owner == primary:
+		focus_role = "primary"
+	elif focus_owner != null:
+		focus_role = "other"
+
 	var close_state: String = "visible" if dialog_close_button != null and dialog_close_button.visible else "mandatory-root"
 	var script: String = (
 		"document.body.dataset.yakolakDialogSystem='native-control-v1';" +
@@ -348,15 +366,11 @@ func _publish_dialog_contract(controls: Array[Control]) -> void:
 		"document.body.dataset.yakolakDialogBackdrop='blocked-not-dismissible';" +
 		"document.body.dataset.yakolakDialogClose='" + close_state + "';" +
 		"document.body.dataset.yakolakDialogFocus='" + focused + "';" +
+		"document.body.dataset.yakolakDialogFocusRole='" + focus_role + "';" +
 		"document.body.dataset.yakolakDialogFocusCount='" + str(controls.size()) + "';" +
 		"document.body.dataset.yakolakDialogKeyboard='tab-loop+escape';"
 	)
 
-	var primary: Control = null
-	for control: Control in controls:
-		if control != dialog_close_button:
-			primary = control
-			break
 	if primary != null:
 		var primary_center: Vector2 = primary.get_global_rect().get_center() * canvas_scale
 		script += "document.body.dataset.yakolakDialogPrimaryX='%.2f';" % primary_center.x
