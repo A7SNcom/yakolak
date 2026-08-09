@@ -79,46 +79,63 @@ func _restart_completed_local_match() -> void:
 
 
 func _on_web_force_match_complete(_arguments: Array) -> void:
+	# Leave the JavaScript callback before production gameplay publishes browser
+	# state back through JavaScriptBridge. This avoids a re-entrant bridge stall.
+	call_deferred("_force_match_complete_for_test")
+
+
+func _force_match_complete_for_test() -> void:
 	if not match_initialized or online_active or round_complete or players.is_empty():
 		return
 	var winner: String = _current_direction()
-	# Deterministically enter the real match-complete path without spending the
-	# test on round progression. _finish_round still performs the production win.
 	scores[winner] = maxi(total_rounds - 1, 0)
 	_finish_round(winner, [])
 
 
 func _on_web_rematch(_arguments: Array) -> void:
-	# Test the same production action used by "إعادة المباراة"; no reload and no
-	# direct mutation of the reset state from the browser harness.
-	_on_round_action()
+	# Same production action used by "إعادة المباراة", scheduled after returning
+	# from the browser callback so its state publications are never re-entrant.
+	call_deferred("_on_round_action")
 
 
 func _on_web_run_rematch_lifecycle_test(_arguments: Array) -> void:
+	call_deferred("_run_rematch_lifecycle_test")
+
+
+func _run_rematch_lifecycle_test() -> void:
 	if not match_initialized or online_active or players.is_empty():
 		_publish_rematch_test_result(false, 0, ["match-not-ready"])
 		return
 	var failures: Array[String] = []
+	var completed_cycles: int = 0
 	for cycle: int in range(1, 4):
 		_test_dirty_completed_match()
-		if not match_complete:
-			failures.append("cycle-%d-did-not-complete" % cycle)
-			break
 		# This is the exact production action behind the rematch button/path.
 		_on_round_action()
-		failures.append_array(_test_clean_rematch_state(cycle))
-		if not failures.is_empty():
+		var cycle_failures: Array[String] = _test_clean_rematch_state(cycle)
+		if not cycle_failures.is_empty():
+			failures.append_array(cycle_failures)
 			break
-	_publish_rematch_test_result(failures.is_empty(), 3 if failures.is_empty() else 0, failures)
+		completed_cycles = cycle
+	_publish_rematch_test_result(failures.is_empty() and completed_cycles == 3, completed_cycles, failures)
 
 
 func _test_dirty_completed_match() -> void:
-	# Create representative state from the match that is about to end: a used
-	# stone, occupied slot, non-zero move count, non-zero score and a different
-	# active player. The production finish path then creates winner/result state.
+	# Represent the end of a dirty prior match without running round progression:
+	# winner, score, turn, used stone, occupied slot, old selection and visual
+	# result marker are all intentionally stale before the real rematch action.
+	action_in_progress = false
 	var winner_index: int = mini(1, players.size() - 1)
 	current_player_index = winner_index
+	round_starter_index = winner_index
+	round_number = maxi(total_rounds, 2)
 	var winner: String = _current_direction()
+	round_complete = true
+	match_complete = true
+	round_winner = winner
+	scores[winner] = maxi(total_rounds, 1)
+	move_count = 1
+
 	var piece_index: int = -1
 	for index: int in range(piece_records.size()):
 		var record: Dictionary = piece_records[index] as Dictionary
@@ -131,12 +148,20 @@ func _test_dirty_completed_match() -> void:
 		piece_records[piece_index] = record
 		var size_name: String = str(record.get("type", "large"))
 		occupied_slots[_slot_key(0, size_name)] = piece_index
-		move_count = 1
+		winning_piece_indices = [piece_index]
+		selected_index = piece_index
 		var piece: MeshInstance3D = record.get("mesh", null) as MeshInstance3D
 		if piece != null:
 			piece.position += Vector3.UP * 2.0
-	scores[winner] = maxi(total_rounds - 1, 0)
-	_finish_round(winner, [])
+
+	_ensure_score_marker_root()
+	if score_marker_root != null:
+		var stale_marker := Node3D.new()
+		stale_marker.name = "RematchLifecycleTestMarker"
+		score_marker_root.add_child(stale_marker)
+	_publish_score_marker_state()
+	_publish_cleanliness_state()
+	_publish_match_state("match-complete")
 
 
 func _test_clean_rematch_state(cycle: int) -> Array[String]:
@@ -149,8 +174,8 @@ func _test_clean_rematch_state(cycle: int) -> Array[String]:
 		failures.append("cycle-%d-round-%d" % [cycle, round_number])
 	if round_complete or match_complete:
 		failures.append("cycle-%d-complete-flags" % cycle)
-	if not round_winner.is_empty():
-		failures.append("cycle-%d-winner-%s" % [cycle, round_winner])
+	if not round_winner.is_empty() or not winning_piece_indices.is_empty():
+		failures.append("cycle-%d-winner" % cycle)
 	if selected_index != -1 or tray_open or not tray_indices.is_empty():
 		failures.append("cycle-%d-selection" % cycle)
 	if move_count != 0 or move_active or move_piece_index != -1 or move_cell != -1:
