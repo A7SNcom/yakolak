@@ -30,12 +30,8 @@ function safeRoom(value) {
   return /^\d{2}$/.test(room) ? room : '';
 }
 
-// Turso result rows expose fields through a row object that is not guaranteed
-// to survive object spreading. rooms.js used to construct the post-mutation
-// pseudo-row with {...row}; on production this dropped room_code and produced
-// {room:{code:"undefined"}} after an otherwise successful move. Repair only a
-// missing/malformed identity at this transport boundary. Never rewrite one
-// valid room code into another, and never sanitize the actual client payload.
+// Defense in depth only. rooms.js now preserves room_code itself, but keep this
+// boundary guard so a malformed transport row can never poison the client.
 function repairCapturedRoomIdentity(value, requestedRoom) {
   if (value == null || !requestedRoom) return value;
   try {
@@ -145,13 +141,6 @@ export default async function handler(req, res) {
     details,
   };
 
-  try {
-    const db = getTelemetryClient();
-    if (db) await persistWithDeadline(db, event, req);
-  } catch (telemetryError) {
-    console.warn('[YAKOLAK_ROOM_TRACE_WRITE_SKIPPED]', telemetryError?.message || telemetryError);
-  }
-
   const summary = {
     trace: traceId,
     request: requestId,
@@ -171,8 +160,17 @@ export default async function handler(req, res) {
   else if (level === 'warn') console.warn('[YAKOLAK_ROOM_TRACE]', line);
   else console.log('[YAKOLAK_ROOM_TRACE]', line);
 
+  // Return the gameplay response first. Telemetry is intentionally outside the
+  // latency path: even a slow/locked telemetry DB must never delay a move.
   res.end = originalEnd;
-  return finishResponse(originalEnd, captured, capturedEncoding, capturedCallback);
+  finishResponse(originalEnd, captured, capturedEncoding, capturedCallback);
+
+  try {
+    const db = getTelemetryClient();
+    if (db) await persistWithDeadline(db, event, req);
+  } catch (telemetryError) {
+    console.warn('[YAKOLAK_ROOM_TRACE_WRITE_SKIPPED]', telemetryError?.message || telemetryError);
+  }
 }
 
 export const __testing = {
