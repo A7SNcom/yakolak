@@ -2,18 +2,23 @@ import { createHash, randomInt } from 'node:crypto';
 import { createClient } from '@tursodatabase/serverless/compat';
 
 const TABLE = 'yakolak_online_rooms_v5';
+const PRESENCE_TABLE = 'yakolak_online_presence_v1';
+const RATE_TABLE = 'yakolak_online_join_rate_v1';
 const PROTOCOL = 5;
 const COLORS = ['marble', 'blue', 'gold', 'green'];
 const SIZES = ['small', 'medium', 'large'];
 const LINES = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
 const ROOM_TTL_MS = 3 * 60 * 60 * 1000;
 const WAITING_REUSE_MS = 20 * 60 * 1000;
-const FINISHED_REUSE_MS = 15 * 60 * 1000;
+const FINISHED_MATCH_REUSE_MS = 15 * 60 * 1000;
+const PLAYER_STALE_MS = 60 * 1000;
+const RATE_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT = 24;
 const MAX_BODY_BYTES = 8_000;
 const ROOM_PATTERN = /^\d{2}$/;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,96}$/;
 let client;
-let tableReady;
+let tablesReady;
 
 function json(res, status, payload) {
   res.statusCode = status;
@@ -33,20 +38,37 @@ function getClient() {
 }
 
 async function ensureTable(db) {
-  tableReady ||= db.execute(`
-    CREATE TABLE IF NOT EXISTS ${TABLE} (
-      room_code TEXT PRIMARY KEY,
-      create_key TEXT NOT NULL UNIQUE,
-      auth_json TEXT NOT NULL,
-      state_json TEXT NOT NULL,
-      version INTEGER NOT NULL DEFAULT 1,
-      status TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      expires_at TEXT NOT NULL
-    )
-  `);
-  await tableReady;
+  tablesReady ||= Promise.all([
+    db.execute(`
+      CREATE TABLE IF NOT EXISTS ${TABLE} (
+        room_code TEXT PRIMARY KEY,
+        create_key TEXT NOT NULL UNIQUE,
+        auth_json TEXT NOT NULL,
+        state_json TEXT NOT NULL,
+        version INTEGER NOT NULL DEFAULT 1,
+        status TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+      )
+    `),
+    db.execute(`
+      CREATE TABLE IF NOT EXISTS ${PRESENCE_TABLE} (
+        room_code TEXT NOT NULL,
+        seat TEXT NOT NULL,
+        last_seen TEXT NOT NULL,
+        PRIMARY KEY (room_code, seat)
+      )
+    `),
+    db.execute(`
+      CREATE TABLE IF NOT EXISTS ${RATE_TABLE} (
+        rate_key TEXT PRIMARY KEY,
+        count INTEGER NOT NULL,
+        expires_at TEXT NOT NULL
+      )
+    `),
+  ]);
+  await tablesReady;
 }
 
 function parseBody(req) {
@@ -130,10 +152,13 @@ function hasLegalMove(state, color) {
   return false;
 }
 
-function nextPlayablePlayer(state, fromIndex) {
+function nextPlayablePlayer(state, fromIndex, allowedSeats = null) {
+  const allowed = allowedSeats ? new Set(allowedSeats) : null;
   for (let offset = 1; offset <= state.players.length; offset += 1) {
     const index = (fromIndex + offset) % state.players.length;
-    if (hasLegalMove(state, state.players[index].color)) return index;
+    const player = state.players[index];
+    if (allowed && !allowed.has(player.seat)) continue;
+    if (hasLegalMove(state, player.color)) return index;
   }
   return -1;
 }
@@ -160,7 +185,8 @@ function createState(hostColor, targetPlayers, targetRounds) {
     matchComplete: false,
     matchWinner: null,
     matchWinners: [],
-    rematch: { p1: false }
+    rematch: { p1: false },
+    skippedSeat: null,
   };
 }
 
@@ -198,7 +224,8 @@ function finishRound(state, { color = null, seat = null, draw = false, lastMove 
     matchComplete,
     matchWinner: leaders.length === 1 ? { seat: leaders[0].seat, color: leaders[0].color, wins: Number(scores[leaders[0].seat] || 0) } : null,
     matchWinners: leaders.map(player => ({ seat: player.seat, color: player.color, wins: Number(scores[player.seat] || 0) })),
-    rematch: Object.fromEntries(state.players.map(player => [player.seat, false]))
+    rematch: Object.fromEntries(state.players.map(player => [player.seat, false])),
+    skippedSeat: null,
   };
 }
 
@@ -215,18 +242,14 @@ function applyMove(state, seat, move) {
   board[String(cell)] ||= {};
   board[String(cell)][size] = current.color;
   const lastMove = { cell, size, color: current.color, seat };
-  const next = { ...state, board, lastMove, moveNumber: Number(state.moveNumber || 0) + 1, winner: null, draw: false };
+  const next = { ...state, board, lastMove, moveNumber: Number(state.moveNumber || 0) + 1, winner: null, draw: false, skippedSeat: null };
   if (winner(board, current.color)) return finishRound(next, { color: current.color, seat, lastMove });
   const turnIndex = nextPlayablePlayer(next, state.turnIndex);
   if (turnIndex < 0) return finishRound(next, { draw: true, lastMove });
   return { ...next, turnIndex };
 }
 
-function rematchState(state, seat) {
-  if (state.status !== 'finished') throw new Error('round_not_finished');
-  if (!state.players.some(player => player.seat === seat)) throw new Error('invalid_seat');
-  const rematch = { ...state.rematch, [seat]: true };
-  if (!state.players.every(player => rematch[player.seat])) return { ...state, rematch };
+function advanceRoundState(state) {
   const cleared = Object.fromEntries(state.players.map(player => [player.seat, false]));
   if (state.matchComplete) {
     return {
@@ -234,7 +257,7 @@ function rematchState(state, seat) {
       status: 'playing', turnIndex: 0, board: emptyBoard(), round: 1, completedRounds: 0,
       scores: Object.fromEntries(state.players.map(player => [player.seat, 0])),
       winner: null, draw: false, lastMove: null, moveNumber: 0,
-      matchComplete: false, matchWinner: null, matchWinners: [], rematch: cleared
+      matchComplete: false, matchWinner: null, matchWinners: [], rematch: cleared, skippedSeat: null,
     };
   }
   return {
@@ -242,13 +265,54 @@ function rematchState(state, seat) {
     status: 'playing', turnIndex: Number(state.round || 1) % state.players.length,
     board: emptyBoard(), round: Number(state.round || 1) + 1,
     winner: null, draw: false, lastMove: null,
-    matchComplete: false, matchWinner: null, matchWinners: [], rematch: cleared
+    matchComplete: false, matchWinner: null, matchWinners: [], rematch: cleared, skippedSeat: null,
   };
+}
+
+function rematchState(state, seat, requiredSeats = null) {
+  if (state.status !== 'finished') throw new Error('round_not_finished');
+  if (!state.players.some(player => player.seat === seat)) throw new Error('invalid_seat');
+  const rematch = { ...state.rematch, [seat]: true };
+  const required = requiredSeats || state.players.map(player => player.seat);
+  if (!required.every(requiredSeat => rematch[requiredSeat])) return { ...state, rematch };
+  return advanceRoundState({ ...state, rematch });
 }
 
 function leaveState(state, seat) {
   if (!state.players.some(player => player.seat === seat)) throw new Error('invalid_seat');
+  if (state.status === 'waiting' && seat !== 'p1') {
+    const players = state.players.filter(player => player.seat !== seat);
+    const scores = { ...state.scores };
+    const rematch = { ...state.rematch };
+    delete scores[seat];
+    delete rematch[seat];
+    return { ...state, players, scores, rematch, cancelledBy: null };
+  }
   return { ...state, status: 'cancelled', cancelledBy: seat };
+}
+
+function reconcilePresenceState(state, connectedSeats) {
+  const connected = new Set(connectedSeats || []);
+  if (!connected.size) return state;
+
+  if (state.status === 'playing') {
+    const current = state.players[state.turnIndex];
+    if (current && !connected.has(current.seat)) {
+      const nextIndex = nextPlayablePlayer(state, state.turnIndex, [...connected]);
+      if (nextIndex >= 0 && nextIndex !== state.turnIndex) {
+        return { ...state, turnIndex: nextIndex, skippedSeat: current.seat };
+      }
+    }
+    return state;
+  }
+
+  if (state.status === 'finished' && !state.matchComplete) {
+    const activeSeats = state.players.map(player => player.seat).filter(seat => connected.has(seat));
+    if (activeSeats.length > 0 && activeSeats.every(seat => Boolean(state.rematch?.[seat]))) {
+      return advanceRoundState(state);
+    }
+  }
+  return state;
 }
 
 function publicRoom(row, state = null) {
@@ -289,18 +353,93 @@ async function readCreateRequest(db, createKey) {
 async function cleanupReusableRooms(db) {
   const now = Date.now();
   await db.execute({
-    sql: `DELETE FROM ${TABLE} WHERE expires_at <= ? OR status = 'cancelled' OR (status = 'waiting' AND updated_at < ?) OR (status = 'finished' AND updated_at < ?)`,
-    args: [new Date(now).toISOString(), new Date(now - WAITING_REUSE_MS).toISOString(), new Date(now - FINISHED_REUSE_MS).toISOString()]
+    sql: `DELETE FROM ${TABLE}
+          WHERE expires_at <= ?
+             OR status = 'cancelled'
+             OR (status = 'waiting' AND updated_at < ?)
+             OR (status = 'finished' AND COALESCE(json_extract(state_json, '$.matchComplete'), 0) = 1 AND updated_at < ?)`,
+    args: [new Date(now).toISOString(), new Date(now - WAITING_REUSE_MS).toISOString(), new Date(now - FINISHED_MATCH_REUSE_MS).toISOString()]
   });
+  await db.execute({
+    sql: `DELETE FROM ${PRESENCE_TABLE} WHERE room_code NOT IN (SELECT room_code FROM ${TABLE}) OR last_seen < ?`,
+    args: [new Date(now - ROOM_TTL_MS).toISOString()]
+  });
+  await db.execute({ sql: `DELETE FROM ${RATE_TABLE} WHERE expires_at <= ?`, args: [new Date(now).toISOString()] });
+}
+
+function materializeUpdatedRow(row, state, expectedVersion, auth = null) {
+  const authJson = JSON.stringify(auth || authEntries(row));
+  return {
+    room_code: String(row.room_code),
+    auth_json: authJson,
+    state_json: JSON.stringify(state),
+    version: expectedVersion + 1,
+    status: state.status,
+  };
 }
 
 async function updateRoom(db, row, state, expectedVersion, auth = null) {
+  const updated = materializeUpdatedRow(row, state, expectedVersion, auth);
   const result = await db.execute({
     sql: `UPDATE ${TABLE} SET auth_json = ?, state_json = ?, status = ?, version = version + 1, updated_at = ?, expires_at = ? WHERE room_code = ? AND version = ?`,
-    args: [JSON.stringify(auth || authEntries(row)), JSON.stringify(state), state.status, new Date().toISOString(), isoAfter(ROOM_TTL_MS), String(row.room_code), expectedVersion]
+    args: [updated.auth_json, updated.state_json, state.status, new Date().toISOString(), isoAfter(ROOM_TTL_MS), updated.room_code, expectedVersion]
   });
   if (Number(result.rowsAffected || 0) !== 1) throw new Error('version_conflict');
-  return { ...row, version: expectedVersion + 1, state_json: JSON.stringify(state), status: state.status };
+  return updated;
+}
+
+async function touchPresence(db, code, seat) {
+  if (!ROOM_PATTERN.test(String(code || '')) || !/^p[1-4]$/.test(String(seat || ''))) return;
+  await db.execute({
+    sql: `INSERT INTO ${PRESENCE_TABLE} (room_code, seat, last_seen) VALUES (?, ?, ?)
+          ON CONFLICT(room_code, seat) DO UPDATE SET last_seen = excluded.last_seen`,
+    args: [code, seat, new Date().toISOString()]
+  });
+}
+
+async function removePresence(db, code, seat) {
+  await db.execute({ sql: `DELETE FROM ${PRESENCE_TABLE} WHERE room_code = ? AND seat = ?`, args: [code, seat] });
+}
+
+async function connectedSeats(db, code) {
+  const cutoff = new Date(Date.now() - PLAYER_STALE_MS).toISOString();
+  const result = await db.execute({
+    sql: `SELECT seat FROM ${PRESENCE_TABLE} WHERE room_code = ? AND last_seen >= ?`,
+    args: [code, cutoff]
+  });
+  return (result.rows || []).map(row => String(row.seat || '')).filter(seat => /^p[1-4]$/.test(seat));
+}
+
+async function reconcileRoomPresence(db, row) {
+  const state = JSON.parse(String(row.state_json));
+  const connected = await connectedSeats(db, String(row.room_code));
+  const next = reconcilePresenceState(state, connected);
+  if (next === state) return row;
+  try {
+    return await updateRoom(db, row, next, Number(row.version));
+  } catch (error) {
+    if (error?.message !== 'version_conflict') throw error;
+    return (await readRoom(db, String(row.room_code))) || row;
+  }
+}
+
+function requestFingerprint(req) {
+  const forwarded = String(req.headers?.['x-forwarded-for'] || '').split(',')[0].trim();
+  const direct = String(req.headers?.['x-real-ip'] || req.socket?.remoteAddress || '').trim();
+  return tokenHash(forwarded || direct || 'unknown');
+}
+
+async function enforceDiscoveryRate(db, req) {
+  const bucket = Math.floor(Date.now() / RATE_WINDOW_MS);
+  const key = tokenHash(`${requestFingerprint(req)}:${bucket}`);
+  const expiresAt = new Date((bucket + 2) * RATE_WINDOW_MS).toISOString();
+  await db.execute({
+    sql: `INSERT INTO ${RATE_TABLE} (rate_key, count, expires_at) VALUES (?, 1, ?)
+          ON CONFLICT(rate_key) DO UPDATE SET count = count + 1, expires_at = excluded.expires_at`,
+    args: [key, expiresAt]
+  });
+  const result = await db.execute({ sql: `SELECT count FROM ${RATE_TABLE} WHERE rate_key = ? LIMIT 1`, args: [key] });
+  if (Number(result.rows?.[0]?.count || 0) > RATE_LIMIT) throw new Error('rate_limited');
 }
 
 async function createRoom(db, color, targetPlayers, targetRounds, clientToken, requestId) {
@@ -310,6 +449,7 @@ async function createRoom(db, color, targetPlayers, targetRounds, clientToken, r
   const existing = await readCreateRequest(db, createKey);
   if (existing) {
     if (seatFor(existing, token) !== 'p1') throw new Error('unauthorized');
+    await touchPresence(db, String(existing.room_code), 'p1');
     return { token, seat: 'p1', room: publicRoom(existing) };
   }
 
@@ -324,6 +464,7 @@ async function createRoom(db, color, targetPlayers, targetRounds, clientToken, r
         sql: `INSERT INTO ${TABLE} (room_code, create_key, auth_json, state_json, version, status, created_at, updated_at, expires_at) VALUES (?, ?, ?, ?, 1, 'waiting', ?, ?, ?)`,
         args: [code, createKey, JSON.stringify([{ seat: 'p1', hash: tokenHash(token), joinKey: createKey }]), JSON.stringify(state), now, now, isoAfter(ROOM_TTL_MS)]
       });
+      await touchPresence(db, code, 'p1');
       return { token, seat: 'p1', room: { code, version: 1, ...state } };
     } catch (error) {
       const message = String(error?.message || '').toLowerCase();
@@ -331,6 +472,7 @@ async function createRoom(db, color, targetPlayers, targetRounds, clientToken, r
       const retryExisting = await readCreateRequest(db, createKey);
       if (retryExisting) {
         if (seatFor(retryExisting, token) !== 'p1') throw new Error('unauthorized');
+        await touchPresence(db, String(retryExisting.room_code), 'p1');
         return { token, seat: 'p1', room: publicRoom(retryExisting) };
       }
     }
@@ -349,6 +491,7 @@ async function joinRoom(db, code, color, clientToken, requestId) {
     const prior = auth.find(entry => entry.joinKey === joinKey);
     if (prior) {
       if (prior.hash !== tokenHash(token)) throw new Error('unauthorized');
+      await touchPresence(db, code, prior.seat);
       return { token, seat: prior.seat, room: publicRoom(row) };
     }
 
@@ -360,7 +503,10 @@ async function joinRoom(db, code, color, clientToken, requestId) {
       sql: `UPDATE ${TABLE} SET auth_json = ?, state_json = ?, status = ?, version = version + 1, updated_at = ?, expires_at = ? WHERE room_code = ? AND version = ?`,
       args: [JSON.stringify([...auth, { seat, hash: tokenHash(token), joinKey }]), JSON.stringify(next), next.status, new Date().toISOString(), isoAfter(ROOM_TTL_MS), code, Number(row.version)]
     });
-    if (Number(result.rowsAffected || 0) === 1) return { token, seat, room: { code, version: Number(row.version) + 1, ...next } };
+    if (Number(result.rowsAffected || 0) === 1) {
+      await touchPresence(db, code, seat);
+      return { token, seat, room: { code, version: Number(row.version) + 1, ...next } };
+    }
   }
   throw new Error('version_conflict');
 }
@@ -372,7 +518,6 @@ function preview(row) {
     status: state.status,
     targetPlayers: state.targetPlayers,
     targetRounds: state.targetRounds,
-    players: state.players,
     availableColors: COLORS.filter(color => !state.players.some(player => player.color === color))
   };
 }
@@ -382,6 +527,7 @@ function statusFor(error) {
   if (code === 'payload_too_large') return 413;
   if (code === 'room_not_found') return 404;
   if (code === 'unauthorized') return 401;
+  if (code === 'rate_limited') return 429;
   if (code === 'room_code_exhausted') return 503;
   if (['not_your_turn', 'room_full', 'room_not_waiting', 'version_conflict', 'color_taken', 'room_not_playing', 'round_not_finished', 'occupied_slot', 'no_piece_remaining'].includes(code)) return 409;
   if (['invalid_color', 'invalid_player_count', 'invalid_round_count', 'invalid_move', 'invalid_room_code', 'invalid_payload', 'invalid_action', 'invalid_seat', 'invalid_session'].includes(code)) return 400;
@@ -402,10 +548,12 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const code = normalizeCode(req.query?.code);
       if (!ROOM_PATTERN.test(code)) throw new Error('invalid_room_code');
-      const row = await readRoom(db, code);
+      let row = await readRoom(db, code);
       if (!row) throw new Error('room_not_found');
       const seat = seatFor(row, bearer(req));
       if (!seat) throw new Error('unauthorized');
+      await touchPresence(db, code, seat);
+      row = await reconcileRoomPresence(db, row);
       if (Number(req.query?.since || 0) === Number(row.version)) {
         res.statusCode = 204;
         res.setHeader('cache-control', 'no-store, max-age=0');
@@ -423,6 +571,7 @@ export default async function handler(req, res) {
       return json(res, 201, { ok: true, ...(await createRoom(db, String(body.color || ''), Number(body.targetPlayers), Number(body.targetRounds), String(body.clientToken || ''), String(body.requestId || ''))) });
     }
     if (action === 'preview') {
+      await enforceDiscoveryRate(db, req);
       const code = normalizeCode(body.code);
       if (!ROOM_PATTERN.test(code)) throw new Error('invalid_room_code');
       const row = await readRoom(db, code);
@@ -430,6 +579,7 @@ export default async function handler(req, res) {
       return json(res, 200, { ok: true, room: preview(row) });
     }
     if (action === 'join') {
+      await enforceDiscoveryRate(db, req);
       const code = normalizeCode(body.code);
       if (!ROOM_PATTERN.test(code)) throw new Error('invalid_room_code');
       return json(res, 200, { ok: true, ...(await joinRoom(db, code, String(body.color || ''), String(body.clientToken || ''), String(body.requestId || ''))) });
@@ -437,10 +587,13 @@ export default async function handler(req, res) {
 
     const code = normalizeCode(body.code);
     if (!ROOM_PATTERN.test(code)) throw new Error('invalid_room_code');
-    const row = await readRoom(db, code);
+    let row = await readRoom(db, code);
     if (!row) throw new Error('room_not_found');
     const seat = seatFor(row, bearer(req));
     if (!seat) throw new Error('unauthorized');
+    await touchPresence(db, code, seat);
+    row = await reconcileRoomPresence(db, row);
+
     const expectedVersion = Number(body.version);
     if (!Number.isInteger(expectedVersion) || expectedVersion !== Number(row.version)) {
       return json(res, 409, { ok: false, error: 'version_conflict', room: publicRoom(row) });
@@ -449,11 +602,17 @@ export default async function handler(req, res) {
     const state = JSON.parse(String(row.state_json));
     let next;
     if (action === 'move') next = applyMove(state, seat, body);
-    else if (action === 'rematch') next = rematchState(state, seat);
+    else if (action === 'rematch') {
+      const activeSeats = await connectedSeats(db, code);
+      const requiredSeats = state.matchComplete ? state.players.map(player => player.seat) : activeSeats;
+      next = rematchState(state, seat, requiredSeats.length ? requiredSeats : [seat]);
+    }
     else if (action === 'leave') next = leaveState(state, seat);
     else throw new Error('invalid_action');
+
     const auth = action === 'leave' ? authEntries(row).filter(entry => entry.seat !== seat) : null;
     const updated = await updateRoom(db, row, next, expectedVersion, auth);
+    if (action === 'leave') await removePresence(db, code, seat);
     return json(res, 200, { ok: true, seat, room: publicRoom(updated, next) });
   } catch (error) {
     const status = statusFor(error);
@@ -464,11 +623,17 @@ export default async function handler(req, res) {
 
 export const __testing = {
   PROTOCOL,
+  PLAYER_STALE_MS,
   applyMove,
   createState,
   emptyBoard,
   joinState,
+  leaveState,
+  materializeUpdatedRow,
   normalizeCode,
+  preview,
+  publicRoom,
+  reconcilePresenceState,
   rematchState,
   winner
 };
