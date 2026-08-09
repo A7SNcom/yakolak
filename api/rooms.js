@@ -650,11 +650,8 @@ export default async function handler(req, res) {
     const mutationKind = action === 'move' || action === 'rematch' ? action : '';
     const mutationId = String(body.mutationId || '');
 
-    // Compatibility during the web rollout: clients that already send a stable
-    // mutation id get exactly-once semantics immediately. Once the rebuilt web
-    // bundle is live, the endpoint can make this field mandatory without a
-    // temporary production outage for the previous compiled client.
-    if (mutationKind && validMutationId(mutationId) && mutationApplied(state, seat, mutationKind, mutationId)) {
+    if (mutationKind && !validMutationId(mutationId)) throw new Error('invalid_mutation_id');
+    if (mutationKind && mutationApplied(state, seat, mutationKind, mutationId)) {
       return json(res, 200, { ok: true, seat, room: publicRoom(row, state), duplicate: true });
     }
 
@@ -671,16 +668,14 @@ export default async function handler(req, res) {
     else if (action === 'leave') next = leaveState(state, seat);
     else throw new Error('invalid_action');
 
-    if (mutationKind && validMutationId(mutationId)) {
-      next = recordMutation(next, seat, mutationKind, mutationId);
-    }
+    if (mutationKind) next = recordMutation(next, seat, mutationKind, mutationId);
 
     const auth = action === 'leave' ? authEntries(row).filter(entry => entry.seat !== seat) : null;
     let updated;
     try {
       updated = await updateRoom(db, row, next, expectedVersion, auth);
     } catch (error) {
-      if (error?.message === 'version_conflict' && mutationKind && validMutationId(mutationId)) {
+      if (error?.message === 'version_conflict' && mutationKind) {
         const latest = await readRoom(db, code);
         if (latest) {
           const latestState = JSON.parse(String(latest.state_json));
