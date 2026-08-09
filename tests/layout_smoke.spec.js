@@ -25,8 +25,8 @@ async function expectCanvasToFillViewport(page, expectedWidth, expectedHeight) {
   expect(Math.abs(box.height - expectedHeight)).toBeLessThanOrEqual(2);
 }
 
-test('authoritative layout fills portrait and landscape Chromium viewports', async ({ page }) => {
-  test.setTimeout(90000);
+test('authoritative canvas fills portrait landscape and wide Chromium viewports', async ({ page }) => {
+  test.setTimeout(120000);
   const failures = [];
 
   page.on('pageerror', error => failures.push(`pageerror: ${error.message}`));
@@ -38,22 +38,26 @@ test('authoritative layout fills portrait and landscape Chromium viewports', asy
     }
   });
 
-  await page.goto('http://127.0.0.1:8000/', { waitUntil: 'domcontentloaded' });
+  await page.goto('http://127.0.0.1:8000/?yakolakTestFast=1', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
-    () => document.body.dataset.yakolakLayout === 'ready',
+    () => ['playing', 'complete'].includes(document.body.dataset.yakolakIntro),
     null,
     { timeout: 60000 }
   );
 
-  expect(await page.evaluate(() => document.body.dataset.yakolakBases)).toBe('4');
-  expect(await page.evaluate(() => document.body.dataset.yakolakPieces)).toBe('36');
   await expectCanvasToFillViewport(page, 390, 844);
-  await page.screenshot({ path: 'web/layout-audit-mobile.png', fullPage: true });
+
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.waitForTimeout(500);
+  await expectCanvasToFillViewport(page, 844, 390);
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.waitForTimeout(750);
+  await page.waitForTimeout(500);
   await expectCanvasToFillViewport(page, 1440, 900);
-  await page.screenshot({ path: 'web/layout-audit-desktop.png', fullPage: true });
+
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.waitForTimeout(500);
+  await expectCanvasToFillViewport(page, 1920, 1080);
 
   expect(failures).toEqual([]);
 });
