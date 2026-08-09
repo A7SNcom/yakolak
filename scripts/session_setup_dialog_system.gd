@@ -16,6 +16,8 @@ const DIALOG_ICON_FONT = preload("res://assets/fonts/DejaVuSans.ttf")
 var dialog_backdrop: ColorRect
 var dialog_close_button: Button
 var dialog_focus_pending: bool = false
+var web_window: JavaScriptObject
+var web_escape_callback: JavaScriptObject
 
 
 func _build_shell() -> void:
@@ -295,13 +297,29 @@ func _collect_focusable_controls(node: Node, output: Array[Control]) -> void:
 func _install_web_keyboard_guard() -> void:
 	if not OS.has_feature("web"):
 		return
+	# Godot's stable JavaScriptBridge contract requires retaining the callback
+	# reference; keep it on this node for the whole setup lifetime.
+	web_window = JavaScriptBridge.get_interface("window")
+	web_escape_callback = JavaScriptBridge.create_callback(_on_web_escape)
+	if web_window != null:
+		web_window.__yakolakDialogEscape = web_escape_callback
 	JavaScriptBridge.eval(
-		"if(!window.__yakolakDialogTabGuard){" +
-		"window.__yakolakDialogTabGuard=function(e){" +
-		"if(e.key==='Tab'&&document.body.dataset.yakolakSetup==='visible'){e.preventDefault();}" +
-		"};window.addEventListener('keydown',window.__yakolakDialogTabGuard,true);}",
+		"if(!window.__yakolakDialogKeyGuard){" +
+		"window.__yakolakDialogKeyGuard=function(e){" +
+		"if(document.body.dataset.yakolakSetup!=='visible'){return;}" +
+		"if(e.key==='Tab'){e.preventDefault();return;}" +
+		"if(e.key==='Escape'){e.preventDefault();e.stopPropagation();" +
+		"if(typeof window.__yakolakDialogEscape==='function'){window.__yakolakDialogEscape('escape');}}" +
+		"};window.addEventListener('keydown',window.__yakolakDialogKeyGuard,true);}",
 		true
 	)
+
+
+func _on_web_escape(_args: Array) -> void:
+	if not showing:
+		return
+	if active_screen != "room_entry":
+		_dialog_cancel()
 
 
 func _publish_dialog_contract(controls: Array[Control]) -> void:
