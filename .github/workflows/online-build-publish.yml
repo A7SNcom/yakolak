@@ -49,6 +49,7 @@ jobs:
           node --check tests/production_online_probe.mjs
           node tests/online_rules.test.mjs
           node tests/online_logic_hardening.test.mjs
+          node tests/online_exactly_once_contract.test.mjs
           node tests/online_reliability_contract.test.mjs
           node tests/arabic_ui_contract.test.mjs
           node tests/telemetry_contract.test.mjs
