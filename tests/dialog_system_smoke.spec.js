@@ -42,6 +42,14 @@ async function waitStage(page, stage) {
   await page.waitForTimeout(80);
 }
 
+async function waitFocusRole(page, role) {
+  await page.waitForFunction(
+    expected => document.body.dataset.yakolakDialogFocusRole === expected,
+    role,
+    { timeout: 10000 }
+  );
+}
+
 async function assertContract(page) {
   const contract = await page.evaluate(() => ({
     system: document.body.dataset.yakolakDialogSystem,
@@ -49,6 +57,7 @@ async function assertContract(page) {
     backdrop: document.body.dataset.yakolakDialogBackdrop,
     keyboard: document.body.dataset.yakolakDialogKeyboard,
     focus: document.body.dataset.yakolakDialogFocus,
+    focusRole: document.body.dataset.yakolakDialogFocusRole,
     focusCount: Number(document.body.dataset.yakolakDialogFocusCount),
   }));
   expect(contract.system).toBe('native-control-v1');
@@ -56,6 +65,7 @@ async function assertContract(page) {
   expect(contract.backdrop).toBe('blocked-not-dismissible');
   expect(contract.keyboard).toBe('tab-loop+escape');
   expect(contract.focus).toBe('button');
+  expect(contract.focusRole).toBe('primary');
   expect(contract.focusCount).toBeGreaterThan(0);
 }
 
@@ -123,8 +133,9 @@ test('dialog keyboard path starts focused, loops with Tab and honors Escape', as
   await page.keyboard.press('Shift+Tab');
   await page.keyboard.press('Enter');
   await waitStage(page, 'room_entry');
+  await waitFocusRole(page, 'primary');
 
-  // Re-enter and verify Escape follows the same cancel contract.
+  // Re-enter only after focus has demonstrably returned to the rebuilt root.
   await page.keyboard.press('Enter');
   await waitStage(page, 'setup:count');
   await page.keyboard.press('Escape');
@@ -137,6 +148,7 @@ test('dialog keyboard path starts focused, loops with Tab and honors Escape', as
   console.log(`YAKOLAK_DIALOG_ESCAPE ${JSON.stringify(escapeBridge)}`);
   expect(escapeBridge.seen).toBe('godot');
   await waitStage(page, 'room_entry');
+  await waitFocusRole(page, 'primary');
 
   // The mandatory root cannot be dismissed into an unusable game state.
   await page.keyboard.press('Escape');
