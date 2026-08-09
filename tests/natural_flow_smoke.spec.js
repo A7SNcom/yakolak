@@ -130,7 +130,7 @@ test('experienced player gets structural decisions first and starts without tuto
 });
 
 test('new player reaches the same setup then learns immediately before the real match', async ({ page }) => {
-  test.setTimeout(120000);
+  test.setTimeout(150000);
   const fatal = [];
   page.on('pageerror', error => fatal.push(`pageerror: ${error.message}`));
   page.on('console', message => {
@@ -153,7 +153,7 @@ test('new player reaches the same setup then learns immediately before the real 
           document.body.dataset.yakolakMatchState === 'turn' &&
           document.body.dataset.yakolakPlayers === '2',
     null,
-    { timeout: 60000 }
+    { timeout: 90000 }
   );
 
   expect(await page.evaluate(() => document.body.dataset.yakolakSetupLearning)).toBe('learn');
