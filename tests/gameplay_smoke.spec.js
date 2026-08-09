@@ -98,7 +98,8 @@ async function startPassPlay(page, failures, songRequests) {
           document.body.dataset.yakolakLegalMarkerStyle === 'surface-ring' &&
           typeof window.yakolakTestStartPassPlay === 'function' &&
           typeof window.yakolakTestPlayOneMove === 'function' &&
-          typeof window.yakolakTestClearSelection === 'function',
+          typeof window.yakolakTestClearSelection === 'function' &&
+          typeof window.yakolakTestRefreshPickTargets === 'function',
     null,
     { timeout: 60000 }
   );
@@ -137,56 +138,36 @@ async function readPickTarget(page, side, size) {
     return {
       direction: d.yakolakPiecePickDirection,
       model: d.yakolakPiecePickModel,
+      revision: Number(d.yakolakPiecePickTargetRevision || 0),
       x: Number(d[`yakolakTestSide${suffix}${cap}X`] || 0),
-      y: Number(d[`yakolakTestSide${suffix}${cap}Y`] || 0)
+      y: Number(d[`yakolakTestSide${suffix}${cap}Y`] || 0),
+      internalX: Number(d[`yakolakTestSide${suffix}${cap}InternalX`] || 0),
+      internalY: Number(d[`yakolakTestSide${suffix}${cap}InternalY`] || 0)
     };
   }, { suffix, cap });
 }
 
-async function stablePickTarget(page, direction, side, size) {
-  const suffix = sideSuffix(side);
-  const cap = sizeCap(size);
+async function freshPickTarget(page, direction, side, size) {
+  const before = await page.evaluate(() => Number(document.body.dataset.yakolakPiecePickTargetRevision || 0));
+  await page.evaluate(() => window.yakolakTestRefreshPickTargets());
   await page.waitForFunction(
-    ({ expectedDirection, suffix, cap }) => {
-      const d = document.body.dataset;
-      return d.yakolakPiecePickDirection === expectedDirection &&
-             d.yakolakPiecePickModel === 'mesh-triangle-frontmost' &&
-             Number(d[`yakolakTestSide${suffix}${cap}X`] || 0) > 0 &&
-             Number(d[`yakolakTestSide${suffix}${cap}Y`] || 0) > 0;
-    },
-    { expectedDirection: direction, suffix, cap },
-    { timeout: 12000 }
+    previous => Number(document.body.dataset.yakolakPiecePickTargetRevision || 0) > previous,
+    before,
+    { timeout: 5000 }
   );
-
-  let previous = null;
-  let stableSamples = 0;
-  for (let attempt = 0; attempt < 24; attempt += 1) {
-    await page.waitForTimeout(300);
-    const current = await readPickTarget(page, side, size);
-    const valid = current.direction === direction &&
-                  current.model === 'mesh-triangle-frontmost' &&
-                  Number.isFinite(current.x) && current.x > 0 &&
-                  Number.isFinite(current.y) && current.y > 0;
-    if (!valid) {
-      previous = null;
-      stableSamples = 0;
-      continue;
-    }
-    if (previous && Math.abs(current.x - previous.x) <= 0.35 && Math.abs(current.y - previous.y) <= 0.35) {
-      stableSamples += 1;
-    } else {
-      stableSamples = 0;
-    }
-    previous = current;
-    // Three matching samples span at least two fresh telemetry intervals and
-    // prevent a point from a moving camera/tray from being clicked later.
-    if (stableSamples >= 2) return current;
-  }
-  throw new Error(`pick target did not stabilize: ${direction}/${side}/${size}`);
+  const target = await readPickTarget(page, side, size);
+  expect(target.direction).toBe(direction);
+  expect(target.model).toBe('mesh-triangle-frontmost');
+  expect(Number.isFinite(target.x) && target.x > 0).toBeTruthy();
+  expect(Number.isFinite(target.y) && target.y > 0).toBeTruthy();
+  expect(Number.isFinite(target.internalX) && target.internalX > 0).toBeTruthy();
+  expect(Number.isFinite(target.internalY) && target.internalY > 0).toBeTruthy();
+  return target;
 }
 
 async function pickTarget(page, direction, side, size, inputMode) {
-  const target = await stablePickTarget(page, direction, side, size);
+  const target = await freshPickTarget(page, direction, side, size);
+  console.log(`YAKOLAK_PICK_TARGET dir=${direction} side=${side} size=${size} css=(${target.x.toFixed(2)},${target.y.toFixed(2)}) internal=(${target.internalX.toFixed(2)},${target.internalY.toFixed(2)}) rev=${target.revision}`);
   if (inputMode === 'touch') await page.touchscreen.tap(target.x, target.y);
   else await page.mouse.click(target.x, target.y);
 }
