@@ -62,6 +62,32 @@ func _wizard_header(title: String) -> Control:
 	return super._wizard_header(clearer_title)
 
 
+func _build_mode_question(content: VBoxContainer, seat_index: int) -> void:
+	var row := _choice_row()
+	var local := _button("على نفس الجهاز", Color("#10201f"), Color("#f2f0e9"))
+	local.pressed.connect(_choose_mode.bind(seat_index, "local"))
+	row.add_child(local)
+	var bot := _button("كمبيوتر", Color.WHITE, Color("#235b50"))
+	bot.pressed.connect(_choose_mode.bind(seat_index, "bot"))
+	row.add_child(bot)
+	# Online is a room-wide mode in the current protocol. Offer it only on the
+	# first opponent so a later choice can never silently rewrite earlier seats.
+	if seat_index == 1:
+		var online_label: String = "الكل أونلاين" if _active_count() > 2 else "أونلاين"
+		var online_button := _button(online_label, Color.WHITE, Color("#2a4d63"))
+		online_button.pressed.connect(_choose_mode.bind(seat_index, "online"))
+		row.add_child(online_button)
+	content.add_child(row)
+
+
+func _choose_mode(seat_index: int, mode_id: String) -> void:
+	# Guard the same rule behind the UI: unsupported mixed online/local configs
+	# must not be reachable from test hooks or future callers either.
+	if mode_id == "online" and seat_index != 1:
+		return
+	super._choose_mode(seat_index, mode_id)
+
+
 func _build_color_question(content: VBoxContainer) -> void:
 	var grid := GridContainer.new()
 	grid.columns = 2 if card.size.x * canvas_scale < 430.0 else 4
