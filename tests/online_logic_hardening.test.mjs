@@ -77,6 +77,32 @@ function twoPlayerRoom() {
   );
 }
 
+// Turn selection must never wrap all the way back to the player who just moved.
+// If every other player has exhausted all legal pieces, the round ends instead
+// of granting a second consecutive move to the current player.
+{
+  let state = twoPlayerRoom();
+  state = {
+    ...state,
+    board: {
+      '0': { small: 'blue' },
+      '1': { small: 'blue' },
+      '2': { small: 'blue' },
+      '3': { medium: 'blue' },
+      '4': { medium: 'blue' },
+      '5': { medium: 'blue' },
+      '6': { large: 'blue' },
+      '7': { large: 'blue' },
+      '8': { large: 'blue' },
+    },
+    turnIndex: 0,
+  };
+  const after = applyMove(state, 'p1', { cell: 0, size: 'medium' });
+  assert.equal(after.status, 'finished');
+  assert.equal(after.draw, true);
+  assert.equal(after.lastMove?.seat, 'p1');
+}
+
 // Presence also cannot advance a finished round. Every player in the match must
 // explicitly acknowledge the next round; connection freshness is not a vote.
 {
