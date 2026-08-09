@@ -168,9 +168,13 @@ test('online move preempts polling, survives a network failure, and restores the
   expect(movePosts).toBe(2);
   expect(pollCount).toBeGreaterThanOrEqual(2);
 
-  const saved = await page.evaluate(codeValue => localStorage.getItem(`yakolak-online:${codeValue}`), code);
-  expect(saved).toContain('p1');
-  expect(saved).toContain(token);
+  const storage = await page.evaluate(codeValue => ({
+    session: sessionStorage.getItem(`yakolak-online:${codeValue}`),
+    local: localStorage.getItem(`yakolak-online:${codeValue}`),
+  }), code);
+  expect(storage.session).toContain('p1');
+  expect(storage.session).toContain(token);
+  expect(storage.local).toBeNull();
 
   await page.goto(`http://127.0.0.1:8000/?room=${code}&yakolakTestFast=1`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
