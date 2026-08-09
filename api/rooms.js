@@ -306,23 +306,11 @@ function reconcilePresenceState(state, connectedSeats) {
     return { ...state, players, scores, rematch, status: 'waiting' };
   }
 
-  if (state.status === 'playing') {
-    const current = state.players[state.turnIndex];
-    if (current && !connected.has(current.seat)) {
-      const nextIndex = nextPlayablePlayer(state, state.turnIndex, [...connected]);
-      if (nextIndex >= 0 && nextIndex !== state.turnIndex) {
-        return { ...state, turnIndex: nextIndex, skippedSeat: current.seat };
-      }
-    }
-    return state;
-  }
-
-  if (state.status === 'finished' && !state.matchComplete) {
-    const activeSeats = state.players.map(player => player.seat).filter(seat => connected.has(seat));
-    if (activeSeats.length > 0 && activeSeats.every(seat => Boolean(state.rematch?.[seat]))) {
-      return advanceRoundState(state);
-    }
-  }
+  // Presence is transport health, never gameplay authority. Once a match has
+  // started it must not change turnIndex, skip a player, or advance a round.
+  // A stale tab/network heartbeat can otherwise hand the same player repeated
+  // turns, exactly as observed in room 54. Gameplay advances only through a
+  // successful move, an explicit rematch quorum, or an explicit leave/cancel.
   return state;
 }
 
@@ -637,11 +625,7 @@ export default async function handler(req, res) {
     const state = JSON.parse(String(row.state_json));
     let next;
     if (action === 'move') next = applyMove(state, seat, body);
-    else if (action === 'rematch') {
-      const playerSeats = new Set(state.players.map(player => player.seat));
-      const activeSeats = (await connectedSeats(db, code)).filter(activeSeat => playerSeats.has(activeSeat));
-      next = rematchState(state, seat, activeSeats.length ? activeSeats : [seat]);
-    }
+    else if (action === 'rematch') next = rematchState(state, seat);
     else if (action === 'leave') next = leaveState(state, seat);
     else throw new Error('invalid_action');
 
