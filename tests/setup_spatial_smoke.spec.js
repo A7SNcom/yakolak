@@ -1,5 +1,14 @@
 import { test, expect } from '@playwright/test';
 
+const VIEWPORTS = [
+  { name: 'small portrait', width: 320, height: 568, side: false },
+  { name: 'medium portrait', width: 390, height: 844, side: false },
+  { name: 'small landscape', width: 568, height: 320, side: true },
+  { name: 'medium landscape', width: 844, height: 390, side: true },
+  { name: 'desktop', width: 1366, height: 768, side: false },
+  { name: 'wide desktop', width: 1920, height: 1080, side: false },
+];
+
 test.use({
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 1,
@@ -15,16 +24,12 @@ test.use({
   }
 });
 
-test('setup stays compact, uses real Thmanyah weights, and leaves no empty gameplay chrome above it', async ({ page }) => {
-  test.setTimeout(120000);
+function watchFailures(page) {
   const failures = [];
   page.on('pageerror', error => failures.push(`pageerror: ${error.message}`));
   page.on('requestfailed', request => {
     const url = request.url();
     const errorText = request.failure()?.errorText || '';
-    // Chromium can cancel a duplicate/speculative Godot bootstrap fetch after
-    // the engine has already booted from the successful request. If the only
-    // PCK/WASM request had really failed, the readiness waits below cannot pass.
     if ((url.endsWith('/index.wasm') || url.endsWith('/index.pck')) && errorText === 'net::ERR_ABORTED') return;
     failures.push(`requestfailed: ${url} ${errorText}`);
   });
@@ -32,8 +37,10 @@ test('setup stays compact, uses real Thmanyah weights, and leaves no empty gamep
     const text = message.text();
     if (message.type() === 'error' && !text.includes('favicon')) failures.push(`console: ${text}`);
   });
+  return failures;
+}
 
-  await page.goto('http://127.0.0.1:8000/?yakolakTestFast=1', { waitUntil: 'domcontentloaded' });
+async function waitForSetup(page) {
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'complete' &&
           document.body.dataset.yakolakSetup === 'visible' &&
@@ -42,43 +49,98 @@ test('setup stays compact, uses real Thmanyah weights, and leaves no empty gamep
     null,
     { timeout: 60000 }
   );
+}
 
-  await page.evaluate(() => window.yakolakTestShowSetup());
+async function readSetupMetrics(page) {
   await page.waitForFunction(
-    () => document.body.dataset.yakolakSetupLayout === 'split-wizard-v1' &&
-          document.body.dataset.yakolakSetupWizard === 'color' &&
+    () => document.body.dataset.yakolakSetupWizard === 'color' &&
+          document.body.dataset.yakolakSetupDirection === 'rtl' &&
+          document.body.dataset.yakolakSetupMotion === 'soft-panel-and-table-v3' &&
           document.body.dataset.yakolakArabicFont === 'thmanyah' &&
-          document.body.dataset.yakolakSetupFontFamily === 'thmanyah-sans' &&
-          document.body.dataset.yakolakSetupFontWeights === 'light,medium,bold' &&
-          document.body.dataset.yakolakSetupScrollable === 'false' &&
-          document.body.dataset.yakolakHudVisibility === 'hidden' &&
-          Number.isFinite(Number(document.body.dataset.yakolakBoardSetupYRatio)),
+          Number.isFinite(Number(document.body.dataset.yakolakBoardSetupXRatio)) &&
+          Number.isFinite(Number(document.body.dataset.yakolakBoardSetupYRatio)) &&
+          Number.isFinite(Number(document.body.dataset.yakolakSetupCardLeftRatio)) &&
+          Number.isFinite(Number(document.body.dataset.yakolakSetupCardTopRatio)) &&
+          Number.isFinite(Number(document.body.dataset.yakolakSetupCardRightRatio)) &&
+          Number.isFinite(Number(document.body.dataset.yakolakSetupCardBottomRatio)),
     null,
     { timeout: 15000 }
   );
 
-  const setup = await page.evaluate(() => ({
+  return page.evaluate(() => ({
+    boardX: Number(document.body.dataset.yakolakBoardSetupXRatio),
     boardY: Number(document.body.dataset.yakolakBoardSetupYRatio),
+    cardLeft: Number(document.body.dataset.yakolakSetupCardLeftRatio),
+    cardTop: Number(document.body.dataset.yakolakSetupCardTopRatio),
+    cardRight: Number(document.body.dataset.yakolakSetupCardRightRatio),
     cardBottom: Number(document.body.dataset.yakolakSetupCardBottomRatio),
+    touchMin: Number(document.body.dataset.yakolakSetupTouchMin),
+    safeLeft: Number(document.body.dataset.yakolakSafeLeft || 0),
+    safeTop: Number(document.body.dataset.yakolakSafeTop || 0),
+    safeRight: Number(document.body.dataset.yakolakSafeRight || 0),
+    safeBottom: Number(document.body.dataset.yakolakSafeBottom || 0),
     font: document.body.dataset.yakolakArabicFont,
     fontFamily: document.body.dataset.yakolakSetupFontFamily,
     fontWeights: document.body.dataset.yakolakSetupFontWeights,
+    direction: document.body.dataset.yakolakSetupDirection,
     layout: document.body.dataset.yakolakSetupLayout,
+    layoutMode: document.body.dataset.yakolakSetupLayoutMode,
     scrollable: document.body.dataset.yakolakSetupScrollable,
-    hud: document.body.dataset.yakolakHudVisibility
+    hud: document.body.dataset.yakolakHudVisibility,
+    motion: document.body.dataset.yakolakSetupMotion,
   }));
+}
 
-  expect(setup.font).toBe('thmanyah');
-  expect(setup.fontFamily).toBe('thmanyah-sans');
-  expect(setup.fontWeights).toBe('light,medium,bold');
-  expect(setup.layout).toBe('split-wizard-v1');
-  expect(setup.scrollable).toBe('false');
-  expect(setup.hud).toBe('hidden');
-  expect(setup.cardBottom).toBeLessThan(0.50);
-  expect(setup.boardY).toBeGreaterThan(0.58);
-  expect(setup.boardY).toBeLessThan(0.88);
-  expect(setup.boardY - setup.cardBottom).toBeGreaterThan(0.10);
+test('setup survives the full phone/orientation/desktop matrix without clipping or camera jumps', async ({ page }) => {
+  test.setTimeout(150000);
+  const failures = watchFailures(page);
 
+  await page.goto('http://127.0.0.1:8000/?yakolakTestFast=1', { waitUntil: 'domcontentloaded' });
+  await waitForSetup(page);
+
+  for (const viewport of VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.evaluate(() => window.yakolakTestShowSetup());
+    const setup = await readSetupMetrics(page);
+
+    expect(setup.font, viewport.name).toBe('thmanyah');
+    expect(setup.fontFamily, viewport.name).toBe('thmanyah-sans');
+    expect(setup.fontWeights, viewport.name).toBe('light,medium,bold');
+    expect(setup.direction, viewport.name).toBe('rtl');
+    expect(setup.layout, viewport.name).toBe('split-wizard-v1');
+    expect(setup.scrollable, viewport.name).toBe('false');
+    expect(setup.hud, viewport.name).toBe('hidden');
+    expect(setup.motion, viewport.name).toBe('soft-panel-and-table-v3');
+    expect(setup.touchMin, viewport.name).toBeGreaterThanOrEqual(48);
+
+    expect(setup.cardLeft, viewport.name).toBeGreaterThanOrEqual(0);
+    expect(setup.cardTop, viewport.name).toBeGreaterThanOrEqual(0);
+    expect(setup.cardRight, viewport.name).toBeLessThanOrEqual(1);
+    expect(setup.cardBottom, viewport.name).toBeLessThanOrEqual(1);
+    expect(setup.cardRight - setup.cardLeft, viewport.name).toBeGreaterThan(0.15);
+    expect(setup.cardBottom - setup.cardTop, viewport.name).toBeGreaterThan(0.12);
+    expect(setup.boardX, viewport.name).toBeGreaterThan(0);
+    expect(setup.boardX, viewport.name).toBeLessThan(1);
+    expect(setup.boardY, viewport.name).toBeGreaterThan(0);
+    expect(setup.boardY, viewport.name).toBeLessThan(1);
+
+    if (viewport.side) {
+      expect(setup.layoutMode, viewport.name).toBe('landscape-side');
+      expect(setup.cardLeft, viewport.name).toBeGreaterThan(0.30);
+      expect(setup.boardX, viewport.name).toBeLessThan(setup.cardLeft - 0.02);
+    } else {
+      expect(setup.layoutMode, viewport.name).toBe('stack-split');
+      expect(setup.cardBottom, viewport.name).toBeLessThan(0.50);
+      expect(setup.boardY - setup.cardBottom, viewport.name).toBeGreaterThan(0.08);
+    }
+
+    expect(setup.safeLeft, viewport.name).toBeGreaterThanOrEqual(0);
+    expect(setup.safeTop, viewport.name).toBeGreaterThanOrEqual(0);
+    expect(setup.safeRight, viewport.name).toBeGreaterThanOrEqual(0);
+    expect(setup.safeBottom, viewport.name).toBeGreaterThanOrEqual(0);
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => window.yakolakTestStartPassPlay());
   await page.waitForFunction(
     () => document.body.dataset.yakolakGameplay === 'ready' &&
@@ -86,11 +148,12 @@ test('setup stays compact, uses real Thmanyah weights, and leaves no empty gamep
           document.body.dataset.yakolakGameplayFont === 'thmanyah' &&
           document.body.dataset.yakolakGameplayFontWeights === 'regular,medium,bold' &&
           document.body.dataset.yakolakScoreHud === 'hidden' &&
-          document.body.dataset.yakolakResultOverlay === 'hidden',
+          document.body.dataset.yakolakResultOverlay === 'hidden' &&
+          document.body.dataset.yakolakCameraFocusInside === 'true',
     null,
-    { timeout: 20000 }
+    { timeout: 25000 }
   );
 
   expect(failures).toEqual([]);
-  console.log(`YAKOLAK_SPLIT_SETUP_OK thmanyah=multi-weight card=${setup.cardBottom.toFixed(3)} board=${setup.boardY.toFixed(3)} hud=${setup.hud}`);
+  console.log(`YAKOLAK_RESPONSIVE_MATRIX_OK viewports=${VIEWPORTS.length} rtl=true touch=48 safe-area=true gameplay=ready`);
 });
