@@ -38,6 +38,19 @@ function twoPlayerRoom() {
   assert.equal(leaveState(waiting, 'p1').status, 'cancelled');
 }
 
+// A guest that disappears while a 3/4-player lobby is waiting must not reserve
+// its seat/color indefinitely. The host is deliberately retained.
+{
+  let waiting = createState('marble', 4, 3);
+  waiting = joinState(waiting, 'p2', 'blue');
+  waiting = joinState(waiting, 'p3', 'gold');
+  const cleaned = reconcilePresenceState(waiting, ['p1', 'p3']);
+  assert.equal(cleaned.status, 'waiting');
+  assert.deepEqual(cleaned.players.map(player => player.seat), ['p1', 'p3']);
+  assert.equal(Object.hasOwn(cleaned.scores, 'p2'), false);
+  assert.equal(Object.hasOwn(cleaned.rematch, 'p2'), false);
+}
+
 // Preview exposes only what joining actually needs. Do not leak player list.
 {
   const state = twoPlayerRoom();
@@ -59,7 +72,8 @@ function twoPlayerRoom() {
 }
 
 // Non-final rounds can continue when the only connected player has already
-// acknowledged the result. Match-complete replay remains explicit.
+// acknowledged the result. Match-complete never advances merely from polling;
+// an explicit replay request is still required.
 {
   let finished = twoPlayerRoom();
   finished = {
@@ -77,6 +91,9 @@ function twoPlayerRoom() {
 
   const complete = { ...finished, matchComplete: true };
   assert.equal(reconcilePresenceState(complete, ['p1']).status, 'finished');
+  const replay = rematchState(complete, 'p1', ['p1']);
+  assert.equal(replay.status, 'playing');
+  assert.equal(replay.round, 1);
 }
 
 // Normal connected rematch semantics are unchanged.
