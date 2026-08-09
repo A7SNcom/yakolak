@@ -1,7 +1,8 @@
 extends "res://scripts/online_session.gd"
 
 # Final online transport hardening. Keep identity per-tab, never silently
-# overwrite a queued player action, and preserve unrelated URL parameters.
+# overwrite a queued player action, preserve unrelated URL parameters, and
+# treat every gameplay mutation as one immutable intent across retries.
 
 const MAX_DURABLE_ACTIONS: int = 8
 const BRIDGE_EVENT_CHECK_MS: int = 34
@@ -80,6 +81,30 @@ func restore_from_location() -> bool:
 	return true
 
 
+func submit_move(cell: int, size_name: String) -> void:
+	if not active or room.is_empty():
+		return
+	_queue_or_send("move", {
+		"action": "move",
+		"code": str(room.get("code", "")),
+		"version": int(room.get("version", 0)),
+		"cell": cell,
+		"size": size_name,
+		"mutationId": _new_secret(24),
+	})
+
+
+func request_rematch() -> void:
+	if not active or room.is_empty():
+		return
+	_queue_or_send("rematch", {
+		"action": "rematch",
+		"code": str(room.get("code", "")),
+		"version": int(room.get("version", 0)),
+		"mutationId": _new_secret(24),
+	})
+
+
 func deactivate(clear_saved: bool = false) -> void:
 	var code: String = str(identity.get("code", room.get("code", "")))
 	if clear_saved and active and not room.is_empty():
@@ -130,6 +155,12 @@ func _queue_or_send(kind: String, payload: Dictionary) -> void:
 		_abort_active_request()
 		_clear_inflight()
 	elif busy:
+		# A second tap while the same turn mutation is already in flight is not a
+		# second game intent. Drop it locally; the server also deduplicates retries.
+		if kind == "move" and inflight_kind == "move":
+			return
+		if kind == "rematch" and inflight_kind == "rematch":
+			return
 		_enqueue_action(kind, payload)
 		return
 	_request_post(kind, payload)
@@ -166,12 +197,39 @@ func _flush_queued_action() -> bool:
 		if not active or room.is_empty():
 			continue
 		payload["code"] = str(room.get("code", payload.get("code", "")))
-		payload["version"] = int(room.get("version", payload.get("version", 0)))
+		# Never rebase the version of a queued intent. If the authoritative room
+		# advanced, that old intent must conflict instead of becoming a new turn.
 		if kind == "move" and not _can_apply_move_intent(payload):
 			continue
 		_request_post(kind, payload)
 		return true
 	return false
+
+
+func _reconcile_pending_mutation() -> void:
+	if pending_mutation_kind.is_empty() or room.is_empty() or busy:
+		return
+	if _mutation_already_applied(pending_mutation_kind, pending_mutation_payload):
+		_clear_pending_mutation()
+		return
+	if pending_mutation_attempts >= MAX_MUTATION_RETRIES:
+		_clear_pending_mutation()
+		_accept_room(room)
+		return
+	if pending_mutation_kind == "move" and not _can_apply_move_intent(pending_mutation_payload):
+		_clear_pending_mutation()
+		_accept_room(room)
+		return
+	if pending_mutation_kind == "rematch" and str(room.get("status", "")) != "finished":
+		_clear_pending_mutation()
+		return
+	var kind: String = pending_mutation_kind
+	# Retry the exact original payload, including mutationId AND original version.
+	# The server can acknowledge an already-applied mutation by mutationId; it
+	# must never reinterpret an old action against a newer room version.
+	var payload: Dictionary = pending_mutation_payload.duplicate(true)
+	pending_mutation_attempts += 1
+	_request_post(kind, payload)
 
 
 func _clear_queued_action() -> void:
@@ -181,6 +239,16 @@ func _clear_queued_action() -> void:
 
 
 func _handle_request_failure(kind: String, payload: Dictionary, error_code: String, status: int, data: Dictionary = {}) -> void:
+	if error_code == "version_conflict" and data.get("room", null) is Dictionary:
+		_mark_connected()
+		# A conflict means this exact old intent was not accepted (an accepted
+		# retry is returned as 200 by mutationId). Never rebase it onto a later turn.
+		if kind == "move" or kind == "rematch":
+			_clear_pending_mutation()
+		_accept_room(data["room"] as Dictionary)
+		if not busy:
+			_flush_queued_action()
+		return
 	if kind == "leave" and _is_transient_failure(error_code, status) and active:
 		_enqueue_action(kind, payload)
 		_mark_reconnecting(error_code)
