@@ -169,6 +169,21 @@ func _piece_mesh_radius(piece_index: int) -> float:
 	return maxf(aabb.size.x, aabb.size.y) * 0.5
 
 
+func _piece_test_surface_point(piece_index: int) -> Vector3:
+	# Browser checks must aim at the visible top of the real stone, not its
+	# bottom plane. With an oblique camera, projecting z=0 can legitimately put
+	# the ray behind a lower outer ring even when testing a taller inner stone.
+	if piece_index < 0 or piece_index >= piece_records.size():
+		return Vector3.ZERO
+	var mesh_instance: MeshInstance3D = (piece_records[piece_index] as Dictionary).get("mesh") as MeshInstance3D
+	if mesh_instance == null or mesh_instance.mesh == null:
+		return Vector3.ZERO
+	var aabb: AABB = mesh_instance.mesh.get_aabb()
+	var radius: float = maxf(aabb.size.x, aabb.size.y) * 0.5
+	var top_z: float = aabb.position.z + aabb.size.z
+	return Vector3(radius * 0.90, 0.0, top_z)
+
+
 func _publish_piece_test_targets() -> void:
 	if camera == null:
 		return
@@ -181,8 +196,8 @@ func _publish_piece_test_targets() -> void:
 	var script: String = ""
 
 	# Publish one real browser target for every size in every neighboring stack.
-	# The points sit on the exposed outer portion of each rendered mesh; tests
-	# then click/tap those exact CSS pixels and assert the exact Stone_* identity.
+	# Targets use each mesh's visible top surface; the browser then clicks/taps
+	# those exact CSS pixels and asserts the exact Stone_* identity.
 	for side: int in [-1, 0, 1]:
 		var available: Array[int] = _available_stack_indices(direction, side)
 		for size_name: String in ["small", "medium", "large"]:
@@ -196,8 +211,7 @@ func _publish_piece_test_targets() -> void:
 			var mesh_instance: MeshInstance3D = (piece_records[index] as Dictionary).get("mesh") as MeshInstance3D
 			if mesh_instance == null:
 				continue
-			var radius: float = _piece_mesh_radius(index)
-			var world_target: Vector3 = mesh_instance.to_global(Vector3(radius * 0.90, 0.0, 0.0))
+			var world_target: Vector3 = mesh_instance.to_global(_piece_test_surface_point(index))
 			var internal_point: Vector2 = camera.unproject_position(world_target)
 			var css_point: Vector2 = canvas_rect.position + internal_point * css_scale
 			var size_cap: String = size_name.capitalize()
