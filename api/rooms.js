@@ -1,13 +1,23 @@
 import { createHash, randomInt } from 'node:crypto';
 import { createClient } from '@tursodatabase/serverless/compat';
+import {
+  COLORS as RULE_COLORS,
+  SIZES as RULE_SIZES,
+  emptyBoard as rulesEmptyBoard,
+  hasLegalMove as rulesHasLegalMove,
+  isValidPlayerCount,
+  isValidWinsToMatch,
+  validatePlacement,
+  winner as rulesWinner,
+  winningPatterns as rulesWinningPatterns,
+} from './game-rules.js';
 
 const TABLE = 'yakolak_online_rooms_v5';
 const PRESENCE_TABLE = 'yakolak_online_presence_v1';
 const RATE_TABLE = 'yakolak_online_join_rate_v1';
 const PROTOCOL = 5;
-const COLORS = ['marble', 'blue', 'gold', 'green'];
-const SIZES = ['small', 'medium', 'large'];
-const LINES = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
+const COLORS = RULE_COLORS;
+const SIZES = RULE_SIZES;
 const ROOM_TTL_MS = 3 * 60 * 60 * 1000;
 const WAITING_REUSE_MS = 20 * 60 * 1000;
 const FINISHED_MATCH_REUSE_MS = 15 * 60 * 1000;
@@ -145,42 +155,23 @@ function validColor(value) {
 }
 
 function validPlayers(value) {
-  return [2, 3, 4].includes(Number(value));
+  return isValidPlayerCount(value);
 }
 
 function validRounds(value) {
-  return [3, 5].includes(Number(value));
+  return isValidWinsToMatch(value);
 }
 
 function emptyBoard() {
-  return Object.fromEntries(Array.from({ length: 9 }, (_, index) => [String(index), {}]));
-}
-
-function countPieces(board, color, size) {
-  return Object.values(board).filter(cell => cell?.[size] === color).length;
+  return rulesEmptyBoard();
 }
 
 function winner(board, color) {
-  for (const line of LINES) {
-    for (const size of SIZES) {
-      if (line.every(cell => board[String(cell)]?.[size] === color)) return true;
-    }
-    if (line.every((cell, index) => board[String(cell)]?.[SIZES[index]] === color)) return true;
-    if (line.every((cell, index) => board[String(cell)]?.[SIZES[2 - index]] === color)) return true;
-  }
-  return Array.from({ length: 9 }, (_, index) => index).some(cell =>
-    SIZES.every(size => board[String(cell)]?.[size] === color)
-  );
+  return rulesWinner(board, color);
 }
 
 function hasLegalMove(state, color) {
-  for (const size of SIZES) {
-    if (countPieces(state.board, color, size) >= 3) continue;
-    for (let cell = 0; cell < 9; cell += 1) {
-      if (!state.board[String(cell)]?.[size]) return true;
-    }
-  }
-  return false;
+  return rulesHasLegalMove(state.board, color);
 }
 
 function nextPlayablePlayer(state, fromIndex, allowedSeats = null) {
@@ -198,11 +189,13 @@ function createState(hostColor, targetPlayers, targetRounds) {
   if (!validColor(hostColor)) throw new Error('invalid_color');
   if (!validPlayers(targetPlayers)) throw new Error('invalid_player_count');
   if (!validRounds(targetRounds)) throw new Error('invalid_round_count');
+  const winsToMatch = Number(targetRounds);
   return {
     protocol: PROTOCOL,
     status: 'waiting',
     targetPlayers: Number(targetPlayers),
-    targetRounds: Number(targetRounds),
+    targetRounds: winsToMatch,
+    winsToMatch,
     players: [{ seat: 'p1', color: hostColor }],
     turnIndex: 0,
     board: emptyBoard(),
@@ -241,12 +234,15 @@ function finishRound(state, { color = null, seat = null, draw = false, lastMove 
   const scores = { ...state.scores };
   if (seat) scores[seat] = Number(scores[seat] || 0) + 1;
   const completedRounds = Number(state.completedRounds || 0) + 1;
-  const matchComplete = Boolean(seat) && Number(scores[seat] || 0) >= Number(state.targetRounds);
+  const winsToMatch = Number(state.winsToMatch ?? state.targetRounds);
+  const matchComplete = Boolean(seat) && Number(scores[seat] || 0) >= winsToMatch;
   const leaders = matchComplete
     ? state.players.filter(player => Number(scores[player.seat] || 0) === Math.max(...Object.values(scores).map(Number)))
     : [];
   return {
     ...state,
+    winsToMatch,
+    targetRounds: winsToMatch,
     status: 'finished',
     scores,
     completedRounds,
@@ -265,11 +261,10 @@ function applyMove(state, seat, move) {
   if (state.status !== 'playing') throw new Error('room_not_playing');
   const current = state.players[state.turnIndex];
   if (!current || current.seat !== seat) throw new Error('not_your_turn');
-  const cell = Number(move?.cell);
-  const size = String(move?.size || '');
-  if (!Number.isInteger(cell) || cell < 0 || cell > 8 || !SIZES.includes(size)) throw new Error('invalid_move');
-  if (state.board[String(cell)]?.[size]) throw new Error('occupied_slot');
-  if (countPieces(state.board, current.color, size) >= 3) throw new Error('no_piece_remaining');
+  const placementError = validatePlacement(state.board, current.color, move);
+  if (placementError) throw new Error(placementError);
+  const cell = Number(move.cell);
+  const size = String(move.size);
   const board = structuredClone(state.board);
   board[String(cell)] ||= {};
   board[String(cell)][size] = current.color;
@@ -326,7 +321,6 @@ function leaveState(state, seat) {
 function reconcilePresenceState(state, connectedSeats) {
   const connected = new Set(connectedSeats || []);
   if (!connected.size) return state;
-
   if (state.status === 'waiting') {
     const players = state.players.filter(player => player.seat === 'p1' || connected.has(player.seat));
     if (players.length === state.players.length) return state;
@@ -335,12 +329,6 @@ function reconcilePresenceState(state, connectedSeats) {
     const rematch = Object.fromEntries(Object.entries(state.rematch || {}).filter(([seat]) => keptSeats.has(seat)));
     return { ...state, players, scores, rematch, status: 'waiting' };
   }
-
-  // Presence is transport health, never gameplay authority. Once a match has
-  // started it must not change turnIndex, skip a player, or advance a round.
-  // A stale tab/network heartbeat can otherwise hand the same player repeated
-  // turns, exactly as observed in room 54. Gameplay advances only through a
-  // successful move, an explicit rematch quorum, or an explicit leave/cancel.
   return state;
 }
 
@@ -365,55 +353,30 @@ function seatFor(row, token) {
 }
 
 async function readRoom(db, code) {
-  const result = await db.execute({
-    sql: `SELECT * FROM ${TABLE} WHERE room_code = ? AND expires_at > ? LIMIT 1`,
-    args: [code, new Date().toISOString()]
-  });
+  const result = await db.execute({ sql: `SELECT * FROM ${TABLE} WHERE room_code = ? AND expires_at > ? LIMIT 1`, args: [code, new Date().toISOString()] });
   return result.rows?.[0] || null;
 }
 
 async function readCreateRequest(db, createKey) {
-  const result = await db.execute({
-    sql: `SELECT * FROM ${TABLE} WHERE create_key = ? AND expires_at > ? LIMIT 1`,
-    args: [createKey, new Date().toISOString()]
-  });
+  const result = await db.execute({ sql: `SELECT * FROM ${TABLE} WHERE create_key = ? AND expires_at > ? LIMIT 1`, args: [createKey, new Date().toISOString()] });
   return result.rows?.[0] || null;
 }
 
 async function cleanupReusableRooms(db) {
   const now = Date.now();
-  await db.execute({
-    sql: `DELETE FROM ${TABLE}
-          WHERE expires_at <= ?
-             OR status = 'cancelled'
-             OR (status = 'waiting' AND updated_at < ?)
-             OR (status = 'finished' AND COALESCE(json_extract(state_json, '$.matchComplete'), 0) = 1 AND updated_at < ?)`,
-    args: [new Date(now).toISOString(), new Date(now - WAITING_REUSE_MS).toISOString(), new Date(now - FINISHED_MATCH_REUSE_MS).toISOString()]
-  });
-  await db.execute({
-    sql: `DELETE FROM ${PRESENCE_TABLE} WHERE room_code NOT IN (SELECT room_code FROM ${TABLE}) OR last_seen < ?`,
-    args: [new Date(now - ROOM_TTL_MS).toISOString()]
-  });
+  await db.execute({ sql: `DELETE FROM ${TABLE} WHERE expires_at <= ? OR status = 'cancelled' OR (status = 'waiting' AND updated_at < ?) OR (status = 'finished' AND COALESCE(json_extract(state_json, '$.matchComplete'), 0) = 1 AND updated_at < ?)`, args: [new Date(now).toISOString(), new Date(now - WAITING_REUSE_MS).toISOString(), new Date(now - FINISHED_MATCH_REUSE_MS).toISOString()] });
+  await db.execute({ sql: `DELETE FROM ${PRESENCE_TABLE} WHERE room_code NOT IN (SELECT room_code FROM ${TABLE}) OR last_seen < ?`, args: [new Date(now - ROOM_TTL_MS).toISOString()] });
   await db.execute({ sql: `DELETE FROM ${RATE_TABLE} WHERE expires_at <= ?`, args: [new Date(now).toISOString()] });
 }
 
 function materializeUpdatedRow(row, state, expectedVersion, auth = null) {
   const authJson = JSON.stringify(auth || authEntries(row));
-  return {
-    room_code: String(row.room_code),
-    auth_json: authJson,
-    state_json: JSON.stringify(state),
-    version: expectedVersion + 1,
-    status: state.status,
-  };
+  return { room_code: String(row.room_code), auth_json: authJson, state_json: JSON.stringify(state), version: expectedVersion + 1, status: state.status };
 }
 
 async function updateRoom(db, row, state, expectedVersion, auth = null) {
   const updated = materializeUpdatedRow(row, state, expectedVersion, auth);
-  const result = await db.execute({
-    sql: `UPDATE ${TABLE} SET auth_json = ?, state_json = ?, status = ?, version = version + 1, updated_at = ?, expires_at = ? WHERE room_code = ? AND version = ?`,
-    args: [updated.auth_json, updated.state_json, state.status, new Date().toISOString(), isoAfter(ROOM_TTL_MS), updated.room_code, expectedVersion]
-  });
+  const result = await db.execute({ sql: `UPDATE ${TABLE} SET auth_json = ?, state_json = ?, status = ?, version = version + 1, updated_at = ?, expires_at = ? WHERE room_code = ? AND version = ?`, args: [updated.auth_json, updated.state_json, state.status, new Date().toISOString(), isoAfter(ROOM_TTL_MS), updated.room_code, expectedVersion] });
   if (Number(result.rowsAffected || 0) !== 1) throw new Error('version_conflict');
   return updated;
 }
@@ -424,17 +387,9 @@ async function touchPresence(db, code, seat, force = false) {
   const now = Date.now();
   const previous = Number(presenceTouchCache.get(key) || 0);
   if (!force && now - previous < PRESENCE_WRITE_INTERVAL_MS) return;
-  await db.execute({
-    sql: `INSERT INTO ${PRESENCE_TABLE} (room_code, seat, last_seen) VALUES (?, ?, ?)
-          ON CONFLICT(room_code, seat) DO UPDATE SET last_seen = excluded.last_seen`,
-    args: [code, seat, new Date(now).toISOString()]
-  });
+  await db.execute({ sql: `INSERT INTO ${PRESENCE_TABLE} (room_code, seat, last_seen) VALUES (?, ?, ?) ON CONFLICT(room_code, seat) DO UPDATE SET last_seen = excluded.last_seen`, args: [code, seat, new Date(now).toISOString()] });
   presenceTouchCache.set(key, now);
-  if (presenceTouchCache.size > 512) {
-    for (const [cacheKey, touchedAt] of presenceTouchCache) {
-      if (now - Number(touchedAt) > ROOM_TTL_MS) presenceTouchCache.delete(cacheKey);
-    }
-  }
+  if (presenceTouchCache.size > 512) for (const [cacheKey, touchedAt] of presenceTouchCache) if (now - Number(touchedAt) > ROOM_TTL_MS) presenceTouchCache.delete(cacheKey);
 }
 
 async function removePresence(db, code, seat) {
@@ -444,10 +399,7 @@ async function removePresence(db, code, seat) {
 
 async function connectedSeats(db, code) {
   const cutoff = new Date(Date.now() - PLAYER_STALE_MS).toISOString();
-  const result = await db.execute({
-    sql: `SELECT seat FROM ${PRESENCE_TABLE} WHERE room_code = ? AND last_seen >= ?`,
-    args: [code, cutoff]
-  });
+  const result = await db.execute({ sql: `SELECT seat FROM ${PRESENCE_TABLE} WHERE room_code = ? AND last_seen >= ?`, args: [code, cutoff] });
   return (result.rows || []).map(row => String(row.seat || '')).filter(seat => /^p[1-4]$/.test(seat));
 }
 
@@ -479,11 +431,7 @@ async function enforceDiscoveryRate(db, req) {
   const bucket = Math.floor(Date.now() / RATE_WINDOW_MS);
   const key = tokenHash(`${requestFingerprint(req)}:${bucket}`);
   const expiresAt = new Date((bucket + 2) * RATE_WINDOW_MS).toISOString();
-  await db.execute({
-    sql: `INSERT INTO ${RATE_TABLE} (rate_key, count, expires_at) VALUES (?, 1, ?)
-          ON CONFLICT(rate_key) DO UPDATE SET count = count + 1, expires_at = excluded.expires_at`,
-    args: [key, expiresAt]
-  });
+  await db.execute({ sql: `INSERT INTO ${RATE_TABLE} (rate_key, count, expires_at) VALUES (?, 1, ?) ON CONFLICT(rate_key) DO UPDATE SET count = count + 1, expires_at = excluded.expires_at`, args: [key, expiresAt] });
   const result = await db.execute({ sql: `SELECT count FROM ${RATE_TABLE} WHERE rate_key = ? LIMIT 1`, args: [key] });
   if (Number(result.rows?.[0]?.count || 0) > RATE_LIMIT) throw new Error('rate_limited');
 }
@@ -498,7 +446,6 @@ async function createRoom(db, color, targetPlayers, targetRounds, clientToken, r
     await touchPresence(db, String(existing.room_code), 'p1', true);
     return { token, seat: 'p1', room: publicRoom(existing) };
   }
-
   await cleanupReusableRooms(db);
   const state = createState(color, targetPlayers, targetRounds);
   const now = new Date().toISOString();
@@ -506,10 +453,7 @@ async function createRoom(db, color, targetPlayers, targetRounds, clientToken, r
   for (let attempt = 0; attempt < 100; attempt += 1) {
     const code = roomCode((start + attempt) % 100);
     try {
-      await db.execute({
-        sql: `INSERT INTO ${TABLE} (room_code, create_key, auth_json, state_json, version, status, created_at, updated_at, expires_at) VALUES (?, ?, ?, ?, 1, 'waiting', ?, ?, ?)`,
-        args: [code, createKey, JSON.stringify([{ seat: 'p1', hash: tokenHash(token), joinKey: createKey }]), JSON.stringify(state), now, now, isoAfter(ROOM_TTL_MS)]
-      });
+      await db.execute({ sql: `INSERT INTO ${TABLE} (room_code, create_key, auth_json, state_json, version, status, created_at, updated_at, expires_at) VALUES (?, ?, ?, ?, 1, 'waiting', ?, ?, ?)`, args: [code, createKey, JSON.stringify([{ seat: 'p1', hash: tokenHash(token), joinKey: createKey }]), JSON.stringify(state), now, now, isoAfter(ROOM_TTL_MS)] });
       await touchPresence(db, code, 'p1', true);
       return { token, seat: 'p1', room: { code, version: 1, ...publicState(state) } };
     } catch (error) {
@@ -540,37 +484,21 @@ async function joinRoom(db, code, color, clientToken, requestId) {
       await touchPresence(db, code, prior.seat, true);
       return { token, seat: prior.seat, room: publicRoom(row) };
     }
-
     const state = JSON.parse(String(row.state_json));
     const seat = ['p2', 'p3', 'p4'].find(candidate => !state.players.some(player => player.seat === candidate));
     if (!seat) throw new Error('room_full');
     const next = joinState(state, seat, color);
-
-    // Register provisional presence before exposing the seat in room state.
-    // Otherwise a simultaneous host poll can see the new seat without a
-    // presence row and immediately prune it as a stale waiting-room ghost.
     await touchPresence(db, code, seat, true);
-
-    const result = await db.execute({
-      sql: `UPDATE ${TABLE} SET auth_json = ?, state_json = ?, status = ?, version = version + 1, updated_at = ?, expires_at = ? WHERE room_code = ? AND version = ?`,
-      args: [JSON.stringify([...auth, { seat, hash: tokenHash(token), joinKey }]), JSON.stringify(next), next.status, new Date().toISOString(), isoAfter(ROOM_TTL_MS), code, Number(row.version)]
-    });
-    if (Number(result.rowsAffected || 0) === 1) {
-      return { token, seat, room: { code, version: Number(row.version) + 1, ...publicState(next) } };
-    }
+    const result = await db.execute({ sql: `UPDATE ${TABLE} SET auth_json = ?, state_json = ?, status = ?, version = version + 1, updated_at = ?, expires_at = ? WHERE room_code = ? AND version = ?`, args: [JSON.stringify([...auth, { seat, hash: tokenHash(token), joinKey }]), JSON.stringify(next), next.status, new Date().toISOString(), isoAfter(ROOM_TTL_MS), code, Number(row.version)] });
+    if (Number(result.rowsAffected || 0) === 1) return { token, seat, room: { code, version: Number(row.version) + 1, ...publicState(next) } };
   }
   throw new Error('version_conflict');
 }
 
 function preview(row) {
   const state = JSON.parse(String(row.state_json));
-  return {
-    code: String(row.room_code),
-    status: state.status,
-    targetPlayers: state.targetPlayers,
-    targetRounds: state.targetRounds,
-    availableColors: COLORS.filter(color => !state.players.some(player => player.color === color))
-  };
+  const winsToMatch = Number(state.winsToMatch ?? state.targetRounds);
+  return { code: String(row.room_code), status: state.status, targetPlayers: state.targetPlayers, targetRounds: winsToMatch, winsToMatch, availableColors: COLORS.filter(color => !state.players.some(player => player.color === color)) };
 }
 
 function statusFor(error) {
@@ -587,11 +515,7 @@ function statusFor(error) {
 
 export default async function handler(req, res) {
   res.setHeader('allow', 'GET, POST, OPTIONS');
-  if (req.method === 'OPTIONS') {
-    res.statusCode = 204;
-    res.end();
-    return;
-  }
+  if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return; }
   const db = getClient();
   if (!db) return json(res, 503, { ok: false, error: 'online_unavailable' });
   try {
@@ -605,38 +529,16 @@ export default async function handler(req, res) {
       if (!seat) throw new Error('unauthorized');
       await touchPresence(db, code, seat);
       row = await reconcileRoomPresence(db, row);
-      if (Number(req.query?.since || 0) === Number(row.version)) {
-        res.statusCode = 204;
-        res.setHeader('cache-control', 'no-store, max-age=0');
-        return res.end();
-      }
+      if (Number(req.query?.since || 0) === Number(row.version)) { res.statusCode = 204; res.setHeader('cache-control', 'no-store, max-age=0'); return res.end(); }
       return json(res, 200, { ok: true, seat, room: publicRoom(row) });
     }
-
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'method_not_allowed' });
     let body;
     try { body = parseBody(req); } catch { throw new Error('invalid_payload'); }
     const action = String(body.action || '');
-
-    if (action === 'create') {
-      await enforceDiscoveryRate(db, req);
-      return json(res, 201, { ok: true, ...(await createRoom(db, String(body.color || ''), Number(body.targetPlayers), Number(body.targetRounds), String(body.clientToken || ''), String(body.requestId || ''))) });
-    }
-    if (action === 'preview') {
-      await enforceDiscoveryRate(db, req);
-      const code = normalizeCode(body.code);
-      if (!ROOM_PATTERN.test(code)) throw new Error('invalid_room_code');
-      const row = await readRoom(db, code);
-      if (!row) throw new Error('room_not_found');
-      return json(res, 200, { ok: true, room: preview(row) });
-    }
-    if (action === 'join') {
-      await enforceDiscoveryRate(db, req);
-      const code = normalizeCode(body.code);
-      if (!ROOM_PATTERN.test(code)) throw new Error('invalid_room_code');
-      return json(res, 200, { ok: true, ...(await joinRoom(db, code, String(body.color || ''), String(body.clientToken || ''), String(body.requestId || ''))) });
-    }
-
+    if (action === 'create') { await enforceDiscoveryRate(db, req); return json(res, 201, { ok: true, ...(await createRoom(db, String(body.color || ''), Number(body.targetPlayers), Number(body.targetRounds), String(body.clientToken || ''), String(body.requestId || ''))) }); }
+    if (action === 'preview') { await enforceDiscoveryRate(db, req); const code = normalizeCode(body.code); if (!ROOM_PATTERN.test(code)) throw new Error('invalid_room_code'); const row = await readRoom(db, code); if (!row) throw new Error('room_not_found'); return json(res, 200, { ok: true, room: preview(row) }); }
+    if (action === 'join') { await enforceDiscoveryRate(db, req); const code = normalizeCode(body.code); if (!ROOM_PATTERN.test(code)) throw new Error('invalid_room_code'); return json(res, 200, { ok: true, ...(await joinRoom(db, code, String(body.color || ''), String(body.clientToken || ''), String(body.requestId || ''))) }); }
     const code = normalizeCode(body.code);
     if (!ROOM_PATTERN.test(code)) throw new Error('invalid_room_code');
     let row = await readRoom(db, code);
@@ -645,43 +547,29 @@ export default async function handler(req, res) {
     if (!seat) throw new Error('unauthorized');
     await touchPresence(db, code, seat);
     row = await reconcileRoomPresence(db, row);
-
     const state = JSON.parse(String(row.state_json));
     const mutationKind = action === 'move' || action === 'rematch' ? action : '';
     const mutationId = String(body.mutationId || '');
-
     if (mutationKind && !validMutationId(mutationId)) throw new Error('invalid_mutation_id');
-    if (mutationKind && mutationApplied(state, seat, mutationKind, mutationId)) {
-      return json(res, 200, { ok: true, seat, room: publicRoom(row, state), duplicate: true });
-    }
-
+    if (mutationKind && mutationApplied(state, seat, mutationKind, mutationId)) return json(res, 200, { ok: true, seat, room: publicRoom(row, state), duplicate: true });
     let expectedVersion = Number(body.version);
-    if (action === 'leave') {
-      expectedVersion = Number(row.version);
-    } else if (!Number.isInteger(expectedVersion) || expectedVersion !== Number(row.version)) {
-      return json(res, 409, { ok: false, error: 'version_conflict', room: publicRoom(row, state) });
-    }
-
+    if (action === 'leave') expectedVersion = Number(row.version);
+    else if (!Number.isInteger(expectedVersion) || expectedVersion !== Number(row.version)) return json(res, 409, { ok: false, error: 'version_conflict', room: publicRoom(row, state) });
     let next;
     if (action === 'move') next = applyMove(state, seat, body);
     else if (action === 'rematch') next = rematchState(state, seat);
     else if (action === 'leave') next = leaveState(state, seat);
     else throw new Error('invalid_action');
-
     if (mutationKind) next = recordMutation(next, seat, mutationKind, mutationId);
-
     const auth = action === 'leave' ? authEntries(row).filter(entry => entry.seat !== seat) : null;
     let updated;
-    try {
-      updated = await updateRoom(db, row, next, expectedVersion, auth);
-    } catch (error) {
+    try { updated = await updateRoom(db, row, next, expectedVersion, auth); }
+    catch (error) {
       if (error?.message === 'version_conflict' && mutationKind) {
         const latest = await readRoom(db, code);
         if (latest) {
           const latestState = JSON.parse(String(latest.state_json));
-          if (mutationApplied(latestState, seat, mutationKind, mutationId)) {
-            return json(res, 200, { ok: true, seat, room: publicRoom(latest, latestState), duplicate: true });
-          }
+          if (mutationApplied(latestState, seat, mutationKind, mutationId)) return json(res, 200, { ok: true, seat, room: publicRoom(latest, latestState), duplicate: true });
           return json(res, 409, { ok: false, error: 'version_conflict', room: publicRoom(latest, latestState) });
         }
       }
@@ -696,24 +584,4 @@ export default async function handler(req, res) {
   }
 }
 
-export const __testing = {
-  PROTOCOL,
-  PLAYER_STALE_MS,
-  PRESENCE_WRITE_INTERVAL_MS,
-  applyMove,
-  createState,
-  emptyBoard,
-  joinState,
-  leaveState,
-  materializeUpdatedRow,
-  mutationApplied,
-  normalizeCode,
-  preview,
-  publicRoom,
-  publicState,
-  reconcilePresenceState,
-  recordMutation,
-  rematchState,
-  validMutationId,
-  winner
-};
+export const __testing = { PROTOCOL, PLAYER_STALE_MS, PRESENCE_WRITE_INTERVAL_MS, applyMove, createState, emptyBoard, hasLegalMove, joinState, leaveState, materializeUpdatedRow, mutationApplied, normalizeCode, preview, publicRoom, publicState, reconcilePresenceState, recordMutation, rematchState, validMutationId, validatePlacement, winner, winningPatterns: rulesWinningPatterns };

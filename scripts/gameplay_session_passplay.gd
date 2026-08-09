@@ -1,4 +1,4 @@
-extends "res://scripts/gameplay_session.gd"
+extends "res://scripts/gameplay_session_rules.gd"
 
 # Adaptive pass-and-play camera framing.
 # The previous fixed 50° camera worked on wide screens but could push the
