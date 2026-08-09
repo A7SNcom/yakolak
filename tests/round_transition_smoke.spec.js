@@ -36,6 +36,7 @@ test('winner gets the original p.stl score marker and the next local round start
     () => document.body.dataset.yakolakIntro === 'complete' &&
           document.body.dataset.yakolakSetup === 'visible' &&
           document.body.dataset.yakolakHudVisibility === 'hidden' &&
+          document.body.dataset.yakolakClosedBoxSpawn === 'offscreen-top' &&
           typeof window.yakolakTestStartPassPlay === 'function' &&
           typeof window.yakolakTestForceRoundComplete === 'function',
     null,
@@ -66,6 +67,8 @@ test('winner gets the original p.stl score marker and the next local round start
           document.body.dataset.yakolakResultOverlay === 'hidden' &&
           document.body.dataset.yakolakScoreHud === 'hidden' &&
           document.body.dataset.yakolakScoreStars === '0' &&
+          document.body.dataset.yakolakScoreMarkerSpawn === 'offscreen-top' &&
+          document.body.dataset.yakolakScoreMarkerDropTiming === 'unchanged' &&
           Number(document.body.dataset.yakolakScoreMarkers || 0) === 1,
     null,
     { timeout: 5000 }
@@ -80,6 +83,7 @@ test('winner gets the original p.stl score marker and the next local round start
           document.body.dataset.yakolakIntroReplay === 'locked' &&
           document.body.dataset.yakolakMusic === 'playing' &&
           document.body.dataset.yakolakScoreStars === '0' &&
+          document.body.dataset.yakolakScoreMarkerSpawn === 'offscreen-top' &&
           Number(document.body.dataset.yakolakScoreMarkers || 0) === 1,
     null,
     { timeout: 15000 }
@@ -87,5 +91,5 @@ test('winner gets the original p.stl score marker and the next local round start
 
   expect(songRequests).toEqual([]);
   expect(failures).toEqual([]);
-  console.log('YAKOLAK_LEGACY_SCORE_MARKER_OK p-stl v092-placement overlay-hidden auto-round-2 board-ready');
+  console.log('YAKOLAK_LEGACY_SCORE_MARKER_OK p-stl v092-placement offscreen-drop overlay-hidden auto-round-2 board-ready');
 });

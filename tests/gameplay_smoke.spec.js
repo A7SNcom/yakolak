@@ -101,8 +101,11 @@ test('first real move hands the same-device game to player two without a black s
     () => document.body.dataset.yakolakIntro === 'complete' &&
           document.body.dataset.yakolakSetup === 'visible' &&
           document.body.dataset.yakolakMusic === 'playing' &&
+          document.body.dataset.yakolakClosedBoxSpawn === 'offscreen-top' &&
+          document.body.dataset.yakolakLegalMarkerStyle === 'surface-ring' &&
           typeof window.yakolakTestStartPassPlay === 'function' &&
-          typeof window.yakolakTestPlayOneMove === 'function',
+          typeof window.yakolakTestPlayOneMove === 'function' &&
+          typeof window.yakolakTestClearSelection === 'function',
     null,
     { timeout: 60000 }
   );
@@ -117,7 +120,9 @@ test('first real move hands the same-device game to player two without a black s
           document.body.dataset.yakolakCameraStage === 'ready' &&
           document.body.dataset.yakolakCameraCurrent === 'true' &&
           document.body.dataset.yakolakBoardVisible === 'true' &&
-          Number(document.body.dataset.yakolakCameraFacing || 0) > 0.995,
+          Number(document.body.dataset.yakolakCameraFacing || 0) > 0.995 &&
+          Number(document.body.dataset.yakolakTestMediumX || 0) > 0 &&
+          Number(document.body.dataset.yakolakTestMediumY || 0) > 0,
     null,
     { timeout: 15000 }
   );
@@ -125,6 +130,38 @@ test('first real move hands the same-device game to player two without a black s
   const firstImage = await page.screenshot({ fullPage: false });
   const firstRatio = visibleSceneRatio(firstImage);
   expect(firstRatio).toBeGreaterThan(0.01);
+
+  // A medium stone must be selected on the first physical tap. Previously the
+  // tray always forced the large stone first, requiring a second tap.
+  const mediumTarget = await page.evaluate(() => ({
+    x: Number(document.body.dataset.yakolakTestMediumX),
+    y: Number(document.body.dataset.yakolakTestMediumY)
+  }));
+  await page.mouse.click(mediumTarget.x, mediumTarget.y);
+  await page.waitForFunction(
+    () => document.body.dataset.yakolakSelectedSize === 'medium' &&
+          document.body.dataset.yakolakTray === 'open' &&
+          document.body.dataset.yakolakSelectionStyle === 'outline',
+    null,
+    { timeout: 5000 }
+  );
+  const selectionStyle = await page.evaluate(() => ({
+    size: document.body.dataset.yakolakSelectedSize,
+    outline: document.body.dataset.yakolakSelectionOutline,
+    markers: document.body.dataset.yakolakLegalMarkerStyle,
+    boxSpawn: document.body.dataset.yakolakClosedBoxSpawn
+  }));
+  expect(selectionStyle.size).toBe('medium');
+  expect(selectionStyle.outline).toBe('black');
+  expect(selectionStyle.markers).toBe('surface-ring');
+  expect(selectionStyle.boxSpawn).toBe('offscreen-top');
+  await page.evaluate(() => window.yakolakTestClearSelection());
+  await page.waitForFunction(
+    () => document.body.dataset.yakolakTray === 'closed' &&
+          document.body.dataset.yakolakGameplay === 'ready',
+    null,
+    { timeout: 5000 }
+  );
 
   // Apply real desktop zoom before changing turns. The chosen ratio must remain
   // part of the camera tween itself, not disappear during motion then snap back.
@@ -184,5 +221,5 @@ test('first real move hands the same-device game to player two without a black s
 
   expect(songRequests).toEqual([]);
   expect(failures).toEqual([]);
-  console.log(`YAKOLAK_REAL_TURN_CAMERA_OK first=${firstRatio.toFixed(4)} second=${secondRatio.toFixed(4)}`);
+  console.log(`YAKOLAK_REAL_TURN_CAMERA_OK first=${firstRatio.toFixed(4)} second=${secondRatio.toFixed(4)} medium-first-tap=ok markers=surface-ring selection=outline box=offscreen`);
 });
