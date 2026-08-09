@@ -46,6 +46,7 @@ jobs:
           node --check api/_telemetry.js
           node --check api/telemetry.js
           node --check tests/web_test_server.mjs
+          node --check tests/production_online_probe.mjs
           node tests/online_rules.test.mjs
           node tests/online_logic_hardening.test.mjs
           node tests/online_reliability_contract.test.mjs
@@ -93,7 +94,19 @@ jobs:
           git add -f web assets/fonts/thmanyahsans-*.otf
           if git diff --cached --quiet; then
             echo "Web output unchanged."
-            exit 0
+          else
+            git commit -m "[web-ready] نشر نسخة مختبرة حتى انتقال الدور الثاني"
+            git push origin HEAD:main
           fi
-          git commit -m "[web-ready] نشر نسخة مختبرة حتى انتقال الدور الثاني"
-          git push origin HEAD:main
+      - name: Verify real production online path through Turso
+        env:
+          YAKOLAK_PROBE_BASE: https://yakolak.vercel.app
+        run: |
+          for attempt in {1..18}; do
+            if node tests/production_online_probe.mjs; then
+              exit 0
+            fi
+            echo "Production is not ready for the new room contract yet; retry $attempt/18"
+            sleep 10
+          done
+          exit 1
