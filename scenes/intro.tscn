@@ -1,4 +1,4 @@
-[gd_scene load_steps=24 format=3]
+[gd_scene load_steps=25 format=3]
 
 [ext_resource type="Script" path="res://scripts/intro.gd" id="1_intro"]
 [ext_resource type="Script" path="res://scripts/intro_corrections.gd" id="2_corrections"]
@@ -22,6 +22,7 @@
 [ext_resource type="Script" path="res://scripts/gameplay_session_polish.gd" id="20_polish_dependency"]
 [ext_resource type="Script" path="res://scripts/diagnostics_gate.gd" id="21_diagnostics"]
 [ext_resource type="Script" path="res://scripts/gameplay_tutorial_showcase.gd" id="22_gameplay"]
+[ext_resource type="Script" path="res://scripts/gameplay_session_efficient.gd" id="23_efficient_dependency"]
 
 [node name="YAKOLAKIntro26" type="Node3D"]
 script = ExtResource("1_intro")
