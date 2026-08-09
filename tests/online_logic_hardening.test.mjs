@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { __testing } from '../api/rooms.js';
 
 const {
+  applyMove,
   createState,
   joinState,
   leaveState,
@@ -60,20 +61,24 @@ function twoPlayerRoom() {
   assert.equal(Object.hasOwn(shown, 'players'), false);
 }
 
-// If the current player is stale but another player is alive, the room must
-// not hang forever on the stale turn.
+// Presence must never mutate an active turn. This reproduces the room-54 bug:
+// after p1 moves, p2 owns the turn. Even if p2 appears stale, p1 cannot receive
+// the turn again and cannot legally make a second consecutive move.
 {
-  const state = twoPlayerRoom();
-  state.turnIndex = 1;
+  let state = twoPlayerRoom();
+  state = applyMove(state, 'p1', { cell: 4, size: 'medium' });
+  assert.equal(state.turnIndex, 1);
   const reconciled = reconcilePresenceState(state, ['p1']);
-  assert.equal(reconciled.status, 'playing');
-  assert.equal(reconciled.turnIndex, 0);
-  assert.equal(reconciled.skippedSeat, 'p2');
+  assert.equal(reconciled.turnIndex, 1);
+  assert.equal(reconciled.skippedSeat, null);
+  assert.throws(
+    () => applyMove(reconciled, 'p1', { cell: 0, size: 'small' }),
+    /not_your_turn/
+  );
 }
 
-// Non-final rounds can continue when the only connected player has already
-// acknowledged the result. Match-complete never advances merely from polling;
-// an explicit replay request is still required.
+// Presence also cannot advance a finished round. Every player in the match must
+// explicitly acknowledge the next round; connection freshness is not a vote.
 {
   let finished = twoPlayerRoom();
   finished = {
@@ -84,14 +89,20 @@ function twoPlayerRoom() {
     rematch: { p1: true, p2: false },
     matchComplete: false,
   };
-  const advanced = reconcilePresenceState(finished, ['p1']);
+  const unchanged = reconcilePresenceState(finished, ['p1']);
+  assert.equal(unchanged.status, 'finished');
+  assert.equal(unchanged.round, 1);
+
+  const advanced = rematchState(unchanged, 'p2');
   assert.equal(advanced.status, 'playing');
   assert.equal(advanced.round, 2);
   assert.deepEqual(advanced.board['0'], {});
 
   const complete = { ...finished, matchComplete: true };
   assert.equal(reconcilePresenceState(complete, ['p1']).status, 'finished');
-  const replay = rematchState(complete, 'p1', ['p1']);
+  const firstReplayVote = rematchState(complete, 'p1');
+  assert.equal(firstReplayVote.status, 'finished');
+  const replay = rematchState(firstReplayVote, 'p2');
   assert.equal(replay.status, 'playing');
   assert.equal(replay.round, 1);
 }
