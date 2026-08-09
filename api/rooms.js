@@ -156,7 +156,7 @@ function hasLegalMove(state, color) {
 
 function nextPlayablePlayer(state, fromIndex, allowedSeats = null) {
   const allowed = allowedSeats ? new Set(allowedSeats) : null;
-  for (let offset = 1; offset <= state.players.length; offset += 1) {
+  for (let offset = 1; offset < state.players.length; offset += 1) {
     const index = (fromIndex + offset) % state.players.length;
     const player = state.players[index];
     if (allowed && !allowed.has(player.seat)) continue;
