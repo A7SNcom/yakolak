@@ -5,6 +5,7 @@ extends "res://scripts/session_setup_redesign_fix.gd"
 # normalized to Arabic-Indic digits before it reaches a Control.
 
 var web_online_setup_callback: Variant
+var manual_room_code_input: String = ""
 
 
 func _ready() -> void:
@@ -18,6 +19,176 @@ func _ready() -> void:
 	var window: JavaScriptObject = JavaScriptBridge.get_interface("window")
 	if window != null:
 		window.set("yakolakTestStartOnlineSetup", web_online_setup_callback)
+
+
+func show_after_intro() -> void:
+	if showing:
+		return
+	showing = true
+	root.visible = true
+	_publish_setup_state("visible")
+	joining_room_code = _room_code_from_url()
+	if not joining_room_code.is_empty():
+		_request_room_preview(joining_room_code)
+		_show_invitation(joining_room_code)
+	else:
+		_show_room_entry()
+
+
+func _rebuild_active_screen() -> void:
+	layout_refresh_pending = false
+	if not showing:
+		return
+	match active_screen:
+		"room_entry":
+			_show_room_entry()
+		"join_room":
+			_show_join_room()
+		_:
+			super._rebuild_active_screen()
+
+
+func _show_room_entry() -> void:
+	active_screen = "room_entry"
+	joining_room_code = ""
+	online_error_text = ""
+	manual_room_code_input = ""
+	_clear_body()
+	var content := _content_box()
+	body.add_child(content)
+	content.add_child(_label("كيف تبغى تبدأ؟", 25, HORIZONTAL_ALIGNMENT_CENTER))
+	content.add_child(_label("أنشئ لعبة جديدة أو انضم لغرفة موجودة", 14, HORIZONTAL_ALIGNMENT_CENTER, Color("#cbd7d9")))
+	var choices := _choice_row()
+	var create_game := _button("إنشاء لعبة جديدة", Color("#10201f"), Color("#f2f0e9"))
+	create_game.pressed.connect(_start_new_game_flow)
+	choices.add_child(create_game)
+	var join_room := _button("الانضمام لغرفة", Color.WHITE, Color("#214a64"))
+	join_room.pressed.connect(_show_join_room)
+	choices.add_child(join_room)
+	content.add_child(choices)
+	content.add_child(_label("اللعبة الجديدة قد تكون على نفس الجهاز، ضد الكمبيوتر، أو أونلاين.", 13, HORIZONTAL_ALIGNMENT_CENTER, Color("#aebdc0")))
+	_layout_card()
+	call_deferred("_apply_split_framing")
+
+
+func _start_new_game_flow() -> void:
+	joining_room_code = ""
+	online_error_text = ""
+	join_available_colors.clear()
+	room_preview_ready = false
+	room_preview_code = ""
+	tutorial_requested = false
+	wizard_history.clear()
+	_reset_seats()
+	_show_knowledge_question()
+
+
+func _show_join_room() -> void:
+	active_screen = "join_room"
+	joining_room_code = ""
+	_clear_body()
+	var content := _content_box()
+	body.add_child(content)
+	content.add_child(_label("الانضمام لغرفة", 25, HORIZONTAL_ALIGNMENT_CENTER))
+	content.add_child(_label("أدخل رمز الغرفة المكوّن من رقمين", 14, HORIZONTAL_ALIGNMENT_CENTER, Color("#cbd7d9")))
+	if not online_error_text.is_empty():
+		content.add_child(_label(online_error_text, 13, HORIZONTAL_ALIGNMENT_CENTER, Color("#ffc0b8")))
+
+	var code_input := LineEdit.new()
+	code_input.text = _arabize_numbers(manual_room_code_input)
+	code_input.placeholder_text = "مثال: ٥٤"
+	code_input.max_length = 2
+	code_input.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	code_input.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	code_input.text_direction = Control.TEXT_DIRECTION_RTL
+	code_input.add_theme_font_override("font", THMANYAH_MEDIUM)
+	code_input.add_theme_font_size_override("font_size", _ui_font_size(22))
+	code_input.custom_minimum_size = Vector2(0.0, _ui_length(50.0))
+	code_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	code_input.text_changed.connect(_on_manual_room_code_changed)
+	code_input.text_submitted.connect(_submit_manual_room_join)
+	content.add_child(code_input)
+
+	var actions := _choice_row()
+	var back := _button("رجوع", Color("#eef4f3"), Color(0.10, 0.15, 0.17, 0.72))
+	back.pressed.connect(_show_room_entry)
+	actions.add_child(back)
+	var join := _button("انضم", Color("#10201f"), Color("#f2f0e9"))
+	join.pressed.connect(_submit_manual_room_join_from_field.bind(code_input))
+	actions.add_child(join)
+	content.add_child(actions)
+	_layout_card()
+	call_deferred("_apply_split_framing")
+	code_input.grab_focus.call_deferred()
+
+
+func _on_manual_room_code_changed(value: String) -> void:
+	manual_room_code_input = _normalize_room_code(value)
+	online_error_text = ""
+
+
+func _submit_manual_room_join_from_field(field: LineEdit) -> void:
+	_submit_manual_room_join(field.text)
+
+
+func _submit_manual_room_join(value: String) -> void:
+	var normalized: String = _normalize_room_code(value)
+	manual_room_code_input = normalized
+	if normalized.length() != 2:
+		online_error_text = "رمز الغرفة يجب أن يكون رقمين."
+		_show_join_room()
+		return
+	joining_room_code = normalized
+	online_error_text = ""
+	_request_room_preview(normalized)
+	_show_invitation(normalized)
+
+
+func _show_knowledge_question() -> void:
+	active_screen = "question"
+	_clear_body()
+	var content := _content_box()
+	body.add_child(content)
+	content.add_child(_label("هل تعرف اللعبة؟", 25, HORIZONTAL_ALIGNMENT_CENTER))
+	var choices := _choice_row()
+	var yes := _button("نعم، أعرفها", Color("#10201f"), Color("#f2f0e9"))
+	yes.pressed.connect(_open_setup.bind(false))
+	choices.add_child(yes)
+	var no := _button("أبغى أتعلم", Color.WHITE, Color("#235b50"))
+	no.pressed.connect(_open_setup.bind(true))
+	choices.add_child(no)
+	content.add_child(choices)
+	var back := _button("رجوع", Color("#eef4f3"), Color(0.10, 0.15, 0.17, 0.72))
+	back.pressed.connect(_show_room_entry)
+	content.add_child(back)
+	_layout_card()
+	call_deferred("_apply_split_framing")
+
+
+func _show_invitation(code: String) -> void:
+	active_screen = "invitation"
+	_clear_body()
+	var content := _content_box()
+	body.add_child(content)
+	content.add_child(_label("الانضمام لغرفة", 25, HORIZONTAL_ALIGNMENT_CENTER))
+	content.add_child(_label("الغرفة " + code, 18, HORIZONTAL_ALIGNMENT_CENTER, Color("#cbd7d9")))
+	if not online_error_text.is_empty():
+		content.add_child(_label(online_error_text, 14, HORIZONTAL_ALIGNMENT_CENTER, Color("#ffc0b8")))
+	var actions := _choice_row()
+	var back := _button("رجوع", Color("#eef4f3"), Color(0.10, 0.15, 0.17, 0.72))
+	back.pressed.connect(_show_join_room)
+	actions.add_child(back)
+	var join_label: String = "انضم" if room_preview_ready else ("إعادة" if not online_error_text.is_empty() else "...")
+	var join := _button(join_label, Color("#10201f"), Color("#f2f0e9"))
+	join.disabled = not room_preview_ready and online_error_text.is_empty()
+	if room_preview_ready:
+		join.pressed.connect(_open_join_setup.bind(code))
+	else:
+		join.pressed.connect(_retry_room_preview.bind(code))
+	actions.add_child(join)
+	content.add_child(actions)
+	_layout_card()
+	call_deferred("_apply_split_framing")
 
 
 func _label(text_value: String, size: int, alignment: HorizontalAlignment, color: Color = Color.WHITE) -> Label:
