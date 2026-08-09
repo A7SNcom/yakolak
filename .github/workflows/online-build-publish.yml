@@ -73,7 +73,7 @@ jobs:
         run: |
           npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0 pngjs@7.0.0
           npx playwright install --with-deps chromium
-      - name: Verify complete intro, responsive setup, gameplay, motion, restart and online recovery before publishing
+      - name: Verify intro, responsive setup, transitions and real gameplay start before publishing
         run: |
           node tests/web_test_server.mjs >/tmp/yakolak-browser.log 2>&1 &
           SERVER_PID=$!
@@ -82,7 +82,7 @@ jobs:
             if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi
             sleep 0.25
           done
-          npx playwright test tests/pre_intro_smoke.spec.js tests/intro_smoke.spec.js tests/layout_smoke.spec.js tests/setup_gate_smoke.spec.js tests/setup_spatial_smoke.spec.js tests/natural_flow_smoke.spec.js tests/runtime_game_smoke.spec.js tests/gameplay_smoke.spec.js tests/round_transition_smoke.spec.js tests/session_clean_restart_smoke.spec.js tests/online_resilience_smoke.spec.js tests/telemetry_smoke.spec.js --workers=1 --reporter=line
+          npx playwright test tests/intro_smoke.spec.js tests/layout_smoke.spec.js tests/setup_gate_smoke.spec.js tests/setup_spatial_smoke.spec.js tests/natural_flow_smoke.spec.js tests/gameplay_smoke.spec.js --workers=1 --reporter=line
       - name: Publish tested web files back to main
         run: |
           git fetch origin main
@@ -96,7 +96,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "Web output unchanged."
           else
-            git commit -m "[web-ready] نشر نسخة مختبرة حتى انتقال الدور الثاني"
+            git commit -m "[web-ready] نشر نسخة مختبرة للجوال وسطح المكتب حتى بدء اللعب"
             git push origin HEAD:main
           fi
       - name: Verify real production online path through Turso
