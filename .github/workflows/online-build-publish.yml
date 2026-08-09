@@ -47,6 +47,7 @@ jobs:
           node --check api/telemetry.js
           node --check tests/web_test_server.mjs
           node tests/online_rules.test.mjs
+          node tests/online_logic_hardening.test.mjs
           node tests/online_reliability_contract.test.mjs
           node tests/arabic_ui_contract.test.mjs
           node tests/telemetry_contract.test.mjs
