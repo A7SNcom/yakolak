@@ -126,8 +126,7 @@ func _reset_board_for_round() -> void:
 
 	if stability_round_reset_tween != null and stability_round_reset_tween.is_valid():
 		stability_round_reset_tween.kill()
-	stability_round_reset_tween = create_tween()
-	stability_round_reset_tween.set_parallel(true)
+	stability_round_reset_tween = null
 	var generation: int = session_generation
 	for index: int in range(piece_records.size()):
 		var record: Dictionary = piece_records[index] as Dictionary
@@ -137,8 +136,15 @@ func _reset_board_for_round() -> void:
 		if index < home_materials.size():
 			piece.material_override = home_materials[index]
 		if index < home_transforms.size():
+			if stability_round_reset_tween == null:
+				stability_round_reset_tween = create_tween()
+				stability_round_reset_tween.set_parallel(true)
 			stability_round_reset_tween.tween_property(piece, "transform", home_transforms[index], ROUND_RESET_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	stability_round_reset_tween.finished.connect(_finish_stability_round_reset.bind(generation))
+	if stability_round_reset_tween != null:
+		stability_round_reset_tween.finished.connect(_finish_stability_round_reset.bind(generation))
+	else:
+		# A stale/empty reset must not start a Tween with zero Tweeners.
+		call_deferred("_finish_stability_round_reset", generation)
 	_publish_match_state("round-reset")
 
 
@@ -148,6 +154,43 @@ func _finish_stability_round_reset(generation: int) -> void:
 		return
 	action_in_progress = false
 	_start_turn()
+
+
+func _close_piece_tray(skip_index: int = -1, immediate: bool = false) -> void:
+	# Create the closing Tween lazily. Near the end of a match the tray can hold
+	# only the selected piece; skipping that piece used to leave an empty Tween
+	# and Godot emitted "started with no Tweeners".
+	if not tray_open:
+		return
+	var closing: Array[int] = tray_indices.duplicate()
+	tray_open = false
+	tray_indices.clear()
+	if tray_tween != null and tray_tween.is_valid():
+		tray_tween.kill()
+	tray_tween = null
+	var close_tween: Tween = null
+	for index: int in closing:
+		if index == skip_index:
+			continue
+		var record: Dictionary = piece_records[index] as Dictionary
+		var piece: MeshInstance3D = record["mesh"] as MeshInstance3D
+		piece.material_override = home_materials[index]
+		if bool(record.get("played", false)):
+			continue
+		if immediate:
+			piece.position = home_transforms[index].origin
+		else:
+			if close_tween == null:
+				close_tween = create_tween()
+				close_tween.set_parallel(true)
+				tray_tween = close_tween
+			close_tween.tween_property(piece, "position", home_transforms[index].origin, TRAY_OPEN_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	if skip_index < 0:
+		selected_index = -1
+		selected_original_material = null
+		_hide_markers()
+		_publish_gameplay_state("ready")
+	_publish_tray_state("closed")
 
 
 func _return_to_setup() -> void:
