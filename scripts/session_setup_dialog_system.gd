@@ -73,8 +73,6 @@ func _color_choice_button(color_id: String, value: Color, selected: bool, enable
 
 
 func _wizard_header(title: String) -> Control:
-	# Cancel/back now lives in one fixed close control, so the header hierarchy
-	# stays identical on every wizard screen.
 	var row := HBoxContainer.new()
 	row.layout_direction = Control.LAYOUT_DIRECTION_RTL
 	var heading := _label(title, 24, HORIZONTAL_ALIGNMENT_RIGHT)
@@ -178,6 +176,7 @@ func _dialog_update_chrome() -> void:
 func _dialog_cancel() -> void:
 	if not showing:
 		return
+	var navigated := true
 	match active_screen:
 		"join_room":
 			_show_room_entry()
@@ -188,9 +187,19 @@ func _dialog_cancel() -> void:
 		"setup":
 			_wizard_back()
 		_:
-			# The root setup choice is mandatory. Dismissing it would leave a table
-			# with no configured match and no safe continuation.
-			return
+			navigated = false
+	if navigated:
+		# A cancel action rebuilds the content tree. Force focus restoration after
+		# that rebuild so keyboard users never remain on a hidden/removed control.
+		dialog_focus_pending = false
+		call_deferred("_restore_dialog_focus_after_navigation")
+
+
+func _restore_dialog_focus_after_navigation() -> void:
+	if not showing:
+		return
+	dialog_focus_pending = false
+	_apply_dialog_focus()
 
 
 func _input(event: InputEvent) -> void:
@@ -210,8 +219,6 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	# Fallback for platforms that map a cancel action without delivering a raw
-	# key event through _input first (controller/back-button parity).
 	if not showing or not event.is_action_pressed("ui_cancel"):
 		return
 	if active_screen != "room_entry":
@@ -296,8 +303,6 @@ func _collect_focusable_controls(node: Node, output: Array[Control]) -> void:
 func _install_web_keyboard_guard() -> void:
 	if not OS.has_feature("web"):
 		return
-	# Reuse the same proven callback registration pattern already used by the
-	# setup-flow browser bridge in this project.
 	web_escape_callback = JavaScriptBridge.create_callback(_on_web_escape)
 	var window: JavaScriptObject = JavaScriptBridge.get_interface("window")
 	if window != null:
