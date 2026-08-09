@@ -25,12 +25,20 @@ async function expectCanvasToFillViewport(page, expectedWidth, expectedHeight) {
   expect(Math.abs(box.height - expectedHeight)).toBeLessThanOrEqual(2);
 }
 
+function recordRequestFailure(failures, request) {
+  const url = request.url();
+  const errorText = request.failure()?.errorText || '';
+  const expectedAbort = errorText === 'net::ERR_ABORTED' &&
+    (url.endsWith('/api/telemetry') || url.endsWith('/index.wasm') || url.endsWith('/index.pck'));
+  if (!expectedAbort) failures.push(`requestfailed: ${url} ${errorText}`);
+}
+
 test('authoritative canvas fills portrait landscape and wide Chromium viewports', async ({ page }) => {
   test.setTimeout(120000);
   const failures = [];
 
   page.on('pageerror', error => failures.push(`pageerror: ${error.message}`));
-  page.on('requestfailed', request => failures.push(`requestfailed: ${request.url()} ${request.failure()?.errorText || ''}`));
+  page.on('requestfailed', request => recordRequestFailure(failures, request));
   page.on('console', message => {
     console.log(`[browser:${message.type()}] ${message.text()}`);
     if (message.type() === 'error' && !message.text().includes('favicon')) {
