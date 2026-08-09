@@ -33,6 +33,125 @@ const SELECTION_LIGHT_ENERGY: float = 1.90
 const SELECTION_DARK_COLOR := Color(0.012, 0.014, 0.018, 1.0)
 const SELECTION_LIGHT_COLOR := Color(1.0, 0.985, 0.94, 1.0)
 
+# Gameplay should spend power only when pixels are actually moving. Static
+# board states render at 30 fps, while every interaction/tween/manual move
+# immediately returns to the approved 60 fps. Geometry, materials, lighting,
+# viewport resolution and effects are untouched.
+const EFF_IDLE_FPS: int = 30
+const EFF_ACTIVE_FPS: int = 60
+const EFF_IDLE_PROCESS_INTERVAL: float = 0.050
+const EFF_INPUT_BOOST_MS: int = 700
+const EFF_SCORE_BOOST_MS: int = 900
+const EFF_MAX_MOVE_STEP_SECONDS: float = 1.0 / 30.0
+
+var _eff_idle_process_accumulator: float = 0.0
+var _eff_boost_until_msec: int = 0
+var _eff_frame_profile: int = -1
+var _eff_move_tracking_piece: int = -1
+var _eff_move_elapsed_msec: float = 0.0
+
+
+func _ready() -> void:
+	super._ready()
+	_eff_apply_frame_budget(true)
+
+
+func _process(delta: float) -> void:
+	var now: int = Time.get_ticks_msec()
+	var full_rate: bool = _eff_requires_full_rate(now)
+	_eff_apply_frame_budget(full_rate)
+
+	# The legacy placement interpolation advances from wall-clock milliseconds.
+	# On a hitch that makes the stone jump a large distance on the next frame.
+	# Feed it a capped, accumulated visual clock instead: a slow device takes a
+	# little longer to finish the move rather than showing an ugly jump.
+	if move_active:
+		_eff_prepare_smoothed_move(delta)
+	else:
+		_eff_reset_move_clock()
+
+	# Before gameplay starts, keep every approved intro/setup motion at 60 fps.
+	# During a live match only the manual stone flight needs this full script
+	# chain every rendered frame; idle state/timer checks are safe at 20 Hz.
+	if not match_initialized or full_rate:
+		_eff_idle_process_accumulator = 0.0
+		super._process(delta)
+		if not move_active:
+			_eff_reset_move_clock()
+		return
+
+	_eff_idle_process_accumulator += maxf(delta, 0.0)
+	if _eff_idle_process_accumulator < EFF_IDLE_PROCESS_INTERVAL:
+		return
+	var batched_delta: float = _eff_idle_process_accumulator
+	_eff_idle_process_accumulator = 0.0
+	super._process(batched_delta)
+	if not move_active:
+		_eff_reset_move_clock()
+
+
+func _input(event: InputEvent) -> void:
+	# Wake the renderer before any user-driven visual reaction. Mouse motion is
+	# included so hover/desktop interaction never feels like a 30-fps interface.
+	if (
+		event is InputEventScreenTouch
+		or event is InputEventScreenDrag
+		or event is InputEventMouseButton
+		or event is InputEventMouseMotion
+		or event is InputEventMagnifyGesture
+	):
+		_eff_boost_until_msec = maxi(_eff_boost_until_msec, Time.get_ticks_msec() + EFF_INPUT_BOOST_MS)
+		_eff_apply_frame_budget(true)
+	super._input(event)
+
+
+func _eff_requires_full_rate(now: int) -> bool:
+	if not match_initialized:
+		return true
+	if now < _eff_boost_until_msec:
+		return true
+	if move_active or camera_transition or action_in_progress or turn_camera_active:
+		return true
+	if tray_tween != null and tray_tween.is_valid() and tray_tween.is_running():
+		return true
+	if camera_tween != null and camera_tween.is_valid() and camera_tween.is_running():
+		return true
+	if stability_round_reset_tween != null and stability_round_reset_tween.is_valid() and stability_round_reset_tween.is_running():
+		return true
+	return false
+
+
+func _eff_apply_frame_budget(full_rate: bool) -> void:
+	var target_fps: int = EFF_ACTIVE_FPS if full_rate else EFF_IDLE_FPS
+	if Engine.max_fps != target_fps:
+		Engine.max_fps = target_fps
+	var profile: int = 1 if full_rate else 0
+	if profile == _eff_frame_profile:
+		return
+	_eff_frame_profile = profile
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval(
+			"document.body.dataset.yakolakGameplayFrameBudget='" + ("motion-60" if full_rate else "idle-30") + "';" +
+			"document.body.dataset.yakolakGameplayVisualQuality='unchanged';",
+			true
+		)
+
+
+func _eff_prepare_smoothed_move(delta: float) -> void:
+	if move_piece_index < 0:
+		return
+	if _eff_move_tracking_piece != move_piece_index:
+		_eff_move_tracking_piece = move_piece_index
+		_eff_move_elapsed_msec = 0.0
+	var visual_step: float = minf(maxf(delta, 0.0), EFF_MAX_MOVE_STEP_SECONDS)
+	_eff_move_elapsed_msec += visual_step * 1000.0
+	move_started_msec = Time.get_ticks_msec() - int(round(_eff_move_elapsed_msec))
+
+
+func _eff_reset_move_clock() -> void:
+	_eff_move_tracking_piece = -1
+	_eff_move_elapsed_msec = 0.0
+
 
 func _build_piece_colliders() -> void:
 	# The old path copied every triangle from all 36 meshes into concave physics
@@ -68,6 +187,8 @@ func _build_piece_colliders() -> void:
 
 
 func _enable_gameplay() -> void:
+	_eff_boost_until_msec = Time.get_ticks_msec() + EFF_INPUT_BOOST_MS
+	_eff_apply_frame_budget(true)
 	super._enable_gameplay()
 	_set_player_base_shadows(false)
 
@@ -75,6 +196,10 @@ func _enable_gameplay() -> void:
 func _reset_for_intro() -> void:
 	# Preserve the approved intro exactly; its complex bases may cast shadows
 	# during the cinematic. The cheaper shadow budget begins only after it ends.
+	_eff_boost_until_msec = 0
+	_eff_idle_process_accumulator = 0.0
+	_eff_reset_move_clock()
+	_eff_apply_frame_budget(true)
 	_set_player_base_shadows(true)
 	super._reset_for_intro()
 
@@ -177,6 +302,8 @@ func _sync_score_markers() -> void:
 	_eff_score_left = left_score
 	_eff_score_front = front_score
 	_eff_score_back = back_score
+	_eff_boost_until_msec = maxi(_eff_boost_until_msec, Time.get_ticks_msec() + EFF_SCORE_BOOST_MS)
+	_eff_apply_frame_budget(true)
 	super._sync_score_markers()
 
 
