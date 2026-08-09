@@ -180,18 +180,19 @@ func _piece_mesh_radius(piece_index: int) -> float:
 	return maxf(aabb.size.x, aabb.size.y) * 0.5
 
 
-func _pointer_resolves_piece_with_margin(screen_position: Vector2, candidate_indices: Array[int], piece_index: int) -> bool:
-	# The browser converts CSS pixels back into Godot viewport coordinates. A
-	# target sitting exactly on a triangle/ring boundary can therefore move by a
-	# fraction of a pixel after scaling. Require a small real screen-space island
-	# around the target to resolve to the same stone before exposing it to tests.
-	var offsets: Array[Vector2] = [
-		Vector2.ZERO,
-		Vector2(3.0, 0.0), Vector2(-3.0, 0.0),
-		Vector2(0.0, 3.0), Vector2(0.0, -3.0),
-		Vector2(2.0, 2.0), Vector2(-2.0, 2.0),
-		Vector2(2.0, -2.0), Vector2(-2.0, -2.0),
-	]
+func _pointer_resolves_piece_with_margin(screen_position: Vector2, candidate_indices: Array[int], piece_index: int, margin: float) -> bool:
+	# A projected ring can be only a few pixels thick at an oblique mobile angle.
+	# Prefer a broad stable island, but never declare a genuinely visible stone
+	# untestable just because an arbitrary fixed 3px neighborhood cannot fit.
+	var diagonal: float = margin * 0.70
+	var offsets: Array[Vector2] = [Vector2.ZERO]
+	if margin > 0.0:
+		offsets.append_array([
+			Vector2(margin, 0.0), Vector2(-margin, 0.0),
+			Vector2(0.0, margin), Vector2(0.0, -margin),
+			Vector2(diagonal, diagonal), Vector2(-diagonal, diagonal),
+			Vector2(diagonal, -diagonal), Vector2(-diagonal, -diagonal),
+		])
 	for offset: Vector2 in offsets:
 		if _mesh_piece_at_pointer(screen_position + offset, candidate_indices) != piece_index:
 			return false
@@ -199,9 +200,9 @@ func _pointer_resolves_piece_with_margin(screen_position: Vector2, candidate_ind
 
 
 func _visible_piece_test_pointer(piece_index: int, candidate_indices: Array[int]) -> Vector2:
-	# Test automation must click a pixel where the requested stone is actually
-	# the frontmost rendered surface. A fixed local angle can be hidden by a
-	# different nested ring from one camera angle while exposed from another.
+	# Test automation aims only at a point where the production picker itself sees
+	# this exact mesh as frontmost. Search strongest margins first, then gracefully
+	# fall back for a thin but still genuinely visible projected ring.
 	if camera == null or piece_index < 0 or piece_index >= piece_records.size():
 		return Vector2(-1.0, -1.0)
 	var record: Dictionary = piece_records[piece_index] as Dictionary
@@ -213,22 +214,23 @@ func _visible_piece_test_pointer(piece_index: int, candidate_indices: Array[int]
 	var aabb: AABB = mesh_instance.mesh.get_aabb()
 	var radius: float = maxf(aabb.size.x, aabb.size.y) * 0.5
 	var top_z: float = aabb.position.z + aabb.size.z
-	var radial_factors: Array[float] = [0.92, 0.84, 0.76, 0.68, 0.60]
+	var radial_factors: Array[float] = [0.96, 0.92, 0.88, 0.84, 0.80, 0.76, 0.72, 0.68, 0.64, 0.60, 0.56]
+	var margins: Array[float] = [3.0, 2.0, 1.0, 0.5, 0.0]
 
-	# Probe the complete visible ring and only keep a point with a stable margin.
-	for radial_factor: float in radial_factors:
-		for angle_index: int in range(32):
-			var angle: float = TAU * float(angle_index) / 32.0
-			var local_target := Vector3(
-				cos(angle) * radius * radial_factor,
-				sin(angle) * radius * radial_factor,
-				top_z
-			)
-			var internal_point: Vector2 = camera.unproject_position(mesh_instance.to_global(local_target))
-			if internal_point.x < 5.0 or internal_point.y < 5.0 or internal_point.x > viewport_size.x - 5.0 or internal_point.y > viewport_size.y - 5.0:
-				continue
-			if _pointer_resolves_piece_with_margin(internal_point, candidate_indices, piece_index):
-				return internal_point
+	for margin: float in margins:
+		for radial_factor: float in radial_factors:
+			for angle_index: int in range(64):
+				var angle: float = TAU * float(angle_index) / 64.0
+				var local_target := Vector3(
+					cos(angle) * radius * radial_factor,
+					sin(angle) * radius * radial_factor,
+					top_z
+				)
+				var internal_point: Vector2 = camera.unproject_position(mesh_instance.to_global(local_target))
+				if internal_point.x < 2.0 or internal_point.y < 2.0 or internal_point.x > viewport_size.x - 2.0 or internal_point.y > viewport_size.y - 2.0:
+					continue
+				if _pointer_resolves_piece_with_margin(internal_point, candidate_indices, piece_index, margin):
+					return internal_point
 
 	return Vector2(-1.0, -1.0)
 
@@ -276,7 +278,6 @@ func _publish_piece_test_targets() -> void:
 			script += "document.body.dataset.yakolakTestSide%s%sY='%s';" % [side_cap, size_cap, str(css_point.y)]
 			script += "document.body.dataset.yakolakTestSide%s%sInternalX='%s';" % [side_cap, size_cap, str(internal_point.x)]
 			script += "document.body.dataset.yakolakTestSide%s%sInternalY='%s';" % [side_cap, size_cap, str(internal_point.y)]
-			# Preserve the existing center-stack test contract used by other checks.
 			if side == 0:
 				script += "document.body.dataset.yakolakTest%sX='%s';" % [size_cap, str(css_point.x)]
 				script += "document.body.dataset.yakolakTest%sY='%s';" % [size_cap, str(css_point.y)]
