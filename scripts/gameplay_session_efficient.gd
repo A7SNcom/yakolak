@@ -357,3 +357,15 @@ func _selection_material(source: Material) -> StandardMaterial3D:
 			true
 		)
 	return result
+
+
+func _advance_turn_or_draw() -> void:
+	# A turn may move only to another player. Never wrap the search back to the
+	# player who just moved; if nobody else has a legal move, the round is over.
+	for offset: int in range(1, players.size()):
+		var candidate: int = (current_player_index + offset) % players.size()
+		if _player_has_legal_move(_direction_for_player(candidate)):
+			current_player_index = candidate
+			_start_turn()
+			return
+	_finish_round("", [])
