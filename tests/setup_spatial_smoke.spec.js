@@ -22,10 +22,10 @@ test('setup stays compact, uses real Thmanyah weights, and leaves no empty gamep
   page.on('requestfailed', request => {
     const url = request.url();
     const errorText = request.failure()?.errorText || '';
-    // Chromium can cancel one duplicate/speculative WASM fetch after Godot has
-    // already booted from the successful request. This is harmless and is
-    // treated the same way as the main gameplay browser smoke test.
-    if (url.endsWith('/index.wasm') && errorText === 'net::ERR_ABORTED') return;
+    // Chromium can cancel a duplicate/speculative Godot bootstrap fetch after
+    // the engine has already booted from the successful request. If the only
+    // PCK/WASM request had really failed, the readiness waits below cannot pass.
+    if ((url.endsWith('/index.wasm') || url.endsWith('/index.pck')) && errorText === 'net::ERR_ABORTED') return;
     failures.push(`requestfailed: ${url} ${errorText}`);
   });
   page.on('console', message => {
