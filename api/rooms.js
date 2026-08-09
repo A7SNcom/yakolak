@@ -297,6 +297,17 @@ function reconcilePresenceState(state, connectedSeats) {
   const connected = new Set(connectedSeats || []);
   if (!connected.size) return state;
 
+  if (state.status === 'waiting') {
+    // Never evict the host automatically. A stale guest, however, must not
+    // reserve a seat/color forever and turn into a ghost player when the lobby fills.
+    const players = state.players.filter(player => player.seat === 'p1' || connected.has(player.seat));
+    if (players.length === state.players.length) return state;
+    const keptSeats = new Set(players.map(player => player.seat));
+    const scores = Object.fromEntries(Object.entries(state.scores || {}).filter(([seat]) => keptSeats.has(seat)));
+    const rematch = Object.fromEntries(Object.entries(state.rematch || {}).filter(([seat]) => keptSeats.has(seat)));
+    return { ...state, players, scores, rematch, status: 'waiting' };
+  }
+
   if (state.status === 'playing') {
     const current = state.players[state.turnIndex];
     if (current && !connected.has(current.seat)) {
@@ -428,8 +439,13 @@ async function reconcileRoomPresence(db, row) {
   const connected = await connectedSeats(db, String(row.room_code));
   const next = reconcilePresenceState(state, connected);
   if (next === state) return row;
+  const validSeats = new Set((next.players || []).map(player => player.seat));
+  const nextAuth = authEntries(row).filter(entry => validSeats.has(entry.seat));
+  const removedSeats = state.players.map(player => player.seat).filter(seat => !validSeats.has(seat));
   try {
-    return await updateRoom(db, row, next, Number(row.version));
+    const updated = await updateRoom(db, row, next, Number(row.version), nextAuth);
+    for (const removedSeat of removedSeats) await removePresence(db, String(row.room_code), removedSeat);
+    return updated;
   } catch (error) {
     if (error?.message !== 'version_conflict') throw error;
     return (await readRoom(db, String(row.room_code))) || row;
@@ -581,6 +597,7 @@ export default async function handler(req, res) {
     const action = String(body.action || '');
 
     if (action === 'create') {
+      await enforceDiscoveryRate(db, req);
       return json(res, 201, { ok: true, ...(await createRoom(db, String(body.color || ''), Number(body.targetPlayers), Number(body.targetRounds), String(body.clientToken || ''), String(body.requestId || ''))) });
     }
     if (action === 'preview') {
@@ -622,8 +639,7 @@ export default async function handler(req, res) {
     else if (action === 'rematch') {
       const playerSeats = new Set(state.players.map(player => player.seat));
       const activeSeats = (await connectedSeats(db, code)).filter(activeSeat => playerSeats.has(activeSeat));
-      const requiredSeats = state.matchComplete ? state.players.map(player => player.seat) : activeSeats;
-      next = rematchState(state, seat, requiredSeats.length ? requiredSeats : [seat]);
+      next = rematchState(state, seat, activeSeats.length ? activeSeats : [seat]);
     }
     else if (action === 'leave') next = leaveState(state, seat);
     else throw new Error('invalid_action');
