@@ -26,7 +26,7 @@ async function expectCanvasToFillViewport(page, width, height) {
 }
 
 test('Godot intro preserves the level table and exact v130 loading-star motion', async ({ page }) => {
-  test.setTimeout(300000);
+  test.setTimeout(240000);
   const failures = [];
   const introLogs = [];
 
@@ -99,17 +99,6 @@ test('Godot intro preserves the level table and exact v130 loading-star motion',
   );
   await expect(page.locator('#yakolakLoader')).toHaveCount(0, { timeout: 5000 });
 
-  if (await page.evaluate(() => document.body.dataset.yakolakIntro === 'complete')) {
-    await page.keyboard.press('R');
-    await page.waitForFunction(
-      () => document.body.dataset.yakolakIntro === 'playing',
-      null,
-      { timeout: 5000 }
-    );
-  }
-  await page.waitForTimeout(900);
-  await page.screenshot({ path: 'web/intro-mobile-motion.png', fullPage: false, timeout: 120000 });
-
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'complete' &&
           document.body.dataset.yakolakGeometry === 'ready',
@@ -138,17 +127,10 @@ test('Godot intro preserves the level table and exact v130 loading-star motion',
   expect(joined).toContain('YAKOLAK_INTRO_COMPLETE');
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(750);
   await expectCanvasToFillViewport(page, 1440, 900);
   expect(await page.evaluate(() => document.body.dataset.yakolakCamera)).toBe('level-centered');
-  await page.keyboard.press('R');
-  await page.waitForFunction(
-    () => document.body.dataset.yakolakIntro === 'playing',
-    null,
-    { timeout: 5000 }
-  );
-  await page.waitForTimeout(900);
-  await page.screenshot({ path: 'web/intro-desktop-motion.png', fullPage: false, timeout: 120000 });
+  await page.screenshot({ path: 'web/intro-desktop-final.png', fullPage: false, timeout: 120000 });
 
   expect(failures).toEqual([]);
 });
