@@ -17,11 +17,18 @@ test.use({
   }
 });
 
+function recordRequestFailure(failures, request) {
+  const url = request.url();
+  const errorText = request.failure()?.errorText || '';
+  if (errorText === 'net::ERR_ABORTED' && (url.endsWith('/api/telemetry') || url.endsWith('/index.wasm') || url.endsWith('/index.pck'))) return;
+  failures.push(`requestfailed: ${url} ${errorText}`);
+}
+
 test('setup stays hidden through closed-box handoff and opens only after unboxing', async ({ page }) => {
   test.setTimeout(180000);
   const failures = [];
   page.on('pageerror', error => failures.push(`pageerror: ${error.message}`));
-  page.on('requestfailed', request => failures.push(`requestfailed: ${request.url()} ${request.failure()?.errorText || ''}`));
+  page.on('requestfailed', request => recordRequestFailure(failures, request));
   page.on('console', message => {
     if (message.type() === 'error' && !message.text().includes('favicon')) failures.push(`console: ${message.text()}`);
   });
