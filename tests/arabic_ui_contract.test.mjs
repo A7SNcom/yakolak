@@ -7,6 +7,7 @@ const gameplayPolish = fs.readFileSync(new URL('../scripts/gameplay_session_poli
 const gameplayNestedPick = fs.readFileSync(new URL('../scripts/gameplay_session_nested_pick.gd', import.meta.url), 'utf8');
 const setup = fs.readFileSync(new URL('../scripts/session_setup_arabic.gd', import.meta.url), 'utf8');
 const setupFlow = fs.readFileSync(new URL('../scripts/session_setup_flow.gd', import.meta.url), 'utf8');
+const setupDialog = fs.readFileSync(new URL('../scripts/session_setup_dialog_system.gd', import.meta.url), 'utf8');
 const online = fs.readFileSync(new URL('../scripts/online_session.gd', import.meta.url), 'utf8');
 const onlineHardened = fs.readFileSync(new URL('../scripts/online_session_hardened.gd', import.meta.url), 'utf8');
 const scene = fs.readFileSync(new URL('../scenes/intro.tscn', import.meta.url), 'utf8');
@@ -18,7 +19,8 @@ assert.ok(gameplayPolish.includes('extends "res://scripts/gameplay_session_harde
 assert.ok(gameplayHardened.includes('extends "res://scripts/gameplay_session_resilient.gd"'), 'hardened gameplay must preserve the Arabic/stability layer');
 assert.ok(scene.includes('res://scripts/online_session_hardened.gd'), 'the hardened online layer must remain active');
 assert.ok(onlineHardened.includes('extends "res://scripts/online_session.gd"'), 'hardened online must preserve the base Arabic invitation transport');
-assert.ok(scene.includes('res://scripts/session_setup_flow.gd'), 'the user-journey setup layer must remain active');
+assert.ok(scene.includes('res://scripts/session_setup_dialog_system.gd'), 'the unified dialog layer must remain active');
+assert.ok(setupDialog.includes('extends "res://scripts/session_setup_flow.gd"'), 'the dialog layer must preserve the user-journey setup layer');
 assert.ok(setupFlow.includes('extends "res://scripts/session_setup_arabic.gd"'), 'the user-journey layer must preserve the Arabic setup layer');
 
 assert.ok(gameplay.includes('func _arabize_digits'), 'gameplay must normalize visible numbers to Arabic digits');
