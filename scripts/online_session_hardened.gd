@@ -4,7 +4,50 @@ extends "res://scripts/online_session.gd"
 # overwrite a queued player action, and preserve unrelated URL parameters.
 
 const MAX_DURABLE_ACTIONS: int = 8
+const BRIDGE_EVENT_CHECK_MS: int = 34
 var durable_action_queue: Array[Dictionary] = []
+var next_bridge_event_check_msec: int = 0
+
+
+func _process(_delta: float) -> void:
+	if not OS.has_feature("web"):
+		return
+
+	# Local/offline play should make the online transport essentially dormant.
+	# Avoid a Godot <-> browser JavaScript bridge round-trip every rendered frame.
+	if not active and not busy and bootstrap_kind.is_empty():
+		return
+
+	var now: int = Time.get_ticks_msec()
+	if now >= next_wake_check_msec:
+		next_wake_check_msec = now + WAKE_CHECK_MS
+		_consume_browser_wake()
+
+	if busy:
+		# Browser fetch responses are asynchronous; checking their queue at ~30 Hz
+		# cuts bridge churn while adding at most about one 30-fps frame of latency.
+		if now >= next_bridge_event_check_msec:
+			next_bridge_event_check_msec = now + BRIDGE_EVENT_CHECK_MS
+			if _consume_bridge_event():
+				return
+
+		if request_started_msec > 0 and now - request_started_msec >= REQUEST_TIMEOUT_MS + 900:
+			var timed_out_kind: String = inflight_kind
+			var timed_out_payload: Dictionary = inflight_payload.duplicate(true)
+			_abort_active_request()
+			_clear_inflight()
+			_handle_request_failure(timed_out_kind, timed_out_payload, "online_timeout", 0)
+		return
+
+	if not bootstrap_kind.is_empty() and not active:
+		if now >= next_bootstrap_retry_msec:
+			_request_post(bootstrap_kind, bootstrap_payload)
+		return
+
+	if not active or room.is_empty():
+		return
+	if now >= next_poll_msec:
+		_poll()
 
 
 func restore_from_location() -> bool:
