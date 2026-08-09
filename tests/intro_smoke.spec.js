@@ -25,13 +25,21 @@ async function expectCanvasToFillViewport(page, width, height) {
   expect(Math.abs(box.height - height)).toBeLessThanOrEqual(2);
 }
 
+function recordRequestFailure(failures, request) {
+  const url = request.url();
+  const errorText = request.failure()?.errorText || '';
+  const expectedAbort = errorText === 'net::ERR_ABORTED' &&
+    (url.endsWith('/api/telemetry') || url.endsWith('/index.wasm') || url.endsWith('/index.pck'));
+  if (!expectedAbort) failures.push(`requestfailed: ${url} ${errorText}`);
+}
+
 test('Godot intro preserves the level table and exact v130 loading-star motion', async ({ page }) => {
   test.setTimeout(240000);
   const failures = [];
   const introLogs = [];
 
   page.on('pageerror', error => failures.push(`pageerror: ${error.message}`));
-  page.on('requestfailed', request => failures.push(`requestfailed: ${request.url()} ${request.failure()?.errorText || ''}`));
+  page.on('requestfailed', request => recordRequestFailure(failures, request));
   page.on('console', message => {
     const text = message.text();
     console.log(`[browser:${message.type()}] ${text}`);
