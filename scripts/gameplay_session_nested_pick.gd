@@ -37,6 +37,8 @@ func _handle_pointer(screen_position: Vector2) -> void:
 	# This deliberately does not trust the first physics surface, because the
 	# outer large model can occlude the medium/small models from the camera.
 	var piece_index: int = _nested_piece_at_pointer(screen_position)
+	if browser_automation:
+		print("YAKOLAK_NESTED_PICK pointer=(%.2f,%.2f) resolved=%d" % [screen_position.x, screen_position.y, piece_index])
 	if piece_index >= 0:
 		var record: Dictionary = piece_records[piece_index] as Dictionary
 		if bool(record.get("played", false)):
@@ -203,6 +205,13 @@ func _publish_piece_test_targets() -> void:
 	if best_stack.is_empty():
 		return
 
+	# Camera3D returns Godot viewport coordinates, while Playwright clicks in CSS
+	# pixels. Convert exactly the same way as the intro pixel-match code; this is
+	# test-only telemetry and does not alter real pointer handling.
+	var canvas_rect: Rect2 = _gameplay_canvas_css_rect()
+	if canvas_rect.size.x < 1.0 or canvas_rect.size.y < 1.0 or viewport_size.x < 1.0 or viewport_size.y < 1.0:
+		return
+	var css_scale := Vector2(canvas_rect.size.x / viewport_size.x, canvas_rect.size.y / viewport_size.y)
 	var script: String = ""
 	for size_name: String in ["small", "medium", "large"]:
 		var index: int = -1
@@ -218,8 +227,29 @@ func _publish_piece_test_targets() -> void:
 		# interprets this point in the same local plane, so the test exercises a
 		# real browser click even if the large collision shell sits in front.
 		var world_target: Vector3 = mesh_instance.to_global(Vector3(radius * 0.90, 0.0, 0.0))
-		var point: Vector2 = camera.unproject_position(world_target)
+		var internal_point: Vector2 = camera.unproject_position(world_target)
+		var css_point: Vector2 = canvas_rect.position + internal_point * css_scale
 		var cap: String = size_name.capitalize()
-		script += "document.body.dataset.yakolakTest%sX='%s';" % [cap, str(point.x)]
-		script += "document.body.dataset.yakolakTest%sY='%s';" % [cap, str(point.y)]
+		script += "document.body.dataset.yakolakTest%sX='%s';" % [cap, str(css_point.x)]
+		script += "document.body.dataset.yakolakTest%sY='%s';" % [cap, str(css_point.y)]
 	JavaScriptBridge.eval(script, true)
+
+
+func _gameplay_canvas_css_rect() -> Rect2:
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	if not OS.has_feature("web"):
+		return Rect2(Vector2.ZERO, viewport_size)
+	var raw: Variant = JavaScriptBridge.eval(
+		"JSON.stringify((()=>{const c=document.getElementById('canvas');const r=c?c.getBoundingClientRect():{left:0,top:0,width:window.innerWidth,height:window.innerHeight};return{x:r.left,y:r.top,w:r.width,h:r.height};})())",
+		true
+	)
+	var parsed: Variant = JSON.parse_string(str(raw))
+	if parsed is Dictionary:
+		var data := parsed as Dictionary
+		var rect := Rect2(
+			Vector2(float(data.get("x", 0.0)), float(data.get("y", 0.0))),
+			Vector2(float(data.get("w", 0.0)), float(data.get("h", 0.0)))
+		)
+		if rect.size.x > 1.0 and rect.size.y > 1.0:
+			return rect
+	return Rect2(Vector2.ZERO, viewport_size)
