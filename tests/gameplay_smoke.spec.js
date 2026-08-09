@@ -45,12 +45,34 @@ async function cameraHealth(page) {
     boardVisible: document.body.dataset.yakolakBoardVisible,
     focusInside: document.body.dataset.yakolakCameraFocusInside,
     facing: Number(document.body.dataset.yakolakCameraFacing || 0),
+    fov: Number(document.body.dataset.yakolakCameraFov || 0),
     gameplay: document.body.dataset.yakolakGameplay,
     moves: Number(document.body.dataset.yakolakMoves || 0)
   }));
 }
 
-test('first real move hands the same-device game to player two without a black scene', async ({ page }) => {
+async function expectContinuousZoom(page) {
+  await page.waitForFunction(() => {
+    const effective = Number(document.body.dataset.yakolakTurnEffectiveFov || 0);
+    const finished = Number(document.body.dataset.yakolakCameraTransitionFinishedFov || 0);
+    const restored = Number(document.body.dataset.yakolakCameraZoomFov || 0);
+    return effective > 0 && Math.abs(finished - effective) < 0.08 && Math.abs(restored - effective) < 0.08;
+  }, null, { timeout: 5000 });
+
+  const zoom = await page.evaluate(() => ({
+    base: Number(document.body.dataset.yakolakTurnBaseFov || 0),
+    effective: Number(document.body.dataset.yakolakTurnEffectiveFov || 0),
+    finished: Number(document.body.dataset.yakolakCameraTransitionFinishedFov || 0),
+    restored: Number(document.body.dataset.yakolakCameraZoomFov || 0),
+    ratio: Number(document.body.dataset.yakolakCameraZoomRatio || 1)
+  }));
+  expect(zoom.ratio).toBeLessThan(0.99);
+  expect(Math.abs(zoom.base - zoom.effective)).toBeGreaterThan(0.5);
+  expect(Math.abs(zoom.finished - zoom.effective)).toBeLessThan(0.08);
+  expect(Math.abs(zoom.restored - zoom.effective)).toBeLessThan(0.08);
+}
+
+test('first real move hands the same-device game to player two without a black scene or zoom snap', async ({ page }) => {
   test.setTimeout(120000);
   const failures = [];
   const songRequests = [];
@@ -96,6 +118,17 @@ test('first real move hands the same-device game to player two without a black s
   const firstRatio = visibleSceneRatio(firstImage);
   expect(firstRatio).toBeGreaterThan(0.01);
 
+  // Apply real desktop zoom before changing turns. The chosen ratio must remain
+  // part of the camera tween itself, not disappear during motion then snap back.
+  await page.mouse.move(640, 360);
+  await page.mouse.wheel(0, -120);
+  await page.mouse.wheel(0, -120);
+  await page.waitForFunction(
+    () => Number(document.body.dataset.yakolakCameraZoomRatio || 1) < 0.99,
+    null,
+    { timeout: 5000 }
+  );
+
   // Reproduce the exact reported failure: player 1 places one stone, then the
   // camera hands the same device to player 2.
   await page.evaluate(() => window.yakolakTestPlayOneMove());
@@ -111,6 +144,7 @@ test('first real move hands the same-device game to player two without a black s
     null,
     { timeout: 20000 }
   );
+  await expectContinuousZoom(page);
 
   const secondHealth = await cameraHealth(page);
   expect(secondHealth.player).toBe('back');
@@ -125,7 +159,8 @@ test('first real move hands the same-device game to player two without a black s
   expect(secondRatio).toBeGreaterThan(0.01);
   expect(secondRatio).toBeGreaterThan(firstRatio * 0.20);
 
-  // A second real move proves the camera can hand control back again too.
+  // A second real move proves the camera can hand control back again too and
+  // the same zoom ratio remains continuous in the reverse direction.
   await page.evaluate(() => window.yakolakTestPlayOneMove());
   await page.waitForFunction(
     () => Number(document.body.dataset.yakolakMoves || 0) >= 2 &&
@@ -137,6 +172,7 @@ test('first real move hands the same-device game to player two without a black s
     null,
     { timeout: 20000 }
   );
+  await expectContinuousZoom(page);
 
   expect(songRequests).toEqual([]);
   expect(failures).toEqual([]);
