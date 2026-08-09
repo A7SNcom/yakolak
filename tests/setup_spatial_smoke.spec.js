@@ -51,19 +51,29 @@ async function waitForSetup(page) {
   );
 }
 
-async function readSetupMetrics(page) {
+async function readSetupMetrics(page, expectedMode) {
   await page.waitForFunction(
-    () => document.body.dataset.yakolakSetupWizard === 'color' &&
-          document.body.dataset.yakolakSetupDirection === 'rtl' &&
-          document.body.dataset.yakolakSetupMotion === 'soft-panel-and-table-v3' &&
-          document.body.dataset.yakolakArabicFont === 'thmanyah' &&
-          Number.isFinite(Number(document.body.dataset.yakolakBoardSetupXRatio)) &&
-          Number.isFinite(Number(document.body.dataset.yakolakBoardSetupYRatio)) &&
-          Number.isFinite(Number(document.body.dataset.yakolakSetupCardLeftRatio)) &&
-          Number.isFinite(Number(document.body.dataset.yakolakSetupCardTopRatio)) &&
-          Number.isFinite(Number(document.body.dataset.yakolakSetupCardRightRatio)) &&
-          Number.isFinite(Number(document.body.dataset.yakolakSetupCardBottomRatio)),
-    null,
+    mode => document.body.dataset.yakolakSetupWizard === 'color' &&
+            document.body.dataset.yakolakSetupDirection === 'rtl' &&
+            document.body.dataset.yakolakSetupMotion === 'soft-panel-and-table-v3' &&
+            document.body.dataset.yakolakSetupLayoutMode === mode &&
+            document.body.dataset.yakolakArabicFont === 'thmanyah',
+    expectedMode,
+    { timeout: 15000 }
+  );
+
+  // Camera and panel tweens are deliberate. Measure only the settled composition,
+  // never the transient frame produced while an orientation change is in flight.
+  await page.waitForTimeout(900);
+  await page.waitForFunction(
+    mode => document.body.dataset.yakolakSetupLayoutMode === mode &&
+            Number.isFinite(Number(document.body.dataset.yakolakBoardSetupXRatio)) &&
+            Number.isFinite(Number(document.body.dataset.yakolakBoardSetupYRatio)) &&
+            Number.isFinite(Number(document.body.dataset.yakolakSetupCardLeftRatio)) &&
+            Number.isFinite(Number(document.body.dataset.yakolakSetupCardTopRatio)) &&
+            Number.isFinite(Number(document.body.dataset.yakolakSetupCardRightRatio)) &&
+            Number.isFinite(Number(document.body.dataset.yakolakSetupCardBottomRatio)),
+    expectedMode,
     { timeout: 15000 }
   );
 
@@ -92,16 +102,17 @@ async function readSetupMetrics(page) {
 }
 
 test('setup survives the full phone/orientation/desktop matrix without clipping or camera jumps', async ({ page }) => {
-  test.setTimeout(150000);
+  test.setTimeout(180000);
   const failures = watchFailures(page);
 
   await page.goto('http://127.0.0.1:8000/?yakolakTestFast=1', { waitUntil: 'domcontentloaded' });
   await waitForSetup(page);
 
   for (const viewport of VIEWPORTS) {
+    const expectedMode = viewport.side ? 'landscape-side' : 'portrait-stack';
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.evaluate(() => window.yakolakTestShowSetup());
-    const setup = await readSetupMetrics(page);
+    const setup = await readSetupMetrics(page, expectedMode);
 
     expect(setup.font, viewport.name).toBe('thmanyah');
     expect(setup.fontFamily, viewport.name).toBe('thmanyah-sans');
@@ -119,6 +130,8 @@ test('setup survives the full phone/orientation/desktop matrix without clipping 
     expect(setup.cardBottom, viewport.name).toBeLessThanOrEqual(1);
     expect(setup.cardRight - setup.cardLeft, viewport.name).toBeGreaterThan(0.15);
     expect(setup.cardBottom - setup.cardTop, viewport.name).toBeGreaterThan(0.12);
+    expect(Number.isFinite(setup.boardX), viewport.name).toBe(true);
+    expect(Number.isFinite(setup.boardY), viewport.name).toBe(true);
     expect(setup.boardX, viewport.name).toBeGreaterThan(0);
     expect(setup.boardX, viewport.name).toBeLessThan(1);
     expect(setup.boardY, viewport.name).toBeGreaterThan(0);
@@ -141,6 +154,7 @@ test('setup survives the full phone/orientation/desktop matrix without clipping 
   }
 
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(900);
   await page.evaluate(() => window.yakolakTestStartPassPlay());
   await page.waitForFunction(
     () => document.body.dataset.yakolakGameplay === 'ready' &&
