@@ -121,6 +121,11 @@ async function verifyRealMatchAndExactlyOnce() {
     assertRoomIdentity(state, code);
     assert.equal(state.room.status, 'playing');
 
+    // No gameplay mutation is accepted without its immutable operation id.
+    const missingMutationId = await postRaw({ action: 'move', code, version, cell: 0, size: 'small' }, p1Token);
+    assert.equal(missingMutationId.status, 400);
+    assert.equal(missingMutationId.data.error, 'invalid_mutation_id');
+
     // Lost/delayed response simulation: the same mutation is sent twice at the
     // same time. Both callers must converge on one authoritative move/version.
     const firstVersion = version;
