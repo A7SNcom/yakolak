@@ -129,37 +129,64 @@ function sizeCap(size) {
   return size[0].toUpperCase() + size.slice(1);
 }
 
-async function waitForPickTargets(page, direction) {
+async function readPickTarget(page, side, size) {
+  const suffix = sideSuffix(side);
+  const cap = sizeCap(size);
+  return page.evaluate(({ suffix, cap }) => {
+    const d = document.body.dataset;
+    return {
+      direction: d.yakolakPiecePickDirection,
+      model: d.yakolakPiecePickModel,
+      x: Number(d[`yakolakTestSide${suffix}${cap}X`] || 0),
+      y: Number(d[`yakolakTestSide${suffix}${cap}Y`] || 0)
+    };
+  }, { suffix, cap });
+}
+
+async function stablePickTarget(page, direction, side, size) {
+  const suffix = sideSuffix(side);
+  const cap = sizeCap(size);
   await page.waitForFunction(
-    expectedDirection => {
+    ({ expectedDirection, suffix, cap }) => {
       const d = document.body.dataset;
       return d.yakolakPiecePickDirection === expectedDirection &&
              d.yakolakPiecePickModel === 'mesh-triangle-frontmost' &&
-             Number(d.yakolakTestSideMinus1MediumX || 0) > 0 &&
-             Number(d.yakolakTestSide0SmallX || 0) > 0 &&
-             Number(d.yakolakTestSide0MediumX || 0) > 0 &&
-             Number(d.yakolakTestSide0LargeX || 0) > 0 &&
-             Number(d.yakolakTestSidePlus1MediumX || 0) > 0;
+             Number(d[`yakolakTestSide${suffix}${cap}X`] || 0) > 0 &&
+             Number(d[`yakolakTestSide${suffix}${cap}Y`] || 0) > 0;
     },
-    direction,
-    { timeout: 7000 }
+    { expectedDirection: direction, suffix, cap },
+    { timeout: 12000 }
   );
-  // Target telemetry is refreshed every ~220 ms while browser automation is active.
-  await page.waitForTimeout(280);
+
+  let previous = null;
+  let stableSamples = 0;
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    await page.waitForTimeout(300);
+    const current = await readPickTarget(page, side, size);
+    const valid = current.direction === direction &&
+                  current.model === 'mesh-triangle-frontmost' &&
+                  Number.isFinite(current.x) && current.x > 0 &&
+                  Number.isFinite(current.y) && current.y > 0;
+    if (!valid) {
+      previous = null;
+      stableSamples = 0;
+      continue;
+    }
+    if (previous && Math.abs(current.x - previous.x) <= 0.35 && Math.abs(current.y - previous.y) <= 0.35) {
+      stableSamples += 1;
+    } else {
+      stableSamples = 0;
+    }
+    previous = current;
+    // Three matching samples span at least two fresh telemetry intervals and
+    // prevent a point from a moving camera/tray from being clicked later.
+    if (stableSamples >= 2) return current;
+  }
+  throw new Error(`pick target did not stabilize: ${direction}/${side}/${size}`);
 }
 
-async function pickTarget(page, side, size, inputMode) {
-  const suffix = sideSuffix(side);
-  const cap = sizeCap(size);
-  const target = await page.evaluate(({ suffix, cap }) => {
-    const d = document.body.dataset;
-    return {
-      x: Number(d[`yakolakTestSide${suffix}${cap}X`]),
-      y: Number(d[`yakolakTestSide${suffix}${cap}Y`])
-    };
-  }, { suffix, cap });
-  expect(Number.isFinite(target.x) && target.x > 0).toBeTruthy();
-  expect(Number.isFinite(target.y) && target.y > 0).toBeTruthy();
+async function pickTarget(page, direction, side, size, inputMode) {
+  const target = await stablePickTarget(page, direction, side, size);
   if (inputMode === 'touch') await page.touchscreen.tap(target.x, target.y);
   else await page.mouse.click(target.x, target.y);
 }
@@ -191,38 +218,33 @@ async function clearSelection(page) {
     null,
     { timeout: 5000 }
   );
-  await page.waitForTimeout(320);
 }
 
 async function verifyRaisedTraySwitching(page, direction, side, inputMode) {
-  await waitForPickTargets(page, direction);
-  await pickTarget(page, side, 'large', inputMode);
+  await pickTarget(page, direction, side, 'large', inputMode);
   await expectExactStone(page, direction, side, 'large');
 
   // The reported failure lived here: after the tray opened, the old code used
   // overlapping solid AABB proxies. Switch across both holes while the tray is
   // still open and require the exact rendered stone identity on every tap.
-  await page.waitForTimeout(340);
-  await pickTarget(page, side, 'small', inputMode);
+  await pickTarget(page, direction, side, 'small', inputMode);
   await expectExactStone(page, direction, side, 'small');
 
-  await page.waitForTimeout(340);
-  await pickTarget(page, side, 'medium', inputMode);
+  await pickTarget(page, direction, side, 'medium', inputMode);
   await expectExactStone(page, direction, side, 'medium');
   await clearSelection(page);
 }
 
 async function verifyNeighborStacks(page, direction, inputMode) {
   for (const side of [-1, 0, 1]) {
-    await waitForPickTargets(page, direction);
-    await pickTarget(page, side, 'medium', inputMode);
+    await pickTarget(page, direction, side, 'medium', inputMode);
     await expectExactStone(page, direction, side, 'medium');
     await clearSelection(page);
   }
 }
 
 test('desktop mouse keeps exact L/M/S identity across tray, neighbors, zoom and camera angle', async ({ page }) => {
-  test.setTimeout(150000);
+  test.setTimeout(210000);
   const failures = [];
   const songRequests = [];
   await startPassPlay(page, failures, songRequests);
@@ -244,7 +266,6 @@ test('desktop mouse keeps exact L/M/S identity across tray, neighbors, zoom and 
     null,
     { timeout: 5000 }
   );
-  await page.waitForTimeout(320);
   await verifyRaisedTraySwitching(page, 'right', 0, 'mouse');
 
   // Move once to rotate the active camera to player two, then repeat the exact
@@ -299,7 +320,7 @@ test('desktop mouse keeps exact L/M/S identity across tray, neighbors, zoom and 
 });
 
 test('mobile touch uses the same exact stone ray in portrait and after camera rotation', async ({ browser }) => {
-  test.setTimeout(150000);
+  test.setTimeout(210000);
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
     deviceScaleFactor: 2,
