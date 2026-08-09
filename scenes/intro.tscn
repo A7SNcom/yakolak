@@ -1,8 +1,8 @@
-[gd_scene load_steps=22 format=3]
+[gd_scene load_steps=20 format=3]
 
 [ext_resource type="Script" path="res://scripts/intro.gd" id="1_intro"]
 [ext_resource type="Script" path="res://scripts/intro_corrections.gd" id="2_corrections"]
-[ext_resource type="Script" path="res://scripts/gameplay_session_nested_pick.gd" id="3_gameplay"]
+[ext_resource type="Script" path="res://scripts/gameplay_session_efficient.gd" id="3_gameplay"]
 [ext_resource type="Script" path="res://scripts/pre_intro_hidden_drop.gd" id="4_preintro"]
 [ext_resource type="Script" path="res://scripts/visual_polish.gd" id="5_visual"]
 [ext_resource type="Script" path="res://scripts/pre_intro_refinement.gd" id="6_refinement"]
@@ -15,10 +15,8 @@
 [ext_resource type="Script" path="res://scripts/background_music.gd" id="13_music"]
 [ext_resource type="Script" path="res://scripts/gameplay_camera_zoom.gd" id="14_zoom"]
 [ext_resource type="Script" path="res://scripts/online_resilience_test_bridge.gd" id="15_online_test"]
-[ext_resource type="Script" path="res://scripts/telemetry_monitor.gd" id="16_telemetry"]
+[ext_resource type="Script" path="res://scripts/diagnostics_gate.gd" id="16_diagnostics"]
 [ext_resource type="Script" path="res://scripts/rooms_observer_route.gd" id="17_rooms_observer"]
-[ext_resource type="Script" path="res://scripts/telemetry_watchdog.gd" id="18_watchdog"]
-[ext_resource type="Script" path="res://scripts/telemetry_console_capture.gd" id="19_console_capture"]
 [ext_resource type="Script" path="res://scripts/gameplay_session_polish.gd" id="20_polish_dependency"]
 
 [node name="YAKOLAKIntro26" type="Node3D"]
@@ -57,14 +55,8 @@ script = ExtResource("12_setup_guard")
 [node name="RoomsObserverRoute" type="Node" parent="."]
 script = ExtResource("17_rooms_observer")
 
-[node name="TelemetryMonitor" type="Node" parent="."]
-script = ExtResource("16_telemetry")
-
-[node name="TelemetryConsoleCapture" type="Node" parent="."]
-script = ExtResource("19_console_capture")
-
-[node name="TelemetryWatchdog" type="Node" parent="."]
-script = ExtResource("18_watchdog")
+[node name="DiagnosticsGate" type="Node" parent="."]
+script = ExtResource("16_diagnostics")
 
 [node name="OnlineSession" type="Node" parent="."]
 script = ExtResource("11_online")
