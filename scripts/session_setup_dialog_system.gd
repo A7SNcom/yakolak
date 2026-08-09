@@ -1,8 +1,8 @@
 extends "res://scripts/session_setup_flow.gd"
 
-# One modal/dialog contract for the post-intro setup flow.
-# Keep the existing game visual language and split-table composition, while
-# centralising sizing, backdrop, focus, cancel/close semantics and input parity.
+# One dialog contract for the post-intro setup flow. It preserves the current
+# game look and split-table composition, while centralising sizing, backdrop,
+# focus, cancel/close semantics and mouse/touch/keyboard parity.
 
 const DIALOG_DEFAULT_WIDTH_CSS := 480.0
 const DIALOG_WIDE_WIDTH_CSS := 560.0
@@ -71,8 +71,8 @@ func _color_choice_button(color_id: String, value: Color, selected: bool, enable
 
 
 func _wizard_header(title: String) -> Control:
-	# Back/cancel now lives in one fixed close control, so every wizard title has
-	# the same hierarchy and the header never changes width depending on actions.
+	# Cancel/back now lives in one fixed close control, so the header hierarchy
+	# stays identical on every wizard screen.
 	var row := HBoxContainer.new()
 	row.layout_direction = Control.LAYOUT_DIRECTION_RTL
 	var heading := _label(title, 24, HORIZONTAL_ALIGNMENT_RIGHT)
@@ -96,8 +96,7 @@ func _layout_card() -> void:
 	var region_width_css: float = region.size.x * canvas_scale
 	var width_css: float = minf(preferred_width_css, region_width_css)
 	if _is_short_landscape():
-		var side_width_css: float = clampf(region_width_css * 0.62, 300.0, 430.0)
-		width_css = minf(width_css, side_width_css)
+		width_css = minf(width_css, clampf(region_width_css * 0.62, 300.0, 430.0))
 	else:
 		width_css = minf(width_css, maxf(280.0, canvas_css_size.x - 24.0))
 
@@ -115,9 +114,6 @@ func _layout_card() -> void:
 	_dialog_update_chrome()
 	if body != null and body.get_child_count() > 0:
 		call_deferred("_settle_dialog")
-	if showing and not layout_refresh_pending:
-		layout_refresh_pending = true
-		call_deferred("_rebuild_active_screen")
 	if showing:
 		call_deferred("_apply_split_framing")
 
@@ -157,10 +153,8 @@ func _settle_dialog() -> void:
 
 func _hide_legacy_back_buttons(node: Node) -> void:
 	for child: Node in node.get_children():
-		if child is Button:
-			var button := child as Button
-			if button.text == "رجوع":
-				button.visible = false
+		if child is Button and (child as Button).text == "رجوع":
+			(child as Button).visible = false
 		_hide_legacy_back_buttons(child)
 
 
@@ -173,8 +167,6 @@ func _dialog_update_chrome() -> void:
 		return
 	var size_px := Vector2(_ui_length(DIALOG_CLOSE_SIZE_CSS), _ui_length(DIALOG_CLOSE_SIZE_CSS))
 	dialog_close_button.size = size_px
-	# Fixed top-left close affordance in the card. This stays opposite the RTL
-	# title start and avoids changing the content hierarchy between screens.
 	dialog_close_button.position = card.position + Vector2(
 		_ui_length(DIALOG_CLOSE_GUTTER_CSS),
 		_ui_length(DIALOG_CLOSE_GUTTER_CSS)
@@ -194,18 +186,16 @@ func _dialog_cancel() -> void:
 		"setup":
 			_wizard_back()
 		_:
-			# room_entry is the mandatory root of the setup flow. It deliberately
-			# cannot be dismissed into a dead-end table with no configured match.
+			# The root setup choice is mandatory. Dismissing it would leave a table
+			# with no configured match and no safe continuation.
 			return
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not showing or not event.is_action_pressed("ui_cancel"):
 		return
-	if active_screen == "room_entry":
-		get_viewport().set_input_as_handled()
-		return
-	_dialog_cancel()
+	if active_screen != "room_entry":
+		_dialog_cancel()
 	get_viewport().set_input_as_handled()
 
 
@@ -335,4 +325,3 @@ func _publish_setup_metrics() -> void:
 			"document.body.dataset.yakolakDialogBackdrop='blocked-not-dismissible';",
 			true
 		)
-	call_deferred("_settle_dialog")
