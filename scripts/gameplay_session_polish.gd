@@ -13,15 +13,69 @@ const OUTLINE_GROW_AMOUNT: float = 0.58
 const OFFSCREEN_MARGIN_PX: float = 80.0
 
 var web_clear_selection_callback: Variant
+var browser_automation: bool = false
+var last_test_target_publish_msec: int = -1000
 
 
 func _ready() -> void:
 	super._ready()
 	if OS.has_feature("web"):
+		browser_automation = bool(JavaScriptBridge.eval("Boolean(navigator.webdriver)", true))
 		web_clear_selection_callback = JavaScriptBridge.create_callback(_on_web_clear_selection)
 		var window: JavaScriptObject = JavaScriptBridge.get_interface("window")
 		if window != null:
 			window.set("yakolakTestClearSelection", web_clear_selection_callback)
+
+
+func _process(delta: float) -> void:
+	super._process(delta)
+	if not browser_automation or not match_initialized or not gameplay_ready or camera == null:
+		return
+	var now: int = Time.get_ticks_msec()
+	if now - last_test_target_publish_msec < 220:
+		return
+	last_test_target_publish_msec = now
+	_publish_piece_test_targets()
+
+
+func _publish_piece_test_targets() -> void:
+	var direction: String = _current_direction()
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var center: Vector2 = viewport_size * 0.5
+	var best_by_size: Dictionary = {}
+	var distance_by_size: Dictionary = {}
+	for index: int in range(piece_records.size()):
+		var record: Dictionary = piece_records[index] as Dictionary
+		if bool(record.get("played", false)) or str(record.get("dir", "")) != direction:
+			continue
+		var size_name: String = str(record.get("type", ""))
+		var mesh_instance: MeshInstance3D = record.get("mesh") as MeshInstance3D
+		if mesh_instance == null:
+			continue
+		# Aim at an exposed part of each nested ring rather than its shared center,
+		# so the browser test exercises the same real ray-pick path as a player.
+		var offset: Vector3
+		match size_name:
+			"large": offset = Vector3(17.0, 0.0, 9.5)
+			"medium": offset = Vector3(12.5, 0.0, 7.0)
+			_: offset = Vector3(8.0, 0.0, 4.5)
+		var point: Vector2 = camera.unproject_position(mesh_instance.to_global(offset))
+		var visible: bool = point.x >= 0.0 and point.x <= viewport_size.x and point.y >= 0.0 and point.y <= viewport_size.y
+		var distance: float = point.distance_squared_to(center) + (0.0 if visible else 100000000.0)
+		if not distance_by_size.has(size_name) or distance < float(distance_by_size[size_name]):
+			distance_by_size[size_name] = distance
+			best_by_size[size_name] = point
+	if best_by_size.is_empty():
+		return
+	var script: String = ""
+	for size_name: String in ["small", "medium", "large"]:
+		if not best_by_size.has(size_name):
+			continue
+		var point: Vector2 = best_by_size[size_name] as Vector2
+		var cap: String = size_name.capitalize()
+		script += "document.body.dataset.yakolakTest%sX='%s';" % [cap, str(point.x)]
+		script += "document.body.dataset.yakolakTest%sY='%s';" % [cap, str(point.y)]
+	JavaScriptBridge.eval(script, true)
 
 
 func _build_board_targets() -> void:
