@@ -1,7 +1,7 @@
 extends "res://scripts/gameplay_session_roundsafe.gd"
 
 # Safe shared-device turn camera.
-# Position and FOV are animated while the camera keeps looking at the board.
+# Position and effective FOV are animated while the camera keeps looking at the board.
 # The studio back wall is hidden only while a turn camera is behind it, because
 # otherwise that opaque wall sits between the camera and the entire game scene.
 
@@ -12,7 +12,11 @@ var turn_camera_start_position: Vector3 = Vector3.ZERO
 var turn_camera_target_position: Vector3 = Vector3.ZERO
 var turn_camera_focus: Vector3 = Vector3(0.0, 0.42, 0.0)
 var turn_camera_start_fov: float = 50.0
+# Base adaptive FOV for the viewport. GameplayCameraZoom uses this to preserve
+# the user's relative zoom when the camera moves to another side.
 var turn_camera_target_fov: float = 50.0
+# Actual FOV reached by the motion after applying the user's zoom ratio.
+var turn_camera_effective_fov: float = 50.0
 var turn_camera_direction: String = ""
 var turn_camera_active: bool = false
 var web_play_move_callback: Variant
@@ -47,6 +51,7 @@ func _transition_to_current_player() -> void:
 	turn_camera_target_position = axis * radius + Vector3(0.0, height, 0.0)
 	turn_camera_start_fov = camera.fov
 	turn_camera_target_fov = target_fov
+	turn_camera_effective_fov = _effective_turn_fov(target_fov)
 	turn_camera_focus = Vector3(0.0, 0.42, 0.0)
 	turn_camera_active = true
 	camera_transition = true
@@ -68,7 +73,17 @@ func _transition_to_current_player() -> void:
 	_apply_turn_camera_progress(0.0)
 	_publish_match_state("camera-transition")
 	_publish_turn_camera(direction, aspect, radius, height, target_fov)
+	_publish_effective_turn_fov(target_fov, turn_camera_effective_fov)
 	_publish_camera_health("start")
+
+
+func _effective_turn_fov(base_fov: float) -> float:
+	if intro == null:
+		return base_fov
+	var zoom_controller: Node = intro.get_node_or_null("GameplayCameraZoom")
+	if zoom_controller != null and zoom_controller.has_method("effective_fov_for_base"):
+		return float(zoom_controller.call("effective_fov_for_base", base_fov))
+	return base_fov
 
 
 func _apply_turn_camera_progress(progress: float) -> void:
@@ -76,7 +91,7 @@ func _apply_turn_camera_progress(progress: float) -> void:
 		return
 	var t: float = clampf(progress, 0.0, 1.0)
 	camera.position = turn_camera_start_position.lerp(turn_camera_target_position, t)
-	camera.fov = lerpf(turn_camera_start_fov, turn_camera_target_fov, t)
+	camera.fov = lerpf(turn_camera_start_fov, turn_camera_effective_fov, t)
 	camera.current = true
 	camera.look_at(turn_camera_focus, Vector3.UP)
 
@@ -84,7 +99,7 @@ func _apply_turn_camera_progress(progress: float) -> void:
 func _finish_camera_transition() -> void:
 	if turn_camera_active and camera != null:
 		camera.position = turn_camera_target_position
-		camera.fov = turn_camera_target_fov
+		camera.fov = turn_camera_effective_fov
 		camera.current = true
 		camera.look_at(turn_camera_focus, Vector3.UP)
 		_ensure_game_scene_visible()
@@ -120,6 +135,16 @@ func _set_studio_backdrop_visible(value: bool) -> void:
 		JavaScriptBridge.eval("document.body.dataset.yakolakStudioBackdrop='%s';" % ("visible" if value else "hidden-for-camera"), true)
 
 
+func _publish_effective_turn_fov(base_fov: float, effective_fov: float) -> void:
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.eval(
+		"document.body.dataset.yakolakTurnBaseFov='%.3f';" % base_fov +
+		"document.body.dataset.yakolakTurnEffectiveFov='%.3f';" % effective_fov,
+		true
+	)
+
+
 func _publish_camera_health(stage: String) -> void:
 	if not OS.has_feature("web") or camera == null or intro == null:
 		return
@@ -138,6 +163,9 @@ func _publish_camera_health(stage: String) -> void:
 	var wall_visible: bool = wall != null and wall.is_visible_in_tree()
 	var viewport_camera: Camera3D = get_viewport().get_camera_3d()
 	var viewport_owns_camera: bool = viewport_camera == camera
+	var finished_fov_script: String = ""
+	if stage == "finished":
+		finished_fov_script = "document.body.dataset.yakolakCameraTransitionFinishedFov='%.3f';" % camera.fov
 	JavaScriptBridge.eval(
 		"document.body.dataset.yakolakCameraStage='%s';" % stage +
 		"document.body.dataset.yakolakCameraCurrent='%s';" % ("true" if camera.current else "false") +
@@ -145,11 +173,13 @@ func _publish_camera_health(stage: String) -> void:
 		"document.body.dataset.yakolakCameraFacing='%.5f';" % facing +
 		"document.body.dataset.yakolakCameraFocusInside='%s';" % ("true" if focus_inside else "false") +
 		"document.body.dataset.yakolakCameraZ='%.3f';" % camera.position.z +
+		"document.body.dataset.yakolakCameraFov='%.3f';" % camera.fov +
 		"document.body.dataset.yakolakBoardVisible='%s';" % ("true" if board_visible else "false") +
-		"document.body.dataset.yakolakBackWallVisible='%s';" % ("true" if wall_visible else "false"),
+		"document.body.dataset.yakolakBackWallVisible='%s';" % ("true" if wall_visible else "false") +
+		finished_fov_script,
 		true
 	)
-	print("YAKOLAK_TURN_CAMERA_SAFE stage=%s dir=%s current=%s viewport_camera=%s board=%s wall=%s camera_z=%.3f wall_z=%.1f facing=%.5f focus_inside=%s" % [stage, turn_camera_direction, str(camera.current), str(viewport_owns_camera), str(board_visible), str(wall_visible), camera.position.z, STUDIO_BACK_WALL_Z, facing, str(focus_inside)])
+	print("YAKOLAK_TURN_CAMERA_SAFE stage=%s dir=%s current=%s viewport_camera=%s board=%s wall=%s camera_z=%.3f fov=%.3f wall_z=%.1f facing=%.5f focus_inside=%s" % [stage, turn_camera_direction, str(camera.current), str(viewport_owns_camera), str(board_visible), str(wall_visible), camera.position.z, camera.fov, STUDIO_BACK_WALL_Z, facing, str(focus_inside)])
 
 
 func _publish_test_targets() -> void:
