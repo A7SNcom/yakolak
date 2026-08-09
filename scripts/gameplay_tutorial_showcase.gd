@@ -4,12 +4,17 @@ extends "res://scripts/gameplay_session_efficient.gd"
 # The learner watches three complete scripted examples on the real board:
 # 1) same-size line, 2) graded small/medium/large line, 3) full stack/tower.
 # No tutorial move requires user input; the real match starts only afterwards.
+# Keep this journey compact: it is onboarding before the match, not a cutscene.
 
 const SHOWCASE_CAMERA_POSITION := Vector3(11.8, 17.2, 12.8)
 const SHOWCASE_CAMERA_TARGET := Vector3(0.0, 0.45, 0.0)
-const SHOWCASE_CAMERA_SECONDS: float = 0.62
-const SHOWCASE_MOVE_SECONDS: float = 0.52
-const SHOWCASE_RESET_SECONDS: float = 0.48
+const SHOWCASE_CAMERA_SECONDS: float = 0.42
+const SHOWCASE_MOVE_SECONDS: float = 0.38
+const SHOWCASE_RESET_SECONDS: float = 0.32
+const SHOWCASE_LEAD_SECONDS: float = 0.70
+const SHOWCASE_MOVE_GAP_SECONDS: float = 0.12
+const SHOWCASE_RESULT_SECONDS: float = 1.20
+const SHOWCASE_TO_MATCH_SECONDS: float = 0.40
 const SHOWCASE_ARC_HEIGHT: float = 22.0 * U
 
 var tutorial_showcase_running: bool = false
@@ -133,7 +138,7 @@ func _run_spectator_tutorial() -> void:
 	if score_label != null:
 		score_label.text = ""
 	_publish_tutorial_stage("complete")
-	await get_tree().create_timer(0.55).timeout
+	await get_tree().create_timer(SHOWCASE_TO_MATCH_SECONDS).timeout
 	if not match_initialized or online_active:
 		return
 	_start_turn()
@@ -151,7 +156,7 @@ func _showcase_demo(
 		return
 	_publish_tutorial_stage(stage)
 	_showcase_caption(lead_text, stage)
-	await get_tree().create_timer(0.80).timeout
+	await get_tree().create_timer(SHOWCASE_LEAD_SECONDS).timeout
 
 	for move_value: Variant in moves:
 		if not _showcase_valid(generation):
@@ -162,7 +167,7 @@ func _showcase_demo(
 			str(move.get("size", "")),
 			int(move.get("cell", -1))
 		)
-		await get_tree().create_timer(0.16).timeout
+		await get_tree().create_timer(SHOWCASE_MOVE_GAP_SECONDS).timeout
 
 	if not _showcase_valid(generation):
 		return
@@ -171,7 +176,7 @@ func _showcase_demo(
 	if winning.size() == 3:
 		_highlight_winning_pieces(winning)
 	_showcase_caption(win_text, stage)
-	await get_tree().create_timer(1.65).timeout
+	await get_tree().create_timer(SHOWCASE_RESULT_SECONDS).timeout
 
 
 func _showcase_place_piece(direction: String, size_name: String, cell: int) -> void:
