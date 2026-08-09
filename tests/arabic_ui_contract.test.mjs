@@ -3,13 +3,15 @@ import fs from 'node:fs';
 
 const gameplay = fs.readFileSync(new URL('../scripts/gameplay_session_resilient.gd', import.meta.url), 'utf8');
 const gameplayHardened = fs.readFileSync(new URL('../scripts/gameplay_session_hardened.gd', import.meta.url), 'utf8');
+const gameplayPolish = fs.readFileSync(new URL('../scripts/gameplay_session_polish.gd', import.meta.url), 'utf8');
 const setup = fs.readFileSync(new URL('../scripts/session_setup_arabic.gd', import.meta.url), 'utf8');
 const online = fs.readFileSync(new URL('../scripts/online_session.gd', import.meta.url), 'utf8');
 const onlineHardened = fs.readFileSync(new URL('../scripts/online_session_hardened.gd', import.meta.url), 'utf8');
 const scene = fs.readFileSync(new URL('../scenes/intro.tscn', import.meta.url), 'utf8');
 const server = fs.readFileSync(new URL('../api/rooms.js', import.meta.url), 'utf8');
 
-assert.ok(scene.includes('res://scripts/gameplay_session_hardened.gd'), 'the hardened gameplay layer must remain active');
+assert.ok(scene.includes('res://scripts/gameplay_session_polish.gd'), 'the gameplay polish layer must remain active');
+assert.ok(gameplayPolish.includes('extends "res://scripts/gameplay_session_hardened.gd"'), 'gameplay polish must preserve the hardened gameplay layer');
 assert.ok(gameplayHardened.includes('extends "res://scripts/gameplay_session_resilient.gd"'), 'hardened gameplay must preserve the Arabic/stability layer');
 assert.ok(scene.includes('res://scripts/online_session_hardened.gd'), 'the hardened online layer must remain active');
 assert.ok(onlineHardened.includes('extends "res://scripts/online_session.gd"'), 'hardened online must preserve the base Arabic invitation transport');
