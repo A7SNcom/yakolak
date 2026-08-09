@@ -11,6 +11,7 @@ const {
   publicRoom,
   reconcilePresenceState,
   rematchState,
+  seatOwnership,
 } = __testing;
 
 function twoPlayerRoom() {
@@ -37,6 +38,36 @@ function twoPlayerRoom() {
   assert.deepEqual(afterGuestLeave.players.map(player => player.seat), ['p1']);
   assert.equal(afterGuestLeave.cancelledBy, null);
   assert.equal(leaveState(waiting, 'p1').status, 'cancelled');
+}
+
+// Online seat ownership is one-to-one and independent from color/request ids:
+// one credential cannot own two active seats, one seat cannot have two owners,
+// and credentials for seats that already left are not part of active ownership.
+{
+  let state = createState('marble', 3, 3);
+  state = joinState(state, 'p2', 'blue');
+  const auth = [
+    { seat: 'p1', hash: 'host-hash', joinKey: 'create-key' },
+    { seat: 'p2', hash: 'guest-hash', joinKey: 'join-key-1' },
+  ];
+  const ownership = seatOwnership(state, [
+    ...auth,
+    { seat: 'p4', hash: 'stale-hash', joinKey: 'old-request' },
+  ]);
+  assert.equal(ownership.hashToSeat.get('guest-hash'), 'p2');
+  assert.equal(ownership.seatToHash.get('p2'), 'guest-hash');
+  assert.deepEqual(ownership.auth.map(entry => entry.seat), ['p1', 'p2']);
+
+  const threePlayers = joinState(state, 'p3', 'gold');
+  assert.throws(
+    () => seatOwnership(threePlayers, [...auth, { seat: 'p3', hash: 'guest-hash', joinKey: 'join-key-2' }]),
+    /identity_conflict/
+  );
+  assert.throws(
+    () => seatOwnership(state, [...auth, { seat: 'p2', hash: 'other-owner', joinKey: 'join-key-2' }]),
+    /identity_conflict/
+  );
+  assert.throws(() => joinState(state, 'p3', 'blue'), /color_taken/);
 }
 
 // A guest that disappears while a 3/4-player lobby is waiting must not reserve
