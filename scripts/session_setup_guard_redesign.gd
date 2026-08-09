@@ -1,9 +1,10 @@
 extends Node
 
 # Visibility gate only. Layout, typography and framing are owned by the compact
-# split-screen SessionSetup subclass; this guard must never recenter or restyle it.
+# split-screen SessionSetup subclass. The guard opens the UI only after the real
+# intro is finished, then hands the first rendered frame to the setup motion.
 
-const UI_VERSION := "split-gate-v1"
+const UI_VERSION := "split-gate-v2-motion"
 
 var intro: Node3D
 var preintro: Node
@@ -37,8 +38,12 @@ func _process(_delta: float) -> void:
 		root.visible = false
 		_set_gate("waiting-intro")
 		return
-	root.visible = true
+
 	var just_opened: bool = last_gate != "open"
+	root.visible = true
+	if just_opened and setup.has_method("animate_setup_entry"):
+		# Run before the frame is drawn so the panel never flashes at full opacity.
+		setup.call("animate_setup_entry")
 	_set_gate("open")
 	if just_opened:
 		setup.call_deferred("_apply_split_framing")
