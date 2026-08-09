@@ -48,6 +48,7 @@ func _build_shell() -> void:
 	dialog_close_button.pressed.connect(_dialog_cancel)
 	dialog_close_button.z_index = 20
 	root.add_child(dialog_close_button)
+	_install_web_keyboard_guard()
 	_dialog_update_chrome()
 
 
@@ -191,7 +192,25 @@ func _dialog_cancel() -> void:
 			return
 
 
+func _input(event: InputEvent) -> void:
+	if not showing or not (event is InputEventKey):
+		return
+	var key := event as InputEventKey
+	if not key.pressed or key.echo:
+		return
+	if key.keycode == KEY_TAB:
+		_dialog_move_focus(-1 if key.shift_pressed else 1)
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("ui_cancel"):
+		if active_screen != "room_entry":
+			_dialog_cancel()
+		get_viewport().set_input_as_handled()
+
+
 func _unhandled_key_input(event: InputEvent) -> void:
+	# Fallback for platforms that map a cancel action without delivering a raw
+	# key event through _input first (controller/back-button parity).
 	if not showing or not event.is_action_pressed("ui_cancel"):
 		return
 	if active_screen != "room_entry":
@@ -210,10 +229,7 @@ func _apply_dialog_focus() -> void:
 	dialog_focus_pending = false
 	if not showing or body == null:
 		return
-	var controls: Array[Control] = []
-	_collect_focusable_controls(body, controls)
-	if dialog_close_button != null and dialog_close_button.visible:
-		controls.append(dialog_close_button)
+	var controls: Array[Control] = _dialog_focus_controls()
 	if controls.is_empty():
 		_publish_dialog_contract(controls)
 		return
@@ -235,6 +251,29 @@ func _apply_dialog_focus() -> void:
 	_publish_dialog_contract(controls)
 
 
+func _dialog_focus_controls() -> Array[Control]:
+	var controls: Array[Control] = []
+	if body != null:
+		_collect_focusable_controls(body, controls)
+	if dialog_close_button != null and dialog_close_button.visible:
+		controls.append(dialog_close_button)
+	return controls
+
+
+func _dialog_move_focus(direction: int) -> void:
+	var controls: Array[Control] = _dialog_focus_controls()
+	if controls.is_empty():
+		return
+	var owner: Control = get_viewport().gui_get_focus_owner()
+	var index: int = controls.find(owner)
+	if index < 0:
+		index = 0 if direction >= 0 else controls.size() - 1
+	else:
+		index = posmod(index + direction, controls.size())
+	controls[index].grab_focus()
+	_publish_dialog_contract(controls)
+
+
 func _collect_focusable_controls(node: Node, output: Array[Control]) -> void:
 	for child: Node in node.get_children():
 		if child is Control:
@@ -251,6 +290,18 @@ func _collect_focusable_controls(node: Node, output: Array[Control]) -> void:
 						control.focus_mode = Control.FOCUS_ALL
 						output.append(control)
 		_collect_focusable_controls(child, output)
+
+
+func _install_web_keyboard_guard() -> void:
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.eval(
+		"if(!window.__yakolakDialogTabGuard){" +
+		"window.__yakolakDialogTabGuard=function(e){" +
+		"if(e.key==='Tab'&&document.body.dataset.yakolakSetup==='visible'){e.preventDefault();}" +
+		"};window.addEventListener('keydown',window.__yakolakDialogTabGuard,true);}",
+		true
+	)
 
 
 func _publish_dialog_contract(controls: Array[Control]) -> void:
