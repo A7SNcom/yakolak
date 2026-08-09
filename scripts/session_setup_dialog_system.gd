@@ -16,8 +16,7 @@ const DIALOG_ICON_FONT = preload("res://assets/fonts/DejaVuSans.ttf")
 var dialog_backdrop: ColorRect
 var dialog_close_button: Button
 var dialog_focus_pending: bool = false
-var web_window: JavaScriptObject
-var web_escape_callback: JavaScriptObject
+var web_escape_callback: Variant
 
 
 func _build_shell() -> void:
@@ -297,31 +296,29 @@ func _collect_focusable_controls(node: Node, output: Array[Control]) -> void:
 func _install_web_keyboard_guard() -> void:
 	if not OS.has_feature("web"):
 		return
-	# Register the Godot callback directly as a DOM listener. Passing the retained
-	# JavaScriptBridge callback into addEventListener is more reliable than
-	# assigning the callback to a dynamic window property and invoking it via eval.
-	web_window = JavaScriptBridge.get_interface("window")
-	web_escape_callback = JavaScriptBridge.create_callback(_on_web_keydown)
-	if web_window != null:
-		web_window.addEventListener("keydown", web_escape_callback, true)
+	# Reuse the same proven callback registration pattern already used by the
+	# setup-flow browser bridge in this project.
+	web_escape_callback = JavaScriptBridge.create_callback(_on_web_escape)
+	var window: JavaScriptObject = JavaScriptBridge.get_interface("window")
+	if window != null:
+		window.set("yakolakDialogCancel", web_escape_callback)
 	JavaScriptBridge.eval(
-		"if(!window.__yakolakDialogTabGuard){" +
-		"window.__yakolakDialogTabGuard=function(e){" +
-		"if(document.body.dataset.yakolakSetup==='visible'&&e.key==='Tab'){e.preventDefault();}" +
-		"};window.addEventListener('keydown',window.__yakolakDialogTabGuard,true);}",
+		"if(!window.__yakolakDialogKeyGuardV3){" +
+		"window.__yakolakDialogKeyGuardV3=function(e){" +
+		"if(document.body.dataset.yakolakSetup!=='visible'){return;}" +
+		"if(e.key==='Tab'){e.preventDefault();return;}" +
+		"if(e.key==='Escape'){" +
+		"document.body.dataset.yakolakDialogEscapeSeen='js';" +
+		"e.preventDefault();e.stopPropagation();" +
+		"if(window.yakolakDialogCancel){window.yakolakDialogCancel();}" +
+		"}};window.addEventListener('keydown',window.__yakolakDialogKeyGuardV3,true);}",
 		true
 	)
 
 
-func _on_web_keydown(args: Array) -> void:
-	if args.is_empty():
-		return
-	var js_event := args[0] as JavaScriptObject
-	if js_event == null or str(js_event.key) != "Escape":
-		return
-	JavaScriptBridge.eval("document.body.dataset.yakolakDialogEscapeSeen='escape';", true)
-	js_event.preventDefault()
-	js_event.stopPropagation()
+func _on_web_escape(_arguments: Array) -> void:
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("document.body.dataset.yakolakDialogEscapeSeen='godot';", true)
 	if showing and active_screen != "room_entry":
 		_dialog_cancel()
 
