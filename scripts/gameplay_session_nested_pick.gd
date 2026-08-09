@@ -10,6 +10,17 @@ extends "res://scripts/gameplay_session_polish.gd"
 # screen ray now has one meaning regardless of input device, camera angle or FOV.
 
 var _pick_face_cache: Dictionary = {}
+var _pick_target_revision: int = 0
+var _web_refresh_pick_targets_callback: Variant
+
+
+func _ready() -> void:
+	super._ready()
+	if OS.has_feature("web") and browser_automation:
+		_web_refresh_pick_targets_callback = JavaScriptBridge.create_callback(_on_web_refresh_pick_targets)
+		var window: JavaScriptObject = JavaScriptBridge.get_interface("window")
+		if window != null:
+			window.set("yakolakTestRefreshPickTargets", _web_refresh_pick_targets_callback)
 
 
 func _handle_pointer(screen_position: Vector2) -> void:
@@ -169,6 +180,24 @@ func _piece_mesh_radius(piece_index: int) -> float:
 	return maxf(aabb.size.x, aabb.size.y) * 0.5
 
 
+func _pointer_resolves_piece_with_margin(screen_position: Vector2, candidate_indices: Array[int], piece_index: int) -> bool:
+	# The browser converts CSS pixels back into Godot viewport coordinates. A
+	# target sitting exactly on a triangle/ring boundary can therefore move by a
+	# fraction of a pixel after scaling. Require a small real screen-space island
+	# around the target to resolve to the same stone before exposing it to tests.
+	var offsets: Array[Vector2] = [
+		Vector2.ZERO,
+		Vector2(3.0, 0.0), Vector2(-3.0, 0.0),
+		Vector2(0.0, 3.0), Vector2(0.0, -3.0),
+		Vector2(2.0, 2.0), Vector2(-2.0, 2.0),
+		Vector2(2.0, -2.0), Vector2(-2.0, -2.0),
+	]
+	for offset: Vector2 in offsets:
+		if _mesh_piece_at_pointer(screen_position + offset, candidate_indices) != piece_index:
+			return false
+	return true
+
+
 func _visible_piece_test_pointer(piece_index: int, candidate_indices: Array[int]) -> Vector2:
 	# Test automation must click a pixel where the requested stone is actually
 	# the frontmost rendered surface. A fixed local angle can be hidden by a
@@ -184,22 +213,21 @@ func _visible_piece_test_pointer(piece_index: int, candidate_indices: Array[int]
 	var aabb: AABB = mesh_instance.mesh.get_aabb()
 	var radius: float = maxf(aabb.size.x, aabb.size.y) * 0.5
 	var top_z: float = aabb.position.z + aabb.size.z
-	var radial_factors: Array[float] = [0.88, 0.76]
+	var radial_factors: Array[float] = [0.92, 0.84, 0.76, 0.68, 0.60]
 
-	# Probe around the complete visible ring. We keep only a point for which the
-	# production picker itself resolves this exact piece as the nearest real mesh.
+	# Probe the complete visible ring and only keep a point with a stable margin.
 	for radial_factor: float in radial_factors:
-		for angle_index: int in range(16):
-			var angle: float = TAU * float(angle_index) / 16.0
+		for angle_index: int in range(32):
+			var angle: float = TAU * float(angle_index) / 32.0
 			var local_target := Vector3(
 				cos(angle) * radius * radial_factor,
 				sin(angle) * radius * radial_factor,
 				top_z
 			)
 			var internal_point: Vector2 = camera.unproject_position(mesh_instance.to_global(local_target))
-			if internal_point.x < 1.0 or internal_point.y < 1.0 or internal_point.x > viewport_size.x - 1.0 or internal_point.y > viewport_size.y - 1.0:
+			if internal_point.x < 5.0 or internal_point.y < 5.0 or internal_point.x > viewport_size.x - 5.0 or internal_point.y > viewport_size.y - 5.0:
 				continue
-			if _mesh_piece_at_pointer(internal_point, candidate_indices) == piece_index:
+			if _pointer_resolves_piece_with_margin(internal_point, candidate_indices, piece_index):
 				return internal_point
 
 	return Vector2(-1.0, -1.0)
@@ -237,6 +265,8 @@ func _publish_piece_test_targets() -> void:
 			if internal_point.x < 0.0 or internal_point.y < 0.0:
 				script += "document.body.dataset.yakolakTestSide%s%sX='0';" % [side_cap, size_cap]
 				script += "document.body.dataset.yakolakTestSide%s%sY='0';" % [side_cap, size_cap]
+				script += "document.body.dataset.yakolakTestSide%s%sInternalX='0';" % [side_cap, size_cap]
+				script += "document.body.dataset.yakolakTestSide%s%sInternalY='0';" % [side_cap, size_cap]
 				if side == 0:
 					script += "document.body.dataset.yakolakTest%sX='0';" % size_cap
 					script += "document.body.dataset.yakolakTest%sY='0';" % size_cap
@@ -244,15 +274,25 @@ func _publish_piece_test_targets() -> void:
 			var css_point: Vector2 = canvas_rect.position + internal_point * css_scale
 			script += "document.body.dataset.yakolakTestSide%s%sX='%s';" % [side_cap, size_cap, str(css_point.x)]
 			script += "document.body.dataset.yakolakTestSide%s%sY='%s';" % [side_cap, size_cap, str(css_point.y)]
+			script += "document.body.dataset.yakolakTestSide%s%sInternalX='%s';" % [side_cap, size_cap, str(internal_point.x)]
+			script += "document.body.dataset.yakolakTestSide%s%sInternalY='%s';" % [side_cap, size_cap, str(internal_point.y)]
 			# Preserve the existing center-stack test contract used by other checks.
 			if side == 0:
 				script += "document.body.dataset.yakolakTest%sX='%s';" % [size_cap, str(css_point.x)]
 				script += "document.body.dataset.yakolakTest%sY='%s';" % [size_cap, str(css_point.y)]
 
+	_pick_target_revision += 1
 	script += "document.body.dataset.yakolakPiecePickModel='mesh-triangle-frontmost';"
 	script += "document.body.dataset.yakolakPiecePickInputParity='shared-screen-ray';"
 	script += "document.body.dataset.yakolakPiecePickDirection='" + direction + "';"
+	script += "document.body.dataset.yakolakPiecePickTargetRevision='" + str(_pick_target_revision) + "';"
 	JavaScriptBridge.eval(script, true)
+
+
+func _on_web_refresh_pick_targets(_arguments: Array) -> void:
+	if not browser_automation or not match_initialized or not gameplay_ready or camera == null:
+		return
+	_publish_piece_test_targets()
 
 
 func _gameplay_canvas_css_rect() -> Rect2:
