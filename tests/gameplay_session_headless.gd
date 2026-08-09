@@ -1,7 +1,8 @@
 extends SceneTree
 
-# Exercises the session controller on the actual scene: it starts a local
-# match, makes a physical move, then lets the bot complete a turn.
+# Exercises the session controller on the actual scene: it verifies the restored
+# spectator tutorial owns the board first, then resumes a normal local match and
+# lets the bot complete a turn.
 
 var failures: Array[String] = []
 
@@ -47,14 +48,30 @@ func _run() -> void:
 	await create_timer(0.80).timeout
 	_expect(bool(game.match_initialized), "a local match starts after configuration")
 	_expect(str(game._current_direction()) == "right", "the first turn uses the first player's physical side")
-	_expect(bool(game.gameplay_ready), "the first player becomes interactive after the camera settles")
+	_expect(bool(game.tutorial_showcase_running), "learning starts as a spectator showcase")
+	_expect(not bool(game.gameplay_ready), "the learner cannot move stones while watching the tutorial")
+	_expect(not bool(game.tutorial_complete), "the tutorial does not complete after a user first-move shortcut")
 	_expect(int(game.turn_deadline_msec) == 0, "local play uses the same untimed rules as online")
 	_expect(not bool(intro.get_node("Base_left").visible) and not bool(intro.get_node("Base_front").visible), "unused player sides are removed from the playable table")
+	_expect(game.has_method("_showcase_demo") and game.has_method("_showcase_place_piece"), "the tutorial uses scripted board demonstrations")
 	var strong_rank: int = int(game._bot_choice_rank("back"))
 	game.round_number = 2
 	var weak_rank: int = int(game._bot_choice_rank("back"))
 	game.round_number = 1
 	_expect(strong_rank < weak_rank, "the restored bot gets deliberately weaker on its weak round")
+
+	# End only the long cinematic in this headless contract test. The browser
+	# build exercises the real timing; here we need to continue into gameplay
+	# without spending ~20 seconds watching all three demonstrations.
+	game.tutorial_showcase_generation += 1
+	game.tutorial_showcase_running = false
+	game.tutorial_complete = true
+	game.tutorial_active = false
+	game._showcase_reset_board(false)
+	game.current_player_index = game.round_starter_index
+	game._start_turn()
+	await create_timer(0.80).timeout
+	_expect(bool(game.gameplay_ready), "the first player becomes interactive after the spectator tutorial")
 
 	var piece_index: int = -1
 	for index: int in range(game.piece_records.size()):
@@ -71,7 +88,6 @@ func _run() -> void:
 		_expect(not bool(game.tray_open), "the size tray closes when a move begins")
 		await create_timer(0.85).timeout
 		_expect(int(game.move_count) >= 1, "the selected stone reaches the board")
-		_expect(bool(game.tutorial_complete), "the tutorial completes after the first move")
 		await create_timer(1.75).timeout
 		_expect(int(game.move_count) >= 2, "the configured bot takes a legal follow-up turn")
 
