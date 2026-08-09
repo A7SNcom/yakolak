@@ -1,1 +1,1 @@
-Browser verification trigger for the latest ready web build: runtime package fix.
+Browser verification trigger for wins-required match logic fix.
