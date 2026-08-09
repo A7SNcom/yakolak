@@ -223,15 +223,18 @@ func _frame_table_for_setup(active: bool) -> void:
 			setup_camera_original_v_offset = cam.v_offset
 			setup_camera_offset_captured = true
 		var solved: float = _solve_setup_camera_offset(cam)
+		if OS.has_feature("web"):
+			# A finite value means the setup framing is actually settled. Do not
+			# publish the pre-tween camera position: browser tests and diagnostics
+			# would otherwise race the table motion and sample a transient frame.
+			JavaScriptBridge.eval("delete document.body.dataset.yakolakBoardSetupYRatio;", true)
 		if absf(cam.v_offset - solved) > 0.01:
 			setup_camera_tween = create_tween()
 			setup_camera_tween.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
 			setup_camera_tween.tween_property(cam, "v_offset", solved, TABLE_ENTER_SECONDS)
-		if OS.has_feature("web"):
-			var viewport: Vector2 = get_viewport().get_visible_rect().size
-			var board_center: Vector3 = intro.to_global(Vector3(0.0, 0.35, 0.0))
-			var actual_y: float = cam.unproject_position(board_center).y
-			JavaScriptBridge.eval("document.body.dataset.yakolakBoardSetupYRatio='%.4f';" % (actual_y / maxf(viewport.y, 1.0)), true)
+			setup_camera_tween.tween_callback(Callable(self, "_publish_board_setup_y_ratio"))
+		else:
+			_publish_board_setup_y_ratio()
 		return
 
 	if not setup_camera_offset_captured:
@@ -240,6 +243,18 @@ func _frame_table_for_setup(active: bool) -> void:
 	setup_camera_tween.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN_OUT)
 	setup_camera_tween.tween_property(cam, "v_offset", setup_camera_original_v_offset, TABLE_EXIT_SECONDS)
 	setup_camera_tween.tween_callback(Callable(self, "_release_setup_camera_capture"))
+
+
+func _publish_board_setup_y_ratio() -> void:
+	if not OS.has_feature("web") or intro == null or not showing:
+		return
+	var cam := intro.get("camera") as Camera3D
+	if cam == null:
+		return
+	var viewport: Vector2 = get_viewport().get_visible_rect().size
+	var board_center: Vector3 = intro.to_global(Vector3(0.0, 0.35, 0.0))
+	var actual_y: float = cam.unproject_position(board_center).y
+	JavaScriptBridge.eval("document.body.dataset.yakolakBoardSetupYRatio='%.4f';" % (actual_y / maxf(viewport.y, 1.0)), true)
 
 
 func _release_setup_camera_capture() -> void:
