@@ -199,6 +199,9 @@ func _on_web_setup_flow_action(arguments: Array) -> void:
 	match action:
 		"new":
 			_start_new_game_flow()
+		"join-setup":
+			if not joining_room_code.is_empty() and room_preview_ready:
+				_open_join_setup(joining_room_code)
 		"count":
 			if arguments.size() >= 2:
 				_choose_player_count(clampi(int(arguments[1]), 2, 4))
