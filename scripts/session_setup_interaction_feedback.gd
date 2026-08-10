@@ -4,7 +4,7 @@ extends "res://scripts/session_setup_design_system.gd"
 # immediate visual state changes, a short duplicate-click guard, and no decorative
 # animation that delays the user's next action.
 const FeedbackDesign = preload("res://scripts/ui_design.gd")
-const RAPID_REPEAT_GUARD_MS := 110
+const RAPID_REPEAT_GUARD_MS := 180
 
 var _feedback_guard_until_msec: int = 0
 var _feedback_ack_tween: Tween
