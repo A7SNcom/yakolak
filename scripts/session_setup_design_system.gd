@@ -20,11 +20,14 @@ func _font_for_ui(size: int) -> Font:
 
 
 func _label(text_value: String, size: int, alignment: HorizontalAlignment, color: Color = Color.WHITE) -> Label:
-	# Arabic copy reads as one clear block from the right edge. Centered headings
-	# were making every screen resemble an app questionnaire and collided with
-	# the left-side close control on compact screens.
+	# Arabic copy reads as one clear block from the physical right edge. Godot
+	# mirrors Label alignment when the Control itself inherits RTL layout, so the
+	# label box stays LTR while text shaping remains explicitly RTL.
 	var resolved_alignment: HorizontalAlignment = HORIZONTAL_ALIGNMENT_RIGHT if alignment == HORIZONTAL_ALIGNMENT_CENTER else alignment
 	var label: Label = super._label(text_value, size, resolved_alignment, color)
+	label.layout_direction = Control.LAYOUT_DIRECTION_LTR
+	label.text_direction = Control.TEXT_DIRECTION_RTL
+	label.horizontal_alignment = resolved_alignment
 	if size >= 22:
 		label.add_theme_font_override("font", Design.FONT_BOLD)
 		label.add_theme_font_size_override("font_size", _ui_font_size(maxi(size, Design.FONT_TITLE)))
