@@ -13,16 +13,35 @@ test.use({
   }
 });
 
+test.describe.configure({ mode: 'serial' });
+
 async function openDialog(page) {
+  const browserErrors = [];
+  page.on('pageerror', error => browserErrors.push(`pageerror: ${error.message}`));
+  page.on('console', message => {
+    if (message.type() === 'error') browserErrors.push(`console: ${message.text()}`);
+  });
+
   await page.goto('http://127.0.0.1:8000/?yakolakTestFast=1', { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(
-    () => document.body.dataset.yakolakIntro === 'complete' &&
-          document.body.dataset.yakolakSetup === 'visible' &&
-          document.body.dataset.yakolakDialogSystem === 'native-control-v1' &&
-          document.body.dataset.yakolakDialogStage === 'room_entry',
-    null,
-    { timeout: 60000 }
-  );
+  try {
+    await page.waitForFunction(
+      () => document.body.dataset.yakolakIntro === 'complete' &&
+            document.body.dataset.yakolakSetup === 'visible' &&
+            document.body.dataset.yakolakDialogSystem === 'native-control-v1' &&
+            document.body.dataset.yakolakDialogStage === 'room_entry',
+      null,
+      { timeout: 30000 }
+    );
+  } catch (error) {
+    const diagnostic = await page.evaluate(() => ({
+      dataset: { ...document.body.dataset },
+      title: document.title,
+      canvas: Boolean(document.querySelector('canvas')),
+      readyState: document.readyState,
+    })).catch(e => ({ evaluateError: String(e) }));
+    console.log(`YAKOLAK_DIALOG_BOOT_DIAGNOSTIC ${JSON.stringify({ diagnostic, browserErrors })}`);
+    throw error;
+  }
   await page.waitForTimeout(150);
 }
 
