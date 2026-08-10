@@ -5,9 +5,13 @@ const gameplay = fs.readFileSync(new URL('../scripts/gameplay_session_resilient.
 const gameplayHardened = fs.readFileSync(new URL('../scripts/gameplay_session_hardened.gd', import.meta.url), 'utf8');
 const gameplayPolish = fs.readFileSync(new URL('../scripts/gameplay_session_polish.gd', import.meta.url), 'utf8');
 const gameplayNestedPick = fs.readFileSync(new URL('../scripts/gameplay_session_nested_pick.gd', import.meta.url), 'utf8');
+const gameplayDesign = fs.readFileSync(new URL('../scripts/gameplay_design_system.gd', import.meta.url), 'utf8');
+const turnHudDesign = fs.readFileSync(new URL('../scripts/turn_clarity_hud_design_system.gd', import.meta.url), 'utf8');
 const setup = fs.readFileSync(new URL('../scripts/session_setup_arabic.gd', import.meta.url), 'utf8');
 const setupFlow = fs.readFileSync(new URL('../scripts/session_setup_flow.gd', import.meta.url), 'utf8');
 const setupDialog = fs.readFileSync(new URL('../scripts/session_setup_dialog_system.gd', import.meta.url), 'utf8');
+const setupDesign = fs.readFileSync(new URL('../scripts/session_setup_design_system.gd', import.meta.url), 'utf8');
+const design = fs.readFileSync(new URL('../scripts/ui_design.gd', import.meta.url), 'utf8');
 const iconography = fs.readFileSync(new URL('../scripts/iconography.gd', import.meta.url), 'utf8');
 const closeIcon = fs.readFileSync(new URL('../assets/icons/lucide/x.svg', import.meta.url), 'utf8');
 const menuIcon = fs.readFileSync(new URL('../assets/icons/lucide/ellipsis.svg', import.meta.url), 'utf8');
@@ -22,9 +26,26 @@ assert.ok(gameplayPolish.includes('extends "res://scripts/gameplay_session_harde
 assert.ok(gameplayHardened.includes('extends "res://scripts/gameplay_session_resilient.gd"'), 'hardened gameplay must preserve the Arabic/stability layer');
 assert.ok(scene.includes('res://scripts/online_session_hardened.gd'), 'the hardened online layer must remain active');
 assert.ok(onlineHardened.includes('extends "res://scripts/online_session.gd"'), 'hardened online must preserve the base Arabic invitation transport');
-assert.ok(scene.includes('res://scripts/session_setup_dialog_system.gd'), 'the unified dialog layer must remain active');
+assert.ok(scene.includes('res://scripts/session_setup_design_system.gd'), 'the setup design-system adapter must remain active');
+assert.ok(setupDesign.includes('extends "res://scripts/session_setup_dialog_system.gd"'), 'the design adapter must preserve the unified dialog layer');
 assert.ok(setupDialog.includes('extends "res://scripts/session_setup_flow.gd"'), 'the dialog layer must preserve the user-journey setup layer');
 assert.ok(setupFlow.includes('extends "res://scripts/session_setup_arabic.gd"'), 'the user-journey layer must preserve the Arabic setup layer');
+assert.ok(scene.includes('res://scripts/gameplay_design_system.gd'), 'gameplay chrome must use the shared design adapter');
+assert.ok(gameplayDesign.includes('extends "res://scripts/gameplay_rematch_lifecycle.gd"'), 'gameplay design must preserve the rematch/gameplay chain');
+assert.ok(scene.includes('res://scripts/turn_clarity_hud_design_system.gd'), 'turn HUD must use the shared design adapter');
+assert.ok(turnHudDesign.includes('extends "res://scripts/turn_clarity_hud.gd"'), 'turn HUD design must preserve state logic');
+
+assert.ok(design.includes('class_name YakolakDesign'), 'the 2D design system must expose one shared token source');
+assert.ok(design.includes('const TOUCH_MIN := 48.0'), 'interactive controls must share a 48px minimum target');
+assert.ok(design.includes('const RADIUS_CHIP := 10.0'), 'chip radius must be tokenized');
+assert.ok(design.includes('const RADIUS_CONTROL := 14.0'), 'control radius must be tokenized');
+assert.ok(design.includes('const RADIUS_SURFACE := 18.0'), 'surface radius must be tokenized');
+assert.ok(design.includes('static func surface_style'), 'surface styling must use a shared primitive');
+assert.ok(design.includes('static func button_style'), 'button states must use a shared primitive');
+assert.ok(design.includes('static func apply_button_contract'), 'button typography/touch/focus must use one contract');
+assert.ok(setupDesign.includes('Design.apply_button_contract'), 'setup buttons must consume the shared button primitive');
+assert.ok(gameplayDesign.includes('Design.apply_button_contract'), 'gameplay buttons must consume the shared button primitive');
+assert.ok(turnHudDesign.includes('Design.surface_style'), 'HUD surfaces must consume the shared surface primitive');
 
 assert.ok(gameplay.includes('func _arabize_digits'), 'gameplay must normalize visible numbers to Arabic digits');
 assert.ok(gameplay.includes('turn_label.text = _arabize_digits'), 'turn HUD must pass through Arabic digit normalization');
@@ -71,4 +92,5 @@ assert.ok(closeIcon.includes('Lucide Icons v1.27.0'), 'close icon provenance/ver
 assert.ok(menuIcon.includes('Lucide Icons v1.27.0'), 'menu icon provenance/version must be recorded');
 
 console.log('YAKOLAK_ARABIC_UI_CONTRACT_OK');
+console.log('YAKOLAK_DESIGN_SYSTEM_CONTRACT_OK');
 console.log('YAKOLAK_ICONOGRAPHY_CONTRACT_OK');
