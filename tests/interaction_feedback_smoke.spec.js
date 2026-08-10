@@ -28,7 +28,7 @@ async function bootSetup(page) {
     null,
     { timeout: 30000 }
   );
-  await page.waitForTimeout(160);
+  await page.waitForTimeout(260);
 }
 
 async function primaryPoint(page) {
@@ -51,24 +51,23 @@ test('setup gives immediate state feedback and rapid clicks cannot skip a decisi
   expect(contract.feedback).toBe('hover+pressed+selected+disabled+focus+loading');
   expect(contract.inputs).toBe('mouse+touch+keyboard');
   expect(contract.motion).toBe('instant-subtle');
-  expect(contract.guard).toBeGreaterThanOrEqual(80);
-  expect(contract.guard).toBeLessThanOrEqual(160);
+  expect(contract.guard).toBeGreaterThanOrEqual(150);
+  expect(contract.guard).toBeLessThanOrEqual(220);
 
   const primary = await primaryPoint(page);
   expect(primary.x).toBeGreaterThan(0);
   expect(primary.y).toBeGreaterThan(0);
 
-  // Two real mouse clicks at the same place must count as one decision even if
-  // the next wizard screen appears under the pointer between the two clicks.
-  await page.mouse.click(primary.x, primary.y);
-  await page.mouse.click(primary.x, primary.y);
-  await page.waitForFunction(
-    () => document.body.dataset.yakolakDialogStage === 'setup:count',
-    null,
-    { timeout: 5000 }
-  );
-  await page.waitForTimeout(180);
-  expect(await page.evaluate(() => document.body.dataset.yakolakDialogStage)).toBe('setup:count');
+  // A real double click at one physical location must count as one decision even
+  // if the next wizard screen appears under the pointer between click #1 and #2.
+  await page.mouse.dblclick(primary.x, primary.y, { delay: 20 });
+  await page.waitForTimeout(320);
+  const rapidState = await page.evaluate(() => ({
+    stage: document.body.dataset.yakolakDialogStage,
+    acknowledged: document.body.dataset.yakolakInteractionRapidRepeat || '',
+  }));
+  expect(rapidState.stage).toBe('setup:count');
+  expect(rapidState.acknowledged).toBe('acknowledged');
 });
 
 test('game stone hover reacts before selection and a rapid repeat stays stable', async ({ page }) => {
@@ -97,8 +96,7 @@ test('game stone hover reacts before selection and a rapid repeat stays stable',
     { timeout: 3000 }
   );
 
-  await page.mouse.click(target.x, target.y);
-  await page.mouse.click(target.x, target.y);
+  await page.mouse.dblclick(target.x, target.y, { delay: 20 });
   await page.waitForFunction(
     () => document.body.dataset.yakolakSelected === 'Stone_right_0_large' &&
           document.body.dataset.yakolakTray === 'open',
