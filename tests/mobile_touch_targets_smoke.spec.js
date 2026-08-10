@@ -13,6 +13,19 @@ test.use({
   launchOptions: { args: chromiumArgs }
 });
 
+async function bootstrapSnapshot(page, failures) {
+  const state = await page.evaluate(() => ({
+    intro: document.body.dataset.yakolakIntro || '',
+    setup: document.body.dataset.yakolakSetup || '',
+    gameplay: document.body.dataset.yakolakGameplay || '',
+    touchModel: document.body.dataset.yakolakTouchPickModel || '',
+    hasStart: typeof window.yakolakTestStartPassPlay === 'function',
+    canvas: Boolean(document.getElementById('canvas')),
+    bodyText: (document.body.innerText || '').slice(0, 300)
+  }));
+  return { state, failures: [...failures] };
+}
+
 test('mobile touch targets reduce finger misses without visual inflation', async ({ browser }) => {
   test.setTimeout(120000);
   const context = await browser.newContext({
@@ -39,13 +52,17 @@ test('mobile touch targets reduce finger misses without visual inflation', async
 
   try {
     await page.goto('http://127.0.0.1:8000/?yakolakTestFast=1', { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(
-      () => document.body.dataset.yakolakIntro === 'complete' &&
-            document.body.dataset.yakolakSetup === 'visible' &&
-            typeof window.yakolakTestStartPassPlay === 'function',
-      null,
-      { timeout: 60000 }
-    );
+    try {
+      await page.waitForFunction(
+        () => document.body.dataset.yakolakIntro === 'complete' &&
+              document.body.dataset.yakolakSetup === 'visible' &&
+              typeof window.yakolakTestStartPassPlay === 'function',
+        null,
+        { timeout: 25000 }
+      );
+    } catch {
+      throw new Error(`touch bootstrap failed: ${JSON.stringify(await bootstrapSnapshot(page, failures))}`);
+    }
 
     await page.evaluate(() => window.yakolakTestStartPassPlay());
     await page.waitForFunction(
