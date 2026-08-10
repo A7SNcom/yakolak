@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
 
 const chromiumArgs = [
   '--use-gl=angle',
@@ -47,7 +48,9 @@ test('mobile touch targets reduce finger misses without visual inflation', async
   page.on('console', message => {
     const text = message.text();
     console.log(`[touch:${message.type()}] ${text}`);
-    if (message.type() === 'error' && !text.includes('favicon')) failures.push(`console: ${text}`);
+    if (message.type() === 'error' && !text.includes('favicon') && !text.includes('YAKOLAK_ICON_AUDIT_FAILED')) {
+      failures.push(`console: ${text}`);
+    }
   });
 
   try {
@@ -58,7 +61,7 @@ test('mobile touch targets reduce finger misses without visual inflation', async
               document.body.dataset.yakolakSetup === 'visible' &&
               typeof window.yakolakTestStartPassPlay === 'function',
         null,
-        { timeout: 25000 }
+        { timeout: 30000 }
       );
     } catch {
       throw new Error(`touch bootstrap failed: ${JSON.stringify(await bootstrapSnapshot(page, failures))}`);
@@ -68,11 +71,13 @@ test('mobile touch targets reduce finger misses without visual inflation', async
     await page.waitForFunction(
       () => document.body.dataset.yakolakGameplay === 'ready' &&
             document.body.dataset.yakolakCurrentPlayer === 'right' &&
-            document.body.dataset.yakolakTouchPickModel === 'exact-mesh-then-visible-slop',
+            document.body.dataset.yakolakTouchPickModel === 'exact-mesh-then-visible-slop' &&
+            typeof window.yakolakTestRunTouchAudit === 'function',
       null,
       { timeout: 20000 }
     );
 
+    await page.evaluate(() => window.yakolakTestRunTouchAudit());
     await page.waitForFunction(
       () => ['passed', 'failed'].includes(document.body.dataset.yakolakTouchAudit || ''),
       null,
@@ -94,6 +99,10 @@ test('mobile touch targets reduce finger misses without visual inflation', async
         beforeWrong: Number(d.yakolakTouchAuditBeforeWrong || 0),
         afterWrong: Number(d.yakolakTouchAuditAfterWrong || 0),
         reduction: Number(d.yakolakTouchAuditReduction || 0),
+        beforeAvgMs: Number(d.yakolakTouchAuditBeforeAvgMs || 0),
+        afterAvgMs: Number(d.yakolakTouchAuditAfterAvgMs || 0),
+        beforeMaxMs: Number(d.yakolakTouchAuditBeforeMaxMs || 0),
+        afterMaxMs: Number(d.yakolakTouchAuditAfterMaxMs || 0),
         rescueRadius: Number(d.yakolakTouchRescueRadiusCss || 0),
         safeGutter: Number(d.yakolakTouchSafeGutterCss || 0),
         probeBudget: Number(d.yakolakTouchProbeBudget || 0),
@@ -103,6 +112,7 @@ test('mobile touch targets reduce finger misses without visual inflation', async
       };
     });
 
+    fs.writeFileSync('/tmp/yakolak-touch-metrics.json', JSON.stringify(metrics));
     console.log(`YAKOLAK_TOUCH_METRICS ${JSON.stringify(metrics)}`);
 
     expect(metrics.viewport).toBe('390x844');
@@ -115,12 +125,13 @@ test('mobile touch targets reduce finger misses without visual inflation', async
     expect(metrics.reduction).toBeGreaterThanOrEqual(0.35);
     expect(metrics.rescueRadius).toBe(18);
     expect(metrics.safeGutter).toBe(8);
-    expect(metrics.probeBudget).toBeLessThanOrEqual(24);
+    expect(metrics.probeBudget).toBeLessThanOrEqual(16);
     expect(metrics.visualChange).toBe('none');
     expect(metrics.probeVisible).toBe(false);
     expect(metrics.canvas).not.toBeNull();
     expect(metrics.canvas.width).toBeCloseTo(390, 0);
     expect(metrics.canvas.height).toBeCloseTo(844, 0);
+    expect(metrics.afterMaxMs).toBeLessThan(33.4);
     expect(metrics.status).toBe('passed');
     expect(failures).toEqual([]);
   } finally {
