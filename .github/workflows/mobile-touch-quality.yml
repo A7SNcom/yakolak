@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - scripts/gameplay_touch_targets.gd
+      - scripts/gameplay_session_nested_pick.gd
       - scenes/intro.tscn
       - tests/mobile_touch_targets_smoke.spec.js
       - .github/workflows/mobile-touch-quality.yml
@@ -61,3 +61,10 @@ jobs:
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
           for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
           npx playwright test tests/mobile_touch_targets_smoke.spec.js --workers=1 --reporter=github
+      - name: Report touch metrics
+        if: always()
+        run: |
+          if [ -s /tmp/yakolak-touch-metrics.json ]; then
+            METRICS=$(cat /tmp/yakolak-touch-metrics.json)
+            echo "::notice title=YAKOLAK Mobile Touch Metrics::$METRICS"
+          fi
