@@ -19,9 +19,8 @@ func _ready() -> void:
 func _clear_body() -> void:
 	super._clear_body()
 	# A rebuilt screen can occupy the exact pixels of the control that opened it.
-	# Put a short GUI-level pointer shield above the new screen: this is more
-	# reliable than only debouncing _input because Button.pressed is emitted by
-	# Godot's GUI path. The blocked repeat still gets a tiny visible acknowledgement.
+	# Arm a very short carry-over guard. Each new Button also guards its own
+	# button_down signal, which is the reliable level for Godot GUI activation.
 	_feedback_guard_serial += 1
 	_feedback_guard_until_msec = Time.get_ticks_msec() + RAPID_REPEAT_GUARD_MS
 	_install_pointer_shield(_feedback_guard_serial)
@@ -99,6 +98,10 @@ func _apply_button_feedback(button: Button) -> void:
 	else:
 		button.focus_mode = Control.FOCUS_ALL
 
+	if not button.has_meta("yakolak_feedback_guard_connected"):
+		button.set_meta("yakolak_feedback_guard_connected", true)
+		button.button_down.connect(_on_feedback_button_down.bind(button))
+
 	var pressed_style: StyleBox = button.get_theme_stylebox("pressed")
 	if pressed_style != null:
 		button.add_theme_stylebox_override("hover_pressed", pressed_style.duplicate() as StyleBox)
@@ -115,6 +118,31 @@ func _apply_button_feedback(button: Button) -> void:
 			button.add_theme_stylebox_override("disabled", disabled_style)
 
 
+func _on_feedback_button_down(button: Button) -> void:
+	if button == null or button.disabled:
+		return
+	var now: int = Time.get_ticks_msec()
+	if now >= _feedback_guard_until_msec:
+		return
+	# Disabling during button_down cancels this activation before Button.pressed
+	# can fire, so a second physical click cannot answer the freshly shown screen.
+	button.disabled = true
+	button.mouse_default_cursor_shape = Control.CURSOR_ARROW
+	button.focus_mode = Control.FOCUS_NONE
+	_acknowledge_guarded_repeat()
+	_release_guarded_button(button, _feedback_guard_serial)
+
+
+func _release_guarded_button(button: Button, serial: int) -> void:
+	var remaining_ms: int = maxi(1, _feedback_guard_until_msec - Time.get_ticks_msec())
+	await get_tree().create_timer(float(remaining_ms) / 1000.0).timeout
+	if serial != _feedback_guard_serial or not is_instance_valid(button):
+		return
+	button.disabled = false
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	button.focus_mode = Control.FOCUS_ALL
+
+
 func _apply_line_edit_feedback(field: LineEdit) -> void:
 	if field == null:
 		return
@@ -128,7 +156,7 @@ func _apply_line_edit_feedback(field: LineEdit) -> void:
 
 
 func _install_pointer_shield(serial: int) -> void:
-	if body == null:
+	if root == null:
 		return
 	var shield := Control.new()
 	shield.name = "InteractionRepeatShield"
@@ -137,7 +165,7 @@ func _install_pointer_shield(serial: int) -> void:
 	shield.focus_mode = Control.FOCUS_NONE
 	shield.z_index = 4096
 	shield.gui_input.connect(_on_pointer_shield_input)
-	body.add_child(shield)
+	root.add_child(shield)
 	_release_pointer_shield(shield, serial)
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("document.body.dataset.yakolakInteractionRapidGuard='active';", true)
