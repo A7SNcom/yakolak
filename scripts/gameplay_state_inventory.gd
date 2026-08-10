@@ -66,8 +66,12 @@ func _on_online_room_changed(remote: Dictionary, identity: Dictionary) -> void:
 func _on_online_error(code: String) -> void:
 	var was_restoring: bool = restoring_online
 	var was_joining: bool = not str(pending_online_configuration.get("online_join_code", "")).is_empty()
-	super._on_online_error(code)
+	# Gameplay owns the in-flight state only. Release it BEFORE the base handler
+	# hands a join failure back to SessionSetup, otherwise this layer erases the
+	# setup screen's precise room-full/not-found/etc. state immediately after it
+	# is published.
 	_clear_online_ui_state()
+	super._on_online_error(code)
 	# Join failures are already rendered by SessionSetup.show_online_error().
 	# Host/bootstrap and restore failures previously collapsed into a generic line.
 	if not was_joining and setup != null:
