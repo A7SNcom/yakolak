@@ -44,6 +44,8 @@ async function startPassPlay(page) {
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'complete' &&
           document.body.dataset.yakolakSetup === 'visible' &&
+          document.body.dataset.yakolakIconAudit === 'passed' &&
+          document.body.dataset.yakolakIconSystem === 'lucide-svg-1.27.0' &&
           document.body.dataset.yakolakTurnHudMatrix === 'pass' &&
           Number(document.body.dataset.yakolakTurnHudMatrixCount || 0) >= 13 &&
           typeof window.yakolakTestStartPassPlay === 'function' &&
@@ -69,6 +71,19 @@ async function startPassPlay(page) {
 test('turn HUD stays guess-free from choice through selection, placement, next player and match end', async ({ page }) => {
   test.setTimeout(150000);
   await startPassPlay(page);
+
+  const iconAudit = await page.evaluate(() => ({
+    audit: document.body.dataset.yakolakIconAudit,
+    system: document.body.dataset.yakolakIconSystem,
+    close: document.body.dataset.yakolakIconClose,
+    menu: document.body.dataset.yakolakIconMenu,
+    rtl: document.body.dataset.yakolakIconRtl
+  }));
+  expect(iconAudit.audit).toBe('passed');
+  expect(iconAudit.system).toBe('lucide-svg-1.27.0');
+  expect(iconAudit.close).toBe('x|icon-only|24-grid|stroke-2');
+  expect(iconAudit.menu).toBe('ellipsis|icon-only|24-grid|stroke-2');
+  expect(iconAudit.rtl).toBe('no-directional-controls');
 
   let state = await hud(page);
   expect(state.matrix).toBe('pass');
@@ -134,7 +149,8 @@ test('turn HUD stays guess-free from choice through selection, placement, next p
     () => Number(document.body.dataset.yakolakTurnHudAreaRatio || 1) > 0 &&
           Number(document.body.dataset.yakolakTurnHudAreaRatio || 1) < 0.09 &&
           Number(document.body.dataset.yakolakTurnHudWidthPx || 999) <= 322 &&
-          Number(document.body.dataset.yakolakTurnHudHeightPx || 999) <= 90,
+          Number(document.body.dataset.yakolakTurnHudHeightPx || 999) <= 90 &&
+          document.body.dataset.yakolakIconAudit === 'passed',
     null,
     { timeout: 5000 }
   );
