@@ -7,6 +7,7 @@ const FeedbackDesign = preload("res://scripts/ui_design.gd")
 const RAPID_REPEAT_GUARD_MS := 180
 
 var _feedback_guard_until_msec: int = 0
+var _feedback_guard_serial: int = 0
 var _feedback_ack_tween: Tween
 
 
@@ -17,13 +18,17 @@ func _ready() -> void:
 
 func _clear_body() -> void:
 	super._clear_body()
-	# A rebuilt screen can occupy the same pixels as the button that opened it.
-	# Ignore only the immediate duplicate/synthetic follow-up so a double-click
-	# cannot accidentally answer two consecutive wizard questions.
+	# A rebuilt screen can occupy the exact pixels of the control that opened it.
+	# Put a short GUI-level pointer shield above the new screen: this is more
+	# reliable than only debouncing _input because Button.pressed is emitted by
+	# Godot's GUI path. The blocked repeat still gets a tiny visible acknowledgement.
+	_feedback_guard_serial += 1
 	_feedback_guard_until_msec = Time.get_ticks_msec() + RAPID_REPEAT_GUARD_MS
+	_install_pointer_shield(_feedback_guard_serial)
 
 
 func _input(event: InputEvent) -> void:
+	# Fallback for pointer events that do not travel through the Control GUI path.
 	if showing and _is_feedback_pointer_press(event) and Time.get_ticks_msec() < _feedback_guard_until_msec:
 		_acknowledge_guarded_repeat()
 		get_viewport().set_input_as_handled()
@@ -120,6 +125,36 @@ func _apply_line_edit_feedback(field: LineEdit) -> void:
 	var focus := FeedbackDesign.button_style(unit, Color(1.0, 1.0, 1.0, 0.09), "focus", true)
 	field.add_theme_stylebox_override("normal", normal)
 	field.add_theme_stylebox_override("focus", focus)
+
+
+func _install_pointer_shield(serial: int) -> void:
+	if body == null:
+		return
+	var shield := Control.new()
+	shield.name = "InteractionRepeatShield"
+	shield.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shield.mouse_filter = Control.MOUSE_FILTER_STOP
+	shield.focus_mode = Control.FOCUS_NONE
+	shield.z_index = 4096
+	shield.gui_input.connect(_on_pointer_shield_input)
+	body.add_child(shield)
+	_release_pointer_shield(shield, serial)
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("document.body.dataset.yakolakInteractionRapidGuard='active';", true)
+
+
+func _release_pointer_shield(shield: Control, serial: int) -> void:
+	await get_tree().create_timer(float(RAPID_REPEAT_GUARD_MS) / 1000.0).timeout
+	if is_instance_valid(shield):
+		shield.queue_free()
+	if serial == _feedback_guard_serial and OS.has_feature("web"):
+		JavaScriptBridge.eval("document.body.dataset.yakolakInteractionRapidGuard='ready';", true)
+
+
+func _on_pointer_shield_input(event: InputEvent) -> void:
+	if _is_feedback_pointer_press(event):
+		_acknowledge_guarded_repeat()
+	get_viewport().set_input_as_handled()
 
 
 func _is_feedback_pointer_press(event: InputEvent) -> bool:
