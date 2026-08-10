@@ -32,17 +32,38 @@ func _connect_online_state_signal() -> void:
 		online.connect("connection_state_changed", callback)
 
 
+func _transport_restore_pending() -> bool:
+	# Read-only observation of OnlineSession. A restored identity begins with a
+	# room shell at version 0 and remains authoritative even if the intro resets
+	# gameplay presentation once during its final transition.
+	if online == null or not bool(online.get("active")):
+		return false
+	var room_value: Variant = online.get("room")
+	var identity_value: Variant = online.get("identity")
+	if not (room_value is Dictionary) or not (identity_value is Dictionary):
+		return false
+	var transport_room: Dictionary = room_value as Dictionary
+	var transport_identity: Dictionary = identity_value as Dictionary
+	return not transport_identity.is_empty() and not transport_room.is_empty() and int(transport_room.get("version", -1)) == 0
+
+
+func _show_restore_state_if_pending() -> bool:
+	if not (restoring_online or _transport_restore_pending()):
+		return false
+	if setup != null and setup.has_method("hide_for_online_restore"):
+		setup.call("hide_for_online_restore")
+	_set_online_ui_state("restoring-room")
+	return true
+
+
 func _enable_gameplay() -> void:
 	_trace_online_ui("enable:before")
 	super._enable_gameplay()
-	_trace_online_ui("enable:after:restore=" + str(restoring_online))
+	_trace_online_ui("enable:after:restore=" + str(restoring_online) + ":transport=" + str(_transport_restore_pending()))
 	# restore_from_location() can emit reconnecting synchronously inside the
-	# base enable call. Once the saved identity is accepted, gameplay owns the
-	# screen until restoration resolves; the invitation setup must not compete.
-	if restoring_online:
-		if setup != null and setup.has_method("hide_for_online_restore"):
-			setup.call("hide_for_online_restore")
-		_set_online_ui_state("restoring-room")
+	# base enable call. The transport's version-0 room shell is the stable UI
+	# signal that restoration is still pending across intro presentation resets.
+	_show_restore_state_if_pending()
 
 
 func _start_online_host(configuration: Dictionary) -> void:
@@ -78,7 +99,7 @@ func _on_online_room_changed(remote: Dictionary, identity: Dictionary) -> void:
 
 
 func _on_online_error(code: String) -> void:
-	var was_restoring: bool = restoring_online
+	var was_restoring: bool = restoring_online or _transport_restore_pending()
 	var was_joining: bool = not str(pending_online_configuration.get("online_join_code", "")).is_empty()
 	# Gameplay owns the in-flight state only. Release it BEFORE the base handler
 	# hands a join failure back to SessionSetup, otherwise this layer erases the
@@ -97,7 +118,7 @@ func _on_connection_state_changed(state: String, detail: String) -> void:
 		# While a saved room is being restored, transient retry details describe
 		# transport mechanics, not a new user-visible situation. Keep the more
 		# truthful restore state until the authoritative room arrives or fails.
-		if restoring_online or detail == "restoring":
+		if restoring_online or _transport_restore_pending() or detail == "restoring":
 			_set_online_ui_state("restoring-room")
 		else:
 			_set_online_ui_state("reconnecting")
@@ -113,8 +134,14 @@ func _return_to_setup() -> void:
 
 
 func _reset_for_intro() -> void:
+	var restore_still_pending: bool = restoring_online or _transport_restore_pending()
 	_clear_online_ui_state("reset-for-intro")
 	super._reset_for_intro()
+	# Intro owns its visual reset, but it must not turn an already-running saved
+	# room request into a silent screen. Re-assert only the presentation state;
+	# OnlineSession itself is untouched and continues the same request.
+	if restore_still_pending or _transport_restore_pending():
+		_show_restore_state_if_pending()
 
 
 func _sync_waiting_overlay() -> void:
