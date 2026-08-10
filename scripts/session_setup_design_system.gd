@@ -121,11 +121,31 @@ func _apply_picker_font(picker: OptionButton) -> void:
 	menu.add_theme_font_override("font", Design.FONT_MEDIUM)
 
 
+func _schedule_dialog_focus() -> void:
+	# The base dialog publishes its web/touch contract when focus is applied.
+	# With the larger game typography, child rects can still be resolving in the
+	# frame where the card is content-fitted. Wait for two real layout frames so
+	# the first published stage and hit coordinates describe the same geometry.
+	if dialog_focus_pending:
+		return
+	dialog_focus_pending = true
+	call_deferred("_apply_dialog_focus_after_design_layout")
+
+
+func _apply_dialog_focus_after_design_layout() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if not showing:
+		dialog_focus_pending = false
+		return
+	dialog_focus_pending = false
+	_apply_dialog_focus()
+
+
 func _fit_card_to_content() -> void:
 	super._fit_card_to_content()
-	# Typography/spacing can move the content-fit card after the first focus
-	# contract is published. Refresh web hit coordinates only after Godot has
-	# completed the resulting layout frames; this does not alter input behavior.
+	# Also refresh geometry after content-fit for later resizes/reflows where
+	# focus itself does not change. This is contract telemetry only.
 	call_deferred("_publish_dialog_geometry_after_layout")
 
 
