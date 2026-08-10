@@ -111,37 +111,29 @@ func _touch_piece_at_pointer(screen_position: Vector2, candidate_indices: Array[
 	if not _touch_rescue_allowed(screen_position):
 		return -1
 
+	# A rescue is allowed only when every visible mesh found in the complete
+	# finger neighborhood agrees on one stone. If two nested/neighboring stones
+	# appear anywhere around the missed center, the tap is genuinely ambiguous
+	# and is rejected instead of guessing. This is deliberately conservative.
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var unique_candidate: int = -1
+	var agreeing_hits: int = 0
 	for radius_css: float in TOUCH_RESCUE_RADII_CSS:
-		var counts: Dictionary = {}
 		for angle_index: int in range(TOUCH_RESCUE_ANGLES):
 			var angle: float = TAU * float(angle_index) / float(TOUCH_RESCUE_ANGLES)
 			var probe: Vector2 = screen_position + _touch_css_offset_to_internal(radius_css, angle)
 			if probe.x < 0.0 or probe.y < 0.0 or probe.x >= viewport_size.x or probe.y >= viewport_size.y:
 				continue
 			var hit: int = _mesh_piece_at_pointer(probe, candidate_indices)
-			if hit >= 0:
-				counts[hit] = int(counts.get(hit, 0)) + 1
+			if hit < 0:
+				continue
+			if unique_candidate < 0:
+				unique_candidate = hit
+			elif hit != unique_candidate:
+				return -1
+			agreeing_hits += 1
 
-		if counts.is_empty():
-			continue
-		var winner: int = -1
-		var winner_count: int = 0
-		var tied: bool = false
-		for value: Variant in counts.keys():
-			var candidate: int = int(value)
-			var count: int = int(counts[value])
-			if count > winner_count:
-				winner = candidate
-				winner_count = count
-				tied = false
-			elif count == winner_count:
-				tied = true
-		if tied:
-			return -1
-		if winner >= 0:
-			return winner
-	return -1
+	return unique_candidate if unique_candidate >= 0 and agreeing_hits >= 2 else -1
 
 
 func _current_piece_candidates() -> Array[int]:
