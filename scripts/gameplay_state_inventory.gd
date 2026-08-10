@@ -1,4 +1,4 @@
-extends "res://scripts/gameplay_touch_stack_policy.gd"
+extends "res://scripts/gameplay_interaction_feedback.gd"
 
 # UI-only online gameplay state layer. It does not change transport retries,
 # requests, reconciliation, or rules; it only makes every wait/failure/restore
