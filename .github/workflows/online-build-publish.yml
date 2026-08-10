@@ -74,7 +74,7 @@ jobs:
         run: |
           npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0 pngjs@7.0.0
           npx playwright install --with-deps chromium
-      - name: Verify dialog mouse touch keyboard interaction feedback and online states before publishing
+      - name: Verify existing dialog and interaction behavior
         run: |
           node tests/web_test_server.mjs >/tmp/yakolak-dialog-browser.log 2>&1 &
           SERVER_PID=$!
@@ -83,7 +83,35 @@ jobs:
             if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi
             sleep 0.25
           done
-          npx playwright test tests/dialog_system_smoke.spec.js tests/interaction_feedback_smoke.spec.js tests/online_state_inventory_smoke.spec.js --workers=1 --reporter=line
+          npx playwright test tests/dialog_system_smoke.spec.js tests/interaction_feedback_smoke.spec.js --workers=1 --reporter=line
+      - name: Force room preview UI states
+        run: |
+          node tests/web_test_server.mjs >/tmp/yakolak-state-preview.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
+          npx playwright test tests/online_state_inventory_smoke.spec.js --grep "room preview never" --workers=1 --reporter=line
+      - name: Force room-full join race UI state
+        run: |
+          node tests/web_test_server.mjs >/tmp/yakolak-state-join.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
+          npx playwright test tests/online_state_inventory_smoke.spec.js --grep "join request shows" --workers=1 --reporter=line
+      - name: Force create wait reconnect recovery cancellation states
+        run: |
+          node tests/web_test_server.mjs >/tmp/yakolak-state-host.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
+          npx playwright test tests/online_state_inventory_smoke.spec.js --grep "host path explains" --workers=1 --reporter=line
+      - name: Force restore and move acknowledgement states
+        run: |
+          node tests/web_test_server.mjs >/tmp/yakolak-state-restore.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
+          npx playwright test tests/online_state_inventory_smoke.spec.js --grep "restore and move" --workers=1 --reporter=line
       - name: Verify intro responsive setup transitions HUD and real gameplay start before publishing
         run: |
           node tests/web_test_server.mjs >/tmp/yakolak-browser.log 2>&1 &
