@@ -13,6 +13,7 @@ var online_ui_clear_due_msec: int = 0
 
 func _ready() -> void:
 	super._ready()
+	_trace_online_ui("ready")
 	call_deferred("_connect_online_state_signal")
 
 
@@ -32,7 +33,9 @@ func _connect_online_state_signal() -> void:
 
 
 func _enable_gameplay() -> void:
+	_trace_online_ui("enable:before")
 	super._enable_gameplay()
+	_trace_online_ui("enable:after:restore=" + str(restoring_online))
 	# restore_from_location() can emit reconnecting synchronously inside the
 	# base enable call. Once the saved identity is accepted, gameplay owns the
 	# screen until restoration resolves; the invitation setup must not compete.
@@ -69,9 +72,9 @@ func _on_online_room_changed(remote: Dictionary, identity: Dictionary) -> void:
 		_set_online_ui_state("room-cancelled")
 	elif status == "playing":
 		if online_ui_state_id != "connected":
-			_clear_online_ui_state()
+			_clear_online_ui_state("room:playing")
 	elif status == "finished":
-		_clear_online_ui_state()
+		_clear_online_ui_state("room:finished")
 
 
 func _on_online_error(code: String) -> void:
@@ -81,7 +84,7 @@ func _on_online_error(code: String) -> void:
 	# hands a join failure back to SessionSetup, otherwise this layer erases the
 	# setup screen's precise room-full/not-found/etc. state immediately after it
 	# is published.
-	_clear_online_ui_state()
+	_clear_online_ui_state("online-error:" + code)
 	super._on_online_error(code)
 	# Join failures are already rendered by SessionSetup.show_online_error().
 	# Host/bootstrap and restore failures previously collapsed into a generic line.
@@ -105,18 +108,18 @@ func _on_connection_state_changed(state: String, detail: String) -> void:
 
 
 func _return_to_setup() -> void:
-	_clear_online_ui_state()
+	_clear_online_ui_state("return-to-setup")
 	super._return_to_setup()
 
 
 func _reset_for_intro() -> void:
-	_clear_online_ui_state()
+	_clear_online_ui_state("reset-for-intro")
 	super._reset_for_intro()
 
 
 func _sync_waiting_overlay() -> void:
 	if online_ui_state_id == "connected" and online_ui_clear_due_msec > 0 and Time.get_ticks_msec() >= online_ui_clear_due_msec:
-		_clear_online_ui_state()
+		_clear_online_ui_state("connected-timeout")
 
 	super._sync_waiting_overlay()
 	if waiting_root == null:
@@ -163,18 +166,30 @@ func _set_online_ui_state(state_id: String, detail: String = "") -> void:
 	online_ui_state_id = state_id
 	online_ui_detail = detail
 	online_ui_clear_due_msec = 0
+	_trace_online_ui("set:" + state_id)
 	_publish_online_ui_state(state_id, detail)
 	if waiting_root != null:
 		_sync_waiting_overlay()
 
 
-func _clear_online_ui_state() -> void:
+func _clear_online_ui_state(reason: String = "unknown") -> void:
 	var had_state: bool = not online_ui_state_id.is_empty() or not online_ui_detail.is_empty()
+	if had_state:
+		_trace_online_ui("clear:" + reason + ":from=" + online_ui_state_id)
 	online_ui_state_id = ""
 	online_ui_detail = ""
 	online_ui_clear_due_msec = 0
 	if had_state:
 		_publish_online_ui_state("", "")
+
+
+func _trace_online_ui(event: String) -> void:
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.eval(
+		"(()=>{const e=" + JSON.stringify(event) + ";const d=document.body.dataset;d.yakolakOnlineUiTrace=(d.yakolakOnlineUiTrace?d.yakolakOnlineUiTrace+'|':'')+e;})();",
+		true
+	)
 
 
 func _publish_online_ui_state(state_id: String, detail: String) -> void:
