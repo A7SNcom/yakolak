@@ -115,8 +115,9 @@ func _sync_waiting_overlay() -> void:
 		if target > 0:
 			detail = _arabize_digits("انضم %d من %d" % [joined, target])
 
+	# Setup owns room-entry/invitation states. When gameplay has no online state,
+	# it must stay silent instead of deleting the setup layer's browser contract.
 	if state_id.is_empty():
-		_publish_online_ui_state("", "")
 		return
 
 	var state: Dictionary = OnlineStateCatalog.get_state(state_id)
@@ -150,10 +151,12 @@ func _set_online_ui_state(state_id: String, detail: String = "") -> void:
 
 
 func _clear_online_ui_state() -> void:
+	var had_state: bool = not online_ui_state_id.is_empty() or not online_ui_detail.is_empty()
 	online_ui_state_id = ""
 	online_ui_detail = ""
 	online_ui_clear_due_msec = 0
-	_publish_online_ui_state("", "")
+	if had_state:
+		_publish_online_ui_state("", "")
 
 
 func _publish_online_ui_state(state_id: String, detail: String) -> void:
