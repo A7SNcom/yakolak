@@ -6,7 +6,9 @@ on:
       - main
     paths:
       - scripts/gameplay_session_nested_pick.gd
+      - scripts/gameplay_touch_stack_policy.gd
       - scripts/gameplay_touch_semantic_audit.gd
+      - scripts/gameplay_state_inventory.gd
       - scenes/intro.tscn
       - tests/mobile_touch_targets_smoke.spec.js
       - .github/workflows/mobile-touch-quality.yml
