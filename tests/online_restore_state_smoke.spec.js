@@ -26,6 +26,7 @@ async function snapshot(page) {
     action: document.body.dataset.yakolakOnlineUiAction || '',
     message: document.body.dataset.yakolakOnlineUiMessage || '',
     surface: document.body.dataset.yakolakOnlineUiSurface || '',
+    trace: document.body.dataset.yakolakOnlineUiTrace || '',
     gameplay: document.body.dataset.yakolakGameplay || '',
     currentPlayer: document.body.dataset.yakolakCurrentPlayer || '',
     saved: sessionStorage.getItem('yakolak-online:61') || '',
