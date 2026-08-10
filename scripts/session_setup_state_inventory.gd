@@ -10,11 +10,6 @@ var online_ui_error_code: String = ""
 var online_state_return_screen: String = "room_entry"
 
 
-func _ready() -> void:
-	super._ready()
-	_publish_online_ui_state()
-
-
 func _rebuild_active_screen() -> void:
 	if showing and active_screen == "online_state":
 		layout_refresh_pending = false
@@ -244,9 +239,11 @@ func _set_online_ui_state(state_id: String, error_code: String = "") -> void:
 
 
 func _clear_online_ui_state() -> void:
+	var had_state: bool = not online_ui_state_id.is_empty() or not online_ui_error_code.is_empty()
 	online_ui_state_id = ""
 	online_ui_error_code = ""
-	_publish_online_ui_state()
+	if had_state:
+		_publish_online_ui_state()
 
 
 func _publish_online_ui_state() -> void:
