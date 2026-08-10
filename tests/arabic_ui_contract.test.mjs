@@ -8,6 +8,9 @@ const gameplayNestedPick = fs.readFileSync(new URL('../scripts/gameplay_session_
 const setup = fs.readFileSync(new URL('../scripts/session_setup_arabic.gd', import.meta.url), 'utf8');
 const setupFlow = fs.readFileSync(new URL('../scripts/session_setup_flow.gd', import.meta.url), 'utf8');
 const setupDialog = fs.readFileSync(new URL('../scripts/session_setup_dialog_system.gd', import.meta.url), 'utf8');
+const iconography = fs.readFileSync(new URL('../scripts/iconography.gd', import.meta.url), 'utf8');
+const closeIcon = fs.readFileSync(new URL('../assets/icons/lucide/x.svg', import.meta.url), 'utf8');
+const menuIcon = fs.readFileSync(new URL('../assets/icons/lucide/ellipsis.svg', import.meta.url), 'utf8');
 const online = fs.readFileSync(new URL('../scripts/online_session.gd', import.meta.url), 'utf8');
 const onlineHardened = fs.readFileSync(new URL('../scripts/online_session_hardened.gd', import.meta.url), 'utf8');
 const scene = fs.readFileSync(new URL('../scenes/intro.tscn', import.meta.url), 'utf8');
@@ -40,4 +43,25 @@ assert.ok(onlineHardened.includes('localStorage.removeItem'), 'legacy cross-tab 
 assert.ok(server.includes("const ROOM_PATTERN = /^\\d{2}$/"), 'the network room identifier must remain exactly two digits');
 assert.ok(server.includes("replace(/[٠-٩]/g"), 'the server must accept Arabic-Indic room digits');
 
+// Generic UI icons must be vector resources, not font glyphs. The branded
+// loading star, stones and score markers are intentionally outside this system.
+assert.ok(scene.includes('res://scripts/iconography.gd'), 'the unified iconography layer must remain active');
+assert.ok(iconography.includes('ICON_SYSTEM := "lucide-svg-1.27.0"'), 'the icon family/version must be explicit and pinned');
+assert.ok(iconography.includes('button.text = ""'), 'generic icon buttons must not render Unicode glyph text');
+assert.ok(iconography.includes('button.icon = texture'), 'generic icon buttons must render SVG textures');
+assert.ok(iconography.includes('icon_max_width'), 'generic icon sizing must be constrained consistently');
+assert.ok(iconography.includes('icon_alignment = HORIZONTAL_ALIGNMENT_CENTER'), 'generic icons must stay optically centered');
+assert.ok(iconography.includes("yakolakIconRtl='no-directional-controls'"), 'the current icon set must declare its RTL directionality contract');
+assert.ok(iconography.includes("yakolakIconAudit='"), 'runtime must publish the in-context icon audit result');
+
+for (const [name, svg] of [['close', closeIcon], ['menu', menuIcon]]) {
+  assert.ok(svg.includes('viewBox="0 0 24 24"'), `${name} icon must use the shared 24px grid`);
+  assert.ok(svg.includes('stroke-width="2"'), `${name} icon must use the shared 2px stroke`);
+  assert.ok(svg.includes('stroke-linecap="round"'), `${name} icon must use rounded stroke caps`);
+  assert.ok(svg.includes('stroke-linejoin="round"'), `${name} icon must use rounded joins`);
+}
+assert.ok(closeIcon.includes('Lucide Icons v1.27.0'), 'close icon provenance/version must be recorded');
+assert.ok(menuIcon.includes('Lucide Icons v1.27.0'), 'menu icon provenance/version must be recorded');
+
 console.log('YAKOLAK_ARABIC_UI_CONTRACT_OK');
+console.log('YAKOLAK_ICONOGRAPHY_CONTRACT_OK');
