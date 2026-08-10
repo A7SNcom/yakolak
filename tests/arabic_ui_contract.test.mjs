@@ -46,7 +46,14 @@ assert.ok(server.includes("replace(/[٠-٩]/g"), 'the server must accept Arabic-
 // Generic UI icons must be vector resources, not font glyphs. The branded
 // loading star, stones and score markers are intentionally outside this system.
 assert.ok(scene.includes('res://scripts/iconography.gd'), 'the unified iconography layer must remain active');
+assert.ok(scene.includes('res://assets/icons/lucide/x.svg'), 'close SVG must be an explicit scene dependency for Web export');
+assert.ok(scene.includes('res://assets/icons/lucide/ellipsis.svg'), 'menu SVG must be an explicit scene dependency for Web export');
+assert.ok(scene.includes('close_icon = ExtResource'), 'scene must inject the close SVG into the icon system');
+assert.ok(scene.includes('menu_icon = ExtResource'), 'scene must inject the menu SVG into the icon system');
 assert.ok(iconography.includes('ICON_SYSTEM := "lucide-svg-1.27.0"'), 'the icon family/version must be explicit and pinned');
+assert.ok(iconography.includes('@export var close_icon: Texture2D'), 'close icon must be scene-owned instead of source-path preload');
+assert.ok(iconography.includes('@export var menu_icon: Texture2D'), 'menu icon must be scene-owned instead of source-path preload');
+assert.ok(!iconography.includes('preload("res://assets/icons/lucide/'), 'icon SVGs must not rely on source-path preload in Web exports');
 assert.ok(iconography.includes('button.text = ""'), 'generic icon buttons must not render Unicode glyph text');
 assert.ok(iconography.includes('button.icon = texture'), 'generic icon buttons must render SVG textures');
 assert.ok(iconography.includes('icon_max_width'), 'generic icon sizing must be constrained consistently');
