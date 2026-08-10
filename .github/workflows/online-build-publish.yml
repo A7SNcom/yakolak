@@ -73,7 +73,7 @@ jobs:
         run: |
           npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0 pngjs@7.0.0
           npx playwright install --with-deps chromium
-      - name: Verify dialog mouse touch and keyboard before publishing
+      - name: Verify dialog mouse touch keyboard and interaction feedback before publishing
         run: |
           node tests/web_test_server.mjs >/tmp/yakolak-dialog-browser.log 2>&1 &
           SERVER_PID=$!
@@ -82,7 +82,7 @@ jobs:
             if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi
             sleep 0.25
           done
-          npx playwright test tests/dialog_system_smoke.spec.js --workers=1 --reporter=line
+          npx playwright test tests/dialog_system_smoke.spec.js tests/interaction_feedback_smoke.spec.js --workers=1 --reporter=line
       - name: Verify intro responsive setup transitions HUD and real gameplay start before publishing
         run: |
           node tests/web_test_server.mjs >/tmp/yakolak-browser.log 2>&1 &
