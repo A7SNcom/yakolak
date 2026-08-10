@@ -1,4 +1,4 @@
-[gd_scene load_steps=28 format=3]
+[gd_scene load_steps=30 format=3]
 
 [ext_resource type="Script" path="res://scripts/intro.gd" id="1_intro"]
 [ext_resource type="Script" path="res://scripts/intro_corrections.gd" id="2_corrections"]
@@ -26,6 +26,8 @@
 [ext_resource type="Script" path="res://scripts/gameplay_tutorial_showcase.gd" id="24_tutorial_dependency"]
 [ext_resource type="Script" path="res://scripts/turn_clarity_hud.gd" id="25_turn_hud"]
 [ext_resource type="Script" path="res://scripts/iconography.gd" id="26_iconography"]
+[ext_resource type="Texture2D" path="res://assets/icons/lucide/x.svg" id="27_close_icon"]
+[ext_resource type="Texture2D" path="res://assets/icons/lucide/ellipsis.svg" id="28_menu_icon"]
 
 [node name="YAKOLAKIntro26" type="Node3D"]
 script = ExtResource("1_intro")
@@ -89,3 +91,5 @@ script = ExtResource("14_zoom")
 
 [node name="Iconography" type="Node" parent="."]
 script = ExtResource("26_iconography")
+close_icon = ExtResource("27_close_icon")
+menu_icon = ExtResource("28_menu_icon")
