@@ -10,6 +10,18 @@ var online_ui_error_code: String = ""
 var online_state_return_screen: String = "room_entry"
 
 
+func show_after_intro() -> void:
+	# Gameplay may already be restoring a saved identity from the room URL before
+	# the intro finishes. In that case the invitation is not a second user path;
+	# opening it would start a competing preview request and obscure restore UI.
+	if online != null and bool(online.get("active")):
+		var identity_value: Variant = online.get("identity")
+		if identity_value is Dictionary and not (identity_value as Dictionary).is_empty():
+			hide_for_online_restore()
+			return
+	super.show_after_intro()
+
+
 func hide_for_online_restore() -> void:
 	# A saved session owns the screen while it is being restored. Do not leave
 	# the invitation card visible behind the gameplay restore state.
