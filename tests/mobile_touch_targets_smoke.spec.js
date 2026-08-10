@@ -9,6 +9,10 @@ const chromiumArgs = [
   '--disable-dev-shm-usage'
 ];
 
+test.use({
+  launchOptions: { args: chromiumArgs }
+});
+
 test('mobile touch targets reduce finger misses without visual inflation', async ({ browser }) => {
   test.setTimeout(120000);
   const context = await browser.newContext({
