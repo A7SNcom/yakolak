@@ -33,10 +33,12 @@ func _connect_online_state_signal() -> void:
 
 func _enable_gameplay() -> void:
 	super._enable_gameplay()
-	# restore_from_location() can emit its reconnecting signal synchronously
-	# inside the base enable call. Mirror the already-authoritative restore flag
-	# afterwards so the UI cannot miss that short ordering window.
+	# restore_from_location() can emit reconnecting synchronously inside the
+	# base enable call. Once the saved identity is accepted, gameplay owns the
+	# screen until restoration resolves; the invitation setup must not compete.
 	if restoring_online:
+		if setup != null and setup.has_method("hide_for_online_restore"):
+			setup.call("hide_for_online_restore")
 		_set_online_ui_state("restoring-room")
 
 
@@ -89,7 +91,10 @@ func _on_online_error(code: String) -> void:
 
 func _on_connection_state_changed(state: String, detail: String) -> void:
 	if state == "reconnecting":
-		if detail == "restoring":
+		# While a saved room is being restored, transient retry details describe
+		# transport mechanics, not a new user-visible situation. Keep the more
+		# truthful restore state until the authoritative room arrives or fails.
+		if restoring_online or detail == "restoring":
 			_set_online_ui_state("restoring-room")
 		else:
 			_set_online_ui_state("reconnecting")
