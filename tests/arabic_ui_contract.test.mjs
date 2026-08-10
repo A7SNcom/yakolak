@@ -32,8 +32,9 @@ assert.ok(setupDialog.includes('extends "res://scripts/session_setup_flow.gd"'),
 assert.ok(setupFlow.includes('extends "res://scripts/session_setup_arabic.gd"'), 'the user-journey layer must preserve the Arabic setup layer');
 assert.ok(scene.includes('res://scripts/gameplay_design_system.gd'), 'gameplay chrome must use the shared design adapter');
 assert.ok(gameplayDesign.includes('extends "res://scripts/gameplay_rematch_lifecycle.gd"'), 'gameplay design must preserve the rematch/gameplay chain');
-assert.ok(scene.includes('res://scripts/turn_clarity_hud_design_system.gd'), 'turn HUD must use the shared design adapter');
-assert.ok(turnHudDesign.includes('extends "res://scripts/turn_clarity_hud.gd"'), 'turn HUD design must preserve state logic');
+assert.ok(scene.includes('res://scripts/turn_clarity_hud_design_system.gd'), 'the turn clarity adapter must remain active');
+assert.ok(turnHudDesign.includes('extends "res://scripts/turn_clarity_hud.gd"'), 'the turn clarity adapter must preserve turn-focus state logic');
+assert.ok(turnHudDesign.includes("yakolakDesignTurnCue='localized-3d-light'"), 'turn clarity must be communicated by the 3D focus-light contract');
 
 assert.ok(design.includes('class_name YakolakDesign'), 'the 2D design system must expose one shared token source');
 assert.ok(design.includes('const TOUCH_MIN := 48.0'), 'interactive controls must share a 48px minimum target');
@@ -45,10 +46,10 @@ assert.ok(design.includes('static func button_style'), 'button states must use a
 assert.ok(design.includes('static func apply_button_contract'), 'button typography/touch/focus must use one contract');
 assert.ok(setupDesign.includes('Design.apply_button_contract'), 'setup buttons must consume the shared button primitive');
 assert.ok(gameplayDesign.includes('Design.apply_button_contract'), 'gameplay buttons must consume the shared button primitive');
-assert.ok(turnHudDesign.includes('Design.surface_style'), 'HUD surfaces must consume the shared surface primitive');
+assert.ok(!turnHudDesign.includes('Design.surface_style'), 'retired turn clarity must not recreate a redundant 2D surface');
 
 assert.ok(gameplay.includes('func _arabize_digits'), 'gameplay must normalize visible numbers to Arabic digits');
-assert.ok(gameplay.includes('turn_label.text = _arabize_digits'), 'turn HUD must pass through Arabic digit normalization');
+assert.ok(gameplay.includes('turn_label.text = _arabize_digits'), 'legacy turn text must remain Arabic-normalized even though the visible cue is 3D');
 assert.ok(gameplay.includes('score_label.text = _arabize_digits'), 'score HUD must pass through Arabic digit normalization');
 assert.ok(gameplay.includes('result_button.text = _arabize_digits'), 'result text must pass through Arabic digit normalization');
 
