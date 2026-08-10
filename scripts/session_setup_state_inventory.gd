@@ -10,6 +10,22 @@ var online_ui_error_code: String = ""
 var online_state_return_screen: String = "room_entry"
 
 
+func hide_for_online_restore() -> void:
+	# A saved session owns the screen while it is being restored. Do not leave
+	# the invitation card visible behind the gameplay restore state.
+	showing = false
+	active_screen = ""
+	joining_room_code = ""
+	room_preview_ready = false
+	room_preview_code = ""
+	join_available_colors.clear()
+	if root != null:
+		root.visible = false
+	_clear_body()
+	_clear_online_ui_state()
+	_publish_setup_state("hidden")
+
+
 func _rebuild_active_screen() -> void:
 	if showing and active_screen == "online_state":
 		layout_refresh_pending = false
