@@ -215,6 +215,10 @@ func _on_web_setup_flow_action(arguments: Array) -> void:
 			if arguments.size() >= 2:
 				_choose_wizard_color(str(arguments[1]))
 		"continue":
+			# Tests must follow the visible invitation action before pressing the
+			# color-screen CTA; this keeps forced state coverage on a reachable path.
+			if active_screen == "invitation" and not joining_room_code.is_empty() and room_preview_ready:
+				_open_join_setup(joining_room_code)
 			_continue_after_color()
 		"knowledge":
 			if arguments.size() >= 2:
