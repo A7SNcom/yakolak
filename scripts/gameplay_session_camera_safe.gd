@@ -239,6 +239,13 @@ func _first_legal_cell_for_size(size_name: String) -> int:
 
 
 func _on_web_play_one_move(_arguments: Array) -> void:
+	# Return to the browser before the real move path publishes UI state back
+	# through JavaScriptBridge. Re-entering JS from inside its callback can hide
+	# the deterministic submitting-move state used to verify online correctness.
+	call_deferred("_play_one_move_for_test")
+
+
+func _play_one_move_for_test() -> void:
 	if not match_initialized or round_complete or not gameplay_ready or _current_mode() != "local":
 		return
 	var direction: String = _current_direction()
