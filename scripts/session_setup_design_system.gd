@@ -121,6 +121,23 @@ func _apply_picker_font(picker: OptionButton) -> void:
 	menu.add_theme_font_override("font", Design.FONT_MEDIUM)
 
 
+func _fit_card_to_content() -> void:
+	super._fit_card_to_content()
+	# Typography/spacing can move the content-fit card after the first focus
+	# contract is published. Refresh web hit coordinates only after Godot has
+	# completed the resulting layout frames; this does not alter input behavior.
+	call_deferred("_publish_dialog_geometry_after_layout")
+
+
+func _publish_dialog_geometry_after_layout() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if not showing:
+		return
+	_dialog_update_chrome()
+	_publish_dialog_contract(_dialog_focus_controls())
+
+
 func _publish_setup_metrics() -> void:
 	super._publish_setup_metrics()
 	_publish_design_contract()
