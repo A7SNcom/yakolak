@@ -31,6 +31,15 @@ func _connect_online_state_signal() -> void:
 		online.connect("connection_state_changed", callback)
 
 
+func _enable_gameplay() -> void:
+	super._enable_gameplay()
+	# restore_from_location() can emit its reconnecting signal synchronously
+	# inside the base enable call. Mirror the already-authoritative restore flag
+	# afterwards so the UI cannot miss that short ordering window.
+	if restoring_online:
+		_set_online_ui_state("restoring-room")
+
+
 func _start_online_host(configuration: Dictionary) -> void:
 	_set_online_ui_state("creating-room")
 	super._start_online_host(configuration)
