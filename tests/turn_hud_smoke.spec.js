@@ -15,26 +15,19 @@ test.use({
   }
 });
 
-async function hud(page) {
+async function focus(page) {
   return page.evaluate(() => {
     const d = document.body.dataset;
     return {
-      visible: d.yakolakTurnHud,
-      state: d.yakolakTurnHudState,
-      player: d.yakolakTurnHudPlayer,
-      playerText: d.yakolakTurnHudPlayerText,
-      color: d.yakolakTurnHudColor,
-      colorName: d.yakolakTurnHudColorName,
-      selected: d.yakolakTurnHudSelectedSize,
-      large: Number(d.yakolakTurnHudLarge || 0),
-      medium: Number(d.yakolakTurnHudMedium || 0),
-      small: Number(d.yakolakTurnHudSmall || 0),
-      noGuess: d.yakolakTurnHudNoGuess,
-      area: Number(d.yakolakTurnHudAreaRatio || 0),
-      width: Number(d.yakolakTurnHudWidthPx || 0),
-      height: Number(d.yakolakTurnHudHeightPx || 0),
-      matrix: d.yakolakTurnHudMatrix,
-      matrixCount: Number(d.yakolakTurnHudMatrixCount || 0)
+      hud: d.yakolakTurnHud,
+      contract: d.yakolakTurnFocusContract,
+      cue: d.yakolakTurnFocus,
+      direction: d.yakolakTurnFocusDirection,
+      color: d.yakolakTurnFocusColor,
+      energy: Number(d.yakolakTurnFocusEnergy || 0),
+      noPanel: d.yakolakTurnFocusNoPanel,
+      designHud: d.yakolakDesignHud,
+      designCue: d.yakolakDesignTurnCue
     };
   });
 }
@@ -44,13 +37,10 @@ async function startPassPlay(page) {
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'complete' &&
           document.body.dataset.yakolakSetup === 'visible' &&
-          document.body.dataset.yakolakIconAudit === 'passed' &&
-          document.body.dataset.yakolakIconSystem === 'lucide-svg-1.27.0' &&
-          document.body.dataset.yakolakTurnHudMatrix === 'pass' &&
-          Number(document.body.dataset.yakolakTurnHudMatrixCount || 0) >= 13 &&
+          document.body.dataset.yakolakTurnFocusContract === 'pass' &&
+          document.body.dataset.yakolakTurnFocusNoPanel === 'true' &&
           typeof window.yakolakTestStartPassPlay === 'function' &&
           typeof window.yakolakTestPlayOneMove === 'function' &&
-          typeof window.yakolakTestClearSelection === 'function' &&
           typeof window.yakolakTestRefreshPickTargets === 'function' &&
           typeof window.yakolakTestForceMatchComplete === 'function',
     null,
@@ -60,43 +50,28 @@ async function startPassPlay(page) {
   await page.waitForFunction(
     () => document.body.dataset.yakolakGameplay === 'ready' &&
           document.body.dataset.yakolakCurrentPlayer === 'right' &&
-          document.body.dataset.yakolakTurnHud === 'visible' &&
-          document.body.dataset.yakolakTurnHudState === 'choose' &&
-          document.body.dataset.yakolakTurnHudNoGuess === 'true',
+          document.body.dataset.yakolakTurnHud === 'removed' &&
+          document.body.dataset.yakolakTurnFocus === 'active' &&
+          document.body.dataset.yakolakTurnFocusDirection === 'right' &&
+          Number(document.body.dataset.yakolakTurnFocusEnergy || 0) > 0.5,
     null,
     { timeout: 15000 }
   );
 }
 
-test('turn HUD stays guess-free from choice through selection, placement, next player and match end', async ({ page }) => {
+test('active player is communicated by localized 3D light with no redundant turn panel', async ({ page }) => {
   test.setTimeout(150000);
   await startPassPlay(page);
 
-  const iconAudit = await page.evaluate(() => ({
-    audit: document.body.dataset.yakolakIconAudit,
-    system: document.body.dataset.yakolakIconSystem,
-    close: document.body.dataset.yakolakIconClose,
-    menu: document.body.dataset.yakolakIconMenu,
-    rtl: document.body.dataset.yakolakIconRtl
-  }));
-  expect(iconAudit.audit).toBe('passed');
-  expect(iconAudit.system).toBe('lucide-svg-1.27.0');
-  expect(iconAudit.close).toBe('x|icon-only|24-grid|stroke-2');
-  expect(iconAudit.menu).toBe('ellipsis|icon-only|24-grid|stroke-2');
-  expect(iconAudit.rtl).toBe('no-directional-controls');
-
-  let state = await hud(page);
-  expect(state.matrix).toBe('pass');
-  expect(state.matrixCount).toBeGreaterThanOrEqual(13);
-  expect(state.player).not.toBe('');
-  expect(state.colorName).not.toBe('');
-  expect(state.large).toBe(3);
-  expect(state.medium).toBe(3);
-  expect(state.small).toBe(3);
-  expect(state.area).toBeGreaterThan(0);
-  expect(state.area).toBeLessThan(0.09);
-  expect(state.width).toBeLessThanOrEqual(322);
-  expect(state.height).toBeLessThanOrEqual(90);
+  let state = await focus(page);
+  expect(state.hud).toBe('removed');
+  expect(state.contract).toBe('pass');
+  expect(state.noPanel).toBe('true');
+  expect(state.cue).toBe('active');
+  expect(state.direction).toBe('right');
+  expect(state.energy).toBeGreaterThan(0.5);
+  expect(state.designHud).toBe('removed-redundant-panel');
+  expect(state.designCue).toBe('localized-3d-light');
 
   const before = await page.evaluate(() => Number(document.body.dataset.yakolakPiecePickTargetRevision || 0));
   await page.evaluate(() => window.yakolakTestRefreshPickTargets());
@@ -113,53 +88,43 @@ test('turn HUD stays guess-free from choice through selection, placement, next p
   expect(target.y).toBeGreaterThan(0);
   await page.mouse.click(target.x, target.y);
   await page.waitForFunction(
-    () => document.body.dataset.yakolakTurnHudState === 'place' &&
-          document.body.dataset.yakolakTurnHudSelectedSize === 'large' &&
-          document.body.dataset.yakolakTurnHudNoGuess === 'true',
+    () => document.body.dataset.yakolakSelectedType === 'large' &&
+          document.body.dataset.yakolakTurnHud === 'removed' &&
+          document.body.dataset.yakolakTurnFocusDirection === 'right',
     null,
     { timeout: 5000 }
   );
-  state = await hud(page);
-  expect(state.state).toBe('place');
-  expect(state.selected).toBe('large');
-
-  await page.evaluate(() => window.yakolakTestClearSelection());
-  await page.waitForFunction(() => document.body.dataset.yakolakTurnHudState === 'choose', null, { timeout: 5000 });
 
   await page.evaluate(() => window.yakolakTestPlayOneMove());
   await page.waitForFunction(
     () => Number(document.body.dataset.yakolakMoves || 0) >= 1 &&
           document.body.dataset.yakolakCurrentPlayer === 'back' &&
           document.body.dataset.yakolakGameplay === 'ready' &&
-          document.body.dataset.yakolakTurnHudState === 'choose' &&
-          document.body.dataset.yakolakTurnHudNoGuess === 'true' &&
-          (window.__yakolakTurnHudHistory || []).includes('placing') &&
-          (window.__yakolakTurnHudHistory || []).includes('turn-transition'),
+          document.body.dataset.yakolakTurnHud === 'removed' &&
+          document.body.dataset.yakolakTurnFocus === 'active' &&
+          document.body.dataset.yakolakTurnFocusDirection === 'back',
     null,
     { timeout: 15000 }
   );
-  state = await hud(page);
+  state = await focus(page);
+  expect(state.direction).toBe('back');
   expect(state.color).toBe('blue');
-  expect(state.colorName).not.toBe('');
-  expect(state.player).not.toBe('');
-  expect(state.large + state.medium + state.small).toBeGreaterThan(0);
+  expect(state.energy).toBeGreaterThan(0.5);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForFunction(
-    () => Number(document.body.dataset.yakolakTurnHudAreaRatio || 1) > 0 &&
-          Number(document.body.dataset.yakolakTurnHudAreaRatio || 1) < 0.09 &&
-          Number(document.body.dataset.yakolakTurnHudWidthPx || 999) <= 322 &&
-          Number(document.body.dataset.yakolakTurnHudHeightPx || 999) <= 90 &&
-          document.body.dataset.yakolakIconAudit === 'passed',
+    () => document.body.dataset.yakolakTurnHud === 'removed' &&
+          document.body.dataset.yakolakTurnFocusNoPanel === 'true' &&
+          document.body.dataset.yakolakTurnFocusDirection === 'back',
     null,
     { timeout: 5000 }
   );
 
   await page.evaluate(() => window.yakolakTestForceMatchComplete());
   await page.waitForFunction(
-    () => document.body.dataset.yakolakTurnHudState === 'match-complete' &&
-          document.body.dataset.yakolakTurnHudPlayerText === 'لا يوجد دور' &&
-          document.body.dataset.yakolakTurnHudNoGuess === 'true',
+    () => document.body.dataset.yakolakTurnHud === 'removed' &&
+          document.body.dataset.yakolakTurnFocus === 'hidden' &&
+          Number(document.body.dataset.yakolakTurnFocusEnergy || 0) === 0,
     null,
     { timeout: 5000 }
   );
