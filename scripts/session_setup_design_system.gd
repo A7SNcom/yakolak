@@ -4,6 +4,8 @@ extends "res://scripts/session_setup_dialog_system.gd"
 # like a game prompt floating above the table, not a conventional app modal.
 const Design = preload("res://scripts/ui_design.gd")
 
+var design_focus_generation: int = 0
+
 
 func _build_shell() -> void:
 	super._build_shell()
@@ -122,21 +124,27 @@ func _apply_picker_font(picker: OptionButton) -> void:
 
 
 func _schedule_dialog_focus() -> void:
-	# The base dialog publishes its web/touch contract when focus is applied.
-	# With the larger game typography, child rects can still be resolving in the
-	# frame where the card is content-fitted. Wait for two real layout frames so
-	# the first published stage and hit coordinates describe the same geometry.
-	if dialog_focus_pending:
-		return
+	# Mobile browser resize/reflow can schedule more than one settle pass. Give
+	# every pass an id so an older deferred request can never publish hit geometry
+	# for a content tree that has already been rebuilt.
+	design_focus_generation += 1
+	var generation: int = design_focus_generation
 	dialog_focus_pending = true
-	call_deferred("_apply_dialog_focus_after_design_layout")
+	call_deferred("_apply_dialog_focus_after_design_layout", generation)
 
 
-func _apply_dialog_focus_after_design_layout() -> void:
+func _apply_dialog_focus_after_design_layout(generation: int) -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
+	if generation != design_focus_generation:
+		return
 	if not showing:
 		dialog_focus_pending = false
+		return
+	var controls: Array[Control] = _dialog_focus_controls()
+	if controls.is_empty():
+		dialog_focus_pending = false
+		call_deferred("_schedule_dialog_focus")
 		return
 	dialog_focus_pending = false
 	_apply_dialog_focus()
