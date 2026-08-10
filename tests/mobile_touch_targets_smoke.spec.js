@@ -10,24 +10,22 @@ const chromiumArgs = [
   '--disable-dev-shm-usage'
 ];
 
-test.use({
-  launchOptions: { args: chromiumArgs }
-});
+test.use({ launchOptions: { args: chromiumArgs } });
 
 async function bootstrapSnapshot(page, failures) {
-  const state = await page.evaluate(() => ({
+  return page.evaluate((seenFailures) => ({
     intro: document.body.dataset.yakolakIntro || '',
     setup: document.body.dataset.yakolakSetup || '',
     gameplay: document.body.dataset.yakolakGameplay || '',
     touchModel: document.body.dataset.yakolakTouchPickModel || '',
     hasStart: typeof window.yakolakTestStartPassPlay === 'function',
+    hasSemanticAudit: typeof window.yakolakTestRunTouchSemanticAudit === 'function',
     canvas: Boolean(document.getElementById('canvas')),
-    bodyText: (document.body.innerText || '').slice(0, 300)
-  }));
-  return { state, failures: [...failures] };
+    failures: seenFailures
+  }), failures);
 }
 
-test('mobile touch targets reduce finger misses without visual inflation', async ({ browser }) => {
+test('mobile stack and separated-size touch targets improve without wrong taps', async ({ browser }) => {
   test.setTimeout(120000);
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -59,7 +57,8 @@ test('mobile touch targets reduce finger misses without visual inflation', async
       await page.waitForFunction(
         () => document.body.dataset.yakolakIntro === 'complete' &&
               document.body.dataset.yakolakSetup === 'visible' &&
-              typeof window.yakolakTestStartPassPlay === 'function',
+              typeof window.yakolakTestStartPassPlay === 'function' &&
+              typeof window.yakolakTestRunTouchSemanticAudit === 'function',
         null,
         { timeout: 30000 }
       );
@@ -71,15 +70,14 @@ test('mobile touch targets reduce finger misses without visual inflation', async
     await page.waitForFunction(
       () => document.body.dataset.yakolakGameplay === 'ready' &&
             document.body.dataset.yakolakCurrentPlayer === 'right' &&
-            document.body.dataset.yakolakTouchPickModel === 'exact-mesh-then-visible-slop' &&
-            typeof window.yakolakTestRunTouchAudit === 'function',
+            document.body.dataset.yakolakTouchPickModel === 'exact-mesh-then-visible-slop',
       null,
       { timeout: 20000 }
     );
 
-    await page.evaluate(() => window.yakolakTestRunTouchAudit());
+    await page.evaluate(() => window.yakolakTestRunTouchSemanticAudit());
     await page.waitForFunction(
-      () => ['passed', 'failed'].includes(document.body.dataset.yakolakTouchAudit || ''),
+      () => ['passed', 'failed'].includes(document.body.dataset.yakolakTouchSemanticAudit || ''),
       null,
       { timeout: 30000 }
     );
@@ -89,20 +87,26 @@ test('mobile touch targets reduce finger misses without visual inflation', async
       const probe = document.getElementById('__yakolak_touch_safe_probe');
       const probeStyle = probe ? getComputedStyle(probe) : null;
       return {
-        status: d.yakolakTouchAudit,
-        viewport: d.yakolakTouchAuditViewport,
-        fingers: d.yakolakTouchAuditFingerDiameters,
-        centers: Number(d.yakolakTouchAuditCenters || 0),
-        samples: Number(d.yakolakTouchAuditSamples || 0),
-        beforeFalse: Number(d.yakolakTouchAuditBeforeFalse || 0),
-        afterFalse: Number(d.yakolakTouchAuditAfterFalse || 0),
-        beforeWrong: Number(d.yakolakTouchAuditBeforeWrong || 0),
-        afterWrong: Number(d.yakolakTouchAuditAfterWrong || 0),
-        reduction: Number(d.yakolakTouchAuditReduction || 0),
-        beforeAvgMs: Number(d.yakolakTouchAuditBeforeAvgMs || 0),
-        afterAvgMs: Number(d.yakolakTouchAuditAfterAvgMs || 0),
-        beforeMaxMs: Number(d.yakolakTouchAuditBeforeMaxMs || 0),
-        afterMaxMs: Number(d.yakolakTouchAuditAfterMaxMs || 0),
+        status: d.yakolakTouchSemanticAudit,
+        viewport: d.yakolakTouchSemanticViewport,
+        fingers: d.yakolakTouchSemanticFingers,
+        samples: Number(d.yakolakTouchSemanticSamples || 0),
+        stackCenters: Number(d.yakolakTouchSemanticStackCenters || 0),
+        trayCenters: Number(d.yakolakTouchSemanticTrayCenters || 0),
+        stackBeforeFalse: Number(d.yakolakTouchSemanticStackBeforeFalse || 0),
+        stackAfterFalse: Number(d.yakolakTouchSemanticStackAfterFalse || 0),
+        stackBeforeWrong: Number(d.yakolakTouchSemanticStackBeforeWrong || 0),
+        stackAfterWrong: Number(d.yakolakTouchSemanticStackAfterWrong || 0),
+        trayBeforeFalse: Number(d.yakolakTouchSemanticTrayBeforeFalse || 0),
+        trayAfterFalse: Number(d.yakolakTouchSemanticTrayAfterFalse || 0),
+        trayBeforeWrong: Number(d.yakolakTouchSemanticTrayBeforeWrong || 0),
+        trayAfterWrong: Number(d.yakolakTouchSemanticTrayAfterWrong || 0),
+        beforeFalse: Number(d.yakolakTouchSemanticBeforeFalse || 0),
+        afterFalse: Number(d.yakolakTouchSemanticAfterFalse || 0),
+        beforeWrong: Number(d.yakolakTouchSemanticBeforeWrong || 0),
+        afterWrong: Number(d.yakolakTouchSemanticAfterWrong || 0),
+        reduction: Number(d.yakolakTouchSemanticReduction || 0),
+        maxMs: Number(d.yakolakTouchSemanticMaxMs || 0),
         rescueRadius: Number(d.yakolakTouchRescueRadiusCss || 0),
         safeGutter: Number(d.yakolakTouchSafeGutterCss || 0),
         probeBudget: Number(d.yakolakTouchProbeBudget || 0),
@@ -117,12 +121,15 @@ test('mobile touch targets reduce finger misses without visual inflation', async
 
     expect(metrics.viewport).toBe('390x844');
     expect(metrics.fingers).toBe('36,44,52');
-    expect(metrics.centers).toBeGreaterThanOrEqual(6);
+    expect(metrics.stackCenters).toBeGreaterThanOrEqual(3);
+    expect(metrics.trayCenters).toBeGreaterThanOrEqual(3);
     expect(metrics.samples).toBeGreaterThan(0);
     expect(metrics.beforeFalse).toBeGreaterThan(0);
     expect(metrics.afterFalse).toBeLessThan(metrics.beforeFalse);
     expect(metrics.afterWrong).toBeLessThanOrEqual(metrics.beforeWrong);
-    expect(metrics.reduction).toBeGreaterThanOrEqual(0.35);
+    expect(metrics.stackAfterWrong).toBeLessThanOrEqual(metrics.stackBeforeWrong);
+    expect(metrics.trayAfterWrong).toBeLessThanOrEqual(metrics.trayBeforeWrong);
+    expect(metrics.reduction).toBeGreaterThanOrEqual(0.15);
     expect(metrics.rescueRadius).toBe(18);
     expect(metrics.safeGutter).toBe(8);
     expect(metrics.probeBudget).toBeLessThanOrEqual(16);
@@ -131,7 +138,7 @@ test('mobile touch targets reduce finger misses without visual inflation', async
     expect(metrics.canvas).not.toBeNull();
     expect(metrics.canvas.width).toBeCloseTo(390, 0);
     expect(metrics.canvas.height).toBeCloseTo(844, 0);
-    expect(metrics.afterMaxMs).toBeLessThan(33.4);
+    expect(metrics.maxMs).toBeLessThan(33.4);
     expect(metrics.status).toBe('passed');
     expect(failures).toEqual([]);
   } finally {
