@@ -142,22 +142,6 @@ func _apply_dialog_focus_after_design_layout() -> void:
 	_apply_dialog_focus()
 
 
-func _fit_card_to_content() -> void:
-	super._fit_card_to_content()
-	# Also refresh geometry after content-fit for later resizes/reflows where
-	# focus itself does not change. This is contract telemetry only.
-	call_deferred("_publish_dialog_geometry_after_layout")
-
-
-func _publish_dialog_geometry_after_layout() -> void:
-	await get_tree().process_frame
-	await get_tree().process_frame
-	if not showing:
-		return
-	_dialog_update_chrome()
-	_publish_dialog_contract(_dialog_focus_controls())
-
-
 func _publish_setup_metrics() -> void:
 	super._publish_setup_metrics()
 	_publish_design_contract()
