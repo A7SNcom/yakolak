@@ -130,8 +130,8 @@ func _show_invitation(code: String) -> void:
 	_clear_body()
 	var content := _content_box()
 	body.add_child(content)
-	content.add_child(_label("الانضمام لغرفة", 25, HORIZONTAL_ALIGNMENT_CENTER))
-	content.add_child(_label("الغرفة " + code, 17, HORIZONTAL_ALIGNMENT_CENTER, Color("#cbd7d9")))
+	content.add_child(_label("الانضمام لغرفة", 25, HORIZONTAL_ALIGNMENT_RIGHT))
+	content.add_child(_label("الغرفة " + code, 17, HORIZONTAL_ALIGNMENT_RIGHT, Color("#b9c5c4")))
 	content.add_child(_online_state_notice(online_ui_state_id))
 
 	var state: Dictionary = OnlineStateCatalog.get_state(online_ui_state_id)
@@ -240,23 +240,24 @@ func _online_state_notice(state_id: String) -> Control:
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", int(round(_ui_length(6.0))))
+	box.add_theme_constant_override("separation", int(round(_ui_length(5.0))))
 	panel.add_child(box)
-	box.add_child(_label(str(state.get("title", "")), 18, HORIZONTAL_ALIGNMENT_CENTER, Color.WHITE))
-	box.add_child(_label(str(state.get("message", "")), 14, HORIZONTAL_ALIGNMENT_CENTER, Color("#cbd7d9")))
+	box.add_child(_label(str(state.get("title", "")), 18, HORIZONTAL_ALIGNMENT_RIGHT, Color("#f7f5ef")))
+	box.add_child(_label(str(state.get("message", "")), 14, HORIZONTAL_ALIGNMENT_RIGHT, Color("#b9c5c4")))
 	return panel
 
 
 func _online_state_notice_style() -> StyleBoxFlat:
+	# State copy is a text layer, not another card inside the dialog. Removing
+	# this nested frame gives the title/message/action one continuous hierarchy.
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(1.0, 1.0, 1.0, 0.055)
-	style.border_color = Color(0.85, 0.94, 0.95, 0.16)
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(int(round(_ui_length(14.0))))
-	style.content_margin_left = _ui_length(14.0)
-	style.content_margin_right = _ui_length(14.0)
-	style.content_margin_top = _ui_length(12.0)
-	style.content_margin_bottom = _ui_length(12.0)
+	style.bg_color = Color(1.0, 1.0, 1.0, 0.0)
+	style.border_color = Color(1.0, 1.0, 1.0, 0.0)
+	style.set_border_width_all(0)
+	style.content_margin_left = _ui_length(4.0)
+	style.content_margin_right = _ui_length(4.0)
+	style.content_margin_top = _ui_length(2.0)
+	style.content_margin_bottom = _ui_length(6.0)
 	return style
 
 
