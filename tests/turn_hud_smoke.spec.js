@@ -88,7 +88,7 @@ test('active player is communicated by localized 3D light with no redundant turn
   expect(target.y).toBeGreaterThan(0);
   await page.mouse.click(target.x, target.y);
   await page.waitForFunction(
-    () => document.body.dataset.yakolakSelectedType === 'large' &&
+    () => document.body.dataset.yakolakSelectedSize === 'large' &&
           document.body.dataset.yakolakTurnHud === 'removed' &&
           document.body.dataset.yakolakTurnFocusDirection === 'right',
     null,
