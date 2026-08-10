@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 const OUTPUT = 'visual-hierarchy';
 
@@ -38,7 +38,6 @@ test('capture representative 2D hierarchy states without touching intro', async 
   await page.goto('http://127.0.0.1:8000/?yakolakTestFast=1', { waitUntil: 'domcontentloaded' });
   await waitForSetup(page);
 
-  expect(document).not.toBeNull;
   await capture(page, '01-room-entry');
 
   await page.evaluate(() => window.yakolakTestSetupFlowAction('new'));
