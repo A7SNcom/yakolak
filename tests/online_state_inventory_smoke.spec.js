@@ -296,7 +296,11 @@ test('restore and move acknowledgement have explicit non-silent states', async (
   await waitForIntro(page);
   await page.waitForFunction(() => typeof window.yakolakTestStartOnline === 'function' && typeof window.yakolakTestPlayOneMove === 'function');
   await page.evaluate(() => window.yakolakTestStartOnline());
-  await page.waitForFunction(() => document.body.dataset.yakolakCurrentPlayer === 'right', null, { timeout: 20000 });
+  await page.waitForFunction(
+    () => document.body.dataset.yakolakCurrentPlayer === 'right' && document.body.dataset.yakolakGameplay === 'ready',
+    null,
+    { timeout: 20000 }
+  );
   await page.evaluate(() => window.yakolakTestPlayOneMove());
   state = await waitForState(page, 'submitting-move');
   expect(state.message).toContain('تثبيت الحركة');
