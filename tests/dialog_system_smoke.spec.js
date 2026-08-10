@@ -39,8 +39,7 @@ async function openDialog(page) {
       canvas: Boolean(document.querySelector('canvas')),
       readyState: document.readyState,
     })).catch(e => ({ evaluateError: String(e) }));
-    console.log(`YAKOLAK_DIALOG_BOOT_DIAGNOSTIC ${JSON.stringify({ diagnostic, browserErrors })}`);
-    throw error;
+    throw new Error(`YAKOLAK_DIALOG_BOOT_DIAGNOSTIC ${JSON.stringify({ diagnostic, browserErrors, originalError: String(error) })}`);
   }
   await page.waitForTimeout(150);
 }
@@ -100,7 +99,6 @@ test('dialog mouse path uses real canvas hit targets and explicit close', async 
   await page.mouse.click(primary.x, primary.y);
   await waitStage(page, 'setup:count');
 
-  // Clicking the shaded world outside the card must not dismiss a blocking game setup dialog.
   await page.mouse.click(12, 700);
   await page.waitForTimeout(120);
   expect(await page.evaluate(() => document.body.dataset.yakolakDialogStage)).toBe('setup:count');
@@ -144,17 +142,14 @@ test('dialog keyboard path starts focused, loops with Tab and honors Escape', as
   await openDialog(page);
   await assertContract(page);
 
-  // Primary action owns initial focus.
   await page.keyboard.press('Enter');
   await waitStage(page, 'setup:count');
 
-  // The first control's previous focus target is the fixed close button.
   await page.keyboard.press('Shift+Tab');
   await page.keyboard.press('Enter');
   await waitStage(page, 'room_entry');
   await waitFocusRole(page, 'primary');
 
-  // Re-enter only after focus has demonstrably returned to the rebuilt root.
   await page.keyboard.press('Enter');
   await waitStage(page, 'setup:count');
   await page.keyboard.press('Escape');
@@ -164,12 +159,10 @@ test('dialog keyboard path starts focused, loops with Tab and honors Escape', as
     stage: document.body.dataset.yakolakDialogStage || 'none',
     callback: typeof window.yakolakDialogCancel,
   }));
-  console.log(`YAKOLAK_DIALOG_ESCAPE ${JSON.stringify(escapeBridge)}`);
   expect(escapeBridge.seen).toBe('godot');
   await waitStage(page, 'room_entry');
   await waitFocusRole(page, 'primary');
 
-  // The mandatory root cannot be dismissed into an unusable game state.
   await page.keyboard.press('Escape');
   await page.waitForTimeout(120);
   expect(await page.evaluate(() => document.body.dataset.yakolakDialogStage)).toBe('room_entry');
