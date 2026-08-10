@@ -34,12 +34,17 @@ async function openDialog(page) {
     );
   } catch (error) {
     const diagnostic = await page.evaluate(() => ({
-      dataset: { ...document.body.dataset },
-      title: document.title,
+      intro: document.body.dataset.yakolakIntro || '',
+      setup: document.body.dataset.yakolakSetup || '',
+      dialogSystem: document.body.dataset.yakolakDialogSystem || '',
+      dialogStage: document.body.dataset.yakolakDialogStage || '',
+      interaction: document.body.dataset.yakolakInteractionFeedback || '',
+      onlineState: document.body.dataset.yakolakOnlineUiState || '',
+      onlineSurface: document.body.dataset.yakolakOnlineUiSurface || '',
       canvas: Boolean(document.querySelector('canvas')),
       readyState: document.readyState,
     })).catch(e => ({ evaluateError: String(e) }));
-    throw new Error(`YAKOLAK_DIALOG_BOOT_DIAGNOSTIC ${JSON.stringify({ diagnostic, browserErrors, originalError: String(error) })}`);
+    throw new Error(`YAKOLAK_DIALOG_BOOT_DIAGNOSTIC ${JSON.stringify({ browserErrors, diagnostic, originalError: String(error) })}`);
   }
   await page.waitForTimeout(150);
 }
