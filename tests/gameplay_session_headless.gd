@@ -5,6 +5,7 @@ extends SceneTree
 # lets the bot complete a turn.
 
 var failures: Array[String] = []
+var intro: Node
 
 
 func _init() -> void:
@@ -12,7 +13,7 @@ func _init() -> void:
 
 
 func _run() -> void:
-	var intro := preload("res://scenes/intro.tscn").instantiate()
+	intro = preload("res://scenes/intro.tscn").instantiate()
 	root.add_child(intro)
 	await process_frame
 	intro.playing = false
@@ -22,7 +23,7 @@ func _run() -> void:
 	var game: Node = intro.get_node_or_null("PostIntroGameplay")
 	_expect(game != null, "the post-intro controller exists")
 	if game == null:
-		_finish()
+		await _finish()
 		return
 	_expect(bool(game.waiting_for_setup), "the board waits for the compact setup")
 	_expect(bool(game.intro_runtime_suspended), "completed intro workers are suspended during setup/gameplay")
@@ -98,7 +99,7 @@ func _run() -> void:
 	var setup: Node = intro.get_node_or_null("SessionSetup")
 	_expect(setup != null and bool(setup.showing), "the setup is visible again after an online failure")
 
-	_finish()
+	await _finish()
 
 
 func _expect(condition: bool, message: String) -> void:
@@ -107,6 +108,13 @@ func _expect(condition: bool, message: String) -> void:
 
 
 func _finish() -> void:
+	# SceneTree.quit() does not model scene ownership teardown for this script
+	# runner. Free the real scene first so _exit_tree hooks release playback,
+	# Tweens and transient resources before Godot performs leak accounting.
+	if intro != null and is_instance_valid(intro):
+		intro.queue_free()
+		await process_frame
+		await process_frame
 	if failures.is_empty():
 		print("YAKOLAK_GAMEPLAY_SESSION_HEADLESS_OK")
 		quit(0)
