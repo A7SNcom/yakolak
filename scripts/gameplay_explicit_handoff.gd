@@ -1,9 +1,10 @@
 extends "res://scripts/gameplay_state_inventory.gd"
 
 # The production gameplay layer accepts intro ownership only from the explicit
-# lifecycle signals exposed by intro_handoff.gd. The inherited polling path is
-# kept as a defensive same-state fallback, but `playing` and worker guards are
-# never authority to start gameplay.
+# lifecycle contract exposed by intro_handoff.gd. Signals are the observer API;
+# the root also directly dispatches the same explicit event in exported Web so
+# delivery never depends on process polling. The one-shot generation token is
+# still the single authority that can transfer ownership.
 
 
 func _ready() -> void:
@@ -17,21 +18,39 @@ func _ready() -> void:
 	var handoff_handler := Callable(self, "_on_explicit_gameplay_handoff_ready")
 	if intro.has_signal("gameplay_handoff_ready") and not intro.is_connected("gameplay_handoff_ready", handoff_handler):
 		intro.connect("gameplay_handoff_ready", handoff_handler)
-	# Scene ordering can make the first lifecycle signal precede this child _ready.
-	# Consume only an already-published explicit token; never infer from visuals.
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("document.body.dataset.yakolakIntroHandoffConsumer='connected';", true)
+	# Scene ordering can make an already-published lifecycle token exist before a
+	# consumer reconnect. Consume only that explicit token; never infer visuals.
 	_try_consume_explicit_handoff(intro_generation_seen)
 
 
 func _on_explicit_intro_run_started(generation: int) -> void:
+	accept_intro_run_started(generation)
+
+
+func _on_explicit_gameplay_handoff_ready(generation: int) -> void:
+	accept_intro_handoff(generation)
+
+
+func accept_intro_run_started(generation: int) -> void:
+	if intro == null:
+		intro = get_parent() as Node3D
 	if intro == null or generation != int(intro.get("intro_run_generation")):
 		return
 	intro_generation_seen = generation
 	gameplay_ready = false
 	if initialized:
 		_reset_for_intro()
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("document.body.dataset.yakolakIntroHandoffConsumer='intro-started';", true)
 
 
-func _on_explicit_gameplay_handoff_ready(generation: int) -> void:
+func accept_intro_handoff(generation: int) -> void:
+	if intro == null:
+		intro = get_parent() as Node3D
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("document.body.dataset.yakolakIntroHandoffConsumer='handoff-seen';", true)
 	_try_consume_explicit_handoff(generation)
 
 
@@ -41,6 +60,11 @@ func _try_consume_explicit_handoff(generation: int) -> void:
 	if generation != int(intro.get("intro_run_generation")):
 		return
 	intro_generation_seen = generation
+	if not initialized:
+		# True completion normally happens long after interaction initialization,
+		# but keep delivery lossless for accelerated tests or future scene changes.
+		call_deferred("_try_consume_explicit_handoff", generation)
+		return
 	if intro.has_method("consume_gameplay_handoff") and bool(intro.call("consume_gameplay_handoff", generation)):
 		_enable_gameplay()
 

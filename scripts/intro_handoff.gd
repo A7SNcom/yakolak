@@ -22,6 +22,7 @@ func _restart_intro() -> void:
 	super._restart_intro()
 	print("YAKOLAK_INTRO_RUN_STARTED generation=%d" % intro_run_generation)
 	intro_run_started.emit(intro_run_generation)
+	_dispatch_intro_run_started(intro_run_generation)
 
 
 func _publish_complete() -> void:
@@ -41,8 +42,8 @@ func _publish_gameplay_handoff() -> void:
 	gameplay_handoff_pending = true
 	gameplay_handoff_emit_count += 1
 	print("YAKOLAK_INTRO_HANDOFF_READY generation=%d emits=%d" % [intro_run_generation, gameplay_handoff_emit_count])
-	# Publish observability before emitting. Signal delivery is synchronous, so a
-	# successful gameplay consumer must be the final visible state for the frame.
+	# Publish observability before dispatch. Signal delivery/direct dispatch are
+	# synchronous, so a successful consumer leaves `consumed` as the final state.
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakIntroHandoffEvent='ready';" +
@@ -50,6 +51,22 @@ func _publish_gameplay_handoff() -> void:
 			true
 		)
 	gameplay_handoff_ready.emit(intro_run_generation)
+	_dispatch_gameplay_handoff(intro_run_generation)
+
+
+func _dispatch_intro_run_started(generation: int) -> void:
+	# Signals remain the decoupled lifecycle API. The direct scene dispatch is a
+	# deterministic delivery path for exported Web builds, where the consumer may
+	# have script processing disabled after setup. Both paths hit the same token.
+	var gameplay: Node = get_node_or_null("PostIntroGameplay")
+	if gameplay != null and gameplay.has_method("accept_intro_run_started"):
+		gameplay.call("accept_intro_run_started", generation)
+
+
+func _dispatch_gameplay_handoff(generation: int) -> void:
+	var gameplay: Node = get_node_or_null("PostIntroGameplay")
+	if gameplay != null and gameplay.has_method("accept_intro_handoff"):
+		gameplay.call("accept_intro_handoff", generation)
 
 
 func consume_gameplay_handoff(expected_generation: int = -1) -> bool:
