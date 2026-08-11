@@ -130,6 +130,10 @@ func _on_connection_state_changed(state: String, detail: String) -> void:
 			_set_online_ui_state("restoring-room")
 		else:
 			_set_online_ui_state("reconnecting")
+		# OnlineSession publishes its legacy pill after emitting this signal.
+		# Defer one hide into the same handoff frame so the browser never paints
+		# two surfaces describing the same disconnect/reconnect condition.
+		call_deferred("_hide_legacy_connection_status")
 		return
 	if state == "connected":
 		# Recovery itself requires no decision. Remove the interrupting reconnect
@@ -194,9 +198,14 @@ func _sync_waiting_overlay() -> void:
 	_layout_waiting_overlay()
 
 	# The old transport pill and the new state card must never compete visually.
-	if OS.has_feature("web"):
-		JavaScriptBridge.eval("var e=document.getElementById('yakolak-online-status');if(e){e.style.display='none';}", true)
+	_hide_legacy_connection_status()
 	_publish_online_ui_state(state_id, detail)
+
+
+func _hide_legacy_connection_status() -> void:
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.eval("var e=document.getElementById('yakolak-online-status');if(e){e.style.display='none';}", true)
 
 
 func _set_online_ui_state(state_id: String, detail: String = "") -> void:
