@@ -62,6 +62,7 @@ run_godot_resource_gate() {
   rm -f "$log_file"
 }
 
+run_godot_resource_gate res://tests/intro_handoff_headless.gd intro_handoff
 run_godot_resource_gate res://tests/gameplay_session_headless.gd gameplay_session
 run_godot_resource_gate res://tests/gameplay_session_lifecycle_headless.gd gameplay_lifecycle
 

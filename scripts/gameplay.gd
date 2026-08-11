@@ -32,7 +32,7 @@ var camera: Camera3D
 var piece_records: Array = []
 var target_markers: Array[MeshInstance3D] = []
 var initialized: bool = false
-var intro_was_playing: bool = true
+var intro_generation_seen: int = 0
 var gameplay_ready: bool = false
 
 var selected_index: int = -1
@@ -68,20 +68,27 @@ func _process(_delta: float) -> void:
 		if not initialized:
 			return
 
-	var intro_playing: bool = bool(intro.get("playing"))
-	if intro_playing:
-		if not intro_was_playing:
-			_reset_for_intro()
-		intro_was_playing = true
+	# Lifecycle ownership is explicit. `playing` belongs to intro visuals and can
+	# be false during pre-intro pauses without meaning gameplay may start.
+	var intro_generation: int = int(intro.get("intro_run_generation"))
+	if intro_generation > intro_generation_seen:
+		intro_generation_seen = intro_generation
+		_reset_for_intro()
 		gameplay_ready = false
 		return
 
-	if intro_was_playing:
-		intro_was_playing = false
+	if intro.has_method("consume_gameplay_handoff") and bool(intro.call("consume_gameplay_handoff")):
 		_enable_gameplay()
 
 	if move_active:
 		_update_move()
+
+
+func _intro_handoff_is_consumed() -> bool:
+	if intro == null:
+		return false
+	var generation: int = int(intro.get("intro_run_generation"))
+	return generation > 0 and int(intro.get("gameplay_handoff_consumed_generation")) == generation
 
 
 func _input(event: InputEvent) -> void:
