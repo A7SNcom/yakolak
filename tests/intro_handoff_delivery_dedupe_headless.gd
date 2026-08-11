@@ -1,8 +1,9 @@
 extends SceneTree
 
-# Regression for the production gameplay consumer's signal + direct handoff
-# delivery. The intro token remains ownership authority, while the consumer must
-# claim each published generation once before attempting consume/_enable_gameplay.
+# Regression for the production gameplay consumer's signal + direct + polling
+# handoff delivery. The intro token remains ownership authority, while every
+# delivery source must claim each published generation once before attempting
+# consume/_enable_gameplay.
 
 const TIMEOUT_MSEC: int = 5000
 
@@ -24,6 +25,12 @@ func _run() -> void:
 		await _finish()
 		return
 	_expect(await _wait_until(Callable(self, "_game_initialized")), "gameplay initializes before handoff delivery test")
+
+	# Structural guard: gameplay.gd's frame fallback may discover delivery state,
+	# but direct token consumption from _process must never return.
+	var gameplay_source: String = FileAccess.get_file_as_string("res://scripts/gameplay.gd")
+	_expect(not gameplay_source.contains("intro.call(\"consume_gameplay_handoff\", intro_generation_seen)"), "frame polling has no direct token-consume path")
+	_expect(gameplay_source.contains("_accept_gameplay_handoff_delivery(intro_generation_seen, \"polling\")"), "frame polling enters shared consumer claim")
 
 	var claims_before: int = int(game.get("intro_handoff_claim_count"))
 	var consumes_before: int = int(intro.get("gameplay_handoff_consume_count"))
@@ -90,6 +97,80 @@ func _run() -> void:
 	_expect(int(game.get("intro_handoff_apply_count")) == applications_before + 2, "replay duplicate direct delivery cannot rerun restore/application work")
 	_expect(str(game.get("intro_handoff_consumer_probe")) == "handoff-consumed", "replay duplicate preserves successful probe")
 
+	# Generation 3 simulates complete loss of signal + direct handoff delivery.
+	# Only the published pending token exists. Frame polling must recover it by
+	# entering the exact same claim; it must not have a private consume/enable path.
+	intro.call("_restart_intro")
+	var polling_generation: int = int(intro.get("intro_run_generation"))
+	_expect(polling_generation == replay_generation + 1, "polling replay advances one generation")
+	_expect(await _wait_until(Callable(self, "_replay_reset_seen").bind(polling_generation, resets_before + 3)), "polling replay reset is observed once")
+	intro.set_process(false)
+	var poll_attempts_before: int = int(game.get("intro_handoff_poll_attempt_count"))
+	var poll_claims_before: int = int(game.get("intro_handoff_poll_claim_count"))
+	_publish_pending_without_delivery(polling_generation)
+	_expect(await _wait_until(Callable(self, "_handoff_consumed").bind(polling_generation)), "polling recovers one handoff when signal and direct delivery are lost")
+	_expect(int(game.get("intro_handoff_claim_count")) == claims_before + 3, "polling recovery creates exactly one shared consumer claim")
+	_expect(int(game.get("intro_handoff_claimed_generation")) == polling_generation, "polling claim belongs to current generation")
+	_expect(int(game.get("intro_handoff_poll_claim_count")) == poll_claims_before + 1, "polling source records exactly one claim")
+	_expect(int(game.get("intro_handoff_poll_attempt_count")) == poll_attempts_before + 1, "polling needs exactly one claim attempt for pending token")
+	_expect(int(intro.get("gameplay_handoff_consume_count")) == consumes_before + 3, "polling recovery consumes token once through claim")
+	_expect(int(game.get("intro_handoff_apply_count")) == applications_before + 3, "polling recovery enables gameplay once through claim")
+	_expect(str(game.get("intro_handoff_consumer_probe")) == "handoff-consumed", "polling recovery leaves successful consumer probe")
+
+	# Once handoff succeeds, _process must make zero further polling attempts for
+	# that generation even across extra frames.
+	var poll_attempts_after_success: int = int(game.get("intro_handoff_poll_attempt_count"))
+	await _settle_frames(8)
+	_expect(int(game.get("intro_handoff_poll_attempt_count")) == poll_attempts_after_success, "polling stops all per-frame claim attempts after handoff success")
+	_expect(int(intro.get("gameplay_handoff_consume_count")) == consumes_before + 3, "post-success frames cannot reconsume token")
+	_expect(int(game.get("intro_handoff_apply_count")) == applications_before + 3, "post-success frames cannot rerun gameplay enable")
+	_expect(str(game.get("intro_handoff_consumer_probe")) == "handoff-consumed", "post-success polling silence preserves successful probe")
+
+	# Generation 4 exercises delayed consumer initialization. Delivery claims the
+	# generation first, but token consumption is deferred inside that same claim
+	# until initialization is ready; polling is disabled so no competing path can
+	# hide a split authority bug.
+	intro.call("_restart_intro")
+	var delayed_generation: int = int(intro.get("intro_run_generation"))
+	_expect(delayed_generation == polling_generation + 1, "delayed-init replay advances one generation")
+	_expect(await _wait_until(Callable(self, "_replay_reset_seen").bind(delayed_generation, resets_before + 4)), "delayed-init replay reset is observed once")
+	intro.set_process(false)
+	game.set_process(false)
+	game.set("initialized", false)
+	var delayed_claims_before: int = int(game.get("intro_handoff_claim_count"))
+	var delayed_consumes_before: int = int(intro.get("gameplay_handoff_consume_count"))
+	_publish_pending_without_delivery(delayed_generation)
+	game.call("accept_intro_handoff", delayed_generation)
+	await _settle_frames(2)
+	_expect(int(game.get("intro_handoff_claim_count")) == delayed_claims_before + 1, "delayed consumer claims generation once before initialization")
+	_expect(int(game.get("intro_handoff_claimed_generation")) == delayed_generation, "delayed consumer claim tracks current generation")
+	_expect(int(intro.get("gameplay_handoff_consume_count")) == delayed_consumes_before, "delayed initialization does not consume token early")
+	_expect(str(game.get("intro_handoff_consumer_probe")) == "handoff-pending-init", "delayed initialization is observable inside claimed delivery")
+	game.set("initialized", true)
+	_expect(await _wait_until(Callable(self, "_handoff_consumed").bind(delayed_generation)), "claimed delayed handoff consumes after initialization becomes ready")
+	_expect(int(intro.get("gameplay_handoff_consume_count")) == delayed_consumes_before + 1, "delayed handoff consumes exactly one token")
+	_expect(int(game.get("intro_handoff_apply_count")) == applications_before + 4, "delayed handoff enables gameplay exactly once")
+	game.set_process(true)
+
+	# Generation 5 reconnects the signal observer and returns to normal production
+	# signal + direct delivery. A replay must mint one fresh claim/token only; the
+	# polling claim from generation 3 cannot leak into this generation.
+	if not intro.is_connected("gameplay_handoff_ready", handoff_handler):
+		intro.connect("gameplay_handoff_ready", handoff_handler)
+	var poll_claims_after_recovery: int = int(game.get("intro_handoff_poll_claim_count"))
+	intro.call("_restart_intro")
+	var final_generation: int = int(intro.get("intro_run_generation"))
+	_expect(final_generation == delayed_generation + 1, "post-reconnect replay advances one generation")
+	_expect(await _wait_until(Callable(self, "_replay_reset_seen").bind(final_generation, resets_before + 5)), "post-reconnect replay reset is observed once")
+	intro.set_process(false)
+	_publish_true_completion()
+	_expect(await _wait_until(Callable(self, "_handoff_consumed").bind(final_generation)), "reconnected signal plus direct delivery consumes fresh handoff")
+	_expect(int(game.get("intro_handoff_claim_count")) == claims_before + 5, "each of five generations creates one claim only")
+	_expect(int(intro.get("gameplay_handoff_consume_count")) == consumes_before + 5, "each of five generations consumes one token only")
+	_expect(int(game.get("intro_handoff_apply_count")) == applications_before + 5, "each of five generations applies gameplay once only")
+	_expect(int(game.get("intro_handoff_poll_claim_count")) == poll_claims_after_recovery, "normal replay does not create an extra polling claim")
+	_expect(str(game.get("intro_handoff_consumer_probe")) == "handoff-consumed", "final replay leaves successful probe")
+
 	await _finish()
 
 
@@ -97,6 +178,15 @@ func _publish_true_completion() -> void:
 	intro.call("_snap_final")
 	intro.set("playing", false)
 	intro.call("_publish_complete")
+
+
+func _publish_pending_without_delivery(generation: int) -> void:
+	# Test-only representation of a handoff whose signal/direct delivery was lost.
+	# The root still owns a real pending generation token; no consumer callback is
+	# emitted here, so only production frame polling can discover the delivery.
+	intro.set("gameplay_handoff_published_generation", generation)
+	intro.set("gameplay_handoff_pending", true)
+	intro.set("gameplay_handoff_emit_count", int(intro.get("gameplay_handoff_emit_count")) + 1)
 
 
 func _game_initialized() -> bool:
@@ -141,13 +231,16 @@ func _expect(condition: bool, message: String) -> void:
 
 func _finish() -> void:
 	Engine.time_scale = 1.0
+	if game != null and is_instance_valid(game):
+		game.set_process(true)
+		game.set("initialized", true)
 	if intro != null and is_instance_valid(intro):
 		intro.queue_free()
 		await process_frame
 		await process_frame
 		await process_frame
 	if failures.is_empty():
-		print("YAKOLAK_INTRO_HANDOFF_DELIVERY_DEDUPE_OK first=signal+direct claims=1 consumes=1 replay=direct-fallback probe=stable")
+		print("YAKOLAK_INTRO_HANDOFF_DELIVERY_DEDUPE_OK signal=1 direct=1 polling=claim-only delayed-init=claim-only generations=5 probe=stable")
 		quit(0)
 		return
 	for failure: String in failures:

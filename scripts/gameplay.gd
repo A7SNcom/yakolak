@@ -40,6 +40,15 @@ var gameplay_ready: bool = false
 var intro_handoff_applied_generation: int = -1
 var intro_handoff_apply_depth: int = 0
 var intro_handoff_apply_count: int = 0
+# Every delivery source — signal, direct dispatch, reconnect, and polling — must
+# claim the current generation here before touching the ownership token. The
+# token in intro_handoff.gd remains the only authority that transfers ownership.
+var intro_handoff_claimed_generation: int = -1
+var intro_handoff_claim_count: int = 0
+# Polling remains only as loss-recovery delivery. These counters are deliberately
+# separate so regressions can prove it never consumes or enables outside claim.
+var intro_handoff_poll_attempt_count: int = 0
+var intro_handoff_poll_claim_count: int = 0
 
 var selected_index: int = -1
 var selected_home_position: Vector3 = Vector3.ZERO
@@ -83,14 +92,77 @@ func _process(_delta: float) -> void:
 		gameplay_ready = false
 		return
 
-	# Polling is only a delivery fallback for the same explicit generation token.
-	# Supplying the expected generation prevents any stale pending token from a
-	# previous replay from being consumed by a newer run.
-	if intro_generation_seen > 0 and intro.has_method("consume_gameplay_handoff") and bool(intro.call("consume_gameplay_handoff", intro_generation_seen)):
-		_enable_gameplay()
+	# Polling is only a delivery fallback. It may discover a published pending
+	# token, but it cannot consume it directly: it must enter the same per-generation
+	# consumer claim used by signal/direct/reconnect. After any source claims this
+	# generation the polling path becomes completely inert until the next replay.
+	if intro_generation_seen > 0 and intro_handoff_claimed_generation != intro_generation_seen:
+		if int(intro.get("gameplay_handoff_published_generation")) == intro_generation_seen and bool(intro.get("gameplay_handoff_pending")):
+			intro_handoff_poll_attempt_count += 1
+			_accept_gameplay_handoff_delivery(intro_generation_seen, "polling")
 
 	if move_active:
 		_update_move()
+
+
+func _accept_gameplay_handoff_delivery(generation: int, source: String = "unknown") -> void:
+	if intro == null:
+		_publish_intro_handoff_consumer_probe("consume-no-root")
+		return
+	if generation <= 0:
+		_publish_intro_handoff_consumer_probe("consume-invalid-generation")
+		return
+	if generation != int(intro.get("intro_run_generation")):
+		_publish_intro_handoff_consumer_probe("consume-stale-generation")
+		return
+	intro_generation_seen = generation
+	# The first delivery source for a published pending token owns the consumer
+	# claim. Same-generation duplicates return before token access or observability.
+	if generation == intro_handoff_claimed_generation:
+		return
+	if int(intro.get("gameplay_handoff_published_generation")) != generation:
+		return
+	if not bool(intro.get("gameplay_handoff_pending")):
+		return
+	intro_handoff_claimed_generation = generation
+	intro_handoff_claim_count += 1
+	if source == "polling":
+		intro_handoff_poll_claim_count += 1
+	print("YAKOLAK_INTRO_HANDOFF_CLAIMED generation=%d claims=%d source=%s" % [generation, intro_handoff_claim_count, source])
+	_publish_intro_handoff_consumer_probe("handoff-seen")
+	_consume_claimed_gameplay_handoff(generation)
+
+
+func _consume_claimed_gameplay_handoff(generation: int) -> void:
+	# Delayed consumer initialization can outlive the delivery frame. A replay can
+	# also invalidate deferred old-generation work; in both cases the claim remains
+	# the boundary and stale work never reaches the token or overwrites observability.
+	if intro == null:
+		return
+	if generation != intro_handoff_claimed_generation:
+		return
+	if generation != int(intro.get("intro_run_generation")):
+		return
+	if not initialized:
+		_publish_intro_handoff_consumer_probe("handoff-pending-init")
+		call_deferred("_consume_claimed_gameplay_handoff", generation)
+		return
+	if not intro.has_method("consume_gameplay_handoff"):
+		_publish_intro_handoff_consumer_probe("consume-method-missing")
+		return
+	if bool(intro.call("consume_gameplay_handoff", generation)):
+		_publish_intro_handoff_consumer_probe("handoff-consumed")
+		_enable_gameplay()
+	else:
+		# This is a genuine failure of the single claimed delivery. Polling cannot
+		# start another same-generation attempt after the claim has been established.
+		_publish_intro_handoff_consumer_probe("handoff-token-rejected")
+
+
+func _publish_intro_handoff_consumer_probe(_value: String) -> void:
+	# The production explicit layer overrides this hook for Web observability.
+	# Base consumers keep the exact same claim/token contract without a Web probe.
+	pass
 
 
 func _intro_handoff_generation_ready() -> int:
