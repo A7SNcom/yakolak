@@ -20,6 +20,8 @@ function deferred() {
 async function snapshot(page) {
   return page.evaluate(() => ({
     intro: document.body.dataset.yakolakIntro || '',
+    handoff: document.body.dataset.yakolakIntroHandoffEvent || '',
+    handoffGeneration: document.body.dataset.yakolakIntroHandoffConsumedGeneration || '',
     setup: document.body.dataset.yakolakSetup || '',
     flow: document.body.dataset.yakolakSetupFlowStage || '',
     state: document.body.dataset.yakolakOnlineUiState || '',
@@ -72,12 +74,21 @@ test('saved room restore is visibly explained while GET is pending', async ({ pa
   });
 
   await page.goto('http://127.0.0.1:8000/?yakolakTestFast=1&room=61', { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => document.body.dataset.yakolakIntro === 'complete', null, { timeout: 60000 });
+
+  // `yakolakIntro=complete` is also used by the web loader and is not an
+  // ownership boundary. Saved-room restoration must wait for the explicit
+  // one-shot intro handoff consumed by gameplay.
+  await page.waitForFunction(
+    () => document.body.dataset.yakolakIntroHandoffEvent === 'consumed',
+    null,
+    { timeout: 60000 }
+  );
   await page.waitForTimeout(1200);
 
   const pending = await snapshot(page);
   expect(pending.saved, `saved identity missing: ${JSON.stringify(pending)}`).not.toBe('');
-  expect(getRequests, `restore GET was never issued: ${JSON.stringify(pending)}`).toBeGreaterThan(0);
+  expect(pending.handoff, `explicit intro handoff missing: ${JSON.stringify(pending)}`).toBe('consumed');
+  expect(getRequests, `restore GET was never issued after explicit handoff: ${JSON.stringify(pending)}`).toBeGreaterThan(0);
   expect(pending, `restore is active but UI is ambiguous: ${JSON.stringify(pending)}`).toMatchObject({
     state: 'restoring-room',
     surface: 'gameplay',
