@@ -16,6 +16,18 @@ func _run() -> void:
 	intro = preload("res://scenes/intro.tscn").instantiate()
 	root.add_child(intro)
 	await process_frame
+	# This fast gameplay contract starts at an already-completed intro boundary.
+	# The lifecycle regression separately runs the real cinematic timing. Mark the
+	# two handoff guards explicitly so gameplay cannot confuse pre-intro's internal
+	# playing=false pause with the final ownership transfer.
+	var preintro: Node = intro.get_node_or_null("StarToTablePreIntro")
+	if preintro != null:
+		preintro.set("completed", true)
+		preintro.set_process(false)
+	var smooth: Node = intro.get_node_or_null("SmoothIntroTimeline")
+	if smooth != null:
+		smooth.set("active", false)
+		smooth.set_process(false)
 	intro.playing = false
 	for _frame in range(6):
 		await process_frame

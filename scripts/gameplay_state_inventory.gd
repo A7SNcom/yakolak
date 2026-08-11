@@ -56,7 +56,29 @@ func _show_restore_state_if_pending() -> bool:
 	return true
 
 
+func _intro_handoff_ready() -> bool:
+	# pre-intro deliberately parks intro.playing=false while it owns the scene.
+	# That pause is not the gameplay handoff. Release intro ownership only after
+	# pre-intro completed and the smooth final timeline has actually stopped.
+	if intro == null or bool(intro.get("playing")):
+		return false
+	var preintro: Node = intro.get_node_or_null("StarToTablePreIntro")
+	if preintro != null and not bool(preintro.get("completed")):
+		return false
+	var smooth: Node = intro.get_node_or_null("SmoothIntroTimeline")
+	if smooth != null and bool(smooth.get("active")):
+		return false
+	return true
+
+
 func _enable_gameplay() -> void:
+	if not _intro_handoff_ready():
+		_trace_online_ui("enable:ignored-preintro-pause")
+		return
+	# Release intro ownership synchronously. ExistingIntroCorrections runs at a
+	# later process priority, so a deferred shutdown could still overwrite the
+	# final gameplay-owned transforms once in the handoff frame.
+	_suspend_intro_runtime()
 	_trace_online_ui("enable:before")
 	super._enable_gameplay()
 	_trace_online_ui("enable:after:restore=" + str(restoring_online) + ":transport=" + str(_transport_restore_pending()))
@@ -255,6 +277,8 @@ func _intro_handoff_workers() -> Array[StringName]:
 
 
 func _suspend_intro_runtime() -> void:
+	if not _intro_handoff_ready():
+		return
 	# Preserve the accepted final frame, then make the ownership transfer strict:
 	# gameplay owns the scene after this point, so no intro callback may keep
 	# receiving process/physics/input work or retain a time-scale side effect.

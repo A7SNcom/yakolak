@@ -61,7 +61,7 @@ func _run() -> void:
 
 	# Do not manufacture the post-intro state. Wait for gameplay.gd to observe the
 	# real playing=true -> false transition and call _enable_gameplay(), which owns
-	# the production handoff and its deferred intro-runtime suspension.
+	# the production handoff and its intro-runtime suspension.
 	var handed_off: bool = await _wait_for_gameplay_handoff()
 	_expect(handed_off, "real intro hands control to gameplay setup")
 	await _settle_frames(6)
@@ -204,7 +204,7 @@ func _intro_resize_connection_count() -> int:
 		if worker != null:
 			owner_ids[worker.get_instance_id()] = true
 	var count: int = 0
-	for connection_value: Variant in get_viewport().get_signal_connection_list("size_changed"):
+	for connection_value: Variant in intro.get_viewport().get_signal_connection_list("size_changed"):
 		var connection: Dictionary = connection_value as Dictionary
 		var callback: Callable = connection.get("callable", Callable())
 		if not callback.is_valid():
