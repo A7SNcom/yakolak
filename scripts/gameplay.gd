@@ -46,9 +46,12 @@ var intro_handoff_apply_count: int = 0
 var intro_handoff_claimed_generation: int = -1
 var intro_handoff_claim_count: int = 0
 # A claim can arrive before the gameplay consumer has finished initialization.
-# Keep at most one next-frame resume scheduled for that generation; replay/reset
-# cancels it by changing this generation marker before the callback can consume.
-var intro_handoff_init_wait_scheduled_generation: int = -1
+# Hold exactly one claimed generation without scheduling frame retries. The
+# successful initialization transition itself resumes that claim once; replay or
+# reset clears stale pending work before it can ever touch the ownership token.
+var intro_handoff_pending_init_generation: int = -1
+var intro_handoff_init_hold_count: int = 0
+var intro_handoff_init_wake_count: int = 0
 # Polling remains only as loss-recovery delivery. These counters are deliberately
 # separate so regressions can prove it never consumes or enables outside claim.
 var intro_handoff_poll_attempt_count: int = 0
@@ -83,7 +86,8 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	if not initialized:
-		initialized = _initialize_when_ready()
+		if _initialize_when_ready():
+			_complete_gameplay_consumer_initialization()
 		if not initialized:
 			return
 
@@ -138,9 +142,9 @@ func _accept_gameplay_handoff_delivery(generation: int, source: String = "unknow
 
 
 func _consume_claimed_gameplay_handoff(generation: int) -> void:
-	# Delayed consumer initialization can outlive the delivery frame. A replay can
-	# invalidate a waiting old-generation callback; in both cases the claim remains
-	# the boundary and stale work never reaches the token or overwrites observability.
+	# Delayed initialization never creates a second delivery authority. The claim
+	# is held once until initialization completes, and replay can cancel the held
+	# generation silently before any token access occurs.
 	if intro == null:
 		return
 	if generation != intro_handoff_claimed_generation:
@@ -148,10 +152,12 @@ func _consume_claimed_gameplay_handoff(generation: int) -> void:
 	if generation != int(intro.get("intro_run_generation")):
 		return
 	if not initialized:
-		_publish_intro_handoff_consumer_probe("handoff-pending-init")
-		_schedule_claimed_gameplay_handoff_resume(generation)
+		if intro_handoff_pending_init_generation != generation:
+			intro_handoff_pending_init_generation = generation
+			intro_handoff_init_hold_count += 1
+			_publish_intro_handoff_consumer_probe("handoff-pending-init")
 		return
-	intro_handoff_init_wait_scheduled_generation = -1
+	intro_handoff_pending_init_generation = -1
 	if not intro.has_method("consume_gameplay_handoff"):
 		_publish_intro_handoff_consumer_probe("consume-method-missing")
 		return
@@ -164,21 +170,29 @@ func _consume_claimed_gameplay_handoff(generation: int) -> void:
 		_publish_intro_handoff_consumer_probe("handoff-token-rejected")
 
 
-func _schedule_claimed_gameplay_handoff_resume(generation: int) -> void:
-	if intro_handoff_init_wait_scheduled_generation == generation:
+func _complete_gameplay_consumer_initialization() -> void:
+	# This is the only wake-up for a claim that arrived before initialization. It
+	# is invoked exactly when _initialize_when_ready() succeeds, never once/frame.
+	if initialized:
 		return
-	intro_handoff_init_wait_scheduled_generation = generation
-	var resume := Callable(self, "_resume_claimed_gameplay_handoff_after_frame").bind(generation)
-	get_tree().process_frame.connect(resume, CONNECT_ONE_SHOT)
+	initialized = true
+	var pending_generation: int = intro_handoff_pending_init_generation
+	intro_handoff_pending_init_generation = -1
+	if pending_generation <= 0:
+		return
+	if intro == null:
+		return
+	if pending_generation != intro_handoff_claimed_generation:
+		return
+	if pending_generation != int(intro.get("intro_run_generation")):
+		return
+	intro_handoff_init_wake_count += 1
+	print("YAKOLAK_INTRO_HANDOFF_INIT_WAKE generation=%d wakes=%d" % [pending_generation, intro_handoff_init_wake_count])
+	_consume_claimed_gameplay_handoff(pending_generation)
 
 
-func _resume_claimed_gameplay_handoff_after_frame(generation: int) -> void:
-	# A replay/reset may have replaced the waiting generation before this frame.
-	# In that case the old callback is deliberately silent and cannot touch token.
-	if intro_handoff_init_wait_scheduled_generation != generation:
-		return
-	intro_handoff_init_wait_scheduled_generation = -1
-	_consume_claimed_gameplay_handoff(generation)
+func _cancel_pending_gameplay_handoff_initialization() -> void:
+	intro_handoff_pending_init_generation = -1
 
 
 func _publish_intro_handoff_consumer_probe(_value: String) -> void:
@@ -481,7 +495,7 @@ func _reset_for_intro() -> void:
 	# A replay starts a new generation, so the previous applied generation stays
 	# recorded while any interrupted nested application scope is discarded.
 	intro_handoff_apply_depth = 0
-	intro_handoff_init_wait_scheduled_generation = -1
+	_cancel_pending_gameplay_handoff_initialization()
 	if selected_index >= 0:
 		var selected_record: Dictionary = piece_records[selected_index] as Dictionary
 		var selected_mesh := selected_record["mesh"] as MeshInstance3D

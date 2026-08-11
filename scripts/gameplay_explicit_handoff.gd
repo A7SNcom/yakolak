@@ -64,6 +64,10 @@ func accept_intro_run_started(generation: int) -> void:
 	if generation == intro_generation_seen:
 		_publish_consumer_probe("intro-start-duplicate-generation")
 		return
+	# A replay owns a new generation even if gameplay initialization is still
+	# incomplete. Cancel any held handoff from the old generation immediately;
+	# completion of initialization must never wake stale ownership work.
+	_cancel_pending_gameplay_handoff_initialization()
 	intro_generation_seen = generation
 	gameplay_ready = false
 	if initialized:
