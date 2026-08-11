@@ -4,7 +4,6 @@ extends "res://scripts/gameplay_interaction_feedback.gd"
 # requests, reconciliation, or rules; it only makes every wait/failure/restore
 # state visible on the existing waiting card with one consistent vocabulary.
 const OnlineStateCatalog = preload("res://scripts/online_state_catalog.gd")
-const CONNECTED_CONFIRM_MS: int = 1200
 
 var online_ui_state_id: String = ""
 var online_ui_detail: String = ""
@@ -102,8 +101,7 @@ func _on_online_room_changed(remote: Dictionary, identity: Dictionary) -> void:
 	elif status == "cancelled":
 		_set_online_ui_state("room-cancelled")
 	elif status == "playing":
-		if online_ui_state_id != "connected":
-			_clear_online_ui_state("room:playing")
+		_clear_online_ui_state("room:playing")
 	elif status == "finished":
 		_clear_online_ui_state("room:finished")
 
@@ -134,8 +132,10 @@ func _on_connection_state_changed(state: String, detail: String) -> void:
 			_set_online_ui_state("reconnecting")
 		return
 	if state == "connected":
-		_set_online_ui_state("connected")
-		online_ui_clear_due_msec = Time.get_ticks_msec() + CONNECTED_CONFIRM_MS
+		# Recovery itself requires no decision. Remove the interrupting reconnect
+		# card immediately; the authoritative room event that follows owns all
+		# gameplay presentation and must not compete with a success message.
+		_clear_online_ui_state("connection-restored")
 
 
 func _return_to_setup() -> void:
@@ -216,6 +216,11 @@ func _clear_online_ui_state(reason: String = "unknown") -> void:
 	online_ui_state_id = ""
 	online_ui_detail = ""
 	online_ui_clear_due_msec = 0
+	# Do not leave the full-rect STOP control alive for even one extra frame after
+	# a transient resolves. Waiting/cancelled room states are owned by the base
+	# waiting contract and remain visible through their own explicit conditions.
+	if waiting_root != null and not (online_active and online_waiting) and not online_cancelled:
+		waiting_root.visible = false
 	if had_state:
 		_publish_online_ui_state("", "")
 
