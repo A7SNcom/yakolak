@@ -99,7 +99,7 @@ func _process(_delta: float) -> void:
 	# Lifecycle ownership is explicit. `playing` belongs to intro visuals and can
 	# be false during pre-intro pauses without meaning gameplay may start. Polling
 	# is only loss recovery: it must redeliver the start through the same consumer
-	# claim as signal/direct and never call _reset_for_intro() on its own.
+	# claim as signal/direct and never perform an intro reset on its own.
 	var intro_generation: int = int(intro.get("intro_run_generation"))
 	if intro_generation > intro_generation_seen:
 		_recover_intro_run_start_by_polling(intro_generation)
