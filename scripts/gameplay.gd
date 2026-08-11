@@ -45,6 +45,10 @@ var intro_handoff_apply_count: int = 0
 # token in intro_handoff.gd remains the only authority that transfers ownership.
 var intro_handoff_claimed_generation: int = -1
 var intro_handoff_claim_count: int = 0
+# A claim can arrive before the gameplay consumer has finished initialization.
+# Keep at most one next-frame resume scheduled for that generation; replay/reset
+# cancels it by changing this generation marker before the callback can consume.
+var intro_handoff_init_wait_scheduled_generation: int = -1
 # Polling remains only as loss-recovery delivery. These counters are deliberately
 # separate so regressions can prove it never consumes or enables outside claim.
 var intro_handoff_poll_attempt_count: int = 0
@@ -135,7 +139,7 @@ func _accept_gameplay_handoff_delivery(generation: int, source: String = "unknow
 
 func _consume_claimed_gameplay_handoff(generation: int) -> void:
 	# Delayed consumer initialization can outlive the delivery frame. A replay can
-	# also invalidate deferred old-generation work; in both cases the claim remains
+	# invalidate a waiting old-generation callback; in both cases the claim remains
 	# the boundary and stale work never reaches the token or overwrites observability.
 	if intro == null:
 		return
@@ -145,8 +149,9 @@ func _consume_claimed_gameplay_handoff(generation: int) -> void:
 		return
 	if not initialized:
 		_publish_intro_handoff_consumer_probe("handoff-pending-init")
-		call_deferred("_consume_claimed_gameplay_handoff", generation)
+		_schedule_claimed_gameplay_handoff_resume(generation)
 		return
+	intro_handoff_init_wait_scheduled_generation = -1
 	if not intro.has_method("consume_gameplay_handoff"):
 		_publish_intro_handoff_consumer_probe("consume-method-missing")
 		return
@@ -157,6 +162,23 @@ func _consume_claimed_gameplay_handoff(generation: int) -> void:
 		# This is a genuine failure of the single claimed delivery. Polling cannot
 		# start another same-generation attempt after the claim has been established.
 		_publish_intro_handoff_consumer_probe("handoff-token-rejected")
+
+
+func _schedule_claimed_gameplay_handoff_resume(generation: int) -> void:
+	if intro_handoff_init_wait_scheduled_generation == generation:
+		return
+	intro_handoff_init_wait_scheduled_generation = generation
+	var resume := Callable(self, "_resume_claimed_gameplay_handoff_after_frame").bind(generation)
+	get_tree().process_frame.connect(resume, CONNECT_ONE_SHOT)
+
+
+func _resume_claimed_gameplay_handoff_after_frame(generation: int) -> void:
+	# A replay/reset may have replaced the waiting generation before this frame.
+	# In that case the old callback is deliberately silent and cannot touch token.
+	if intro_handoff_init_wait_scheduled_generation != generation:
+		return
+	intro_handoff_init_wait_scheduled_generation = -1
+	_consume_claimed_gameplay_handoff(generation)
 
 
 func _publish_intro_handoff_consumer_probe(_value: String) -> void:
@@ -459,6 +481,7 @@ func _reset_for_intro() -> void:
 	# A replay starts a new generation, so the previous applied generation stays
 	# recorded while any interrupted nested application scope is discarded.
 	intro_handoff_apply_depth = 0
+	intro_handoff_init_wait_scheduled_generation = -1
 	if selected_index >= 0:
 		var selected_record: Dictionary = piece_records[selected_index] as Dictionary
 		var selected_mesh := selected_record["mesh"] as MeshInstance3D
