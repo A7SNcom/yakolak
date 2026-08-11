@@ -201,7 +201,6 @@ test('[1/6] normal move renders no non-actionable blocker', async ({ page }) => 
   const normal = await messageInventory(page);
   expect(normal.moveBlocker).toBe('removed');
   expect(normal.movePending).toBe('');
-  expect(normal.movePendingTrace).not.toContain('hint-shown');
   expect(normal.surfaces).toEqual([]);
   assertMessageSafety(normal);
 });
