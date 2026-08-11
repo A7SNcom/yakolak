@@ -31,19 +31,33 @@ python3 scripts/prepare_logo.py
 timeout 5m "$GODOT_BIN" --headless --path . --import
 timeout 2m "$GODOT_BIN" --headless --path . --script res://tests/game_rules_headless.gd
 timeout 2m "$GODOT_BIN" --headless --path . --script res://tests/session_setup_headless.gd
-GAMEPLAY_HEADLESS_LOG="$(mktemp)"
-set +e
-timeout 2m "$GODOT_BIN" --verbose --headless --path . --script res://tests/gameplay_session_headless.gd 2>&1 | tee "$GAMEPLAY_HEADLESS_LOG"
-GAMEPLAY_HEADLESS_STATUS=${PIPESTATUS[0]}
-set -e
-if [ "$GAMEPLAY_HEADLESS_STATUS" -ne 0 ]; then
-  exit "$GAMEPLAY_HEADLESS_STATUS"
-fi
-if grep -Eq "ObjectDB instances were leaked at exit|resources still in use at exit" "$GAMEPLAY_HEADLESS_LOG"; then
-  echo "YAKOLAK_GAMEPLAY_RESOURCE_LEAK_GATE_FAIL"
-  exit 1
-fi
-echo "YAKOLAK_GAMEPLAY_RESOURCE_LEAK_GATE_OK"
+
+run_godot_resource_gate() {
+  local script_path="$1"
+  local label="$2"
+  local log_file
+  local status
+  log_file="$(mktemp)"
+  set +e
+  timeout 2m "$GODOT_BIN" --verbose --headless --path . --script "$script_path" 2>&1 | tee "$log_file"
+  status=${PIPESTATUS[0]}
+  set -e
+  if [ "$status" -ne 0 ]; then
+    rm -f "$log_file"
+    return "$status"
+  fi
+  if grep -Eq "ObjectDB instances were leaked at exit|resources still in use at exit" "$log_file"; then
+    echo "YAKOLAK_GAMEPLAY_RESOURCE_LEAK_GATE_FAIL label=$label"
+    rm -f "$log_file"
+    return 1
+  fi
+  echo "YAKOLAK_GAMEPLAY_RESOURCE_LEAK_GATE_OK label=$label"
+  rm -f "$log_file"
+}
+
+run_godot_resource_gate res://tests/gameplay_session_headless.gd gameplay_session
+run_godot_resource_gate res://tests/gameplay_session_lifecycle_headless.gd gameplay_lifecycle
+
 timeout 7m "$GODOT_BIN" --headless --path . --export-release "Web" web/index.html
 test -s web/index.html; test -s web/index.js; test -s web/index.wasm; test -s web/index.pck
 cp generated/YAKOLAK_INVERTED.svg web/yakolak-logo.svg
