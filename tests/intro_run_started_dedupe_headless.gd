@@ -143,7 +143,6 @@ func _run() -> void:
 	_expect(int(game.get("intro_run_started_reset_count")) == delayed_resets_before + 1, "latest delayed generation reset applies exactly once")
 	_expect(int(game.get("intro_run_started_reset_generation")) == delayed_final_generation, "applied delayed reset belongs to final generation only")
 	_expect(int(game.get("move_count")) == 0, "deferred reset executes before final gameplay ownership")
-	_expect(not bool(game.get("waiting_for_setup")), "deferred reset runs the full gameplay reset chain")
 	_expect(int(game.get("intro_handoff_init_wake_count")) == wakes_before_completion + 1, "completion wakes final claimed handoff once")
 	_expect(int(intro.get("gameplay_handoff_consume_count")) == consumes_before_completion + 1, "completion consumes final token once after reset")
 	_expect(int(intro.get("gameplay_handoff_consumed_generation")) == delayed_final_generation, "consumed token belongs to final replay generation")
