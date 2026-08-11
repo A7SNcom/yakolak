@@ -23,6 +23,11 @@ var intro_run_started_pending_reset_generation: int = -1
 # and frame polling cannot own separate consumption paths. This layer only adds
 # Web observability for that shared claim.
 var intro_handoff_consumer_probe: String = ""
+# Observability is generation-bound independently from ownership. The probe may
+# advance for a fresh replay, but a consumed generation is terminal and stale or
+# duplicate intro-start delivery can never replace its successful final state.
+var intro_handoff_consumer_probe_generation: int = -1
+var intro_handoff_consumer_probe_terminal_generation: int = -1
 
 
 func _ready() -> void:
@@ -37,7 +42,7 @@ func _ready() -> void:
 	var handoff_handler := Callable(self, "_on_explicit_gameplay_handoff_ready")
 	if intro.has_signal("gameplay_handoff_ready") and not intro.is_connected("gameplay_handoff_ready", handoff_handler):
 		intro.connect("gameplay_handoff_ready", handoff_handler)
-	_publish_consumer_probe("connected")
+	_publish_consumer_probe("connected", ready_generation)
 	# Scene ordering can make an already-published lifecycle token exist before a
 	# consumer reconnect. Reconnect is only another delivery source into the same
 	# handoff path, which now recovers any missing start claim/reset first; it never
@@ -57,17 +62,17 @@ func accept_intro_run_started(generation: int) -> void:
 	if intro == null:
 		intro = get_parent() as Node3D
 	if intro == null:
-		_publish_consumer_probe("intro-start-no-root")
+		_publish_consumer_probe("intro-start-no-root", generation)
 		return
 	if generation != int(intro.get("intro_run_generation")):
-		_publish_consumer_probe("intro-start-stale-generation")
+		_publish_consumer_probe("intro-start-stale-generation", generation)
 		return
 	# Signal delivery, direct Web dispatch, handoff/reconnect recovery, and polling
 	# all enter here. The first path claims the generation through
 	# `intro_generation_seen`; every duplicate path exits before mutating gameplay
 	# or resetting session/restore state.
 	if generation == intro_generation_seen:
-		_publish_consumer_probe("intro-start-duplicate-generation")
+		_publish_consumer_probe("intro-start-duplicate-generation", generation)
 		return
 	# A replay owns a new generation even if gameplay initialization is still
 	# incomplete. Cancel any held handoff from the old generation immediately;
@@ -82,7 +87,7 @@ func accept_intro_run_started(generation: int) -> void:
 		# Only the newest pre-init replay keeps a reset obligation. A later replay
 		# silently replaces this integer before any reset side effect can occur.
 		intro_run_started_pending_reset_generation = generation
-	_publish_consumer_probe("intro-started")
+	_publish_consumer_probe("intro-started", generation)
 
 
 func _complete_gameplay_consumer_initialization() -> void:
@@ -148,10 +153,50 @@ func accept_intro_handoff(generation: int) -> void:
 
 
 func _publish_intro_handoff_consumer_probe(value: String) -> void:
-	_publish_consumer_probe(value)
+	var generation: int = -1
+	if intro != null:
+		generation = int(intro.get("intro_run_generation"))
+	_publish_consumer_probe(value, generation)
 
 
-func _publish_consumer_probe(value: String) -> void:
-	intro_handoff_consumer_probe = value
+func _publish_consumer_probe(value: String, generation: int = -1) -> void:
+	var observed_generation: int = generation
+	if observed_generation <= 0 and intro != null:
+		observed_generation = int(intro.get("intro_run_generation"))
+	var next_value: String = value
+	if observed_generation > 0:
+		# A stale start belongs to its delivered generation, not whichever replay is
+		# current now. Never let an older/future stale delivery move the live probe.
+		if next_value == "intro-start-stale-generation" and intro != null:
+			if observed_generation != int(intro.get("intro_run_generation")):
+				return
+		if intro_handoff_consumer_probe_generation > observed_generation:
+			return
+		# The root's consumed generation is authoritative even across reconnects.
+		# Reassert terminal success rather than allowing a later diagnostic write.
+		if intro != null and int(intro.get("gameplay_handoff_consumed_generation")) == observed_generation:
+			next_value = "handoff-consumed"
+		elif intro_handoff_consumer_probe_terminal_generation == observed_generation:
+			return
+		# Same-generation duplicate/stale start diagnostics are lower-priority than
+		# an already accepted start or any handoff state for that generation.
+		var start_diagnostic: bool = (
+			next_value == "intro-start-duplicate-generation"
+			or next_value == "intro-start-stale-generation"
+		)
+		var existing_progressed: bool = (
+			intro_handoff_consumer_probe == "intro-started"
+			or intro_handoff_consumer_probe.begins_with("handoff-")
+		)
+		if (
+			start_diagnostic
+			and intro_handoff_consumer_probe_generation == observed_generation
+			and existing_progressed
+		):
+			return
+		intro_handoff_consumer_probe_generation = observed_generation
+		if next_value == "handoff-consumed":
+			intro_handoff_consumer_probe_terminal_generation = observed_generation
+	intro_handoff_consumer_probe = next_value
 	if OS.has_feature("web"):
-		JavaScriptBridge.eval("document.body.dataset.yakolakIntroHandoffConsumer='%s';" % value, true)
+		JavaScriptBridge.eval("document.body.dataset.yakolakIntroHandoffConsumer='%s';" % next_value, true)
