@@ -4,6 +4,7 @@ extends "res://scripts/intro.gd"
 # `playing` remains a visual-clock flag and may be false during internal pauses.
 # Gameplay receives control only by consuming the one-shot token published from
 # the real intro completion path.
+signal intro_run_started(generation: int)
 signal gameplay_handoff_ready(generation: int)
 
 var intro_run_generation: int = 0
@@ -20,6 +21,7 @@ func _restart_intro() -> void:
 	gameplay_handoff_pending = false
 	super._restart_intro()
 	print("YAKOLAK_INTRO_RUN_STARTED generation=%d" % intro_run_generation)
+	intro_run_started.emit(intro_run_generation)
 
 
 func _publish_complete() -> void:
@@ -38,18 +40,22 @@ func _publish_gameplay_handoff() -> void:
 	gameplay_handoff_published_generation = intro_run_generation
 	gameplay_handoff_pending = true
 	gameplay_handoff_emit_count += 1
-	gameplay_handoff_ready.emit(intro_run_generation)
 	print("YAKOLAK_INTRO_HANDOFF_READY generation=%d emits=%d" % [intro_run_generation, gameplay_handoff_emit_count])
+	# Publish observability before emitting. Signal delivery is synchronous, so a
+	# successful gameplay consumer must be the final visible state for the frame.
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakIntroHandoffEvent='ready';" +
 			"document.body.dataset.yakolakIntroHandoffGeneration='" + str(intro_run_generation) + "';",
 			true
 		)
+	gameplay_handoff_ready.emit(intro_run_generation)
 
 
-func consume_gameplay_handoff() -> bool:
+func consume_gameplay_handoff(expected_generation: int = -1) -> bool:
 	if not gameplay_handoff_pending:
+		return false
+	if expected_generation >= 0 and expected_generation != intro_run_generation:
 		return false
 	if gameplay_handoff_published_generation != intro_run_generation:
 		gameplay_handoff_pending = false
