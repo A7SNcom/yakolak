@@ -27,6 +27,9 @@ async function snapshot(page) {
     starMotion: document.body.dataset.yakolakStarMotion || '',
     handoff: document.body.dataset.yakolakIntroHandoffEvent || '',
     handoffGeneration: document.body.dataset.yakolakIntroHandoffConsumedGeneration || '',
+    handoffConsumer: document.body.dataset.yakolakIntroHandoffConsumer || '',
+    handoffDispatch: document.body.dataset.yakolakIntroHandoffDispatch || '',
+    introRunDispatch: document.body.dataset.yakolakIntroRunDispatch || '',
     setup: document.body.dataset.yakolakSetup || '',
     flow: document.body.dataset.yakolakSetupFlowStage || '',
     state: document.body.dataset.yakolakOnlineUiState || '',
@@ -44,6 +47,14 @@ test('saved room restore is visibly explained while GET is pending', async ({ pa
   test.setTimeout(90000);
   const restoreGate = deferred();
   let getRequests = 0;
+  const pageErrors = [];
+  const consoleErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  page.on('console', message => {
+    if (message.type() === 'error' || message.type() === 'warning') {
+      consoleErrors.push(`${message.type()}:${message.text()}`);
+    }
+  });
 
   await page.addInitScript(() => {
     sessionStorage.setItem('yakolak-online:61', JSON.stringify({
@@ -91,7 +102,7 @@ test('saved room restore is visibly explained while GET is pending', async ({ pa
     );
   } catch (error) {
     const stalled = await snapshot(page);
-    throw new Error(`explicit handoff stalled: ${JSON.stringify(stalled)}; getRequests=${getRequests}; original=${error}`);
+    throw new Error(`explicit handoff stalled: ${JSON.stringify(stalled)}; getRequests=${getRequests}; pageErrors=${JSON.stringify(pageErrors)}; consoleErrors=${JSON.stringify(consoleErrors.slice(-12))}; original=${error}`);
   }
   await page.waitForTimeout(1200);
 

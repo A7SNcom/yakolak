@@ -59,14 +59,34 @@ func _dispatch_intro_run_started(generation: int) -> void:
 	# deterministic delivery path for exported Web builds, where the consumer may
 	# have script processing disabled after setup. Both paths hit the same token.
 	var gameplay: Node = get_node_or_null("PostIntroGameplay")
-	if gameplay != null and gameplay.has_method("accept_intro_run_started"):
-		gameplay.call("accept_intro_run_started", generation)
+	if gameplay == null:
+		_publish_dispatch_probe("yakolakIntroRunDispatch", "missing-node")
+		return
+	if not gameplay.has_method("accept_intro_run_started"):
+		_publish_dispatch_probe("yakolakIntroRunDispatch", "missing-method")
+		return
+	_publish_dispatch_probe("yakolakIntroRunDispatch", "calling")
+	gameplay.call("accept_intro_run_started", generation)
+	_publish_dispatch_probe("yakolakIntroRunDispatch", "called")
 
 
 func _dispatch_gameplay_handoff(generation: int) -> void:
 	var gameplay: Node = get_node_or_null("PostIntroGameplay")
-	if gameplay != null and gameplay.has_method("accept_intro_handoff"):
-		gameplay.call("accept_intro_handoff", generation)
+	if gameplay == null:
+		_publish_dispatch_probe("yakolakIntroHandoffDispatch", "missing-node")
+		return
+	if not gameplay.has_method("accept_intro_handoff"):
+		_publish_dispatch_probe("yakolakIntroHandoffDispatch", "missing-method")
+		return
+	_publish_dispatch_probe("yakolakIntroHandoffDispatch", "calling")
+	gameplay.call("accept_intro_handoff", generation)
+	_publish_dispatch_probe("yakolakIntroHandoffDispatch", "called")
+
+
+func _publish_dispatch_probe(key: String, value: String) -> void:
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.eval("document.body.dataset.%s='%s';" % [key, value], true)
 
 
 func consume_gameplay_handoff(expected_generation: int = -1) -> bool:
