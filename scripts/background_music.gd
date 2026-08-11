@@ -14,6 +14,16 @@ func _ready() -> void:
 	_publish_music_state("playing")
 
 
+func _exit_tree() -> void:
+	# Audio playback owns a RefCounted AudioStreamPlayback which in turn keeps the
+	# MP3 resource alive. Stop it explicitly before the node/script are torn down;
+	# relying on SceneTree shutdown left both objects alive in headless runs.
+	if finished.is_connected(_restart_song):
+		finished.disconnect(_restart_song)
+	stop()
+	stream = null
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	# Browsers may keep WebAudio suspended until the first user gesture. Godot
 	# resumes its audio context on interaction; retry playback if needed.
