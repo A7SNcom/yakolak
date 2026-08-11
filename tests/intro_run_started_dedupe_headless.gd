@@ -33,6 +33,19 @@ func _run() -> void:
 	_expect(base_completion_position > pending_apply_position, "pending intro reset is applied before base handoff wake")
 	_expect(explicit_source.contains("intro_handoff_pending_init_generation = held_handoff_generation"), "same-generation claimed handoff survives only the deferred reset")
 
+	# The base frame fallback is allowed to discover a lost start, but it must not
+	# retain independent reset authority. Its only action is redelivery into the
+	# production accept_intro_run_started claim used by signal/direct dispatch.
+	var base_source: String = FileAccess.get_file_as_string("res://scripts/gameplay.gd")
+	var process_start: int = base_source.find("func _process(_delta: float) -> void:")
+	var handoff_poll_comment: int = base_source.find("# Polling is only a delivery fallback.", process_start)
+	var process_intro_block: String = ""
+	if process_start >= 0 and handoff_poll_comment > process_start:
+		process_intro_block = base_source.substr(process_start, handoff_poll_comment - process_start)
+	_expect(process_intro_block.contains("_recover_intro_run_start_by_polling(intro_generation)"), "frame fallback redelivers intro start through one helper")
+	_expect(not process_intro_block.contains("_reset_for_intro()"), "frame fallback has no direct intro reset authority")
+	_expect(base_source.contains("call(\"accept_intro_run_started\", generation)"), "polling helper enters the same public start claim")
+
 	var initial_generation: int = int(intro.get("intro_run_generation"))
 	var resets_before: int = int(game.get("intro_run_started_reset_count"))
 	_expect(initial_generation > 0, "intro has an initial generation")
@@ -174,7 +187,84 @@ func _run() -> void:
 	await _settle_frames(2)
 	_expect(int(game.get("intro_run_started_reset_count")) == delayed_resets_before + 2, "post-init duplicate start remains one-shot")
 
+	# Polling recovery regression: disconnect the signal and deliberately advance
+	# the authoritative intro generation without emitting either signal or direct
+	# dispatch. Frame polling must recover that lost start through the same accept
+	# claim exactly once, without touching the handoff token/claim path.
+	if intro.is_connected("intro_run_started", started_handler):
+		intro.disconnect("intro_run_started", started_handler)
+	var polling_resets_before: int = int(game.get("intro_run_started_reset_count"))
+	var polling_attempts_before: int = int(game.get("intro_run_started_poll_attempt_count"))
+	var polling_claims_before: int = int(game.get("intro_run_started_poll_claim_count"))
+	var handoff_claims_before_polling: int = int(game.get("intro_handoff_claim_count"))
+	var handoff_consumes_before_polling: int = int(intro.get("gameplay_handoff_consume_count"))
+	game.set("move_count", 6)
+	game.set("waiting_for_setup", true)
+	intro.set("gameplay_handoff_pending", false)
+	var polling_generation: int = post_init_generation + 1
+	intro.set("intro_run_generation", polling_generation)
 	game.set_process(true)
+	await _settle_frames(3)
+	_expect(int(game.get("intro_run_started_poll_attempt_count")) == polling_attempts_before + 1, "polling attempts one recovery for a missed start")
+	_expect(int(game.get("intro_run_started_poll_claim_count")) == polling_claims_before + 1, "polling enters and wins the shared start claim once")
+	_expect(int(game.get("intro_run_started_reset_count")) == polling_resets_before + 1, "polling recovery causes exactly one reset through accept path")
+	_expect(int(game.get("intro_run_started_reset_generation")) == polling_generation, "polling recovery reset belongs to missed generation")
+	_expect(int(game.get("intro_generation_seen")) == polling_generation, "polling recovery records the shared generation claim")
+	_expect(int(game.get("move_count")) == 0, "polling recovery applies normal reset side effects")
+	_expect(not bool(game.get("waiting_for_setup")), "polling recovery clears restored setup ownership once")
+	_expect(int(game.get("intro_handoff_claim_count")) == handoff_claims_before_polling, "intro-start polling does not create a handoff consumer claim")
+	_expect(int(intro.get("gameplay_handoff_consume_count")) == handoff_consumes_before_polling, "intro-start polling does not consume the handoff token")
+
+	await _settle_frames(4)
+	_expect(int(game.get("intro_run_started_poll_attempt_count")) == polling_attempts_before + 1, "same recovered generation is not polled again")
+	_expect(int(game.get("intro_run_started_poll_claim_count")) == polling_claims_before + 1, "same recovered generation cannot claim again")
+	_expect(int(game.get("intro_run_started_reset_count")) == polling_resets_before + 1, "same recovered generation cannot reset twice")
+
+	# A pending delayed-init reset remains authoritative. Once that generation has
+	# already entered accept_intro_run_started, polling sees no unclaimed gap and
+	# cannot bypass the pending obligation or call reset independently.
+	game.set_process(false)
+	game.set("initialized", false)
+	game.set("move_count", 12)
+	game.set("waiting_for_setup", true)
+	var pending_generation: int = polling_generation + 1
+	intro.set("intro_run_generation", pending_generation)
+	game.call("accept_intro_run_started", pending_generation)
+	var pending_resets_before: int = int(game.get("intro_run_started_reset_count"))
+	var pending_poll_attempts_before: int = int(game.get("intro_run_started_poll_attempt_count"))
+	_expect(int(game.get("intro_run_started_pending_reset_generation")) == pending_generation, "delayed generation stores one pending reset before completion")
+	_expect(int(game.get("move_count")) == 12, "pending reset has not mutated gameplay early")
+	game.call("_complete_gameplay_consumer_initialization")
+	game.call("_process", 0.0)
+	_expect(int(game.get("intro_run_started_pending_reset_generation")) == -1, "completion settles pending reset")
+	_expect(int(game.get("intro_run_started_reset_count")) == pending_resets_before + 1, "pending reset applies once on completion")
+	_expect(int(game.get("intro_run_started_reset_generation")) == pending_generation, "pending reset keeps current generation")
+	_expect(int(game.get("intro_run_started_poll_attempt_count")) == pending_poll_attempts_before, "polling does not bypass an already-claimed pending reset")
+	_expect(int(game.get("move_count")) == 0, "pending reset completes normal reset side effects")
+
+	# Reconnect the signal observer, then lose the next direct/signal start again.
+	# The next replay must receive one fresh polling claim and one fresh reset—not
+	# reuse or repeat the previous generation's claim.
+	if not intro.is_connected("intro_run_started", started_handler):
+		intro.connect("intro_run_started", started_handler)
+	var next_poll_attempts_before: int = int(game.get("intro_run_started_poll_attempt_count"))
+	var next_poll_claims_before: int = int(game.get("intro_run_started_poll_claim_count"))
+	var next_resets_before: int = int(game.get("intro_run_started_reset_count"))
+	game.set("move_count", 5)
+	game.set("waiting_for_setup", true)
+	intro.set("gameplay_handoff_pending", false)
+	var next_poll_generation: int = pending_generation + 1
+	intro.set("intro_run_generation", next_poll_generation)
+	game.set_process(true)
+	await _settle_frames(3)
+	_expect(int(game.get("intro_run_started_poll_attempt_count")) == next_poll_attempts_before + 1, "next replay gets one new polling recovery attempt")
+	_expect(int(game.get("intro_run_started_poll_claim_count")) == next_poll_claims_before + 1, "next replay gets one new polling start claim")
+	_expect(int(game.get("intro_run_started_reset_count")) == next_resets_before + 1, "next replay gets exactly one new reset")
+	_expect(int(game.get("intro_run_started_reset_generation")) == next_poll_generation, "next replay reset belongs to its new generation")
+	_expect(int(game.get("move_count")) == 0, "next replay reset clears gameplay")
+	await _settle_frames(3)
+	_expect(int(game.get("intro_run_started_reset_count")) == next_resets_before + 1, "next replay reset remains one-shot after more frames")
+
 	await _finish()
 
 
@@ -218,7 +308,7 @@ func _finish() -> void:
 		await process_frame
 		await process_frame
 	if failures.is_empty():
-		print("YAKOLAK_INTRO_RUN_STARTED_DEDUPE_OK delivery=signal+direct delayed_reset=latest-only reset_before_handoff=1 post_init=one-shot")
+		print("YAKOLAK_INTRO_RUN_STARTED_DEDUPE_OK delivery=signal+direct polling=shared-claim delayed_reset=latest-only reset_before_handoff=1 replay=one-shot")
 		quit(0)
 		return
 	for failure: String in failures:
