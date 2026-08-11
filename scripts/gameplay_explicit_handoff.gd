@@ -14,6 +14,10 @@ extends "res://scripts/gameplay_state_inventory.gd"
 # generation, every duplicate path for that generation becomes a no-op.
 var intro_run_started_reset_generation: int = -1
 var intro_run_started_reset_count: int = 0
+# A replay can arrive before gameplay has finished building its consumer state.
+# Keep only the newest generation's reset obligation. This is not ownership: the
+# existing handoff token/consumer claim remain the only path that can enable play.
+var intro_run_started_pending_reset_generation: int = -1
 
 # The delivery claim itself lives in gameplay.gd so signal, direct, reconnect,
 # and frame polling cannot own separate consumption paths. This layer only adds
@@ -71,11 +75,69 @@ func accept_intro_run_started(generation: int) -> void:
 	intro_generation_seen = generation
 	gameplay_ready = false
 	if initialized:
-		intro_run_started_reset_generation = generation
-		intro_run_started_reset_count += 1
-		_reset_for_intro()
-		print("YAKOLAK_INTRO_RUN_RESET generation=%d resets=%d" % [generation, intro_run_started_reset_count])
+		intro_run_started_pending_reset_generation = -1
+		_apply_intro_run_started_reset(generation)
+	else:
+		# Only the newest pre-init replay keeps a reset obligation. A later replay
+		# silently replaces this integer before any reset side effect can occur.
+		intro_run_started_pending_reset_generation = generation
 	_publish_consumer_probe("intro-started")
+
+
+func _complete_gameplay_consumer_initialization() -> void:
+	# `_initialize_when_ready()` has already built the consumer state when this
+	# callback is reached. Apply the newest deferred intro reset synchronously
+	# before the base completion can wake an already-claimed handoff generation.
+	if initialized:
+		return
+	_apply_pending_intro_run_started_reset()
+	super._complete_gameplay_consumer_initialization()
+
+
+func _apply_pending_intro_run_started_reset() -> void:
+	var generation: int = intro_run_started_pending_reset_generation
+	if generation <= 0:
+		return
+	intro_run_started_pending_reset_generation = -1
+	if intro == null:
+		return
+	if generation != intro_generation_seen:
+		return
+	if generation != int(intro.get("intro_run_generation")):
+		return
+	# A same-generation handoff may already have claimed its token delivery while
+	# initialization was delayed. `_reset_for_intro()` intentionally cancels held
+	# handoffs, so preserve only this already-existing current claim across the
+	# reset; the token remains authoritative and is consumed later by the base wake.
+	_apply_intro_run_started_reset(generation, true)
+
+
+func _apply_intro_run_started_reset(generation: int, preserve_claimed_handoff: bool = false) -> void:
+	if intro == null:
+		return
+	if generation <= 0:
+		return
+	if generation != int(intro.get("intro_run_generation")):
+		return
+	if generation == intro_run_started_reset_generation:
+		return
+	var held_handoff_generation: int = intro_handoff_pending_init_generation if preserve_claimed_handoff else -1
+	intro_run_started_reset_generation = generation
+	intro_run_started_reset_count += 1
+	_reset_for_intro()
+	# Restoring this value does not claim or consume anything. It only retains the
+	# current generation's claim that existed before the reset, and only while the
+	# original pending token is still current and authoritative.
+	if (
+		preserve_claimed_handoff
+		and held_handoff_generation == generation
+		and intro_handoff_claimed_generation == generation
+		and int(intro.get("intro_run_generation")) == generation
+		and int(intro.get("gameplay_handoff_published_generation")) == generation
+		and bool(intro.get("gameplay_handoff_pending"))
+	):
+		intro_handoff_pending_init_generation = held_handoff_generation
+	print("YAKOLAK_INTRO_RUN_RESET generation=%d resets=%d" % [generation, intro_run_started_reset_count])
 
 
 func accept_intro_handoff(generation: int) -> void:
