@@ -56,24 +56,11 @@ func _show_restore_state_if_pending() -> bool:
 	return true
 
 
-func _intro_handoff_ready() -> bool:
-	# pre-intro deliberately parks intro.playing=false while it owns the scene.
-	# That pause is not the gameplay handoff. Release intro ownership only after
-	# pre-intro completed and the smooth final timeline has actually stopped.
-	if intro == null or bool(intro.get("playing")):
-		return false
-	var preintro: Node = intro.get_node_or_null("StarToTablePreIntro")
-	if preintro != null and not bool(preintro.get("completed")):
-		return false
-	var smooth: Node = intro.get_node_or_null("SmoothIntroTimeline")
-	if smooth != null and bool(smooth.get("active")):
-		return false
-	return true
-
-
 func _enable_gameplay() -> void:
-	if not _intro_handoff_ready():
-		_trace_online_ui("enable:ignored-preintro-pause")
+	# Every caller, including tests and legacy subclasses, must enter through the
+	# shared one-shot generation claim. Visual intro flags are never authority.
+	if not _begin_intro_handoff_application():
+		_trace_online_ui("enable:ignored-nonexplicit-or-duplicate")
 		return
 	# Release intro ownership synchronously. ExistingIntroCorrections runs at a
 	# later process priority, so a deferred shutdown could still overwrite the
@@ -86,6 +73,7 @@ func _enable_gameplay() -> void:
 	# base enable call. The transport's version-0 room shell is the stable UI
 	# signal that restoration is still pending across intro presentation resets.
 	_show_restore_state_if_pending()
+	_end_intro_handoff_application()
 
 
 func _start_online_host(configuration: Dictionary) -> void:

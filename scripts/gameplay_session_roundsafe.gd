@@ -18,6 +18,10 @@ func _ready() -> void:
 
 
 func _enable_gameplay() -> void:
+	# Do not run even the replay-lock side effect unless the explicit generation
+	# token has already transferred intro ownership to gameplay.
+	if not _intro_handoff_ready():
+		return
 	super._enable_gameplay()
 	_lock_intro_replay()
 

@@ -157,15 +157,18 @@ func _input(event: InputEvent) -> void:
 
 
 func _enable_gameplay() -> void:
-	# The base script calls this exactly once after the intro.  Keep the board
-	# inert until the user has answered the short setup.
+	# This session layer can be called directly by tests/legacy subclasses, so it
+	# must claim the same explicit generation token as the top production layer.
+	if not _begin_intro_handoff_application():
+		return
+	# Keep the board inert until the user has answered the short setup.
 	move_active = false
 	gameplay_ready = false
 	_hide_markers()
 	_capture_home_state()
 	_publish_gameplay_state("setup")
-	# Let the final approved intro frame finish first, then stop its correction
-	# workers and resize callbacks from touching the live gameplay camera.
+	# The token is already consumed at this point. Stop correction workers only
+	# after explicit ownership transfer; visual clock flags are not consulted.
 	call_deferred("_suspend_intro_runtime")
 	if setup == null or online == null:
 		_connect_setup()
@@ -176,10 +179,12 @@ func _enable_gameplay() -> void:
 		online_waiting = true
 		turn_label.text = "استعادة الغرفة…"
 		score_label.text = ""
+		_end_intro_handoff_application()
 		return
 	waiting_for_setup = true
 	if setup != null:
 		setup.call("show_after_intro")
+	_end_intro_handoff_application()
 
 
 func _reset_for_intro() -> void:
@@ -226,7 +231,9 @@ func _reset_for_intro() -> void:
 
 
 func _suspend_intro_runtime() -> void:
-	if intro == null or bool(intro.get("playing")):
+	# Intro runtime may be suspended only after the explicit current-generation
+	# handoff token was consumed. `intro.playing` is a visual clock, not authority.
+	if not _intro_handoff_ready():
 		return
 	var viewport: Viewport = get_viewport()
 	var intro_fit := Callable(intro, "_fit_camera")

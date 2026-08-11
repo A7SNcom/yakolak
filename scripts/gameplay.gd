@@ -34,6 +34,12 @@ var target_markers: Array[MeshInstance3D] = []
 var initialized: bool = false
 var intro_generation_seen: int = 0
 var gameplay_ready: bool = false
+# Shared explicit handoff application guard. The intro token is consumed once by
+# intro_handoff.gd; these counters make the consumer side one-shot as well, even
+# when a legacy path or test calls _enable_gameplay() directly.
+var intro_handoff_applied_generation: int = -1
+var intro_handoff_apply_depth: int = 0
+var intro_handoff_apply_count: int = 0
 
 var selected_index: int = -1
 var selected_home_position: Vector3 = Vector3.ZERO
@@ -77,18 +83,57 @@ func _process(_delta: float) -> void:
 		gameplay_ready = false
 		return
 
-	if intro.has_method("consume_gameplay_handoff") and bool(intro.call("consume_gameplay_handoff")):
+	# Polling is only a delivery fallback for the same explicit generation token.
+	# Supplying the expected generation prevents any stale pending token from a
+	# previous replay from being consumed by a newer run.
+	if intro_generation_seen > 0 and intro.has_method("consume_gameplay_handoff") and bool(intro.call("consume_gameplay_handoff", intro_generation_seen)):
 		_enable_gameplay()
 
 	if move_active:
 		_update_move()
 
 
-func _intro_handoff_is_consumed() -> bool:
+func _intro_handoff_generation_ready() -> int:
 	if intro == null:
-		return false
+		return -1
 	var generation: int = int(intro.get("intro_run_generation"))
-	return generation > 0 and int(intro.get("gameplay_handoff_consumed_generation")) == generation
+	if generation <= 0:
+		return -1
+	if int(intro.get("gameplay_handoff_consumed_generation")) != generation:
+		return -1
+	return generation
+
+
+func _intro_handoff_ready() -> bool:
+	return _intro_handoff_generation_ready() > 0
+
+
+func _intro_handoff_is_consumed() -> bool:
+	return _intro_handoff_ready()
+
+
+func _begin_intro_handoff_application() -> bool:
+	var generation: int = _intro_handoff_generation_ready()
+	if generation <= 0:
+		return false
+	# Nested super implementations participate in one outer application. Only the
+	# first entry for a generation increments the observable application count.
+	if intro_handoff_apply_depth > 0:
+		if intro_handoff_applied_generation != generation:
+			return false
+		intro_handoff_apply_depth += 1
+		return true
+	if intro_handoff_applied_generation == generation:
+		return false
+	intro_handoff_applied_generation = generation
+	intro_handoff_apply_depth = 1
+	intro_handoff_apply_count += 1
+	return true
+
+
+func _end_intro_handoff_application() -> void:
+	if intro_handoff_apply_depth > 0:
+		intro_handoff_apply_depth -= 1
 
 
 func _input(event: InputEvent) -> void:
@@ -327,15 +372,21 @@ func _update_move() -> void:
 
 
 func _enable_gameplay() -> void:
+	if not _begin_intro_handoff_application():
+		return
 	gameplay_ready = true
 	move_active = false
 	_hide_markers()
 	_publish_gameplay_state("ready")
 	_publish_test_targets.call_deferred()
 	print("YAKOLAK_GAMEPLAY_READY selectable=36 cells=9")
+	_end_intro_handoff_application()
 
 
 func _reset_for_intro() -> void:
+	# A replay starts a new generation, so the previous applied generation stays
+	# recorded while any interrupted nested application scope is discarded.
+	intro_handoff_apply_depth = 0
 	if selected_index >= 0:
 		var selected_record: Dictionary = piece_records[selected_index] as Dictionary
 		var selected_mesh := selected_record["mesh"] as MeshInstance3D

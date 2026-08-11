@@ -4,7 +4,8 @@ extends "res://scripts/gameplay_state_inventory.gd"
 # lifecycle contract exposed by intro_handoff.gd. Signals are the observer API;
 # the root also directly dispatches the same explicit event in exported Web so
 # delivery never depends on process polling. The one-shot generation token is
-# still the single authority that can transfer ownership.
+# still the single authority that can transfer ownership. Readiness itself lives
+# in the shared gameplay base so subclasses cannot redefine the contract.
 
 
 func _ready() -> void:
@@ -86,7 +87,3 @@ func _try_consume_explicit_handoff(generation: int) -> void:
 func _publish_consumer_probe(value: String) -> void:
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("document.body.dataset.yakolakIntroHandoffConsumer='%s';" % value, true)
-
-
-func _intro_handoff_ready() -> bool:
-	return _intro_handoff_is_consumed()
