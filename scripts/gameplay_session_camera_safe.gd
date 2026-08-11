@@ -31,6 +31,38 @@ func _ready() -> void:
 			window.set("yakolakTestPlayOneMove", web_play_move_callback)
 
 
+func _on_online_room_changed(remote: Dictionary, identity: Dictionary) -> void:
+	super._on_online_room_changed(remote, identity)
+	if str(remote.get("status", "")) != "playing" or not match_initialized:
+		return
+	# Seat ownership in the accepted authoritative room grants the online turn.
+	# Camera completion is presentation only and must never be able to strand a
+	# valid owner with gameplay_ready=false after p3 -> p4 (or any later turn).
+	gameplay_ready = _current_mode() == "local"
+	turn_deadline_msec = 0
+
+
+func _input(event: InputEvent) -> void:
+	# Offline/shared-device play still waits for camera motion before accepting a
+	# tap. Online play is different: once the authoritative room says this tab's
+	# seat owns the turn, a stalled/cancelled visual tween cannot veto that owner.
+	var authoritative_online_turn: bool = (
+		online_active
+		and not online_waiting
+		and gameplay_ready
+		and _current_mode() == "local"
+		and camera_transition
+		and turn_camera_active
+	)
+	if not authoritative_online_turn:
+		super._input(event)
+		return
+	var visual_transition_active: bool = camera_transition
+	camera_transition = false
+	super._input(event)
+	camera_transition = visual_transition_active and turn_camera_active
+
+
 func _transition_to_current_player() -> void:
 	if camera == null or _current_mode() != "local":
 		turn_camera_active = false
