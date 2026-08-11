@@ -61,6 +61,10 @@ var intro_handoff_poll_claim_count: int = 0
 # claim remains the single start authority for signal, direct, and polling paths.
 var intro_run_started_poll_attempt_count: int = 0
 var intro_run_started_poll_claim_count: int = 0
+# Base consumers also need the same start claim when the explicit Web layer is
+# deliberately absent. A pre-init start is held once and settled before any held
+# handoff wake, so polling never becomes an alternate reset authority.
+var intro_run_started_base_pending_reset_generation: int = -1
 
 var selected_index: int = -1
 var selected_home_position: Vector3 = Vector3.ZERO
@@ -118,14 +122,31 @@ func _process(_delta: float) -> void:
 		_update_move()
 
 
+func accept_intro_run_started(generation: int) -> void:
+	# Canonical base start claim. Production's explicit consumer overrides this
+	# method to add its richer pending/observability contract; polling reaches that
+	# override dynamically, while base-only consumers retain identical ownership.
+	if intro == null or generation <= 0:
+		return
+	if generation != int(intro.get("intro_run_generation")):
+		return
+	if generation == intro_generation_seen:
+		return
+	_cancel_pending_gameplay_handoff_initialization()
+	intro_generation_seen = generation
+	gameplay_ready = false
+	if not initialized:
+		intro_run_started_base_pending_reset_generation = generation
+		return
+	intro_run_started_base_pending_reset_generation = -1
+	_reset_for_intro()
+
+
 func _recover_intro_run_start_by_polling(generation: int) -> void:
 	intro_run_started_poll_attempt_count += 1
 	if intro == null or generation <= 0:
 		return
 	if generation != int(intro.get("intro_run_generation")):
-		return
-	if not has_method("accept_intro_run_started"):
-		_publish_intro_handoff_consumer_probe("intro-start-consumer-missing")
 		return
 	var seen_before: int = intro_generation_seen
 	# Dynamic dispatch intentionally lands on the production explicit consumer's
@@ -194,12 +215,30 @@ func _consume_claimed_gameplay_handoff(generation: int) -> void:
 		_publish_intro_handoff_consumer_probe("handoff-token-rejected")
 
 
+func _apply_pending_base_intro_run_started_reset() -> void:
+	var generation: int = intro_run_started_base_pending_reset_generation
+	intro_run_started_base_pending_reset_generation = -1
+	if generation <= 0 or intro == null:
+		return
+	if generation != intro_generation_seen:
+		return
+	if generation != int(intro.get("intro_run_generation")):
+		return
+	# Reset clears a held handoff by design. Preserve only the already-claimed
+	# current generation so initialization completion can wake it after reset.
+	var held_handoff_generation: int = intro_handoff_pending_init_generation
+	_reset_for_intro()
+	if held_handoff_generation == generation and intro_handoff_claimed_generation == generation:
+		intro_handoff_pending_init_generation = held_handoff_generation
+
+
 func _complete_gameplay_consumer_initialization() -> void:
 	# This is the only wake-up for a claim that arrived before initialization. It
 	# is invoked exactly when _initialize_when_ready() succeeds, never once/frame.
 	if initialized:
 		return
 	initialized = true
+	_apply_pending_base_intro_run_started_reset()
 	var pending_generation: int = intro_handoff_pending_init_generation
 	intro_handoff_pending_init_generation = -1
 	if pending_generation <= 0:
