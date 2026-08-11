@@ -281,7 +281,8 @@ func _suspend_intro_runtime() -> void:
 		return
 	# Preserve the accepted final frame, then make the ownership transfer strict:
 	# gameplay owns the scene after this point, so no intro callback may keep
-	# receiving process/physics/input work or retain a time-scale side effect.
+	# receiving process/physics/input work. FramePacingGovernor owns the global
+	# time-scale transition and releases it from the same explicit lifecycle event.
 	super._suspend_intro_runtime()
 	if not intro_runtime_suspended or intro == null:
 		return
@@ -294,8 +295,7 @@ func _suspend_intro_runtime() -> void:
 			continue
 		worker.set_process(false)
 		worker.set_physics_process(false)
-	Engine.time_scale = 1.0
-	print("YAKOLAK_INTRO_HANDOFF_QUIESCENT workers=%d root_process=false time_scale=1.0" % _intro_handoff_workers().size())
+	print("YAKOLAK_INTRO_HANDOFF_QUIESCENT workers=%d root_process=false" % _intro_handoff_workers().size())
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakIntroHandoff='quiescent';" +
