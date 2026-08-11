@@ -29,6 +29,16 @@ var intro_handoff_consumer_probe: String = ""
 var intro_handoff_consumer_probe_generation: int = -1
 var intro_handoff_consumer_probe_terminal_generation: int = -1
 
+# A normal online move commit has no user decision, so it must never borrow the
+# full-screen waiting card. Keep the exact move intent guarded locally while the
+# authoritative transport owns commit/retry/dedupe. A tiny hint appears only if
+# acknowledgement is genuinely slow and never receives pointer input.
+const ONLINE_MOVE_PENDING_HINT_DELAY_MS: int = 650
+var online_move_commit_pending: bool = false
+var online_move_pending_started_msec: int = 0
+var online_move_pending_hint_visible: bool = false
+var online_move_pending_hint_suppressed: bool = false
+
 
 func _ready() -> void:
 	super._ready()
@@ -48,6 +58,139 @@ func _ready() -> void:
 	# handoff path, which now recovers any missing start claim/reset first; it never
 	# adopts intro_generation_seen directly or bypasses the ownership token.
 	_accept_gameplay_handoff_delivery(ready_generation, "ready-reconnect")
+
+
+func _process(delta: float) -> void:
+	super._process(delta)
+	_sync_online_move_pending_affordance()
+
+
+func _begin_move(cell: int) -> void:
+	if not online_active:
+		super._begin_move(cell)
+		return
+	# Only the action that could duplicate the unresolved authoritative intent is
+	# locked. The rest of gameplay/UI input stays live and the transport keeps its
+	# existing immutable mutationId/version safety as a second line of defence.
+	if online_move_commit_pending:
+		_trace_online_move_pending("duplicate-commit-blocked")
+		return
+	if selected_index < 0 or online == null:
+		super._begin_move(cell)
+		return
+	online_move_commit_pending = true
+	online_move_pending_started_msec = Time.get_ticks_msec()
+	online_move_pending_hint_suppressed = false
+	_hide_online_move_pending_hint("new-intent")
+	_trace_online_move_pending("armed")
+	super._begin_move(cell)
+	# gameplay_session intentionally locks gameplay_ready for generic waits. This
+	# pending move is narrower: restore input and let this override reject only a
+	# second commit until an authoritative room resolution arrives.
+	if online_move_commit_pending and match_initialized and not round_complete and _current_mode() == "local":
+		gameplay_ready = true
+	# Parent state inventory still records `submitting-move` for diagnostics. Hide
+	# its full-rect STOP control in the same synchronous stack before a frame can
+	# render or intercept input.
+	_sync_waiting_overlay()
+
+
+func _sync_waiting_overlay() -> void:
+	super._sync_waiting_overlay()
+	if online_ui_state_id != "submitting-move" or waiting_root == null:
+		return
+	waiting_root.visible = false
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval(
+			"document.body.dataset.yakolakOnlineWaiting='hidden';" +
+			"document.body.dataset.yakolakMoveBlocker='removed';",
+			true
+		)
+
+
+func _sync_online_move_pending_affordance() -> void:
+	if not online_move_commit_pending or online_move_pending_hint_visible or online_move_pending_hint_suppressed:
+		return
+	if Time.get_ticks_msec() - online_move_pending_started_msec < ONLINE_MOVE_PENDING_HINT_DELAY_MS:
+		return
+	if online == null or bool(online.get("reconnecting")):
+		online_move_pending_hint_suppressed = true
+		return
+	_show_online_move_pending_hint()
+
+
+func _show_online_move_pending_hint() -> void:
+	if online_move_pending_hint_visible or not OS.has_feature("web"):
+		return
+	online_move_pending_hint_visible = true
+	JavaScriptBridge.eval(
+		"(()=>{let e=document.getElementById('yakolak-move-pending');if(!e){e=document.createElement('div');e.id='yakolak-move-pending';e.setAttribute('role','status');e.setAttribute('aria-live','polite');e.style.cssText='position:fixed;left:50%;top:max(12px,env(safe-area-inset-top));transform:translateX(-50%);z-index:2147482998;padding:5px 9px;border-radius:999px;background:#151719b8;color:#fff;font:600 12px system-ui;direction:rtl;pointer-events:none;box-shadow:0 2px 10px #0004;white-space:nowrap';document.body.appendChild(e);}e.textContent='تثبيت…';document.body.dataset.yakolakMovePending='subtle';document.body.dataset.yakolakMovePendingSurface='non-blocking';})();",
+		true
+	)
+	_trace_online_move_pending("hint-shown")
+
+
+func _hide_online_move_pending_hint(reason: String) -> void:
+	var had_hint: bool = online_move_pending_hint_visible
+	online_move_pending_hint_visible = false
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval(
+			"(()=>{const e=document.getElementById('yakolak-move-pending');if(e)e.remove();delete document.body.dataset.yakolakMovePending;delete document.body.dataset.yakolakMovePendingSurface;})();",
+			true
+		)
+	if had_hint:
+		_trace_online_move_pending("hint-hidden:" + reason)
+
+
+func _clear_online_move_commit_pending(reason: String) -> void:
+	var had_pending: bool = online_move_commit_pending
+	online_move_commit_pending = false
+	online_move_pending_started_msec = 0
+	online_move_pending_hint_suppressed = false
+	_hide_online_move_pending_hint(reason)
+	if had_pending:
+		_trace_online_move_pending("resolved:" + reason)
+
+
+func _on_online_room_changed(remote: Dictionary, identity: Dictionary) -> void:
+	# Any accepted authoritative room emission resolves this UI/input pending
+	# intent: commit, explicit rejection snapshot, or turn/status/version change.
+	_clear_online_move_commit_pending("room-resolution")
+	super._on_online_room_changed(remote, identity)
+
+
+func _on_online_error(code: String) -> void:
+	_clear_online_move_commit_pending("error:" + code)
+	super._on_online_error(code)
+
+
+func _on_connection_state_changed(state: String, detail: String) -> void:
+	if state == "reconnecting" and online_move_commit_pending:
+		# Timeout/transient reconnect may still retry the exact mutation. Keep the
+		# commit guard, but the pending-copy affordance must disappear immediately
+		# and must not reappear until an authoritative room resolves the intent.
+		online_move_pending_hint_suppressed = true
+		_hide_online_move_pending_hint("reconnect:" + detail)
+	super._on_connection_state_changed(state, detail)
+
+
+func _return_to_setup() -> void:
+	_clear_online_move_commit_pending("return-to-setup")
+	super._return_to_setup()
+
+
+func _reset_for_intro() -> void:
+	_clear_online_move_commit_pending("intro-reset")
+	super._reset_for_intro()
+
+
+func _trace_online_move_pending(event: String) -> void:
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.eval(
+		"(()=>{const e=" + JSON.stringify(event) + ",d=document.body.dataset;d.yakolakMovePendingTrace=(d.yakolakMovePendingTrace?d.yakolakMovePendingTrace+'|':'')+e;d.yakolakMoveInputPolicy='commit-only';})();",
+		true
+	)
 
 
 func _on_explicit_intro_run_started(generation: int) -> void:
