@@ -69,6 +69,7 @@ run_godot_resource_gate res://tests/intro_handoff_delivery_dedupe_headless.gd in
 run_godot_resource_gate res://tests/intro_handoff_headless.gd intro_handoff
 run_godot_resource_gate res://tests/intro_handoff_base_consumer_headless.gd intro_handoff_base_consumer
 run_godot_resource_gate res://tests/gameplay_session_headless.gd gameplay_session
+run_godot_resource_gate res://tests/authoritative_turn_indicator_headless.gd authoritative_turn_indicator
 run_godot_resource_gate res://tests/online_player4_owner_boundary_headless.gd online_player4_owner_boundary
 run_godot_resource_gate res://tests/gameplay_session_lifecycle_headless.gd gameplay_lifecycle
 
