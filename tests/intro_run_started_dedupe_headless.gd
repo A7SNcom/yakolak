@@ -21,6 +21,18 @@ func _run() -> void:
 		return
 	_expect(await _wait_until(Callable(self, "_game_initialized")), "gameplay initializes before start-event dedupe test")
 
+	# Structural ordering guard: the production explicit layer must settle any
+	# deferred intro reset inside initialization completion before delegating to
+	# the base completion, whose existing responsibility is waking a held handoff.
+	var explicit_source: String = FileAccess.get_file_as_string("res://scripts/gameplay_explicit_handoff.gd")
+	var completion_start: int = explicit_source.find("func _complete_gameplay_consumer_initialization()")
+	var pending_apply_position: int = explicit_source.find("_apply_pending_intro_run_started_reset()", completion_start)
+	var base_completion_position: int = explicit_source.find("super._complete_gameplay_consumer_initialization()", completion_start)
+	_expect(explicit_source.contains("var intro_run_started_pending_reset_generation: int = -1"), "consumer keeps one pending intro reset generation")
+	_expect(completion_start >= 0 and pending_apply_position > completion_start, "initialization completion applies pending intro reset")
+	_expect(base_completion_position > pending_apply_position, "pending intro reset is applied before base handoff wake")
+	_expect(explicit_source.contains("intro_handoff_pending_init_generation = held_handoff_generation"), "same-generation claimed handoff survives only the deferred reset")
+
 	var initial_generation: int = int(intro.get("intro_run_generation"))
 	var resets_before: int = int(game.get("intro_run_started_reset_count"))
 	_expect(initial_generation > 0, "intro has an initial generation")
@@ -65,7 +77,115 @@ func _run() -> void:
 	await _settle_frames(2)
 	_expect(int(game.get("intro_run_started_reset_count")) == resets_before + 2, "stale direct generation is rejected")
 
+	# Delayed consumer initialization regression. Reconnect the signal first, then
+	# deliberately hold initialization across several replay generations. No reset
+	# may execute early, and the newest generation must silently replace older
+	# pending reset obligations.
+	if not intro.is_connected("intro_run_started", started_handler):
+		intro.connect("intro_run_started", started_handler)
+	var delayed_resets_before: int = int(game.get("intro_run_started_reset_count"))
+	game.set_process(false)
+	game.set("initialized", false)
+	game.set("move_count", 11)
+	game.set("waiting_for_setup", true)
+
+	intro.call("_restart_intro")
+	var delayed_first_generation: int = int(intro.get("intro_run_generation"))
+	intro.set_process(false)
+	await _settle_frames(2)
+	_expect(int(game.get("intro_generation_seen")) == delayed_first_generation, "delayed consumer claims first replay generation")
+	_expect(int(game.get("intro_run_started_pending_reset_generation")) == delayed_first_generation, "first replay before init stores pending reset")
+	_expect(int(game.get("intro_run_started_reset_count")) == delayed_resets_before, "replay before init does not apply reset early")
+	_expect(int(game.get("move_count")) == 11, "deferred reset side effects have not run early")
+
+	# Lose the signal observer for one replay, then reconnect it for the next. The
+	# direct fallback and restored signal both feed the same pending generation.
+	if intro.is_connected("intro_run_started", started_handler):
+		intro.disconnect("intro_run_started", started_handler)
+	intro.call("_restart_intro")
+	var delayed_second_generation: int = int(intro.get("intro_run_generation"))
+	intro.set_process(false)
+	_expect(delayed_second_generation == delayed_first_generation + 1, "direct-only delayed replay advances generation")
+	_expect(int(game.get("intro_run_started_pending_reset_generation")) == delayed_second_generation, "new direct-only replay replaces old pending reset")
+	if not intro.is_connected("intro_run_started", started_handler):
+		intro.connect("intro_run_started", started_handler)
+	intro.call("_restart_intro")
+	var delayed_final_generation: int = int(intro.get("intro_run_generation"))
+	intro.set_process(false)
+	await _settle_frames(2)
+	_expect(delayed_final_generation == delayed_second_generation + 1, "reconnected delayed replay advances to final generation")
+	_expect(int(game.get("intro_generation_seen")) == delayed_final_generation, "latest replay owns delayed consumer generation")
+	_expect(int(game.get("intro_run_started_pending_reset_generation")) == delayed_final_generation, "several pre-init replays keep latest reset only")
+	_expect(int(game.get("intro_run_started_reset_count")) == delayed_resets_before, "several pre-init replays still apply zero resets early")
+	_expect(int(game.get("move_count")) == 11, "replaced pending resets never mutate gameplay")
+
+	game.call("accept_intro_run_started", delayed_first_generation)
+	_expect(int(game.get("intro_run_started_pending_reset_generation")) == delayed_final_generation, "stale replay cannot replace latest pending reset")
+
+	# Let the final generation publish a real pending ownership token and claim it
+	# while initialization is still delayed. Completion must reset first, preserve
+	# only this current claim, then let the unchanged base token path consume and
+	# enable exactly once.
+	var consumes_before_completion: int = int(intro.get("gameplay_handoff_consume_count"))
+	var applications_before_completion: int = int(game.get("intro_handoff_apply_count"))
+	var wakes_before_completion: int = int(game.get("intro_handoff_init_wake_count"))
+	_publish_pending_without_delivery(delayed_final_generation)
+	game.call("accept_intro_handoff", delayed_final_generation)
+	await _settle_frames(2)
+	_expect(int(game.get("intro_handoff_pending_init_generation")) == delayed_final_generation, "final handoff claim waits for delayed initialization")
+	_expect(int(intro.get("gameplay_handoff_consume_count")) == consumes_before_completion, "token is untouched before initialization completion")
+	_expect(int(game.get("intro_handoff_apply_count")) == applications_before_completion, "gameplay is not enabled before initialization completion")
+
+	game.call("_complete_gameplay_consumer_initialization")
+	await _settle_frames(2)
+	_expect(bool(game.get("initialized")), "consumer initialization completes")
+	_expect(int(game.get("intro_run_started_pending_reset_generation")) == -1, "completion clears pending intro reset")
+	_expect(int(game.get("intro_run_started_reset_count")) == delayed_resets_before + 1, "latest delayed generation reset applies exactly once")
+	_expect(int(game.get("intro_run_started_reset_generation")) == delayed_final_generation, "applied delayed reset belongs to final generation only")
+	_expect(int(game.get("move_count")) == 0, "deferred reset executes before final gameplay ownership")
+	_expect(not bool(game.get("waiting_for_setup")), "deferred reset runs the full gameplay reset chain")
+	_expect(int(game.get("intro_handoff_init_wake_count")) == wakes_before_completion + 1, "completion wakes final claimed handoff once")
+	_expect(int(intro.get("gameplay_handoff_consume_count")) == consumes_before_completion + 1, "completion consumes final token once after reset")
+	_expect(int(intro.get("gameplay_handoff_consumed_generation")) == delayed_final_generation, "consumed token belongs to final replay generation")
+	_expect(int(game.get("intro_handoff_apply_count")) == applications_before_completion + 1, "completion enables final gameplay once after reset")
+	_expect(int(game.get("intro_handoff_pending_init_generation")) == -1, "consumed final claim leaves no pending initialization handoff")
+
+	game.call("_complete_gameplay_consumer_initialization")
+	game.call("accept_intro_handoff", delayed_final_generation)
+	await _settle_frames(2)
+	_expect(int(game.get("intro_run_started_reset_count")) == delayed_resets_before + 1, "duplicate completion cannot repeat delayed reset")
+	_expect(int(intro.get("gameplay_handoff_consume_count")) == consumes_before_completion + 1, "duplicate completion cannot reconsume final token")
+	_expect(int(game.get("intro_handoff_apply_count")) == applications_before_completion + 1, "duplicate completion cannot re-enable final gameplay")
+
+	# Normal replay after initialization keeps the original one-shot behavior.
+	game.set("move_count", 4)
+	game.set("waiting_for_setup", true)
+	intro.call("_restart_intro")
+	var post_init_generation: int = int(intro.get("intro_run_generation"))
+	intro.set_process(false)
+	await _settle_frames(2)
+	_expect(post_init_generation == delayed_final_generation + 1, "post-init replay advances one generation")
+	_expect(int(game.get("intro_run_started_pending_reset_generation")) == -1, "post-init replay never creates pending reset")
+	_expect(int(game.get("intro_run_started_reset_count")) == delayed_resets_before + 2, "post-init replay still resets immediately once")
+	_expect(int(game.get("intro_run_started_reset_generation")) == post_init_generation, "post-init reset belongs to current generation")
+	_expect(int(game.get("move_count")) == 0, "post-init replay clears gameplay immediately")
+	_expect(not bool(game.get("waiting_for_setup")), "post-init replay preserves full reset behavior")
+	intro.call("_dispatch_intro_run_started", post_init_generation)
+	game.call("_on_explicit_intro_run_started", post_init_generation)
+	await _settle_frames(2)
+	_expect(int(game.get("intro_run_started_reset_count")) == delayed_resets_before + 2, "post-init duplicate start remains one-shot")
+
+	game.set_process(true)
 	await _finish()
+
+
+func _publish_pending_without_delivery(generation: int) -> void:
+	# Test-only representation of a handoff whose signal/direct delivery was lost.
+	# The intro root still owns a real pending token; this helper does not call any
+	# consumer path, so ownership remains exclusively with consume_gameplay_handoff.
+	intro.set("gameplay_handoff_published_generation", generation)
+	intro.set("gameplay_handoff_pending", true)
+	intro.set("gameplay_handoff_emit_count", int(intro.get("gameplay_handoff_emit_count")) + 1)
 
 
 func _game_initialized() -> bool:
@@ -99,7 +219,7 @@ func _finish() -> void:
 		await process_frame
 		await process_frame
 	if failures.is_empty():
-		print("YAKOLAK_INTRO_RUN_STARTED_DEDUPE_OK delivery=signal+direct resets=1 next_replay=1 direct_fallback=kept")
+		print("YAKOLAK_INTRO_RUN_STARTED_DEDUPE_OK delivery=signal+direct delayed_reset=latest-only reset_before_handoff=1 post_init=one-shot")
 		quit(0)
 		return
 	for failure: String in failures:
