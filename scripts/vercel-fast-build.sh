@@ -37,16 +37,23 @@ run_godot_resource_gate() {
   local label="$2"
   local log_file
   local status
+  local detail
   log_file="$(mktemp)"
   set +e
   timeout 2m "$GODOT_BIN" --verbose --headless --path . --script "$script_path" 2>&1 | tee "$log_file"
   status=${PIPESTATUS[0]}
   set -e
   if [ "$status" -ne 0 ]; then
+    detail="$(tail -n 28 "$log_file" | tr '\n' ' ' | cut -c1-3500)"
+    detail="${detail//'%'/'%25'}"
+    echo "::error title=YAKOLAK ${label} Godot gate::${detail}"
     rm -f "$log_file"
     return "$status"
   fi
   if grep -Eq "ObjectDB instances were leaked at exit|resources still in use at exit" "$log_file"; then
+    detail="$(grep -E "ObjectDB instances were leaked at exit|resources still in use at exit" "$log_file" | tr '\n' ' ' | cut -c1-2000)"
+    detail="${detail//'%'/'%25'}"
+    echo "::error title=YAKOLAK ${label} resource leak::${detail}"
     echo "YAKOLAK_GAMEPLAY_RESOURCE_LEAK_GATE_FAIL label=$label"
     rm -f "$log_file"
     return 1
