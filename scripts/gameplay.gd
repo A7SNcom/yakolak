@@ -56,6 +56,11 @@ var intro_handoff_init_wake_count: int = 0
 # separate so regressions can prove it never consumes or enables outside claim.
 var intro_handoff_poll_attempt_count: int = 0
 var intro_handoff_poll_claim_count: int = 0
+# Intro-start polling follows the same rule: it may recover a lost delivery, but
+# it owns no reset side effect. The existing accept_intro_run_started consumer
+# claim remains the single start authority for signal, direct, and polling paths.
+var intro_run_started_poll_attempt_count: int = 0
+var intro_run_started_poll_claim_count: int = 0
 
 var selected_index: int = -1
 var selected_home_position: Vector3 = Vector3.ZERO
@@ -92,12 +97,12 @@ func _process(_delta: float) -> void:
 			return
 
 	# Lifecycle ownership is explicit. `playing` belongs to intro visuals and can
-	# be false during pre-intro pauses without meaning gameplay may start.
+	# be false during pre-intro pauses without meaning gameplay may start. Polling
+	# is only loss recovery: it must redeliver the start through the same consumer
+	# claim as signal/direct and never call _reset_for_intro() on its own.
 	var intro_generation: int = int(intro.get("intro_run_generation"))
 	if intro_generation > intro_generation_seen:
-		intro_generation_seen = intro_generation
-		_reset_for_intro()
-		gameplay_ready = false
+		_recover_intro_run_start_by_polling(intro_generation)
 		return
 
 	# Polling is only a delivery fallback. It may discover a published pending
@@ -111,6 +116,25 @@ func _process(_delta: float) -> void:
 
 	if move_active:
 		_update_move()
+
+
+func _recover_intro_run_start_by_polling(generation: int) -> void:
+	intro_run_started_poll_attempt_count += 1
+	if intro == null or generation <= 0:
+		return
+	if generation != int(intro.get("intro_run_generation")):
+		return
+	if not has_method("accept_intro_run_started"):
+		_publish_intro_handoff_consumer_probe("intro-start-consumer-missing")
+		return
+	var seen_before: int = intro_generation_seen
+	# Dynamic dispatch intentionally lands on the production explicit consumer's
+	# accept_intro_run_started implementation. That method owns dedupe, pending
+	# reset, replay invalidation, and observability; polling owns none of them.
+	call("accept_intro_run_started", generation)
+	if intro_generation_seen == generation and seen_before != generation:
+		intro_run_started_poll_claim_count += 1
+		print("YAKOLAK_INTRO_RUN_POLL_RECOVERED generation=%d claims=%d" % [generation, intro_run_started_poll_claim_count])
 
 
 func _accept_gameplay_handoff_delivery(generation: int, source: String = "unknown") -> void:
