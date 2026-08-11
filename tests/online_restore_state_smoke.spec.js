@@ -20,6 +20,11 @@ function deferred() {
 async function snapshot(page) {
   return page.evaluate(() => ({
     intro: document.body.dataset.yakolakIntro || '',
+    preIntro: document.body.dataset.yakolakPreIntro || '',
+    loaderHandoff: document.body.dataset.yakolakLoaderHandoff || '',
+    matchReady: document.body.dataset.yakolakMatchReady || '',
+    matchError: document.body.dataset.yakolakMatchErrorPx || '',
+    starMotion: document.body.dataset.yakolakStarMotion || '',
     handoff: document.body.dataset.yakolakIntroHandoffEvent || '',
     handoffGeneration: document.body.dataset.yakolakIntroHandoffConsumedGeneration || '',
     setup: document.body.dataset.yakolakSetup || '',
@@ -78,11 +83,16 @@ test('saved room restore is visibly explained while GET is pending', async ({ pa
   // `yakolakIntro=complete` is also used by the web loader and is not an
   // ownership boundary. Saved-room restoration must wait for the explicit
   // one-shot intro handoff consumed by gameplay.
-  await page.waitForFunction(
-    () => document.body.dataset.yakolakIntroHandoffEvent === 'consumed',
-    null,
-    { timeout: 60000 }
-  );
+  try {
+    await page.waitForFunction(
+      () => document.body.dataset.yakolakIntroHandoffEvent === 'consumed',
+      null,
+      { timeout: 20000 }
+    );
+  } catch (error) {
+    const stalled = await snapshot(page);
+    throw new Error(`explicit handoff stalled: ${JSON.stringify(stalled)}; getRequests=${getRequests}; original=${error}`);
+  }
   await page.waitForTimeout(1200);
 
   const pending = await snapshot(page);
