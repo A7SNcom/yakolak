@@ -168,7 +168,16 @@ func _accept_gameplay_handoff_delivery(generation: int, source: String = "unknow
 	if generation != int(intro.get("intro_run_generation")):
 		_publish_intro_handoff_consumer_probe("consume-stale-generation")
 		return
-	intro_generation_seen = generation
+	# A handoff or reconnect may be the first surviving delivery for a generation.
+	# It cannot adopt that generation independently, because doing so would hide a
+	# missed intro-start delivery from polling and skip the reset obligation. Route
+	# every adoption through the same dynamic start claim used by signal/direct and
+	# start polling before the unchanged handoff consumer claim can touch the token.
+	if generation != intro_generation_seen:
+		call("accept_intro_run_started", generation)
+	if generation != intro_generation_seen:
+		_publish_intro_handoff_consumer_probe("consume-start-unclaimed")
+		return
 	# The first delivery source for a published pending token owns the consumer
 	# claim. Same-generation duplicates return before token access or observability.
 	if generation == intro_handoff_claimed_generation:

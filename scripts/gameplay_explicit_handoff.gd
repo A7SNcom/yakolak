@@ -10,8 +10,8 @@ extends "res://scripts/gameplay_state_inventory.gd"
 # cannot redefine the contract.
 
 # `intro_generation_seen` is the shared start-event claim across explicit signal,
-# direct dispatch, and the base polling fallback. Once one path claims a current
-# generation, every duplicate path for that generation becomes a no-op.
+# direct dispatch, handoff/reconnect recovery, and the base polling fallback. Once
+# one path claims a current generation, every duplicate path is a no-op.
 var intro_run_started_reset_generation: int = -1
 var intro_run_started_reset_count: int = 0
 # A replay can arrive before gameplay has finished building its consumer state.
@@ -30,7 +30,7 @@ func _ready() -> void:
 	if intro == null:
 		_publish_consumer_probe("ready-no-intro")
 		return
-	intro_generation_seen = int(intro.get("intro_run_generation"))
+	var ready_generation: int = int(intro.get("intro_run_generation"))
 	var started_handler := Callable(self, "_on_explicit_intro_run_started")
 	if intro.has_signal("intro_run_started") and not intro.is_connected("intro_run_started", started_handler):
 		intro.connect("intro_run_started", started_handler)
@@ -40,8 +40,9 @@ func _ready() -> void:
 	_publish_consumer_probe("connected")
 	# Scene ordering can make an already-published lifecycle token exist before a
 	# consumer reconnect. Reconnect is only another delivery source into the same
-	# claim; it never bypasses the token or creates a second ownership authority.
-	_accept_gameplay_handoff_delivery(intro_generation_seen, "ready-reconnect")
+	# handoff path, which now recovers any missing start claim/reset first; it never
+	# adopts intro_generation_seen directly or bypasses the ownership token.
+	_accept_gameplay_handoff_delivery(ready_generation, "ready-reconnect")
 
 
 func _on_explicit_intro_run_started(generation: int) -> void:
@@ -61,10 +62,10 @@ func accept_intro_run_started(generation: int) -> void:
 	if generation != int(intro.get("intro_run_generation")):
 		_publish_consumer_probe("intro-start-stale-generation")
 		return
-	# Signal delivery and direct Web dispatch are intentionally both kept. They
-	# are synchronous fallbacks for the same lifecycle event, so the first path
-	# claims the generation through `intro_generation_seen` and every duplicate
-	# path exits before mutating gameplay or resetting session/restore state.
+	# Signal delivery, direct Web dispatch, handoff/reconnect recovery, and polling
+	# all enter here. The first path claims the generation through
+	# `intro_generation_seen`; every duplicate path exits before mutating gameplay
+	# or resetting session/restore state.
 	if generation == intro_generation_seen:
 		_publish_consumer_probe("intro-start-duplicate-generation")
 		return
