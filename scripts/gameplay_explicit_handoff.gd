@@ -7,6 +7,12 @@ extends "res://scripts/gameplay_state_inventory.gd"
 # still the single authority that can transfer ownership. Readiness itself lives
 # in the shared gameplay base so subclasses cannot redefine the contract.
 
+# `intro_generation_seen` is the shared start-event claim across explicit signal,
+# direct dispatch, and the base polling fallback. Once one path claims a current
+# generation, every duplicate path for that generation becomes a no-op.
+var intro_run_started_reset_generation: int = -1
+var intro_run_started_reset_count: int = 0
+
 
 func _ready() -> void:
 	super._ready()
@@ -43,10 +49,20 @@ func accept_intro_run_started(generation: int) -> void:
 	if generation != int(intro.get("intro_run_generation")):
 		_publish_consumer_probe("intro-start-stale-generation")
 		return
+	# Signal delivery and direct Web dispatch are intentionally both kept. They
+	# are synchronous fallbacks for the same lifecycle event, so the first path
+	# claims the generation through `intro_generation_seen` and every duplicate
+	# path exits before mutating gameplay or resetting session/restore state.
+	if generation == intro_generation_seen:
+		_publish_consumer_probe("intro-start-duplicate-generation")
+		return
 	intro_generation_seen = generation
 	gameplay_ready = false
 	if initialized:
+		intro_run_started_reset_generation = generation
+		intro_run_started_reset_count += 1
 		_reset_for_intro()
+		print("YAKOLAK_INTRO_RUN_RESET generation=%d resets=%d" % [generation, intro_run_started_reset_count])
 	_publish_consumer_probe("intro-started")
 
 
