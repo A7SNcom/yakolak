@@ -240,3 +240,53 @@ func _publish_online_ui_state(state_id: String, detail: String) -> void:
 		"document.body.dataset.yakolakOnlineUiSurface='gameplay';",
 		true
 	)
+
+
+func _intro_handoff_workers() -> Array[StringName]:
+	return [
+		&"StarToTablePreIntro",
+		&"StarToTableRefinement",
+		&"ExistingIntroCorrections",
+		&"SmoothIntroTimeline",
+		&"WebGPUWarmup",
+		&"FramePacingGovernor",
+		&"StudioVisualPolish",
+	]
+
+
+func _suspend_intro_runtime() -> void:
+	# Preserve the accepted final frame, then make the ownership transfer strict:
+	# gameplay owns the scene after this point, so no intro callback may keep
+	# receiving process/physics/input work or retain a time-scale side effect.
+	super._suspend_intro_runtime()
+	if not intro_runtime_suspended or intro == null:
+		return
+	intro.set_process(false)
+	intro.set_physics_process(false)
+	intro.set_process_unhandled_input(false)
+	for worker_name: StringName in _intro_handoff_workers():
+		var worker: Node = intro.get_node_or_null(NodePath(worker_name))
+		if worker == null:
+			continue
+		worker.set_process(false)
+		worker.set_physics_process(false)
+	Engine.time_scale = 1.0
+	print("YAKOLAK_INTRO_HANDOFF_QUIESCENT workers=%d root_process=false time_scale=1.0" % _intro_handoff_workers().size())
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval(
+			"document.body.dataset.yakolakIntroHandoff='quiescent';" +
+			"document.body.dataset.yakolakIntroWorkersActive='0';",
+			true
+		)
+
+
+func _resume_intro_runtime() -> void:
+	var was_suspended: bool = intro_runtime_suspended
+	super._resume_intro_runtime()
+	if not was_suspended or intro == null:
+		return
+	# A deliberate intro replay only needs the root timeline plus the two workers
+	# the base replay path already restores. One-shot pre-intro/warmup/polish
+	# workers remain completed and are not restarted.
+	intro.set_process(true)
+	intro.set_process_unhandled_input(true)
