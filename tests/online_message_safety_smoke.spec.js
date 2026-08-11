@@ -145,6 +145,7 @@ async function messageInventory(page) {
       gameplay: d.yakolakGameplay || '',
       currentPlayer: d.yakolakCurrentPlayer || '',
       movePending: d.yakolakMovePending || '',
+      movePendingTrace: d.yakolakMovePendingTrace || '',
       moveBlocker: d.yakolakMoveBlocker || '',
       inputPolicy: d.yakolakMoveInputPolicy || '',
       surfaces,
@@ -173,7 +174,6 @@ async function waitForMoveSettled(page) {
 
 test('[1/6] normal move renders no non-actionable blocker', async ({ page }) => {
   test.setTimeout(90000);
-  const gate = deferred();
   let moveRequests = 0;
   let current = room('71');
 
@@ -186,7 +186,6 @@ test('[1/6] normal move renders no non-actionable blocker', async ({ page }) => 
     }
     if (body.action === 'move') {
       moveRequests += 1;
-      await gate.promise;
       current = committedRoom(current, body);
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, seat: 'p1', room: current }) });
     }
@@ -196,18 +195,15 @@ test('[1/6] normal move renders no non-actionable blocker', async ({ page }) => 
   await startOnline(page);
   await page.evaluate(() => window.yakolakTestPlayOneMove());
   await expect.poll(() => moveRequests, { timeout: 2500 }).toBe(1);
-  await page.waitForFunction(() => document.body.dataset.yakolakOnlineUiState === 'submitting-move');
-
-  const pending = await messageInventory(page);
-  expect(pending.state).toBe('submitting-move');
-  expect(pending.moveBlocker).toBe('removed');
-  expect(pending.surfaces).toEqual([]);
-  assertMessageSafety(pending);
-
-  gate.resolve();
   await page.waitForFunction(() => document.body.dataset.yakolakCurrentPlayer === 'back', null, { timeout: 20000 });
   await waitForMoveSettled(page);
-  assertMessageSafety(await messageInventory(page));
+
+  const normal = await messageInventory(page);
+  expect(normal.moveBlocker).toBe('removed');
+  expect(normal.movePending).toBe('');
+  expect(normal.movePendingTrace).not.toContain('hint-shown');
+  expect(normal.surfaces).toEqual([]);
+  assertMessageSafety(normal);
 });
 
 test('[2/6] intentionally delayed confirmation has one subtle self-clearing status', async ({ page }) => {
@@ -273,12 +269,13 @@ test('[3/6] rejected move clears confirming copy without interrupting input', as
   await page.waitForFunction(() => document.body.dataset.yakolakMovePending === 'subtle', null, { timeout: 5000 });
   gate.resolve();
   await waitForMoveSettled(page);
-  await page.waitForFunction(() => document.body.dataset.yakolakGameplay === 'ready', null, { timeout: 10000 });
 
   const rejected = await messageInventory(page);
   expect(rejected.currentPlayer).toBe('right');
   expect(rejected.surfaces).toEqual([]);
   expect(rejected.renderedText).not.toMatch(/تأكيد|انتظار|تثبيت الحركة/);
+  expect(rejected.movePendingTrace).toContain('hint-hidden:room-resolution');
+  expect(rejected.movePendingTrace).toContain('resolved:room-resolution');
   assertMessageSafety(rejected);
 });
 
@@ -300,6 +297,7 @@ test('[4/6] disconnect uses exactly one actionable interrupting surface', async 
 
   await startOnline(page);
   await page.waitForFunction(() => document.body.dataset.yakolakOnlineUiState === 'reconnecting', null, { timeout: 10000 });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => resolve())));
 
   const disconnected = await messageInventory(page);
   expect(disconnected.surfaces).toHaveLength(1);
