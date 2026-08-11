@@ -227,8 +227,9 @@ test('host path explains create, waiting, disconnect, recovery, and cancellation
   firstPollGate.resolve();
   state = await waitForState(page, 'reconnecting');
   expect(state.message).toContain('انقطع الاتصال');
-  state = await waitForState(page, 'connected');
-  expect(state.message).toContain('عاد الاتصال');
+  state = await waitForState(page, 'waiting-players');
+  expect(state.message).toContain('انضم');
+  expect(state.message).not.toContain('عاد الاتصال');
   state = await waitForState(page, 'room-cancelled');
   expect(state.action).toBe('exit');
   expect(state.message).toContain('انتهت الغرفة');
