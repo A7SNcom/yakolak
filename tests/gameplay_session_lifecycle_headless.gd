@@ -6,6 +6,15 @@ extends SceneTree
 
 const MEASURED_CYCLES: int = 4
 const MEMORY_DRIFT_LIMIT_BYTES: int = 128 * 1024
+const INTRO_ONLY_WORKERS: Array[StringName] = [
+	&"StarToTablePreIntro",
+	&"StarToTableRefinement",
+	&"ExistingIntroCorrections",
+	&"SmoothIntroTimeline",
+	&"WebGPUWarmup",
+	&"FramePacingGovernor",
+	&"StudioVisualPolish",
+]
 
 var failures: Array[String] = []
 var intro: Node
@@ -21,8 +30,11 @@ func _init() -> void:
 func _run() -> void:
 	intro = preload("res://scenes/intro.tscn").instantiate()
 	root.add_child(intro)
+	# This test starts at the post-intro ownership boundary. Do not let the real
+	# cinematic timeline keep mutating the same scene while measured gameplay
+	# sessions are created and destroyed.
+	_isolate_post_intro_runtime()
 	await process_frame
-	intro.playing = false
 	for _frame in range(8):
 		await process_frame
 
@@ -35,7 +47,7 @@ func _run() -> void:
 	# One unmeasured warm-up absorbs first-use script/render allocations. Every
 	# measured cycle below must return to this same steady-state footprint.
 	await _run_session_cycle(0)
-	await _settle_frames(8)
+	await _settle_frames(12)
 	baseline_memory = _memory_bytes()
 	baseline_objects = _object_count()
 	print("YAKOLAK_GAMEPLAY_LIFECYCLE_BASELINE memory=%d objects=%d" % [baseline_memory, baseline_objects])
@@ -43,7 +55,7 @@ func _run() -> void:
 	var previous_memory: int = baseline_memory
 	for cycle: int in range(1, MEASURED_CYCLES + 1):
 		await _run_session_cycle(cycle)
-		await _settle_frames(8)
+		await _settle_frames(12)
 		var memory_after: int = _memory_bytes()
 		var objects_after: int = _object_count()
 		var memory_delta: int = memory_after - baseline_memory
@@ -60,6 +72,19 @@ func _run() -> void:
 		previous_memory = memory_after
 
 	await _finish()
+
+
+func _isolate_post_intro_runtime() -> void:
+	intro.playing = false
+	intro.set_process(false)
+	intro.set_physics_process(false)
+	for worker_name: StringName in INTRO_ONLY_WORKERS:
+		var worker: Node = intro.get_node_or_null(NodePath(worker_name))
+		if worker == null:
+			continue
+		worker.set_process(false)
+		worker.set_physics_process(false)
+	print("YAKOLAK_GAMEPLAY_LIFECYCLE_INTRO_ISOLATED workers=%d" % INTRO_ONLY_WORKERS.size())
 
 
 func _run_session_cycle(cycle: int) -> void:
@@ -91,7 +116,7 @@ func _run_session_cycle(cycle: int) -> void:
 	# Return through the production setup path; this is the resource ownership
 	# boundary under test. It must kill session Tweens and release transient refs.
 	game._return_to_setup()
-	await _settle_frames(6)
+	await _settle_frames(8)
 	_expect(bool(game.waiting_for_setup), "cycle %d returns to setup" % cycle)
 	_expect(not bool(game.match_initialized), "cycle %d ends the gameplay session" % cycle)
 	_expect(game.camera_tween == null, "cycle %d releases camera tween" % cycle)
