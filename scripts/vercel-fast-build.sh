@@ -63,6 +63,7 @@ run_godot_resource_gate() {
 }
 
 run_godot_resource_gate res://tests/intro_run_started_dedupe_headless.gd intro_run_started_dedupe
+run_godot_resource_gate res://tests/intro_handoff_delivery_dedupe_headless.gd intro_handoff_delivery_dedupe
 run_godot_resource_gate res://tests/intro_handoff_headless.gd intro_handoff
 run_godot_resource_gate res://tests/intro_handoff_base_consumer_headless.gd intro_handoff_base_consumer
 run_godot_resource_gate res://tests/gameplay_session_headless.gd gameplay_session

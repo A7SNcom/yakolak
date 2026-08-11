@@ -13,6 +13,14 @@ extends "res://scripts/gameplay_state_inventory.gd"
 var intro_run_started_reset_generation: int = -1
 var intro_run_started_reset_count: int = 0
 
+# Signal delivery and direct Web dispatch intentionally deliver the same handoff
+# generation. This consumer-side claim collapses those delivery paths BEFORE the
+# token is consumed. It never grants gameplay ownership: only the intro token can
+# do that. A generation is claimable only while its published token is pending.
+var intro_handoff_claimed_generation: int = -1
+var intro_handoff_claim_count: int = 0
+var intro_handoff_consumer_probe: String = ""
+
 
 func _ready() -> void:
 	super._ready()
@@ -69,7 +77,6 @@ func accept_intro_run_started(generation: int) -> void:
 func accept_intro_handoff(generation: int) -> void:
 	if intro == null:
 		intro = get_parent() as Node3D
-	_publish_consumer_probe("handoff-seen")
 	_try_consume_explicit_handoff(generation)
 
 
@@ -84,11 +91,37 @@ func _try_consume_explicit_handoff(generation: int) -> void:
 		_publish_consumer_probe("consume-stale-generation")
 		return
 	intro_generation_seen = generation
+	# The first signal/direct path for a published pending token claims delivery.
+	# Every same-generation duplicate returns before touching the token or the Web
+	# probe, so a successful `handoff-consumed` state cannot be overwritten by the
+	# expected second delivery path.
+	if generation == intro_handoff_claimed_generation:
+		return
+	if int(intro.get("gameplay_handoff_published_generation")) != generation:
+		return
+	if not bool(intro.get("gameplay_handoff_pending")):
+		return
+	intro_handoff_claimed_generation = generation
+	intro_handoff_claim_count += 1
+	print("YAKOLAK_INTRO_HANDOFF_CLAIMED generation=%d claims=%d" % [generation, intro_handoff_claim_count])
+	_publish_consumer_probe("handoff-seen")
+	_consume_claimed_explicit_handoff(generation)
+
+
+func _consume_claimed_explicit_handoff(generation: int) -> void:
+	# A replay can invalidate a deferred old-generation attempt. Drop it silently
+	# rather than letting stale work overwrite observability for the new owner.
+	if intro == null:
+		return
+	if generation != intro_handoff_claimed_generation:
+		return
+	if generation != int(intro.get("intro_run_generation")):
+		return
 	if not initialized:
 		_publish_consumer_probe("handoff-pending-init")
 		# True completion normally happens long after interaction initialization,
 		# but keep delivery lossless for accelerated tests or future scene changes.
-		call_deferred("_try_consume_explicit_handoff", generation)
+		call_deferred("_consume_claimed_explicit_handoff", generation)
 		return
 	if not intro.has_method("consume_gameplay_handoff"):
 		_publish_consumer_probe("consume-method-missing")
@@ -97,9 +130,12 @@ func _try_consume_explicit_handoff(generation: int) -> void:
 		_publish_consumer_probe("handoff-consumed")
 		_enable_gameplay()
 	else:
+		# This is now a genuine failure of the one claimed delivery, not the normal
+		# signal+direct duplicate path after a successful consume.
 		_publish_consumer_probe("handoff-token-rejected")
 
 
 func _publish_consumer_probe(value: String) -> void:
+	intro_handoff_consumer_probe = value
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("document.body.dataset.yakolakIntroHandoffConsumer='%s';" % value, true)
