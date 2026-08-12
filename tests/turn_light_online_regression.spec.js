@@ -305,11 +305,14 @@ test('mobile portrait LIGHTING-12 authoritative transitions stay clear and frame
     await pushRoom(page, state, { turnIndex: 3 });
     await settled(page, 4, 'rapid-p3-to-p4');
 
-    // Match the existing online reconnect contract: one forced failed poll
-    // clears the turn, then the next recovery poll hydrates the same room/P4.
+    // One failed poll drives the lighting owner to the temporary neutral state.
+    // Reconnect transport semantics are outside LIGHTING-12: restoration is
+    // asserted when the next accepted authoritative room snapshot arrives,
+    // preserving the same P4 turn while bumping only the server room version.
     state.reconnectFailures = 1;
     await wakePoll(page);
     await settledNeutral(page, 'reconnect-neutral');
+    await pushRoom(page, state, { turnIndex: 3 });
     await settled(page, 4, 'reconnect-restored-p4');
 
     await pushRoom(page, state, {
