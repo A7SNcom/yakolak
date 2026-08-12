@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { __testing } from '../api/rooms.js';
 import { RULES, COLORS, SIZES, LINES, emptyBoard as canonicalEmptyBoard, validatePlacement, placePiece, winningPatterns, winner as canonicalWinner, hasLegalMove as canonicalHasLegalMove, countPieces, isValidPlayerCount, isValidWinsToMatch, uniqueWinningSlots } from '../api/game-rules.js';
-const { PROTOCOL, applyMove, createState, joinState, normalizeCode, rematchState, winner } = __testing;
+const { PROTOCOL, advanceRoundState, applyMove, createState, joinState, normalizeCode, winner } = __testing;
 assert.equal(PROTOCOL, 5);
 assert.equal(normalizeCode('٤٢'), '42');
 assert.deepEqual(RULES.playerCounts, [2,3,4]); assert.deepEqual(RULES.sizes, ['small','medium','large']); assert.deepEqual(RULES.winsToMatchOptions, [3,5]);
@@ -28,8 +28,8 @@ const draw=[['p1',2,'medium'],['p2',3,'medium'],['p1',3,'large'],['p2',8,'small'
 {let s=room(); for(let i=0;i<draw.length;i++){const [seat,cell,size]=draw[i]; s=move(s,seat,cell,size); if(i<draw.length-1)assert.equal(s.status,'playing');} assert.equal(s.status,'finished'); assert(s.draw); assert.equal(s.winner,null); assert.deepEqual(s.scores,{p1:0,p2:0});}
 const lastWin=[['p1',5,'small'],['p2',8,'small'],['p1',6,'small'],['p2',5,'large'],['p1',7,'large'],['p2',4,'medium'],['p1',0,'medium'],['p2',1,'large'],['p1',4,'small'],['p2',8,'large'],['p1',5,'medium'],['p2',2,'medium'],['p1',0,'large'],['p2',3,'medium'],['p1',7,'medium'],['p2',2,'small'],['p1',4,'large'],['p2',7,'small']];
 {let s=room(); for(let i=0;i<lastWin.length;i++){const [seat,cell,size]=lastWin[i]; s=move(s,seat,cell,size); if(i<lastWin.length-1)assert.equal(s.status,'playing');} assert.equal(s.status,'finished'); assert(!s.draw); assert.equal(s.winner?.seat,'p2'); assert(!canonicalHasLegalMove(s.board,'marble')); assert(!canonicalHasLegalMove(s.board,'blue'));}
-function advanceAll(s){for(const p of s.players)s=rematchState(s,p.seat); return s;}
-for(const playerCount of [2,3,4]){let s=room(playerCount,3); for(let round=1;round<=playerCount+1;round++){assert.equal(s.turnIndex,(round-1)%playerCount); s={...s,status:'finished',winner:null,draw:true,completedRounds:round,rematch:Object.fromEntries(s.players.map(p=>[p.seat,false]))}; s=advanceAll(s);}}
+function advanceRound(s){return advanceRoundState(s,'p1');}
+for(const playerCount of [2,3,4]){let s=room(playerCount,3); for(let round=1;round<=playerCount+1;round++){assert.equal(s.turnIndex,(round-1)%playerCount); s={...s,status:'finished',winner:null,draw:true,completedRounds:round,rematch:Object.fromEntries(s.players.map(p=>[p.seat,false]))}; s=advanceRound(s);}}
 function winStarter(s){const winnerSeat=s.players[s.turnIndex].seat; const loser=s.players.find(p=>p.seat!==winnerSeat).seat; s=move(s,winnerSeat,0,'small'); s=move(s,loser,8,'large'); s=move(s,winnerSeat,1,'small'); s=move(s,loser,7,'medium'); return move(s,winnerSeat,2,'small');}
-for(const wins of [3,5]){let s=room(2,wins); const rounds=wins*2-1; for(let r=1;r<=rounds;r++){s=winStarter(s); assert.equal(s.matchComplete,r===rounds); if(r<rounds)s=advanceAll(s);} assert.equal(s.matchWinner?.wins,wins);}
+for(const wins of [3,5]){let s=room(2,wins); const rounds=wins*2-1; for(let r=1;r<=rounds;r++){s=winStarter(s); assert.equal(s.matchComplete,r===rounds); if(r<rounds)s=advanceRound(s);} assert.equal(s.matchWinner?.wins,wins);}
 console.log(`YAKOLAK_ONLINE_RULES_OK matrix=49 cells=${RULES.cellCount} sizes=${SIZES.length} wins=3|5`);
