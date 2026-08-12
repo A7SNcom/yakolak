@@ -1,6 +1,20 @@
 import { test, expect } from '@playwright/test';
 
-const ARABIC_DIGITS = /[٠-٩۰-۹]/;
+const ARABIC_DIGITS = /[٠-٩۰-۹]/u;
+const ARABIC_LETTERS = /[\u0600-\u06FF]/u;
+const WESTERN_DIGITS = /[0-9]/u;
+const DIGITS21_CATEGORIES = [
+  'room_code',
+  'player_label',
+  'player_count',
+  'scores',
+  'match_target',
+  'piece_counters',
+  'dialogs_status',
+  'reconnect_ui',
+  'round_end',
+  'match_end',
+];
 const BROWSER_ARGS = [
   '--use-gl=angle',
   '--use-angle=swiftshader',
@@ -69,22 +83,76 @@ async function installRoomApi(page) {
   return state;
 }
 
-async function startFourPlayerOnline(page) {
+async function waitForFastIntro(page) {
   await page.goto('http://127.0.0.1:8000/?yakolakTestFast=1', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'complete' &&
       document.body.dataset.yakolakSetup === 'visible' &&
-      document.body.dataset.yakolakSetupFlowStage === 'entry' &&
-      typeof window.yakolakTestSetupFlowAction === 'function',
+      typeof window.yakolakTestSetupFlowAction === 'function' &&
+      typeof window.yakolakTestShowDigitFixture === 'function',
     null,
     { timeout: 60000 }
   );
+}
+
+async function collectVisibleStrings(page) {
+  return page.evaluate(() => {
+    let godot = [];
+    try {
+      godot = JSON.parse(document.body.dataset.yakolakVisibleStrings || '[]');
+    } catch {
+      godot = [];
+    }
+
+    const dom = [];
+    for (const element of document.querySelectorAll('body *')) {
+      if (['SCRIPT', 'STYLE', 'NOSCRIPT', 'CANVAS'].includes(element.tagName)) continue;
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity || 1) <= 0.01) continue;
+      if (rect.width <= 0 || rect.height <= 0 || rect.bottom <= 0 || rect.right <= 0 || rect.top >= innerHeight || rect.left >= innerWidth) continue;
+
+      const directText = [...element.childNodes]
+        .filter(node => node.nodeType === Node.TEXT_NODE)
+        .map(node => node.textContent || '')
+        .join(' ')
+        .trim();
+      if (directText) dom.push({ name: element.id || element.tagName, type: 'DOM', text: directText });
+
+      if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+        const fieldText = (element.value || element.placeholder || '').trim();
+        if (fieldText) dom.push({ name: element.id || element.tagName, type: 'DOMField', text: fieldText });
+      }
+    }
+    return [...godot, ...dom];
+  });
+}
+
+async function expectVisibleWesternDigits(page, context) {
+  await page.waitForFunction(() => Boolean(document.body.dataset.yakolakVisibleStrings), null, { timeout: 10000 });
+  const records = await collectVisibleStrings(page);
+  const violations = records.filter(record => ARABIC_DIGITS.test(String(record.text || '')));
+  expect(violations, `${context}: rendered Arabic-Indic digit violation`).toEqual([]);
+  return records;
+}
+
+async function startFourPlayerOnline(page) {
+  await waitForFastIntro(page);
   await page.evaluate(() => window.yakolakTestSetupFlowAction('new'));
   await page.waitForFunction(() => document.body.dataset.yakolakSetupFlowStage === 'count');
+  let records = await expectVisibleWesternDigits(page, 'setup player-count screen');
+  expect(records.some(record => WESTERN_DIGITS.test(String(record.text || '')))).toBe(true);
+
   await page.evaluate(() => window.yakolakTestSetupFlowAction('count', 4));
   await page.waitForFunction(() => document.body.dataset.yakolakSetupFlowStage === 'mode:1');
+  records = await expectVisibleWesternDigits(page, 'setup player-label/mode screen');
+  expect(records.some(record => String(record.text || '').includes('2'))).toBe(true);
+
   await page.evaluate(() => window.yakolakTestSetupFlowAction('mode', 1, 'online'));
   await page.waitForFunction(() => document.body.dataset.yakolakSetupFlowStage === 'rounds');
+  records = await expectVisibleWesternDigits(page, 'setup match-target screen');
+  expect(records.some(record => WESTERN_DIGITS.test(String(record.text || '')))).toBe(true);
+
   await page.evaluate(() => window.yakolakTestSetupFlowAction('rounds', 3));
   await page.waitForFunction(() => document.body.dataset.yakolakSetupFlowStage === 'color');
   await page.evaluate(() => window.yakolakTestSetupFlowAction('continue'));
@@ -94,9 +162,10 @@ async function startFourPlayerOnline(page) {
     null,
     { timeout: 30000 }
   );
+  await expectVisibleWesternDigits(page, 'live gameplay HUD and room invite');
 }
 
-test('room code renders Western digits through the shared boundary without mutating numeric state', async ({ page }) => {
+test('room code and live Arabic setup/gameplay render only Western digits without mutating numeric state', async ({ page }) => {
   test.setTimeout(120000);
   const state = await installRoomApi(page);
   await startFourPlayerOnline(page);
@@ -119,4 +188,50 @@ test('room code renders Western digits through the shared boundary without mutat
   expect(state.createBody?.targetPlayers).toBe(4);
   expect(typeof state.createBody?.targetRounds).toBe('number');
   expect(state.createBody?.targetRounds).toBe(3);
+});
+
+test('DIGITS-21 rendered regression matrix covers Arabic and English numeric UI and captures mobile RTL proof', async ({ page }, testInfo) => {
+  test.setTimeout(120000);
+  await waitForFastIntro(page);
+
+  for (const mode of ['ar', 'en']) {
+    await page.evaluate(selectedMode => window.yakolakTestShowDigitFixture(selectedMode), mode);
+    await page.waitForFunction(
+      ({ expectedMode, expectedCount }) => {
+        if (document.body.dataset.yakolakDigits21Fixture !== expectedMode) return false;
+        try {
+          const records = JSON.parse(document.body.dataset.yakolakVisibleStrings || '[]');
+          const fixture = records.filter(record => String(record.name || '').startsWith('Digits21_'));
+          if (fixture.length !== expectedCount) return false;
+          const copy = fixture.map(record => String(record.text || '')).join(' | ');
+          return expectedMode === 'ar' ? copy.includes('رمز الغرفة 54') : copy.includes('Room code 54');
+        } catch {
+          return false;
+        }
+      },
+      { expectedMode: mode, expectedCount: DIGITS21_CATEGORIES.length },
+      { timeout: 10000 }
+    );
+
+    const visible = await expectVisibleWesternDigits(page, `DIGITS-21 ${mode} visible-string scan`);
+    const fixture = visible.filter(record => String(record.name || '').startsWith('Digits21_'));
+    const names = fixture.map(record => String(record.name).replace(/^Digits21_/, '')).sort();
+    expect(names).toEqual([...DIGITS21_CATEGORIES].sort());
+    expect(fixture.every(record => WESTERN_DIGITS.test(String(record.text || '')))).toBe(true);
+
+    if (mode === 'ar') {
+      expect(fixture.some(record => ARABIC_LETTERS.test(String(record.text || '')) && WESTERN_DIGITS.test(String(record.text || '')))).toBe(true);
+      const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+      expect(viewport).toEqual({ width: 390, height: 844 });
+      const screenshotPath = testInfo.outputPath('digits-21-arabic-mobile.png');
+      await page.screenshot({ path: screenshotPath, fullPage: false });
+      await testInfo.attach('DIGITS-21 Arabic mobile portrait', { path: screenshotPath, contentType: 'image/png' });
+    } else {
+      expect(fixture.some(record => /[A-Za-z]/u.test(String(record.text || '')) && WESTERN_DIGITS.test(String(record.text || '')))).toBe(true);
+    }
+
+    const hiddenSample = await page.evaluate(() => document.body.dataset.yakolakDigits21HiddenSample || '');
+    expect(hiddenSample).toMatch(ARABIC_DIGITS);
+    expect(fixture.some(record => record.name === 'Digits21HiddenTranslation')).toBe(false);
+  }
 });
