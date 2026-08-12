@@ -1,4 +1,4 @@
-[gd_scene load_steps=40 format=3]
+[gd_scene load_steps=41 format=3]
 
 [ext_resource type="Script" path="res://scripts/intro_handoff.gd" id="1_intro"]
 [ext_resource type="Script" path="res://scripts/intro_corrections.gd" id="2_corrections"]
@@ -38,6 +38,7 @@
 [ext_resource type="Script" path="res://scripts/online_state_catalog.gd" id="36_online_state_catalog_dependency"]
 [ext_resource type="Script" path="res://scripts/gameplay_touch_semantic_audit.gd" id="37_touch_semantic_audit"]
 [ext_resource type="Script" path="res://scripts/gameplay_state_inventory.gd" id="38_gameplay_state_dependency"]
+[ext_resource type="Script" path="res://scripts/turn_light_crossfade.gd" id="39_turn_light"]
 
 [node name="YAKOLAKIntro26" type="Node3D"]
 script = ExtResource("1_intro")
@@ -98,6 +99,9 @@ script = ExtResource("37_touch_semantic_audit")
 
 [node name="TurnClarityHUD" type="Node" parent="."]
 script = ExtResource("25_turn_hud")
+
+[node name="TurnLightCrossfade" type="Node3D" parent="."]
+script = ExtResource("39_turn_light")
 
 [node name="GameplayCameraZoom" type="Node" parent="."]
 script = ExtResource("14_zoom")

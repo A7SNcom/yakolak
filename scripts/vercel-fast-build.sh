@@ -12,6 +12,7 @@ python3 scripts/check_approved_baseline.py
 node --check api/game-rules.js
 node --check api/rooms.js
 node tests/online_rules.test.mjs
+node tests/turn_light_contract.test.mjs
 if ! find "$GODOT_DIR" -maxdepth 1 -type f -name 'Godot_*' -perm -u+x 2>/dev/null | grep -q .; then
   rm -rf "$GODOT_DIR"; mkdir -p "$GODOT_DIR"; zip="$TOOL_CACHE/Godot_v${GODOT_TAG}_linux.x86_64.zip"
   if [ ! -s "$zip" ]; then tmp="${zip}.tmp"; rm -f "$tmp"; curl --fail --location --retry 4 --connect-timeout 20 --max-time 180 "${RELEASE}/Godot_v${GODOT_TAG}_linux.x86_64.zip" --output "$tmp"; mv "$tmp" "$zip"; fi
@@ -70,6 +71,7 @@ run_godot_resource_gate res://tests/intro_handoff_headless.gd intro_handoff
 run_godot_resource_gate res://tests/intro_handoff_base_consumer_headless.gd intro_handoff_base_consumer
 run_godot_resource_gate res://tests/gameplay_session_headless.gd gameplay_session
 run_godot_resource_gate res://tests/authoritative_turn_indicator_headless.gd authoritative_turn_indicator
+run_godot_resource_gate res://tests/turn_light_crossfade_headless.gd turn_light_crossfade
 run_godot_resource_gate res://tests/online_player4_owner_boundary_headless.gd online_player4_owner_boundary
 run_godot_resource_gate res://tests/gameplay_session_lifecycle_headless.gd gameplay_lifecycle
 

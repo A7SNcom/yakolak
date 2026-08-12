@@ -145,6 +145,7 @@ func _build_authoritative_turn_snapshot(lifecycle: String) -> Dictionary:
 		"player_index": current_player_index if index_valid else -1,
 		"player_number": current_player_index + 1 if index_valid else 0,
 		"seat": seat,
+		"direction": str(player.get("direction", "")),
 		"mode": str(player.get("mode", "")),
 		"color": str(player.get("color", "")),
 		"color_name": str(player.get("color_name", "")),
@@ -154,12 +155,13 @@ func _build_authoritative_turn_snapshot(lifecycle: String) -> Dictionary:
 
 
 func _authoritative_turn_key(snapshot: Dictionary) -> String:
-	return "%s|%s|%d|%d|%s|%s|%s" % [
+	return "%s|%s|%d|%d|%s|%s|%s|%s" % [
 		"1" if bool(snapshot.get("valid", false)) else "0",
 		str(snapshot.get("lifecycle", "")),
 		int(snapshot.get("round", 0)),
 		int(snapshot.get("player_index", -1)),
 		str(snapshot.get("seat", "")),
+		str(snapshot.get("direction", "")),
 		"1" if bool(snapshot.get("online", false)) else "0",
 		"1" if bool(snapshot.get("local_turn", false)) else "0",
 	]
@@ -173,6 +175,7 @@ func _publish_authoritative_turn_probe(snapshot: Dictionary) -> void:
 		"document.body.dataset.yakolakAuthoritativeTurnValid='%s';" % ("true" if bool(snapshot.get("valid", false)) else "false") +
 		"document.body.dataset.yakolakAuthoritativeTurnLifecycle='%s';" % _turn_js(str(snapshot.get("lifecycle", ""))) +
 		"document.body.dataset.yakolakAuthoritativeTurnPlayer='%d';" % int(snapshot.get("player_number", 0)) +
+		"document.body.dataset.yakolakAuthoritativeTurnDirection='%s';" % _turn_js(str(snapshot.get("direction", ""))) +
 		"document.body.dataset.yakolakAuthoritativeTurnSource='gameplay-state-event';",
 		true
 	)
