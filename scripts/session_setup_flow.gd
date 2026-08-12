@@ -5,6 +5,7 @@ extends "res://scripts/session_setup_arabic.gd"
 # No gameplay capability is added here.
 
 var web_setup_flow_action_callback: Variant
+var custom_setup_active: bool = false
 
 
 func _ready() -> void:
@@ -42,6 +43,7 @@ func _start_new_game_flow() -> void:
 	room_preview_ready = false
 	room_preview_code = ""
 	tutorial_requested = false
+	custom_setup_active = false
 	wizard_history.clear()
 	_reset_seats()
 	wizard_step = "count"
@@ -63,6 +65,21 @@ func _wizard_header(title: String) -> Control:
 
 
 func _build_mode_question(content: VBoxContainer, seat_index: int) -> void:
+	# Keep the established room-wide online shortcut on the first opponent. The
+	# Custom branch is presentation only: it reuses the same seat dictionaries and
+	# _choose_mode path, exposing only the local/bot combinations gameplay supports.
+	if seat_index == 1 and not custom_setup_active:
+		var quick_row := _choice_row()
+		var online_label: String = "الكل أونلاين" if _active_count() > 2 else "أونلاين"
+		var online_button := _button(online_label, Color.WHITE, Color("#2a4d63"))
+		online_button.pressed.connect(_choose_mode.bind(seat_index, "online"))
+		quick_row.add_child(online_button)
+		var custom_button := _button("مخصص", Color("#10201f"), Color("#f2f0e9"))
+		custom_button.pressed.connect(_begin_custom_setup)
+		quick_row.add_child(custom_button)
+		content.add_child(quick_row)
+		return
+
 	var row := _choice_row()
 	var local := _button("على نفس الجهاز", Color("#10201f"), Color("#f2f0e9"))
 	local.pressed.connect(_choose_mode.bind(seat_index, "local"))
@@ -70,22 +87,73 @@ func _build_mode_question(content: VBoxContainer, seat_index: int) -> void:
 	var bot := _button("كمبيوتر", Color.WHITE, Color("#235b50"))
 	bot.pressed.connect(_choose_mode.bind(seat_index, "bot"))
 	row.add_child(bot)
-	# Online is a room-wide mode in the current protocol. Offer it only on the
-	# first opponent so a later choice can never silently rewrite earlier seats.
-	if seat_index == 1:
-		var online_label: String = "الكل أونلاين" if _active_count() > 2 else "أونلاين"
-		var online_button := _button(online_label, Color.WHITE, Color("#2a4d63"))
-		online_button.pressed.connect(_choose_mode.bind(seat_index, "online"))
-		row.add_child(online_button)
 	content.add_child(row)
 
 
+func _begin_custom_setup() -> void:
+	custom_setup_active = true
+	_show_setup()
+
+
 func _choose_mode(seat_index: int, mode_id: String) -> void:
-	# Guard the same rule behind the UI: unsupported mixed online/local configs
-	# must not be reachable from test hooks or future callers either.
+	# Online remains room-wide and owned by the pre-existing quick path. Custom
+	# cannot manufacture an online/local or online/bot room the network cannot
+	# represent. Keep the same guard behind UI/test hooks for future callers.
+	if custom_setup_active and mode_id == "online":
+		return
 	if mode_id == "online" and seat_index != 1:
 		return
 	super._choose_mode(seat_index, mode_id)
+
+
+func _configuration_validation_error() -> String:
+	var active_players: int = _active_count()
+	if joining_room_code.is_empty() and active_players < 2:
+		return "أضف لاعبًا آخر."
+	if active_players < 1 or active_players > 4:
+		return "عدد اللاعبين غير مدعوم."
+
+	var seen_colors: Dictionary = {}
+	var has_online: bool = false
+	for index: int in range(seats.size()):
+		var seat: Dictionary = seats[index]
+		if not bool(seat.get("active", false)):
+			continue
+		var color_id: String = str(seat.get("color", ""))
+		var color_supported: bool = false
+		for color_data: Dictionary in PALETTE:
+			if str(color_data.get("id", "")) == color_id:
+				color_supported = true
+				break
+		if not color_supported:
+			return "لون لاعب غير مدعوم."
+		if seen_colors.has(color_id):
+			return "لا يمكن تكرار لون لاعب."
+		seen_colors[color_id] = true
+
+		var mode_id: String = "local" if index == 0 else str(seat.get("mode", ""))
+		if index == 0 and mode_id != "local":
+			return "المقعد الأول يجب أن يكون على هذا الجهاز."
+		if not ["local", "bot", "online"].has(mode_id):
+			return "نوع لاعب غير مدعوم."
+		if mode_id == "online":
+			has_online = true
+
+	# The authoritative online room model is all-online after p1. This is the
+	# same rule enforced by gameplay's host gate and by the existing mode setter.
+	if has_online and not _active_secondary_players_are_online():
+		return "لا يمكن خلط الأونلاين مع لاعبين محليين أو الكمبيوتر."
+	return ""
+
+
+func _emit_configuration() -> void:
+	var validation_error: String = _configuration_validation_error()
+	if not validation_error.is_empty():
+		show_setup_error(validation_error)
+		return
+	# Do not add a Custom-only payload. Base emission remains the one canonical
+	# {tutorial, rounds, players, online_join_code} config consumed by gameplay.
+	super._emit_configuration()
 
 
 func _build_color_question(content: VBoxContainer) -> void:
@@ -172,6 +240,10 @@ func _tutorial_available_for_current_configuration() -> bool:
 
 
 func _wizard_back() -> void:
+	if custom_setup_active and wizard_step == "mode:1":
+		custom_setup_active = false
+		_show_setup()
+		return
 	if not wizard_history.is_empty():
 		wizard_step = wizard_history.pop_back()
 		_show_setup()
@@ -180,6 +252,11 @@ func _wizard_back() -> void:
 		_show_invitation(joining_room_code)
 	else:
 		_show_room_entry()
+
+
+func reset_for_intro() -> void:
+	custom_setup_active = false
+	super.reset_for_intro()
 
 
 func _publish_flow_stage(stage: String) -> void:
@@ -205,6 +282,9 @@ func _on_web_setup_flow_action(arguments: Array) -> void:
 		"count":
 			if arguments.size() >= 2:
 				_choose_player_count(clampi(int(arguments[1]), 2, 4))
+		"custom":
+			if wizard_step == "mode:1":
+				_begin_custom_setup()
 		"mode":
 			if arguments.size() >= 3:
 				_choose_mode(clampi(int(arguments[1]), 1, 3), str(arguments[2]))
