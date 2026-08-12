@@ -1,8 +1,10 @@
 extends "res://scripts/gameplay_explicit_handoff.gd"
 
 # TURN-UI-08: one event-driven observer contract for turn presentation.
-# This layer does not own or advance turns. It only snapshots the already-applied
-# authoritative gameplay state and emits when that turn/lifecycle state changes.
+# UX-TURN-33: accepted online seat ownership also owns the pointer-readiness
+# boundary. Presentation motion may continue, but camera/light/tween state is
+# never consulted to grant or delay an already-authoritative local turn.
+# This layer still does not own or advance turns.
 signal authoritative_turn_changed(snapshot: Dictionary)
 
 var authoritative_turn_revision: int = 0
@@ -10,6 +12,9 @@ var authoritative_turn_last_key: String = ""
 var authoritative_turn_cached_snapshot: Dictionary = {}
 var authoritative_turn_transitioning: bool = false
 var authoritative_online_snapshot_hydrated: bool = false
+var authoritative_input_dispatch_count: int = 0
+var authoritative_input_visual_motion_count: int = 0
+var authoritative_input_last_dispatch_msec: int = 0
 
 
 func _ready() -> void:
@@ -23,6 +28,65 @@ func authoritative_turn_snapshot() -> Dictionary:
 		snapshot["revision"] = authoritative_turn_revision
 		return snapshot
 	return authoritative_turn_cached_snapshot.duplicate(true)
+
+
+func _input(event: InputEvent) -> void:
+	# Once an accepted room snapshot says this seat owns the turn, dispatch the
+	# exact existing gameplay pointer path directly. The inherited shared-device
+	# path may still gate on camera motion; online authority must not. Duplicate
+	# commits remain guarded by gameplay_explicit_handoff._begin_move().
+	if not _authoritative_online_pointer_ready():
+		super._input(event)
+		return
+
+	var pointer_position: Vector2 = Vector2.ZERO
+	var pressed: bool = false
+	var pointer_event: bool = true
+	if event is InputEventScreenTouch:
+		var touch := event as InputEventScreenTouch
+		pressed = touch.pressed
+		pointer_position = touch.position
+	elif event is InputEventMouseButton:
+		var mouse := event as InputEventMouseButton
+		pressed = mouse.pressed and mouse.button_index == MOUSE_BUTTON_LEFT
+		pointer_position = mouse.position
+	else:
+		pointer_event = false
+
+	if not pointer_event:
+		super._input(event)
+		return
+	if not pressed:
+		return
+
+	# A real local move animation is still an unsafe input interval. Online room
+	# application does not use that animation, so this protects the genuine case
+	# without making presentation-only camera/light motion authoritative.
+	if move_active:
+		get_viewport().set_input_as_handled()
+		return
+
+	get_viewport().set_input_as_handled()
+	var now: int = Time.get_ticks_msec()
+	if now - last_pointer_msec < INPUT_DEBOUNCE_MS and pointer_position.distance_to(last_pointer_position) < 12.0:
+		return
+	last_pointer_msec = now
+	last_pointer_position = pointer_position
+	authoritative_input_dispatch_count += 1
+	authoritative_input_last_dispatch_msec = now
+	if camera_transition or turn_camera_active:
+		authoritative_input_visual_motion_count += 1
+	_handle_pointer(pointer_position)
+
+
+func _authoritative_online_pointer_ready() -> bool:
+	if not online_active or online_waiting or not match_initialized or round_complete or match_complete or online_cancelled:
+		return false
+	var snapshot: Dictionary = authoritative_turn_snapshot()
+	if not bool(snapshot.get("valid", false)) or not bool(snapshot.get("online", false)) or not bool(snapshot.get("local_turn", false)):
+		return false
+	var authoritative_seat: String = str(snapshot.get("seat", ""))
+	return not authoritative_seat.is_empty() and authoritative_seat == str(online_identity.get("seat", ""))
 
 
 func _start_online_host(configuration: Dictionary) -> void:

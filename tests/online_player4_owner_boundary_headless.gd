@@ -1,8 +1,13 @@
 extends SceneTree
 
-# Regression for ONLINE-02. The server trace for room 61 proved v7/turnIndex=3
-# reached p4 on every tab; this test keeps that authoritative ownership distinct
-# from the visual turn-camera tween so p4 cannot be stranded before submit_move.
+# ONLINE-02 originally protected the p3 -> p4 owner boundary. UX-TURN-33 turns
+# that into a general production regression for p1 -> p2 and p3 -> p4: accepted
+# authoritative ownership must permit real pointer input even while the visual
+# camera tween is intentionally paused forever. The client may never advance a
+# turn itself, and the existing exactly-once pending guard must still win.
+
+const INPUT_BOUND_MS: int = 100
+const COLORS: Array[String] = ["green", "marble", "gold", "blue"]
 
 class FakeOnline:
 	extends Node
@@ -11,6 +16,7 @@ class FakeOnline:
 	var last_size: String = ""
 	var room: Dictionary = {}
 	var identity: Dictionary = {}
+	var reconnecting: bool = false
 
 	func submit_move(cell: int, size_name: String) -> void:
 		submit_count += 1
@@ -28,13 +34,97 @@ func _init() -> void:
 
 
 func _run() -> void:
+	await _exercise_transition("p2", 0, 1, 21, "P1->P2")
+	await _exercise_transition("p4", 2, 3, 31, "P3->P4")
+	if failures.is_empty():
+		print("YAKOLAK_UX_TURN_33_INPUT_READINESS_OK")
+		quit(0)
+		return
+	for failure: String in failures:
+		push_error(failure)
+	quit(1)
+
+
+func _exercise_transition(target_seat: String, from_index: int, to_index: int, version: int, label: String) -> void:
+	await _bootstrap(target_seat)
+	if game == null:
+		await _teardown()
+		return
+
+	var before: Dictionary = _room_state(version, from_index, maxi(0, version - 20))
+	var after: Dictionary = _room_state(version + 1, to_index, maxi(1, version - 19))
+
+	_accept(before, target_seat)
+	_expect(int(game.get("current_player_index")) == from_index, label + " begins on the authoritative previous owner")
+	_expect(not bool(game.call("_authoritative_online_pointer_ready")), label + " target seat cannot act before ownership")
+	_expect(not bool(game.get("gameplay_ready")), label + " target seat remains blocked out of turn")
+	var revision_before: int = int(game.get("authoritative_turn_revision"))
+
+	_accept(after, target_seat)
+	var revision_after: int = int(game.get("authoritative_turn_revision"))
+	_expect(revision_after == revision_before + 1, label + " publishes exactly one authoritative turn advance")
+	_expect(int(game.get("current_player_index")) == to_index, label + " applies the authoritative next owner")
+	_expect(str(game.call("_current_mode")) == "local", label + " accepted seat ownership becomes the one local mover")
+	var snapshot: Dictionary = game.call("authoritative_turn_snapshot") as Dictionary
+	_expect(bool(snapshot.get("valid", false)), label + " authoritative snapshot is valid")
+	_expect(bool(snapshot.get("local_turn", false)), label + " authoritative snapshot marks only this seat local")
+	_expect(str(snapshot.get("seat", "")) == target_seat, label + " snapshot owner matches the accepted identity")
+	_expect(bool(game.call("_authoritative_online_pointer_ready")), label + " input is ready from authority before visuals finish")
+	_expect(bool(game.get("camera_transition")), label + " camera presentation is still transitioning")
+	_expect(bool(game.get("turn_camera_active")), label + " turn-camera tween is genuinely active")
+
+	var first_turn_tween: Tween = game.get("camera_tween") as Tween
+	_expect(first_turn_tween != null and first_turn_tween.is_valid(), label + " has a live visual tween to stall")
+	if first_turn_tween != null and first_turn_tween.is_valid():
+		first_turn_tween.pause()
+
+	# Re-delivering the same accepted room state cannot manufacture another turn
+	# edge or another camera transition.
+	_accept(after, target_seat)
+	_expect(int(game.get("authoritative_turn_revision")) == revision_after, label + " duplicate room does not advance authority twice")
+	_expect(game.get("camera_tween") == first_turn_tween, label + " duplicate room does not start a second turn tween")
+
+	var dispatch_before: int = int(game.get("authoritative_input_dispatch_count"))
+	var visual_before: int = int(game.get("authoritative_input_visual_motion_count"))
+	var started_msec: int = Time.get_ticks_msec()
+	_press_current_piece(label)
+	var first_input_msec: int = int(game.get("authoritative_input_last_dispatch_msec"))
+	var elapsed_msec: int = first_input_msec - started_msec
+	_expect(first_input_msec >= started_msec, label + " records the first legal pointer dispatch")
+	_expect(elapsed_msec >= 0 and elapsed_msec <= INPUT_BOUND_MS, label + " first legal input is bounded to %dms" % INPUT_BOUND_MS)
+	_expect(int(game.get("selected_index")) >= 0, label + " real pointer input selects a legal current-owner piece")
+	_expect(int(game.get("authoritative_input_dispatch_count")) == dispatch_before + 1, label + " dispatches the first pointer exactly once")
+	_expect(int(game.get("authoritative_input_visual_motion_count")) == visual_before + 1, label + " accepts input while presentation motion is unfinished")
+	_expect(bool(game.get("camera_transition")) and bool(game.get("turn_camera_active")), label + " input does not falsify or finish visual motion")
+
+	var selected_size: String = str(game.call("_selected_size"))
+	var first_cell: int = int(game.call("_first_legal_cell_for_size", selected_size))
+	_expect(first_cell >= 0, label + " selected piece has a legal target")
+	if first_cell >= 0:
+		_press_cell(first_cell, label)
+	_expect(online.submit_count == 1, label + " submits exactly one legal move while the camera tween is stalled")
+	_expect(bool(game.get("online_move_commit_pending")), label + " exactly-once pending guard arms after the first submit")
+	_expect(int(game.get("current_player_index")) == to_index, label + " client input cannot advance authoritative turnIndex")
+	_expect(int(game.get("authoritative_turn_revision")) == revision_after, label + " client input cannot invent an authoritative revision")
+
+	var second_cell: int = _second_legal_cell(selected_size, first_cell)
+	_expect(second_cell >= 0, label + " has a second legal target for duplicate-input proof")
+	if second_cell >= 0:
+		_press_cell(second_cell, label)
+	_expect(online.submit_count == 1, label + " duplicate input while move is pending cannot submit twice")
+	_expect(int(game.get("current_player_index")) == to_index, label + " duplicate input cannot repeat the turn transition")
+	_expect(bool(game.get("camera_transition")) and bool(game.get("turn_camera_active")), label + " visual tween remains independently stalled after input")
+
+	await _teardown()
+
+
+func _bootstrap(target_seat: String) -> void:
 	intro = preload("res://scenes/intro.tscn").instantiate()
 	root.add_child(intro)
 	await process_frame
 	game = intro.get_node_or_null("PostIntroGameplay")
-	_expect(game != null, "production gameplay controller exists")
+	_expect(game != null, target_seat + " production gameplay controller exists")
 	if game == null:
-		await _finish()
 		return
 
 	intro.call("_restart_intro")
@@ -43,128 +133,108 @@ func _run() -> void:
 	intro.call("_publish_complete")
 	for _frame in range(6):
 		await process_frame
-	_expect(bool(game.get("waiting_for_setup")), "explicit intro handoff initializes gameplay before online state")
+	_expect(bool(game.get("waiting_for_setup")), target_seat + " explicit handoff initializes gameplay")
 
 	online = FakeOnline.new()
-	online.name = "OnlinePlayer4BoundaryTransport"
+	online.name = "UXTurn33Transport_" + target_seat
 	intro.add_child(online)
 	game.set("online", online)
 
-	var p3_room: Dictionary = _room_state(
-		6,
-		2,
-		2,
-		{
-			"4": {"large": "green"},
-			"5": {"medium": "marble"},
-		},
-		{"cell": 5, "size": "medium", "color": "marble", "seat": "p2"}
-	)
-	var p4_room: Dictionary = _room_state(
-		7,
-		3,
-		3,
-		{
-			"4": {"large": "green"},
-			"5": {"medium": "marble"},
-			"0": {"small": "gold"},
-		},
-		{"cell": 0, "size": "small", "color": "gold", "seat": "p3"}
-	)
 
-	# Reproduce the production boundary: this tab is p4, while the accepted room
-	# first says p3 owns v6 and then advances once to p4 at v7.
-	_accept_for("p4", p3_room)
-	_expect(int(game.get("current_player_index")) == 2, "v6 is owned by player 3")
-	_expect(str(game.call("_current_mode")) == "online", "p4 remains blocked while p3 owns the turn")
-	_expect(not bool(game.get("gameplay_ready")), "p4 cannot act out of turn")
-
-	_accept_for("p4", p4_room)
-	_expect(int(game.get("current_player_index")) == 3, "player 3 advances exactly once to player 4")
-	_expect(str(game.call("_current_mode")) == "local", "authoritative p4 seat becomes the local owner")
-	_expect(bool(game.get("gameplay_ready")), "p4 ownership is ready before camera completion")
-	_expect(bool(game.get("camera_transition")), "the visual camera transition may still be running")
-	var first_turn_tween: Variant = game.get("camera_tween")
-
-	# A repeated copy of the same authoritative v7 must not start a second turn
-	# transition or manufacture a second ownership edge.
-	_accept_for("p4", p4_room)
-	_expect(game.get("camera_tween") == first_turn_tween, "duplicate v7 does not advance p4 twice")
-	_expect(int(game.get("current_player_index")) == 3, "duplicate v7 keeps the same authoritative turn")
-
-	# All four client identities converge on the exact same v7/turnIndex=3. Only
-	# p4 may become locally actionable; p1-p3 remain blocked before transport.
-	for seat: String in ["p1", "p2", "p3"]:
-		_accept_for(seat, p4_room)
-		_expect(int(online.room.get("version", -1)) == 7, seat + " sees authoritative version 7")
-		_expect(int(game.get("current_player_index")) == 3, seat + " sees authoritative player 4 turn")
-		_expect(not bool(game.get("gameplay_ready")), seat + " remains blocked out of turn")
-		game.call("_play_one_move_for_test")
-		_expect(online.submit_count == 0, seat + " cannot submit p4's move")
-
-	_accept_for("p4", p4_room)
-	_expect(int(online.room.get("version", -1)) == 7, "p4 converges on authoritative version 7")
-	_expect(bool(game.get("gameplay_ready")), "p4 stays actionable on the same authoritative state")
-	game.call("_play_one_move_for_test")
-	_expect(online.submit_count == 1, "p4 submits exactly one legal move")
-	_expect(online.last_cell >= 0 and online.last_cell <= 8, "p4 submission uses a legal board cell")
-	_expect(["small", "medium", "large"].has(online.last_size), "p4 submission uses a legal piece size")
-	game.call("_play_one_move_for_test")
-	_expect(online.submit_count == 1, "p4 cannot manufacture a second move from the same turn")
-
-	# Model the single authoritative acknowledgement after p4's move. Every tab
-	# must converge on v8/turnIndex=0, and p4 must become out-of-turn immediately.
-	var v8_room: Dictionary = _room_state(
-		8,
-		0,
-		4,
-		{
-			"4": {"large": "green"},
-			"5": {"medium": "marble"},
-			"0": {"small": "gold"},
-			"8": {"large": "blue"},
-		},
-		{"cell": 8, "size": "large", "color": "blue", "seat": "p4"}
-	)
-	for seat: String in ["p1", "p2", "p3", "p4"]:
-		_accept_for(seat, v8_room)
-		_expect(int(online.room.get("version", -1)) == 8, seat + " converges on authoritative version 8")
-		_expect(int(game.get("current_player_index")) == 0, seat + " converges on player 1 after p4")
-	_expect(not bool(game.get("gameplay_ready")), "p4 is blocked once authoritative ownership leaves p4")
-	game.call("_play_one_move_for_test")
-	_expect(online.submit_count == 1, "out-of-turn p4 remains unable to submit")
-
-	await _finish()
-
-
-func _accept_for(seat: String, room_state: Dictionary) -> void:
-	online.identity = {"token": "test-" + seat, "seat": seat, "code": "61"}
+func _accept(room_state: Dictionary, seat: String) -> void:
+	online.identity = {"token": "ux33-" + seat, "seat": seat, "code": str(room_state.get("code", "33"))}
 	online.room = room_state.duplicate(true)
 	game.call("_on_online_room_changed", online.room, online.identity)
 
 
-func _room_state(version: int, turn_index: int, move_number: int, board: Dictionary, last_move: Dictionary) -> Dictionary:
+func _press_current_piece(label: String) -> void:
+	var records: Array = game.get("piece_records") as Array
+	var direction: String = str(game.call("_current_direction"))
+	var piece_index: int = -1
+	for index: int in range(records.size()):
+		var record: Dictionary = records[index] as Dictionary
+		if bool(record.get("played", false)):
+			continue
+		if str(record.get("dir", "")) == direction and str(record.get("type", "")) == "large":
+			piece_index = index
+			break
+	_expect(piece_index >= 0, label + " finds a legal current-owner large piece")
+	if piece_index < 0:
+		return
+	var record: Dictionary = records[piece_index] as Dictionary
+	var mesh: MeshInstance3D = record.get("mesh") as MeshInstance3D
+	var camera: Camera3D = game.get("camera") as Camera3D
+	_expect(mesh != null and camera != null, label + " has live piece mesh and camera")
+	if mesh == null or camera == null:
+		return
+	var screen: Vector2 = camera.unproject_position(mesh.to_global(Vector3(17.0, 0.0, 9.5)))
+	var viewport_size: Vector2 = game.get_viewport().get_visible_rect().size
+	_expect(screen.x >= 0.0 and screen.x <= viewport_size.x and screen.y >= 0.0 and screen.y <= viewport_size.y, label + " first legal piece remains inside current board framing")
+	_press(screen)
+
+
+func _press_cell(cell: int, label: String) -> void:
+	var target: Node3D = intro.get_node_or_null("BoardTarget_%d" % cell) as Node3D
+	var camera: Camera3D = game.get("camera") as Camera3D
+	_expect(target != null and camera != null, label + " has live legal target and camera")
+	if target == null or camera == null:
+		return
+	var screen: Vector2 = camera.unproject_position(target.global_position)
+	_press(screen)
+
+
+func _press(position: Vector2) -> void:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = true
+	event.position = position
+	game.call("_input", event)
+
+
+func _second_legal_cell(size_name: String, excluded: int) -> int:
+	for cell: int in range(9):
+		if cell == excluded:
+			continue
+		if bool(game.call("_is_legal_cell", cell, size_name)):
+			return cell
+	return -1
+
+
+func _room_state(version: int, turn_index: int, move_number: int) -> Dictionary:
+	var board: Dictionary = {}
+	for cell: int in range(9):
+		board[str(cell)] = {}
+	var players: Array[Dictionary] = [
+		{"seat": "p1", "color": COLORS[0]},
+		{"seat": "p2", "color": COLORS[1]},
+		{"seat": "p3", "color": COLORS[2]},
+		{"seat": "p4", "color": COLORS[3]},
+	]
+	var previous_index: int = (turn_index + players.size() - 1) % players.size()
+	var last_move: Dictionary = {}
+	if move_number > 0:
+		last_move = {
+			"cell": previous_index,
+			"size": "small",
+			"color": str(players[previous_index].get("color", "")),
+			"seat": str(players[previous_index].get("seat", "")),
+		}
 	return {
-		"code": "61",
+		"code": "33",
 		"version": version,
 		"status": "playing",
 		"targetPlayers": 4,
 		"targetRounds": 3,
 		"winsToMatch": 3,
-		"players": [
-			{"seat": "p1", "color": "green"},
-			{"seat": "p2", "color": "marble"},
-			{"seat": "p3", "color": "gold"},
-			{"seat": "p4", "color": "blue"},
-		],
+		"players": players,
 		"turnIndex": turn_index,
-		"board": board.duplicate(true),
+		"board": board,
 		"round": 1,
 		"completedRounds": 0,
 		"scores": {"p1": 0, "p2": 0, "p3": 0, "p4": 0},
 		"winner": {},
 		"draw": false,
-		"lastMove": last_move.duplicate(true),
+		"lastMove": last_move,
 		"moveNumber": move_number,
 		"matchComplete": false,
 		"matchWinner": null,
@@ -173,20 +243,16 @@ func _room_state(version: int, turn_index: int, move_number: int, board: Diction
 	}
 
 
-func _expect(condition: bool, message: String) -> void:
-	if not condition:
-		failures.append(message)
-
-
-func _finish() -> void:
+func _teardown() -> void:
 	if intro != null and is_instance_valid(intro):
 		intro.queue_free()
 		await process_frame
 		await process_frame
-	if failures.is_empty():
-		print("YAKOLAK_ONLINE_PLAYER4_OWNER_BOUNDARY_OK")
-		quit(0)
-		return
-	for failure: String in failures:
-		push_error(failure)
-	quit(1)
+	intro = null
+	game = null
+	online = null
+
+
+func _expect(condition: bool, message: String) -> void:
+	if not condition:
+		failures.append(message)
