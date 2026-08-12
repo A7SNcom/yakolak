@@ -239,6 +239,12 @@ func _clear_queued_action() -> void:
 
 
 func _handle_request_failure(kind: String, payload: Dictionary, error_code: String, status: int, data: Dictionary = {}) -> void:
+	# Room-edit failures belong to the base room-edit owner. In particular, a
+	# stale editor must close, hydrate the canonical room, and surface the stale
+	# notice instead of being swallowed by the generic mutation conflict path.
+	if kind == "edit":
+		super._handle_request_failure(kind, payload, error_code, status, data)
+		return
 	if error_code == "version_conflict" and data.get("room", null) is Dictionary:
 		_mark_connected()
 		# A conflict means this exact old intent was not accepted (an accepted
