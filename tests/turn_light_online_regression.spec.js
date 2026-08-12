@@ -202,6 +202,21 @@ async function settledNeutral(page, label) {
   return observed;
 }
 
+async function waitForCrossfade(page, expectedPlayer, label) {
+  await page.waitForFunction(player => {
+    const d = document.body.dataset;
+    return d.yakolakAuthoritativeTurnValid === 'true' &&
+      Number(d.yakolakAuthoritativeTurnPlayer) === player &&
+      d.yakolakTurnLightRevision === d.yakolakAuthoritativeTurnRevision &&
+      d.yakolakTurnLightDirection === d.yakolakAuthoritativeTurnDirection &&
+      d.yakolakTurnLightState === 'crossfading';
+  }, expectedPlayer, { timeout: 10000 });
+  const observed = await lightSnapshot(page);
+  expect(Number(observed.authoritative.player), `${label}: authoritative intermediate player`).toBe(expectedPlayer);
+  expect(observed.light.state, `${label}: transition must actually be in flight before retarget`).toBe('crossfading');
+  return observed;
+}
+
 function percentile(values, p) {
   if (!values.length) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -244,7 +259,9 @@ async function attachMetrics(page, testInfo, label) {
     states: data.states,
   };
   await testInfo.attach(`${label}-metrics.json`, { body: Buffer.from(JSON.stringify(metrics, null, 2)), contentType: 'application/json' });
-  console.log(`YAKOLAK_LIGHTING12_BROWSER_METRICS ${JSON.stringify({ before: metrics.before, transition: metrics.transition, after: metrics.after, transitionDurations: metrics.transitionDurations })}`);
+  const summary = { before: metrics.before, transition: metrics.transition, after: metrics.after, transitionDurations: metrics.transitionDurations };
+  console.log(`YAKOLAK_LIGHTING12_BROWSER_METRICS ${JSON.stringify(summary)}`);
+  console.log(`::notice title=LIGHTING-12 mobile metrics::${JSON.stringify(summary)}`);
   return metrics;
 }
 
@@ -278,10 +295,11 @@ test('mobile portrait LIGHTING-12 authoritative transitions stay clear and frame
     await pushRoom(page, state, { turnIndex: 1 });
     await settled(page, 2, 'p1-to-p2');
 
-    // Repeated rapid changes include the owner-boundary P3 -> P4 handoff.
+    // Repeated rapid changes include the owner-boundary P3 -> P4 handoff. Do
+    // not use a wall-clock guess here: prove P3 became authoritative and its
+    // crossfade is actually in flight before publishing P4.
     await pushRoom(page, state, { turnIndex: 2 });
-    await page.waitForTimeout(70);
-    const beforeP4 = await lightSnapshot(page);
+    const beforeP4 = await waitForCrossfade(page, 3, 'p2-to-p3-in-flight');
     await pushRoom(page, state, { turnIndex: 3 });
     const afterP4 = await settled(page, 4, 'rapid-p3-to-p4');
     expect(Number(afterP4.light.retargets), 'rapid P3 -> P4 must retarget the single tween').toBeGreaterThan(Number(beforeP4.light.retargets));
@@ -356,7 +374,7 @@ test('mobile portrait Reduced Motion skips lighting tween and keeps authoritativ
     expect(initial.light.state, 'initial reduced-motion state').toBe('immediate');
 
     await pushRoom(page, state, { turnIndex: 2 });
-    await page.waitForTimeout(20);
+    await page.waitForFunction(() => document.body.dataset.yakolakAuthoritativeTurnPlayer === '3', null, { timeout: 10000 });
     await pushRoom(page, state, { turnIndex: 3 });
     const p4 = await settled(page, 4, 'reduced-rapid-p3-p4');
     expect(p4.light.state, 'Reduced Motion must apply final state immediately').toBe('immediate');
