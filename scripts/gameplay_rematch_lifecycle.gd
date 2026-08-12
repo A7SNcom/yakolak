@@ -4,14 +4,25 @@ extends "res://scripts/gameplay_tutorial_showcase.gd"
 # Preserve the chosen configuration (players / wins-to-match) but rebuild every
 # runtime and visual match state from the same clean baseline used for a fresh
 # session. This deliberately does not reload the page or alter round rules.
+#
+# MATCH-END-26 keeps the exposed post-match surface intentionally small:
+# rematch is available everywhere, while returning to setup is exposed only for
+# local matches. The online server currently treats leave as room cancellation,
+# so presenting it as an individual post-match exit would not be a safe action.
 
 var web_force_match_complete_callback: Variant
 var web_rematch_callback: Variant
 var web_rematch_lifecycle_test_callback: Variant
+var web_post_match_return_callback: Variant
+
+var post_match_secondary_button: Button
+var post_match_action_pending: String = ""
 
 
 func _ready() -> void:
 	super._ready()
+	_build_post_match_secondary_button()
+	_publish_post_match_action_state()
 	if not OS.has_feature("web"):
 		return
 	var test_fast: bool = bool(JavaScriptBridge.eval("new URL(location.href).searchParams.get('yakolakTestFast')==='1'", true))
@@ -20,22 +31,173 @@ func _ready() -> void:
 	web_force_match_complete_callback = JavaScriptBridge.create_callback(_on_web_force_match_complete)
 	web_rematch_callback = JavaScriptBridge.create_callback(_on_web_rematch)
 	web_rematch_lifecycle_test_callback = JavaScriptBridge.create_callback(_on_web_run_rematch_lifecycle_test)
+	web_post_match_return_callback = JavaScriptBridge.create_callback(_on_web_post_match_return)
 	var window: JavaScriptObject = JavaScriptBridge.get_interface("window")
 	if window != null:
 		window.set("yakolakTestForceMatchComplete", web_force_match_complete_callback)
 		window.set("yakolakTestRematch", web_rematch_callback)
 		window.set("yakolakTestRunRematchLifecycle", web_rematch_lifecycle_test_callback)
+		window.set("yakolakTestPostMatchReturn", web_post_match_return_callback)
+
+
+func _build_post_match_secondary_button() -> void:
+	if hud_layer == null or post_match_secondary_button != null:
+		return
+	post_match_secondary_button = Button.new()
+	post_match_secondary_button.name = "PostMatchSecondaryAction"
+	post_match_secondary_button.set_anchors_preset(Control.PRESET_CENTER)
+	post_match_secondary_button.offset_left = -132.0
+	post_match_secondary_button.offset_top = 74.0
+	post_match_secondary_button.offset_right = 132.0
+	post_match_secondary_button.offset_bottom = 122.0
+	post_match_secondary_button.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	post_match_secondary_button.focus_mode = Control.FOCUS_NONE
+	post_match_secondary_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	post_match_secondary_button.add_theme_font_override("font", ARABIC_FONT)
+	post_match_secondary_button.add_theme_font_size_override("font_size", 17)
+	post_match_secondary_button.add_theme_color_override("font_color", Color.WHITE)
+	post_match_secondary_button.add_theme_color_override("font_hover_color", Color.WHITE)
+	post_match_secondary_button.add_theme_color_override("font_pressed_color", Color.WHITE)
+	post_match_secondary_button.add_theme_color_override("font_disabled_color", Color("#b9c4c0"))
+
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Color("#15181aec")
+	normal.corner_radius_top_left = 14
+	normal.corner_radius_top_right = 14
+	normal.corner_radius_bottom_left = 14
+	normal.corner_radius_bottom_right = 14
+	normal.border_width_left = 1
+	normal.border_width_top = 1
+	normal.border_width_right = 1
+	normal.border_width_bottom = 1
+	normal.border_color = Color("#ffffff24")
+	var hover := normal.duplicate() as StyleBoxFlat
+	hover.bg_color = Color("#285e51")
+	var pressed := normal.duplicate() as StyleBoxFlat
+	pressed.bg_color = Color("#174438")
+	var disabled := normal.duplicate() as StyleBoxFlat
+	disabled.bg_color = Color("#15181ab8")
+	post_match_secondary_button.add_theme_stylebox_override("normal", normal)
+	post_match_secondary_button.add_theme_stylebox_override("hover", hover)
+	post_match_secondary_button.add_theme_stylebox_override("pressed", pressed)
+	post_match_secondary_button.add_theme_stylebox_override("disabled", disabled)
+	post_match_secondary_button.add_theme_stylebox_override("focus", normal)
+	post_match_secondary_button.visible = false
+	post_match_secondary_button.pressed.connect(_on_post_match_secondary_action)
+	hud_layer.add_child(post_match_secondary_button)
+
+
+func _show_round_result() -> void:
+	super._show_round_result()
+	if not match_complete:
+		_hide_post_match_secondary_button()
+		if result_button != null:
+			result_button.disabled = false
+		_publish_post_match_action_state()
+		return
+
+	# Keep only the result plus the real primary action. Do not add tap hints or
+	# explanatory copy that does not itself perform an action.
+	if result_button != null:
+		var leaders: Array[String] = _match_leaders()
+		if leaders.size() == 1:
+			result_button.text = "بطل المباراة: %s\nإعادة المباراة" % _player_name(leaders[0])
+		else:
+			result_button.text = "تعادل المباراة\nإعادة المباراة"
+		result_button.visible = true
+
+	# Returning to setup is a safe local lifecycle transition. Do not expose the
+	# current online leave/cancel primitive as though it were an individual exit.
+	if post_match_secondary_button != null:
+		post_match_secondary_button.text = "العودة للإعدادات"
+		post_match_secondary_button.visible = not online_active
+	_sync_post_match_controls()
+	_publish_post_match_action_state()
 
 
 func _on_round_action() -> void:
 	if not round_complete or action_in_progress:
 		return
-	# Online rematches remain server-authoritative, and an unfinished local
-	# match still uses the existing next-round path unchanged.
-	if online_active or not match_complete:
+	if online_active:
+		if online_cancelled or not match_complete:
+			super._on_round_action()
+			return
+		# One user decision creates one immutable transport intent. The transport
+		# owns retry/deduplication with mutationId; this UI lock prevents a second
+		# tap from creating a second rematch vote while the first is unresolved.
+		if online == null:
+			return
+		post_match_action_pending = "rematch"
+		action_in_progress = true
+		_sync_post_match_controls()
+		_publish_post_match_action_state()
+		online.call("request_rematch")
+		return
+	if not match_complete:
 		super._on_round_action()
 		return
+	post_match_action_pending = "rematch"
 	_restart_completed_local_match()
+
+
+func _on_post_match_secondary_action() -> void:
+	if online_active or not round_complete or not match_complete or action_in_progress:
+		return
+	post_match_action_pending = "setup"
+	action_in_progress = true
+	_sync_post_match_controls()
+	_publish_post_match_action_state()
+	_return_to_setup()
+
+
+func _on_online_room_changed(remote: Dictionary, identity: Dictionary) -> void:
+	super._on_online_room_changed(remote, identity)
+	if post_match_action_pending != "rematch":
+		return
+	var status: String = str(remote.get("status", ""))
+	if status == "finished":
+		# The local vote is accepted but other players may still need to choose.
+		# Keep result visible and the action locked; no duplicate vote is useful.
+		_sync_post_match_controls()
+		_publish_post_match_action_state()
+		return
+	post_match_action_pending = ""
+	action_in_progress = false
+	_hide_post_match_secondary_button()
+	if result_button != null:
+		result_button.disabled = false
+	_publish_post_match_action_state()
+
+
+func _on_online_error(code: String) -> void:
+	post_match_action_pending = ""
+	action_in_progress = false
+	_hide_post_match_secondary_button()
+	if result_button != null:
+		result_button.disabled = false
+	super._on_online_error(code)
+	_publish_post_match_action_state()
+
+
+func _return_to_setup() -> void:
+	post_match_action_pending = ""
+	action_in_progress = false
+	_hide_post_match_secondary_button()
+	if result_button != null:
+		result_button.disabled = false
+	super._return_to_setup()
+	_publish_cleanliness_state()
+	_publish_post_match_action_state()
+
+
+func _reset_for_intro() -> void:
+	post_match_action_pending = ""
+	action_in_progress = false
+	_hide_post_match_secondary_button()
+	if result_button != null:
+		result_button.disabled = false
+	super._reset_for_intro()
+	_publish_post_match_action_state()
 
 
 func _restart_completed_local_match() -> void:
@@ -69,13 +231,47 @@ func _restart_completed_local_match() -> void:
 
 	_sync_active_sides()
 	_update_hud()
+	post_match_action_pending = ""
+	_hide_post_match_secondary_button()
+	if result_button != null:
+		result_button.disabled = false
 	_publish_cleanliness_state()
 	action_in_progress = false
+	_publish_post_match_action_state()
 	if not match_initialized:
 		return
 	_start_turn()
 	_publish_match_state("ready")
 	print("YAKOLAK_MATCH_REMATCH_CLEAN generation=%d players=%d" % [session_generation, players.size()])
+
+
+func _sync_post_match_controls() -> void:
+	var locked: bool = not post_match_action_pending.is_empty()
+	if result_button != null and match_complete:
+		result_button.disabled = locked
+	if post_match_secondary_button != null:
+		post_match_secondary_button.disabled = locked
+
+
+func _hide_post_match_secondary_button() -> void:
+	if post_match_secondary_button != null:
+		post_match_secondary_button.visible = false
+		post_match_secondary_button.disabled = false
+
+
+func _publish_post_match_action_state() -> void:
+	if not OS.has_feature("web"):
+		return
+	var primary: String = "rematch" if match_complete and not online_cancelled else ""
+	var secondary: String = "setup" if match_complete and not online_active and post_match_secondary_button != null and post_match_secondary_button.visible else ""
+	var result_text: String = result_button.text if result_button != null and result_button.visible else ""
+	JavaScriptBridge.eval(
+		"document.body.dataset.yakolakPostMatchPrimary=" + JSON.stringify(primary) + ";" +
+		"document.body.dataset.yakolakPostMatchSecondary=" + JSON.stringify(secondary) + ";" +
+		"document.body.dataset.yakolakPostMatchPending=" + JSON.stringify(post_match_action_pending) + ";" +
+		"document.body.dataset.yakolakPostMatchResult=" + JSON.stringify(result_text) + ";",
+		true
+	)
 
 
 func _on_web_force_match_complete(_arguments: Array) -> void:
@@ -96,6 +292,11 @@ func _on_web_rematch(_arguments: Array) -> void:
 	# Same production action used by "إعادة المباراة", scheduled after returning
 	# from the browser callback so its state publications are never re-entrant.
 	call_deferred("_on_round_action")
+
+
+func _on_web_post_match_return(_arguments: Array) -> void:
+	# Same production action used by the local "العودة للإعدادات" button.
+	call_deferred("_on_post_match_secondary_action")
 
 
 func _on_web_run_rematch_lifecycle_test(_arguments: Array) -> void:
@@ -125,6 +326,7 @@ func _test_dirty_completed_match() -> void:
 	# winner, score, turn, used stone, occupied slot, old selection and visual
 	# result marker are all intentionally stale before the real rematch action.
 	action_in_progress = false
+	post_match_action_pending = ""
 	var winner_index: int = mini(1, players.size() - 1)
 	current_player_index = winner_index
 	round_starter_index = winner_index
@@ -161,6 +363,7 @@ func _test_dirty_completed_match() -> void:
 		score_marker_root.add_child(stale_marker)
 	_publish_score_marker_state()
 	_publish_cleanliness_state()
+	_show_round_result()
 	_publish_match_state("match-complete")
 
 
@@ -182,6 +385,8 @@ func _test_clean_rematch_state(cycle: int) -> Array[String]:
 		failures.append("cycle-%d-move-state" % cycle)
 	if not occupied_slots.is_empty():
 		failures.append("cycle-%d-occupied-%d" % [cycle, occupied_slots.size()])
+	if not post_match_action_pending.is_empty() or action_in_progress:
+		failures.append("cycle-%d-post-match-action" % cycle)
 	for direction_value: Variant in scores.keys():
 		if int(scores.get(str(direction_value), 0)) != 0:
 			failures.append("cycle-%d-score-%s" % [cycle, str(direction_value)])
