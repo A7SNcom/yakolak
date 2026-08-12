@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: digits-21-${{ github.ref }}
-  cancel-in-progress: true
+  group: digits-21-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   rendered-numerals:
