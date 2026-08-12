@@ -40,10 +40,9 @@ func _mark_reconnecting(detail: String) -> void:
 
 
 func _mark_connected() -> void:
-	# A successful HTTP response is not enough to reopen gameplay. The room
-	# snapshot and any pending move must first pass through _accept_room below.
-	if reconnect_hydration_pending:
-		return
+	# Transport recovery and gameplay hydration are deliberately separate. A
+	# successful response can clear reconnect UI while gameplay remains blocked
+	# by reconnect_hydration_pending until a complete snapshot is accepted.
 	super._mark_connected()
 
 
@@ -140,4 +139,3 @@ func _finish_reconnect_hydration_if_ready() -> void:
 		return
 	reconnect_hydration_pending = false
 	reconnect_hydration_floor_version = -1
-	super._mark_connected()

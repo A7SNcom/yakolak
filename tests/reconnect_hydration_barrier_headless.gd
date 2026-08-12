@@ -22,6 +22,13 @@ func _test_player4_reconnect_input_barrier() -> void:
 	var session: Node = _session(_room(10, 3, "cached-p4"), "p4")
 	session.call("_mark_reconnecting", "test-player4")
 	_expect(bool(session.get("reconnect_hydration_pending")), "P4 reconnect must enter hydration barrier")
+	_expect(bool(session.get("reconnecting")), "P4 reconnect must expose transport recovery state")
+
+	# Transport recovery must not itself reopen gameplay. A 204/success can clear
+	# reconnect UI while the independent authoritative hydration barrier stays shut.
+	session.call("_mark_connected")
+	_expect(not bool(session.get("reconnecting")), "transport recovery did not clear reconnect UI state")
+	_expect(bool(session.get("reconnect_hydration_pending")), "transport recovery incorrectly opened gameplay hydration barrier")
 
 	# This is the concrete regression: before RESILIENCE-29, submit_move inherited
 	# the prioritized path and would accept this stale click, preempting the full
