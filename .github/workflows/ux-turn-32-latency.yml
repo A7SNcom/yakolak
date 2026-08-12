@@ -26,6 +26,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install server dependency
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+
       - name: Validate diagnostic syntax
         run: node --check tests/ux_turn_32_latency.spec.js
 
