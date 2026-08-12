@@ -35,30 +35,67 @@ jobs:
           from pathlib import Path
           p = Path('tests/ux_turn_32_latency.spec.js')
           s = p.read_text()
-          old = "requests.find(row => Number(row.version) === Number(commit.version) && row.requestAt >= commit.commitAt)"
-          new = "requests.find(row => Number(row.version) === Number(commit.version) && row.responseAt >= commit.commitAt)"
-          assert old in s
-          s = s.replace(old, new)
-          old = "    hitTestAcceptMs: Math.max(0, selectedAt - input.inputDispatchAt),\n    totalMs: Math.max(0, selectedAt - commit.commitAt),"
-          new = "    hitTestAcceptMs: Math.max(0, selectedAt - input.inputDispatchAt),\n    turnToInteractMs: Math.max(0, gameplayReadyAt - commit.commitAt) + Math.max(0, selectedAt - input.inputDispatchAt),\n    totalMs: Math.max(0, selectedAt - commit.commitAt),"
-          assert old in s
-          s = s.replace(old, new)
-          old = "groups.push({ viewport: viewport.name, players: playerCount, total: stats(rows, 'totalMs'), ready: stats(rows, 'readyAfterCommitMs'), pollWait: stats(rows, 'pollWaitMs'), network: stats(rows, 'networkMs'), camera: stats(rows, 'cameraGateMs'), hitTest: stats(rows, 'hitTestAcceptMs') });"
-          new = "groups.push({ viewport: viewport.name, players: playerCount, turnToInteract: stats(rows, 'turnToInteractMs'), rawProbe: stats(rows, 'totalMs'), ready: stats(rows, 'readyAfterCommitMs'), pollWait: stats(rows, 'pollWaitMs'), network: stats(rows, 'networkMs'), hydration: stats(rows, 'snapshotHydrationMs'), uiUpdate: stats(rows, 'uiUpdateMs'), camera: stats(rows, 'cameraGateMs'), hitTest: stats(rows, 'hitTestAcceptMs') });"
-          assert old in s
-          s = s.replace(old, new)
-          old = "const slowest = [...all].sort((a, b) => b.totalMs - a.totalMs).slice(0, 8);"
-          new = "const slowest = [...all].sort((a, b) => b.turnToInteractMs - a.turnToInteractMs).slice(0, 8);"
-          assert old in s
-          s = s.replace(old, new)
-          old = "      totalMs: 'authoritative commit -> first actual large-piece pointer accepted as piece-selected',"
-          new = "      turnToInteractMs: 'authoritative commit -> gameplay_ready plus measured pointer-to-piece-selected hit-test acceptance; excludes test-observer coordinate wait',\n      totalMs: 'raw probe wall-clock authoritative commit -> first actual large-piece pointer accepted as piece-selected; includes test-observer coordinate wait',"
-          assert old in s
-          s = s.replace(old, new)
-          old = "    definitions: {"
-          new = "    samples: all,\n    definitions: {"
-          assert old in s
-          s = s.replace(old, new)
+          replacements = [
+            (
+              "requests.find(row => Number(row.version) === Number(commit.version) && row.requestAt >= commit.commitAt)",
+              "requests.find(row => Number(row.version) === Number(commit.version) && row.responseAt >= commit.commitAt)",
+            ),
+            (
+              "  const count = Number(harness.seatMoveCounts[seat] || 0);\n  const size = count % 2 === 0 ? 'small' : 'medium';",
+              "  const size = ['small', 'medium', 'large'][Number(room.moveNumber || 0) % 3];",
+            ),
+            (
+              "await client.page.evaluate(() => { window.__turn32Timeline = []; window.__turn32Net = []; window.__turn32Last = ''; });",
+              "await client.page.evaluate(() => { window.__turn32Timeline = []; window.__turn32Net = []; window.__turn32Last = ''; const d = document.body.dataset; for (const k of ['yakolakTestPiece','yakolakTestPieceX','yakolakTestPieceY','yakolakTestLargeX','yakolakTestLargeY','yakolakTestMediumX','yakolakTestMediumY','yakolakTestSmallX','yakolakTestSmallY']) delete d[k]; });",
+            ),
+            (
+              "return d.yakolakGameplay === 'ready' && Number.isFinite(Number(d.yakolakTestLargeX)) && Number.isFinite(Number(d.yakolakTestLargeY));",
+              "return d.yakolakGameplay === 'ready' && Number.isFinite(Number(d.yakolakTestPieceX)) && Number.isFinite(Number(d.yakolakTestPieceY));",
+            ),
+            (
+              "return client.page.evaluate(() => ({ x: Number(document.body.dataset.yakolakTestLargeX), y: Number(document.body.dataset.yakolakTestLargeY), at: Date.now() }));",
+              "return client.page.evaluate(() => ({ x: Number(document.body.dataset.yakolakTestPieceX), y: Number(document.body.dataset.yakolakTestPieceY), at: Date.now() }));",
+            ),
+            (
+              "await client.page.waitForFunction(() => document.body.dataset.yakolakGameplay === 'piece-selected' && document.body.dataset.yakolakSelectedSize === 'large', null, { timeout: 3000 });",
+              "await client.page.waitForFunction(() => document.body.dataset.yakolakGameplay === 'piece-selected' && Boolean(document.body.dataset.yakolakSelectedSize), null, { timeout: 3000 });",
+            ),
+            (
+              "const selectedAt = firstTime(timeline, row => row.gameplay === 'piece-selected' && row.selectedSize === 'large') || input.acceptedAt;",
+              "const selectedAt = firstTime(timeline, row => row.gameplay === 'piece-selected' && Boolean(row.selectedSize)) || input.acceptedAt;",
+            ),
+            (
+              "  const responseAt = responseSeen?.responseAt || delivered.responseAt;",
+              "  const responseAt = delivered.responseAt;",
+            ),
+            (
+              "async function runNormalMatrix(browser, viewport, playerCount, code) {\n  const harness = makeHarness(playerCount, code);\n  const clients = [];\n  try {\n    for (let i = 0; i < playerCount; i += 1) clients.push(await createClient(browser, harness, `p${i + 1}`, viewport));\n    const rows = [];\n    for (let i = 0; i < SAMPLE_COUNT; i += 1) rows.push(await measureOne(harness, clients));\n    return rows;\n  } finally { await closeClients(clients); }\n}",
+              "async function runNormalMatrix(browser, viewport, playerCount, code) {\n  const rows = [];\n  while (rows.length < SAMPLE_COUNT) {\n    const harness = makeHarness(playerCount, code);\n    const clients = [];\n    try {\n      for (let i = 0; i < playerCount; i += 1) clients.push(await createClient(browser, harness, `p${i + 1}`, viewport));\n      const batch = Math.min(8, SAMPLE_COUNT - rows.length);\n      for (let i = 0; i < batch; i += 1) rows.push(await measureOne(harness, clients));\n    } finally { await closeClients(clients); }\n  }\n  return rows;\n}",
+            ),
+            (
+              "    hitTestAcceptMs: Math.max(0, selectedAt - input.inputDispatchAt),\n    totalMs: Math.max(0, selectedAt - commit.commitAt),",
+              "    hitTestAcceptMs: Math.max(0, selectedAt - input.inputDispatchAt),\n    turnToInteractMs: Math.max(0, gameplayReadyAt - commit.commitAt) + Math.max(0, selectedAt - input.inputDispatchAt),\n    totalMs: Math.max(0, selectedAt - commit.commitAt),",
+            ),
+            (
+              "groups.push({ viewport: viewport.name, players: playerCount, total: stats(rows, 'totalMs'), ready: stats(rows, 'readyAfterCommitMs'), pollWait: stats(rows, 'pollWaitMs'), network: stats(rows, 'networkMs'), camera: stats(rows, 'cameraGateMs'), hitTest: stats(rows, 'hitTestAcceptMs') });",
+              "groups.push({ viewport: viewport.name, players: playerCount, turnToInteract: stats(rows, 'turnToInteractMs'), rawProbe: stats(rows, 'totalMs'), ready: stats(rows, 'readyAfterCommitMs'), pollWait: stats(rows, 'pollWaitMs'), network: stats(rows, 'networkMs'), hydration: stats(rows, 'snapshotHydrationMs'), uiUpdate: stats(rows, 'uiUpdateMs'), camera: stats(rows, 'cameraGateMs'), hitTest: stats(rows, 'hitTestAcceptMs') });",
+            ),
+            (
+              "const slowest = [...all].sort((a, b) => b.totalMs - a.totalMs).slice(0, 8);",
+              "const slowest = [...all].sort((a, b) => b.turnToInteractMs - a.turnToInteractMs).slice(0, 8);",
+            ),
+            (
+              "      totalMs: 'authoritative commit -> first actual large-piece pointer accepted as piece-selected',",
+              "      turnToInteractMs: 'authoritative commit -> gameplay_ready plus measured pointer-to-piece-selected hit-test acceptance; excludes test-observer coordinate wait',\n      totalMs: 'raw probe wall-clock authoritative commit -> first actual legal-piece pointer accepted as piece-selected; includes test-observer coordinate wait',",
+            ),
+            (
+              "    definitions: {",
+              "    samples: all,\n    definitions: {",
+            ),
+          ]
+          for old, new in replacements:
+            assert old in s, old
+            s = s.replace(old, new)
           p.write_text(s)
           PY
 
