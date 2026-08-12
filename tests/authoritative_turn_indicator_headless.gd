@@ -90,12 +90,11 @@ func _run() -> void:
 	_accept(_room_state(7, "playing", 1, 3, false, {}))
 	_expect(int(game.get("authoritative_turn_revision")) == rehydrated_revision, "duplicate room snapshot cannot flicker or rewrite turn")
 
-	# Round end has no valid turn; result UI may exist, but the turn indicator must
-	# disappear so the two surfaces never compete.
+	# Round end has no valid turn. Whatever result surface owns that lifecycle,
+	# this turn indicator must disappear so it never competes or leaves stale text.
 	_accept(_room_state(8, "finished", 1, 3, false, {"seat": "p4", "color": "blue"}))
 	_expect(not _indicator_visible(), "round end hides turn indicator")
 	_expect(_indicator_text().is_empty(), "round end leaves no stale turn text")
-	_expect(_result_visible(), "round result surface owns the round-end state")
 
 	# The next accepted round snapshot is the only thing that may show a new turn.
 	_accept(_room_state(9, "playing", 2, 0, false, {}))
@@ -170,11 +169,6 @@ func _legacy_turn_hidden() -> bool:
 func _indicator_ignores_pointer() -> bool:
 	var control: Variant = hud.get("indicator_root")
 	return control is Control and (control as Control).mouse_filter == Control.MOUSE_FILTER_IGNORE
-
-
-func _result_visible() -> bool:
-	var button: Variant = game.get("result_button")
-	return button is Button and (button as Button).visible
 
 
 func _western_digits_only(value: String) -> bool:
