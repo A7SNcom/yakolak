@@ -83,7 +83,7 @@ func _run() -> void:
 	_expect(int(game.get("intro_run_started_reset_generation")) == direct_only_generation, "direct fallback reset belongs to new generation")
 	_expect(int(game.get("intro_generation_seen")) == direct_only_generation, "direct fallback claims new generation")
 	_expect(int(game.get("move_count")) == 0, "direct fallback reset clears gameplay")
-	_expect(not bool(game.get("waiting_for_setup")), "direct fallback reset clears setup ownership")
+	_expect(game.get("waiting_for_setup") != true, "direct fallback reset clears setup ownership")
 
 	# A delayed stale direct call cannot reopen or reset the current replay.
 	intro.call("_dispatch_intro_run_started", combined_generation)
@@ -151,7 +151,7 @@ func _run() -> void:
 
 	game.call("_complete_gameplay_consumer_initialization")
 	await _settle_frames(2)
-	_expect(bool(game.get("initialized")), "consumer initialization completes")
+	_expect(game.get("initialized") == true, "consumer initialization completes")
 	_expect(int(game.get("intro_run_started_pending_reset_generation")) == -1, "completion clears pending intro reset")
 	_expect(int(game.get("intro_run_started_reset_count")) == delayed_resets_before + 1, "latest delayed generation reset applies exactly once")
 	_expect(int(game.get("intro_run_started_reset_generation")) == delayed_final_generation, "applied delayed reset belongs to final generation only")
@@ -181,7 +181,7 @@ func _run() -> void:
 	_expect(int(game.get("intro_run_started_reset_count")) == delayed_resets_before + 2, "post-init replay still resets immediately once")
 	_expect(int(game.get("intro_run_started_reset_generation")) == post_init_generation, "post-init reset belongs to current generation")
 	_expect(int(game.get("move_count")) == 0, "post-init replay clears gameplay immediately")
-	_expect(not bool(game.get("waiting_for_setup")), "post-init replay preserves full reset behavior")
+	_expect(game.get("waiting_for_setup") != true, "post-init replay preserves full reset behavior")
 	intro.call("_dispatch_intro_run_started", post_init_generation)
 	game.call("_on_explicit_intro_run_started", post_init_generation)
 	await _settle_frames(2)
@@ -211,7 +211,7 @@ func _run() -> void:
 	_expect(int(game.get("intro_run_started_reset_generation")) == polling_generation, "polling recovery reset belongs to missed generation")
 	_expect(int(game.get("intro_generation_seen")) == polling_generation, "polling recovery records the shared generation claim")
 	_expect(int(game.get("move_count")) == 0, "polling recovery applies normal reset side effects")
-	_expect(not bool(game.get("waiting_for_setup")), "polling recovery clears restored setup ownership once")
+	_expect(game.get("waiting_for_setup") != true, "polling recovery clears restored setup ownership once")
 	_expect(int(game.get("intro_handoff_claim_count")) == handoff_claims_before_polling, "intro-start polling does not create a handoff consumer claim")
 	_expect(int(intro.get("gameplay_handoff_consume_count")) == handoff_consumes_before_polling, "intro-start polling does not consume the handoff token")
 
@@ -278,13 +278,13 @@ func _publish_pending_without_delivery(generation: int) -> void:
 
 
 func _game_initialized() -> bool:
-	return game != null and bool(game.get("initialized"))
+	return game != null and game.get("initialized") == true
 
 
 func _wait_until(predicate: Callable) -> bool:
 	var deadline: int = Time.get_ticks_msec() + TIMEOUT_MSEC
 	while Time.get_ticks_msec() < deadline:
-		if bool(predicate.call()):
+		if predicate.call() == true:
 			return true
 		await process_frame
 	return false
