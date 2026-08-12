@@ -7,6 +7,8 @@ const ARGS = [
 const COLORS = ['marble', 'blue', 'gold', 'green'];
 const FINAL_STATES = ['final', 'stable', 'immediate'];
 const SAMPLE_WINDOW_MS = 3500;
+const STABLE_FRAME_MS = 40;
+const STABLE_FRAME_COUNT = 20;
 
 test.use({ launchOptions: { args: ARGS } });
 
@@ -155,7 +157,6 @@ async function warmLighting(page, roomState, reducedMotion) {
     const state = await settled(page, player, `${reducedMotion ? 'reduced' : 'normal'}-warm-p${player}`);
     if (reducedMotion) expect(state.state).toBe('immediate');
   }
-  await page.waitForTimeout(SAMPLE_WINDOW_MS);
 }
 
 async function installSampler(page) {
@@ -184,6 +185,14 @@ async function installSampler(page) {
     };
     requestAnimationFrame(tick);
   });
+}
+
+async function waitForStableCadence(page) {
+  await page.waitForFunction(({ maxFrameMs, count }) => {
+    const frames = window.__lighting12Perf3?.frames || [];
+    if (frames.length < count) return false;
+    return frames.slice(-count).every(row => row.dt <= maxFrameMs);
+  }, { maxFrameMs: STABLE_FRAME_MS, count: STABLE_FRAME_COUNT }, { timeout: 30000 });
 }
 
 async function collectFixedBaseline(page) {
@@ -264,6 +273,7 @@ async function runMode(browser, reducedMotion) {
 
     await warmLighting(page, roomState, reducedMotion);
     await installSampler(page);
+    await waitForStableCadence(page);
     await collectFixedBaseline(page);
     await setPhase(page, 'transition');
 
@@ -303,7 +313,7 @@ async function runMode(browser, reducedMotion) {
 }
 
 test('LIGHTING-12 mobile frame-time isolates crossfade cost with Reduced Motion control', async ({ browser }, testInfo) => {
-  test.setTimeout(180000);
+  test.setTimeout(240000);
   const normal = await runMode(browser, false);
   const reduced = await runMode(browser, true);
   const normalP95Delta = normal.transition.p95 - normal.before.p95;
