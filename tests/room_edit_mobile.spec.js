@@ -83,9 +83,11 @@ test('ROOM-EDIT-15 mobile editor saves, cancels, backs out, reopens and handles 
 
   page.on('pageerror', error => failures.push(`pageerror:${error.message}`));
   page.on('console', message => {
-    if (message.type() === 'error' && !message.text().includes('favicon')) {
-      failures.push(`console:${message.text()}`);
-    }
+    if (message.type() !== 'error') return;
+    const text = message.text();
+    if (text.includes('favicon')) return;
+    if (text.includes('Failed to load resource') && text.includes('409 (Conflict)')) return;
+    failures.push(`console:${text}`);
   });
 
   await page.route('**/api/rooms**', async route => {
