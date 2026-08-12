@@ -185,7 +185,7 @@ function twoPlayerRoom() {
 }
 
 // ROUND-END-23: one real winning move commits the result once, then exactly one
-// owner transition clears round-scoped state while preserving match progress.
+// server transition clears round-scoped state while preserving match progress.
 {
   let state = twoPlayerRoom();
   state = applyMove(state, 'p1', { cell: 0, size: 'small' });
@@ -201,8 +201,8 @@ function twoPlayerRoom() {
   assert.equal(state.moveNumber, 5);
   assert.equal(state.matchComplete, false);
 
-  assert.throws(() => advanceRoundState(state, 'p2'), /unauthorized/);
-  const nextRound = advanceRoundState(state, 'p1');
+  assert.throws(() => advanceRoundState(state, 'p9'), /invalid_seat/);
+  const nextRound = advanceRoundState(state, 'p2');
   assert.equal(nextRound.status, 'playing');
   assert.equal(nextRound.round, 2);
   assert.equal(nextRound.turnIndex, 1);
@@ -218,7 +218,8 @@ function twoPlayerRoom() {
 }
 
 // Presence never advances a finished round. Ordinary round advance is automatic
-// from p1 only; match-complete replay remains a separate all-player decision.
+// from any authenticated active seat; match-complete replay remains a separate
+// all-player decision.
 {
   let finished = twoPlayerRoom();
   finished = {
@@ -232,9 +233,9 @@ function twoPlayerRoom() {
   const unchanged = reconcilePresenceState(finished, ['p1']);
   assert.equal(unchanged.status, 'finished');
   assert.equal(unchanged.round, 1);
-  assert.throws(() => rematchState(unchanged, 'p2'), /unauthorized/);
+  assert.throws(() => rematchState(unchanged, 'p9'), /invalid_seat/);
 
-  const advanced = rematchState(unchanged, 'p1');
+  const advanced = rematchState(unchanged, 'p2');
   assert.equal(advanced.status, 'playing');
   assert.equal(advanced.round, 2);
   assert.deepEqual(advanced.board['0'], {});
