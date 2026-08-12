@@ -55,7 +55,7 @@ func _process(_delta: float) -> void:
 func restore_from_location() -> bool:
 	if not OS.has_feature("web") or active or busy:
 		return false
-	var raw_code: Variant = JavaScriptBridge.eval("String(new URL(location.href).searchParams.get('room')||'')", true)
+	var raw_code: Variant = JavaScriptBridge.eval("String(new URL(location.href).searchParams.get('yakolakTestRoom')||new URL(location.href).searchParams.get('room')||'')", true)
 	var code: String = _normalize_code(str(raw_code))
 	if not _valid_room_code(code):
 		return false
@@ -265,6 +265,14 @@ func _handle_request_failure(kind: String, payload: Dictionary, error_code: Stri
 
 
 func _accept_room(next_room: Dictionary) -> void:
+	# A newer authoritative version proves an older round-scoped mutation can no
+	# longer be committed as that original intent. Drop it before emitting the
+	# hydrated room so no stale move/rematch survives into the next round.
+	if not pending_mutation_kind.is_empty():
+		var pending_version: int = int(pending_mutation_payload.get("version", -1))
+		var next_version: int = int(next_room.get("version", -1))
+		if pending_version >= 0 and next_version > pending_version:
+			_clear_pending_mutation()
 	super._accept_room(next_room)
 	if active and not busy and not durable_action_queue.is_empty():
 		call_deferred("_flush_queued_action")
