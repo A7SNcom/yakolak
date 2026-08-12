@@ -1,4 +1,4 @@
-[gd_scene load_steps=41 format=3]
+[gd_scene load_steps=42 format=3]
 
 [ext_resource type="Script" path="res://scripts/intro_handoff.gd" id="1_intro"]
 [ext_resource type="Script" path="res://scripts/intro_corrections.gd" id="2_corrections"]
@@ -39,6 +39,7 @@
 [ext_resource type="Script" path="res://scripts/gameplay_touch_semantic_audit.gd" id="37_touch_semantic_audit"]
 [ext_resource type="Script" path="res://scripts/gameplay_state_inventory.gd" id="38_gameplay_state_dependency"]
 [ext_resource type="Script" path="res://scripts/turn_light_crossfade.gd" id="39_turn_light"]
+[ext_resource type="Script" path="res://scripts/gameplay_explicit_handoff.gd" id="40_gameplay_handoff_dependency"]
 
 [node name="YAKOLAKIntro26" type="Node3D"]
 script = ExtResource("1_intro")

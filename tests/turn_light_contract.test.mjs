@@ -7,9 +7,11 @@ const lighting = fs.readFileSync(new URL('../scripts/turn_light_crossfade.gd', i
 const build = fs.readFileSync(new URL('../scripts/vercel-fast-build.sh', import.meta.url), 'utf8');
 
 assert.ok(scene.includes('res://scripts/turn_light_crossfade.gd'), 'production scene must load the single turn-light owner');
+assert.ok(scene.includes('res://scripts/gameplay_explicit_handoff.gd'), 'production scene must retain the authoritative gameplay inheritance base in exported Web');
 assert.ok(scene.includes('[node name="TurnLightCrossfade" type="Node3D" parent="."]'), 'production scene must contain exactly one turn-light controller node');
 assert.equal((scene.match(/node name="TurnLightCrossfade"/g) || []).length, 1, 'turn-light owner must not be duplicated');
 
+assert.ok(authoritative.startsWith('extends "res://scripts/gameplay_explicit_handoff.gd"'), 'authoritative turn source must inherit the explicit handoff gameplay owner');
 assert.ok(authoritative.includes('"direction": str(player.get("direction", ""))'), 'authoritative snapshot must carry the physical seat direction');
 assert.ok(authoritative.includes('str(snapshot.get("direction", ""))'), 'turn-state dedupe key must include physical direction');
 
