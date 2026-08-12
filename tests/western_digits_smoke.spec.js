@@ -239,6 +239,7 @@ test('DIGITS-21 rendered regression matrix covers Arabic and English numeric UI 
       expect(fixture.some(record => ARABIC_LETTERS.test(String(record.text || '')) && WESTERN_DIGITS.test(String(record.text || '')))).toBe(true);
       const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
       expect(viewport).toEqual({ width: 390, height: 844 });
+      await page.waitForTimeout(750);
       await mkdir('artifacts', { recursive: true });
       const screenshotPath = 'artifacts/digits-21-arabic-mobile.png';
       await page.screenshot({ path: screenshotPath, fullPage: false });
