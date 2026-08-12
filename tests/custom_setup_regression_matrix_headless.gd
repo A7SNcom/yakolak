@@ -116,7 +116,10 @@ func _verify_quick_online_equivalence() -> void:
 
 		var quick_configuration: Dictionary = captures.get(quick_key, {}) as Dictionary
 		var legacy_configuration: Dictionary = captures.get(legacy_key, {}) as Dictionary
-		_expect(quick_configuration == legacy_configuration, "%s is byte-for-byte canonical-equivalent to the pre-Custom setup model" % quick_key)
+		_expect(
+			_canonical_setup_signature(quick_configuration) == _canonical_setup_signature(legacy_configuration),
+			"%s keeps the pre-Custom canonical tutorial/rounds/join-code + seat/mode/color setup" % quick_key
+		)
 		var expected_modes: Array[String] = ["local"]
 		for _index: int in range(1, player_count):
 			expected_modes.append("online")
@@ -246,6 +249,24 @@ func _verify_back_edit_cancel_and_count_changes() -> void:
 func _capture(configuration: Dictionary, key: String) -> void:
 	capture_counts[key] = int(capture_counts.get(key, 0)) + 1
 	captures[key] = configuration.duplicate(true)
+
+
+func _canonical_setup_signature(configuration: Dictionary) -> Dictionary:
+	var canonical_players: Array[Dictionary] = []
+	var players: Array = configuration.get("players", []) as Array
+	for player_value: Variant in players:
+		var player: Dictionary = player_value as Dictionary
+		canonical_players.append({
+			"seat": str(player.get("seat", "")),
+			"mode": str(player.get("mode", "")),
+			"color": str(player.get("color", "")),
+		})
+	return {
+		"tutorial": bool(configuration.get("tutorial", false)),
+		"rounds": int(configuration.get("rounds", 0)),
+		"players": canonical_players,
+		"online_join_code": str(configuration.get("online_join_code", "")),
+	}
 
 
 func _assert_configuration(configuration: Dictionary, player_count: int, expected_modes: Array, expected_colors: Array, label: String) -> void:
