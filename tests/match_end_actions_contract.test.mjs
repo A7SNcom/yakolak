@@ -6,7 +6,8 @@ const { applyMove, createState, joinState, rematchState } = __testing;
 const gameplay = fs.readFileSync(new URL('../scripts/gameplay_rematch_lifecycle.gd', import.meta.url), 'utf8');
 
 function completedOnlineMatch() {
-  let state = joinState(createState('marble', 2, 1), 'p2', 'blue');
+  let state = joinState(createState('marble', 2, 3), 'p2', 'blue');
+  state = { ...state, scores: { ...state.scores, p1: 2 } };
   state = applyMove(state, 'p1', { cell: 0, size: 'small' });
   state = applyMove(state, 'p2', { cell: 3, size: 'large' });
   state = applyMove(state, 'p1', { cell: 1, size: 'small' });
@@ -25,7 +26,7 @@ function completedOnlineMatch() {
   assert.equal(firstVote.status, 'finished');
   assert.equal(firstVote.matchComplete, true);
   assert.equal(firstVote.rematch.p1, true);
-  assert.equal(firstVote.scores.p1, 1);
+  assert.equal(firstVote.scores.p1, 3);
 
   const restarted = rematchState(firstVote, 'p2');
   assert.equal(restarted.status, 'playing');
