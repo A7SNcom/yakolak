@@ -4,6 +4,7 @@ extends "res://scripts/gameplay_interaction_feedback.gd"
 # requests, reconciliation, or rules; it only makes every wait/failure/restore
 # state visible on the existing waiting card with one consistent vocabulary.
 const OnlineStateCatalog = preload("res://scripts/online_state_catalog.gd")
+const DisplayBoundary = preload("res://scripts/ui_design.gd")
 
 var online_ui_state_id: String = ""
 var online_ui_detail: String = ""
@@ -35,7 +36,7 @@ func _transport_restore_pending() -> bool:
 	# Read-only observation of OnlineSession. A restored identity begins with a
 	# room shell at version 0 and remains authoritative even if the intro resets
 	# gameplay presentation once during its final transition.
-	if online == null or not bool(online.get("active")):
+	if online == null or online.get("active") != true:
 		return false
 	var room_value: Variant = online.get("room")
 	var identity_value: Variant = online.get("identity")
@@ -81,7 +82,7 @@ func _start_online_host(configuration: Dictionary) -> void:
 
 
 func _start_online_join(configuration: Dictionary, code: String) -> void:
-	_set_online_ui_state("joining-room", "الغرفة " + _arabize_digits(code))
+	_set_online_ui_state("joining-room", "الغرفة " + DisplayBoundary.display_text(code))
 	super._start_online_join(configuration, code)
 
 
@@ -97,7 +98,7 @@ func _on_online_room_changed(remote: Dictionary, identity: Dictionary) -> void:
 	if status == "waiting":
 		var joined: int = (remote.get("players", []) as Array).size()
 		var target: int = int(remote.get("targetPlayers", joined))
-		_set_online_ui_state("waiting-players", _arabize_digits("انضم %d من %d" % [joined, maxi(target, joined)]))
+		_set_online_ui_state("waiting-players", DisplayBoundary.display_text("انضم %d من %d" % [joined, maxi(target, joined)]))
 	elif status == "cancelled":
 		_set_online_ui_state("room-cancelled")
 	elif status == "playing":
@@ -175,7 +176,7 @@ func _sync_waiting_overlay() -> void:
 		var joined: int = players.size()
 		var target: int = maxi(_waiting_target_count(), joined)
 		if target > 0:
-			detail = _arabize_digits("انضم %d من %d" % [joined, target])
+			detail = DisplayBoundary.display_text("انضم %d من %d" % [joined, target])
 
 	# Setup owns room-entry/invitation states. When gameplay has no online state,
 	# it must stay silent instead of deleting the setup layer's browser contract.
@@ -186,7 +187,7 @@ func _sync_waiting_overlay() -> void:
 	waiting_root.visible = true
 	var code: String = _waiting_room_code()
 	if waiting_room_label != null:
-		waiting_room_label.text = "الغرفة " + _arabize_waiting(code) if not code.is_empty() else "ياكلك أونلاين"
+		waiting_room_label.text = "الغرفة " + DisplayBoundary.display_text(code) if not code.is_empty() else "ياكلك أونلاين"
 	if waiting_title_label != null:
 		waiting_title_label.text = str(state.get("title", ""))
 	if waiting_progress_label != null:
