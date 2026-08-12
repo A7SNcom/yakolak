@@ -276,33 +276,58 @@ function applyMove(state, seat, move) {
   return { ...next, turnIndex };
 }
 
-function advanceRoundState(state) {
+function advanceRoundState(state, seat) {
+  if (state.status !== 'finished' || state.matchComplete) throw new Error('round_not_finished');
+  if (seat !== 'p1') throw new Error('unauthorized');
   const cleared = Object.fromEntries(state.players.map(player => [player.seat, false]));
-  if (state.matchComplete) {
-    return {
-      ...state,
-      status: 'playing', turnIndex: 0, board: emptyBoard(), round: 1, completedRounds: 0,
-      scores: Object.fromEntries(state.players.map(player => [player.seat, 0])),
-      winner: null, draw: false, lastMove: null, moveNumber: 0,
-      matchComplete: false, matchWinner: null, matchWinners: [], rematch: cleared, skippedSeat: null,
-    };
-  }
   return {
     ...state,
-    status: 'playing', turnIndex: Number(state.round || 1) % state.players.length,
-    board: emptyBoard(), round: Number(state.round || 1) + 1,
-    winner: null, draw: false, lastMove: null,
-    matchComplete: false, matchWinner: null, matchWinners: [], rematch: cleared, skippedSeat: null,
+    status: 'playing',
+    turnIndex: Number(state.round || 1) % state.players.length,
+    board: emptyBoard(),
+    round: Number(state.round || 1) + 1,
+    winner: null,
+    draw: false,
+    lastMove: null,
+    moveNumber: 0,
+    matchComplete: false,
+    matchWinner: null,
+    matchWinners: [],
+    rematch: cleared,
+    skippedSeat: null,
+  };
+}
+
+function restartMatchState(state) {
+  const cleared = Object.fromEntries(state.players.map(player => [player.seat, false]));
+  return {
+    ...state,
+    status: 'playing',
+    turnIndex: 0,
+    board: emptyBoard(),
+    round: 1,
+    completedRounds: 0,
+    scores: Object.fromEntries(state.players.map(player => [player.seat, 0])),
+    winner: null,
+    draw: false,
+    lastMove: null,
+    moveNumber: 0,
+    matchComplete: false,
+    matchWinner: null,
+    matchWinners: [],
+    rematch: cleared,
+    skippedSeat: null,
   };
 }
 
 function rematchState(state, seat, requiredSeats = null) {
   if (state.status !== 'finished') throw new Error('round_not_finished');
   if (!state.players.some(player => player.seat === seat)) throw new Error('invalid_seat');
+  if (!state.matchComplete) return advanceRoundState(state, seat);
   const rematch = { ...state.rematch, [seat]: true };
   const required = requiredSeats || state.players.map(player => player.seat);
   if (!required.every(requiredSeat => rematch[requiredSeat])) return { ...state, rematch };
-  return advanceRoundState({ ...state, rematch });
+  return restartMatchState({ ...state, rematch });
 }
 
 function leaveState(state, seat) {
@@ -685,4 +710,4 @@ export default async function handler(req, res) {
   }
 }
 
-export const __testing = { PROTOCOL, PLAYER_STALE_MS, PRESENCE_WRITE_INTERVAL_MS, applyMove, applyRoomEdit, createState, emptyBoard, hasLegalMove, joinState, leaveState, materializeUpdatedRow, mutationApplied, normalizeCode, preview, publicRoom, publicState, reconcilePresenceState, recordMutation, rematchState, requireCurrentVersion, seatOwnership, validMutationId, validatePlacement, winner, winningPatterns: rulesWinningPatterns };
+export const __testing = { PROTOCOL, PLAYER_STALE_MS, PRESENCE_WRITE_INTERVAL_MS, advanceRoundState, applyMove, applyRoomEdit, createState, emptyBoard, hasLegalMove, joinState, leaveState, materializeUpdatedRow, mutationApplied, normalizeCode, preview, publicRoom, publicState, reconcilePresenceState, recordMutation, rematchState, requireCurrentVersion, seatOwnership, validMutationId, validatePlacement, winner, winningPatterns: rulesWinningPatterns };
