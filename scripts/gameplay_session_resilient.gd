@@ -2,7 +2,7 @@ extends "res://scripts/gameplay_session_ui.gd"
 
 # Final gameplay safety layer. Every new session starts from the captured
 # physical home state, stale tweens can never finish inside a newer match, and
-# online rounds advance automatically from one deterministic owner client.
+# online rounds advance automatically through one server-authoritative path.
 const Display = preload("res://scripts/ui_design.gd")
 
 const ONLINE_NEXT_ROUND_DELAY_MS: int = 1100
@@ -99,7 +99,7 @@ func _apply_online_room(remote: Dictionary) -> void:
 		if key != online_round_auto_key:
 			online_round_auto_key = key
 			online_round_auto_sent = false
-			online_round_auto_due_msec = Time.get_ticks_msec() + ONLINE_NEXT_ROUND_DELAY_MS if str(online_identity.get("seat", "")) == "p1" else 0
+			online_round_auto_due_msec = Time.get_ticks_msec() + ONLINE_NEXT_ROUND_DELAY_MS
 	elif status == "playing":
 		online_round_auto_due_msec = 0
 		online_round_auto_sent = false
@@ -114,8 +114,6 @@ func _maybe_auto_advance_online_round() -> void:
 		return
 	online_round_auto_due_msec = 0
 	if not online_active or online == null or not match_initialized or not round_complete or match_complete or online_cancelled:
-		return
-	if str(online_identity.get("seat", "")) != "p1":
 		return
 	online_round_auto_sent = true
 	online.call("request_rematch")
