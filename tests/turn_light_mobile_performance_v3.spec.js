@@ -148,6 +148,16 @@ async function waitLightingAccepted(page, player) {
   }, player, { timeout: 15000 });
 }
 
+async function warmLighting(page, roomState, reducedMotion) {
+  for (const turnIndex of [1, 2, 3, 0]) {
+    await pushRoom(page, roomState, { turnIndex });
+    const player = turnIndex + 1;
+    const state = await settled(page, player, `${reducedMotion ? 'reduced' : 'normal'}-warm-p${player}`);
+    if (reducedMotion) expect(state.state).toBe('immediate');
+  }
+  await page.waitForTimeout(SAMPLE_WINDOW_MS);
+}
+
 async function installSampler(page) {
   await page.evaluate(() => {
     window.__lighting12Perf3 = { phase: 'warmup', frames: [], states: [] };
@@ -177,9 +187,6 @@ async function installSampler(page) {
 }
 
 async function collectFixedBaseline(page) {
-  // Let WebGL/SwiftShader startup settle. Do not use the startup frames as a
-  // baseline because they reflect renderer initialization rather than lighting.
-  await page.waitForTimeout(SAMPLE_WINDOW_MS);
   await page.evaluate(() => {
     window.__lighting12Perf3.frames = [];
     window.__lighting12Perf3.states = [];
@@ -239,9 +246,15 @@ async function runMode(browser, reducedMotion) {
   const page = await context.newPage();
   const roomState = await installRoomApi(page);
   const errors = [];
+  let expectedReconnect503Errors = 0;
   page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
   page.on('console', message => {
-    if (message.type() === 'error' && !message.text().includes('favicon')) errors.push(`console: ${message.text()}`);
+    if (message.type() !== 'error' || message.text().includes('favicon')) return;
+    if (expectedReconnect503Errors > 0 && message.text().includes('503 (Service Unavailable)')) {
+      expectedReconnect503Errors -= 1;
+      return;
+    }
+    errors.push(`console: ${message.text()}`);
   });
   try {
     await openOnlineRoom(page);
@@ -249,6 +262,7 @@ async function runMode(browser, reducedMotion) {
     expect(initial.reducedMotion).toBe(reducedMotion ? 'true' : 'false');
     if (reducedMotion) expect(initial.state).toBe('immediate');
 
+    await warmLighting(page, roomState, reducedMotion);
     await installSampler(page);
     await collectFixedBaseline(page);
     await setPhase(page, 'transition');
@@ -270,6 +284,7 @@ async function runMode(browser, reducedMotion) {
     if (reducedMotion) expect(p4.state).toBe('immediate');
 
     roomState.failedPolls = 1;
+    expectedReconnect503Errors = 1;
     await wake(page);
     await neutral(page, `${reducedMotion ? 'reduced' : 'normal'}-reconnect-neutral`);
     await pushRoom(page, roomState, { turnIndex: 3 });
@@ -317,8 +332,6 @@ test('LIGHTING-12 mobile frame-time isolates crossfade cost with Reduced Motion 
   console.log(`YAKOLAK_LIGHTING12_PERF_V3 ${JSON.stringify(summary)}`);
   console.log(`::notice title=LIGHTING-12 stable mobile metrics::${JSON.stringify(summary)}`);
 
-  // Sample-count floors are intentionally small because SwiftShader can render
-  // this 3D scene slowly; every rAF stall is retained instead of being filtered.
   expect(normal.before.count, 'normal baseline samples').toBeGreaterThanOrEqual(5);
   expect(reduced.before.count, 'Reduced Motion baseline samples').toBeGreaterThanOrEqual(5);
   expect(normal.transition.count, 'normal transition samples').toBeGreaterThanOrEqual(5);
