@@ -305,9 +305,9 @@ test('mobile portrait LIGHTING-12 authoritative transitions stay clear and frame
     await pushRoom(page, state, { turnIndex: 3 });
     await settled(page, 4, 'rapid-p3-to-p4');
 
-    // Force reconnect long enough for the no-turn presentation to settle, then
-    // verify hydration restores the same authoritative P4 focus.
-    state.reconnectFailures = 3;
+    // Match the existing online reconnect contract: one forced failed poll
+    // clears the turn, then the next recovery poll hydrates the same room/P4.
+    state.reconnectFailures = 1;
     await wakePoll(page);
     await settledNeutral(page, 'reconnect-neutral');
     await settled(page, 4, 'reconnect-restored-p4');
