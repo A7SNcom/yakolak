@@ -70,14 +70,14 @@ jobs:
         env:
           YAKOLAK_TURN32_BASE: http://127.0.0.1:8000
           YAKOLAK_TURN32_LABEL: main-controlled
-          YAKOLAK_TURN32_SAMPLES: "12"
+          YAKOLAK_TURN32_SAMPLES: "20"
         run: npx playwright test tests/ux_turn_32_latency.spec.js --workers=1 --reporter=github
 
-      - name: Measure current Production client bundle and live API RTT
+      - name: Measure starting Production client bundle and live API RTT
         env:
-          YAKOLAK_TURN32_BASE: https://yakolak.vercel.app
-          YAKOLAK_TURN32_LABEL: production-controlled
-          YAKOLAK_TURN32_SAMPLES: "12"
+          YAKOLAK_TURN32_BASE: https://yakolak-9y4vronvt-ahmdkcoms-projects.vercel.app
+          YAKOLAK_TURN32_LABEL: production-start-controlled
+          YAKOLAK_TURN32_SAMPLES: "20"
         run: npx playwright test tests/ux_turn_32_latency.spec.js --workers=1 --reporter=github
 
       - name: Upload UX-TURN-32 evidence
