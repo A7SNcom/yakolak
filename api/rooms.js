@@ -278,7 +278,7 @@ function applyMove(state, seat, move) {
 
 function advanceRoundState(state, seat) {
   if (state.status !== 'finished' || state.matchComplete) throw new Error('round_not_finished');
-  if (seat !== 'p1') throw new Error('unauthorized');
+  if (!state.players.some(player => player.seat === seat)) throw new Error('invalid_seat');
   const cleared = Object.fromEntries(state.players.map(player => [player.seat, false]));
   return {
     ...state,
