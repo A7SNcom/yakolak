@@ -6,6 +6,8 @@ const gameplayHardened = fs.readFileSync(new URL('../scripts/gameplay_session_ha
 const gameplayPolish = fs.readFileSync(new URL('../scripts/gameplay_session_polish.gd', import.meta.url), 'utf8');
 const gameplayNestedPick = fs.readFileSync(new URL('../scripts/gameplay_session_nested_pick.gd', import.meta.url), 'utf8');
 const gameplayDesign = fs.readFileSync(new URL('../scripts/gameplay_design_system.gd', import.meta.url), 'utf8');
+const authoritativeTurn = fs.readFileSync(new URL('../scripts/gameplay_authoritative_turn_state.gd', import.meta.url), 'utf8');
+const turnHud = fs.readFileSync(new URL('../scripts/turn_clarity_hud.gd', import.meta.url), 'utf8');
 const turnHudDesign = fs.readFileSync(new URL('../scripts/turn_clarity_hud_design_system.gd', import.meta.url), 'utf8');
 const setup = fs.readFileSync(new URL('../scripts/session_setup_arabic.gd', import.meta.url), 'utf8');
 const setupFlow = fs.readFileSync(new URL('../scripts/session_setup_flow.gd', import.meta.url), 'utf8');
@@ -32,9 +34,18 @@ assert.ok(setupDialog.includes('extends "res://scripts/session_setup_flow.gd"'),
 assert.ok(setupFlow.includes('extends "res://scripts/session_setup_arabic.gd"'), 'the user-journey layer must preserve the Arabic setup layer');
 assert.ok(scene.includes('res://scripts/gameplay_design_system.gd'), 'gameplay chrome must use the shared design adapter');
 assert.ok(gameplayDesign.includes('extends "res://scripts/gameplay_rematch_lifecycle.gd"'), 'gameplay design must preserve the rematch/gameplay chain');
+assert.ok(scene.includes('res://scripts/gameplay_authoritative_turn_state.gd'), 'production gameplay must include the authoritative turn observer layer');
+assert.ok(authoritativeTurn.includes('signal authoritative_turn_changed'), 'turn presentation must subscribe to one authoritative gameplay event');
+assert.ok(authoritativeTurn.includes('authoritative_online_snapshot_hydrated'), 'reconnect must stay hidden until a fresh accepted room snapshot hydrates turn state');
 assert.ok(scene.includes('res://scripts/turn_clarity_hud_design_system.gd'), 'the turn clarity adapter must remain active');
-assert.ok(turnHudDesign.includes('extends "res://scripts/turn_clarity_hud.gd"'), 'the turn clarity adapter must preserve turn-focus state logic');
-assert.ok(turnHudDesign.includes("yakolakDesignTurnCue='localized-3d-light'"), 'turn clarity must be communicated by the 3D focus-light contract');
+assert.ok(turnHudDesign.includes('extends "res://scripts/turn_clarity_hud.gd"'), 'the turn clarity adapter must preserve the authoritative indicator state logic');
+assert.ok(turnHudDesign.includes("yakolakDesignTurnCue='top-center-30px-capsule'"), 'turn clarity must use the compact fixed top-center capsule contract');
+assert.ok(turnHud.includes("yakolakTurnIndicatorSource='authoritative-turn-signal'"), 'turn indicator must consume the authoritative gameplay signal only');
+assert.ok(turnHud.includes("yakolakTurnIndicatorPolling='none'"), 'turn indicator must explicitly publish its no-polling contract');
+assert.ok(!turnHud.includes('func _process('), 'turn indicator must never poll turn state per frame');
+assert.ok(turnHud.includes('return "دورك"'), 'local online turn copy must remain compact');
+assert.ok(turnHud.includes('return "دور لاعب " + str(number)'), 'remote turn copy must use the authoritative player number');
+assert.ok(!turnHud.includes('_arabize_digits'), 'the top turn indicator must keep Western ASCII digits 0-9');
 
 assert.ok(design.includes('class_name YakolakDesign'), 'the 2D design system must expose one shared token source');
 assert.ok(design.includes('const TOUCH_MIN := 48.0'), 'interactive controls must share a 48px minimum target');
@@ -46,10 +57,10 @@ assert.ok(design.includes('static func button_style'), 'button states must use a
 assert.ok(design.includes('static func apply_button_contract'), 'button typography/touch/focus must use one contract');
 assert.ok(setupDesign.includes('Design.apply_button_contract'), 'setup buttons must consume the shared button primitive');
 assert.ok(gameplayDesign.includes('Design.apply_button_contract'), 'gameplay buttons must consume the shared button primitive');
-assert.ok(!turnHudDesign.includes('Design.surface_style'), 'retired turn clarity must not recreate a redundant 2D surface');
+assert.ok(!turnHudDesign.includes('Design.surface_style'), 'turn indicator must not grow into a redundant gameplay surface');
 
 assert.ok(gameplay.includes('func _arabize_digits'), 'gameplay must normalize visible numbers to Arabic digits');
-assert.ok(gameplay.includes('turn_label.text = _arabize_digits'), 'legacy turn text must remain Arabic-normalized even though the visible cue is 3D');
+assert.ok(gameplay.includes('turn_label.text = _arabize_digits'), 'hidden legacy turn text must remain Arabic-normalized for compatibility');
 assert.ok(gameplay.includes('score_label.text = _arabize_digits'), 'score HUD must pass through Arabic digit normalization');
 assert.ok(gameplay.includes('result_button.text = _arabize_digits'), 'result text must pass through Arabic digit normalization');
 
