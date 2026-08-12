@@ -1,3 +1,4 @@
+import { mkdir } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 
 const ARABIC_DIGITS = /[٠-٩۰-۹]/u;
@@ -228,7 +229,8 @@ test('DIGITS-21 rendered regression matrix covers Arabic and English numeric UI 
       expect(fixture.some(record => ARABIC_LETTERS.test(String(record.text || '')) && WESTERN_DIGITS.test(String(record.text || '')))).toBe(true);
       const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
       expect(viewport).toEqual({ width: 390, height: 844 });
-      const screenshotPath = testInfo.outputPath('digits-21-arabic-mobile.png');
+      await mkdir('artifacts', { recursive: true });
+      const screenshotPath = 'artifacts/digits-21-arabic-mobile.png';
       await page.screenshot({ path: screenshotPath, fullPage: false });
       await testInfo.attach('DIGITS-21 Arabic mobile portrait', { path: screenshotPath, contentType: 'image/png' });
     } else {
