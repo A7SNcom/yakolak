@@ -23,6 +23,7 @@ async function startLocalMatch(page) {
           typeof window.yakolakTestStartPassPlay === 'function' &&
           typeof window.yakolakTestForceMatchComplete === 'function' &&
           typeof window.yakolakTestRematch === 'function' &&
+          typeof window.yakolakTestRunRematchLifecycle === 'function' &&
           typeof window.yakolakTestPostMatchReturn === 'function',
     null,
     { timeout: 60000 }
@@ -117,4 +118,85 @@ test('MATCH-END-26 local return-to-setup commits once and leaves no match residu
   );
 
   expect(await page.evaluate(() => window.__yakolakMatchEndRuntimeToken)).toBe(runtimeToken);
+});
+
+test('MATCH-END-27 three rematches clear selection, modal, pending and lighting residue', async ({ page }, testInfo) => {
+  test.setTimeout(120000);
+  await startLocalMatch(page);
+
+  await page.evaluate(() => window.yakolakTestRunRematchLifecycle());
+  await page.waitForFunction(
+    () => document.body.dataset.yakolakRematchLifecycle === 'passed' &&
+          document.body.dataset.yakolakRematchCycles === '3' &&
+          document.body.dataset.yakolakRematchFailures === '' &&
+          document.body.dataset.yakolakGameplay === 'ready' &&
+          document.body.dataset.yakolakSetup !== 'visible' &&
+          document.body.dataset.yakolakPostMatchPrimary === '' &&
+          document.body.dataset.yakolakPostMatchSecondary === '' &&
+          document.body.dataset.yakolakPostMatchPending === '' &&
+          document.body.dataset.yakolakPostMatchResult === '' &&
+          Number(document.body.dataset.yakolakMoves || -1) === 0 &&
+          Number(document.body.dataset.yakolakResiduePlayed || -1) === 0 &&
+          Number(document.body.dataset.yakolakResidueOccupied || -1) === 0 &&
+          Number(document.body.dataset.yakolakResidueStray || -1) === 0 &&
+          document.body.dataset.yakolakAuthoritativeTurnValid === 'true' &&
+          document.body.dataset.yakolakTurnLightDirection === document.body.dataset.yakolakAuthoritativeTurnDirection &&
+          document.body.dataset.yakolakTurnLightRevision === document.body.dataset.yakolakAuthoritativeTurnRevision &&
+          document.body.dataset.yakolakTurnLightFinalCount === '1',
+    null,
+    { timeout: 20000 }
+  );
+
+  const snapshot = await page.evaluate(() => {
+    const d = document.body.dataset;
+    return {
+      lifecycle: d.yakolakRematchLifecycle || '',
+      cycles: d.yakolakRematchCycles || '',
+      failures: d.yakolakRematchFailures || '',
+      gameplay: d.yakolakGameplay || '',
+      setup: d.yakolakSetup || '',
+      postMatch: {
+        primary: d.yakolakPostMatchPrimary || '',
+        secondary: d.yakolakPostMatchSecondary || '',
+        pending: d.yakolakPostMatchPending || '',
+        result: d.yakolakPostMatchResult || '',
+      },
+      selection: d.yakolakSelectedSize || '',
+      residue: {
+        played: Number(d.yakolakResiduePlayed || 0),
+        occupied: Number(d.yakolakResidueOccupied || 0),
+        stray: Number(d.yakolakResidueStray || 0),
+      },
+      authoritativeTurn: {
+        valid: d.yakolakAuthoritativeTurnValid || '',
+        player: d.yakolakAuthoritativeTurnPlayer || '',
+        direction: d.yakolakAuthoritativeTurnDirection || '',
+        revision: d.yakolakAuthoritativeTurnRevision || '',
+      },
+      lighting: {
+        state: d.yakolakTurnLightState || '',
+        direction: d.yakolakTurnLightDirection || '',
+        revision: d.yakolakTurnLightRevision || '',
+        finalCount: d.yakolakTurnLightFinalCount || '',
+      },
+    };
+  });
+
+  await testInfo.attach('match-end-27-ui-snapshot.json', {
+    body: Buffer.from(JSON.stringify(snapshot, null, 2)),
+    contentType: 'application/json',
+  });
+  console.log('MATCH_END_27_UI_SNAPSHOT', JSON.stringify(snapshot));
+
+  expect(snapshot.lifecycle).toBe('passed');
+  expect(snapshot.cycles).toBe('3');
+  expect(snapshot.failures).toBe('');
+  expect(snapshot.setup).not.toBe('visible');
+  expect(snapshot.postMatch).toEqual({ primary: '', secondary: '', pending: '', result: '' });
+  expect(snapshot.selection).toBe('');
+  expect(snapshot.residue).toEqual({ played: 0, occupied: 0, stray: 0 });
+  expect(snapshot.authoritativeTurn.valid).toBe('true');
+  expect(snapshot.lighting.direction).toBe(snapshot.authoritativeTurn.direction);
+  expect(snapshot.lighting.revision).toBe(snapshot.authoritativeTurn.revision);
+  expect(snapshot.lighting.finalCount).toBe('1');
 });
