@@ -7,8 +7,6 @@ const ARGS = [
 const COLORS = ['marble', 'blue', 'gold', 'green'];
 const FINAL_STATES = ['final', 'stable', 'immediate'];
 const SAMPLE_WINDOW_MS = 3500;
-const STABLE_FRAME_MS = 40;
-const STABLE_FRAME_COUNT = 20;
 
 test.use({ launchOptions: { args: ARGS } });
 
@@ -157,6 +155,7 @@ async function warmLighting(page, roomState, reducedMotion) {
     const state = await settled(page, player, `${reducedMotion ? 'reduced' : 'normal'}-warm-p${player}`);
     if (reducedMotion) expect(state.state).toBe('immediate');
   }
+  await page.waitForTimeout(SAMPLE_WINDOW_MS);
 }
 
 async function installSampler(page) {
@@ -185,14 +184,6 @@ async function installSampler(page) {
     };
     requestAnimationFrame(tick);
   });
-}
-
-async function waitForStableCadence(page) {
-  await page.waitForFunction(({ maxFrameMs, count }) => {
-    const frames = window.__lighting12Perf3?.frames || [];
-    if (frames.length < count) return false;
-    return frames.slice(-count).every(row => row.dt <= maxFrameMs);
-  }, { maxFrameMs: STABLE_FRAME_MS, count: STABLE_FRAME_COUNT }, { timeout: 30000 });
 }
 
 async function collectFixedBaseline(page) {
@@ -273,7 +264,6 @@ async function runMode(browser, reducedMotion) {
 
     await warmLighting(page, roomState, reducedMotion);
     await installSampler(page);
-    await waitForStableCadence(page);
     await collectFixedBaseline(page);
     await setPhase(page, 'transition');
 
@@ -313,13 +303,16 @@ async function runMode(browser, reducedMotion) {
 }
 
 test('LIGHTING-12 mobile frame-time isolates crossfade cost with Reduced Motion control', async ({ browser }, testInfo) => {
-  test.setTimeout(240000);
+  test.setTimeout(180000);
   const normal = await runMode(browser, false);
   const reduced = await runMode(browser, true);
   const normalP95Delta = normal.transition.p95 - normal.before.p95;
   const reducedP95Delta = reduced.transition.p95 - reduced.before.p95;
   const normalMeanDelta = normal.transition.mean - normal.before.mean;
   const reducedMeanDelta = reduced.transition.mean - reduced.before.mean;
+  const transitionP95Gap = normal.transition.p95 - reduced.transition.p95;
+  const transitionMeanGap = normal.transition.mean - reduced.transition.mean;
+  const transitionOver50Gap = normal.transition.over50Ratio - reduced.transition.over50Ratio;
   const report = {
     normal, reduced,
     derived: {
@@ -329,6 +322,9 @@ test('LIGHTING-12 mobile frame-time isolates crossfade cost with Reduced Motion 
       lightingSpecificMeanDeltaMs: normalMeanDelta - reducedMeanDelta,
       normalOver50Delta: normal.transition.over50Ratio - normal.before.over50Ratio,
       reducedOver50Delta: reduced.transition.over50Ratio - reduced.before.over50Ratio,
+      normalVsReducedTransitionP95Ms: transitionP95Gap,
+      normalVsReducedTransitionMeanMs: transitionMeanGap,
+      normalVsReducedTransitionOver50: transitionOver50Gap,
     },
   };
   await testInfo.attach('lighting12-mobile-performance-v3.json', {
@@ -340,7 +336,7 @@ test('LIGHTING-12 mobile frame-time isolates crossfade cost with Reduced Motion 
     derived: report.derived,
   };
   console.log(`YAKOLAK_LIGHTING12_PERF_V3 ${JSON.stringify(summary)}`);
-  console.log(`::notice title=LIGHTING-12 stable mobile metrics::${JSON.stringify(summary)}`);
+  console.log(`::notice title=LIGHTING-12 matched-control mobile metrics::${JSON.stringify(summary)}`);
 
   expect(normal.before.count, 'normal baseline samples').toBeGreaterThanOrEqual(5);
   expect(reduced.before.count, 'Reduced Motion baseline samples').toBeGreaterThanOrEqual(5);
@@ -349,14 +345,11 @@ test('LIGHTING-12 mobile frame-time isolates crossfade cost with Reduced Motion 
   expect(normal.errors, `normal errors: ${JSON.stringify(normal.errors)}`).toEqual([]);
   expect(reduced.errors, `Reduced Motion errors: ${JSON.stringify(reduced.errors)}`).toEqual([]);
 
-  // Exact transition duration and no-luminance-spike are enforced in the direct
-  // Godot gate. Browser-observed crossfade duration remains diagnostic because
-  // an all-renderer stall stretches rAF timestamps equally with the tween off.
-  expect(normalP95Delta, 'Normal Motion p95 increase beyond baseline/control').toBeLessThanOrEqual(Math.max(20, reducedP95Delta + 20));
-  expect(normalP95Delta - reducedP95Delta, 'crossfade-specific p95 cost').toBeLessThanOrEqual(20);
-  expect(normalMeanDelta - reducedMeanDelta, 'crossfade-specific mean frame cost').toBeLessThanOrEqual(15);
-  expect(normal.transition.over50Ratio - normal.before.over50Ratio, 'crossfade-specific visible jank').toBeLessThanOrEqual(
-    Math.max(0.08, (reduced.transition.over50Ratio - reduced.before.over50Ratio) + 0.05)
-  );
-  expect(normal.after.p95, 'normal frame-time recovers after transitions').toBeLessThanOrEqual(Math.max(50, normal.before.p95 + 20));
+  // SwiftShader startup remains diagnostic only. The performance gate compares
+  // the same transition workload with the tween on versus Reduced Motion off.
+  expect(transitionP95Gap, 'crossfade-specific transition p95 cost').toBeLessThanOrEqual(20);
+  expect(transitionMeanGap, 'crossfade-specific transition mean cost').toBeLessThanOrEqual(15);
+  expect(transitionOver50Gap, 'crossfade-specific visible-jank ratio').toBeLessThanOrEqual(0.05);
+  expect(normal.after.p95, 'normal frame-time recovers after transitions').toBeLessThanOrEqual(50);
+  expect(reduced.after.p95, 'Reduced Motion frame-time recovers after transitions').toBeLessThanOrEqual(50);
 });
