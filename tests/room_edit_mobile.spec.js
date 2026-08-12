@@ -57,6 +57,23 @@ async function canvasSnapshot(page) {
   });
 }
 
+async function tap(page, selector) {
+  const locator = page.locator(selector);
+  await expect(locator).toBeVisible();
+  const box = await locator.boundingBox();
+  expect(box, `${selector} should have a touchable box`).not.toBeNull();
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  expect(point.x, `${selector} center x`).toBeGreaterThanOrEqual(0);
+  expect(point.x, `${selector} center x`).toBeLessThanOrEqual(390);
+  expect(point.y, `${selector} center y`).toBeGreaterThanOrEqual(0);
+  expect(point.y, `${selector} center y`).toBeLessThanOrEqual(844);
+  await page.touchscreen.tap(point.x, point.y);
+}
+
+async function waitForEditorHistoryCleanup(page) {
+  await page.waitForFunction(() => !history.state?.yakolakRoomEdit);
+}
+
 test('ROOM-EDIT-15 mobile editor saves, cancels, backs out, reopens and handles stale state without layout shift', async ({ page }) => {
   test.setTimeout(150000);
   let current = waitingRoom();
@@ -132,7 +149,7 @@ test('ROOM-EDIT-15 mobile editor saves, cancels, backs out, reopens and handles 
   expect(baseline.height).toBeCloseTo(844, 0);
 
   // Open: all controls fit the portrait safe area and keep touch targets usable.
-  await page.locator('#yakolak-room-edit-button').click();
+  await tap(page, '#yakolak-room-edit-button');
   await page.waitForSelector('#yakolak-room-edit-modal', { state: 'visible' });
   const opened = await page.evaluate(() => {
     const modal = document.getElementById('yakolak-room-edit-modal');
@@ -153,30 +170,36 @@ test('ROOM-EDIT-15 mobile editor saves, cancels, backs out, reopens and handles 
 
   // Cancel/close must be mutation-free, then the editor can reopen cleanly.
   await page.selectOption('#yakolak-room-edit-color', 'gold');
-  await page.locator('#yakolak-room-edit-cancel').click();
+  await tap(page, '#yakolak-room-edit-cancel');
   await expect(page.locator('#yakolak-room-edit-modal')).toHaveCount(0);
+  await waitForEditorHistoryCleanup(page);
   expect(editBodies).toHaveLength(0);
-  await page.locator('#yakolak-room-edit-button').click();
+  await tap(page, '#yakolak-room-edit-button');
   await expect(page.locator('#yakolak-room-edit-color')).toHaveValue('marble');
-  await page.locator('#yakolak-room-edit-modal').click({ position: { x: 3, y: 3 } });
+  const backdrop = await page.locator('#yakolak-room-edit-modal').boundingBox();
+  expect(backdrop).not.toBeNull();
+  await page.touchscreen.tap(backdrop.x + 3, backdrop.y + 3);
   await expect(page.locator('#yakolak-room-edit-modal')).toHaveCount(0);
+  await waitForEditorHistoryCleanup(page);
   expect(editBodies).toHaveLength(0);
 
   // Browser Back closes only the modal; it must not navigate away from the room.
-  await page.locator('#yakolak-room-edit-button').click();
+  await tap(page, '#yakolak-room-edit-button');
   const urlBeforeBack = page.url();
   await page.evaluate(() => history.back());
   await expect(page.locator('#yakolak-room-edit-modal')).toHaveCount(0);
+  await waitForEditorHistoryCleanup(page);
   expect(page.url()).toBe(urlBeforeBack);
   await expect(page.locator('#yakolak-room-edit-button')).toBeVisible();
 
   // Save all editable fields from one captured canonical version.
-  await page.locator('#yakolak-room-edit-button').click();
+  await tap(page, '#yakolak-room-edit-button');
   await page.selectOption('#yakolak-room-edit-color', 'gold');
   await page.selectOption('#yakolak-room-edit-players', '4');
   await page.selectOption('#yakolak-room-edit-rounds', '5');
-  await page.locator('#yakolak-room-edit-save').click();
+  await tap(page, '#yakolak-room-edit-save');
   await expect(page.locator('#yakolak-room-edit-modal')).toHaveCount(0);
+  await waitForEditorHistoryCleanup(page);
   await expect(page.locator('#yakolak-room-edit-notice')).toContainText('تم حفظ التعديل');
   expect(editBodies.at(-1)).toMatchObject({
     action: 'edit',
@@ -189,22 +212,24 @@ test('ROOM-EDIT-15 mobile editor saves, cancels, backs out, reopens and handles 
 
   // A competing canonical update makes the open editor stale. The stale save
   // must surface an error, hydrate latest state, and never overwrite it.
-  await page.locator('#yakolak-room-edit-button').click();
+  await tap(page, '#yakolak-room-edit-button');
   expect(await page.locator('#yakolak-room-edit-rounds').inputValue()).toBe('5');
   current = { ...current, version: 3, targetRounds: 3, winsToMatch: 3 };
   conflictMode = true;
   await page.selectOption('#yakolak-room-edit-rounds', '5');
-  await page.locator('#yakolak-room-edit-save').click();
+  await tap(page, '#yakolak-room-edit-save');
   await expect(page.locator('#yakolak-room-edit-modal')).toHaveCount(0);
+  await waitForEditorHistoryCleanup(page);
   await expect(page.locator('#yakolak-room-edit-notice')).toContainText('تغيرت الغرفة');
   expect(editBodies.at(-1).version).toBe(2);
   expect(current).toMatchObject({ version: 3, targetRounds: 3, winsToMatch: 3 });
 
-  await page.locator('#yakolak-room-edit-button').click();
+  await tap(page, '#yakolak-room-edit-button');
   await expect(page.locator('#yakolak-room-edit-color')).toHaveValue('gold');
   await expect(page.locator('#yakolak-room-edit-players')).toHaveValue('4');
   await expect(page.locator('#yakolak-room-edit-rounds')).toHaveValue('3');
-  await page.locator('#yakolak-room-edit-cancel').click();
+  await tap(page, '#yakolak-room-edit-cancel');
+  await waitForEditorHistoryCleanup(page);
 
   expect(await canvasSnapshot(page)).toEqual(baseline);
   expect(baseline.scrollWidth).toBeLessThanOrEqual(baseline.viewportWidth);
