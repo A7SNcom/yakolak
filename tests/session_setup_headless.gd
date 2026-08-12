@@ -106,6 +106,7 @@ func _run_custom_setup_regression() -> void:
 	setup._start_new_game_flow()
 	setup._choose_player_count(3)
 	setup._begin_custom_setup()
+	await process_frame
 	_expect(bool(setup.custom_setup_active), "Custom enters the existing per-seat setup path")
 	var custom_buttons: Array[String] = _button_texts(setup.body)
 	_expect(custom_buttons.has("على نفس الجهاز") and custom_buttons.has("كمبيوتر"), "Custom exposes only supported local and bot seat types")
