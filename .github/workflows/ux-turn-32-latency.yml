@@ -33,6 +33,7 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import textwrap
           p = Path('tests/ux_turn_32_latency.spec.js')
           s = p.read_text()
           replacements = [
@@ -99,51 +100,52 @@ jobs:
 
           start = s.index("async function selectFirstLegalPiece(client, expectedPlayer) {")
           end = s.index("\nasync function measureOne", start)
-          robust_probe = r'''async function selectFirstLegalPiece(client, expectedPlayer) {
-  await client.page.waitForFunction(player => {
-    const d = document.body.dataset;
-    return d.yakolakAuthoritativeTurnValid === 'true' && Number(d.yakolakAuthoritativeTurnPlayer) === player && d.yakolakGameplay === 'ready';
-  }, expectedPlayer, { timeout: 20000 });
-  const firstTarget = await waitLargeTarget(client);
-  const firstAttemptAt = Date.now();
-  const deadline = firstAttemptAt + 8000;
-  let attempts = 0;
-  while (Date.now() < deadline) {
-    const targets = await client.page.evaluate(() => {
-      const d = document.body.dataset;
-      const width = innerWidth;
-      const height = innerHeight;
-      const rows = [];
-      const add = (size, xRaw, yRaw) => {
-        const x = Number(xRaw);
-        const y = Number(yRaw);
-        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-        if (x < 1 || y < 1 || x > width - 1 || y > height - 1) return;
-        if (rows.some(row => Math.abs(row.x - x) < 1 && Math.abs(row.y - y) < 1)) return;
-        rows.push({ size, x, y });
-      };
-      add('large', d.yakolakTestLargeX, d.yakolakTestLargeY);
-      add('medium', d.yakolakTestMediumX, d.yakolakTestMediumY);
-      add('small', d.yakolakTestSmallX, d.yakolakTestSmallY);
-      add('generic', d.yakolakTestPieceX, d.yakolakTestPieceY);
-      return rows;
-    });
-    for (const target of targets) {
-      attempts += 1;
-      const inputDispatchAt = Date.now();
-      await tap(client, target.x, target.y);
-      try {
-        await client.page.waitForFunction(() => document.body.dataset.yakolakGameplay === 'piece-selected' && Boolean(document.body.dataset.yakolakSelectedSize), null, { timeout: 180 });
-        const accepted = await client.page.evaluate(() => ({ acceptedAt: Date.now(), selectedSize: document.body.dataset.yakolakSelectedSize || '' }));
-        return { targetReadyAt: firstTarget.at, firstAttemptAt, inputDispatchAt, acceptedAt: accepted.acceptedAt, selectedSize: accepted.selectedSize, attempts };
-      } catch {}
-    }
-    await client.page.waitForTimeout(targets.length > 1 ? 24 : 130);
-  }
-  const diagnostics = await client.page.evaluate(() => ({ ...document.body.dataset }));
-  throw new Error(`no legal pointer accepted after ${attempts} fresh projected probes: ${JSON.stringify({ gameplay: diagnostics.yakolakGameplay, authPlayer: diagnostics.yakolakAuthoritativeTurnPlayer, currentPlayer: diagnostics.yakolakCurrentPlayer, largeX: diagnostics.yakolakTestLargeX, largeY: diagnostics.yakolakTestLargeY, mediumX: diagnostics.yakolakTestMediumX, mediumY: diagnostics.yakolakTestMediumY, smallX: diagnostics.yakolakTestSmallX, smallY: diagnostics.yakolakTestSmallY })}`);
-}
-'''
+          robust_probe = textwrap.dedent(r'''
+          async function selectFirstLegalPiece(client, expectedPlayer) {
+            await client.page.waitForFunction(player => {
+              const d = document.body.dataset;
+              return d.yakolakAuthoritativeTurnValid === 'true' && Number(d.yakolakAuthoritativeTurnPlayer) === player && d.yakolakGameplay === 'ready';
+            }, expectedPlayer, { timeout: 20000 });
+            const firstTarget = await waitLargeTarget(client);
+            const firstAttemptAt = Date.now();
+            const deadline = firstAttemptAt + 8000;
+            let attempts = 0;
+            while (Date.now() < deadline) {
+              const targets = await client.page.evaluate(() => {
+                const d = document.body.dataset;
+                const width = innerWidth;
+                const height = innerHeight;
+                const rows = [];
+                const add = (size, xRaw, yRaw) => {
+                  const x = Number(xRaw);
+                  const y = Number(yRaw);
+                  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+                  if (x < 1 || y < 1 || x > width - 1 || y > height - 1) return;
+                  if (rows.some(row => Math.abs(row.x - x) < 1 && Math.abs(row.y - y) < 1)) return;
+                  rows.push({ size, x, y });
+                };
+                add('large', d.yakolakTestLargeX, d.yakolakTestLargeY);
+                add('medium', d.yakolakTestMediumX, d.yakolakTestMediumY);
+                add('small', d.yakolakTestSmallX, d.yakolakTestSmallY);
+                add('generic', d.yakolakTestPieceX, d.yakolakTestPieceY);
+                return rows;
+              });
+              for (const target of targets) {
+                attempts += 1;
+                const inputDispatchAt = Date.now();
+                await tap(client, target.x, target.y);
+                try {
+                  await client.page.waitForFunction(() => document.body.dataset.yakolakGameplay === 'piece-selected' && Boolean(document.body.dataset.yakolakSelectedSize), null, { timeout: 180 });
+                  const accepted = await client.page.evaluate(() => ({ acceptedAt: Date.now(), selectedSize: document.body.dataset.yakolakSelectedSize || '' }));
+                  return { targetReadyAt: firstTarget.at, firstAttemptAt, inputDispatchAt, acceptedAt: accepted.acceptedAt, selectedSize: accepted.selectedSize, attempts };
+                } catch {}
+              }
+              await client.page.waitForTimeout(targets.length > 1 ? 24 : 130);
+            }
+            const diagnostics = await client.page.evaluate(() => ({ ...document.body.dataset }));
+            throw new Error(`no legal pointer accepted after ${attempts} fresh projected probes: ${JSON.stringify({ gameplay: diagnostics.yakolakGameplay, authPlayer: diagnostics.yakolakAuthoritativeTurnPlayer, currentPlayer: diagnostics.yakolakCurrentPlayer, largeX: diagnostics.yakolakTestLargeX, largeY: diagnostics.yakolakTestLargeY, mediumX: diagnostics.yakolakTestMediumX, mediumY: diagnostics.yakolakTestMediumY, smallX: diagnostics.yakolakTestSmallX, smallY: diagnostics.yakolakTestSmallY })}`);
+          }
+          ''').lstrip()
           s = s[:start] + robust_probe + s[end:]
           p.write_text(s)
           PY
