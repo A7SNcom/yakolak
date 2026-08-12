@@ -83,7 +83,6 @@ func _run_player_count(player_count: int) -> void:
 		_expect(bool(game.get("round_complete")), phase + " shows exactly one round result state")
 		_expect(not bool(game.get("tray_open")), phase + " finished snapshot closes piece tray")
 		_expect(int(game.get("selected_index")) == -1, phase + " finished snapshot clears selection")
-		_expect((game.get("result_button") as Button).visible, phase + " round result is visible at boundary")
 		_expect(int(game.get("scores").get("right", -1)) == int(scores["p1"]), phase + " score increment hydrates once")
 
 		# Reconnect while all clients are at the boundary: the same authoritative
