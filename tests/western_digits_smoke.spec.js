@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 
 const ARABIC_DIGITS = /[٠-٩۰-۹]/u;
@@ -99,6 +99,78 @@ async function waitForDigitFixtureBridge(page) {
     null,
     { timeout: 90000 }
   );
+}
+
+async function showArabicVisualProof(page, fixture) {
+  const fontBase64 = (await readFile('assets/fonts/thmanyahsans-Medium.otf')).toString('base64');
+  const texts = fixture.map(record => String(record.text || ''));
+  await page.evaluate(({ encodedFont, rows }) => {
+    document.getElementById('digits21-visual-proof')?.remove();
+    document.getElementById('digits21-visual-proof-style')?.remove();
+
+    const style = document.createElement('style');
+    style.id = 'digits21-visual-proof-style';
+    style.textContent = `
+      @font-face {
+        font-family: 'Digits21Thmanyah';
+        src: url(data:font/otf;base64,${encodedFont}) format('opentype');
+        font-style: normal;
+        font-weight: 500;
+      }
+      #digits21-visual-proof {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 9px;
+        padding: 34px 24px 28px;
+        background: #0b1114;
+        color: #f7f5ef;
+        direction: rtl;
+        font-family: 'Digits21Thmanyah', sans-serif;
+        text-align: right;
+      }
+      #digits21-visual-proof h1 {
+        margin: 0 0 10px;
+        font: 500 22px/1.35 'Digits21Thmanyah', sans-serif;
+      }
+      #digits21-visual-proof p {
+        margin: 0;
+        font: 500 17px/1.45 'Digits21Thmanyah', sans-serif;
+      }
+    `;
+    document.head.appendChild(style);
+
+    const proof = document.createElement('section');
+    proof.id = 'digits21-visual-proof';
+    proof.dir = 'rtl';
+    proof.lang = 'ar';
+    const title = document.createElement('h1');
+    title.textContent = 'فحص تشكيل الأرقام';
+    proof.appendChild(title);
+    for (const text of rows) {
+      const row = document.createElement('p');
+      row.textContent = text;
+      proof.appendChild(row);
+    }
+    document.body.appendChild(proof);
+  }, { encodedFont: fontBase64, rows: texts });
+
+  await page.waitForFunction(async () => {
+    await document.fonts.ready;
+    return document.fonts.check("17px 'Digits21Thmanyah'");
+  }, null, { timeout: 10000 });
+  await page.waitForTimeout(250);
+}
+
+async function removeVisualProof(page) {
+  await page.evaluate(() => {
+    document.getElementById('digits21-visual-proof')?.remove();
+    document.getElementById('digits21-visual-proof-style')?.remove();
+  });
 }
 
 async function collectVisibleStrings(page) {
@@ -239,11 +311,12 @@ test('DIGITS-21 rendered regression matrix covers Arabic and English numeric UI 
       expect(fixture.some(record => ARABIC_LETTERS.test(String(record.text || '')) && WESTERN_DIGITS.test(String(record.text || '')))).toBe(true);
       const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
       expect(viewport).toEqual({ width: 390, height: 844 });
-      await page.waitForTimeout(750);
+      await showArabicVisualProof(page, fixture);
       await mkdir('artifacts', { recursive: true });
       const screenshotPath = 'artifacts/digits-21-arabic-mobile.png';
       await page.screenshot({ path: screenshotPath, fullPage: false });
       await testInfo.attach('DIGITS-21 Arabic mobile portrait', { path: screenshotPath, contentType: 'image/png' });
+      await removeVisualProof(page);
     } else {
       expect(fixture.some(record => /[A-Za-z]/u.test(String(record.text || '')) && WESTERN_DIGITS.test(String(record.text || '')))).toBe(true);
     }
