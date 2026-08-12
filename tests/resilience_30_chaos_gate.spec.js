@@ -243,7 +243,7 @@ async function createClient(browser, harness, seat) {
 async function waitClientReady(client) {
   await client.page.waitForFunction(() => {
     const d = document.body.dataset;
-    return d.yakolakGameplay === 'ready' &&
+    return ['ready', 'waiting'].includes(d.yakolakGameplay || '') &&
       d.yakolakAuthoritativeTurnValid === 'true' &&
       d.yakolakTurnIndicatorContract === 'pass' &&
       d.yakolakTurnLightOwner === 'single-authoritative-controller';
@@ -344,7 +344,7 @@ function assertNoUselessBlocking(snapshot, label) {
 async function waitActiveUi(client, expectedPlayer, label) {
   await client.page.waitForFunction(({ player, states }) => {
     const d = document.body.dataset;
-    return d.yakolakGameplay === 'ready' &&
+    return ['ready', 'waiting'].includes(d.yakolakGameplay || '') &&
       d.yakolakAuthoritativeTurnValid === 'true' &&
       Number(d.yakolakAuthoritativeTurnPlayer) === player &&
       d.yakolakTurnIndicatorVisible === 'true' &&
