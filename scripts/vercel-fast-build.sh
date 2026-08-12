@@ -74,6 +74,7 @@ run_godot_resource_gate res://tests/gameplay_session_headless.gd gameplay_sessio
 run_godot_resource_gate res://tests/authoritative_turn_indicator_headless.gd authoritative_turn_indicator
 run_godot_resource_gate res://tests/turn_light_crossfade_headless.gd turn_light_crossfade
 run_godot_resource_gate res://tests/online_player4_owner_boundary_headless.gd online_player4_owner_boundary
+run_godot_resource_gate res://tests/round_boundary_multiclient_headless.gd round_boundary_multiclient
 run_godot_resource_gate res://tests/gameplay_session_lifecycle_headless.gd gameplay_lifecycle
 
 timeout 7m "$GODOT_BIN" --headless --path . --export-release "Web" web/index.html
