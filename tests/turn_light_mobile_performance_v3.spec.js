@@ -118,14 +118,25 @@ async function settled(page, player, label) {
 }
 
 async function neutral(page, label) {
-  await page.waitForFunction(states => {
+  const handle = await page.waitForFunction(states => {
     const d = document.body.dataset;
-    return d.yakolakAuthoritativeTurnValid === 'false' && d.yakolakTurnLightDirection === '' &&
-      d.yakolakTurnLightFinalCount === '0' && states.includes(d.yakolakTurnLightState || '');
+    const matches = d.yakolakAuthoritativeTurnValid === 'false' &&
+      d.yakolakTurnLightDirection === '' && d.yakolakTurnLightFinalCount === '0' &&
+      states.includes(d.yakolakTurnLightState || '');
+    if (!matches) return false;
+    return {
+      authValid: d.yakolakAuthoritativeTurnValid || '',
+      direction: d.yakolakTurnLightDirection || '',
+      finalCount: d.yakolakTurnLightFinalCount || '',
+      state: d.yakolakTurnLightState || '',
+    };
   }, FINAL_STATES, { timeout: 15000 });
-  const s = await readLight(page);
-  expect(s.direction, `${label}: stale direction`).toBe('');
-  expect(s.finalCount, `${label}: all neutral`).toBe('0');
+  const snapshot = await handle.jsonValue();
+  await handle.dispose();
+  expect(snapshot.authValid, `${label}: authoritative turn temporarily invalid`).toBe('false');
+  expect(snapshot.direction, `${label}: stale direction`).toBe('');
+  expect(snapshot.finalCount, `${label}: all neutral`).toBe('0');
+  expect(FINAL_STATES, `${label}: neutral lighting settled`).toContain(snapshot.state);
 }
 
 async function waitLightingAccepted(page, player) {
