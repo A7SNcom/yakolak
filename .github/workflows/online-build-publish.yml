@@ -134,13 +134,29 @@ jobs:
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
           for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
           npx playwright test tests/online_message_safety_smoke.spec.js --workers=1 --reporter=github
+      - name: Enforce DIGITS-21 rendered numeral shaping gate
+        run: |
+          rm -rf artifacts
+          node tests/web_test_server.mjs >/tmp/yakolak-digits21.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
+          npx playwright test tests/western_digits_smoke.spec.js --workers=1 --reporter=github
+      - name: Upload DIGITS-21 Arabic mobile proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: digits-21-arabic-mobile
+          path: artifacts/digits-21-arabic-mobile.png
+          if-no-files-found: error
+          retention-days: 14
       - name: Verify intro responsive setup transitions HUD and real gameplay start before publishing
         run: |
           node tests/web_test_server.mjs >/tmp/yakolak-browser.log 2>&1 &
           SERVER_PID=$!
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
           for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
-          npx playwright test tests/intro_smoke.spec.js tests/layout_smoke.spec.js tests/setup_gate_smoke.spec.js tests/setup_spatial_smoke.spec.js tests/natural_flow_smoke.spec.js tests/gameplay_smoke.spec.js tests/turn_hud_smoke.spec.js tests/western_digits_smoke.spec.js --workers=1 --reporter=github
+          npx playwright test tests/intro_smoke.spec.js tests/layout_smoke.spec.js tests/setup_gate_smoke.spec.js tests/setup_spatial_smoke.spec.js tests/natural_flow_smoke.spec.js tests/gameplay_smoke.spec.js tests/turn_hud_smoke.spec.js --workers=1 --reporter=github
       - name: Publish tested web files back to main
         run: |
           git fetch origin main
