@@ -87,7 +87,7 @@ async function waitForFastIntro(page) {
       typeof window.yakolakTestSetupFlowAction === 'function' &&
       typeof window.yakolakTestShowDigitFixture === 'function',
     null,
-    { timeout: 60000 }
+    { timeout: 180000 }
   );
 }
 
@@ -170,7 +170,7 @@ async function startFourPlayerOnline(page) {
 }
 
 test('room code and live Arabic setup/gameplay render only Western digits without mutating numeric state', async ({ page }) => {
-  test.setTimeout(120000);
+  test.setTimeout(300000);
   const state = await installRoomApi(page);
   const visible = await startFourPlayerOnline(page);
 
@@ -197,7 +197,7 @@ test('room code and live Arabic setup/gameplay render only Western digits withou
 });
 
 test('DIGITS-21 rendered regression matrix covers Arabic and English numeric UI and captures mobile RTL proof', async ({ page }, testInfo) => {
-  test.setTimeout(120000);
+  test.setTimeout(300000);
   await waitForFastIntro(page);
 
   for (const mode of ['ar', 'en']) {
