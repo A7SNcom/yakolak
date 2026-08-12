@@ -125,8 +125,6 @@ func _retarget_turn_light(next_direction: String, revision: int, lifecycle: Stri
 		if light == null:
 			continue
 		var energy: float = ACTIVE_ENERGY if direction == next_direction else NEUTRAL_ENERGY
-		if is_equal_approx(light.light_energy, energy):
-			continue
 		transition_tween.tween_property(light, "light_energy", energy, CROSSFADE_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	transition_tween.finished.connect(_finish_transition.bind(serial, next_direction, revision, lifecycle))
 	_publish_state("crossfading", revision, lifecycle)
