@@ -47,9 +47,12 @@ assert.ok(turnHud.includes("yakolakTurnIndicatorPolling='none'"), 'turn indicato
 assert.ok(!turnHud.includes('func _process('), 'turn indicator must never poll turn state per frame');
 assert.ok(turnHud.includes('return "دورك"'), 'local online turn copy must remain compact');
 assert.ok(turnHud.includes('return "دور لاعب " + str(number)'), 'remote turn copy must use the authoritative player number');
-assert.ok(!turnHud.includes('_arabize_digits'), 'the top turn indicator must keep Western ASCII digits 0-9');
+assert.ok(turnHud.includes('Display.display_text(_indicator_copy(snapshot))'), 'turn copy must cross the shared Western-digit display boundary');
 
 assert.ok(design.includes('class_name YakolakDesign'), 'the 2D design system must expose one shared token source');
+assert.ok(design.includes('static func display_text(value: Variant) -> String'), 'all numeral shaping must share one user-facing display boundary');
+assert.ok(design.includes('const ARABIC_INDIC_DIGITS'), 'display boundary must normalize Arabic-Indic input');
+assert.ok(design.includes('const EXTENDED_ARABIC_INDIC_DIGITS'), 'display boundary must normalize Extended Arabic-Indic input');
 assert.ok(design.includes('const TOUCH_MIN := 48.0'), 'interactive controls must share a 48px minimum target');
 assert.ok(design.includes('const RADIUS_CHIP := 10.0'), 'chip radius must be tokenized');
 assert.ok(design.includes('const RADIUS_CONTROL := 14.0'), 'control radius must be tokenized');
@@ -61,18 +64,22 @@ assert.ok(setupDesign.includes('Design.apply_button_contract'), 'setup buttons m
 assert.ok(gameplayDesign.includes('Design.apply_button_contract'), 'gameplay buttons must consume the shared button primitive');
 assert.ok(!turnHudDesign.includes('Design.surface_style'), 'turn indicator must not grow into a redundant gameplay surface');
 
-assert.ok(gameplay.includes('func _arabize_digits'), 'gameplay must normalize visible numbers to Arabic digits');
-assert.ok(gameplay.includes('turn_label.text = _arabize_digits'), 'hidden legacy turn text must remain Arabic-normalized for compatibility');
-assert.ok(gameplay.includes('score_label.text = _arabize_digits'), 'score HUD must pass through Arabic digit normalization');
-assert.ok(gameplay.includes('result_button.text = _arabize_digits'), 'result text must pass through Arabic digit normalization');
+assert.ok(!gameplay.includes('func _arabize_digits'), 'gameplay must not own an ad-hoc Arabic digit converter');
+assert.ok(gameplay.includes('turn_label.text = Display.display_text(turn_label.text)'), 'legacy turn text must cross the shared display boundary');
+assert.ok(gameplay.includes('score_label.text = Display.display_text(score_label.text)'), 'score text must cross the shared display boundary');
+assert.ok(gameplay.includes('result_button.text = Display.display_text(result_button.text)'), 'result text must cross the shared display boundary');
 
-assert.ok(setup.includes('func _arabize_numbers'), 'setup must normalize all user-facing numbers');
-assert.ok(setup.includes('super._label(_arabize_numbers(text_value)'), 'every setup label must be Arabic-normalized by default');
-assert.ok(setup.includes('super._button(_arabize_numbers(text_value)'), 'every setup button must be Arabic-normalized by default');
+assert.ok(!setup.includes('func _arabize_numbers'), 'setup must not own an ad-hoc Arabic digit converter');
+assert.ok(setup.includes('super._label(Display.display_text(text_value)'), 'every setup label must cross the shared display boundary');
+assert.ok(setup.includes('super._button(Display.display_text(text_value)'), 'every setup button must cross the shared display boundary');
+assert.ok(setup.includes('placeholder_text = "مثال: 54"'), 'room-code placeholder must demonstrate Western digits');
+assert.ok(setup.includes('field.text = display_value'), 'Arabic/Persian room-code input must be immediately re-rendered as Western digits');
 assert.ok(setup.includes('result.length() >= 2'), 'room input must be capped at two digits');
 
-assert.ok(online.includes('func _arabic_digits'), 'online invitation text must display Arabic digits');
-assert.ok(online.includes("'الغرفة '+c"), 'online invitation must present the room as an Arabic room number');
+assert.ok(online.includes('func _arabic_digits'), 'base transport keeps its legacy virtual hook for compatibility');
+assert.ok(online.includes('JSON.stringify(_arabic_digits(code))'), 'invite DOM must continue to pass room-code display through the virtual hook');
+assert.ok(onlineHardened.includes('func _arabic_digits(value: String) -> String:'), 'active online transport must override the legacy digit hook');
+assert.ok(onlineHardened.includes('return Display.display_text(value)'), 'active online invite text must resolve through the shared Western-digit boundary');
 assert.ok(onlineHardened.includes('sessionStorage.setItem'), 'online identity must be scoped to the current tab');
 assert.ok(onlineHardened.includes('localStorage.removeItem'), 'legacy cross-tab identity must be removed');
 assert.ok(server.includes("const ROOM_PATTERN = /^\\d{2}$/"), 'the network room identifier must remain exactly two digits');
@@ -106,5 +113,6 @@ assert.ok(closeIcon.includes('Lucide Icons v1.27.0'), 'close icon provenance/ver
 assert.ok(menuIcon.includes('Lucide Icons v1.27.0'), 'menu icon provenance/version must be recorded');
 
 console.log('YAKOLAK_ARABIC_UI_CONTRACT_OK');
+console.log('YAKOLAK_WESTERN_DIGITS_DISPLAY_CONTRACT_OK');
 console.log('YAKOLAK_DESIGN_SYSTEM_CONTRACT_OK');
 console.log('YAKOLAK_ICONOGRAPHY_CONTRACT_OK');

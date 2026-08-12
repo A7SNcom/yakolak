@@ -1,8 +1,9 @@
 extends "res://scripts/session_setup_redesign_fix.gd"
 
-# Arabic is the permanent presentation layer. Internal IDs/network values stay
-# ASCII where protocols need them, but every user-facing setup string is
-# normalized to Arabic-Indic digits before it reaches a Control.
+# Arabic remains the permanent presentation language and RTL contract. Numeric
+# state stays ASCII internally; DIGITS-20 routes every setup display string
+# through the shared Western-digit boundary without changing locale behavior.
+const Display = preload("res://scripts/ui_design.gd")
 
 var web_online_setup_callback: Variant
 var manual_room_code_input: String = ""
@@ -95,8 +96,8 @@ func _show_join_room() -> void:
 		content.add_child(_label(online_error_text, 13, HORIZONTAL_ALIGNMENT_CENTER, Color("#ffc0b8")))
 
 	var code_input := LineEdit.new()
-	code_input.text = _arabize_numbers(manual_room_code_input)
-	code_input.placeholder_text = "مثال: ٥٤"
+	code_input.text = Display.display_text(manual_room_code_input)
+	code_input.placeholder_text = "مثال: 54"
 	code_input.max_length = 2
 	code_input.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	code_input.layout_direction = Control.LAYOUT_DIRECTION_RTL
@@ -105,7 +106,7 @@ func _show_join_room() -> void:
 	code_input.add_theme_font_size_override("font_size", _ui_font_size(22))
 	code_input.custom_minimum_size = Vector2(0.0, _ui_length(50.0))
 	code_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	code_input.text_changed.connect(_on_manual_room_code_changed)
+	code_input.text_changed.connect(_on_manual_room_code_changed.bind(code_input))
 	code_input.text_submitted.connect(_submit_manual_room_join)
 	content.add_child(code_input)
 
@@ -122,9 +123,16 @@ func _show_join_room() -> void:
 	code_input.grab_focus.call_deferred()
 
 
-func _on_manual_room_code_changed(value: String) -> void:
-	manual_room_code_input = _normalize_room_code(value)
+func _on_manual_room_code_changed(value: String, field: LineEdit) -> void:
+	var normalized: String = _normalize_room_code(value)
+	manual_room_code_input = normalized
 	online_error_text = ""
+	var display_value: String = Display.display_text(normalized)
+	if field.text != display_value:
+		field.set_block_signals(true)
+		field.text = display_value
+		field.caret_column = display_value.length()
+		field.set_block_signals(false)
 
 
 func _submit_manual_room_join_from_field(field: LineEdit) -> void:
@@ -192,15 +200,15 @@ func _show_invitation(code: String) -> void:
 
 
 func _label(text_value: String, size: int, alignment: HorizontalAlignment, color: Color = Color.WHITE) -> Label:
-	return super._label(_arabize_numbers(text_value), size, alignment, color)
+	return super._label(Display.display_text(text_value), size, alignment, color)
 
 
 func _button(text_value: String, foreground: Color, background: Color) -> Button:
-	return super._button(_arabize_numbers(text_value), foreground, background)
+	return super._button(Display.display_text(text_value), foreground, background)
 
 
 func _big_choice(text_value: String) -> Button:
-	return super._big_choice(_arabize_numbers(text_value))
+	return super._big_choice(Display.display_text(text_value))
 
 
 func _build_mode_question(content: VBoxContainer, seat_index: int) -> void:
@@ -262,7 +270,9 @@ func _on_web_start_online_setup(arguments: Array) -> void:
 
 
 func _arabic_digit(value: int) -> String:
-	return _arabize_numbers(str(value))
+	# Keep the legacy hook name used by older setup layers, but route its output
+	# through the single display boundary rather than owning numeral shaping.
+	return Display.display_text(value)
 
 
 func _room_code_from_url() -> String:
@@ -295,19 +305,10 @@ func _normalize_room_code(value: String) -> String:
 	return result
 
 
-func _arabize_numbers(value: String) -> String:
-	var result: String = value
-	var western: Array[String] = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-	var arabic: Array[String] = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"]
-	for index: int in range(10):
-		result = result.replace(western[index], arabic[index])
-	return result
-
-
 func _reset_seats() -> void:
 	seats = [
 		{"active": true, "color": "marble", "mode": "local", "label": "أنا"},
-		{"active": false, "color": "blue", "mode": "local", "label": "اللاعب ٢"},
-		{"active": false, "color": "gold", "mode": "local", "label": "اللاعب ٣"},
-		{"active": false, "color": "green", "mode": "local", "label": "اللاعب ٤"},
+		{"active": false, "color": "blue", "mode": "local", "label": "اللاعب 2"},
+		{"active": false, "color": "gold", "mode": "local", "label": "اللاعب 3"},
+		{"active": false, "color": "green", "mode": "local", "label": "اللاعب 4"},
 	]

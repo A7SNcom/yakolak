@@ -3,6 +3,7 @@ extends "res://scripts/gameplay_session_ui.gd"
 # Final gameplay safety layer. Every new session starts from the captured
 # physical home state, stale tweens can never finish inside a newer match, and
 # online rounds advance automatically once every connected player sees finish.
+const Display = preload("res://scripts/ui_design.gd")
 
 const ONLINE_NEXT_ROUND_DELAY_MS: int = 1100
 
@@ -33,11 +34,11 @@ func _process(delta: float) -> void:
 func _update_hud() -> void:
 	super._update_hud()
 	if turn_label != null:
-		turn_label.text = _arabize_digits(turn_label.text)
+		turn_label.text = Display.display_text(turn_label.text)
 	if score_label != null:
-		score_label.text = _arabize_digits(score_label.text)
+		score_label.text = Display.display_text(score_label.text)
 	if result_button != null:
-		result_button.text = _arabize_digits(result_button.text)
+		result_button.text = Display.display_text(result_button.text)
 
 
 func _on_configuration_ready(configuration: Dictionary) -> void:
@@ -286,15 +287,6 @@ func _reset_online_round_auto() -> void:
 	online_round_auto_due_msec = 0
 	online_round_auto_key = ""
 	online_round_auto_sent = false
-
-
-func _arabize_digits(value: String) -> String:
-	var result: String = value
-	var western: Array[String] = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-	var arabic: Array[String] = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"]
-	for index: int in range(10):
-		result = result.replace(western[index], arabic[index])
-	return result
 
 
 func _publish_cleanliness_state() -> void:

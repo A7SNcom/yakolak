@@ -63,6 +63,7 @@ run_godot_resource_gate() {
   rm -f "$log_file"
 }
 
+run_godot_resource_gate res://tests/western_digits_display_headless.gd western_digits_display
 run_godot_resource_gate res://tests/intro_run_started_dedupe_headless.gd intro_run_started_dedupe
 run_godot_resource_gate res://tests/intro_handoff_probe_monotonic_headless.gd intro_handoff_probe_monotonic
 run_godot_resource_gate res://tests/intro_handoff_start_adoption_headless.gd intro_handoff_start_adoption

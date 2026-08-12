@@ -3,6 +3,7 @@ extends Node
 # TURN-UI-08: exactly one compact top turn indicator. It consumes only the
 # authoritative_turn_changed snapshot emitted by gameplay and never polls
 # gameplay, camera, lighting, animation, or DOM state.
+const Display = preload("res://scripts/ui_design.gd")
 const ARABIC_FONT = preload("res://assets/fonts/DejaVuSans.ttf")
 const INDICATOR_MIN_WIDTH: float = 56.0
 const INDICATOR_MAX_WIDTH: float = 124.0
@@ -118,7 +119,7 @@ func _on_authoritative_turn_changed(snapshot: Dictionary) -> void:
 		_hide_indicator(revision, str(snapshot.get("lifecycle", "no-turn")))
 		return
 
-	var text: String = _indicator_copy(snapshot)
+	var text: String = Display.display_text(_indicator_copy(snapshot))
 	if text.is_empty():
 		_hide_indicator(revision, "no-copy")
 		return

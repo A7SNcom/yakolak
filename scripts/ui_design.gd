@@ -11,6 +11,12 @@ const FONT_REGULAR = preload("res://assets/fonts/thmanyahsans-Regular.otf")
 const FONT_MEDIUM = preload("res://assets/fonts/thmanyahsans-Medium.otf")
 const FONT_BOLD = preload("res://assets/fonts/thmanyahsans-Bold.otf")
 
+# DIGITS-20: one user-facing numeral boundary. Internal values remain untouched;
+# only text crossing into presentation is normalized to Western ASCII digits.
+const WESTERN_DIGITS: Array[String] = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+const ARABIC_INDIC_DIGITS: Array[String] = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"]
+const EXTENDED_ARABIC_INDIC_DIGITS: Array[String] = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"]
+
 # Warm ivory ties the flat UI to the marble pieces; cool muted text recedes.
 const TEXT_PRIMARY := Color("#f7f5ef")
 const TEXT_MUTED := Color("#b9c5c4")
@@ -37,6 +43,14 @@ const FONT_TITLE := 26
 
 const HOVER_LIGHTEN := 0.055
 const PRESSED_DARKEN := 0.075
+
+
+static func display_text(value: Variant) -> String:
+	var result: String = str(value)
+	for index: int in range(10):
+		result = result.replace(ARABIC_INDIC_DIGITS[index], WESTERN_DIGITS[index])
+		result = result.replace(EXTENDED_ARABIC_INDIC_DIGITS[index], WESTERN_DIGITS[index])
+	return result
 
 
 static func font_for_size(size: int) -> Font:

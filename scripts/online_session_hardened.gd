@@ -3,6 +3,7 @@ extends "res://scripts/online_session.gd"
 # Final online transport hardening. Keep identity per-tab, never silently
 # overwrite a queued player action, preserve unrelated URL parameters, and
 # treat every gameplay mutation as one immutable intent across retries.
+const Display = preload("res://scripts/ui_design.gd")
 
 const MAX_DURABLE_ACTIONS: int = 8
 const BRIDGE_EVENT_CHECK_MS: int = 34
@@ -267,3 +268,9 @@ func _accept_room(next_room: Dictionary) -> void:
 	super._accept_room(next_room)
 	if active and not busy and not durable_action_queue.is_empty():
 		call_deferred("_flush_queued_action")
+
+
+func _arabic_digits(value: String) -> String:
+	# Base online code still calls this legacy hook when building the invite DOM.
+	# The active transport resolves it through the single shared display boundary.
+	return Display.display_text(value)
