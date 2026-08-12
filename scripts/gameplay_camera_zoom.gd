@@ -31,7 +31,7 @@ func _process(_delta: float) -> void:
 	if not _resolve_dependencies():
 		return
 
-	var match_initialized: bool = bool(gameplay.get("match_initialized"))
+	var match_initialized: bool = gameplay.get("match_initialized") == true
 	if not match_initialized:
 		if previous_match_initialized:
 			_reset_zoom_state()
@@ -40,7 +40,7 @@ func _process(_delta: float) -> void:
 		return
 
 	previous_match_initialized = true
-	var transition_active: bool = bool(gameplay.get("camera_transition"))
+	var transition_active: bool = gameplay.get("camera_transition") == true
 	if previous_transition and not transition_active:
 		# The camera transition now targets the effective zoomed FOV itself.
 		# Keep this as an idempotent safety restore for old/external transitions.
@@ -112,9 +112,9 @@ func _resolve_dependencies() -> bool:
 func _gameplay_zoom_available() -> bool:
 	if not _resolve_dependencies():
 		return false
-	if not bool(gameplay.get("match_initialized")):
+	if gameplay.get("match_initialized") != true:
 		return false
-	if bool(gameplay.get("camera_transition")) or bool(gameplay.get("round_complete")):
+	if gameplay.get("camera_transition") == true or gameplay.get("round_complete") == true:
 		return false
 	return true
 
