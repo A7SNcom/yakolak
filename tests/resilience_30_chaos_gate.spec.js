@@ -116,6 +116,19 @@ function makeHarness() {
   harness.log = (kind, detail = {}) => {
     harness.timeline.push({ index: harness.timeline.length, kind, ...structuredClone(detail) });
   };
+  harness.recordAppDelivery = (seat, snapshot, source) => {
+    const copy = structuredClone(snapshot);
+    const previous = harness.appDeliveries.get(seat);
+    if (previous && Number(previous.version) > Number(copy.version)) return;
+    harness.appDeliveries.set(seat, copy);
+    harness.log('app-snapshot', {
+      seat,
+      source,
+      version: copy.version,
+      turnIndex: copy.turnIndex,
+      round: copy.round,
+    });
+  };
   harness.latency = (seat, method, action) => {
     const key = `${seat}:${method}:${action}`;
     const count = Number(harness.requestCounters.get(key) || 0) + 1;
@@ -172,8 +185,7 @@ async function installApiRoute(context, harness) {
       const since = Number(url.searchParams.get('since') || '-1');
       if (since >= harness.version) return route.fulfill({ status: 204, body: '' });
       const snapshot = structuredClone(harness.room());
-      harness.appDeliveries.set(seat, snapshot);
-      harness.log('app-snapshot', { seat, version: snapshot.version, turnIndex: snapshot.turnIndex, round: snapshot.round });
+      harness.recordAppDelivery(seat, snapshot, 'poll');
       return jsonReply(route, 200, { ok: true, seat, room: snapshot });
     }
 
@@ -182,12 +194,16 @@ async function installApiRoute(context, harness) {
 
     const mutationId = String(body.mutationId || '');
     if (mutationApplied(harness.state, seat, action, mutationId)) {
+      const snapshot = harness.room();
+      if (action === 'rematch') harness.recordAppDelivery(seat, snapshot, 'rematch-duplicate-ack');
       harness.log('duplicate-ack', { seat, action, mutationId, version: harness.version });
-      return jsonReply(route, 200, { ok: true, seat, room: harness.room(), duplicate: true });
+      return jsonReply(route, 200, { ok: true, seat, room: snapshot, duplicate: true });
     }
     if (Number(body.version) !== harness.version) {
+      const snapshot = harness.room();
+      if (action === 'rematch') harness.recordAppDelivery(seat, snapshot, 'rematch-version-conflict');
       harness.log('version-conflict', { seat, action, mutationId, expected: body.version, canonical: harness.version });
-      return jsonReply(route, 409, { ok: false, error: 'version_conflict', room: harness.room() });
+      return jsonReply(route, 409, { ok: false, error: 'version_conflict', room: snapshot });
     }
 
     let next;
@@ -220,7 +236,9 @@ async function installApiRoute(context, harness) {
       harness.log('response-lost-after-commit', { seat, action, mutationId, version: harness.version });
       return jsonReply(route, 503, { ok: false, error: 'online_server_error' });
     }
-    return jsonReply(route, 200, { ok: true, seat, room: harness.room() });
+    const snapshot = harness.room();
+    if (action === 'rematch') harness.recordAppDelivery(seat, snapshot, 'rematch-commit-ack');
+    return jsonReply(route, 200, { ok: true, seat, room: snapshot });
   });
 }
 
