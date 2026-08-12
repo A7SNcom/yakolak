@@ -52,8 +52,9 @@ assert.ok(transient.includes('_mark_reconnecting'), 'transient failures must rec
 assert.ok(transient.includes('bootstrap_attempts'), 'lost create/join responses must be retried safely');
 
 assert.ok(gameplay.includes('_maybe_auto_advance_online_round'), 'online rounds must not freeze after round one');
-assert.ok(gameplay.includes('str(online_identity.get("seat", "")) != "p1"'), 'only the deterministic owner may submit automatic round advance');
-assert.ok(gameplay.includes('online.call("request_rematch")'), 'the owner must use the existing exactly-once authoritative mutation path');
+assert.ok(!gameplay.includes('str(online_identity.get("seat", "")) != "p1"'), 'automatic round advance must not depend on host availability');
+assert.ok(gameplay.includes('online.call("request_rematch")'), 'automatic round advance must use the existing exactly-once authoritative mutation path');
+assert.ok(server.includes("if (!state.players.some(player => player.seat === seat)) throw new Error('invalid_seat');"), 'server round transition must reject non-members');
 assert.ok(gameplay.includes('stability_round_reset_tween'), 'round reset animation must be tracked and cancellable');
 assert.ok(gameplay.includes('_clean_visual_board'), 'new games must explicitly clear previous physical board state');
 
