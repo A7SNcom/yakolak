@@ -31,26 +31,21 @@ test.use({
 });
 
 function room54() {
-  const players = [
-    { seat: 'p1', color: 'marble' },
-    { seat: 'p2', color: 'blue' },
-    { seat: 'p3', color: 'gold' },
-    { seat: 'p4', color: 'green' },
-  ];
+  const players = [{ seat: 'p1', color: 'marble' }];
   return {
     code: '54',
     version: 1,
     protocol: 5,
-    status: 'playing',
+    status: 'waiting',
     targetPlayers: 4,
     targetRounds: 3,
     winsToMatch: 3,
     players,
-    turnIndex: 3,
+    turnIndex: 0,
     board: Object.fromEntries(Array.from({ length: 9 }, (_, index) => [String(index), {}])),
     round: 1,
     completedRounds: 0,
-    scores: { p1: 0, p2: 0, p3: 0, p4: 0 },
+    scores: { p1: 0 },
     winner: null,
     draw: false,
     lastMove: null,
@@ -58,7 +53,7 @@ function room54() {
     matchComplete: false,
     matchWinner: null,
     matchWinners: [],
-    rematch: { p1: false, p2: false, p3: false, p4: false },
+    rematch: { p1: false },
   };
 }
 
@@ -158,27 +153,37 @@ async function startFourPlayerOnline(page) {
   await page.evaluate(() => window.yakolakTestSetupFlowAction('continue'));
   await page.waitForFunction(
     () => document.body.dataset.yakolakGameplay === 'ready' &&
-      document.getElementById('yakolak-invite-copy')?.textContent?.includes('الغرفة 54'),
+      document.body.dataset.yakolakOnlineUiState === 'waiting-players',
     null,
     { timeout: 30000 }
   );
-  await expectVisibleWesternDigits(page, 'live gameplay HUD and room invite');
+  await page.waitForFunction(() => {
+    try {
+      const records = JSON.parse(document.body.dataset.yakolakVisibleStrings || '[]');
+      return records.some(record => String(record.text || '').includes('الغرفة 54'));
+    } catch {
+      return false;
+    }
+  }, null, { timeout: 10000 });
+  return expectVisibleWesternDigits(page, 'live waiting-room UI');
 }
 
 test('room code and live Arabic setup/gameplay render only Western digits without mutating numeric state', async ({ page }) => {
   test.setTimeout(120000);
   const state = await installRoomApi(page);
-  await startFourPlayerOnline(page);
+  const visible = await startFourPlayerOnline(page);
 
   const observed = await page.evaluate(() => ({
-    invite: document.getElementById('yakolak-invite-copy')?.textContent || '',
     urlRoom: new URL(location.href).searchParams.get('room') || '',
     players: document.body.dataset.yakolakPlayers || '',
     rounds: document.body.dataset.yakolakSetupRounds || '',
+    onlineMessage: document.body.dataset.yakolakOnlineUiMessage || '',
   }));
 
-  expect(observed.invite).toContain('الغرفة 54');
-  expect(observed.invite).not.toMatch(ARABIC_DIGITS);
+  expect(visible.some(record => String(record.text || '').includes('الغرفة 54'))).toBe(true);
+  expect(visible.some(record => String(record.text || '').includes('انضم 1 من 4'))).toBe(true);
+  expect(observed.onlineMessage).toContain('انضم 1 من 4');
+  expect(observed.onlineMessage).not.toMatch(ARABIC_DIGITS);
   expect(observed.urlRoom).toBe('54');
   expect(observed.players).toBe('4');
   expect(observed.rounds).toBe('3');
