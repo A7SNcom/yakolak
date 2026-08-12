@@ -29,6 +29,39 @@ jobs:
       - name: Install server dependency
         run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
 
+      - name: Correct measurement-only harness boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('tests/ux_turn_32_latency.spec.js')
+          s = p.read_text()
+          old = "requests.find(row => Number(row.version) === Number(commit.version) && row.requestAt >= commit.commitAt)"
+          new = "requests.find(row => Number(row.version) === Number(commit.version) && row.responseAt >= commit.commitAt)"
+          assert old in s
+          s = s.replace(old, new)
+          old = "    hitTestAcceptMs: Math.max(0, selectedAt - input.inputDispatchAt),\n    totalMs: Math.max(0, selectedAt - commit.commitAt),"
+          new = "    hitTestAcceptMs: Math.max(0, selectedAt - input.inputDispatchAt),\n    turnToInteractMs: Math.max(0, gameplayReadyAt - commit.commitAt) + Math.max(0, selectedAt - input.inputDispatchAt),\n    totalMs: Math.max(0, selectedAt - commit.commitAt),"
+          assert old in s
+          s = s.replace(old, new)
+          old = "groups.push({ viewport: viewport.name, players: playerCount, total: stats(rows, 'totalMs'), ready: stats(rows, 'readyAfterCommitMs'), pollWait: stats(rows, 'pollWaitMs'), network: stats(rows, 'networkMs'), camera: stats(rows, 'cameraGateMs'), hitTest: stats(rows, 'hitTestAcceptMs') });"
+          new = "groups.push({ viewport: viewport.name, players: playerCount, turnToInteract: stats(rows, 'turnToInteractMs'), rawProbe: stats(rows, 'totalMs'), ready: stats(rows, 'readyAfterCommitMs'), pollWait: stats(rows, 'pollWaitMs'), network: stats(rows, 'networkMs'), hydration: stats(rows, 'snapshotHydrationMs'), uiUpdate: stats(rows, 'uiUpdateMs'), camera: stats(rows, 'cameraGateMs'), hitTest: stats(rows, 'hitTestAcceptMs') });"
+          assert old in s
+          s = s.replace(old, new)
+          old = "const slowest = [...all].sort((a, b) => b.totalMs - a.totalMs).slice(0, 8);"
+          new = "const slowest = [...all].sort((a, b) => b.turnToInteractMs - a.turnToInteractMs).slice(0, 8);"
+          assert old in s
+          s = s.replace(old, new)
+          old = "      totalMs: 'authoritative commit -> first actual large-piece pointer accepted as piece-selected',"
+          new = "      turnToInteractMs: 'authoritative commit -> gameplay_ready plus measured pointer-to-piece-selected hit-test acceptance; excludes test-observer coordinate wait',\n      totalMs: 'raw probe wall-clock authoritative commit -> first actual large-piece pointer accepted as piece-selected; includes test-observer coordinate wait',"
+          assert old in s
+          s = s.replace(old, new)
+          old = "    definitions: {"
+          new = "    samples: all,\n    definitions: {"
+          assert old in s
+          s = s.replace(old, new)
+          p.write_text(s)
+          PY
+
       - name: Validate diagnostic syntax
         run: node --check tests/ux_turn_32_latency.spec.js
 
