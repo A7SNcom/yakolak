@@ -295,10 +295,12 @@ func accept_intro_handoff(generation: int) -> void:
 	_accept_gameplay_handoff_delivery(generation, "explicit")
 
 
-func _publish_intro_handoff_consumer_probe(value: String) -> void:
-	var generation: int = -1
-	if intro != null:
-		generation = int(intro.get("intro_run_generation"))
+func _publish_intro_handoff_consumer_probe(value: String, generation: int) -> void:
+	# Handoff diagnostics already know which delivery generation caused them.
+	# Never infer a different current replay for this path; invalid/unbound values
+	# are intentionally ignored rather than contaminating a valid generation probe.
+	if generation <= 0:
+		return
 	_publish_consumer_probe(value, generation)
 
 
@@ -308,6 +310,10 @@ func _publish_consumer_probe(value: String, generation: int = -1) -> void:
 		observed_generation = int(intro.get("intro_run_generation"))
 	var next_value: String = value
 	if observed_generation > 0:
+		# A future diagnostic cannot become the live probe before the root reaches
+		# that generation. Older diagnostics are rejected by the monotonic check below.
+		if intro != null and observed_generation > int(intro.get("intro_run_generation")):
+			return
 		# A stale start belongs to its delivered generation, not whichever replay is
 		# current now. Never let an older/future stale delivery move the live probe.
 		if next_value == "intro-start-stale-generation" and intro != null:
@@ -342,4 +348,7 @@ func _publish_consumer_probe(value: String, generation: int = -1) -> void:
 			intro_handoff_consumer_probe_terminal_generation = observed_generation
 	intro_handoff_consumer_probe = next_value
 	if OS.has_feature("web"):
-		JavaScriptBridge.eval("document.body.dataset.yakolakIntroHandoffConsumer='%s';" % next_value, true)
+		JavaScriptBridge.eval(
+			"document.body.dataset.yakolakIntroHandoffConsumer='%s';document.body.dataset.yakolakIntroHandoffConsumerGeneration='%d';" % [next_value, observed_generation],
+			true
+		)

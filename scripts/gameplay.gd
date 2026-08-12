@@ -160,13 +160,13 @@ func _recover_intro_run_start_by_polling(generation: int) -> void:
 
 func _accept_gameplay_handoff_delivery(generation: int, source: String = "unknown") -> void:
 	if intro == null:
-		_publish_intro_handoff_consumer_probe("consume-no-root")
+		_publish_intro_handoff_consumer_probe("consume-no-root", generation)
 		return
 	if generation <= 0:
-		_publish_intro_handoff_consumer_probe("consume-invalid-generation")
+		_publish_intro_handoff_consumer_probe("consume-invalid-generation", generation)
 		return
 	if generation != int(intro.get("intro_run_generation")):
-		_publish_intro_handoff_consumer_probe("consume-stale-generation")
+		_publish_intro_handoff_consumer_probe("consume-stale-generation", generation)
 		return
 	# A handoff or reconnect may be the first surviving delivery for a generation.
 	# It cannot adopt that generation independently, because doing so would hide a
@@ -176,7 +176,7 @@ func _accept_gameplay_handoff_delivery(generation: int, source: String = "unknow
 	if generation != intro_generation_seen:
 		call("accept_intro_run_started", generation)
 	if generation != intro_generation_seen:
-		_publish_intro_handoff_consumer_probe("consume-start-unclaimed")
+		_publish_intro_handoff_consumer_probe("consume-start-unclaimed", generation)
 		return
 	# The first delivery source for a published pending token owns the consumer
 	# claim. Same-generation duplicates return before token access or observability.
@@ -191,7 +191,7 @@ func _accept_gameplay_handoff_delivery(generation: int, source: String = "unknow
 	if source == "polling":
 		intro_handoff_poll_claim_count += 1
 	print("YAKOLAK_INTRO_HANDOFF_CLAIMED generation=%d claims=%d source=%s" % [generation, intro_handoff_claim_count, source])
-	_publish_intro_handoff_consumer_probe("handoff-seen")
+	_publish_intro_handoff_consumer_probe("handoff-seen", generation)
 	_consume_claimed_gameplay_handoff(generation)
 
 
@@ -209,19 +209,19 @@ func _consume_claimed_gameplay_handoff(generation: int) -> void:
 		if intro_handoff_pending_init_generation != generation:
 			intro_handoff_pending_init_generation = generation
 			intro_handoff_init_hold_count += 1
-			_publish_intro_handoff_consumer_probe("handoff-pending-init")
+			_publish_intro_handoff_consumer_probe("handoff-pending-init", generation)
 		return
 	intro_handoff_pending_init_generation = -1
 	if not intro.has_method("consume_gameplay_handoff"):
-		_publish_intro_handoff_consumer_probe("consume-method-missing")
+		_publish_intro_handoff_consumer_probe("consume-method-missing", generation)
 		return
 	if bool(intro.call("consume_gameplay_handoff", generation)):
-		_publish_intro_handoff_consumer_probe("handoff-consumed")
+		_publish_intro_handoff_consumer_probe("handoff-consumed", generation)
 		_enable_gameplay()
 	else:
 		# This is a genuine failure of the single claimed delivery. Polling cannot
 		# start another same-generation attempt after the claim has been established.
-		_publish_intro_handoff_consumer_probe("handoff-token-rejected")
+		_publish_intro_handoff_consumer_probe("handoff-token-rejected", generation)
 
 
 func _apply_pending_base_intro_run_started_reset() -> void:
@@ -267,9 +267,10 @@ func _cancel_pending_gameplay_handoff_initialization() -> void:
 	intro_handoff_pending_init_generation = -1
 
 
-func _publish_intro_handoff_consumer_probe(_value: String) -> void:
+func _publish_intro_handoff_consumer_probe(_value: String, _generation: int) -> void:
 	# The production explicit layer overrides this hook for Web observability.
-	# Base consumers keep the exact same claim/token contract without a Web probe.
+	# Base consumers keep the exact same claim/token contract without a Web probe;
+	# diagnostics still carry the delivery generation across this boundary.
 	pass
 
 

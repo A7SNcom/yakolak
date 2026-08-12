@@ -36,11 +36,19 @@ func _run() -> void:
 	_expect(explicit_source.contains("var intro_handoff_consumer_probe_terminal_generation: int = -1"), "probe tracks terminal consumed generation")
 	_expect(explicit_source.contains("_publish_consumer_probe(\"intro-start-stale-generation\", generation)"), "stale start publication remains generation-bound")
 	_expect(explicit_source.contains("_publish_consumer_probe(\"intro-start-duplicate-generation\", generation)"), "duplicate start publication remains generation-bound")
+	_expect(explicit_source.contains("func _publish_intro_handoff_consumer_probe(value: String, generation: int)"), "explicit handoff probe accepts delivered generation")
+	_expect(explicit_source.contains("_publish_consumer_probe(value, generation)"), "explicit handoff probe forwards delivered generation unchanged")
+	_expect(explicit_source.contains("yakolakIntroHandoffConsumerGeneration"), "Web observability exposes the generation beside handoff state")
 	_expect(explicit_source.contains("gameplay_handoff_consumed_generation"), "probe observes authoritative consumed generation without changing token logic")
 
 	var base_source: String = FileAccess.get_file_as_string("res://scripts/gameplay.gd")
 	_expect(base_source.contains("_accept_gameplay_handoff_delivery(intro_generation_seen, \"polling\")"), "polling remains on shared handoff claim")
 	_expect(base_source.contains("intro.call(\"consume_gameplay_handoff\", generation)"), "token consumption remains in unchanged base consumer")
+	_expect(base_source.contains("func _publish_intro_handoff_consumer_probe(_value: String, _generation: int)"), "base observability boundary carries generation")
+	_expect(base_source.contains("_publish_intro_handoff_consumer_probe(\"consume-stale-generation\", generation)"), "stale handoff diagnostic carries original generation")
+	_expect(base_source.contains("_publish_intro_handoff_consumer_probe(\"consume-invalid-generation\", generation)"), "invalid handoff diagnostic carries original generation")
+	_expect(base_source.contains("_publish_intro_handoff_consumer_probe(\"consume-start-unclaimed\", generation)"), "unclaimed-start diagnostic carries original generation")
+	_expect(base_source.contains("_publish_intro_handoff_consumer_probe(\"handoff-consumed\", generation)"), "terminal handoff diagnostic carries original generation")
 
 	var resets_before: int = int(game.get("intro_run_started_reset_count"))
 	var claims_before: int = int(game.get("intro_handoff_claim_count"))
@@ -76,6 +84,15 @@ func _run() -> void:
 	_expect(int(intro.get("gameplay_handoff_consume_count")) == first_consumes_after, "late starts cannot reconsume first token")
 	_expect(int(game.get("intro_handoff_apply_count")) == first_apps_after, "late starts cannot re-enable first generation")
 
+	# A stale handoff diagnostic before the next replay starts must stay historical.
+	# It cannot downgrade the terminal first-generation success or mutate ownership.
+	if first_generation > 1:
+		game.call("_accept_gameplay_handoff_delivery", first_generation - 1, "stale-before-next-start")
+	await _settle_frames(2)
+	_expect(str(game.get("intro_handoff_consumer_probe")) == "handoff-consumed", "stale handoff before next start cannot downgrade first success")
+	_expect(int(game.get("intro_handoff_consumer_probe_generation")) == first_generation, "pre-next-start stale handoff cannot change first probe attribution")
+	_expect(int(game.get("intro_handoff_claim_count")) == first_claims_after, "pre-next-start stale handoff cannot claim ownership")
+
 	# Generation 2: disconnect the start signal so direct dispatch owns the fresh
 	# start, then delay consumer initialization and use reconnect as handoff source.
 	# Old-generation delivery must not overwrite the new generation's observability.
@@ -97,6 +114,15 @@ func _run() -> void:
 	_expect(str(game.get("intro_handoff_consumer_probe")) == "intro-started", "new generation starts fresh observability")
 	_expect(int(game.get("intro_handoff_consumer_probe_generation")) == second_generation, "fresh observability is bound to second generation")
 	_expect(int(game.get("intro_handoff_consumer_probe_terminal_generation")) == first_generation, "old terminal generation does not block fresh replay")
+
+	# These are the exact regressions for the original bug: a late generation-N
+	# handoff and an invalid delivery arrive while N+1 is current. Neither may be
+	# attributed to N+1 or replace its fresh probe.
+	game.call("_accept_gameplay_handoff_delivery", first_generation, "stale-after-current-start")
+	game.call("_accept_gameplay_handoff_delivery", 0, "invalid-after-current-start")
+	await _settle_frames(2)
+	_expect(str(game.get("intro_handoff_consumer_probe")) == "intro-started", "old/invalid handoff diagnostics cannot poison current probe")
+	_expect(int(game.get("intro_handoff_consumer_probe_generation")) == second_generation, "old/invalid diagnostics cannot be relabeled as current generation")
 
 	game.call("accept_intro_run_started", first_generation)
 	await _settle_frames(2)
@@ -121,6 +147,17 @@ func _run() -> void:
 	_expect(int(game.get("intro_handoff_pending_init_generation")) == second_generation, "reconnect holds second claim until initialization")
 	_expect(int(intro.get("gameplay_handoff_consume_count")) == second_consumes_before, "delayed reconnect does not consume token early")
 	_expect(str(game.get("intro_handoff_consumer_probe")) == "handoff-pending-init", "second generation progresses to pending handoff")
+	_expect(int(game.get("intro_handoff_consumer_probe_generation")) == second_generation, "same-generation handoff diagnostic stays attributed to second generation")
+
+	# Signal/direct duplicates after the shared claim must be inert: no extra claim,
+	# no token access, and no observability rewrite.
+	var claimed_second_count: int = int(game.get("intro_handoff_claim_count"))
+	game.call("_on_explicit_gameplay_handoff_ready", second_generation)
+	game.call("accept_intro_handoff", second_generation)
+	await _settle_frames(2)
+	_expect(int(game.get("intro_handoff_claim_count")) == claimed_second_count, "signal/direct handoff duplicates cannot create a second claim")
+	_expect(str(game.get("intro_handoff_consumer_probe")) == "handoff-pending-init", "signal/direct handoff duplicates cannot rewrite pending observability")
+	_expect(int(game.get("intro_handoff_consumer_probe_generation")) == second_generation, "duplicate handoff observability remains second-generation bound")
 
 	game.call("accept_intro_run_started", second_generation)
 	game.call("accept_intro_run_started", first_generation)
@@ -143,12 +180,14 @@ func _run() -> void:
 	game.call("accept_intro_run_started", second_generation)
 	game.call("_on_explicit_intro_run_started", second_generation)
 	game.call("accept_intro_run_started", first_generation)
+	game.call("_accept_gameplay_handoff_delivery", first_generation, "stale-after-consume")
+	game.call("_on_explicit_gameplay_handoff_ready", second_generation)
 	await _settle_frames(3)
-	_expect(str(game.get("intro_handoff_consumer_probe")) == "handoff-consumed", "second success remains final after delayed duplicate/stale starts")
+	_expect(str(game.get("intro_handoff_consumer_probe")) == "handoff-consumed", "second success remains final after delayed duplicate/stale deliveries")
 	_expect(int(game.get("intro_handoff_consumer_probe_generation")) == second_generation, "second final probe remains generation-bound")
-	_expect(int(game.get("intro_handoff_claim_count")) == second_claims_after, "post-success starts cannot reclaim second generation")
-	_expect(int(intro.get("gameplay_handoff_consume_count")) == second_consumes_after, "post-success starts cannot reconsume second token")
-	_expect(int(game.get("intro_handoff_apply_count")) == second_apps_after, "post-success starts cannot re-enable second generation")
+	_expect(int(game.get("intro_handoff_claim_count")) == second_claims_after, "post-success deliveries cannot reclaim second generation")
+	_expect(int(intro.get("gameplay_handoff_consume_count")) == second_consumes_after, "post-success deliveries cannot reconsume second token")
+	_expect(int(game.get("intro_handoff_apply_count")) == second_apps_after, "post-success deliveries cannot re-enable second generation")
 
 	# Generation 3 proves consecutive replay rollover: the old terminal marker may
 	# remain historical, but the visible probe immediately belongs to the new run
@@ -171,8 +210,10 @@ func _run() -> void:
 	_expect(int(game.get("intro_handoff_apply_count")) == third_apps_before + 1, "third replay enables once")
 	game.call("accept_intro_run_started", second_generation)
 	game.call("accept_intro_run_started", third_generation)
+	game.call("_accept_gameplay_handoff_delivery", second_generation, "stale-after-third-consume")
 	await _settle_frames(2)
-	_expect(str(game.get("intro_handoff_consumer_probe")) == "handoff-consumed", "third consumed probe survives old/current late starts")
+	_expect(str(game.get("intro_handoff_consumer_probe")) == "handoff-consumed", "third consumed probe survives old/current late deliveries")
+	_expect(int(game.get("intro_handoff_consumer_probe_generation")) == third_generation, "third consumed probe remains attributed to third generation")
 	_expect(int(game.get("intro_handoff_consumer_probe_terminal_generation")) == third_generation, "third generation becomes the latest terminal probe")
 
 	await _finish()
@@ -242,7 +283,7 @@ func _finish() -> void:
 		await process_frame
 		await process_frame
 	if failures.is_empty():
-		print("YAKOLAK_INTRO_HANDOFF_PROBE_MONOTONIC_OK generations=3 consumed=terminal stale=ignored duplicate=ignored reconnect=covered delayed-init=covered")
+		print("YAKOLAK_INTRO_HANDOFF_PROBE_MONOTONIC_OK generations=3 consumed=terminal stale-handoff=isolated invalid=unattributed duplicates=ignored reconnect=covered delayed-init=covered")
 		quit(0)
 		return
 	for failure: String in failures:
