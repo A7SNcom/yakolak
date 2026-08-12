@@ -318,6 +318,61 @@ function leaveState(state, seat) {
   return { ...state, status: 'cancelled', cancelledBy: seat };
 }
 
+// Room settings are mutable only while the lobby is waiting, and only by the
+// authoritative owner seat. The editable surface is deliberately an allowlist:
+// changing player/turn/board/status ownership would create a second rules path.
+function applyRoomEdit(state, seat, changes) {
+  if (seat !== 'p1') throw new Error('unauthorized');
+  if (state.status !== 'waiting') throw new Error('room_edit_forbidden');
+  if (!changes || typeof changes !== 'object' || Array.isArray(changes)) throw new Error('invalid_payload');
+  const keys = Object.keys(changes);
+  if (!keys.length) throw new Error('invalid_payload');
+  const allowed = new Set(['color', 'targetPlayers', 'targetRounds']);
+  if (keys.some(key => !allowed.has(key))) throw new Error('unsafe_room_edit');
+
+  let targetPlayers = Number(state.targetPlayers);
+  let winsToMatch = Number(state.winsToMatch ?? state.targetRounds);
+  let players = state.players.map(player => ({ ...player }));
+
+  if (Object.hasOwn(changes, 'targetPlayers')) {
+    const requestedPlayers = Number(changes.targetPlayers);
+    if (!validPlayers(requestedPlayers)) throw new Error('invalid_player_count');
+    // Editing must never become an alternate "start now" transition. A waiting
+    // lobby always retains at least one open seat; joinState remains the sole
+    // transition that turns a filled lobby into a playing match.
+    if (requestedPlayers <= players.length) throw new Error('unsafe_room_edit');
+    targetPlayers = requestedPlayers;
+  }
+
+  if (Object.hasOwn(changes, 'targetRounds')) {
+    const requestedRounds = Number(changes.targetRounds);
+    if (!validRounds(requestedRounds)) throw new Error('invalid_round_count');
+    winsToMatch = requestedRounds;
+  }
+
+  if (Object.hasOwn(changes, 'color')) {
+    const requestedColor = String(changes.color || '');
+    if (!validColor(requestedColor)) throw new Error('invalid_color');
+    if (players.some(player => player.seat !== 'p1' && player.color === requestedColor)) throw new Error('color_taken');
+    players = players.map(player => player.seat === 'p1' ? { ...player, color: requestedColor } : player);
+  }
+
+  return {
+    ...state,
+    targetPlayers,
+    targetRounds: winsToMatch,
+    winsToMatch,
+    players,
+  };
+}
+
+function requireCurrentVersion(expectedVersion, currentVersion) {
+  const expected = Number(expectedVersion);
+  const current = Number(currentVersion);
+  if (!Number.isInteger(expected) || expected !== current) throw new Error('version_conflict');
+  return expected;
+}
+
 function reconcilePresenceState(state, connectedSeats) {
   const connected = new Set(connectedSeats || []);
   if (!connected.size) return state;
@@ -550,8 +605,8 @@ function statusFor(error) {
   if (code === 'unauthorized') return 401;
   if (code === 'rate_limited') return 429;
   if (code === 'room_code_exhausted') return 503;
-  if (['not_your_turn', 'room_full', 'room_not_waiting', 'version_conflict', 'color_taken', 'room_not_playing', 'round_not_finished', 'occupied_slot', 'no_piece_remaining', 'identity_conflict'].includes(code)) return 409;
-  if (['invalid_color', 'invalid_player_count', 'invalid_round_count', 'invalid_move', 'invalid_room_code', 'invalid_payload', 'invalid_action', 'invalid_seat', 'invalid_session', 'invalid_mutation_id'].includes(code)) return 400;
+  if (['not_your_turn', 'room_full', 'room_not_waiting', 'room_edit_forbidden', 'version_conflict', 'color_taken', 'room_not_playing', 'round_not_finished', 'occupied_slot', 'no_piece_remaining', 'identity_conflict'].includes(code)) return 409;
+  if (['invalid_color', 'invalid_player_count', 'invalid_round_count', 'invalid_move', 'invalid_room_code', 'invalid_payload', 'invalid_action', 'invalid_seat', 'invalid_session', 'invalid_mutation_id', 'unsafe_room_edit'].includes(code)) return 400;
   return 500;
 }
 
@@ -596,10 +651,14 @@ export default async function handler(req, res) {
     if (mutationKind && mutationApplied(state, seat, mutationKind, mutationId)) return json(res, 200, { ok: true, seat, room: publicRoom(row, state), duplicate: true });
     let expectedVersion = Number(body.version);
     if (action === 'leave') expectedVersion = Number(row.version);
-    else if (!Number.isInteger(expectedVersion) || expectedVersion !== Number(row.version)) return json(res, 409, { ok: false, error: 'version_conflict', room: publicRoom(row, state) });
+    else {
+      try { expectedVersion = requireCurrentVersion(body.version, row.version); }
+      catch { return json(res, 409, { ok: false, error: 'version_conflict', room: publicRoom(row, state) }); }
+    }
     let next;
     if (action === 'move') next = applyMove(state, seat, body);
     else if (action === 'rematch') next = rematchState(state, seat);
+    else if (action === 'edit') next = applyRoomEdit(state, seat, body.changes);
     else if (action === 'leave') next = leaveState(state, seat);
     else throw new Error('invalid_action');
     if (mutationKind) next = recordMutation(next, seat, mutationKind, mutationId);
@@ -607,11 +666,11 @@ export default async function handler(req, res) {
     let updated;
     try { updated = await updateRoom(db, row, next, expectedVersion, auth); }
     catch (error) {
-      if (error?.message === 'version_conflict' && mutationKind) {
+      if (error?.message === 'version_conflict') {
         const latest = await readRoom(db, code);
         if (latest) {
           const latestState = JSON.parse(String(latest.state_json));
-          if (mutationApplied(latestState, seat, mutationKind, mutationId)) return json(res, 200, { ok: true, seat, room: publicRoom(latest, latestState), duplicate: true });
+          if (mutationKind && mutationApplied(latestState, seat, mutationKind, mutationId)) return json(res, 200, { ok: true, seat, room: publicRoom(latest, latestState), duplicate: true });
           return json(res, 409, { ok: false, error: 'version_conflict', room: publicRoom(latest, latestState) });
         }
       }
@@ -626,4 +685,4 @@ export default async function handler(req, res) {
   }
 }
 
-export const __testing = { PROTOCOL, PLAYER_STALE_MS, PRESENCE_WRITE_INTERVAL_MS, applyMove, createState, emptyBoard, hasLegalMove, joinState, leaveState, materializeUpdatedRow, mutationApplied, normalizeCode, preview, publicRoom, publicState, reconcilePresenceState, recordMutation, rematchState, seatOwnership, validMutationId, validatePlacement, winner, winningPatterns: rulesWinningPatterns };
+export const __testing = { PROTOCOL, PLAYER_STALE_MS, PRESENCE_WRITE_INTERVAL_MS, applyMove, applyRoomEdit, createState, emptyBoard, hasLegalMove, joinState, leaveState, materializeUpdatedRow, mutationApplied, normalizeCode, preview, publicRoom, publicState, reconcilePresenceState, recordMutation, rematchState, requireCurrentVersion, seatOwnership, validMutationId, validatePlacement, winner, winningPatterns: rulesWinningPatterns };

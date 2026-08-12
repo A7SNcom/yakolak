@@ -190,6 +190,21 @@ func request_rematch() -> void:
 	})
 
 
+func edit_room(changes: Dictionary, expected_version: int = -1) -> void:
+	if not active or room.is_empty():
+		return
+	if str(identity.get("seat", "")) != "p1" or str(room.get("status", "")) != "waiting":
+		_show_room_edit_notice("لا يمكن تعديل الغرفة الآن.", true)
+		return
+	var version: int = expected_version if expected_version >= 0 else int(room.get("version", 0))
+	_queue_or_send("edit", {
+		"action": "edit",
+		"code": str(room.get("code", "")),
+		"version": version,
+		"changes": changes.duplicate(true),
+	})
+
+
 func refresh_now() -> void:
 	if active:
 		next_poll_msec = 0
@@ -218,6 +233,7 @@ func deactivate(clear_saved: bool = false) -> void:
 	_clear_pending_mutation()
 	_clear_bootstrap()
 	_hide_invite_button()
+	_hide_room_edit_affordance()
 	_hide_connection_status()
 	if clear_saved and OS.has_feature("web") and not code.is_empty():
 		var code_json: String = JSON.stringify(code)
@@ -241,6 +257,7 @@ func _reset_transport_state(clear_saved: bool) -> void:
 		reconnecting = false
 		next_poll_msec = 0
 		_hide_connection_status()
+		_hide_room_edit_affordance()
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("window.__yakolakOnlineQueue=[];", true)
 
@@ -280,7 +297,10 @@ func _flush_queued_action() -> bool:
 	_clear_queued_action()
 	if active and not room.is_empty():
 		payload["code"] = str(room.get("code", payload.get("code", "")))
-		payload["version"] = int(room.get("version", payload.get("version", 0)))
+		# A room edit is bound to the canonical version visible when its editor was
+		# opened. Never silently upgrade that version while the request is queued.
+		if kind != "edit":
+			payload["version"] = int(room.get("version", payload.get("version", 0)))
 	if kind == "move" and not _can_apply_move_intent(payload):
 		_accept_room(room)
 		return false
@@ -400,7 +420,7 @@ func _poll() -> void:
 
 func _request_post(kind: String, payload: Dictionary) -> void:
 	if busy:
-		if kind == "move" or kind == "rematch" or kind == "leave":
+		if kind == "move" or kind == "rematch" or kind == "leave" or kind == "edit":
 			queued_action_kind = kind
 			queued_action_payload = payload.duplicate(true)
 		return
@@ -443,6 +463,14 @@ func _consume_bridge_event() -> bool:
 	if not parsed is Dictionary:
 		return true
 	var event: Dictionary = parsed as Dictionary
+	if str(event.get("kind", "")) == "room-edit-ui":
+		var edit_data_value: Variant = event.get("data", {})
+		if edit_data_value is Dictionary:
+			var edit_data: Dictionary = edit_data_value as Dictionary
+			var changes_value: Variant = edit_data.get("changes", {})
+			if changes_value is Dictionary:
+				edit_room(changes_value as Dictionary, int(edit_data.get("version", -1)))
+		return true
 	var event_id: int = int(event.get("id", 0))
 	if active_request_id <= 0 or event_id != active_request_id:
 		return true
@@ -498,6 +526,9 @@ func _consume_bridge_event() -> bool:
 	var room_value: Variant = data.get("room", null)
 	if room_value is Dictionary:
 		_accept_room(room_value as Dictionary)
+	if kind == "edit":
+		_hide_room_edit_modal()
+		_show_room_edit_notice("تم حفظ التعديل.", false)
 	if kind == "leave":
 		deactivate(true)
 		return true
@@ -513,6 +544,12 @@ func _handle_request_failure(kind: String, payload: Dictionary, error_code: Stri
 
 	if error_code == "version_conflict" and data.get("room", null) is Dictionary:
 		_mark_connected()
+		if kind == "edit":
+			_accept_room(data["room"] as Dictionary)
+			_hide_room_edit_modal()
+			_show_room_edit_notice("تغيرت الغرفة. افتح التعديل مرة أخرى على أحدث حالة.", true)
+			next_poll_msec = Time.get_ticks_msec() + POLL_MS
+			return
 		if kind == "move" or kind == "rematch":
 			_remember_pending_mutation(kind, payload)
 		_accept_room(data["room"] as Dictionary)
@@ -522,12 +559,26 @@ func _handle_request_failure(kind: String, payload: Dictionary, error_code: Stri
 			_flush_queued_action()
 		return
 
+	if kind == "edit" and ["room_edit_forbidden", "unsafe_room_edit", "invalid_payload", "invalid_color", "invalid_player_count", "invalid_round_count", "color_taken"].has(error_code):
+		_mark_connected()
+		_hide_room_edit_modal()
+		_show_room_edit_notice(_room_edit_error_text(error_code), true)
+		next_poll_msec = 0
+		return
+
 	if kind == "move" or kind == "rematch":
 		if ["not_your_turn", "occupied_slot", "no_piece_remaining", "room_not_playing", "round_not_finished"].has(error_code):
 			_mark_connected()
 			next_poll_msec = 0
 			_accept_room(room)
 			return
+
+	if kind == "edit" and _is_transient_failure(error_code, status):
+		_mark_reconnecting(error_code)
+		_hide_room_edit_modal()
+		_show_room_edit_notice("تعذر تأكيد الحفظ. يتم تحديث الغرفة دون إعادة إرسال التعديل.", true)
+		next_poll_msec = 0
+		return
 
 	if _is_transient_failure(error_code, status):
 		if active and ["poll", "move", "rematch", "leave"].has(kind):
@@ -550,6 +601,18 @@ func _handle_request_failure(kind: String, payload: Dictionary, error_code: Stri
 			return
 
 	_fatal_error(error_code)
+
+
+func _room_edit_error_text(error_code: String) -> String:
+	match error_code:
+		"room_edit_forbidden":
+			return "بدأت اللعبة؛ لم يعد تعديل الإعدادات مسموحًا."
+		"color_taken":
+			return "اللون المختار أصبح محجوزًا."
+		"unsafe_room_edit":
+			return "هذا التعديل غير مسموح في الغرفة الحالية."
+		_:
+			return "تعذر حفظ تعديل الغرفة."
 
 
 func _is_transient_failure(error_code: String, status: int) -> bool:
@@ -598,6 +661,7 @@ func _accept_room(next_room: Dictionary) -> void:
 		return
 	if str(room.get("status", "")) == "playing":
 		_hide_invite_button()
+	_sync_room_edit_affordance()
 	room_state_changed.emit(room.duplicate(true), identity.duplicate(true))
 	if not pending_mutation_kind.is_empty() and not busy:
 		call_deferred("_reconcile_pending_mutation")
@@ -687,6 +751,40 @@ func _show_invite_button(url: String, code: String) -> void:
 func _hide_invite_button() -> void:
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("var b=document.getElementById('yakolak-invite-copy');if(b){b.remove();}", true)
+
+
+func _sync_room_edit_affordance() -> void:
+	if not OS.has_feature("web"):
+		return
+	if active and str(identity.get("seat", "")) == "p1" and str(room.get("status", "")) == "waiting":
+		_show_room_edit_button()
+	else:
+		_hide_room_edit_affordance()
+
+
+func _show_room_edit_button() -> void:
+	var room_json: String = JSON.stringify(room)
+	var script: String = "(function(){const state=" + room_json + ";let b=document.getElementById('yakolak-room-edit-button');if(!b){b=document.createElement('button');b.id='yakolak-room-edit-button';b.type='button';b.style.cssText='position:fixed;left:50%;bottom:78px;transform:translateX(-50%);z-index:2147483000;border:1px solid #ffffff40;border-radius:12px;padding:9px 14px;background:#25292be8;color:#fff;font:650 14px system-ui;direction:rtl;touch-action:manipulation';document.body.appendChild(b);}b.textContent='تعديل الغرفة';b.style.display='block';b.onclick=()=>{let old=document.getElementById('yakolak-room-edit-modal');if(old)old.remove();const m=document.createElement('div');m.id='yakolak-room-edit-modal';m.style.cssText='position:fixed;inset:0;z-index:2147483003;background:#0009;display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));direction:rtl;font-family:system-ui';m.innerHTML=`<div style='width:min(360px,94vw);background:#171a1cf7;border:1px solid #ffffff35;border-radius:18px;padding:18px;box-shadow:0 18px 50px #0008'><div style='font:750 20px system-ui;color:#fff;margin-bottom:14px'>تعديل الغرفة</div><label style='display:block;color:#cfd6d7;font:600 13px system-ui;margin:10px 0 5px'>لونك</label><select id='yakolak-room-edit-color' style='width:100%;min-height:44px;border-radius:10px;background:#25292b;color:#fff;border:1px solid #ffffff2e;padding:8px'></select><label style='display:block;color:#cfd6d7;font:600 13px system-ui;margin:10px 0 5px'>عدد اللاعبين</label><select id='yakolak-room-edit-players' style='width:100%;min-height:44px;border-radius:10px;background:#25292b;color:#fff;border:1px solid #ffffff2e;padding:8px'></select><label style='display:block;color:#cfd6d7;font:600 13px system-ui;margin:10px 0 5px'>أشواط الفوز</label><select id='yakolak-room-edit-rounds' style='width:100%;min-height:44px;border-radius:10px;background:#25292b;color:#fff;border:1px solid #ffffff2e;padding:8px'></select><div style='display:flex;gap:8px;margin-top:16px'><button id='yakolak-room-edit-save' style='flex:1;min-height:46px;border:0;border-radius:11px;background:#f1f0ea;color:#111;font:700 15px system-ui'>حفظ</button><button id='yakolak-room-edit-cancel' style='flex:1;min-height:46px;border:1px solid #ffffff2e;border-radius:11px;background:#25292b;color:#fff;font:650 15px system-ui'>إلغاء</button></div></div>`;document.body.appendChild(m);const host=(state.players||[]).find(p=>p.seat==='p1')||{};const taken=new Set((state.players||[]).filter(p=>p.seat!=='p1').map(p=>p.color));const colors=[['marble','أبيض'],['blue','أزرق'],['gold','ذهبي'],['green','أخضر']];const color=m.querySelector('#yakolak-room-edit-color');for(const [id,name] of colors){if(taken.has(id)&&id!==host.color)continue;color.add(new Option(name,id,false,id===host.color));}const count=m.querySelector('#yakolak-room-edit-players');const occupied=(state.players||[]).length;for(let n=2;n<=4;n++){if(n<=occupied)continue;count.add(new Option(String(n),String(n),false,n===Number(state.targetPlayers)));}const rounds=m.querySelector('#yakolak-room-edit-rounds');for(const n of [3,5])rounds.add(new Option(String(n),String(n),false,n===Number(state.targetRounds||state.winsToMatch)));const close=()=>m.remove();m.querySelector('#yakolak-room-edit-cancel').onclick=close;m.onclick=e=>{if(e.target===m)close();};m.querySelector('#yakolak-room-edit-save').onclick=e=>{const save=e.currentTarget;save.disabled=true;save.textContent='جارٍ الحفظ…';const q=window.__yakolakOnlineQueue=window.__yakolakOnlineQueue||[];q.push({id:0,kind:'room-edit-ui',ok:true,status:0,data:{version:Number(state.version||0),changes:{color:color.value,targetPlayers:Number(count.value),targetRounds:Number(rounds.value)}}});};};})();"
+	JavaScriptBridge.eval(script, true)
+
+
+func _hide_room_edit_modal() -> void:
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("var m=document.getElementById('yakolak-room-edit-modal');if(m){m.remove();}", true)
+
+
+func _hide_room_edit_affordance() -> void:
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("for(const id of ['yakolak-room-edit-button','yakolak-room-edit-modal','yakolak-room-edit-notice']){const e=document.getElementById(id);if(e)e.remove();}", true)
+
+
+func _show_room_edit_notice(text: String, is_error: bool) -> void:
+	if not OS.has_feature("web"):
+		return
+	var text_json: String = JSON.stringify(text)
+	var background: String = "#54231ff2" if is_error else "#174438f2"
+	var script: String = "(()=>{let e=document.getElementById('yakolak-room-edit-notice');if(!e){e=document.createElement('div');e.id='yakolak-room-edit-notice';e.style.cssText='position:fixed;left:50%;bottom:132px;transform:translateX(-50%);z-index:2147483004;max-width:min(86vw,380px);padding:8px 12px;border-radius:11px;color:#fff;font:650 13px system-ui;direction:rtl;text-align:center;box-shadow:0 7px 24px #0007';document.body.appendChild(e);}e.style.background='" + background + "';e.textContent=" + text_json + ";clearTimeout(window.__yakolakRoomEditNoticeTimer);window.__yakolakRoomEditNoticeTimer=setTimeout(()=>e.remove(),2600);})();"
+	JavaScriptBridge.eval(script, true)
 
 
 func _send_leave_keepalive() -> void:

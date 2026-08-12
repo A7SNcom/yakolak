@@ -3,6 +3,7 @@ import { __testing } from '../api/rooms.js';
 
 const {
   applyMove,
+  applyRoomEdit,
   createState,
   joinState,
   leaveState,
@@ -11,6 +12,7 @@ const {
   publicRoom,
   reconcilePresenceState,
   rematchState,
+  requireCurrentVersion,
   seatOwnership,
 } = __testing;
 
@@ -38,6 +40,53 @@ function twoPlayerRoom() {
   assert.deepEqual(afterGuestLeave.players.map(player => player.seat), ['p1']);
   assert.equal(afterGuestLeave.cancelledBy, null);
   assert.equal(leaveState(waiting, 'p1').status, 'cancelled');
+}
+
+// ROOM-EDIT-14: one valid host edit stays inside the existing waiting-room
+// state model and updates only the explicitly safe settings.
+{
+  let waiting = createState('marble', 3, 3);
+  waiting = joinState(waiting, 'p2', 'blue');
+  const edited = applyRoomEdit(waiting, 'p1', { color: 'gold', targetPlayers: 4, targetRounds: 5 });
+  assert.equal(edited.status, 'waiting');
+  assert.equal(edited.targetPlayers, 4);
+  assert.equal(edited.targetRounds, 5);
+  assert.equal(edited.winsToMatch, 5);
+  assert.deepEqual(edited.players, [{ seat: 'p1', color: 'gold' }, { seat: 'p2', color: 'blue' }]);
+  assert.deepEqual(edited.board, waiting.board);
+  assert.equal(edited.turnIndex, waiting.turnIndex);
+}
+
+// ROOM-EDIT-14: stale writes must fail against the room version the editor saw;
+// the handler returns the latest canonical room for this same error.
+{
+  assert.equal(requireCurrentVersion(7, 7), 7);
+  assert.throws(() => requireCurrentVersion(6, 7), /version_conflict/);
+}
+
+// ROOM-EDIT-14: an authenticated guest is still unauthorized to edit host room
+// settings, regardless of which safe field it tries to change.
+{
+  const waiting = joinState(createState('marble', 3, 3), 'p2', 'blue');
+  assert.throws(() => applyRoomEdit(waiting, 'p2', { targetRounds: 5 }), /unauthorized/);
+}
+
+// ROOM-EDIT-14: rule mutation is forbidden after the lobby lifecycle ends.
+{
+  const playing = twoPlayerRoom();
+  assert.equal(playing.status, 'playing');
+  assert.throws(() => applyRoomEdit(playing, 'p1', { targetRounds: 5 }), /room_edit_forbidden/);
+}
+
+// ROOM-EDIT-14: the allowlist is structural, not UI-only. A forged payload
+// cannot mutate authoritative turn/board/status fields or collapse a waiting
+// lobby into a playing match by setting targetPlayers to the occupied count.
+{
+  let waiting = createState('marble', 3, 3);
+  waiting = joinState(waiting, 'p2', 'blue');
+  assert.throws(() => applyRoomEdit(waiting, 'p1', { turnIndex: 1 }), /unsafe_room_edit/);
+  assert.throws(() => applyRoomEdit(waiting, 'p1', { targetPlayers: 2 }), /unsafe_room_edit/);
+  assert.throws(() => applyRoomEdit(waiting, 'p1', { color: 'blue' }), /color_taken/);
 }
 
 // Online seat ownership is one-to-one and independent from color/request ids:
