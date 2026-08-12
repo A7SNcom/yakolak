@@ -19,6 +19,7 @@ const closeIcon = fs.readFileSync(new URL('../assets/icons/lucide/x.svg', import
 const menuIcon = fs.readFileSync(new URL('../assets/icons/lucide/ellipsis.svg', import.meta.url), 'utf8');
 const online = fs.readFileSync(new URL('../scripts/online_session.gd', import.meta.url), 'utf8');
 const onlineHardened = fs.readFileSync(new URL('../scripts/online_session_hardened.gd', import.meta.url), 'utf8');
+const onlineReconnect = fs.readFileSync(new URL('../scripts/online_session_reconnect_hydration.gd', import.meta.url), 'utf8');
 const scene = fs.readFileSync(new URL('../scenes/intro.tscn', import.meta.url), 'utf8');
 const server = fs.readFileSync(new URL('../api/rooms.js', import.meta.url), 'utf8');
 
@@ -26,7 +27,8 @@ assert.ok(scene.includes('res://scripts/gameplay_session_nested_pick.gd'), 'the 
 assert.ok(gameplayNestedPick.includes('extends "res://scripts/gameplay_session_polish.gd"'), 'nested picking must preserve the gameplay polish layer');
 assert.ok(gameplayPolish.includes('extends "res://scripts/gameplay_session_hardened.gd"'), 'gameplay polish must preserve the hardened gameplay layer');
 assert.ok(gameplayHardened.includes('extends "res://scripts/gameplay_session_resilient.gd"'), 'hardened gameplay must preserve the Arabic/stability layer');
-assert.ok(scene.includes('res://scripts/online_session_hardened.gd'), 'the hardened online layer must remain active');
+assert.ok(scene.includes('res://scripts/online_session_reconnect_hydration.gd'), 'the reconnect hydration online layer must remain active');
+assert.ok(onlineReconnect.includes('extends "res://scripts/online_session_hardened.gd"'), 'reconnect hydration must preserve the hardened online layer');
 assert.ok(onlineHardened.includes('extends "res://scripts/online_session.gd"'), 'hardened online must preserve the base Arabic invitation transport');
 assert.ok(scene.includes('res://scripts/session_setup_design_system.gd'), 'the setup design-system adapter must remain active');
 assert.ok(setupDesign.includes('extends "res://scripts/session_setup_dialog_system.gd"'), 'the design adapter must preserve the unified dialog layer');
