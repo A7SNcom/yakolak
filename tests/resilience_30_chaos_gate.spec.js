@@ -488,29 +488,29 @@ async function raceLegalMove(harness, clients, move, mutationId, rng, { dropResp
   return { before, after: harness.room(), owner, body, results };
 }
 
-async function raceBoundary(harness, clients, rng, label) {
-  const before = harness.room();
+async function waitAutomaticBoundary(harness, clients, before, label) {
   assert.equal(before.status, 'finished', `${label}: boundary begins finished`);
   assert.equal(before.matchComplete, false, `${label}: boundary is not final match`);
-  const owner = clients[Math.floor(rng() * clients.length)];
-  const mutationId = token(`boundary:${label}:${before.version}`);
-  const body = { action: 'rematch', code: CODE, version: before.version, mutationId };
-  const [a, b] = await Promise.all([
-    delayedCall(3 + Math.floor(rng() * 20), () => rawPost(owner, body)),
-    delayedCall(6 + Math.floor(rng() * 24), () => rawPost(owner, body)),
-  ]);
-  assert.equal(a.status, 200, `${label}: first boundary request succeeds`);
-  assert.equal(b.status, 200, `${label}: duplicate boundary request is idempotent`);
-  assert.equal([a, b].filter(result => result.data.duplicate === true).length, 1, `${label}: one duplicate boundary ack`);
-  assert.equal(harness.version, before.version + 1, `${label}: one boundary version`);
-  assert.equal(harness.countMutation(mutationId), 1, `${label}: boundary mutation identity committed once`);
+  const commitCountBefore = harness.commitCount;
+  const timelineStart = harness.timeline.length;
+  await wakeAll(clients);
+  await waitUntil(() => {
+    const current = harness.room();
+    return current.status === 'playing' && Number(current.round) === Number(before.round) + 1;
+  }, 10000, `${label}: automatic authoritative round advance`);
+
   const after = harness.room();
+  assert.equal(after.version, before.version + 1, `${label}: one canonical boundary version`);
+  assert.equal(harness.commitCount, commitCountBefore + 1, `${label}: exactly one boundary mutation commits`);
+  const boundaryCommits = harness.timeline.slice(timelineStart).filter(row => row.kind === 'commit' && row.action === 'rematch');
+  assert.equal(boundaryCommits.length, 1, `${label}: one server-authoritative rematch commit`);
   assert.equal(after.status, 'playing', `${label}: next round starts`);
   assert.equal(after.round, before.round + 1, `${label}: round increments once`);
   assert.equal(after.turnIndex, Number(before.round) % 4, `${label}: authoritative starter rotates exactly once`);
   assert.deepEqual(after.scores, before.scores, `${label}: scores persist across round boundary`);
   assert.ok(Object.values(after.board).every(slots => Object.keys(slots || {}).length === 0), `${label}: board reset is canonical`);
   assert.equal(after.moveNumber, 0, `${label}: move counter resets`);
+  harness.log('automatic-round-boundary', { label, before: compactRoom(before), after: compactRoom(after), commit: boundaryCommits[0] });
   return after;
 }
 
@@ -642,10 +642,9 @@ test('RESILIENCE-30 deterministic seeded 4-client online chaos gate', async ({ b
       const finished = harness.room();
       assert.equal(finished.winner?.seat, 'p1', `round ${roundWin}: deterministic p1 winner`);
       assert.equal(Number(finished.scores.p1), roundWin, `round ${roundWin}: score increments exactly once`);
-      await checkpointTerminal(harness, clients, `round-${roundWin}-finished`);
 
       if (roundWin < 3) {
-        await raceBoundary(harness, clients, rng, `round-${roundWin}-boundary`);
+        await waitAutomaticBoundary(harness, clients, finished, `round-${roundWin}-boundary`);
         await checkpointActive(harness, clients, `round-${roundWin + 1}-start`);
       }
     }
