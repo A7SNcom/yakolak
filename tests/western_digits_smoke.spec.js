@@ -91,6 +91,16 @@ async function waitForFastIntro(page) {
   );
 }
 
+async function waitForDigitFixtureBridge(page) {
+  await page.goto('http://127.0.0.1:8000/', { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(
+    () => typeof window.yakolakTestShowDigitFixture === 'function' &&
+      document.body.dataset.yakolakVisibleStrings !== undefined,
+    null,
+    { timeout: 90000 }
+  );
+}
+
 async function collectVisibleStrings(page) {
   return page.evaluate(() => {
     let godot = [];
@@ -197,8 +207,8 @@ test('room code and live Arabic setup/gameplay render only Western digits withou
 });
 
 test('DIGITS-21 rendered regression matrix covers Arabic and English numeric UI and captures mobile RTL proof', async ({ page }, testInfo) => {
-  test.setTimeout(300000);
-  await waitForFastIntro(page);
+  test.setTimeout(180000);
+  await waitForDigitFixtureBridge(page);
 
   for (const mode of ['ar', 'en']) {
     await page.evaluate(selectedMode => window.yakolakTestShowDigitFixture(selectedMode), mode);
