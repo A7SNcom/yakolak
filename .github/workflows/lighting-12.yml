@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - 'tests/turn_light_crossfade_headless.gd'
-      - 'tests/turn_light_mobile_performance_v2.spec.js'
+      - 'tests/turn_light_mobile_performance_v3.spec.js'
       - '.github/workflows/lighting-12.yml'
       - 'scripts/turn_light_crossfade.gd'
       - 'scripts/gameplay_authoritative_turn_state.gd'
@@ -65,7 +65,7 @@ jobs:
             yakolak-godot-4.7.1-
 
       - name: Validate browser performance source
-        run: node --check tests/turn_light_mobile_performance_v2.spec.js
+        run: node --check tests/turn_light_mobile_performance_v3.spec.js
 
       - name: Build latest main and run Godot lighting gate
         env:
@@ -83,7 +83,7 @@ jobs:
           SERVER_PID=$!
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
           for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
-          npx playwright test tests/turn_light_mobile_performance_v2.spec.js --workers=1 --reporter=github
+          npx playwright test tests/turn_light_mobile_performance_v3.spec.js --workers=1 --reporter=github
 
       - name: Upload LIGHTING-12 metrics and failure evidence
         if: always()
