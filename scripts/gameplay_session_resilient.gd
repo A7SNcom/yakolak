@@ -2,7 +2,7 @@ extends "res://scripts/gameplay_session_ui.gd"
 
 # Final gameplay safety layer. Every new session starts from the captured
 # physical home state, stale tweens can never finish inside a newer match, and
-# online rounds advance automatically once every connected player sees finish.
+# online rounds advance automatically from one deterministic owner client.
 const Display = preload("res://scripts/ui_design.gd")
 
 const ONLINE_NEXT_ROUND_DELAY_MS: int = 1100
@@ -39,6 +39,20 @@ func _update_hud() -> void:
 		score_label.text = Display.display_text(score_label.text)
 	if result_button != null:
 		result_button.text = Display.display_text(result_button.text)
+
+
+func _show_round_result() -> void:
+	super._show_round_result()
+	if turn_label == null:
+		return
+	if match_complete:
+		var leaders: Array[String] = _match_leaders()
+		turn_label.text = "فاز %s بالمباراة" % _player_name(leaders[0]) if leaders.size() == 1 else "تعادل المباراة"
+	elif round_winner.is_empty():
+		turn_label.text = "تعادل الجولة"
+	else:
+		turn_label.text = "فاز %s بالجولة" % _player_name(round_winner)
+	turn_label.text = Display.display_text(turn_label.text)
 
 
 func _on_configuration_ready(configuration: Dictionary) -> void:
@@ -85,7 +99,7 @@ func _apply_online_room(remote: Dictionary) -> void:
 		if key != online_round_auto_key:
 			online_round_auto_key = key
 			online_round_auto_sent = false
-			online_round_auto_due_msec = Time.get_ticks_msec() + ONLINE_NEXT_ROUND_DELAY_MS
+			online_round_auto_due_msec = Time.get_ticks_msec() + ONLINE_NEXT_ROUND_DELAY_MS if str(online_identity.get("seat", "")) == "p1" else 0
 	elif status == "playing":
 		online_round_auto_due_msec = 0
 		online_round_auto_sent = false
@@ -100,6 +114,8 @@ func _maybe_auto_advance_online_round() -> void:
 		return
 	online_round_auto_due_msec = 0
 	if not online_active or online == null or not match_initialized or not round_complete or match_complete or online_cancelled:
+		return
+	if str(online_identity.get("seat", "")) != "p1":
 		return
 	online_round_auto_sent = true
 	online.call("request_rematch")
