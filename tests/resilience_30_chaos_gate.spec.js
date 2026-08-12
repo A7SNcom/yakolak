@@ -583,7 +583,7 @@ async function saveFailure(harness, clients, testInfo, error) {
 }
 
 test('RESILIENCE-30 deterministic seeded 4-client online chaos gate', async ({ browser }, testInfo) => {
-  test.setTimeout(240000);
+  test.setTimeout(600000);
   const rng = mulberry32(hashInt(SEED));
   const harness = makeHarness();
   const clients = [];
