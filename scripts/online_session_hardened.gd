@@ -55,7 +55,7 @@ func _process(_delta: float) -> void:
 func restore_from_location() -> bool:
 	if not OS.has_feature("web") or active or busy:
 		return false
-	var raw_code: Variant = JavaScriptBridge.eval("String(new URL(location.href).searchParams.get('yakolakTestRoom')||new URL(location.href).searchParams.get('room')||'')", true)
+	var raw_code: Variant = JavaScriptBridge.eval("String(new URL(location.href).searchParams.get('room')||'')", true)
 	var code: String = _normalize_code(str(raw_code))
 	if not _valid_room_code(code):
 		return false
