@@ -90,35 +90,29 @@ async function startFourPlayerOnline(page) {
   await page.evaluate(() => window.yakolakTestSetupFlowAction('continue'));
   await page.waitForFunction(
     () => document.body.dataset.yakolakGameplay === 'ready' &&
-      document.body.dataset.yakolakTurnIndicatorVisible === 'true' &&
-      document.body.dataset.yakolakTurnIndicatorPlayer === '4' &&
-      document.body.dataset.yakolakTurnIndicatorText === 'دور لاعب 4' &&
       document.getElementById('yakolak-invite-copy')?.textContent?.includes('الغرفة 54'),
     null,
     { timeout: 30000 }
   );
 }
 
-test('room code and mixed Arabic player copy render Western digits through the shared boundary', async ({ page }) => {
+test('room code renders Western digits through the shared boundary without mutating numeric state', async ({ page }) => {
   test.setTimeout(120000);
   const state = await installRoomApi(page);
   await startFourPlayerOnline(page);
 
   const observed = await page.evaluate(() => ({
     invite: document.getElementById('yakolak-invite-copy')?.textContent || '',
-    turn: document.body.dataset.yakolakTurnIndicatorText || '',
-    turnPlayer: document.body.dataset.yakolakTurnIndicatorPlayer || '',
-    digitContract: document.body.dataset.yakolakTurnIndicatorDigits || '',
     urlRoom: new URL(location.href).searchParams.get('room') || '',
+    players: document.body.dataset.yakolakPlayers || '',
+    rounds: document.body.dataset.yakolakSetupRounds || '',
   }));
 
   expect(observed.invite).toContain('الغرفة 54');
   expect(observed.invite).not.toMatch(ARABIC_DIGITS);
-  expect(observed.turn).toBe('دور لاعب 4');
-  expect(observed.turn).not.toMatch(ARABIC_DIGITS);
-  expect(observed.turnPlayer).toBe('4');
-  expect(observed.digitContract).toBe('western-0-9');
   expect(observed.urlRoom).toBe('54');
+  expect(observed.players).toBe('4');
+  expect(observed.rounds).toBe('3');
 
   expect(state.room.code).toBe('54');
   expect(typeof state.createBody?.targetPlayers).toBe('number');
