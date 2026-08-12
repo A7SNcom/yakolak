@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { __testing } from '../api/rooms.js';
 
 const {
+  advanceRoundState,
   applyMove,
   applyRoomEdit,
   createState,
@@ -183,8 +184,41 @@ function twoPlayerRoom() {
   assert.equal(after.lastMove?.seat, 'p1');
 }
 
-// Presence also cannot advance a finished round. Every player in the match must
-// explicitly acknowledge the next round; connection freshness is not a vote.
+// ROUND-END-23: one real winning move commits the result once, then exactly one
+// owner transition clears round-scoped state while preserving match progress.
+{
+  let state = twoPlayerRoom();
+  state = applyMove(state, 'p1', { cell: 0, size: 'small' });
+  state = applyMove(state, 'p2', { cell: 8, size: 'large' });
+  state = applyMove(state, 'p1', { cell: 1, size: 'small' });
+  state = applyMove(state, 'p2', { cell: 7, size: 'large' });
+  state = applyMove(state, 'p1', { cell: 2, size: 'small' });
+
+  assert.equal(state.status, 'finished');
+  assert.equal(state.winner?.seat, 'p1');
+  assert.deepEqual(state.scores, { p1: 1, p2: 0 });
+  assert.equal(state.completedRounds, 1);
+  assert.equal(state.moveNumber, 5);
+  assert.equal(state.matchComplete, false);
+
+  assert.throws(() => advanceRoundState(state, 'p2'), /unauthorized/);
+  const nextRound = advanceRoundState(state, 'p1');
+  assert.equal(nextRound.status, 'playing');
+  assert.equal(nextRound.round, 2);
+  assert.equal(nextRound.turnIndex, 1);
+  assert.deepEqual(nextRound.scores, { p1: 1, p2: 0 });
+  assert.equal(nextRound.completedRounds, 1);
+  assert.deepEqual(nextRound.board, createState('marble', 2, 3).board);
+  assert.equal(nextRound.lastMove, null);
+  assert.equal(nextRound.moveNumber, 0);
+  assert.equal(nextRound.winner, null);
+  assert.equal(nextRound.draw, false);
+  assert.deepEqual(nextRound.rematch, { p1: false, p2: false });
+  assert.throws(() => advanceRoundState(nextRound, 'p1'), /round_not_finished/);
+}
+
+// Presence never advances a finished round. Ordinary round advance is automatic
+// from p1 only; match-complete replay remains a separate all-player decision.
 {
   let finished = twoPlayerRoom();
   finished = {
@@ -192,14 +226,15 @@ function twoPlayerRoom() {
     status: 'finished',
     round: 1,
     completedRounds: 1,
-    rematch: { p1: true, p2: false },
+    rematch: { p1: false, p2: false },
     matchComplete: false,
   };
   const unchanged = reconcilePresenceState(finished, ['p1']);
   assert.equal(unchanged.status, 'finished');
   assert.equal(unchanged.round, 1);
+  assert.throws(() => rematchState(unchanged, 'p2'), /unauthorized/);
 
-  const advanced = rematchState(unchanged, 'p2');
+  const advanced = rematchState(unchanged, 'p1');
   assert.equal(advanced.status, 'playing');
   assert.equal(advanced.round, 2);
   assert.deepEqual(advanced.board['0'], {});
@@ -213,14 +248,16 @@ function twoPlayerRoom() {
   assert.equal(replay.round, 1);
 }
 
-// Normal connected rematch semantics are unchanged.
+// Match-complete rematch still requires every player; it is not the ordinary
+// round-advance transition and therefore keeps its existing consent semantics.
 {
   let state = twoPlayerRoom();
-  state = { ...state, status: 'finished', rematch: { p1: false, p2: false } };
+  state = { ...state, status: 'finished', matchComplete: true, rematch: { p1: false, p2: false } };
   state = rematchState(state, 'p1');
   assert.equal(state.status, 'finished');
   state = rematchState(state, 'p2');
   assert.equal(state.status, 'playing');
+  assert.equal(state.round, 1);
 }
 
 console.log('YAKOLAK_ONLINE_LOGIC_HARDENING_OK');
