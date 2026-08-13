@@ -265,7 +265,7 @@ func _publish_contract() -> void:
 		"document.body.dataset.yakolakTurnIndicatorSource='authoritative-turn-signal';" +
 		"document.body.dataset.yakolakTurnIndicatorPolling='none';" +
 		"document.body.dataset.yakolakTurnIndicatorDigits='western-0-9';" +
-		"document.body.dataset.yakolakTurnIndicatorOneGlance='authoritative-player-label+supporting-color';" +
+		"document.body.dataset.yakolakTurnIndicatorOneGlance='copy+player-color';" +
 		"document.body.dataset.yakolakTurnIndicatorLocalCue='semantic-copy+inverted-design-tokens';" +
 		"document.body.dataset.yakolakTurnIndicatorRemoteOwnerSource='authoritative-seat';" +
 		"document.body.dataset.yakolakTurnIndicatorRemoteColorRole='supporting-cue';" +
