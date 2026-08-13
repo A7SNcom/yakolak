@@ -1,6 +1,6 @@
 extends Node
 
-# TURN-UI-08 / UX-TURN-35 / UX-TURN-37: exactly one compact top turn indicator.
+# TURN-UI-08 / UX-TURN-35 / UX-TURN-37 / UX-TURN-38: exactly one compact top turn indicator.
 # It consumes only the authoritative_turn_changed snapshot emitted by gameplay
 # and never polls gameplay, camera, lighting, animation, or DOM state.
 const Display = preload("res://scripts/ui_design.gd")
@@ -20,6 +20,8 @@ var indicator_width: float = INDICATOR_MIN_WIDTH
 var indicator_color_key: String = ""
 var indicator_local_turn: bool = false
 var indicator_emphasis_key: String = ""
+var indicator_owner_seat: String = ""
+var indicator_remote_player_number: int = 0
 var applied_revision: int = -1
 var indicator_update_count: int = 0
 
@@ -138,6 +140,8 @@ func _on_authoritative_turn_changed(snapshot: Dictionary) -> void:
 func _apply_visual_state(snapshot: Dictionary) -> void:
 	indicator_local_turn = bool(snapshot.get("local_turn", false))
 	indicator_color_key = _indicator_color_key(snapshot)
+	indicator_owner_seat = str(snapshot.get("seat", "")).strip_edges().to_lower()
+	indicator_remote_player_number = 0
 	indicator_style.set_border_width_all(2)
 
 	# UX-TURN-37 changes one state only: an accepted authoritative local owner.
@@ -153,10 +157,14 @@ func _apply_visual_state(snapshot: Dictionary) -> void:
 		indicator_label.add_theme_constant_override("outline_size", 0)
 		return
 
-	indicator_emphasis_key = "remote-owner"
+	# UX-TURN-38: remote ownership is led by the stable authoritative seat label.
+	# Player color remains a supporting border cue only; score/camera/light/tween
+	# state is never consulted and therefore cannot replace the visible owner.
+	indicator_remote_player_number = _remote_player_number(snapshot)
+	indicator_emphasis_key = "remote-authoritative-owner"
 	indicator_style.border_color = _indicator_cue_color(indicator_color_key)
 	indicator_style.bg_color = Color(0.035, 0.055, 0.062, 0.94)
-	indicator_label.add_theme_font_override("font", Display.FONT_MEDIUM)
+	indicator_label.add_theme_font_override("font", Display.FONT_BOLD)
 	indicator_label.add_theme_color_override("font_color", Display.TEXT_PRIMARY)
 	indicator_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.72))
 	indicator_label.add_theme_constant_override("outline_size", 1)
@@ -187,13 +195,26 @@ func _indicator_copy(snapshot: Dictionary) -> String:
 	if bool(snapshot.get("online", false)):
 		if bool(snapshot.get("local_turn", false)):
 			return "دورك"
-		var number: int = int(snapshot.get("player_number", 0))
+		var number: int = _remote_player_number(snapshot)
 		return "دور لاعب " + str(number) if number > 0 else ""
 	var color_name: String = str(snapshot.get("color_name", ""))
 	if not color_name.is_empty():
 		return "دور " + color_name
 	var fallback_number: int = int(snapshot.get("player_number", 0))
 	return "دور لاعب " + str(fallback_number) if fallback_number > 0 else ""
+
+
+func _remote_player_number(snapshot: Dictionary) -> int:
+	# Online seat identity (p1, p2, ...) is stable across presentation motion and
+	# is the same identity used by room authority. Array position is fallback only.
+	var seat: String = str(snapshot.get("seat", "")).strip_edges().to_lower()
+	if seat.begins_with("p") and seat.length() > 1:
+		var suffix: String = seat.substr(1)
+		if suffix.is_valid_int():
+			var seat_number: int = int(suffix)
+			if seat_number > 0:
+				return seat_number
+	return int(snapshot.get("player_number", 0))
 
 
 func _hide_indicator(revision: int, lifecycle: String) -> void:
@@ -204,6 +225,8 @@ func _hide_indicator(revision: int, lifecycle: String) -> void:
 	indicator_color_key = ""
 	indicator_local_turn = false
 	indicator_emphasis_key = ""
+	indicator_owner_seat = ""
+	indicator_remote_player_number = 0
 	_publish_hidden(revision, lifecycle)
 
 
@@ -242,8 +265,10 @@ func _publish_contract() -> void:
 		"document.body.dataset.yakolakTurnIndicatorSource='authoritative-turn-signal';" +
 		"document.body.dataset.yakolakTurnIndicatorPolling='none';" +
 		"document.body.dataset.yakolakTurnIndicatorDigits='western-0-9';" +
-		"document.body.dataset.yakolakTurnIndicatorOneGlance='copy+player-color';" +
+		"document.body.dataset.yakolakTurnIndicatorOneGlance='authoritative-player-label+supporting-color';" +
 		"document.body.dataset.yakolakTurnIndicatorLocalCue='semantic-copy+inverted-design-tokens';" +
+		"document.body.dataset.yakolakTurnIndicatorRemoteOwnerSource='authoritative-seat';" +
+		"document.body.dataset.yakolakTurnIndicatorRemoteColorRole='supporting-cue';" +
 		"document.body.dataset.yakolakTurnIndicatorMotion='none';" +
 		"document.body.dataset.yakolakTurnIndicatorStalePolicy='monotonic-revision';" +
 		"document.body.dataset.yakolakTurnFocus='removed';",
@@ -258,6 +283,8 @@ func _publish_state(visible: bool, text: String, snapshot: Dictionary) -> void:
 		"document.body.dataset.yakolakTurnIndicatorVisible='%s';" % ("true" if visible else "false") +
 		"document.body.dataset.yakolakTurnIndicatorText='%s';" % _js(text) +
 		"document.body.dataset.yakolakTurnIndicatorPlayer='%d';" % int(snapshot.get("player_number", 0)) +
+		"document.body.dataset.yakolakTurnIndicatorSeat='%s';" % _js(indicator_owner_seat) +
+		"document.body.dataset.yakolakTurnIndicatorRemotePlayer='%d';" % indicator_remote_player_number +
 		"document.body.dataset.yakolakTurnIndicatorColor='%s';" % _js(indicator_color_key) +
 		"document.body.dataset.yakolakTurnIndicatorLocal='%s';" % ("true" if indicator_local_turn else "false") +
 		"document.body.dataset.yakolakTurnIndicatorEmphasis='%s';" % _js(indicator_emphasis_key) +
@@ -275,6 +302,8 @@ func _publish_hidden(revision: int, lifecycle: String) -> void:
 		"document.body.dataset.yakolakTurnIndicatorVisible='false';" +
 		"document.body.dataset.yakolakTurnIndicatorText='';" +
 		"document.body.dataset.yakolakTurnIndicatorPlayer='0';" +
+		"document.body.dataset.yakolakTurnIndicatorSeat='';" +
+		"document.body.dataset.yakolakTurnIndicatorRemotePlayer='0';" +
 		"document.body.dataset.yakolakTurnIndicatorColor='';" +
 		"document.body.dataset.yakolakTurnIndicatorLocal='false';" +
 		"document.body.dataset.yakolakTurnIndicatorEmphasis='';" +
