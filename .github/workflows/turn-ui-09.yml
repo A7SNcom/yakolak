@@ -1,17 +1,23 @@
-name: TURN-UI-09 turn indicator regression
+name: UX-TURN-36 turn indicator state consistency gate
 
 on:
   push:
     branches:
       - main
     paths:
-      - 'tests/turn_indicator_online_regression.spec.js'
+      - 'tests/ux_turn_36_state_consistency.spec.js'
       - '.github/workflows/turn-ui-09.yml'
       - 'scripts/turn_clarity_hud.gd'
       - 'scripts/gameplay_authoritative_turn_state.gd'
+      - 'scripts/gameplay_explicit_handoff.gd'
+      - 'scripts/gameplay_state_inventory.gd'
       - 'scripts/gameplay_session_ui.gd'
       - 'scripts/gameplay_session.gd'
       - 'scripts/gameplay.gd'
+      - 'scripts/online_session.gd'
+      - 'scripts/browser_verification_bridge.gd'
+      - 'scripts/session_setup.gd'
+      - 'scripts/session_setup_flow.gd'
       - 'export_presets.cfg'
       - 'scenes/intro.tscn'
   workflow_dispatch:
@@ -20,17 +26,18 @@ permissions:
   contents: read
 
 concurrency:
-  group: turn-ui-09-${{ github.ref }}
+  group: ux-turn-36-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  visual-state-regression:
+  accepted-room-state-consistency:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
       - name: Fetch pinned Thmanyah Sans UI font weights
         run: |
           mkdir -p assets/fonts
@@ -43,11 +50,14 @@ jobs:
           test "$(git hash-object assets/fonts/thmanyahsans-Light.otf)" = "aebd416113380e9e96bbe9bfbc5c4a008b2f7b67"
           test "$(git hash-object assets/fonts/thmanyahsans-Medium.otf)" = "87fdec346be83a9dcc9eed5ea8aa04cc5a87faef"
           test "$(git hash-object assets/fonts/thmanyahsans-Bold.otf)" = "349937a73e14f681a3d4cb95e966aa7cec35bcc3"
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
       - name: Install small server dependency
         run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+
       - name: Restore Godot caches
         uses: actions/cache@v4
         with:
@@ -55,35 +65,44 @@ jobs:
             ~/.cache/yakolak-tools
             ~/.local/share/godot/export_templates/4.7.1.stable
             .godot
-          key: turn-ui-09-godot-4.7.1-${{ hashFiles('project.godot', 'export_presets.cfg') }}
+          key: ux-turn-36-godot-4.7.1-${{ hashFiles('project.godot', 'export_presets.cfg') }}
           restore-keys: |
+            ux-turn-36-godot-4.7.1-
             turn-ui-09-godot-4.7.1-
             yakolak-godot-4.7.1-
-      - name: Validate regression source
-        run: node --check tests/turn_indicator_online_regression.spec.js
+
+      - name: Validate state-consistency source
+        run: node --check tests/ux_turn_36_state_consistency.spec.js
+
       - name: Build latest main Web artifact
         env:
           YAKOLAK_KEEP_IMPORT_CACHE: "1"
         run: bash scripts/vercel-fast-build.sh
+
       - name: Install Chromium runner
         run: |
           npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0
           npx playwright install --with-deps chromium
-      - name: Run 2/3/4-player mobile + desktop turn regression
+
+      - name: Run deterministic 2/3/4-player accepted-room turn gate
         run: |
-          node tests/web_test_server.mjs >/tmp/yakolak-turn-ui-09.log 2>&1 &
+          node tests/web_test_server.mjs >/tmp/yakolak-ux-turn-36.log 2>&1 &
           SERVER_PID=$!
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
-          npx playwright test tests/turn_indicator_online_regression.spec.js --workers=1 --reporter=github
-      - name: Upload failure screenshots and authoritative snapshots
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi
+            sleep 0.25
+          done
+          npx playwright test tests/ux_turn_36_state_consistency.spec.js --workers=1 --reporter=github
+
+      - name: Upload failure screenshot and authoritative room state
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: turn-ui-09-failure-${{ github.sha }}
+          name: ux-turn-36-failure-${{ github.sha }}
           if-no-files-found: ignore
           retention-days: 14
           path: |
             test-results/**/*.png
             test-results/**/*.json
-            /tmp/yakolak-turn-ui-09.log
+            /tmp/yakolak-ux-turn-36.log
