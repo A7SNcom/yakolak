@@ -56,6 +56,7 @@ jobs:
           node --check tests/match_end_actions_contract.test.mjs
           node --check tests/turn_hud_smoke.spec.js
           node --check tests/turn_indicator_online_regression.spec.js
+          node --check tests/ux_turn_37_local_turn.spec.js
           node tests/online_rules.test.mjs
           node tests/online_logic_hardening.test.mjs
           node tests/online_exactly_once_contract.test.mjs
@@ -177,6 +178,21 @@ jobs:
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
           for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
           npx playwright test tests/turn_indicator_online_regression.spec.js --grep "4p authoritative turn indicator" --workers=1 --reporter=github
+      - name: Enforce UX-TURN-37 authoritative local-turn distinction before publishing
+        run: |
+          node tests/web_test_server.mjs >/tmp/yakolak-ux-turn-37.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
+          npx playwright test tests/ux_turn_37_local_turn.spec.js --workers=1 --reporter=github
+      - name: Upload UX-TURN-37 visual proofs
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ux-turn-37-local-turn-${{ github.sha }}
+          path: artifacts/ux-turn-37-*.png
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload UX-TURN-35 viewport proofs
         if: ${{ success() }}
         uses: actions/upload-artifact@v4
