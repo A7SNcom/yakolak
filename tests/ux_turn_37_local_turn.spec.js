@@ -122,7 +122,7 @@ test('UX-TURN-37 initial authoritative local turn is unmistakably local', async 
 test('UX-TURN-37 P3 to P4 local, rejected and stale input, and reconnect retarget atomically', async ({ page }) => {
   test.setTimeout(180000); mkdirSync('artifacts', { recursive: true });
   const state = await installRestoredRoom(page, { code: '74', localSeat: 'p4', turnIndex: 2 }); await openRestoredRoom(page, '74'); await waitForOwner(page, 3, false); await installSampler(page);
-  let observed = await snapshot(page); expect(observed.hud.text).toBe('دور لاعب 3'); expect(observed.hud.local).toBe('false'); expect(observed.hud.emphasis).toBe('remote-owner');
+  let observed = await snapshot(page); expect(observed.hud.text).toBe('دور لاعب 3'); expect(observed.hud.local).toBe('false'); expect(observed.hud.emphasis).toBe('remote-authoritative-owner');
 
   state.current = { ...structuredClone(state.current), version: state.current.version + 1, turnIndex: 3 }; await wakePoll(page); await waitForOwner(page, 4, true);
   observed = await snapshot(page); expectLocalCue(observed, 4); const p4Revision = observed.hud.revision; await page.screenshot({ path: 'artifacts/ux-turn-37-p4-local.png', fullPage: true });
