@@ -13,6 +13,7 @@ const {
 } = __testing;
 
 const hardened = fs.readFileSync(new URL('../scripts/online_session_hardened.gd', import.meta.url), 'utf8');
+const turnHud = fs.readFileSync(new URL('../scripts/turn_clarity_hud.gd', import.meta.url), 'utf8');
 
 function room() {
   return joinState(createState('marble', 2, 3), 'p2', 'blue');
@@ -71,5 +72,44 @@ assert.ok(prioritized.includes('kind == "rematch" and inflight_kind == "rematch"
 const failures = hardened.match(/func _handle_request_failure[\s\S]*?\n\nfunc _accept_room/)?.[0] || '';
 assert.ok(failures.includes('error_code == "version_conflict"'), 'stale mutation conflicts need explicit handling');
 assert.ok(failures.includes('_clear_pending_mutation()'), 'a rejected stale intent must be discarded instead of retried on a future turn');
+
+// UX-TURN-38: remote identity is the accepted authoritative room seat. The
+// compact indicator may use color only as a supporting cue and must remain
+// monotonic so stale camera/light/tween work cannot repaint an older opponent.
+assert.ok(turnHud.includes('func _remote_player_number(snapshot: Dictionary)'), 'remote player identity must have one resolver');
+assert.ok(turnHud.includes('seat.begins_with("p")'), 'remote player label must prefer the stable authoritative seat');
+assert.ok(turnHud.includes('indicator_emphasis_key = "remote-authoritative-owner"'), 'remote turn needs a distinct owner emphasis state');
+assert.ok(turnHud.includes("yakolakTurnIndicatorRemoteOwnerSource='authoritative-seat'"), 'web contract must expose authoritative-seat ownership');
+assert.ok(turnHud.includes("yakolakTurnIndicatorRemoteColorRole='supporting-cue'"), 'seat color must remain a supporting cue');
+assert.ok(turnHud.includes('if revision >= 0 and revision <= applied_revision:'), 'older presentation callbacks must be rejected by revision');
+assert.ok(!turnHud.includes('func _process('), 'turn indicator must not poll camera/light/tween state');
+
+const remoteNumber = snapshot => {
+  const seat = String(snapshot.seat || '').trim().toLowerCase();
+  const match = /^p([1-9][0-9]*)$/.exec(seat);
+  return match ? Number(match[1]) : Number(snapshot.player_number || 0);
+};
+const applyRemote = (state, snapshot) => {
+  if (snapshot.revision <= state.revision) return state;
+  const player = remoteNumber(snapshot);
+  return { revision: snapshot.revision, updates: state.updates + 1, player, seat: snapshot.seat, text: `دور لاعب ${player}` };
+};
+for (const playerCount of [3, 4]) {
+  let visible = { revision: 0, updates: 0, player: 0, seat: '', text: '' };
+  let revision = 1;
+  for (let player = 2; player <= playerCount; player += 1) {
+    const before = visible.updates;
+    visible = applyRemote(visible, { revision, seat: `p${player}`, player_number: player });
+    assert.equal(visible.updates, before + 1, `${playerCount}p P${player} must change visible owner exactly once`);
+    assert.equal(visible.player, player, `${playerCount}p P${player} identity must match authoritative seat`);
+    assert.equal(visible.text, `دور لاعب ${player}`, `${playerCount}p P${player} must be explicit`);
+    assert.doesNotMatch(visible.text, /[٠-٩۰-۹]/, `${playerCount}p P${player} must use Western digits`);
+    revision += 1;
+  }
+  const settled = visible;
+  visible = applyRemote(visible, { revision: settled.revision - 1, seat: 'p2', player_number: 2 });
+  assert.deepEqual(visible, settled, `${playerCount}p stale camera/light/tween callback cannot overwrite the remote owner`);
+}
+assert.equal(remoteNumber({ seat: 'p4', player_number: 2 }), 4, 'authoritative seat must beat array-derived player number');
 
 console.log('YAKOLAK_ONLINE_EXACTLY_ONCE_CONTRACT_OK');

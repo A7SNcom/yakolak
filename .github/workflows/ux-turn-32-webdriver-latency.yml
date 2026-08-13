@@ -1,0 +1,170 @@
+name: UX-TURN-32 exact Godot turn latency
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - tests/ux_turn_32_webdriver_probe_patch.py
+      - tests/ux_turn_32_console_patch.py
+      - tests/ux_turn_32_timeout_patch.py
+      - .github/workflows/ux-turn-32-webdriver-latency.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ux-turn-32-webdriver-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      PROD_SHA: b1e1fd57000e3a0e4383eddd4e07941f65992c83
+      PROD_URL: https://yakolak-2ddt9ya3t-ahmdkcoms-projects.vercel.app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Restore Godot caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/yakolak-tools
+            ~/.local/share/godot/export_templates/4.7.1.stable
+            .godot
+          key: yakolak-godot-4.7.1-${{ hashFiles('project.godot', 'export_presets.cfg') }}
+          restore-keys: |
+            yakolak-godot-4.7.1-
+
+      - name: Record exact sources and preserve diagnostic tools
+        run: |
+          mkdir -p artifacts/ux-turn-32 /tmp/ux-turn-32
+          git rev-parse HEAD | tee artifacts/ux-turn-32/main-source-sha.txt
+          printf '%s\n' "$PROD_SHA" > artifacts/ux-turn-32/production-source-sha.txt
+          cp tests/ux_turn_32_latency.spec.js /tmp/ux-turn-32/ux_turn_32_latency.spec.js
+          cp tests/ux_turn_32_webdriver_probe_patch.py /tmp/ux-turn-32/ux_turn_32_webdriver_probe_patch.py
+          cp tests/ux_turn_32_console_patch.py /tmp/ux-turn-32/ux_turn_32_console_patch.py
+          cp tests/ux_turn_32_timeout_patch.py /tmp/ux-turn-32/ux_turn_32_timeout_patch.py
+
+      - name: Apply diagnostic-only probe to latest main
+        run: |
+          python tests/ux_turn_32_webdriver_probe_patch.py
+          python tests/ux_turn_32_console_patch.py
+          python tests/ux_turn_32_timeout_patch.py
+          node --check tests/ux_turn_32_latency.spec.js
+
+      - name: Build instrumented latest main
+        env:
+          YAKOLAK_KEEP_IMPORT_CACHE: "1"
+        run: |
+          rm -rf .godot/exported
+          bash scripts/vercel-fast-build.sh
+
+      - name: Start latest-main server
+        run: |
+          node tests/web_test_server.mjs >artifacts/ux-turn-32/main-web-server.log 2>&1 &
+          echo $! > artifacts/ux-turn-32/server.pid
+          for i in {1..100}; do
+            if curl -fsS http://127.0.0.1:8000/ >/dev/null; then exit 0; fi
+            sleep 0.25
+          done
+          exit 1
+
+      - name: Measure latest main with exact Godot input path
+        env:
+          YAKOLAK_TURN32_BASE: http://127.0.0.1:8000
+          YAKOLAK_TURN32_LABEL: main-webdriver-exact
+          YAKOLAK_TURN32_SAMPLES: "12"
+        run: |
+          set +e
+          npx playwright test tests/ux_turn_32_latency.spec.js --workers=1 --reporter=github 2>&1 | tee artifacts/ux-turn-32/main-playwright.log
+          code=${PIPESTATUS[0]}
+          set -e
+          printf '%s\n' "$code" > artifacts/ux-turn-32/main-exit-code.txt
+          exit "$code"
+
+      - name: Stop latest-main server
+        if: ${{ always() }}
+        run: |
+          if [ -f artifacts/ux-turn-32/server.pid ]; then kill "$(cat artifacts/ux-turn-32/server.pid)" || true; fi
+          rm -f artifacts/ux-turn-32/server.pid
+
+      - name: Prepare instrumented Production source
+        if: ${{ always() && !cancelled() }}
+        run: |
+          git reset --hard "$PROD_SHA"
+          mkdir -p tests artifacts/ux-turn-32
+          cp /tmp/ux-turn-32/ux_turn_32_latency.spec.js tests/ux_turn_32_latency.spec.js
+          cp /tmp/ux-turn-32/ux_turn_32_webdriver_probe_patch.py tests/ux_turn_32_webdriver_probe_patch.py
+          cp /tmp/ux-turn-32/ux_turn_32_console_patch.py tests/ux_turn_32_console_patch.py
+          cp /tmp/ux-turn-32/ux_turn_32_timeout_patch.py tests/ux_turn_32_timeout_patch.py
+          python tests/ux_turn_32_webdriver_probe_patch.py
+          python tests/ux_turn_32_console_patch.py
+          python tests/ux_turn_32_timeout_patch.py
+          node --check tests/ux_turn_32_latency.spec.js
+          git rev-parse HEAD | tee artifacts/ux-turn-32/production-checkout-sha.txt
+
+      - name: Build instrumented Production source
+        if: ${{ always() && !cancelled() }}
+        env:
+          YAKOLAK_KEEP_IMPORT_CACHE: "1"
+        run: |
+          rm -rf .godot/exported
+          bash scripts/vercel-fast-build.sh
+
+      - name: Start Production-source server
+        if: ${{ always() && !cancelled() }}
+        run: |
+          node tests/web_test_server.mjs >artifacts/ux-turn-32/production-web-server.log 2>&1 &
+          echo $! > artifacts/ux-turn-32/server.pid
+          for i in {1..100}; do
+            if curl -fsS http://127.0.0.1:8000/ >/dev/null; then exit 0; fi
+            sleep 0.25
+          done
+          exit 1
+
+      - name: Measure pinned Production source and live immutable API RTT
+        if: ${{ always() && !cancelled() }}
+        env:
+          YAKOLAK_TURN32_BASE: http://127.0.0.1:8000
+          YAKOLAK_TURN32_LIVE_BASE: ${{ env.PROD_URL }}
+          YAKOLAK_TURN32_LABEL: production-source-webdriver-exact
+          YAKOLAK_TURN32_SAMPLES: "12"
+        run: |
+          set +e
+          npx playwright test tests/ux_turn_32_latency.spec.js --workers=1 --reporter=github 2>&1 | tee artifacts/ux-turn-32/production-playwright.log
+          code=${PIPESTATUS[0]}
+          set -e
+          printf '%s\n' "$code" > artifacts/ux-turn-32/production-exit-code.txt
+          exit "$code"
+
+      - name: Stop Production-source server
+        if: ${{ always() }}
+        run: |
+          if [ -f artifacts/ux-turn-32/server.pid ]; then kill "$(cat artifacts/ux-turn-32/server.pid)" || true; fi
+
+      - name: Upload UX-TURN-32 exact evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ux-turn-32-exact-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/ux-turn-32/**
+            test-results/**
+          if-no-files-found: warn
+          retention-days: 14

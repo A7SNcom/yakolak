@@ -5,7 +5,7 @@
   "outputDirectory": "web",
   "framework": null,
   "github": {
-    "autoJobCancelation": true
+    "autoJobCancelation": false
   },
   "git": {
     "deploymentEnabled": {
