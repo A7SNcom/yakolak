@@ -105,10 +105,11 @@ func _build_quick_menu() -> void:
 	quick_layer.add_child(quick_root)
 
 	quick_button = Button.new()
-	quick_button.text = "•••"
+	quick_button.text = "الإعدادات"
+	quick_button.tooltip_text = "فتح الإعدادات"
 	quick_button.focus_mode = Control.FOCUS_NONE
 	quick_button.add_theme_font_override("font", THMANYAH_BOLD)
-	quick_button.add_theme_font_size_override("font_size", _hud_font_size(17))
+	quick_button.add_theme_font_size_override("font_size", _hud_font_size(14))
 	quick_button.add_theme_color_override("font_color", Color("#f4f7f6"))
 	quick_button.add_theme_color_override("font_hover_color", Color.WHITE)
 	quick_button.add_theme_stylebox_override("normal", _quick_style(Color(0.035, 0.055, 0.067, 0.86), 15.0))
@@ -184,7 +185,9 @@ func _quick_action_style(background: Color) -> StyleBoxFlat:
 func _layout_hud() -> void:
 	super._layout_hud()
 	if turn_label != null:
-		turn_label.offset_left = _hud_length(70.0)
+		# The authoritative turn chip owns the centered top position. The retired
+		# full-width HUD must not reserve a left-side offset.
+		turn_label.offset_left = 0.0
 	_layout_quick_menu()
 	_apply_thmanyah_to_hud()
 
@@ -192,14 +195,19 @@ func _layout_hud() -> void:
 func _layout_quick_menu() -> void:
 	if quick_button == null or quick_panel == null:
 		return
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	var margin: float = _hud_length(12.0)
-	var button_size: float = _hud_length(48.0)
-	quick_button.position = Vector2(margin, margin)
-	quick_button.size = Vector2(button_size, button_size)
-	quick_button.add_theme_font_size_override("font_size", _hud_font_size(17))
-	quick_panel.position = Vector2(margin, margin + button_size + _hud_length(8.0))
+	var button_size := Vector2(_hud_length(96.0), _hud_length(44.0))
+	var panel_width: float = _hud_length(158.0)
+	var top: float = maxf(margin, _hud_length(8.0))
+	var button_x: float = maxf(margin, viewport_size.x - margin - button_size.x)
+	var panel_x: float = maxf(margin, viewport_size.x - margin - panel_width)
+	quick_button.position = Vector2(button_x, top)
+	quick_button.size = button_size
+	quick_button.add_theme_font_size_override("font_size", _hud_font_size(14))
+	quick_panel.position = Vector2(panel_x, top + button_size.y + _hud_length(8.0))
 	var action_count: int = 3 if quick_round_button != null and quick_round_button.visible else 2
-	quick_panel.size = Vector2(_hud_length(158.0), _hud_length(18.0 + float(action_count) * 51.0))
+	quick_panel.size = Vector2(panel_width, _hud_length(18.0 + float(action_count) * 51.0))
 	for child: Node in quick_panel.get_children():
 		if child is VBoxContainer:
 			(child as VBoxContainer).add_theme_constant_override("separation", int(round(_hud_length(7.0))))
@@ -236,12 +244,16 @@ func _on_round_action() -> void:
 
 
 func _show_round_result() -> void:
-	# No textual result sheet. The legacy p.stl marker is the result display.
+	# The result card is the explicit handoff: keep it visible until the player
+	# reads the winner/reason and presses it to begin the reset motion.
 	if result_button != null:
-		result_button.visible = false
+		result_button.visible = true
+		result_button.disabled = false
 	local_round_auto_due_msec = 0
-	if not online_active and not match_complete:
-		local_round_auto_due_msec = Time.get_ticks_msec() + 1250
+	# Never advance a local round on a timer. The result card is the player's
+	# only transition affordance, so the winner and the winning pattern remain
+	# readable before any pieces begin returning to their trays.
+	local_round_auto_due_msec = 0
 	_publish_result_overlay_state()
 
 
@@ -262,7 +274,7 @@ func _sync_hud_visibility() -> void:
 	if score_label != null:
 		score_label.visible = false
 	if result_button != null:
-		result_button.visible = false
+		result_button.visible = match_initialized and round_complete
 	var state: String = "visible" if show_turn else "hidden"
 	if state == hud_visibility_state:
 		return
@@ -417,7 +429,7 @@ func _publish_score_marker_state() -> void:
 func _publish_result_overlay_state() -> void:
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
-			"document.body.dataset.yakolakResultOverlay='hidden';" +
+			"document.body.dataset.yakolakResultOverlay='visible';" +
 			"document.body.dataset.yakolakScoreHud='hidden';",
 			true
 		)

@@ -11,6 +11,7 @@ var online_round_auto_due_msec: int = 0
 var online_round_auto_key: String = ""
 var online_round_auto_sent: bool = false
 var stability_round_reset_tween: Tween
+var stability_piece_tweens: Array[Tween] = []
 var session_generation: int = 0
 var web_return_to_setup_callback: Variant
 
@@ -47,11 +48,11 @@ func _show_round_result() -> void:
 		return
 	if match_complete:
 		var leaders: Array[String] = _match_leaders()
-		turn_label.text = "فاز %s بالمباراة" % _player_name(leaders[0]) if leaders.size() == 1 else "تعادل المباراة"
+		turn_label.text = "فاز %s بالمباراة · %s" % [_player_name(leaders[0]), _round_win_reason(winning_piece_indices)] if leaders.size() == 1 else "تعادل المباراة"
 	elif round_winner.is_empty():
 		turn_label.text = "تعادل الجولة"
 	else:
-		turn_label.text = "فاز %s بالجولة" % _player_name(round_winner)
+		turn_label.text = "فاز %s بالجولة · %s" % [_player_name(round_winner), _round_win_reason(winning_piece_indices)]
 	turn_label.text = Display.display_text(turn_label.text)
 
 
@@ -94,12 +95,12 @@ func _apply_online_room(remote: Dictionary) -> void:
 	super._apply_online_room(remote)
 	var status: String = str(remote.get("status", ""))
 	var complete: bool = bool(remote.get("matchComplete", false))
+
 	if status == "finished" and not complete and online_active and not online_cancelled:
-		var key: String = "%s:%d" % [str(remote.get("code", "")), int(remote.get("round", 1))]
-		if key != online_round_auto_key:
-			online_round_auto_key = key
-			online_round_auto_sent = false
-			online_round_auto_due_msec = Time.get_ticks_msec() + ONLINE_NEXT_ROUND_DELAY_MS
+		# Keep the result visible until a player explicitly requests the next
+		# round; the winner and winning pattern must be readable first.
+		online_round_auto_due_msec = 0
+		online_round_auto_sent = false
 	elif status == "playing":
 		online_round_auto_due_msec = 0
 		online_round_auto_sent = false
@@ -142,7 +143,12 @@ func _reset_board_for_round() -> void:
 	if stability_round_reset_tween != null and stability_round_reset_tween.is_valid():
 		stability_round_reset_tween.kill()
 	stability_round_reset_tween = null
+	for reset_tween: Tween in stability_piece_tweens:
+		if reset_tween != null and reset_tween.is_valid():
+			reset_tween.kill()
+	stability_piece_tweens.clear()
 	var generation: int = session_generation
+	var last_delay: float = 0.0
 	for index: int in range(piece_records.size()):
 		var record: Dictionary = piece_records[index] as Dictionary
 		record["played"] = false
@@ -150,12 +156,19 @@ func _reset_board_for_round() -> void:
 		var piece: MeshInstance3D = record["mesh"] as MeshInstance3D
 		if index < home_materials.size():
 			piece.material_override = home_materials[index]
-		if index < home_transforms.size():
-			if stability_round_reset_tween == null:
-				stability_round_reset_tween = create_tween()
-				stability_round_reset_tween.set_parallel(true)
-			stability_round_reset_tween.tween_property(piece, "transform", home_transforms[index], ROUND_RESET_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	if stability_round_reset_tween != null:
+		if index >= home_transforms.size():
+			continue
+		var home: Transform3D = home_transforms[index]
+		var delay: float = float(index % 9) * 0.045
+		last_delay = maxf(last_delay, delay)
+		var piece_tween: Tween = create_tween()
+		stability_piece_tweens.append(piece_tween)
+		piece_tween.tween_interval(delay)
+		piece_tween.tween_property(piece, "position", piece.position + Vector3.UP * (0.32 * U), 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		piece_tween.tween_property(piece, "transform", home, ROUND_RESET_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	if not stability_piece_tweens.is_empty():
+		stability_round_reset_tween = create_tween()
+		stability_round_reset_tween.tween_interval(last_delay + ROUND_RESET_DURATION)
 		stability_round_reset_tween.finished.connect(_finish_stability_round_reset.bind(generation))
 	else:
 		# A stale/empty reset must not start a Tween with zero Tweeners.
@@ -165,6 +178,7 @@ func _reset_board_for_round() -> void:
 
 func _finish_stability_round_reset(generation: int) -> void:
 	stability_round_reset_tween = null
+	stability_piece_tweens.clear()
 	if generation != session_generation or not match_initialized or waiting_for_setup:
 		return
 	action_in_progress = false

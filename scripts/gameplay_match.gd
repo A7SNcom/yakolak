@@ -587,8 +587,9 @@ func _update_hud() -> void:
 	var seconds: int = 18
 	if turn_deadline_msec > 0 and not round_complete:
 		seconds = int(ceil(float(maxi(turn_deadline_msec - Time.get_ticks_msec(), 0)) / 1000.0))
-	turn_label.text = "الجولة %d  ·  للفوز %d أشواط  ·  دور %s  ·  %dث" % [round_number, MATCH_ROUNDS, _player_name(direction), seconds]
-	score_label.text = "أبيض %d   ·   أزرق %d   ·   ذهبي %d   ·   أخضر %d" % [
+	turn_label.text = "دور %s  ·  %dث" % [_player_name(direction), seconds]
+	score_label.text = "النتيجة %d · %d · %d · %d" % [
+
 		int(scores.get("right", 0)), int(scores.get("back", 0)),
 		int(scores.get("left", 0)), int(scores.get("front", 0)),
 	]

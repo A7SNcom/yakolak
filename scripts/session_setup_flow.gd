@@ -74,6 +74,9 @@ func _build_mode_question(content: VBoxContainer, seat_index: int) -> void:
 		var online_button := _button(online_label, Color.WHITE, Color("#2a4d63"))
 		online_button.pressed.connect(_choose_mode.bind(seat_index, "online"))
 		quick_row.add_child(online_button)
+		var computer_button := _button("الكل كمبيوتر", Color.WHITE, Color("#235b50"))
+		computer_button.pressed.connect(_choose_all_computer)
+		quick_row.add_child(computer_button)
 		var custom_button := _button("مخصص", Color("#10201f"), Color("#f2f0e9"))
 		custom_button.pressed.connect(_begin_custom_setup)
 		quick_row.add_child(custom_button)
@@ -93,6 +96,18 @@ func _build_mode_question(content: VBoxContainer, seat_index: int) -> void:
 func _begin_custom_setup() -> void:
 	custom_setup_active = true
 	_show_setup()
+
+
+func _choose_all_computer() -> void:
+	if joining_room_code != "":
+		return
+	for index: int in range(1, seats.size()):
+		var seat: Dictionary = seats[index]
+		if bool(seat.get("active", false)):
+			seat["mode"] = "bot"
+			seats[index] = seat
+	custom_setup_active = false
+	_goto_step("rounds")
 
 
 func _choose_mode(seat_index: int, mode_id: String) -> void:
@@ -285,6 +300,9 @@ func _on_web_setup_flow_action(arguments: Array) -> void:
 		"custom":
 			if wizard_step == "mode:1":
 				_begin_custom_setup()
+		"all-computer":
+			_choose_all_computer()
+
 		"mode":
 			if arguments.size() >= 3:
 				_choose_mode(clampi(int(arguments[1]), 1, 3), str(arguments[2]))

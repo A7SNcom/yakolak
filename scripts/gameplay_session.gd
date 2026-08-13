@@ -913,17 +913,40 @@ func _finish_round(winner: String, winning: Array[int]) -> void:
 func _show_round_result() -> void:
 	if result_button == null:
 		return
+	var reason: String = _round_win_reason(winning_piece_indices)
 	if match_complete:
 		var leaders: Array[String] = _match_leaders()
 		if leaders.size() == 1:
-			result_button.text = "بطل المباراة: %s\nإعادة المباراة" % _player_name(leaders[0])
+			result_button.text = "بطل المباراة: %s\n%s\nإعادة المباراة" % [_player_name(leaders[0]), reason]
 		else:
 			result_button.text = "تعادل المباراة\nإعادة المباراة"
 	elif round_winner == "":
 		result_button.text = "تعادل الجولة\nالجولة التالية"
 	else:
-		result_button.text = "فاز %s\nالجولة التالية" % _player_name(round_winner)
+		result_button.text = "فاز %s بالجولة\n%s\nالجولة التالية" % [_player_name(round_winner), reason]
 	result_button.visible = true
+
+
+func _round_win_reason(winning: Array[int]) -> String:
+	if winning.is_empty():
+		return "لا يوجد فائز"
+	var winning_cells: Dictionary = {}
+	for cell: int in range(CELL_COORDS.size()):
+		for size_name: String in SIZE_ORDER:
+			if winning.has(_piece_at(cell, size_name)):
+				winning_cells[cell] = true
+	if winning_cells.size() == 1:
+		return "أكمل خلية بثلاثة أحجام"
+	for line_value: Variant in WIN_LINES:
+		var line: Array = line_value as Array
+		var complete: bool = true
+		for cell_value: Variant in line:
+			if not winning_cells.has(int(cell_value)):
+				complete = false
+				break
+		if complete:
+			return "كوّن خطًا من ثلاثة أحجار"
+	return "أكمل نمط الفوز"
 
 
 func _match_leaders() -> Array[String]:
@@ -1020,16 +1043,26 @@ func _reset_board_for_round() -> void:
 	if result_button != null:
 		result_button.visible = false
 
-	var tween: Tween = create_tween()
-	tween.set_parallel(true)
+	# Return pieces in a readable, staggered sequence. Each piece lifts slightly
+	# from the board, travels home, and settles; the coordinator waits for the
+	# final staggered tween before handing control to the next turn.
+	var coordinator: Tween = create_tween()
+	var last_delay: float = 0.0
 	for index: int in range(piece_records.size()):
 		var record: Dictionary = piece_records[index] as Dictionary
 		record["played"] = false
 		piece_records[index] = record
 		var piece: MeshInstance3D = record["mesh"] as MeshInstance3D
 		piece.material_override = home_materials[index]
-		tween.tween_property(piece, "transform", home_transforms[index], ROUND_RESET_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	tween.finished.connect(_finish_round_reset)
+		var home: Transform3D = home_transforms[index]
+		var delay: float = float(index % 9) * 0.045
+		last_delay = maxf(last_delay, delay)
+		var piece_tween: Tween = create_tween()
+		piece_tween.tween_interval(delay)
+		piece_tween.tween_property(piece, "position", piece.position + Vector3.UP * (0.32 * U), 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		piece_tween.tween_property(piece, "transform", home, ROUND_RESET_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	coordinator.tween_interval(last_delay + ROUND_RESET_DURATION)
+	coordinator.finished.connect(_finish_round_reset)
 	_publish_match_state("round-reset")
 
 
@@ -1254,11 +1287,11 @@ func _build_hud() -> void:
 	hud_layer.add_child(turn_label)
 
 	score_label = Label.new()
-	score_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	score_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	score_label.offset_left = 12
-	score_label.offset_top = 68
-	score_label.offset_right = -12
-	score_label.offset_bottom = 98
+	score_label.offset_top = 70
+	score_label.offset_right = 220
+	score_label.offset_bottom = 100
 	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	score_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	score_label.layout_direction = Control.LAYOUT_DIRECTION_RTL
@@ -1336,7 +1369,7 @@ func _layout_hud() -> void:
 
 	var result_width_css: float = minf(360.0, maxf(260.0, css_size.x - 32.0))
 	var result_width: float = result_width_css / hud_canvas_scale
-	var result_height: float = _hud_length(116.0)
+	var result_height: float = _hud_length(154.0)
 	result_button.offset_left = -result_width * 0.5
 	result_button.offset_top = -result_height * 0.5
 	result_button.offset_right = result_width * 0.5
@@ -1388,12 +1421,13 @@ func _update_hud() -> void:
 		tutorial_hint = " · يفكر…"
 	elif _current_mode() == "online":
 		tutorial_hint = " · انتظار…"
-	turn_label.text = "الجولة %d · للفوز %d أشواط · %s%s" % [round_number, total_rounds, str(player.get("color_name", "")), tutorial_hint]
+	turn_label.text = "دور %s%s" % [str(player.get("color_name", "")), tutorial_hint]
 	var score_parts: Array[String] = []
 	for entry: Dictionary in players:
 		var direction: String = str(entry["direction"])
-		score_parts.append("%s %d" % [str(entry["color_name"]), int(scores.get(direction, 0))])
-	score_label.text = "  ·  ".join(score_parts)
+		score_parts.append(str(int(scores.get(direction, 0))))
+	score_label.text = "النتيجة " + " · ".join(score_parts)
+
 	var palette_color: Color = Color("#252729")
 	match str(player.get("color", "")):
 		"blue": palette_color = Color("#173fa8")

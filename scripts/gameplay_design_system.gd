@@ -12,6 +12,8 @@ func _ready() -> void:
 func _build_quick_menu() -> void:
 	super._build_quick_menu()
 	if quick_button != null:
+		quick_button.text = "الإعدادات"
+		quick_button.tooltip_text = "فتح الإعدادات"
 		quick_button.focus_mode = Control.FOCUS_ALL
 		quick_button.custom_minimum_size = Vector2(_hud_length(Design.TOUCH_MIN), _hud_length(Design.TOUCH_MIN))
 		quick_button.add_theme_font_override("font", Design.FONT_BOLD)
