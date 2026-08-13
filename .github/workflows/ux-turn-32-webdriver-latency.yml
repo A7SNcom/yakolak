@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - tests/ux_turn_32_webdriver_probe_patch.py
+      - tests/ux_turn_32_console_patch.py
       - .github/workflows/ux-turn-32-webdriver-latency.yml
   workflow_dispatch:
 
@@ -56,10 +57,12 @@ jobs:
           printf '%s\n' "$PROD_SHA" > artifacts/ux-turn-32/production-source-sha.txt
           cp tests/ux_turn_32_latency.spec.js /tmp/ux-turn-32/ux_turn_32_latency.spec.js
           cp tests/ux_turn_32_webdriver_probe_patch.py /tmp/ux-turn-32/ux_turn_32_webdriver_probe_patch.py
+          cp tests/ux_turn_32_console_patch.py /tmp/ux-turn-32/ux_turn_32_console_patch.py
 
       - name: Apply diagnostic-only probe to latest main
         run: |
           python tests/ux_turn_32_webdriver_probe_patch.py
+          python tests/ux_turn_32_console_patch.py
           node --check tests/ux_turn_32_latency.spec.js
 
       - name: Build instrumented latest main
@@ -105,7 +108,9 @@ jobs:
           mkdir -p tests artifacts/ux-turn-32
           cp /tmp/ux-turn-32/ux_turn_32_latency.spec.js tests/ux_turn_32_latency.spec.js
           cp /tmp/ux-turn-32/ux_turn_32_webdriver_probe_patch.py tests/ux_turn_32_webdriver_probe_patch.py
+          cp /tmp/ux-turn-32/ux_turn_32_console_patch.py tests/ux_turn_32_console_patch.py
           python tests/ux_turn_32_webdriver_probe_patch.py
+          python tests/ux_turn_32_console_patch.py
           node --check tests/ux_turn_32_latency.spec.js
           git rev-parse HEAD | tee artifacts/ux-turn-32/production-checkout-sha.txt
 
