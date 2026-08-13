@@ -60,7 +60,10 @@ async function installRestoredRoom(page, { code, localSeat, turnIndex }) {
 async function openRestoredRoom(page, code) {
   await page.goto(`http://127.0.0.1:8000/?yakolakTestFast=1&room=${code}`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.body.dataset.yakolakIntroHandoffEvent === 'consumed', null, { timeout: 45000 });
-  await page.waitForFunction(() => document.body.dataset.yakolakGameplay === 'ready' && document.body.dataset.yakolakAuthoritativeTurnValid === 'true' && document.body.dataset.yakolakTurnIndicatorVisible === 'true' && document.body.dataset.yakolakTurnIndicatorContract === 'pass', null, { timeout: 45000 });
+  // Hydration is proven by accepted authoritative turn + indicator contract. Do not
+  // require local gameplay input readiness here: a remote owner's turn intentionally
+  // leaves the local client non-actionable while the turn indicator must stay valid.
+  await page.waitForFunction(() => document.body.dataset.yakolakAuthoritativeTurnValid === 'true' && document.body.dataset.yakolakTurnIndicatorVisible === 'true' && document.body.dataset.yakolakTurnIndicatorContract === 'pass', null, { timeout: 45000 });
 }
 
 async function wakePoll(page) { await page.evaluate(() => { window.__yakolakOnlineWake = true; }); }
