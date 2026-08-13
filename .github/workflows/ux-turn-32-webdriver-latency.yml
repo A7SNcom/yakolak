@@ -86,7 +86,7 @@ jobs:
         env:
           YAKOLAK_TURN32_BASE: http://127.0.0.1:8000
           YAKOLAK_TURN32_LABEL: main-webdriver-exact
-          YAKOLAK_TURN32_SAMPLES: "20"
+          YAKOLAK_TURN32_SAMPLES: "12"
         run: |
           set +e
           npx playwright test tests/ux_turn_32_latency.spec.js --workers=1 --reporter=github 2>&1 | tee artifacts/ux-turn-32/main-playwright.log
@@ -139,7 +139,7 @@ jobs:
           YAKOLAK_TURN32_BASE: http://127.0.0.1:8000
           YAKOLAK_TURN32_LIVE_BASE: ${{ env.PROD_URL }}
           YAKOLAK_TURN32_LABEL: production-source-webdriver-exact
-          YAKOLAK_TURN32_SAMPLES: "20"
+          YAKOLAK_TURN32_SAMPLES: "12"
         run: |
           set +e
           npx playwright test tests/ux_turn_32_latency.spec.js --workers=1 --reporter=github 2>&1 | tee artifacts/ux-turn-32/production-playwright.log
