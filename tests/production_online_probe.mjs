@@ -198,21 +198,23 @@ async function verifyRealMatchAndExactlyOnce() {
 
     const p1RematchMutation = secret(24);
     const p1RematchVersion = version;
-    state = await post({ action: 'rematch', code, version, mutationId: p1RematchMutation }, p1Token);
+    state = await post({ action: 'rematch', code, version: p1RematchVersion, mutationId: p1RematchMutation }, p1Token);
     version = Number(state.room.version);
     assertRoomIdentity(state, code);
-    assert.equal(state.room.status, 'finished');
-
-    const duplicateRematch = await post({ action: 'rematch', code, version: p1RematchVersion, mutationId: p1RematchMutation }, p1Token);
-    assert.equal(Number(duplicateRematch.room.version), version);
-    assert.equal(duplicateRematch.room.status, 'finished');
-
-    state = await post({ action: 'rematch', code, version, mutationId: secret(24) }, p2Token);
-    version = Number(state.room.version);
-    assertRoomIdentity(state, code);
+    assert.equal(version, p1RematchVersion + 1, 'first accepted rematch must advance the boundary exactly once');
     assert.equal(state.room.status, 'playing');
     assert.equal(state.room.round, 2);
     assert.deepEqual(state.room.board['0'], {});
+
+    const duplicateRematch = await post({ action: 'rematch', code, version: p1RematchVersion, mutationId: p1RematchMutation }, p1Token);
+    assert.equal(duplicateRematch.duplicate, true);
+    assert.equal(Number(duplicateRematch.room.version), version);
+    assert.equal(duplicateRematch.room.status, 'playing');
+    assert.equal(duplicateRematch.room.round, 2);
+
+    const staleP2Rematch = await postRaw({ action: 'rematch', code, version: p1RematchVersion, mutationId: secret(24) }, p2Token);
+    assert.equal(staleP2Rematch.status, 409);
+    assert.equal(staleP2Rematch.data.error, 'version_conflict');
   } finally {
     await leaveQuietly(code, version, p1Token);
   }
@@ -372,16 +374,24 @@ async function verifyFourPlayerTurnCycle() {
     lastRoom = authority.room;
   }
 
-  async function rematchAll(label, expectedRound, expectedStarter) {
-    for (const seat of ['p1', 'p2', 'p3', 'p4']) {
-      const beforeVersion = Number(lastRoom.version);
-      const voted = await post({ action: 'rematch', code, version: beforeVersion, mutationId: secret(24) }, clients[seat].token);
-      assertRoomIdentity(voted, code);
-      assert.equal(Number(voted.room.version), beforeVersion + 1, `${label}:${seat}: rematch vote must advance version once`);
-      lastRoom = voted.room;
-      await syncAll(`${label}:${seat}:converged`, lastRoom);
+  async function advanceRound(label, expectedRound, expectedStarter) {
+    const boundaryVersion = Number(lastRoom.version);
+    const mutationId = secret(24);
+    const advanced = await post({ action: 'rematch', code, version: boundaryVersion, mutationId }, clients.p1.token);
+    assertRoomIdentity(advanced, code);
+    assert.equal(Number(advanced.room.version), boundaryVersion + 1, `${label}: first accepted rematch must advance version once`);
+    lastRoom = advanced.room;
+    await syncAll(`${label}:advanced`, lastRoom);
+
+    const staleResults = await Promise.all(['p2', 'p3', 'p4'].map(seat => postRaw({
+      action: 'rematch', code, version: boundaryVersion, mutationId: secret(24),
+    }, clients[seat].token).then(result => [seat, result])));
+    for (const [seat, result] of staleResults) {
+      assert.equal(result.status, 409, `${label}:${seat}: stale boundary rematch must be rejected`);
+      assert.equal(result.data.error, 'version_conflict', `${label}:${seat}: stale rematch must fail by version`);
     }
-    assert.equal(lastRoom.status, 'playing', `${label}: all four votes must reopen gameplay`);
+
+    assert.equal(lastRoom.status, 'playing', `${label}: accepted rematch must reopen gameplay atomically`);
     assert.equal(Number(lastRoom.round), expectedRound, `${label}: wrong round after boundary`);
     assert.deepEqual(lastRoom.board, Object.fromEntries(Array.from({ length: 9 }, (_, index) => [String(index), {}])), `${label}: board must reset at round boundary`);
     assertTurn(lastRoom, expectedStarter, `${label}:starter`);
@@ -435,7 +445,7 @@ async function verifyFourPlayerTurnCycle() {
     await assertFinishedLocked('round-1-finished', 'p1');
 
     // Cross the round boundary. Four-player starter rotation makes round 2 p2.
-    await rematchAll('round-1-to-2', 2, 'p2');
+    await advanceRound('round-1-to-2', 2, 'p2');
 
     await commitMove('p2', 0, 'small', 'p3', 'r2-m1-p2');
     await commitMove('p3', 8, 'large', 'p4', 'r2-m2-p3');
