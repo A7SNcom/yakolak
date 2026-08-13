@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ux-turn-32-webdriver-${{ github.ref }}
+  group: ux-turn-32-webdriver-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -99,7 +99,7 @@ jobs:
           rm -f artifacts/ux-turn-32/server.pid
 
       - name: Prepare instrumented Production source
-        if: ${{ always() }}
+        if: ${{ always() && !cancelled() }}
         run: |
           git reset --hard "$PROD_SHA"
           mkdir -p tests artifacts/ux-turn-32
@@ -110,7 +110,7 @@ jobs:
           git rev-parse HEAD | tee artifacts/ux-turn-32/production-checkout-sha.txt
 
       - name: Build instrumented Production source
-        if: ${{ always() }}
+        if: ${{ always() && !cancelled() }}
         env:
           YAKOLAK_KEEP_IMPORT_CACHE: "1"
         run: |
@@ -118,7 +118,7 @@ jobs:
           bash scripts/vercel-fast-build.sh
 
       - name: Start Production-source server
-        if: ${{ always() }}
+        if: ${{ always() && !cancelled() }}
         run: |
           node tests/web_test_server.mjs >artifacts/ux-turn-32/production-web-server.log 2>&1 &
           echo $! > artifacts/ux-turn-32/server.pid
@@ -129,7 +129,7 @@ jobs:
           exit 1
 
       - name: Measure pinned Production source and live immutable API RTT
-        if: ${{ always() }}
+        if: ${{ always() && !cancelled() }}
         env:
           YAKOLAK_TURN32_BASE: http://127.0.0.1:8000
           YAKOLAK_TURN32_LIVE_BASE: ${{ env.PROD_URL }}
