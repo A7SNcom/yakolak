@@ -7,6 +7,7 @@ on:
     paths:
       - tests/ux_turn_32_webdriver_probe_patch.py
       - tests/ux_turn_32_console_patch.py
+      - tests/ux_turn_32_timeout_patch.py
       - .github/workflows/ux-turn-32-webdriver-latency.yml
   workflow_dispatch:
 
@@ -20,7 +21,7 @@ concurrency:
 jobs:
   measure:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
     env:
       PROD_SHA: b1e1fd57000e3a0e4383eddd4e07941f65992c83
       PROD_URL: https://yakolak-2ddt9ya3t-ahmdkcoms-projects.vercel.app
@@ -58,11 +59,13 @@ jobs:
           cp tests/ux_turn_32_latency.spec.js /tmp/ux-turn-32/ux_turn_32_latency.spec.js
           cp tests/ux_turn_32_webdriver_probe_patch.py /tmp/ux-turn-32/ux_turn_32_webdriver_probe_patch.py
           cp tests/ux_turn_32_console_patch.py /tmp/ux-turn-32/ux_turn_32_console_patch.py
+          cp tests/ux_turn_32_timeout_patch.py /tmp/ux-turn-32/ux_turn_32_timeout_patch.py
 
       - name: Apply diagnostic-only probe to latest main
         run: |
           python tests/ux_turn_32_webdriver_probe_patch.py
           python tests/ux_turn_32_console_patch.py
+          python tests/ux_turn_32_timeout_patch.py
           node --check tests/ux_turn_32_latency.spec.js
 
       - name: Build instrumented latest main
@@ -109,8 +112,10 @@ jobs:
           cp /tmp/ux-turn-32/ux_turn_32_latency.spec.js tests/ux_turn_32_latency.spec.js
           cp /tmp/ux-turn-32/ux_turn_32_webdriver_probe_patch.py tests/ux_turn_32_webdriver_probe_patch.py
           cp /tmp/ux-turn-32/ux_turn_32_console_patch.py tests/ux_turn_32_console_patch.py
+          cp /tmp/ux-turn-32/ux_turn_32_timeout_patch.py tests/ux_turn_32_timeout_patch.py
           python tests/ux_turn_32_webdriver_probe_patch.py
           python tests/ux_turn_32_console_patch.py
+          python tests/ux_turn_32_timeout_patch.py
           node --check tests/ux_turn_32_latency.spec.js
           git rev-parse HEAD | tee artifacts/ux-turn-32/production-checkout-sha.txt
 
