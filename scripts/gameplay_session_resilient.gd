@@ -97,16 +97,23 @@ func _apply_online_room(remote: Dictionary) -> void:
 	var complete: bool = bool(remote.get("matchComplete", false))
 
 	if status == "finished" and not complete and online_active and not online_cancelled:
-		# Keep the winner/reason visible during a short readable result window,
-		# then advance through the single authoritative rematch path. Online
-		# chaos/reconnect clients must not wait forever for a local click.
-		online_round_auto_due_msec = Time.get_ticks_msec() + ONLINE_NEXT_ROUND_DELAY_MS
-		online_round_auto_sent = false
+		# A room is polled repeatedly. Schedule only when a new authoritative
+		# finished snapshot arrives; resetting the deadline on every poll would
+		# postpone rematch forever under a healthy polling cadence.
+		var finished_key: String = "%s:%s:%s:%s" % [
+			str(remote.get("version", "")),
+			str(remote.get("round", remote.get("roundNumber", ""))),
+			str(remote.get("moveNumber", "")),
+			str(remote.get("winner", remote.get("roundWinner", "")))
+		]
+		if finished_key != online_round_auto_key:
+			online_round_auto_key = finished_key
+			online_round_auto_due_msec = Time.get_ticks_msec() + ONLINE_NEXT_ROUND_DELAY_MS
+			online_round_auto_sent = false
 	elif status == "playing":
-		online_round_auto_due_msec = 0
-		online_round_auto_sent = false
+		_reset_online_round_auto()
 	elif status == "waiting" or status == "cancelled" or complete:
-		online_round_auto_due_msec = 0
+		_reset_online_round_auto()
 
 
 func _maybe_auto_advance_online_round() -> void:
@@ -243,6 +250,7 @@ func _return_to_setup() -> void:
 
 
 func _reset_session_transients() -> void:
+	_reset_online_round_auto()
 	if camera_tween != null and camera_tween.is_valid():
 		camera_tween.kill()
 	camera_tween = null

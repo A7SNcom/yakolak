@@ -128,13 +128,19 @@ func _fit_card_to_content() -> void:
 	var viewport: Vector2 = get_viewport().get_visible_rect().size
 	var region: Rect2 = _layout_region(viewport)
 	var minimum: Vector2 = content.get_combined_minimum_size()
+	var desired_width: float = clampf(
+		minimum.x + _ui_length(36.0),
+		_ui_length(280.0),
+		region.size.x
+	)
 	var desired: float = clampf(
 		minimum.y + _ui_length(DIALOG_CONTENT_EXTRA_CSS),
 		_ui_length(DIALOG_MIN_HEIGHT_CSS),
 		region.size.y
 	)
+	card.position.x = region.position.x + maxf(0.0, (region.size.x - desired_width) * 0.5)
 	card.position.y = region.position.y + maxf(0.0, (region.size.y - desired) * 0.5)
-	card.size.y = desired
+	card.size = Vector2(desired_width, desired)
 	card.pivot_offset = card.size * 0.5
 	_dialog_update_chrome()
 	if showing:

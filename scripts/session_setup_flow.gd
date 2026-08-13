@@ -65,22 +65,30 @@ func _wizard_header(title: String) -> Control:
 
 
 func _build_mode_question(content: VBoxContainer, seat_index: int) -> void:
-	# Keep the established room-wide online shortcut on the first opponent. The
-	# Custom branch is presentation only: it reuses the same seat dictionaries and
-	# _choose_mode path, exposing only the local/bot combinations gameplay supports.
+	# The first opponent gets three complete match presets. Each preset owns the
+	# whole configuration, so the user never selects a room-wide mode and then
+	# discovers that the remaining seats stayed local by accident.
 	if seat_index == 1 and not custom_setup_active:
-		var quick_row := _choice_row()
-		var online_label: String = "الكل أونلاين" if _active_count() > 2 else "أونلاين"
-		var online_button := _button(online_label, Color.WHITE, Color("#2a4d63"))
-		online_button.pressed.connect(_choose_mode.bind(seat_index, "online"))
-		quick_row.add_child(online_button)
-		var computer_button := _button("الكل كمبيوتر", Color.WHITE, Color("#235b50"))
+		var options := VBoxContainer.new()
+		options.layout_direction = Control.LAYOUT_DIRECTION_RTL
+		options.add_theme_constant_override("separation", int(round(_ui_length(10.0))))
+		options.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+		var online_button := _mode_preset("الكل أونلاين", Color("#2a4d63"), Color.WHITE)
+		online_button.tooltip_text = "كل اللاعبين عبر الغرفة"
+		online_button.pressed.connect(_choose_all_online)
+		options.add_child(online_button)
+
+		var computer_button := _mode_preset("الكل كمبيوتر", Color("#235b50"), Color.WHITE)
+		computer_button.tooltip_text = "ابدأ فورًا ضد الكمبيوتر"
 		computer_button.pressed.connect(_choose_all_computer)
-		quick_row.add_child(computer_button)
-		var custom_button := _button("مخصص", Color("#10201f"), Color("#f2f0e9"))
+		options.add_child(computer_button)
+
+		var custom_button := _mode_preset("مخصص", Color("#f2f0e9"), Color("#10201f"))
+		custom_button.tooltip_text = "اختَر طريقة كل لاعب"
 		custom_button.pressed.connect(_begin_custom_setup)
-		quick_row.add_child(custom_button)
-		content.add_child(quick_row)
+		options.add_child(custom_button)
+		content.add_child(options)
 		return
 
 	var row := _choice_row()
@@ -93,9 +101,41 @@ func _build_mode_question(content: VBoxContainer, seat_index: int) -> void:
 	content.add_child(row)
 
 
+func _mode_preset(text_value: String, background: Color, foreground: Color) -> Button:
+	var button := _button(text_value, foreground, background)
+	button.custom_minimum_size = Vector2(0.0, _ui_length(68.0))
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.add_theme_font_size_override("font_size", _ui_font_size(17))
+	return button
+
+
+func _choose_all_online() -> void:
+	if joining_room_code != "":
+		return
+	for index: int in range(1, seats.size()):
+		var seat: Dictionary = seats[index]
+		if bool(seat.get("active", false)):
+			seat["mode"] = "online"
+			seats[index] = seat
+	custom_setup_active = false
+	_goto_step("rounds")
+
+
 func _begin_custom_setup() -> void:
 	custom_setup_active = true
 	_show_setup()
+
+
+func _build_rounds_question(content: VBoxContainer) -> void:
+	var heading := _label("كم فوز تحتاج للمباراة؟", 23, HORIZONTAL_ALIGNMENT_CENTER)
+	content.add_child(heading)
+	var row := _choice_row()
+	for count: int in [3, 5]:
+		var label: String = "%s انتصارات\nللفوز بالمباراة" % str(count)
+		var choice := _mode_preset(label, Color("#f2f0e9"), Color("#10201f"))
+		choice.pressed.connect(_choose_rounds.bind(count))
+		row.add_child(choice)
+	content.add_child(row)
 
 
 func _choose_all_computer() -> void:
@@ -111,9 +151,11 @@ func _choose_all_computer() -> void:
 
 
 func _choose_mode(seat_index: int, mode_id: String) -> void:
-	# Online remains room-wide and owned by the pre-existing quick path. Custom
-	# cannot manufacture an online/local or online/bot room the network cannot
-	# represent. Keep the same guard behind UI/test hooks for future callers.
+	# Preserve the semantic shortcut for both visible UI and internal/test callers:
+	# selecting online on the first opponent configures every active secondary seat.
+	if mode_id == "online" and not custom_setup_active and seat_index == 1:
+		_choose_all_online()
+		return
 	if custom_setup_active and mode_id == "online":
 		return
 	if mode_id == "online" and seat_index != 1:
@@ -300,6 +342,8 @@ func _on_web_setup_flow_action(arguments: Array) -> void:
 		"custom":
 			if wizard_step == "mode:1":
 				_begin_custom_setup()
+		"all-online":
+			_choose_all_online()
 		"all-computer":
 			_choose_all_computer()
 

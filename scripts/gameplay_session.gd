@@ -1351,10 +1351,14 @@ func _layout_hud() -> void:
 
 	var margin: float = _hud_length(12.0)
 	var turn_top: float = _hud_length(12.0)
-	turn_label.offset_left = margin
+	# Keep the chip centered, but reserve the top-right Settings footprint on
+	# narrow screens so the two controls can never overlap.
+	var turn_width_css: float = clampf(css_size.x - 232.0, 72.0, 124.0)
+	var turn_width: float = _hud_length(turn_width_css)
+	turn_label.offset_left = (viewport.x - turn_width) * 0.5
 	turn_label.offset_top = turn_top
-	turn_label.offset_right = -margin
-	turn_label.offset_bottom = turn_top + _hud_length(50.0)
+	turn_label.offset_right = (viewport.x + turn_width) * 0.5
+	turn_label.offset_bottom = turn_top + _hud_length(30.0)
 	turn_label.add_theme_font_size_override("font_size", _hud_font_size(18))
 	turn_style.set_corner_radius_all(int(round(_hud_length(15.0))))
 	turn_style.content_margin_left = _hud_length(14.0)
