@@ -1,8 +1,8 @@
 extends Node
 
-# TURN-UI-08 / UX-TURN-35: exactly one compact top turn indicator. It consumes
-# only the authoritative_turn_changed snapshot emitted by gameplay and never
-# polls gameplay, camera, lighting, animation, or DOM state.
+# TURN-UI-08 / UX-TURN-35 / UX-TURN-37: exactly one compact top turn indicator.
+# It consumes only the authoritative_turn_changed snapshot emitted by gameplay
+# and never polls gameplay, camera, lighting, animation, or DOM state.
 const Display = preload("res://scripts/ui_design.gd")
 const INDICATOR_MIN_WIDTH: float = 56.0
 const INDICATOR_MAX_WIDTH: float = 124.0
@@ -19,6 +19,7 @@ var indicator_style: StyleBoxFlat
 var indicator_width: float = INDICATOR_MIN_WIDTH
 var indicator_color_key: String = ""
 var indicator_local_turn: bool = false
+var indicator_emphasis_key: String = ""
 var applied_revision: int = -1
 var indicator_update_count: int = 0
 
@@ -104,8 +105,6 @@ func _build_indicator() -> void:
 
 
 func _suppress_legacy_turn_surfaces_once() -> void:
-	# The old full-width turn/score HUD remains in the gameplay base for legacy
-	# tests and result plumbing, but is never rendered alongside this indicator.
 	var legacy_turn: Variant = gameplay.get("turn_label")
 	if legacy_turn is Label:
 		(legacy_turn as Label).visible = false
@@ -116,8 +115,6 @@ func _suppress_legacy_turn_surfaces_once() -> void:
 
 func _on_authoritative_turn_changed(snapshot: Dictionary) -> void:
 	var revision: int = int(snapshot.get("revision", -1))
-	# The authoritative source is monotonic. Never let a delayed/replayed older
-	# presentation event resurrect a stale owner or clear a newer owner.
 	if revision >= 0 and revision <= applied_revision:
 		return
 	applied_revision = revision
@@ -141,12 +138,28 @@ func _on_authoritative_turn_changed(snapshot: Dictionary) -> void:
 func _apply_visual_state(snapshot: Dictionary) -> void:
 	indicator_local_turn = bool(snapshot.get("local_turn", false))
 	indicator_color_key = _indicator_color_key(snapshot)
-	var cue_color: Color = _indicator_cue_color(indicator_color_key)
-	indicator_style.border_color = cue_color
 	indicator_style.set_border_width_all(2)
-	indicator_style.bg_color = Color(0.035, 0.055, 0.062, 0.97 if indicator_local_turn else 0.94)
-	indicator_label.add_theme_font_override("font", Display.FONT_BOLD if indicator_local_turn else Display.FONT_MEDIUM)
+
+	# UX-TURN-37 changes one state only: an accepted authoritative local owner.
+	# The existing capsule is inverted with shared design tokens so "دورك" wins
+	# instantly by copy + contrast alone. There is no animation and no new HUD.
+	if indicator_local_turn:
+		indicator_emphasis_key = "local-semantic-contrast"
+		indicator_style.border_color = Display.FOCUS_BORDER
+		indicator_style.bg_color = Display.TEXT_PRIMARY
+		indicator_label.add_theme_font_override("font", Display.FONT_BOLD)
+		indicator_label.add_theme_color_override("font_color", Display.TEXT_DARK)
+		indicator_label.add_theme_color_override("font_outline_color", Color(1.0, 1.0, 1.0, 0.0))
+		indicator_label.add_theme_constant_override("outline_size", 0)
+		return
+
+	indicator_emphasis_key = "remote-owner"
+	indicator_style.border_color = _indicator_cue_color(indicator_color_key)
+	indicator_style.bg_color = Color(0.035, 0.055, 0.062, 0.94)
+	indicator_label.add_theme_font_override("font", Display.FONT_MEDIUM)
 	indicator_label.add_theme_color_override("font_color", Display.TEXT_PRIMARY)
+	indicator_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.72))
+	indicator_label.add_theme_constant_override("outline_size", 1)
 
 
 func _indicator_color_key(snapshot: Dictionary) -> String:
@@ -190,6 +203,7 @@ func _hide_indicator(revision: int, lifecycle: String) -> void:
 		indicator_label.text = ""
 	indicator_color_key = ""
 	indicator_local_turn = false
+	indicator_emphasis_key = ""
 	_publish_hidden(revision, lifecycle)
 
 
@@ -229,6 +243,8 @@ func _publish_contract() -> void:
 		"document.body.dataset.yakolakTurnIndicatorPolling='none';" +
 		"document.body.dataset.yakolakTurnIndicatorDigits='western-0-9';" +
 		"document.body.dataset.yakolakTurnIndicatorOneGlance='copy+player-color';" +
+		"document.body.dataset.yakolakTurnIndicatorLocalCue='semantic-copy+inverted-design-tokens';" +
+		"document.body.dataset.yakolakTurnIndicatorMotion='none';" +
 		"document.body.dataset.yakolakTurnIndicatorStalePolicy='monotonic-revision';" +
 		"document.body.dataset.yakolakTurnFocus='removed';",
 		true
@@ -244,6 +260,7 @@ func _publish_state(visible: bool, text: String, snapshot: Dictionary) -> void:
 		"document.body.dataset.yakolakTurnIndicatorPlayer='%d';" % int(snapshot.get("player_number", 0)) +
 		"document.body.dataset.yakolakTurnIndicatorColor='%s';" % _js(indicator_color_key) +
 		"document.body.dataset.yakolakTurnIndicatorLocal='%s';" % ("true" if indicator_local_turn else "false") +
+		"document.body.dataset.yakolakTurnIndicatorEmphasis='%s';" % _js(indicator_emphasis_key) +
 		"document.body.dataset.yakolakTurnIndicatorLifecycle='%s';" % _js(str(snapshot.get("lifecycle", ""))) +
 		"document.body.dataset.yakolakTurnIndicatorRevision='%d';" % applied_revision +
 		"document.body.dataset.yakolakTurnIndicatorUpdates='%d';" % indicator_update_count,
@@ -260,6 +277,7 @@ func _publish_hidden(revision: int, lifecycle: String) -> void:
 		"document.body.dataset.yakolakTurnIndicatorPlayer='0';" +
 		"document.body.dataset.yakolakTurnIndicatorColor='';" +
 		"document.body.dataset.yakolakTurnIndicatorLocal='false';" +
+		"document.body.dataset.yakolakTurnIndicatorEmphasis='';" +
 		"document.body.dataset.yakolakTurnIndicatorLifecycle='%s';" % _js(lifecycle) +
 		"document.body.dataset.yakolakTurnIndicatorRevision='%d';" % revision +
 		"document.body.dataset.yakolakTurnIndicatorUpdates='%d';" % indicator_update_count,
