@@ -142,33 +142,37 @@ jobs:
           '''
           s = s[:start] + replacement + s[end:]
 
-          reconnect_old = '''        state.accepted = null;
-        state.acceptedReason = 'reconnect-awaiting-first-snapshot';
-        state.reconnectGate = deferred();
-        await page.goto(`http://127.0.0.1:8000/?yakolakTestFast=1&room=${state.server.code}`, { waitUntil: 'domcontentloaded' });
-        await page.waitForFunction(
-          () => document.body.dataset.yakolakIntroHandoffEvent === 'consumed',
-          null,
-          { timeout: 20000 }
-        );
-        await installFrameSampler(page);
-        await checkpoint(page, testInfo, 'reconnect-unhydrated', state, playerCount);
-        state.reconnectGate.resolve();
-        await expect.poll(() => Number(state.accepted?.version ?? -1), { timeout: 20000 })
-          .toBe(Number(state.server.version));
-        await checkpoint(page, testInfo, 'reconnect-hydrated', state, playerCount);'''
-          reconnect_new = '''        state.accepted = null;
-        state.acceptedReason = 'reconnect-awaiting-first-snapshot';
-        await page.goto(`http://127.0.0.1:8000/?yakolakTestFast=1&room=${state.server.code}`, { waitUntil: 'domcontentloaded' });
-        await installFrameSampler(page);
-        await page.waitForFunction(
-          () => document.body.dataset.yakolakIntroHandoffEvent === 'consumed',
-          null,
-          { timeout: 30000 }
-        );
-        await expect.poll(() => Number(state.accepted?.version ?? -1), { timeout: 30000 })
-          .toBe(Number(state.server.version));
-        await checkpoint(page, testInfo, 'reconnect-hydrated', state, playerCount);'''
+          reconnect_old = "\n".join([
+              "        state.accepted = null;",
+              "        state.acceptedReason = 'reconnect-awaiting-first-snapshot';",
+              "        state.reconnectGate = deferred();",
+              "        await page.goto(`http://127.0.0.1:8000/?yakolakTestFast=1&room=${state.server.code}`, { waitUntil: 'domcontentloaded' });",
+              "        await page.waitForFunction(",
+              "          () => document.body.dataset.yakolakIntroHandoffEvent === 'consumed',",
+              "          null,",
+              "          { timeout: 20000 }",
+              "        );",
+              "        await installFrameSampler(page);",
+              "        await checkpoint(page, testInfo, 'reconnect-unhydrated', state, playerCount);",
+              "        state.reconnectGate.resolve();",
+              "        await expect.poll(() => Number(state.accepted?.version ?? -1), { timeout: 20000 })",
+              "          .toBe(Number(state.server.version));",
+              "        await checkpoint(page, testInfo, 'reconnect-hydrated', state, playerCount);",
+          ])
+          reconnect_new = "\n".join([
+              "        state.accepted = null;",
+              "        state.acceptedReason = 'reconnect-awaiting-first-snapshot';",
+              "        await page.goto(`http://127.0.0.1:8000/?yakolakTestFast=1&room=${state.server.code}`, { waitUntil: 'domcontentloaded' });",
+              "        await installFrameSampler(page);",
+              "        await page.waitForFunction(",
+              "          () => document.body.dataset.yakolakIntroHandoffEvent === 'consumed',",
+              "          null,",
+              "          { timeout: 30000 }",
+              "        );",
+              "        await expect.poll(() => Number(state.accepted?.version ?? -1), { timeout: 30000 })",
+              "          .toBe(Number(state.server.version));",
+              "        await checkpoint(page, testInfo, 'reconnect-hydrated', state, playerCount);",
+          ])
           replace_once(reconnect_old, reconnect_new, 'fresh reconnect hydration')
 
           p.write_text(s)
