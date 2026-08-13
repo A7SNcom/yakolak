@@ -108,6 +108,8 @@ async function installSampler(page) {
   });
 }
 
+// CI WebGL startup can be slow after the full online gate suite; these ceilings
+// protect the same assertions without relaxing any authoritative-turn invariant.
 test('UX-TURN-37 initial authoritative local turn is unmistakably local', async ({ page }) => {
   test.setTimeout(120000); mkdirSync('artifacts', { recursive: true });
   await installRestoredRoom(page, { code: '71', localSeat: 'p1', turnIndex: 0 }); await openRestoredRoom(page, '71'); await waitForOwner(page, 1, true);
