@@ -283,7 +283,7 @@ func _sync_hud_visibility() -> void:
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakHudVisibility='" + state + "';" +
 			"document.body.dataset.yakolakScoreHud='hidden';" +
-			"document.body.dataset.yakolakResultOverlay='hidden';" +
+			"document.body.dataset.yakolakResultOverlay='%s';" % ("visible" if match_initialized and round_complete else "hidden") +
 			"document.body.dataset.yakolakGameplayFont='thmanyah';" +
 			"document.body.dataset.yakolakGameplayFontWeights='regular,medium,bold';",
 			true
