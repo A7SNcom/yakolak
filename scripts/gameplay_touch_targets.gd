@@ -5,15 +5,9 @@ extends "res://scripts/gameplay_state_inventory.gd"
 # that misses do we search a small screen-space neighborhood for the nearest
 # unambiguous visible stone. This gives thin nested rings a finger-sized target
 # without making the stones look larger or letting hidden geometry steal taps.
-const TOUCH_RESCUE_RADIUS_CSS: float = 18.0
-const TOUCH_RESCUE_RADII_CSS: Array[float] = [6.0, 12.0, 18.0]
-const TOUCH_RESCUE_ANGLES: int = 8
-const TOUCH_SAFE_GUTTER_CSS: float = 8.0
-const TOUCH_AUDIT_FINGER_DIAMETERS_CSS: Array[float] = [36.0, 44.0, 52.0]
+const TOUCH_TARGET_RESCUE_RADIUS_CSS: float = 34.0
 const TOUCH_AUDIT_MAX_MOBILE_WIDTH_CSS: float = 430.0
-const TOUCH_AUDIT_REQUIRED_REDUCTION: float = 0.35
 
-var _touch_pointer_dispatch: bool = false
 var _touch_audit_scheduled: bool = false
 var _touch_audit_done: bool = false
 var _touch_exact_taps: int = 0
@@ -68,8 +62,14 @@ func _handle_pointer(screen_position: Vector2) -> void:
 				else:
 					_publish_invalid(cell)
 				return
+		if _touch_pointer_dispatch:
+			var rescued_cell: int = _nearest_legal_cell_at_pointer(screen_position)
+			if rescued_cell >= 0:
+				_begin_move(rescued_cell)
+				return
 
 	var piece_index: int = _piece_at_current_pointer(screen_position, _current_piece_candidates())
+
 	if browser_automation:
 		print("YAKOLAK_TOUCH_PICK pointer=(%.2f,%.2f) touch=%s resolved=%d" % [
 			screen_position.x,
@@ -96,13 +96,38 @@ func _handle_pointer(screen_position: Vector2) -> void:
 		_clear_selection()
 
 
+func _nearest_legal_cell_at_pointer(screen_position: Vector2) -> int:
+	if selected_index < 0 or camera == null:
+		return -1
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var canvas_rect: Rect2 = _gameplay_canvas_css_rect()
+	var scale_x: float = viewport_size.x / maxf(canvas_rect.size.x, 1.0)
+	var scale_y: float = viewport_size.y / maxf(canvas_rect.size.y, 1.0)
+	var radius: Vector2 = Vector2(TOUCH_TARGET_RESCUE_RADIUS_CSS * scale_x, TOUCH_TARGET_RESCUE_RADIUS_CSS * scale_y)
+	var best_cell: int = -1
+	var best_distance: float = INF
+	for cell: int in range(target_markers.size()):
+		if not _is_legal_cell(cell, _selected_size()):
+			continue
+		var marker: MeshInstance3D = target_markers[cell]
+		if marker == null or not marker.visible:
+			continue
+		var point: Vector2 = camera.unproject_position(marker.global_position)
+		var delta: Vector2 = (screen_position - point) / radius
+		var normalized_distance: float = delta.length_squared()
+		if normalized_distance <= 1.0 and normalized_distance < best_distance:
+			best_distance = normalized_distance
+			best_cell = cell
+	return best_cell
+
+
 func _piece_at_current_pointer(screen_position: Vector2, candidate_indices: Array[int]) -> int:
 	if not _touch_pointer_dispatch:
 		return _mesh_piece_at_pointer(screen_position, candidate_indices)
-	return _touch_piece_at_pointer(screen_position, candidate_indices, true)
+	return _touch_piece_at_pointer_with_metrics(screen_position, candidate_indices, true)
 
 
-func _touch_piece_at_pointer(screen_position: Vector2, candidate_indices: Array[int], record_metrics: bool) -> int:
+func _touch_piece_at_pointer_with_metrics(screen_position: Vector2, candidate_indices: Array[int], record_metrics: bool) -> int:
 	var exact: int = _mesh_piece_at_pointer(screen_position, candidate_indices)
 	if exact >= 0:
 		if record_metrics:
@@ -259,7 +284,7 @@ func _run_touch_target_audit() -> void:
 				for offset: Vector2 in offsets:
 					var sample: Vector2 = center + offset
 					var baseline: int = _mesh_piece_at_pointer(sample, candidates)
-					var improved: int = _touch_piece_at_pointer(sample, candidates, false)
+					var improved: int = _touch_piece_at_pointer_with_metrics(sample, candidates, false)
 					samples += 1
 					if baseline != intended:
 						before_false += 1
@@ -282,7 +307,7 @@ func _run_touch_target_audit() -> void:
 		and reduction >= TOUCH_AUDIT_REQUIRED_REDUCTION
 	)
 	_touch_audit_done = true
-	_publish_touch_audit(
+	_publish_touch_audit_detail(
 		passed,
 		centers,
 		samples,
@@ -332,7 +357,7 @@ func _publish_touch_runtime_metrics() -> void:
 	)
 
 
-func _publish_touch_audit(
+func _publish_touch_audit_detail(
 	passed: bool,
 	centers: int,
 	samples: int,

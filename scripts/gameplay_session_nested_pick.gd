@@ -8,8 +8,8 @@ extends "res://scripts/gameplay_session_polish.gd"
 # Mouse keeps the exact mesh ray. Touch uses that same exact ray first, then a
 # small invisible screen-space rescue only if the exact touch misses. This keeps
 # the visual design unchanged while making thin projected rings finger-friendly.
-const TOUCH_RESCUE_RADIUS_CSS: float = 18.0
-const TOUCH_RESCUE_RADII_CSS: Array[float] = [9.0, 18.0]
+const TOUCH_RESCUE_RADIUS_CSS: float = 26.0
+const TOUCH_RESCUE_RADII_CSS: Array[float] = [8.0, 16.0, 26.0]
 const TOUCH_RESCUE_ANGLES: int = 8
 const TOUCH_SAFE_GUTTER_CSS: float = 8.0
 const TOUCH_AUDIT_FINGER_DIAMETERS_CSS: Array[float] = [36.0, 44.0, 52.0]

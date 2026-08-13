@@ -6,15 +6,19 @@ extends "res://scripts/gameplay_session_hardened.gd"
 # - legal cells are thin rings embedded into the board surface
 # - score markers enter the frame from above instead of appearing inside it
 
-const LEGAL_RING_OUTER_RADIUS: float = 0.92
-const LEGAL_RING_INNER_RADIUS: float = 0.84
-const LEGAL_RING_CENTER_Y: float = 0.045
-const OUTLINE_GROW_AMOUNT: float = 0.58
+const LEGAL_RING_OUTER_RADIUS: float = 1.10
+const LEGAL_RING_INNER_RADIUS: float = 0.91
+const LEGAL_RING_CENTER_Y: float = 0.075
+const LEGAL_MARKER_SCALE: float = 1.0
+const LEGAL_MARKER_PULSE_SCALE: float = 1.08
+const LEGAL_MARKER_PULSE_SECONDS: float = 0.72
+const OUTLINE_GROW_AMOUNT: float = 0.72
 const OFFSCREEN_MARGIN_PX: float = 80.0
 
 var web_clear_selection_callback: Variant
 var browser_automation: bool = false
 var last_test_target_publish_msec: int = -1000
+var legal_marker_pulse: Tween
 
 
 func _ready() -> void:
@@ -88,7 +92,7 @@ func _build_board_targets() -> void:
 		body.position = Vector3(raw_position.x * U, 0.25, raw_position.z * U)
 		body.set_meta("cell", cell)
 		var target_shape := CylinderShape3D.new()
-		target_shape.radius = DROP_RADIUS * U
+		target_shape.radius = DROP_RADIUS * U * 1.18
 		target_shape.height = 0.50
 		var collision := CollisionShape3D.new()
 		collision.shape = target_shape
@@ -122,12 +126,40 @@ func _build_board_targets() -> void:
 
 
 func _update_legal_markers(size_name: String, piece_color: Color) -> void:
+	if legal_marker_pulse != null and legal_marker_pulse.is_valid():
+		legal_marker_pulse.kill()
+	legal_marker_pulse = null
+	_set_legal_marker_pulse(0.0)
+	var visible_markers: Array[MeshInstance3D] = []
 	for cell: int in range(target_markers.size()):
 		var marker: MeshInstance3D = target_markers[cell]
 		var legal: bool = _is_legal_cell(cell, size_name)
 		marker.visible = legal
+		marker.scale = Vector3.ONE * LEGAL_MARKER_SCALE
 		if legal:
 			marker.material_override = _surface_ring_material(piece_color)
+			visible_markers.append(marker)
+	if visible_markers.is_empty():
+		return
+	legal_marker_pulse = create_tween()
+	legal_marker_pulse.set_loops()
+	legal_marker_pulse.tween_method(_set_legal_marker_pulse, 0.0, 1.0, LEGAL_MARKER_PULSE_SECONDS * 0.5)
+	legal_marker_pulse.tween_method(_set_legal_marker_pulse, 1.0, 0.0, LEGAL_MARKER_PULSE_SECONDS * 0.5)
+
+
+func _set_legal_marker_pulse(value: float) -> void:
+	for marker: MeshInstance3D in target_markers:
+		if marker != null and marker.visible:
+			marker.scale = Vector3.ONE * (LEGAL_MARKER_SCALE + value * (LEGAL_MARKER_PULSE_SCALE - LEGAL_MARKER_SCALE))
+
+
+func _hide_markers() -> void:
+	if legal_marker_pulse != null and legal_marker_pulse.is_valid():
+		legal_marker_pulse.kill()
+	legal_marker_pulse = null
+	for marker: MeshInstance3D in target_markers:
+		marker.visible = false
+		marker.scale = Vector3.ONE * LEGAL_MARKER_SCALE
 
 
 func _surface_ring_material(color: Color) -> StandardMaterial3D:
