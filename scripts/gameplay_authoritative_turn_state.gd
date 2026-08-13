@@ -234,13 +234,14 @@ func _authoritative_turn_key(snapshot: Dictionary) -> String:
 func _publish_authoritative_turn_probe(snapshot: Dictionary) -> void:
 	if not OS.has_feature("web"):
 		return
+	var authoritative_source: String = "online-room" if bool(snapshot.get("online", false)) else "gameplay-state-event"
 	JavaScriptBridge.eval(
 		"document.body.dataset.yakolakAuthoritativeTurnRevision='%d';" % authoritative_turn_revision +
 		"document.body.dataset.yakolakAuthoritativeTurnValid='%s';" % ("true" if bool(snapshot.get("valid", false)) else "false") +
 		"document.body.dataset.yakolakAuthoritativeTurnLifecycle='%s';" % _turn_js(str(snapshot.get("lifecycle", ""))) +
 		"document.body.dataset.yakolakAuthoritativeTurnPlayer='%d';" % int(snapshot.get("player_number", 0)) +
 		"document.body.dataset.yakolakAuthoritativeTurnDirection='%s';" % _turn_js(str(snapshot.get("direction", ""))) +
-		"document.body.dataset.yakolakAuthoritativeTurnSource='gameplay-state-event';",
+		"document.body.dataset.yakolakAuthoritativeTurnSource='%s';" % authoritative_source,
 		true
 	)
 
