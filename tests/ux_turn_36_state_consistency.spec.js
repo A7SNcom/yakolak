@@ -23,7 +23,6 @@ const COLOR_TO_DIRECTION = {
 };
 const ARABIC_INDIC_DIGITS = /[٠-٩۰-۹]/;
 const TURN_COPY = /^دور(?:ك| لاعب [1-4])$/;
-const TURN_LIKE_COPY = /^دور(?:ك| لاعب(?:\s|$))/;
 
 test.use({ launchOptions: { args: BROWSER_ARGS } });
 
@@ -127,7 +126,8 @@ async function installRoomApi(page, playerCount) {
     moveMode: 'reject',
     delayedGate: null,
     moveRequests: 0,
-    reconnectMode: 'normal',
+    reconnectFailures: 0,
+    reconnectGate: null,
     createBody: null,
   };
 
@@ -135,7 +135,8 @@ async function installRoomApi(page, playerCount) {
     const request = route.request();
 
     if (request.method() === 'GET') {
-      if (state.reconnectMode === 'hold') {
+      if (state.reconnectFailures > 0) {
+        state.reconnectFailures -= 1;
         state.accepted = null;
         state.acceptedReason = 'reconnecting-unhydrated';
         return route.fulfill({
@@ -143,6 +144,12 @@ async function installRoomApi(page, playerCount) {
           contentType: 'application/json',
           body: JSON.stringify({ ok: false, error: 'online_server_error' }),
         });
+      }
+
+      if (state.reconnectGate) {
+        const gate = state.reconnectGate;
+        await gate.promise;
+        if (state.reconnectGate === gate) state.reconnectGate = null;
       }
 
       const since = Number(new URL(request.url()).searchParams.get('since') || '-1');
@@ -403,7 +410,6 @@ async function checkpoint(page, testInfo, label, state, playerCount) {
       );
     }
 
-    // BrowserVerificationBridge refreshes rendered Control strings every 180 ms.
     await page.waitForTimeout(240);
     const observed = await browserSnapshot(page);
 
@@ -438,8 +444,6 @@ async function checkpoint(page, testInfo, label, state, playerCount) {
     expect(Number(observed.indicator.revision), `${label}: presentation must consume the same authority revision`)
       .toBe(Number(observed.authoritative.revision));
 
-    // gameplay_session._current_direction() is the owner used by piece/input
-    // validation. It must never disagree with the owner rendered above.
     expect(observed.input.ownerDirection, `${label}: input authority must match displayed owner`).toBe(expected.direction);
     expect(observed.input.ownerDirection, `${label}: input authority must match authoritative direction`)
       .toBe(observed.authoritative.direction);
@@ -482,9 +486,6 @@ async function assertFrameConsistency(page, testInfo, state, playerCount) {
       if (sample.hudText !== expectedText || !TURN_COPY.test(sample.hudText)) return true;
       if (ARABIC_INDIC_DIGITS.test(sample.hudText)) return true;
 
-      // This is the frame-level input/display invariant: the gameplay owner used
-      // by hit validation, the authoritative observer, and the visible owner are
-      // the same even while camera/light animation states are changing.
       if (sample.inputOwnerDirection && sample.authDirection &&
           sample.inputOwnerDirection !== sample.authDirection) return true;
 
@@ -536,7 +537,6 @@ for (const viewport of VIEWPORTS) {
         await installFrameSampler(page);
         await checkpoint(page, testInfo, 'initial-turn', state, playerCount);
 
-        // Rejection must not invent a new owner or intermediate copy.
         await page.evaluate(() => window.yakolakTestPlayOneMove());
         await expect.poll(() => state.moveRequests, { timeout: 5000 }).toBe(1);
         await checkpoint(page, testInfo, 'rejected-move', state, playerCount);
@@ -546,8 +546,6 @@ for (const viewport of VIEWPORTS) {
           { timeout: 5000 }
         );
 
-        // Pending confirmation retains the last accepted room owner. Only the
-        // accepted success snapshot is allowed to advance the visible owner.
         state.moveMode = 'delay';
         state.delayedGate = deferred();
         await page.evaluate(() => window.yakolakTestPlayOneMove());
@@ -562,7 +560,6 @@ for (const viewport of VIEWPORTS) {
         await expect.poll(() => Number(state.accepted?.version ?? -1), { timeout: 10000 }).toBe(2);
         await checkpoint(page, testInfo, 'delayed-confirmation-after-accept', state, playerCount);
 
-        // Cover every seat edge for the configured room size.
         for (let player = 3; player <= playerCount; player += 1) {
           await pushRoom(page, state, { turnIndex: player - 1 });
           await checkpoint(page, testInfo, `seat-transition-p${player - 1}-to-p${player}`, state, playerCount);
@@ -570,15 +567,14 @@ for (const viewport of VIEWPORTS) {
         await pushRoom(page, state, { turnIndex: 0 });
         await checkpoint(page, testInfo, `seat-transition-p${playerCount}-to-p1`, state, playerCount);
 
-        // Reconnect explicitly invalidates client authority until a fresh room
-        // snapshot is accepted; stale pre-disconnect ownership must disappear.
         await pushRoom(page, state, { turnIndex: 1 });
         await checkpoint(page, testInfo, 'pre-reconnect', state, playerCount);
-        state.reconnectMode = 'hold';
+        state.reconnectFailures = 1;
+        state.reconnectGate = deferred();
         await wakePoll(page);
         await expect.poll(() => state.accepted === null, { timeout: 10000 }).toBe(true);
         await checkpoint(page, testInfo, 'reconnect-unhydrated', state, playerCount);
-        state.reconnectMode = 'normal';
+        state.reconnectGate.resolve();
         await wakePoll(page);
         await expect.poll(() => Number(state.accepted?.version ?? -1), { timeout: 10000 })
           .toBe(Number(state.server.version));
