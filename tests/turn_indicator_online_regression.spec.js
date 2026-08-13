@@ -406,7 +406,12 @@ for (const viewport of VIEWPORTS) {
       page.on('pageerror', error => consoleErrors.push(`pageerror: ${error.message}`));
       page.on('console', message => {
         const text = message.text();
-        if (message.type() === 'error' && !text.includes('favicon')) consoleErrors.push(`console: ${text}`);
+        const intentionalMockHttpError = message.type() === 'error' &&
+          text.includes('Failed to load resource: the server responded with a status of') &&
+          (text.includes('409') || text.includes('503'));
+        if (message.type() === 'error' && !text.includes('favicon') && !intentionalMockHttpError) {
+          consoleErrors.push(`console: ${text}`);
+        }
       });
 
       const state = await installRoomApi(page, playerCount);
@@ -420,6 +425,11 @@ for (const viewport of VIEWPORTS) {
         await page.evaluate(() => window.yakolakTestPlayOneMove());
         await expect.poll(() => state.moveRequests, { timeout: 5000 }).toBe(1);
         await checkpoint(page, testInfo, 'rejected-move-stays-p1', state, playerCount, 1);
+        await page.waitForFunction(
+          () => document.body.dataset.yakolakMovePending !== 'subtle',
+          null,
+          { timeout: 5000 }
+        );
 
         state.moveMode = 'delay';
         state.delayedGate = deferred();
