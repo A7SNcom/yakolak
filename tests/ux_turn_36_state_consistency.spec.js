@@ -126,7 +126,6 @@ async function installRoomApi(page, playerCount) {
     moveMode: 'reject',
     delayedGate: null,
     moveRequests: 0,
-    reconnectFailures: 0,
     reconnectGate: null,
     createBody: null,
   };
@@ -135,17 +134,6 @@ async function installRoomApi(page, playerCount) {
     const request = route.request();
 
     if (request.method() === 'GET') {
-      if (state.reconnectFailures > 0) {
-        state.reconnectFailures -= 1;
-        state.accepted = null;
-        state.acceptedReason = 'reconnecting-unhydrated';
-        return route.fulfill({
-          status: 503,
-          contentType: 'application/json',
-          body: JSON.stringify({ ok: false, error: 'online_server_error' }),
-        });
-      }
-
       if (state.reconnectGate) {
         const gate = state.reconnectGate;
         await gate.promise;
@@ -413,7 +401,6 @@ async function checkpoint(page, testInfo, label, state, playerCount) {
     await page.waitForTimeout(240);
     const observed = await browserSnapshot(page);
 
-    expect(observed.authoritative.source, `${label}: accepted online room must own turn authority`).toBe('online-room');
     expect(observed.indicator.source, `${label}: indicator source`).toBe('authoritative-turn-signal');
     expect(observed.indicator.polling, `${label}: animation/polling must never own indicator state`).toBe('none');
     expect(observed.indicator.digits, `${label}: digit policy`).toBe('western-0-9');
@@ -426,9 +413,11 @@ async function checkpoint(page, testInfo, label, state, playerCount) {
       expect(observed.indicator.text, `${label}: hidden indicator cannot retain stale copy`).toBe('');
       expect(observed.domTurnText, `${label}: no duplicate DOM turn copy while hidden`).toEqual([]);
       expect(observed.godotTurnText, `${label}: no rendered Godot turn copy while hidden`).toEqual([]);
+      expect(observed.input.ownerDirection, `${label}: no input owner may survive without authority`).toBe('');
       return;
     }
 
+    expect(observed.authoritative.source, `${label}: accepted online room must own turn authority`).toBe('online-room');
     expect(expected.player, `${label}: accepted room owner must fit ${playerCount} seats`).toBeGreaterThanOrEqual(1);
     expect(expected.player, `${label}: accepted room owner must fit ${playerCount} seats`).toBeLessThanOrEqual(playerCount);
     expect(observed.authoritative.valid, `${label}: authoritative turn must be valid`).toBe('true');
@@ -475,7 +464,7 @@ async function assertFrameConsistency(page, testInfo, state, playerCount) {
       const hudPlayer = Number(sample.hudPlayer);
 
       if (!authValid) {
-        return hudVisible || sample.hudText !== '' || (sample.hudPlayer !== '' && hudPlayer !== 0);
+        return hudVisible || sample.hudText !== '' || (sample.hudPlayer !== '' && hudPlayer !== 0) || sample.inputOwnerDirection !== '';
       }
 
       if (!Number.isInteger(authPlayer) || authPlayer < 1 || authPlayer > playerCount) return true;
@@ -567,19 +556,6 @@ for (const viewport of VIEWPORTS) {
         await pushRoom(page, state, { turnIndex: 0 });
         await checkpoint(page, testInfo, `seat-transition-p${playerCount}-to-p1`, state, playerCount);
 
-        await pushRoom(page, state, { turnIndex: 1 });
-        await checkpoint(page, testInfo, 'pre-reconnect', state, playerCount);
-        state.reconnectFailures = 1;
-        state.reconnectGate = deferred();
-        await wakePoll(page);
-        await expect.poll(() => state.accepted === null, { timeout: 10000 }).toBe(true);
-        await checkpoint(page, testInfo, 'reconnect-unhydrated', state, playerCount);
-        state.reconnectGate.resolve();
-        await wakePoll(page);
-        await expect.poll(() => Number(state.accepted?.version ?? -1), { timeout: 10000 })
-          .toBe(Number(state.server.version));
-        await checkpoint(page, testInfo, 'reconnect-hydrated', state, playerCount);
-
         await pushRoom(page, state, {
           status: 'finished',
           completedRounds: 1,
@@ -628,6 +604,26 @@ for (const viewport of VIEWPORTS) {
         await checkpoint(page, testInfo, 'rematch', state, playerCount);
 
         await assertFrameConsistency(page, testInfo, state, playerCount);
+
+        await pushRoom(page, state, { turnIndex: 1 });
+        await checkpoint(page, testInfo, 'pre-reconnect', state, playerCount);
+        state.accepted = null;
+        state.acceptedReason = 'reconnect-awaiting-first-snapshot';
+        state.reconnectGate = deferred();
+        await page.goto(`http://127.0.0.1:8000/?yakolakTestFast=1&room=${state.server.code}`, { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(
+          () => document.body.dataset.yakolakIntroHandoffEvent === 'consumed',
+          null,
+          { timeout: 20000 }
+        );
+        await installFrameSampler(page);
+        await checkpoint(page, testInfo, 'reconnect-unhydrated', state, playerCount);
+        state.reconnectGate.resolve();
+        await expect.poll(() => Number(state.accepted?.version ?? -1), { timeout: 20000 })
+          .toBe(Number(state.server.version));
+        await checkpoint(page, testInfo, 'reconnect-hydrated', state, playerCount);
+        await assertFrameConsistency(page, testInfo, state, playerCount);
+
         expect(consoleErrors, `browser errors: ${JSON.stringify(consoleErrors)}`).toEqual([]);
       } catch (error) {
         await attachFailureEvidence(page, testInfo, `${viewport.name}-${playerCount}p-unhandled`, state, error);
