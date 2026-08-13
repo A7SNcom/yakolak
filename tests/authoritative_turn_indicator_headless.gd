@@ -1,7 +1,8 @@
 extends SceneTree
 
-# TURN-UI-08 narrow regression: the visual indicator must follow only accepted
-# authoritative turn/lifecycle events and never camera/process polling.
+# TURN-UI-08 / UX-TURN-35 narrow regression: the visual indicator must follow
+# only accepted authoritative turn/lifecycle events, reject stale revisions,
+# and never camera/process polling.
 
 class FakeOnline:
 	extends Node
@@ -60,6 +61,8 @@ func _run() -> void:
 	_expect(_indicator_visible(), "initial authoritative turn is visible")
 	_expect(_indicator_text() == "دور لاعب 1", "initial remote turn uses player 1")
 	_expect(_western_digits_only(_indicator_text()), "initial turn uses Western digits only")
+	_expect(_indicator_color() == "green", "initial turn exposes authoritative player color")
+	_expect(not _indicator_local(), "remote turn is not styled as local")
 	_expect(_legacy_turn_hidden(), "legacy turn banner stays hidden")
 	_expect(_indicator_ignores_pointer(), "indicator cannot steal board touches")
 	var initial_revision: int = int(game.get("authoritative_turn_revision"))
@@ -67,12 +70,40 @@ func _run() -> void:
 		await process_frame
 	_expect(int(game.get("authoritative_turn_revision")) == initial_revision, "process/camera frames do not update turn state")
 
-	# P3 -> P4 is two authoritative room snapshots; no animation state participates.
+	# P3 -> P4 is two authoritative room snapshots; no animation state participates
+	# and the indicator stays continuously visible across the ownership boundary.
 	_accept(_room_state(6, "playing", 1, 2, false, {}))
-	_expect(_indicator_text() == "دور لاعب 3", "player 3 authoritative turn is shown")
+	_expect(_indicator_visible() and _indicator_text() == "دور لاعب 3", "player 3 authoritative turn is shown without a blank frame")
+	_expect(_indicator_color() == "gold", "player 3 color cue follows authoritative color")
 	_accept(_room_state(7, "playing", 1, 3, false, {}))
-	_expect(_indicator_text() == "دورك", "p3 to p4 shows local authoritative turn exactly once")
+	_expect(_indicator_visible() and _indicator_text() == "دورك", "p3 to p4 shows local authoritative turn without flicker")
+	_expect(_indicator_color() == "blue", "local turn keeps the active player's color cue")
+	_expect(_indicator_local(), "local authoritative turn receives local emphasis")
 	var p4_revision: int = int(game.get("authoritative_turn_revision"))
+	var applied_p4_revision: int = int(hud.get("applied_revision"))
+	var p4_update_count: int = int(hud.get("indicator_update_count"))
+
+	# A delayed/replayed presentation event must never resurrect an older owner.
+	hud.call("_on_authoritative_turn_changed", {
+		"revision": applied_p4_revision - 1,
+		"valid": true,
+		"lifecycle": "stale-replay",
+		"player_number": 2,
+		"color": "marble",
+		"color_name": "أبيض",
+		"online": true,
+		"local_turn": false,
+	})
+	_expect(_indicator_text() == "دورك", "older valid revision cannot resurrect stale owner")
+	_expect(_indicator_color() == "blue", "older revision cannot replace active color cue")
+	_expect(int(hud.get("applied_revision")) == applied_p4_revision, "older revision cannot move presentation revision backwards")
+	_expect(int(hud.get("indicator_update_count")) == p4_update_count, "older revision is ignored without a visual update")
+	hud.call("_on_authoritative_turn_changed", {
+		"revision": applied_p4_revision - 1,
+		"valid": false,
+		"lifecycle": "stale-undefined",
+	})
+	_expect(_indicator_visible() and _indicator_text() == "دورك", "older invalid revision cannot clear newer owner")
 
 	# Reconnect clears the potentially stale turn immediately, and connectivity
 	# alone never resurrects it. The accepted room snapshot hydrates it again.
@@ -80,6 +111,7 @@ func _run() -> void:
 	game.call("_on_connection_state_changed", "reconnecting", "turn-ui-test")
 	_expect(not _indicator_visible(), "reconnect pre-hydration hides stale turn")
 	_expect(_indicator_text().is_empty(), "reconnect clears stale copy")
+	_expect(_indicator_color().is_empty(), "hidden turn clears stale color cue")
 	online.reconnecting = false
 	game.call("_on_connection_state_changed", "connected", "turn-ui-test")
 	_expect(not _indicator_visible(), "connected transport alone is not turn authority")
@@ -101,6 +133,7 @@ func _run() -> void:
 	_expect(_indicator_visible(), "next round restores turn indicator")
 	_expect(_indicator_text() == "دور لاعب 1", "next round uses the new authoritative starter")
 	_expect(_western_digits_only(_indicator_text()), "next round keeps Western digits")
+	_expect(_indicator_color() == "green", "next round refreshes player color cue")
 
 	# Match end again has no valid turn and cannot retain the previous starter.
 	_accept(_room_state(10, "finished", 2, 0, true, {"seat": "p1", "color": "green"}))
@@ -111,6 +144,20 @@ func _run() -> void:
 	_accept(_room_state(11, "playing", 1, 1, false, {}))
 	_expect(_indicator_visible(), "rematch accepted snapshot restores one turn indicator")
 	_expect(_indicator_text() == "دور لاعب 2", "rematch shows its authoritative starter without stale text")
+	_expect(_indicator_color() == "marble", "rematch color cue follows new authoritative starter")
+
+	# Once an authoritative undefined lifecycle event reaches the indicator, it
+	# clears synchronously in the same callback with no deferred blanking.
+	var immediate_clear_revision: int = int(hud.get("applied_revision")) + 1
+	hud.call("_on_authoritative_turn_changed", {
+		"revision": immediate_clear_revision,
+		"valid": false,
+		"lifecycle": "undefined-test",
+	})
+	_expect(not _indicator_visible(), "authoritative undefined turn clears immediately")
+	_expect(_indicator_text().is_empty(), "immediate clear removes copy synchronously")
+	_expect(_indicator_color().is_empty(), "immediate clear removes color synchronously")
+	_expect(int(hud.get("applied_revision")) == immediate_clear_revision, "immediate clear commits the authoritative revision")
 
 	await _finish()
 
@@ -159,6 +206,14 @@ func _indicator_visible() -> bool:
 func _indicator_text() -> String:
 	var label: Variant = hud.get("indicator_label")
 	return str((label as Label).text) if label is Label else ""
+
+
+func _indicator_color() -> String:
+	return str(hud.get("indicator_color_key"))
+
+
+func _indicator_local() -> bool:
+	return bool(hud.get("indicator_local_turn"))
 
 
 func _legacy_turn_hidden() -> bool:

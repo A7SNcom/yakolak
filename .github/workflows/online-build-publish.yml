@@ -54,6 +54,8 @@ jobs:
           node --check tests/online_restore_state_smoke.spec.js
           node --check tests/western_digits_smoke.spec.js
           node --check tests/match_end_actions_contract.test.mjs
+          node --check tests/turn_hud_smoke.spec.js
+          node --check tests/turn_indicator_online_regression.spec.js
           node tests/online_rules.test.mjs
           node tests/online_logic_hardening.test.mjs
           node tests/online_exactly_once_contract.test.mjs
@@ -168,6 +170,21 @@ jobs:
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
           for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
           npx playwright test tests/intro_smoke.spec.js tests/layout_smoke.spec.js tests/setup_gate_smoke.spec.js tests/setup_spatial_smoke.spec.js tests/natural_flow_smoke.spec.js tests/gameplay_smoke.spec.js tests/turn_hud_smoke.spec.js --workers=1 --reporter=github
+      - name: Enforce UX-TURN-35 authoritative continuity before publishing
+        run: |
+          node tests/web_test_server.mjs >/tmp/yakolak-ux-turn-35.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
+          npx playwright test tests/turn_indicator_online_regression.spec.js --grep "4p authoritative turn indicator" --workers=1 --reporter=github
+      - name: Upload UX-TURN-35 viewport proofs
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ux-turn-35-indicator-${{ github.sha }}
+          path: artifacts/ux-turn-35-*.png
+          if-no-files-found: error
+          retention-days: 14
       - name: Publish tested web files back to main
         run: |
           git fetch origin main

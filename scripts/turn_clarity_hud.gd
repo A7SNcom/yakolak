@@ -1,10 +1,9 @@
 extends Node
 
-# TURN-UI-08: exactly one compact top turn indicator. It consumes only the
-# authoritative_turn_changed snapshot emitted by gameplay and never polls
-# gameplay, camera, lighting, animation, or DOM state.
+# TURN-UI-08 / UX-TURN-35: exactly one compact top turn indicator. It consumes
+# only the authoritative_turn_changed snapshot emitted by gameplay and never
+# polls gameplay, camera, lighting, animation, or DOM state.
 const Display = preload("res://scripts/ui_design.gd")
-const ARABIC_FONT = preload("res://assets/fonts/DejaVuSans.ttf")
 const INDICATOR_MIN_WIDTH: float = 56.0
 const INDICATOR_MAX_WIDTH: float = 124.0
 const INDICATOR_HEIGHT: float = 30.0
@@ -18,6 +17,8 @@ var indicator_root: PanelContainer
 var indicator_label: Label
 var indicator_style: StyleBoxFlat
 var indicator_width: float = INDICATOR_MIN_WIDTH
+var indicator_color_key: String = ""
+var indicator_local_turn: bool = false
 var applied_revision: int = -1
 var indicator_update_count: int = 0
 
@@ -58,14 +59,14 @@ func _build_indicator() -> void:
 	add_child(indicator_layer)
 
 	indicator_style = StyleBoxFlat.new()
-	indicator_style.bg_color = Color(0.055, 0.065, 0.075, 0.90)
-	indicator_style.border_color = Color(1.0, 1.0, 1.0, 0.13)
-	indicator_style.set_border_width_all(1)
+	indicator_style.bg_color = Color(0.035, 0.055, 0.062, 0.94)
+	indicator_style.border_color = Color(1.0, 1.0, 1.0, 0.34)
+	indicator_style.set_border_width_all(2)
 	indicator_style.set_corner_radius_all(15)
 	indicator_style.content_margin_left = 10.0
 	indicator_style.content_margin_right = 10.0
-	indicator_style.content_margin_top = 3.0
-	indicator_style.content_margin_bottom = 3.0
+	indicator_style.content_margin_top = 2.0
+	indicator_style.content_margin_bottom = 2.0
 
 	indicator_root = PanelContainer.new()
 	indicator_root.name = "AuthoritativeTurnIndicator"
@@ -84,11 +85,15 @@ func _build_indicator() -> void:
 	indicator_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	indicator_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	indicator_label.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	indicator_label.text_direction = Control.TEXT_DIRECTION_RTL
+	indicator_label.language = "ar"
 	indicator_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	indicator_label.clip_text = true
-	indicator_label.add_theme_font_override("font", ARABIC_FONT)
-	indicator_label.add_theme_font_size_override("font_size", 14)
-	indicator_label.add_theme_color_override("font_color", Color.WHITE)
+	indicator_label.add_theme_font_override("font", Display.FONT_MEDIUM)
+	indicator_label.add_theme_font_size_override("font_size", 15)
+	indicator_label.add_theme_color_override("font_color", Display.TEXT_PRIMARY)
+	indicator_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.72))
+	indicator_label.add_theme_constant_override("outline_size", 1)
 	indicator_root.add_child(indicator_label)
 
 	var viewport: Viewport = get_viewport()
@@ -111,7 +116,9 @@ func _suppress_legacy_turn_surfaces_once() -> void:
 
 func _on_authoritative_turn_changed(snapshot: Dictionary) -> void:
 	var revision: int = int(snapshot.get("revision", -1))
-	if revision >= 0 and revision == applied_revision:
+	# The authoritative source is monotonic. Never let a delayed/replayed older
+	# presentation event resurrect a stale owner or clear a newer owner.
+	if revision >= 0 and revision <= applied_revision:
 		return
 	applied_revision = revision
 	indicator_update_count += 1
@@ -123,11 +130,44 @@ func _on_authoritative_turn_changed(snapshot: Dictionary) -> void:
 	if text.is_empty():
 		_hide_indicator(revision, "no-copy")
 		return
+	_apply_visual_state(snapshot)
 	indicator_label.text = text
-	indicator_width = clampf(24.0 + float(text.length()) * 8.0, INDICATOR_MIN_WIDTH, INDICATOR_MAX_WIDTH)
+	indicator_width = clampf(26.0 + float(text.length()) * 8.2, INDICATOR_MIN_WIDTH, INDICATOR_MAX_WIDTH)
 	_layout_indicator()
 	indicator_root.visible = true
 	_publish_state(true, text, snapshot)
+
+
+func _apply_visual_state(snapshot: Dictionary) -> void:
+	indicator_local_turn = bool(snapshot.get("local_turn", false))
+	indicator_color_key = _indicator_color_key(snapshot)
+	var cue_color: Color = _indicator_cue_color(indicator_color_key)
+	indicator_style.border_color = cue_color
+	indicator_style.set_border_width_all(2)
+	indicator_style.bg_color = Color(0.035, 0.055, 0.062, 0.97 if indicator_local_turn else 0.94)
+	indicator_label.add_theme_font_override("font", Display.FONT_BOLD if indicator_local_turn else Display.FONT_MEDIUM)
+	indicator_label.add_theme_color_override("font_color", Display.TEXT_PRIMARY)
+
+
+func _indicator_color_key(snapshot: Dictionary) -> String:
+	var key: String = str(snapshot.get("color", "")).strip_edges().to_lower()
+	if key in ["marble", "blue", "gold", "green"]:
+		return key
+	return "neutral"
+
+
+func _indicator_cue_color(key: String) -> Color:
+	match key:
+		"marble":
+			return Color("#EEEAE0")
+		"blue":
+			return Color("#58A6FF")
+		"gold":
+			return Color("#E8BB55")
+		"green":
+			return Color("#4FD48A")
+		_:
+			return Color(1.0, 1.0, 1.0, 0.34)
 
 
 func _indicator_copy(snapshot: Dictionary) -> String:
@@ -148,6 +188,8 @@ func _hide_indicator(revision: int, lifecycle: String) -> void:
 		indicator_root.visible = false
 	if indicator_label != null:
 		indicator_label.text = ""
+	indicator_color_key = ""
+	indicator_local_turn = false
 	_publish_hidden(revision, lifecycle)
 
 
@@ -186,6 +228,8 @@ func _publish_contract() -> void:
 		"document.body.dataset.yakolakTurnIndicatorSource='authoritative-turn-signal';" +
 		"document.body.dataset.yakolakTurnIndicatorPolling='none';" +
 		"document.body.dataset.yakolakTurnIndicatorDigits='western-0-9';" +
+		"document.body.dataset.yakolakTurnIndicatorOneGlance='copy+player-color';" +
+		"document.body.dataset.yakolakTurnIndicatorStalePolicy='monotonic-revision';" +
 		"document.body.dataset.yakolakTurnFocus='removed';",
 		true
 	)
@@ -198,6 +242,8 @@ func _publish_state(visible: bool, text: String, snapshot: Dictionary) -> void:
 		"document.body.dataset.yakolakTurnIndicatorVisible='%s';" % ("true" if visible else "false") +
 		"document.body.dataset.yakolakTurnIndicatorText='%s';" % _js(text) +
 		"document.body.dataset.yakolakTurnIndicatorPlayer='%d';" % int(snapshot.get("player_number", 0)) +
+		"document.body.dataset.yakolakTurnIndicatorColor='%s';" % _js(indicator_color_key) +
+		"document.body.dataset.yakolakTurnIndicatorLocal='%s';" % ("true" if indicator_local_turn else "false") +
 		"document.body.dataset.yakolakTurnIndicatorLifecycle='%s';" % _js(str(snapshot.get("lifecycle", ""))) +
 		"document.body.dataset.yakolakTurnIndicatorRevision='%d';" % applied_revision +
 		"document.body.dataset.yakolakTurnIndicatorUpdates='%d';" % indicator_update_count,
@@ -212,6 +258,8 @@ func _publish_hidden(revision: int, lifecycle: String) -> void:
 		"document.body.dataset.yakolakTurnIndicatorVisible='false';" +
 		"document.body.dataset.yakolakTurnIndicatorText='';" +
 		"document.body.dataset.yakolakTurnIndicatorPlayer='0';" +
+		"document.body.dataset.yakolakTurnIndicatorColor='';" +
+		"document.body.dataset.yakolakTurnIndicatorLocal='false';" +
 		"document.body.dataset.yakolakTurnIndicatorLifecycle='%s';" % _js(lifecycle) +
 		"document.body.dataset.yakolakTurnIndicatorRevision='%d';" % revision +
 		"document.body.dataset.yakolakTurnIndicatorUpdates='%d';" % indicator_update_count,
@@ -226,7 +274,8 @@ func _publish_layout(top: float) -> void:
 		"document.body.dataset.yakolakTurnIndicatorTop='%.1f';" % top +
 		"document.body.dataset.yakolakTurnIndicatorWidth='%.1f';" % indicator_width +
 		"document.body.dataset.yakolakTurnIndicatorHeight='%.1f';" % INDICATOR_HEIGHT +
-		"document.body.dataset.yakolakTurnIndicatorPointer='ignore';",
+		"document.body.dataset.yakolakTurnIndicatorPointer='ignore';" +
+		"document.body.dataset.yakolakTurnIndicatorOverlay='true';",
 		true
 	)
 
