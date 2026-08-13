@@ -164,6 +164,13 @@ def patch_spec() -> None:
         "spec live base",
     )
 
+    text = replace_once(
+        text,
+        '''async function runNormalMatrix(browser, viewport, playerCount, code) {\n  const harness = makeHarness(playerCount, code);\n  const clients = [];\n  try {\n    for (let i = 0; i < playerCount; i += 1) clients.push(await createClient(browser, harness, `p${i + 1}`, viewport));\n    const rows = [];\n    for (let i = 0; i < SAMPLE_COUNT; i += 1) rows.push(await measureOne(harness, clients));\n    return rows;\n  } finally { await closeClients(clients); }\n}\n''',
+        '''async function runNormalMatrix(browser, viewport, playerCount, code) {\n  const rows = [];\n  while (rows.length < SAMPLE_COUNT) {\n    const harness = makeHarness(playerCount, code);\n    const clients = [];\n    try {\n      for (let i = 0; i < playerCount; i += 1) clients.push(await createClient(browser, harness, `p${i + 1}`, viewport));\n      const batchCount = Math.min(8, SAMPLE_COUNT - rows.length);\n      for (let i = 0; i < batchCount; i += 1) rows.push(await measureOne(harness, clients));\n    } finally { await closeClients(clients); }\n  }\n  return rows;\n}\n''',
+        "fresh legal sample batches",
+    )
+
     new_probe = r'''async function selectFirstLegalPiece(client, expectedPlayer) {
   await client.page.waitForFunction(() => typeof window.yakolakTurn32ProbeInput === 'function', null, { timeout: 20000 });
   const firstProbeAt = Date.now();
