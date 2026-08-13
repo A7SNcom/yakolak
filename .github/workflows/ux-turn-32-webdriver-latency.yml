@@ -21,8 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      PROD_SHA: ebee2a3010b4a2db66fbb9181876c64e5c1b812b
-      PROD_URL: https://yakolak-9y4vronvt-ahmdkcoms-projects.vercel.app
+      PROD_SHA: b1e1fd57000e3a0e4383eddd4e07941f65992c83
+      PROD_URL: https://yakolak-2ddt9ya3t-ahmdkcoms-projects.vercel.app
     steps:
       - uses: actions/checkout@v4
         with:
