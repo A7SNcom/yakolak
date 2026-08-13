@@ -9,7 +9,7 @@ old_pattern = re.compile(
     re.S,
 )
 
-replacement = r'''\tvar records: Array = records_value as Array
+replacement = '''\tvar records: Array = records_value as Array
 \tvar direction: String = str(match_controller.call("_current_direction"))
 \tvar viewport_size: Vector2 = get_viewport().get_visible_rect().size
 \tvar center: Vector2 = viewport_size * 0.5
