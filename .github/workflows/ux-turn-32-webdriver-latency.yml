@@ -84,7 +84,13 @@ jobs:
           YAKOLAK_TURN32_BASE: http://127.0.0.1:8000
           YAKOLAK_TURN32_LABEL: main-webdriver-exact
           YAKOLAK_TURN32_SAMPLES: "20"
-        run: npx playwright test tests/ux_turn_32_latency.spec.js --workers=1 --reporter=github
+        run: |
+          set +e
+          npx playwright test tests/ux_turn_32_latency.spec.js --workers=1 --reporter=github 2>&1 | tee artifacts/ux-turn-32/main-playwright.log
+          code=${PIPESTATUS[0]}
+          set -e
+          printf '%s\n' "$code" > artifacts/ux-turn-32/main-exit-code.txt
+          exit "$code"
 
       - name: Stop latest-main server
         if: ${{ always() }}
@@ -129,7 +135,13 @@ jobs:
           YAKOLAK_TURN32_LIVE_BASE: ${{ env.PROD_URL }}
           YAKOLAK_TURN32_LABEL: production-source-webdriver-exact
           YAKOLAK_TURN32_SAMPLES: "20"
-        run: npx playwright test tests/ux_turn_32_latency.spec.js --workers=1 --reporter=github
+        run: |
+          set +e
+          npx playwright test tests/ux_turn_32_latency.spec.js --workers=1 --reporter=github 2>&1 | tee artifacts/ux-turn-32/production-playwright.log
+          code=${PIPESTATUS[0]}
+          set -e
+          printf '%s\n' "$code" > artifacts/ux-turn-32/production-exit-code.txt
+          exit "$code"
 
       - name: Stop Production-source server
         if: ${{ always() }}
