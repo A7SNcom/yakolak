@@ -43,7 +43,14 @@ func _on_ux_turn_32_input_probe_requested(_arguments: Array) -> void:
 		"reason": "unavailable",
 		"startedMsec": started_msec,
 	}
+	# The production scene's gameplay node is PostIntroGameplay. Resolve it only
+	# for this WebDriver-only diagnostic callback; this does not alter normal play.
+	if match_controller == null and intro != null:
+		match_controller = intro.get_node_or_null("PostIntroGameplay")
+	if match_controller == null and intro != null:
+		match_controller = intro.get_node_or_null("LocalMatchGameplay")
 	if not automation or match_controller == null:
+		result["reason"] = "controller-unavailable"
 		_publish_ux_turn_32_probe(result)
 		return
 	if not bool(match_controller.get("match_initialized")):
@@ -165,11 +172,12 @@ def patch_spec() -> None:
   while (Date.now() - firstProbeAt < 20000) {
     attempts += 1;
     const inputDispatchAt = Date.now();
-    last = await client.page.evaluate(() => {
+    await client.page.evaluate(() => {
       window.__yakolakTurn32ProbeResult = null;
       window.yakolakTurn32ProbeInput();
-      return window.__yakolakTurn32ProbeResult || null;
     });
+    await client.page.waitForFunction(() => window.__yakolakTurn32ProbeResult !== null, null, { timeout: 1000 }).catch(() => {});
+    last = await client.page.evaluate(() => window.__yakolakTurn32ProbeResult || null);
     if (last?.accepted) {
       return {
         firstProbeAt,
