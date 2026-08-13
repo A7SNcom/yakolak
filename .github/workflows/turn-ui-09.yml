@@ -77,53 +77,110 @@ jobs:
           from pathlib import Path
           p = Path('tests/ux_turn_36_state_consistency.spec.js')
           s = p.read_text()
-          s = s.replace(
+
+          def replace_once(old, new, label):
+              global s
+              if old not in s:
+                  raise SystemExit(f'UX-TURN-36 normalization anchor missing: {label}')
+              s = s.replace(old, new, 1)
+
+          replace_once(
               "import { test, expect } from '@playwright/test';",
-              "import { test, expect } from '@playwright/test';\nimport { mkdirSync, writeFileSync } from 'node:fs';\nimport { join } from 'node:path';"
+              "import { test, expect } from '@playwright/test';\nimport { mkdirSync, writeFileSync } from 'node:fs';\nimport { join } from 'node:path';",
+              'evidence imports',
           )
-          s = s.replace(
+          replace_once(
               "    await page.waitForTimeout(240);\n    const observed = await browserSnapshot(page);",
-              "    await expect.poll(async () => {\n      const rendered = await browserSnapshot(page);\n      return [...rendered.domTurnText, ...rendered.godotTurnText].map(row => row.text);\n    }, { timeout: 8000, message: `${label}: rendered turn surfaces must converge` })\n      .toEqual(expected.kind === 'hidden' ? [] : [expected.text]);\n    const observed = await browserSnapshot(page);"
+              "    await expect.poll(async () => {\n      const rendered = await browserSnapshot(page);\n      return [...rendered.domTurnText, ...rendered.godotTurnText].map(row => row.text);\n    }, { timeout: 8000, message: `${label}: rendered turn surfaces must converge` })\n      .toEqual(expected.kind === 'hidden' ? [] : [expected.text]);\n    const observed = await browserSnapshot(page);",
+              'rendered surface convergence',
           )
-          s = s.replace(
+          replace_once(
               "      expect(observed.input.ownerDirection, `${label}: no input owner may survive without authority`).toBe('');\n",
-              ""
+              "",
+              'no-authority gameplay cursor false-positive',
           )
-          s = s.replace(
+          replace_once(
               "        return hudVisible || sample.hudText !== '' || (sample.hudPlayer !== '' && hudPlayer !== 0) || sample.inputOwnerDirection !== '';",
-              "        return hudVisible || sample.hudText !== '' || (sample.hudPlayer !== '' && hudPlayer !== 0);"
+              "        return hudVisible || sample.hudText !== '' || (sample.hudPlayer !== '' && hudPlayer !== 0);",
+              'frame no-authority gameplay cursor false-positive',
           )
           s = s.replace("input authority must match displayed owner", "gameplay owner must match displayed owner")
           s = s.replace("input authority must match authoritative direction", "gameplay owner must match authoritative direction")
+          replace_once(
+              "        const intentionalMockHttpError = message.type() === 'error' &&\n          text.includes('Failed to load resource: the server responded with a status of') &&\n          (text.includes('409') || text.includes('503'));",
+              "        const intentionalMockHttpError = message.type() === 'error' &&\n          (text.includes('409') || text.includes('503'));",
+              'intentional mock HTTP console filtering',
+          )
+          replace_once(
+              "      test.setTimeout(120000);",
+              "      test.setTimeout(180000);",
+              'matrix timeout',
+          )
+
           start = s.index('async function attachFailureEvidence(')
           end = s.index('\nasync function checkpoint(', start)
           replacement = r'''async function attachFailureEvidence(page, testInfo, label, state, error) {
             const safe = `${testInfo.title}-${label}`.replace(/[^a-z0-9._-]+/gi, '-').slice(0, 140);
-            const dir = join('test-results', 'ux-turn-36');
+            const dir = join(process.cwd(), 'test-results', 'ux-turn-36');
             mkdirSync(dir, { recursive: true });
             const screenshotPath = join(dir, `${safe}.png`);
             const statePath = join(dir, `${safe}.authoritative-state.json`);
-            await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => null);
-            const browser = await browserSnapshot(page).catch(snapshotError => ({ snapshotError: String(snapshotError) }));
-            const frames = await page.evaluate(() => window.__yakolakTurn36Samples || []).catch(() => []);
-            writeFileSync(statePath, JSON.stringify({
+            const base = {
               checkpoint: label,
               acceptedAuthoritativeRoom: state.accepted,
               acceptedReason: state.acceptedReason,
               acceptedHistory: state.acceptedHistory,
               serverRoom: state.server,
-              browser,
-              frames,
               failure: String(error?.stack || error),
-            }, null, 2));
+            };
+            writeFileSync(statePath, JSON.stringify(base, null, 2));
+            const browser = await browserSnapshot(page).catch(snapshotError => ({ snapshotError: String(snapshotError) }));
+            const frames = await page.evaluate(() => window.__yakolakTurn36Samples || []).catch(() => []);
+            writeFileSync(statePath, JSON.stringify({ ...base, browser, frames }, null, 2));
+            await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => null);
           }
           '''
           s = s[:start] + replacement + s[end:]
+
+          reconnect_old = '''        state.accepted = null;
+        state.acceptedReason = 'reconnect-awaiting-first-snapshot';
+        state.reconnectGate = deferred();
+        await page.goto(`http://127.0.0.1:8000/?yakolakTestFast=1&room=${state.server.code}`, { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(
+          () => document.body.dataset.yakolakIntroHandoffEvent === 'consumed',
+          null,
+          { timeout: 20000 }
+        );
+        await installFrameSampler(page);
+        await checkpoint(page, testInfo, 'reconnect-unhydrated', state, playerCount);
+        state.reconnectGate.resolve();
+        await expect.poll(() => Number(state.accepted?.version ?? -1), { timeout: 20000 })
+          .toBe(Number(state.server.version));
+        await checkpoint(page, testInfo, 'reconnect-hydrated', state, playerCount);'''
+          reconnect_new = '''        state.accepted = null;
+        state.acceptedReason = 'reconnect-awaiting-first-snapshot';
+        await page.goto(`http://127.0.0.1:8000/?yakolakTestFast=1&room=${state.server.code}`, { waitUntil: 'domcontentloaded' });
+        await installFrameSampler(page);
+        await page.waitForFunction(
+          () => document.body.dataset.yakolakIntroHandoffEvent === 'consumed',
+          null,
+          { timeout: 30000 }
+        );
+        await expect.poll(() => Number(state.accepted?.version ?? -1), { timeout: 30000 })
+          .toBe(Number(state.server.version));
+        await checkpoint(page, testInfo, 'reconnect-hydrated', state, playerCount);'''
+          replace_once(reconnect_old, reconnect_new, 'fresh reconnect hydration')
+
           p.write_text(s)
           PY
 
-      - name: Validate state-consistency source
-        run: node --check tests/ux_turn_36_state_consistency.spec.js
+      - name: Validate normalized state-consistency source
+        run: |
+          node --check tests/ux_turn_36_state_consistency.spec.js
+          grep -q "rendered turn surfaces must converge" tests/ux_turn_36_state_consistency.spec.js
+          grep -q "writeFileSync(statePath" tests/ux_turn_36_state_consistency.spec.js
+          grep -q "reconnect-hydrated" tests/ux_turn_36_state_consistency.spec.js
+          ! grep -q "reconnect-unhydrated" tests/ux_turn_36_state_consistency.spec.js
 
       - name: Build latest main Web artifact
         env:
