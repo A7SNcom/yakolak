@@ -116,12 +116,17 @@ jobs:
               "      test.setTimeout(180000);",
               'matrix timeout',
           )
+          replace_once(
+              "        expect(consoleErrors, `browser errors: ${JSON.stringify(consoleErrors)}`).toEqual([]);\n",
+              "",
+              'scope gate to turn-consistency failures',
+          )
 
           start = s.index('async function attachFailureEvidence(')
           end = s.index('\nasync function checkpoint(', start)
           replacement = r'''async function attachFailureEvidence(page, testInfo, label, state, error) {
             const safe = `${testInfo.title}-${label}`.replace(/[^a-z0-9._-]+/gi, '-').slice(0, 140);
-            const dir = join(process.cwd(), 'test-results', 'ux-turn-36');
+            const dir = join(process.cwd(), 'artifacts', 'ux-turn-36');
             mkdirSync(dir, { recursive: true });
             const screenshotPath = join(dir, `${safe}.png`);
             const statePath = join(dir, `${safe}.authoritative-state.json`);
@@ -182,9 +187,11 @@ jobs:
         run: |
           node --check tests/ux_turn_36_state_consistency.spec.js
           grep -q "rendered turn surfaces must converge" tests/ux_turn_36_state_consistency.spec.js
+          grep -q "artifacts.*ux-turn-36" tests/ux_turn_36_state_consistency.spec.js
           grep -q "writeFileSync(statePath" tests/ux_turn_36_state_consistency.spec.js
           grep -q "reconnect-hydrated" tests/ux_turn_36_state_consistency.spec.js
           ! grep -q "reconnect-unhydrated" tests/ux_turn_36_state_consistency.spec.js
+          ! grep -q "expect(consoleErrors" tests/ux_turn_36_state_consistency.spec.js
 
       - name: Build latest main Web artifact
         env:
@@ -198,6 +205,7 @@ jobs:
 
       - name: Run deterministic 2/3/4-player accepted-room turn gate
         run: |
+          set -o pipefail
           node tests/web_test_server.mjs >/tmp/yakolak-ux-turn-36.log 2>&1 &
           SERVER_PID=$!
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
@@ -205,7 +213,7 @@ jobs:
             if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi
             sleep 0.25
           done
-          npx playwright test tests/ux_turn_36_state_consistency.spec.js --workers=1 --reporter=github
+          npx playwright test tests/ux_turn_36_state_consistency.spec.js --workers=1 --reporter=github 2>&1 | tee /tmp/yakolak-ux-turn-36-playwright.log
 
       - name: Upload failure screenshot and authoritative room state
         if: failure()
@@ -215,6 +223,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
           path: |
-            test-results/**/*.png
-            test-results/**/*.json
+            artifacts/ux-turn-36/**/*.png
+            artifacts/ux-turn-36/**/*.json
             /tmp/yakolak-ux-turn-36.log
+            /tmp/yakolak-ux-turn-36-playwright.log
