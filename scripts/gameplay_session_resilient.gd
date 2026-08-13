@@ -97,9 +97,10 @@ func _apply_online_room(remote: Dictionary) -> void:
 	var complete: bool = bool(remote.get("matchComplete", false))
 
 	if status == "finished" and not complete and online_active and not online_cancelled:
-		# Keep the result visible until a player explicitly requests the next
-		# round; the winner and winning pattern must be readable first.
-		online_round_auto_due_msec = 0
+		# Keep the winner/reason visible during a short readable result window,
+		# then advance through the single authoritative rematch path. Online
+		# chaos/reconnect clients must not wait forever for a local click.
+		online_round_auto_due_msec = Time.get_ticks_msec() + ONLINE_NEXT_ROUND_DELAY_MS
 		online_round_auto_sent = false
 	elif status == "playing":
 		online_round_auto_due_msec = 0
