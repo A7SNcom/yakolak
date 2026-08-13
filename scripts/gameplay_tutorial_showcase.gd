@@ -9,12 +9,15 @@ extends "res://scripts/gameplay_session_efficient.gd"
 const SHOWCASE_CAMERA_POSITION := Vector3(11.8, 17.2, 12.8)
 const SHOWCASE_CAMERA_TARGET := Vector3(0.0, 0.45, 0.0)
 const SHOWCASE_CAMERA_SECONDS: float = 0.42
-const SHOWCASE_MOVE_SECONDS: float = 0.38
-const SHOWCASE_RESET_SECONDS: float = 0.32
-const SHOWCASE_LEAD_SECONDS: float = 0.70
-const SHOWCASE_MOVE_GAP_SECONDS: float = 0.12
-const SHOWCASE_RESULT_SECONDS: float = 1.20
-const SHOWCASE_TO_MATCH_SECONDS: float = 0.40
+# The Web showcase reuses the actual scene, so it must teach the winning shapes
+# without holding the player in a long 15-move cutscene. These timings retain
+# readable motion while bounding the amount of animated work before the match.
+const SHOWCASE_MOVE_SECONDS: float = 0.30
+const SHOWCASE_RESET_SECONDS: float = 0.26
+const SHOWCASE_LEAD_SECONDS: float = 0.55
+const SHOWCASE_MOVE_GAP_SECONDS: float = 0.09
+const SHOWCASE_RESULT_SECONDS: float = 0.85
+const SHOWCASE_TO_MATCH_SECONDS: float = 0.32
 const SHOWCASE_ARC_HEIGHT: float = 22.0 * U
 
 var tutorial_showcase_running: bool = false
@@ -83,9 +86,7 @@ func _run_spectator_tutorial() -> void:
 		"الفوز بالسطر — ثلاث قطع من نفس الحجم على خط",
 		[
 			{"dir": hero, "cell": 0, "size": "large"},
-			{"dir": rival, "cell": 4, "size": "small"},
 			{"dir": hero, "cell": 1, "size": "large"},
-			{"dir": rival, "cell": 4, "size": "medium"},
 			{"dir": hero, "cell": 2, "size": "large"},
 		],
 		"هكذا يكتمل السطر وتفوز"
@@ -99,9 +100,7 @@ func _run_spectator_tutorial() -> void:
 		"الفوز بالدرج — صغير، وسط، كبير على خط",
 		[
 			{"dir": hero, "cell": 6, "size": "small"},
-			{"dir": rival, "cell": 0, "size": "large"},
 			{"dir": hero, "cell": 4, "size": "medium"},
-			{"dir": rival, "cell": 1, "size": "small"},
 			{"dir": hero, "cell": 2, "size": "large"},
 		],
 		"صغير ثم وسط ثم كبير: هذا هو الدرج الفائز"
@@ -115,9 +114,7 @@ func _run_spectator_tutorial() -> void:
 		"الفوز بالبرج — صغير، وسط، كبير في نفس الخانة",
 		[
 			{"dir": hero, "cell": 4, "size": "small"},
-			{"dir": rival, "cell": 0, "size": "large"},
 			{"dir": hero, "cell": 4, "size": "medium"},
-			{"dir": rival, "cell": 2, "size": "small"},
 			{"dir": hero, "cell": 4, "size": "large"},
 		],
 		"الثلاثة في خانة واحدة يصنعون برجًا فائزًا"
