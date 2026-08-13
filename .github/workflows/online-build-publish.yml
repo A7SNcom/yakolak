@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - '.github/workflows/ux-turn-32*.yml'
+      - 'tests/ux_turn_32_*'
   workflow_dispatch:
 
 permissions:
