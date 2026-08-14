@@ -138,7 +138,10 @@ func _fit_card_to_content() -> void:
 		_ui_length(DIALOG_MIN_HEIGHT_CSS),
 		region.size.y
 	)
-	card.position.x = region.position.x + maxf(0.0, (region.size.x - desired_width) * 0.5)
+	if _is_short_landscape():
+		card.position.x = region.position.x + maxf(0.0, region.size.x - desired_width)
+	else:
+		card.position.x = region.position.x + maxf(0.0, (region.size.x - desired_width) * 0.5)
 	card.position.y = region.position.y + maxf(0.0, (region.size.y - desired) * 0.5)
 	card.size = Vector2(desired_width, desired)
 	card.pivot_offset = card.size * 0.5
