@@ -14,6 +14,12 @@ var _touch_exact_taps: int = 0
 var _touch_rescued_taps: int = 0
 var _touch_missed_taps: int = 0
 var _touch_edge_rejected: int = 0
+var _gesture_touch_active: bool = false
+var _gesture_touch_dragged: bool = false
+var _gesture_touch_index: int = -1
+var _gesture_touch_start: Vector2 = Vector2.ZERO
+var _gesture_touch_last: Vector2 = Vector2.ZERO
+const GESTURE_DRAG_THRESHOLD_PX: float = 14.0
 
 
 func _ready() -> void:
@@ -37,7 +43,38 @@ func _process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
-	_touch_pointer_dispatch = event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed
+	if event is InputEventScreenTouch:
+		var touch := event as InputEventScreenTouch
+		if touch.pressed:
+			_gesture_touch_active = true
+			_gesture_touch_dragged = false
+			_gesture_touch_index = touch.index
+			_gesture_touch_start = touch.position
+			_gesture_touch_last = touch.position
+		else:
+			var should_drop: bool = (
+				_gesture_touch_active
+				and touch.index == _gesture_touch_index
+				and _gesture_touch_dragged
+				and selected_index >= 0
+				and not move_active
+			)
+			_gesture_touch_active = false
+			_gesture_touch_index = -1
+			if should_drop:
+				_touch_pointer_dispatch = true
+				_handle_pointer(touch.position)
+				_touch_pointer_dispatch = false
+				get_viewport().set_input_as_handled()
+				return
+	elif event is InputEventScreenDrag:
+		var drag := event as InputEventScreenDrag
+		if _gesture_touch_active and drag.index == _gesture_touch_index:
+			_gesture_touch_last = drag.position
+			if _gesture_touch_start.distance_to(drag.position) >= GESTURE_DRAG_THRESHOLD_PX:
+				_gesture_touch_dragged = true
+
+		_touch_pointer_dispatch = event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed
 	super._input(event)
 	_touch_pointer_dispatch = false
 
