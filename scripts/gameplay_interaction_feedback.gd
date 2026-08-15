@@ -10,13 +10,6 @@ const INVALID_COLOR := Color(1.0, 0.28, 0.20, 0.62)
 
 var _feedback_hover_piece_index: int = -1
 var _feedback_hover_original_material: Material
-var _drag_touch_active: bool = false
-var _drag_touch_moved: bool = false
-var _drag_touch_index: int = -1
-var _drag_touch_start: Vector2 = Vector2.ZERO
-var _drag_preview_cell: int = -1
-const DRAG_START_THRESHOLD_PX: float = 12.0
-const DRAG_PREVIEW_RADIUS_PX: float = 132.0
 var _feedback_invalid_serial: int = 0
 var _feedback_menu_open_cache: bool = false
 var _feedback_sound_muted_cache: bool = false
@@ -53,40 +46,13 @@ func _input(event: InputEvent) -> void:
 
 	if event is InputEventMouseMotion:
 		_feedback_update_piece_hover((event as InputEventMouseMotion).position)
-		if selected_index >= 0 and not move_active:
-			_update_drag_preview((event as InputEventMouseMotion).position)
 	elif event is InputEventMouseButton:
 		var mouse := event as InputEventMouseButton
 		if mouse.pressed and mouse.button_index == MOUSE_BUTTON_LEFT:
 			_feedback_clear_piece_hover()
 	elif event is InputEventScreenTouch:
-		var touch := event as InputEventScreenTouch
-		if touch.pressed:
-			_drag_touch_active = true
-			_drag_touch_moved = false
-			_drag_touch_index = touch.index
-			_drag_touch_start = touch.position
+		if (event as InputEventScreenTouch).pressed:
 			_feedback_clear_piece_hover()
-		else:
-			var should_drop: bool = (
-				_drag_touch_active
-				and touch.index == _drag_touch_index
-				and _drag_touch_moved
-				and selected_index >= 0
-				and not move_active
-			)
-			_drag_touch_active = false
-			_drag_touch_index = -1
-			if should_drop:
-				_handle_drag_drop(touch.position)
-				return
-	elif event is InputEventScreenDrag:
-		var drag := event as InputEventScreenDrag
-		if _drag_touch_active and drag.index == _drag_touch_index:
-			if _drag_touch_start.distance_to(drag.position) >= DRAG_START_THRESHOLD_PX:
-				_drag_touch_moved = true
-			if _drag_touch_moved:
-				_update_drag_preview(drag.position)
 
 	super._input(event)
 
@@ -106,74 +72,12 @@ func _sync_quick_menu() -> void:
 	_feedback_sync_menu_state(false)
 
 
-func _handle_drag_drop(screen_position: Vector2) -> void:
-	_handle_pointer(screen_position)
-	if not move_active:
-		_clear_drag_preview()
-	get_viewport().set_input_as_handled()
-
-
-func _update_drag_preview(screen_position: Vector2) -> void:
-	if selected_index < 0 or move_active or camera == null or target_markers.is_empty():
-		return
-	var best_cell: int = -1
-	var best_distance: float = DRAG_PREVIEW_RADIUS_PX
-	var size_name: String = _selected_size()
-	for cell: int in range(target_markers.size()):
-		var marker: MeshInstance3D = target_markers[cell]
-		if marker == null or not marker.visible or not _is_legal_cell(cell, size_name):
-			continue
-		var screen_target: Vector2 = camera.unproject_position(marker.global_position)
-		var distance: float = screen_target.distance_to(screen_position)
-		if distance < best_distance:
-			best_distance = distance
-			best_cell = cell
-	if best_cell < 0:
-		return
-	var marker: MeshInstance3D = target_markers[best_cell]
-	var record: Dictionary = piece_records[selected_index] as Dictionary
-	var piece: MeshInstance3D = record.get("mesh", null) as MeshInstance3D
-	if piece != null:
-		piece.position = marker.position + Vector3.UP * (0.34 * U)
-		piece.scale = Vector3.ONE * U * 1.12
-	if _drag_preview_cell != best_cell:
-		if _drag_preview_cell >= 0 and _drag_preview_cell < target_markers.size():
-			target_markers[_drag_preview_cell].scale = Vector3.ONE * LEGAL_MARKER_SCALE
-		_drag_preview_cell = best_cell
-		marker.scale = Vector3.ONE * (LEGAL_MARKER_PULSE_SCALE * 1.18)
-		marker.material_override = _feedback_hover_material(marker.material_override)
-	if OS.has_feature("web"):
-		JavaScriptBridge.eval("document.body.dataset.yakolakDragPreviewCell='" + str(best_cell) + "';", true)
-
-
-func _clear_drag_preview() -> void:
-	if selected_index >= 0 and selected_index < piece_records.size() and not move_active:
-		var record: Dictionary = piece_records[selected_index] as Dictionary
-		var piece: MeshInstance3D = record.get("mesh", null) as MeshInstance3D
-		if piece != null:
-			piece.position = selected_home_position + Vector3.UP * (SELECT_LIFT * U)
-			piece.scale = Vector3.ONE * U * 1.08
-	if _drag_preview_cell >= 0 and _drag_preview_cell < target_markers.size():
-		target_markers[_drag_preview_cell].scale = Vector3.ONE * LEGAL_MARKER_SCALE
-	_drag_preview_cell = -1
-	if selected_index >= 0:
-		var selected_record: Dictionary = piece_records[selected_index] as Dictionary
-		_update_legal_markers(_selected_size(), _piece_color(selected_record))
-	if OS.has_feature("web"):
-		JavaScriptBridge.eval("document.body.dataset.yakolakDragPreviewCell='';", true)
-
-
 func _begin_move(cell: int) -> void:
-	_clear_drag_preview()
 	_feedback_clear_piece_hover()
 	super._begin_move(cell)
 
 
 func _reset_for_intro() -> void:
-	_drag_touch_active = false
-	_drag_touch_moved = false
-	_drag_touch_index = -1
-	_clear_drag_preview()
 	_feedback_clear_piece_hover()
 	_feedback_invalid_serial += 1
 	super._reset_for_intro()
