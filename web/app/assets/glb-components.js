@@ -73,8 +73,9 @@ export function decodeGlbComponents(input) {
 
   const components = [];
   for (const [nodeIndex, node] of (gltf.nodes || []).entries()) {
-    if (!Number.isInteger(node.mesh)) throw new Error(`GLB node ${nodeIndex} has no mesh`);
-    if (node.matrix || node.translation || node.rotation || node.scale) throw new Error(`GLB node ${nodeIndex} contains a hidden transform`);
+    // Semantic root/pivot nodes are hierarchy-only. Component mesh nodes remain transform-free.
+    if (!Number.isInteger(node.mesh)) continue;
+    if (node.matrix || node.translation || node.rotation || node.scale) throw new Error(`GLB component node ${nodeIndex} contains a hidden transform`);
     const mesh = gltf.meshes?.[node.mesh];
     if (!mesh || mesh.primitives?.length !== 1) throw new Error(`GLB mesh ${node.mesh} must contain exactly one primitive`);
     const primitive = mesh.primitives[0];
@@ -96,7 +97,7 @@ export function decodeGlbComponents(input) {
       });
     }
     const match = /#component-(\d+)$/.exec(node.name || mesh.name || '');
-    if (!match) throw new Error(`Converter GLB node lacks stable component name: ${node.name || nodeIndex}`);
+    if (!match) throw new Error(`Converter GLB mesh node lacks stable component name: ${node.name || nodeIndex}`);
     components.push(Object.freeze({
       index: Number(match[1]),
       name: node.name,
@@ -109,11 +110,20 @@ export function decodeGlbComponents(input) {
     if (components[index].index !== index) throw new Error(`GLB component sequence gap at ${index}`);
   }
 
+  const provenance = Object.freeze({ ...(gltf.extras?.yakolakConversion || {}) });
+  const geometryProvenance = provenance.geometry || {};
+  if (Number.isInteger(geometryProvenance.componentCount) && geometryProvenance.componentCount !== components.length) {
+    throw new Error(`GLB provenance/component count mismatch: ${geometryProvenance.componentCount}/${components.length}`);
+  }
+
   let disposed = false;
   return Object.freeze({
     format: 'yakolak-glb-components-v1',
     components: Object.freeze(components),
-    provenance: Object.freeze({ ...(gltf.extras?.yakolakConversion || {}) }),
+    provenance,
+    semanticProfile: geometryProvenance.semanticProfile || null,
+    semanticRoots: Object.freeze([...(geometryProvenance.semanticRoots || [])]),
+    sourcePivot: geometryProvenance.sourcePivot ? Object.freeze([...geometryProvenance.sourcePivot]) : null,
     getComponent: (index) => components[index] || null,
     dispose() {
       if (disposed) return;
