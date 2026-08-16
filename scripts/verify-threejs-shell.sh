@@ -12,6 +12,8 @@ required=(
   web/app/camera/frame-governor.js
   web/app/assets/asset-manifest.js
   web/app/assets/asset-manager.js
+  web/app/perf/startup-marks.js
+  web/app/perf/performance-budgets.js
   web/vendor/three/r185/three.module.js
   web/vendor/three/r185/three.core.js
   web/vendor/three/r185/addons/loaders/STLLoader.js
@@ -19,11 +21,13 @@ required=(
   scripts/convert-threejs-assets.mjs
   scripts/lib/stl-glb-converter.mjs
   scripts/lib/asset-conversion-pipeline.mjs
+  scripts/measure-threejs-performance.mjs
   tests/threejs_renderer_owner_contract.test.mjs
   tests/threejs_frame_governor_contract.test.mjs
   tests/threejs_asset_loading_contract.test.mjs
   tests/threejs_asset_runtime_copies_contract.test.mjs
   tests/threejs_asset_conversion_pipeline.test.mjs
+  tests/threejs_performance_budget_contract.test.mjs
 )
 
 for file in "${required[@]}"; do
@@ -49,10 +53,11 @@ node tests/threejs_frame_governor_contract.test.mjs
 node tests/threejs_asset_loading_contract.test.mjs
 node tests/threejs_asset_runtime_copies_contract.test.mjs
 node tests/threejs_asset_conversion_pipeline.test.mjs
+node tests/threejs_performance_budget_contract.test.mjs
 
 if [ "${VERCEL_GIT_COMMIT_REF:-}" = "threejs-rebuild" ]; then
   test -n "${TURSO_DATABASE_URL:-}" || { echo "Missing TURSO_DATABASE_URL" >&2; exit 1; }
   test -n "${TURSO_AUTH_TOKEN:-}" || { echo "Missing TURSO_AUTH_TOKEN" >&2; exit 1; }
 fi
 
-echo "Verified YAKOLAK static Three.js shell with immutable asset gate and deterministic offline conversion contract"
+echo "Verified YAKOLAK static Three.js shell with immutable asset gate, deterministic conversion, and THREEJS-017 performance budgets"
