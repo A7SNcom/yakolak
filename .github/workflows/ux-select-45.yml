@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'tests/ux_select_45_selection_visibility.spec.js'
+      - 'tests/ux_select_45_selection_visibility_v2.spec.js'
       - '.github/workflows/ux-select-45.yml'
       - 'scripts/gameplay_selected_state.gd'
       - 'scripts/gameplay_turn_transition_stale_safe.gd'
@@ -52,13 +53,15 @@ jobs:
 
       - name: Validate UX-SELECT-45 source contract
         run: |
-          node --check tests/ux_select_45_selection_visibility.spec.js
+          node --check tests/ux_select_45_selection_visibility_v2.spec.js
           grep -q "yakolakSelectionEmphasisCount" scripts/gameplay_selected_state.gd
           grep -q "yakolak_selection_outline" scripts/gameplay_selected_state.gd
           grep -q "SELECT44_OUTLINE_GROW" scripts/gameplay_selected_state.gd
           grep -q "_cancel_stale_selection_presentation" scripts/gameplay_selected_state.gd
           grep -q "_apply_online_board" scripts/gameplay_selected_state.gd
           grep -q "single-authoritative-controller" scripts/turn_light_crossfade.gd
+          grep -q "representative board locations" tests/ux_select_45_selection_visibility_v2.spec.js
+          grep -q "reconnect hydration" tests/ux_select_45_selection_visibility_v2.spec.js
 
       - name: Install build dependency
         run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
@@ -86,7 +89,7 @@ jobs:
           npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0 pngjs@7.0.0
           npx playwright install --with-deps chromium
 
-      - name: Run desktop mobile Reduced Motion and hydration matrix
+      - name: Run 4-color desktop mobile board Reduced Motion and hydration matrix
         env:
           YAKOLAK_UX_SELECT_45_LABEL: source
         run: |
@@ -99,10 +102,10 @@ jobs:
             if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi
             sleep 0.25
           done
-          npx playwright test tests/ux_select_45_selection_visibility.spec.js --workers=1 --reporter=github 2>&1 | tee /tmp/yakolak-ux-select-45-playwright.log
+          npx playwright test tests/ux_select_45_selection_visibility_v2.spec.js --workers=1 --reporter=github 2>&1 | tee /tmp/yakolak-ux-select-45-playwright.log
           COUNT=$(find artifacts/ux-select-45-source -type f -name '*.png' | wc -l)
           echo "UX-SELECT-45 rendered frame count: $COUNT"
-          test "$COUNT" -ge 154
+          test "$COUNT" -ge 157
 
       - name: Verify tested artifact already matches canonical Production
         run: |
@@ -121,7 +124,7 @@ jobs:
           echo "::error::Canonical Production does not match the tested source artifact."
           exit 1
 
-      - name: Upload 154+ deterministic rendered frames
+      - name: Upload 157+ deterministic rendered frames
         if: ${{ success() }}
         uses: actions/upload-artifact@v4
         with:
@@ -184,10 +187,10 @@ jobs:
         run: |
           set -o pipefail
           rm -rf artifacts/ux-select-45-production
-          npx playwright test tests/ux_select_45_selection_visibility.spec.js --workers=1 --reporter=github 2>&1 | tee /tmp/yakolak-ux-select-45-production.log
+          npx playwright test tests/ux_select_45_selection_visibility_v2.spec.js --workers=1 --reporter=github 2>&1 | tee /tmp/yakolak-ux-select-45-production.log
           COUNT=$(find artifacts/ux-select-45-production -type f -name '*.png' | wc -l)
           echo "UX-SELECT-45 Production rendered frame count: $COUNT"
-          test "$COUNT" -ge 154
+          test "$COUNT" -ge 157
 
       - name: Upload Production rendered frames
         if: ${{ success() }}
