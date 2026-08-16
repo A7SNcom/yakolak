@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runAssetConversionPipeline } from './lib/asset-conversion-pipeline.mjs';
+import { BOARD_LID_PROFILE_ID, stlToBoardAndLidGlb } from './lib/board-lid-semantic-glb.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const portableManifestPath = 'YAKOLAK_PORTABLE_KIT/assets/manifest.json';
@@ -9,12 +10,17 @@ const statePath = 'web/assets/models/conversion-state.json';
 const portable = JSON.parse(await readFile(path.join(repoRoot, portableManifestPath), 'utf8'));
 
 const outputBySource = Object.freeze({
-  'models/board-and-lid.stl': ['model.board-and-lid', 'web/assets/models/board-and-lid.glb'],
-  'models/player-base.stl': ['model.player-base', 'web/assets/models/player-base.glb'],
-  'models/piece-small.stl': ['model.piece-small', 'web/assets/models/piece-small.glb'],
-  'models/piece-medium.stl': ['model.piece-medium', 'web/assets/models/piece-medium.glb'],
-  'models/piece-large.stl': ['model.piece-large', 'web/assets/models/piece-large.glb'],
-  'models/score-marker.stl': ['model.score-marker', 'web/assets/models/score-marker.glb'],
+  'models/board-and-lid.stl': Object.freeze({
+    logicalId: 'model.board-and-lid',
+    outputPath: 'web/assets/models/board-and-lid.glb',
+    profileId: BOARD_LID_PROFILE_ID,
+    convert: stlToBoardAndLidGlb,
+  }),
+  'models/player-base.stl': Object.freeze({ logicalId: 'model.player-base', outputPath: 'web/assets/models/player-base.glb' }),
+  'models/piece-small.stl': Object.freeze({ logicalId: 'model.piece-small', outputPath: 'web/assets/models/piece-small.glb' }),
+  'models/piece-medium.stl': Object.freeze({ logicalId: 'model.piece-medium', outputPath: 'web/assets/models/piece-medium.glb' }),
+  'models/piece-large.stl': Object.freeze({ logicalId: 'model.piece-large', outputPath: 'web/assets/models/piece-large.glb' }),
+  'models/score-marker.stl': Object.freeze({ logicalId: 'model.score-marker', outputPath: 'web/assets/models/score-marker.glb' }),
 });
 
 const canonicalStlPaths = portable.assets.filter((asset) => asset.path.endsWith('.stl')).map((asset) => asset.path).sort();
@@ -24,8 +30,14 @@ if (JSON.stringify(canonicalStlPaths) !== JSON.stringify(plannedStlPaths)) {
 }
 
 const plan = canonicalStlPaths.map((sourcePath) => {
-  const [logicalId, outputPath] = outputBySource[sourcePath];
-  return Object.freeze({ logicalId, sourcePath: `YAKOLAK_PORTABLE_KIT/assets/${sourcePath}`, outputPath });
+  const target = outputBySource[sourcePath];
+  return Object.freeze({
+    logicalId: target.logicalId,
+    sourcePath: `YAKOLAK_PORTABLE_KIT/assets/${sourcePath}`,
+    outputPath: target.outputPath,
+    ...(target.profileId ? { profileId: target.profileId } : {}),
+    ...(target.convert ? { convert: target.convert } : {}),
+  });
 });
 
 const args = process.argv.slice(2);
