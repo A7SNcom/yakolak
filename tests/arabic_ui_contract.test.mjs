@@ -7,6 +7,7 @@ const gameplayPolish = fs.readFileSync(new URL('../scripts/gameplay_session_poli
 const gameplayNestedPick = fs.readFileSync(new URL('../scripts/gameplay_session_nested_pick.gd', import.meta.url), 'utf8');
 const gameplayDesign = fs.readFileSync(new URL('../scripts/gameplay_design_system.gd', import.meta.url), 'utf8');
 const authoritativeTurn = fs.readFileSync(new URL('../scripts/gameplay_authoritative_turn_state.gd', import.meta.url), 'utf8');
+const turnTransition = fs.readFileSync(new URL('../scripts/gameplay_turn_transition_stale_safe.gd', import.meta.url), 'utf8');
 const turnHud = fs.readFileSync(new URL('../scripts/turn_clarity_hud.gd', import.meta.url), 'utf8');
 const turnHudDesign = fs.readFileSync(new URL('../scripts/turn_clarity_hud_design_system.gd', import.meta.url), 'utf8');
 const setup = fs.readFileSync(new URL('../scripts/session_setup_arabic.gd', import.meta.url), 'utf8');
@@ -36,7 +37,8 @@ assert.ok(setupDialog.includes('extends "res://scripts/session_setup_flow.gd"'),
 assert.ok(setupFlow.includes('extends "res://scripts/session_setup_arabic.gd"'), 'the user-journey layer must preserve the Arabic setup layer');
 assert.ok(scene.includes('res://scripts/gameplay_design_system.gd'), 'gameplay chrome must use the shared design adapter');
 assert.ok(gameplayDesign.includes('extends "res://scripts/gameplay_rematch_lifecycle.gd"'), 'gameplay design must preserve the rematch/gameplay chain');
-assert.ok(scene.includes('res://scripts/gameplay_authoritative_turn_state.gd'), 'production gameplay must include the authoritative turn observer layer');
+assert.ok(scene.includes('res://scripts/gameplay_turn_transition_stale_safe.gd'), 'production gameplay must use the stale-safe turn presentation layer');
+assert.ok(turnTransition.includes('extends "res://scripts/gameplay_authoritative_turn_state.gd"'), 'stale-safe presentation must preserve the authoritative turn observer layer');
 assert.ok(authoritativeTurn.includes('signal authoritative_turn_changed'), 'turn presentation must subscribe to one authoritative gameplay event');
 assert.ok(authoritativeTurn.includes('authoritative_online_snapshot_hydrated'), 'reconnect must stay hidden until a fresh accepted room snapshot hydrates turn state');
 assert.ok(scene.includes('res://scripts/turn_clarity_hud_design_system.gd'), 'the turn clarity adapter must remain active');
@@ -56,7 +58,7 @@ assert.ok(design.includes('const EXTENDED_ARABIC_INDIC_DIGITS'), 'display bounda
 assert.ok(design.includes('const TOUCH_MIN := 48.0'), 'interactive controls must share a 48px minimum target');
 assert.ok(design.includes('const RADIUS_CHIP := 10.0'), 'chip radius must be tokenized');
 assert.ok(design.includes('const RADIUS_CONTROL := 14.0'), 'control radius must be tokenized');
-assert.ok(design.includes('const RADIUS_SURFACE := 18.0'), 'surface radius must be tokenized');
+assert.ok(design.includes('const RADIUS_SURFACE := 18.0'), 'chip radius must be tokenized');
 assert.ok(design.includes('static func surface_style'), 'surface styling must use a shared primitive');
 assert.ok(design.includes('static func button_style'), 'button states must use a shared primitive');
 assert.ok(design.includes('static func apply_button_contract'), 'button typography/touch/focus must use one contract');
