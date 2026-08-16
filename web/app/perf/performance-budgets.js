@@ -12,17 +12,17 @@ export const REPRESENTATIVE_MOBILE_PROFILE = Object.freeze({
   uploadKbps: 750,
 });
 
-// Enforced now. Tight deterministic byte/memory ceilings plus timing headroom for hosted-runner jitter.
+// Enforced now. THREEJS-019 tightened these after one committed player-base GLB replaced the heavier runtime STL payload.
 export const PERFORMANCE_REGRESSION_CEILINGS = Object.freeze({
-  requiredAssetBodyBytes: 13_500_000,
+  requiredAssetBodyBytes: 5_000_000,
   optionalAssetBodyBytes: 14_600_000,
-  allAssetBodyBytes: 28_000_000,
-  startupEncodedBytes: 16_000_000,
-  decodedRequiredGeometryBytes: 19_000_000,
+  allAssetBodyBytes: 20_000_000,
+  startupEncodedBytes: 7_500_000,
+  decodedRequiredGeometryBytes: 5_000_000,
   decodedOptionalTextureRgba8Bytes: 50_331_648,
-  criticalAssetsReadyMs: 90_000,
-  firstInteractiveMs: 90_000,
-  firstVisibleFrameMs: 90_500,
+  criticalAssetsReadyMs: 45_000,
+  firstInteractiveMs: 45_000,
+  firstVisibleFrameMs: 45_500,
   drawCalls: 64,
   triangles: 1_000_000,
   gpuGeometries: 16,
@@ -32,13 +32,13 @@ export const PERFORMANCE_REGRESSION_CEILINGS = Object.freeze({
 
 // Must be met before production cutover; not an excuse to relax the regression ceilings above.
 export const PERFORMANCE_CUTOVER_TARGETS = Object.freeze({
-  requiredAssetBodyBytes: 8_000_000,
-  startupEncodedBytes: 9_000_000,
-  decodedRequiredGeometryBytes: 16_000_000,
+  requiredAssetBodyBytes: 4_800_000,
+  startupEncodedBytes: 7_000_000,
+  decodedRequiredGeometryBytes: 4_800_000,
   decodedOptionalTextureRgba8Bytes: 16_777_216,
-  criticalAssetsReadyMs: 50_000,
-  firstInteractiveMs: 50_000,
-  firstVisibleFrameMs: 50_500,
+  criticalAssetsReadyMs: 40_000,
+  firstInteractiveMs: 40_000,
+  firstVisibleFrameMs: 40_500,
   drawCalls: 64,
   triangles: 900_000,
 });
