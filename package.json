@@ -5,6 +5,10 @@
   "engines": {
     "node": "22.x"
   },
+  "scripts": {
+    "assets:convert": "node scripts/convert-threejs-assets.mjs",
+    "assets:check": "node scripts/convert-threejs-assets.mjs --check"
+  },
   "dependencies": {
     "@tursodatabase/serverless": "^1.3.1"
   }
