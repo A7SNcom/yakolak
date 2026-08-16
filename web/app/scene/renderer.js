@@ -1,5 +1,29 @@
 import * as THREE from 'three';
 
+const DIAGNOSTICS_KEY = '__YAKOLAK_RENDERER_INFO__';
+
+export const RENDERER_BASELINE = Object.freeze({
+  canvasId: 'scene',
+  canvasClassName: 'scene',
+  maxPixelRatio: 1.5,
+  clearColor: 0x0b1018,
+  clearAlpha: 1,
+  toneMappingExposure: 1,
+});
+
+const WEBGL2_CONTEXT_ATTRIBUTES = Object.freeze({
+  alpha: false,
+  antialias: true,
+  depth: true,
+  stencil: false,
+  premultipliedAlpha: false,
+  preserveDrawingBuffer: false,
+  powerPreference: 'default',
+  failIfMajorPerformanceCaveat: false,
+});
+
+let activeOwner = null;
+
 export class WebGLNotSupportedError extends Error {
   constructor(message = 'WebGL 2 is unavailable') {
     super(message);
@@ -7,103 +31,141 @@ export class WebGLNotSupportedError extends Error {
   }
 }
 
-function supportsWebGL2() {
-  const probe = document.createElement('canvas');
-  return Boolean(probe.getContext('webgl2', { failIfMajorPerformanceCaveat: false }));
+export class RendererOwnershipError extends Error {
+  constructor(message = 'The primary WebGL2 renderer already has an owner') {
+    super(message);
+    this.name = 'RendererOwnershipError';
+  }
 }
 
-export function createRendererShell(canvas) {
-  if (!supportsWebGL2()) throw new WebGLNotSupportedError();
+function requireMount(mount) {
+  if (!(mount instanceof HTMLElement)) {
+    throw new TypeError('Renderer owner requires an HTMLElement mount');
+  }
+  if (mount.querySelector('canvas')) {
+    throw new RendererOwnershipError('Renderer mount must not contain a second canvas');
+  }
+}
 
-  const renderer = new THREE.WebGLRenderer({
-    canvas,
-    antialias: true,
-    alpha: false,
-    powerPreference: 'high-performance',
-  });
-  renderer.setClearColor(0x0b1018, 1);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+function createOwnedCanvas(mount) {
+  const canvas = document.createElement('canvas');
+  canvas.id = RENDERER_BASELINE.canvasId;
+  canvas.className = RENDERER_BASELINE.canvasClassName;
+  canvas.dataset.rendererOwner = 'primary-webgl2';
+  canvas.setAttribute('aria-label', 'Three.js preview scene');
+  mount.prepend(canvas);
+  return canvas;
+}
 
-  const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x0b1018, 0.085);
+function getPixelRatio() {
+  return Math.min(Math.max(window.devicePixelRatio || 1, 1), RENDERER_BASELINE.maxPixelRatio);
+}
 
-  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
-  camera.position.set(0, 1.6, 6.2);
-  camera.lookAt(0, 0, 0);
+export function createRendererOwner({ mount }) {
+  if (activeOwner && !activeOwner.disposed) {
+    throw new RendererOwnershipError();
+  }
 
-  const group = new THREE.Group();
-  scene.add(group);
+  requireMount(mount);
+  const canvas = createOwnedCanvas(mount);
+  const context = canvas.getContext('webgl2', WEBGL2_CONTEXT_ATTRIBUTES);
 
-  const geometry = new THREE.TorusKnotGeometry(1.05, 0.28, 128, 20);
-  const material = new THREE.MeshStandardMaterial({
-    color: 0xeef2f7,
-    metalness: 0.36,
-    roughness: 0.28,
-  });
-  const knot = new THREE.Mesh(geometry, material);
-  group.add(knot);
+  if (!context) {
+    canvas.remove();
+    throw new WebGLNotSupportedError();
+  }
 
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(1.85, 0.025, 12, 128),
-    new THREE.MeshBasicMaterial({ color: 0x7385a6, transparent: true, opacity: 0.5 }),
-  );
-  ring.rotation.x = Math.PI * 0.54;
-  ring.rotation.z = Math.PI * 0.18;
-  group.add(ring);
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, context });
+  } catch (error) {
+    canvas.remove();
+    throw error;
+  }
 
-  scene.add(new THREE.HemisphereLight(0xeef5ff, 0x101722, 2.15));
-  const key = new THREE.DirectionalLight(0xffffff, 3.4);
-  key.position.set(4, 6, 5);
-  scene.add(key);
-  const rim = new THREE.PointLight(0x6d85b7, 18, 12, 2);
-  rim.position.set(-3.2, 0.8, 2.4);
-  scene.add(rim);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = RENDERER_BASELINE.toneMappingExposure;
+  renderer.autoClear = true;
+  renderer.setClearColor(RENDERER_BASELINE.clearColor, RENDERER_BASELINE.clearAlpha);
+  renderer.setPixelRatio(getPixelRatio());
+  renderer.shadowMap.enabled = false;
 
-  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const startedAt = performance.now();
-  let frameId = 0;
   let disposed = false;
+  let diagnosticsTarget = null;
 
-  function resize() {
-    const width = Math.max(1, canvas.clientWidth);
-    const height = Math.max(1, canvas.clientHeight);
-    const targetWidth = Math.floor(width * renderer.getPixelRatio());
-    const targetHeight = Math.floor(height * renderer.getPixelRatio());
-    if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
-      renderer.setSize(width, height, false);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-    }
+  function assertLive() {
+    if (disposed) throw new RendererOwnershipError('Renderer owner has been disposed');
   }
 
-  function render(now) {
-    if (disposed) return;
-    resize();
-    if (!reducedMotion) {
-      const t = (now - startedAt) * 0.00022;
-      group.rotation.y = t;
-      group.rotation.x = Math.sin(t * 0.8) * 0.11;
-      ring.rotation.z = Math.PI * 0.18 - t * 0.42;
-    }
+  function resizeToDisplaySize() {
+    assertLive();
+
+    const pixelRatio = getPixelRatio();
+    if (renderer.getPixelRatio() !== pixelRatio) renderer.setPixelRatio(pixelRatio);
+
+    const width = Math.max(1, Math.floor(canvas.clientWidth));
+    const height = Math.max(1, Math.floor(canvas.clientHeight));
+    const targetWidth = Math.floor(width * pixelRatio);
+    const targetHeight = Math.floor(height * pixelRatio);
+    const resized = canvas.width !== targetWidth || canvas.height !== targetHeight;
+
+    if (resized) renderer.setSize(width, height, false);
+    return Object.freeze({ width, height, resized });
+  }
+
+  function render(scene, camera) {
+    assertLive();
     renderer.render(scene, camera);
-    frameId = requestAnimationFrame(render);
   }
 
-  frameId = requestAnimationFrame(render);
+  function exposeDevelopmentDiagnostics(target = window) {
+    assertLive();
 
-  return {
-    renderer,
-    scene,
-    camera,
-    dispose() {
-      if (disposed) return;
-      disposed = true;
-      cancelAnimationFrame(frameId);
-      geometry.dispose();
-      material.dispose();
-      ring.geometry.dispose();
-      ring.material.dispose();
-      renderer.dispose();
+    if (diagnosticsTarget === target) return renderer.info;
+    if (Object.prototype.hasOwnProperty.call(target, DIAGNOSTICS_KEY)) {
+      throw new RendererOwnershipError(`${DIAGNOSTICS_KEY} is already defined`);
+    }
+
+    Object.defineProperty(target, DIAGNOSTICS_KEY, {
+      configurable: true,
+      enumerable: false,
+      get: () => renderer.info,
+    });
+    diagnosticsTarget = target;
+    return renderer.info;
+  }
+
+  function revokeDevelopmentDiagnostics() {
+    if (!diagnosticsTarget) return;
+    const descriptor = Object.getOwnPropertyDescriptor(diagnosticsTarget, DIAGNOSTICS_KEY);
+    if (descriptor?.configurable) delete diagnosticsTarget[DIAGNOSTICS_KEY];
+    diagnosticsTarget = null;
+  }
+
+  let owner;
+  function dispose() {
+    if (disposed) return;
+    disposed = true;
+    revokeDevelopmentDiagnostics();
+    renderer.setAnimationLoop(null);
+    renderer.dispose();
+    renderer.forceContextLoss();
+    canvas.remove();
+    if (activeOwner === owner) activeOwner = null;
+  }
+
+  owner = Object.freeze({
+    canvas,
+    get disposed() {
+      return disposed;
     },
-  };
+    resizeToDisplaySize,
+    render,
+    exposeDevelopmentDiagnostics,
+    dispose,
+  });
+
+  activeOwner = owner;
+  return owner;
 }

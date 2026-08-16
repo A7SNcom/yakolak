@@ -1,11 +1,12 @@
 import { hydrateBuildMarker } from './build-marker.js';
 import { installFatalErrorHandlers } from './fatal-error.js';
-import { createRendererShell, WebGLNotSupportedError } from '../scene/renderer.js';
+import { createRendererOwner, WebGLNotSupportedError } from '../scene/renderer.js';
+import { createPreviewScene } from '../scene/preview-scene.js';
 
+const appElement = document.querySelector('#app');
 const statusElement = document.querySelector('#boot-status');
 const buildMarkerElement = document.querySelector('#build-marker');
 const unsupportedElement = document.querySelector('#unsupported-webgl');
-const canvas = document.querySelector('#scene');
 
 const fatal = installFatalErrorHandlers({ statusElement, unsupportedElement });
 
@@ -14,18 +15,42 @@ async function boot() {
   document.documentElement.dataset.bootState = 'booting';
 
   const markerPromise = hydrateBuildMarker(buildMarkerElement);
+  let rendererOwner = null;
+  let previewScene = null;
 
   try {
-    const shell = createRendererShell(canvas);
-    window.__YAKOLAK_THREEJS_SHELL__ = Object.freeze({
+    rendererOwner = createRendererOwner({ mount: appElement });
+    previewScene = createPreviewScene(rendererOwner);
+    previewScene.start();
+
+    let shell = null;
+    const dispose = () => {
+      previewScene?.dispose();
+      rendererOwner?.dispose();
+      if (window.__YAKOLAK_THREEJS_SHELL__ === shell) {
+        delete window.__YAKOLAK_THREEJS_SHELL__;
+      }
+    };
+
+    shell = Object.freeze({
       runtime: 'threejs-static-esm',
-      renderer: shell.renderer,
-      dispose: () => shell.dispose(),
+      canvas: rendererOwner.canvas,
+      dispose,
+    });
+    window.__YAKOLAK_THREEJS_SHELL__ = shell;
+
+    markerPromise.then((buildInfo) => {
+      if (buildInfo.environment !== 'production' && !rendererOwner.disposed) {
+        rendererOwner.exposeDevelopmentDiagnostics(window);
+      }
     });
 
     if (statusElement) statusElement.textContent = 'Static Three.js shell ready';
     document.documentElement.dataset.bootState = 'ready';
   } catch (error) {
+    previewScene?.dispose();
+    rendererOwner?.dispose();
+
     if (error instanceof WebGLNotSupportedError) {
       fatal.showUnsupportedWebGL();
       return;
