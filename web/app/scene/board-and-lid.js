@@ -11,6 +11,28 @@ function applyTransform(object, transform) {
   if ('visible' in transform) object.visible = transform.visible;
 }
 
+function sameIndices(actual, expected) {
+  return Array.isArray(actual) && actual.length === expected.length && actual.every((value, index) => value === expected[index]);
+}
+
+function sameVector(actual, expected, epsilon = 1e-5) {
+  return Array.isArray(actual) && actual.length === expected.length && actual.every((value, index) => Math.abs(value - expected[index]) <= epsilon);
+}
+
+function validateSemanticContract(runtimeAsset, layout) {
+  if (runtimeAsset?.semanticProfile !== layout.semanticProfile) {
+    throw new Error(`Board/lid semantic profile mismatch: ${runtimeAsset?.semanticProfile || 'missing'} / ${layout.semanticProfile}`);
+  }
+  if (!sameVector(runtimeAsset.sourcePivot, layout.board.assetPivot) || !sameVector(layout.lid.assetPivot, layout.board.assetPivot)) {
+    throw new Error('Board/lid source pivot drift');
+  }
+  const groups = runtimeAsset.semanticGroups || [];
+  const boardGroup = groups.find((group) => group.semanticRole === 'board' || group.name === layout.board.semanticNode);
+  const lidGroup = groups.find((group) => group.semanticRole === 'intro-lid' || group.name === layout.lid.semanticNode);
+  if (!boardGroup || !sameIndices(boardGroup.componentIndices, layout.board.componentIndices)) throw new Error('Board semantic component mapping drift');
+  if (!lidGroup || !sameIndices(lidGroup.componentIndices, layout.lid.componentIndices)) throw new Error('Intro lid semantic component mapping drift');
+}
+
 function requireComponents(runtimeAsset, indices, label) {
   return indices.map((index) => {
     const component = runtimeAsset?.getComponent?.(index) || runtimeAsset?.components?.[index];
@@ -40,6 +62,7 @@ export function createBoardAndLidObjects({ runtimeAsset, layout, boardMaterial, 
   if (runtimeAsset?.format !== 'yakolak-glb-components-v1') throw new TypeError('Board/lid runtime requires deterministic GLB components');
   if (!layout?.board || !layout?.lid) throw new TypeError('Board/lid runtime requires verified layout metadata');
   if (!boardMaterial || !lidMaterial) throw new TypeError('Board/lid runtime requires presentation materials supplied by the scene');
+  validateSemanticContract(runtimeAsset, layout);
 
   const root = new Group();
   root.name = 'board-and-lid-runtime';
