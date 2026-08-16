@@ -14,6 +14,7 @@ on:
       - web/index.html
       - web/styles/app.css
       - tests/threejs_context_recovery_contract.test.mjs
+      - tests/online_exactly_once_contract.test.mjs
       - tests/threejs_renderer_owner_contract.test.mjs
       - tests/threejs_frame_governor_contract.test.mjs
       - scripts/verify-threejs-context-recovery.mjs
@@ -46,6 +47,9 @@ jobs:
 
       - name: Verify context recovery and session invariants
         run: node tests/threejs_context_recovery_contract.test.mjs
+
+      - name: Verify live online exactly-once and authoritative seat contract
+        run: node tests/online_exactly_once_contract.test.mjs
 
       - name: Install browser verifier only
         run: npm install --no-save --package-lock=false playwright@1.55.0
