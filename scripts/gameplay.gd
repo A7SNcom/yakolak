@@ -30,6 +30,7 @@ var move_piece_index: int = -1
 var move_started_msec: int = 0
 var move_from: Vector3 = Vector3.ZERO
 var move_to: Vector3 = Vector3.ZERO
+var move_count: int = 0
 
 var last_pointer_msec: int = -1000
 var last_pointer_position: Vector2 = Vector2(-9999.0, -9999.0)
@@ -40,6 +41,8 @@ func _ready() -> void:
 	table = get_parent() as Node3D
 	set_process(true)
 	set_process_unhandled_input(true)
+	if not get_viewport().size_changed.is_connected(_publish_test_targets):
+		get_viewport().size_changed.connect(_publish_test_targets)
 
 
 func _process(_delta: float) -> void:
@@ -102,6 +105,7 @@ func _initialize_when_ready() -> bool:
 	_build_reset_button()
 	gameplay_ready = true
 	_publish_state("ready")
+	_publish_test_targets.call_deferred()
 	print("YAKOLAK_FREE_PLAY_READY players=4 pieces=36 rules=none")
 	return true
 
@@ -259,6 +263,7 @@ func _update_move() -> void:
 		return
 	mesh.position = move_to
 	mesh.material_override = selected_material
+	move_count += 1
 	move_active = false
 	move_piece_index = -1
 	selected_index = -1
@@ -272,6 +277,7 @@ func _reset_all() -> void:
 	move_piece_index = -1
 	selected_index = -1
 	selected_material = null
+	move_count = 0
 	for index: int in range(pieces.size()):
 		var record: Dictionary = pieces[index] as Dictionary
 		var mesh := record["mesh"] as MeshInstance3D
@@ -282,6 +288,7 @@ func _reset_all() -> void:
 		mesh.material_override = home["material"] as Material
 	gameplay_ready = true
 	_publish_state("ready")
+	_publish_test_targets.call_deferred()
 	print("YAKOLAK_FREE_PLAY_RESET players=4 pieces=36")
 
 
@@ -309,6 +316,31 @@ func _publish_state(state: String) -> void:
 			"document.body.dataset.yakolakMode='free-play';" +
 			"document.body.dataset.yakolakGameplay='" + state + "';" +
 			"document.body.dataset.yakolakPlayers='4';" +
-			"document.body.dataset.yakolakRules='none';",
+			"document.body.dataset.yakolakRules='none';" +
+			"document.body.dataset.yakolakMoves='" + str(move_count) + "';",
 			true
 		)
+
+
+func _publish_test_targets() -> void:
+	if not gameplay_ready or camera == null or pieces.is_empty() or not OS.has_feature("web"):
+		return
+	var sample_index: int = -1
+	for index: int in range(pieces.size()):
+		var record: Dictionary = pieces[index] as Dictionary
+		if str(record["dir"]) == "right" and int(record["side"]) == 0 and str(record["type"]) == "large":
+			sample_index = index
+			break
+	if sample_index < 0:
+		return
+	var sample: Dictionary = pieces[sample_index] as Dictionary
+	var mesh := sample["mesh"] as MeshInstance3D
+	var piece_screen: Vector2 = camera.unproject_position(mesh.to_global(Vector3(17.0, 0.0, 9.5)))
+	var board_screen: Vector2 = camera.unproject_position(Vector3(0.0, 0.52, 0.0))
+	JavaScriptBridge.eval(
+		"document.body.dataset.yakolakTestPieceX='" + str(piece_screen.x) + "';" +
+		"document.body.dataset.yakolakTestPieceY='" + str(piece_screen.y) + "';" +
+		"document.body.dataset.yakolakTestBoardX='" + str(board_screen.x) + "';" +
+		"document.body.dataset.yakolakTestBoardY='" + str(board_screen.y) + "';",
+		true
+	)
