@@ -1,4 +1,4 @@
-name: THREEJS-010 Vendor Three.js r185
+name: THREEJS Vendor Pinned r185
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: threejs-010-vendor-r185
+  group: threejs-vendor-r185
   cancel-in-progress: false
 
 jobs:
@@ -25,32 +25,39 @@ jobs:
           ref: threejs-rebuild
           fetch-depth: 0
 
-      - name: Fetch and verify pinned Three.js r185
+      - name: Fetch and verify immutable Three.js source
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p web/vendor/three/r185
-          curl --fail --location --silent --show-error \
-            https://raw.githubusercontent.com/mrdoob/three.js/r185/build/three.module.js \
-            -o web/vendor/three/r185/three.module.js
-          curl --fail --location --silent --show-error \
-            https://raw.githubusercontent.com/mrdoob/three.js/r185/build/three.core.js \
-            -o web/vendor/three/r185/three.core.js
+          THREE_COMMIT=2431a09f46f34c560bc8e44b33be0e567723d5b9
+          RAW_BASE="https://raw.githubusercontent.com/mrdoob/three.js/${THREE_COMMIT}"
+
+          mkdir -p web/vendor/three/r185/addons/loaders
+          curl --fail --location --silent --show-error "${RAW_BASE}/build/three.module.js" -o web/vendor/three/r185/three.module.js
+          curl --fail --location --silent --show-error "${RAW_BASE}/build/three.core.js" -o web/vendor/three/r185/three.core.js
+          curl --fail --location --silent --show-error "${RAW_BASE}/examples/jsm/loaders/STLLoader.js" -o web/vendor/three/r185/addons/loaders/STLLoader.js
+          curl --fail --location --silent --show-error "${RAW_BASE}/LICENSE" -o web/vendor/three/r185/LICENSE
 
           test "$(git hash-object web/vendor/three/r185/three.module.js)" = "ad13abf7d128bee607a7672646ca543327e258d3"
           test "$(git hash-object web/vendor/three/r185/three.core.js)" = "0bb9262cd029f411933d077fd44197a51ec5e8e9"
+          test "$(git hash-object web/vendor/three/r185/addons/loaders/STLLoader.js)" = "45f8ddfcab5882d938cceb0527e83a6a586bfd17"
+          test "$(git hash-object web/vendor/three/r185/LICENSE)" = "8ada2a5f982916b0ba4b7a0aa7de347587e745d7"
 
-      - name: Commit vendored runtime once
+      - name: Commit vendored runtime only when bytes differ
         shell: bash
         run: |
           set -euo pipefail
-          git add web/vendor/three/r185/three.module.js web/vendor/three/r185/three.core.js
+          git add \
+            web/vendor/three/r185/three.module.js \
+            web/vendor/three/r185/three.core.js \
+            web/vendor/three/r185/addons/loaders/STLLoader.js \
+            web/vendor/three/r185/LICENSE
           if git diff --cached --quiet; then
-            echo "Three.js r185 already vendored"
+            echo "Pinned Three.js r185 files already match immutable upstream"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "THREEJS-010 vendor Three.js r185"
+          git commit -m "THREEJS-011 sync immutable Three.js r185 vendor bytes"
           git pull --rebase origin threejs-rebuild
           git push origin HEAD:threejs-rebuild
