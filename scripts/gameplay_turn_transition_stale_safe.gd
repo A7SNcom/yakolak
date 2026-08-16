@@ -16,17 +16,19 @@ var turn_presentation_stale_finish_count: int = 0
 
 
 func _transition_to_current_player() -> void:
-	# Production presentation starts only after the authoritative snapshot is
-	# published. This prevents a pre-hydration/current_player_index guess from
-	# creating camera work that then has to race the accepted room state.
-	if has_method("authoritative_turn_snapshot"):
+	# Online presentation starts only after the authoritative room snapshot is
+	# published. Offline/shared-device play keeps its established camera/tutorial
+	# lifecycle untouched.
+	if online_active:
 		return
 	super._transition_to_current_player()
 
 
 func _publish_authoritative_turn_state(lifecycle: String) -> void:
 	super._publish_authoritative_turn_state(lifecycle)
-	if authoritative_turn_cached_snapshot.is_empty():
+	# UX-TURN-40 is deliberately scoped to accepted online authority. Offline
+	# presentation remains owned by the inherited gameplay camera path.
+	if not online_active or authoritative_turn_cached_snapshot.is_empty():
 		return
 	_retarget_authoritative_turn_presentation(authoritative_turn_cached_snapshot.duplicate(true))
 
@@ -49,8 +51,6 @@ func _retarget_authoritative_turn_presentation(snapshot: Dictionary) -> void:
 		_cancel_turn_camera_presentation(revision, str(snapshot.get("lifecycle", "invalid-direction")))
 		return
 
-	# If the inherited local/shared path already targeted this exact direction,
-	# adopt the newer authoritative revision without restarting identical motion.
 	if turn_camera_active and turn_presentation_target_direction == direction:
 		_publish_turn_presentation_state("retarget-adopted", revision, str(snapshot.get("lifecycle", "")))
 		return
