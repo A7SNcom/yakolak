@@ -14,6 +14,12 @@ var turn_presentation_retarget_count: int = 0
 var turn_presentation_cancel_count: int = 0
 var turn_presentation_stale_finish_count: int = 0
 
+# UX-TURN-41: cache mobile safe-area/layout data so the inherited per-frame quick
+# menu sync never needs to query browser CSS on every frame.
+var turn41_safe_insets_css: Vector4 = Vector4.ZERO
+var turn41_safe_viewport_size: Vector2 = Vector2(-1.0, -1.0)
+var turn41_layout_publish_key: String = ""
+
 
 func _transition_to_current_player() -> void:
 	# Online presentation starts only after the authoritative room snapshot is
@@ -187,5 +193,114 @@ func _publish_turn_presentation_state(state: String, revision: int, lifecycle: S
 		"document.body.dataset.yakolakTurnPresentationStaleFinishes='%d';" % turn_presentation_stale_finish_count +
 		"document.body.dataset.yakolakTurnPresentationSelection='%d';" % selected_index +
 		"document.body.dataset.yakolakTurnPresentationTray='%s';" % ("open" if tray_open else "closed"),
+		true
+	)
+
+
+# UX-TURN-41 owns only the floating Settings geometry. It does not resize or
+# translate the gameplay canvas/camera. On the narrowest portrait, the button
+# moves below the turn capsule only when its touch rect would enter the capsule's
+# 8px reserved band. Wider screens retain the approved top-right placement.
+func _layout_quick_menu() -> void:
+	if quick_button == null or quick_panel == null:
+		return
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	if viewport_size != turn41_safe_viewport_size:
+		turn41_safe_viewport_size = viewport_size
+		turn41_safe_insets_css = _turn41_read_safe_insets_css(viewport_size)
+		turn41_layout_publish_key = ""
+
+	var left_margin_css: float = maxf(12.0, turn41_safe_insets_css.x + 8.0)
+	var top_css: float = maxf(12.0, turn41_safe_insets_css.y + 8.0)
+	var right_margin_css: float = maxf(12.0, turn41_safe_insets_css.z + 8.0)
+	var button_size := Vector2(_hud_length(96.0), _hud_length(48.0))
+	var panel_width: float = _hud_length(158.0)
+	var button_x: float = maxf(_hud_length(left_margin_css), viewport_size.x - _hud_length(right_margin_css) - button_size.x)
+	var panel_x: float = maxf(_hud_length(left_margin_css), viewport_size.x - _hud_length(right_margin_css) - panel_width)
+	var top: float = _hud_length(top_css)
+
+	var indicator_top_css: float = maxf(12.0, turn41_safe_insets_css.y + 8.0)
+	var indicator_reserved_width: float = _hud_length(124.0)
+	var indicator_reserved := Rect2(
+		Vector2((viewport_size.x - indicator_reserved_width) * 0.5, _hud_length(indicator_top_css)),
+		Vector2(indicator_reserved_width, _hud_length(30.0))
+	).grow(_hud_length(8.0))
+	var proposed_button := Rect2(Vector2(button_x, top), button_size)
+	if proposed_button.intersects(indicator_reserved):
+		top = indicator_reserved.position.y + indicator_reserved.size.y
+
+	quick_button.position = Vector2(button_x, top)
+	quick_button.size = button_size
+	quick_button.add_theme_font_size_override("font_size", _hud_font_size(14))
+	quick_panel.position = Vector2(panel_x, top + button_size.y + _hud_length(8.0))
+	var action_count: int = 3 if quick_round_button != null and quick_round_button.visible else 2
+	quick_panel.size = Vector2(panel_width, _hud_length(18.0 + float(action_count) * 55.0))
+	for child: Node in quick_panel.get_children():
+		if child is VBoxContainer:
+			var menu := child as VBoxContainer
+			menu.add_theme_constant_override("separation", int(round(_hud_length(7.0))))
+			for action: Node in menu.get_children():
+				if action is Button:
+					(action as Button).custom_minimum_size.y = _hud_length(48.0)
+
+	_turn41_publish_layout(viewport_size, Rect2(quick_button.position, quick_button.size))
+
+
+func _turn41_read_safe_insets_css(viewport_size: Vector2) -> Vector4:
+	if OS.has_feature("web"):
+		var raw: Variant = JavaScriptBridge.eval(
+			"JSON.stringify((()=>{const e=document.createElement('div');e.style.cssText='position:fixed;left:0;top:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top);padding-right:env(safe-area-inset-right);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left)';document.body.appendChild(e);const s=getComputedStyle(e);const v={l:parseFloat(s.paddingLeft)||0,t:parseFloat(s.paddingTop)||0,r:parseFloat(s.paddingRight)||0,b:parseFloat(s.paddingBottom)||0};e.remove();return v;})())",
+			true
+		)
+		var decoded: Variant = JSON.parse_string(str(raw))
+		if decoded is Dictionary:
+			var values := decoded as Dictionary
+			return Vector4(
+				maxf(0.0, float(values.get("l", 0.0))),
+				maxf(0.0, float(values.get("t", 0.0))),
+				maxf(0.0, float(values.get("r", 0.0))),
+				maxf(0.0, float(values.get("b", 0.0)))
+			)
+		return Vector4.ZERO
+
+	var safe_rect: Rect2i = DisplayServer.get_display_safe_area()
+	if safe_rect.size.x <= 0 or safe_rect.size.y <= 0:
+		return Vector4.ZERO
+	return Vector4(
+		maxf(0.0, float(safe_rect.position.x)),
+		maxf(0.0, float(safe_rect.position.y)),
+		maxf(0.0, viewport_size.x - float(safe_rect.position.x + safe_rect.size.x)),
+		maxf(0.0, viewport_size.y - float(safe_rect.position.y + safe_rect.size.y))
+	)
+
+
+func _turn41_publish_layout(viewport_size: Vector2, button_rect: Rect2) -> void:
+	if not OS.has_feature("web"):
+		return
+	var scale: float = maxf(hud_canvas_scale, 0.20)
+	var x_css: float = button_rect.position.x * scale
+	var y_css: float = button_rect.position.y * scale
+	var width_css: float = button_rect.size.x * scale
+	var height_css: float = button_rect.size.y * scale
+	var panel_state: String = "open" if quick_panel != null and quick_panel.visible else "closed"
+	var key: String = "%.1f:%.1f:%.1f:%.1f:%.1f:%.1f:%s:%.0fx%.0f" % [
+		x_css, y_css, width_css, height_css,
+		turn41_safe_insets_css.y, turn41_safe_insets_css.z,
+		panel_state, viewport_size.x, viewport_size.y
+	]
+	if key == turn41_layout_publish_key:
+		return
+	turn41_layout_publish_key = key
+	JavaScriptBridge.eval(
+		"document.body.dataset.yakolakTurn41QuickMenu='safe-turn-band';" +
+		"document.body.dataset.yakolakTurn41QuickMenuX='%.1f';" % x_css +
+		"document.body.dataset.yakolakTurn41QuickMenuY='%.1f';" % y_css +
+		"document.body.dataset.yakolakTurn41QuickMenuWidth='%.1f';" % width_css +
+		"document.body.dataset.yakolakTurn41QuickMenuHeight='%.1f';" % height_css +
+		"document.body.dataset.yakolakTurn41QuickMenuPanel='%s';" % panel_state +
+		"document.body.dataset.yakolakTurn41SafeTop='%.1f';" % turn41_safe_insets_css.y +
+		"document.body.dataset.yakolakTurn41SafeRight='%.1f';" % turn41_safe_insets_css.z +
+		"document.body.dataset.yakolakTurn41TouchTarget='48px-min';" +
+		"document.body.dataset.yakolakTurn41CameraPolicy='overlay-only-no-projection-change';",
 		true
 	)
