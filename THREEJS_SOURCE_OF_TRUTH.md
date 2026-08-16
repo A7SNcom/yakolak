@@ -68,12 +68,18 @@ Status values: `OPEN`, `ADAPTER`, or `RESOLVED`. No entry may disappear without 
 - THREEJS-005 resolves only color identity: it does **not** silently resolve this live seat/turn-authority contradiction. The fixed right/back/left/front spatial mapping and color ring remain the Kit presentation contract, while actual online ownership/turn state must still follow authoritative backend state until a separate explicit resolution changes that backend contract.
 - Rule for rewrite: do not make the UI imply fixed-ring online ownership when the live backend state says otherwise unless an explicit backend migration resolves this contract.
 
-### SRC-004 — Invitation and ready-check model — OPEN
+### SRC-004 — Entry and invitation model — RESOLVED
 
-- `YAKOLAK_PORTABLE_KIT/README.md` requires seat-specific invitation links, reserved colors, explicit readiness, and start only after every configured seat is ready.
-- `api/rooms.js` exposes two-digit room discovery/join behavior, lets each joining player request an available color, and switches the room to `playing` automatically when `players.length === targetPlayers`.
-- The current API has no seat-specific invitation reservation or ready flag/state.
-- Rule for rewrite: do not invent client-only readiness or seat reservation and present it as authoritative online state.
+- `YAKOLAK_PORTABLE_KIT/README.md` requires one seat-specific invitation per online seat, with an exact reserved seat/color; the joining player does not choose another color.
+- Current `api/rooms.js` instead treats a two-digit value as a room code, allocates the next free `p2`/`p3`/`p4` seat on join, and accepts a joiner-requested available color.
+- **Resolution — THREEJS-006 (2026-08-16): the rebuild entry is locked to two top-level paths, `قيم جديد` for the host and `دخول بدعوة` for invitees. The host configures seats/colors, and every online seat receives one authoritative invitation reservation for one exact seat and canonical color.**
+- A joiner never chooses, swaps, or falls back to another seat/color. If the reserved seat/color cannot be claimed, the claim fails; the server must not silently allocate a different free seat or color.
+- The manual **2-digit code resolves an invitation, not a room**. One lobby may therefore have multiple active 2-digit invitation codes, one per online seat. Generic “enter room code, then take the next free seat/color” behavior is not part of the Three.js contract.
+- Invitation-link entry and manual-code entry must converge on the same authoritative invitation record before claiming. For the same invitation they must show the same preview, enforce the same validation, return the same reserved seat/color, and produce the same post-claim session identity outcome and errors.
+- The 2-digit invitation value is a locator, not the player's authenticated session credential. Successful claim issues or recovers a separate seat session identity used for later room actions.
+- Invalid, expired, cancelled, stale-after-reconfiguration, or already-claimed invitations do not occupy another seat and never fall back to generic room joining.
+- The complete binding contract is `THREEJS_ENTRY_INVITATION_CONTRACT.md`; later THREEJS tasks must follow it together with this resolution.
+- The current backend is not yet compliant with this resolved migration contract. A later implementation task must add/adjust authoritative invitation reservation/resolution before the rebuilt online UI claims this flow is live. Until then, the client must not fake reservation authority client-side.
 
 ### SRC-005 — Computer/mixed-seat authority — OPEN
 
@@ -111,6 +117,13 @@ Status values: `OPEN`, `ADAPTER`, or `RESOLVED`. No entry may disappear without 
 - Current `api/rooms.js` requires `mutationId` for `move` and `rematch`, while `edit` and `leave` do not use the same mutation-ID requirement (`leave` also bypasses the caller-supplied expected version by using the current row version).
 - Rule for rewrite: follow the live API exactly at its boundary and do not describe all mutations as having identical idempotency/version semantics.
 
+### SRC-011 — Ready-check and automatic start — OPEN
+
+- `YAKOLAK_PORTABLE_KIT/README.md` requires explicit readiness and start only after every configured seat is ready.
+- Current `api/rooms.js` has no ready flag/state and changes the room to `playing` automatically when `players.length === targetPlayers`.
+- THREEJS-006 intentionally resolves entry/invitation reservation only; it does not invent a client-only ready authority or silently change the live start transition.
+- Rule for rewrite: keep readiness/start-gating unresolved until an explicit backend migration defines authoritative ready state and start behavior.
+
 ## 4. Implementation rule for future Three.js tasks
 
 Every implementation decision must be traceable to one of these outcomes:
@@ -124,6 +137,8 @@ Every implementation decision must be traceable to one of these outcomes:
 For `SRC-001` specifically, all future Three.js code, copy, adapters, fixtures, and tests must treat 3/5 as **wins-to-match**. No code path may terminate a match merely because `completedRounds` reaches 3 or 5.
 
 For `SRC-002` specifically, every playable color value crossing rules, state, persistence, network, turn, board, inventory, scoring, or tests must use canonical `marble`, never playable `white`. Rendering and copy for that ID must use the single approved white-marble display/material mapping rather than creating a second color identity. The canonical spatial identity is `right=marble`, `back=blue`, `left=gold`, `front=green`, with fixed spatial ring `right → back → left → front`.
+
+For `SRC-004` specifically, every Three.js entry/invitation implementation must follow `THREEJS_ENTRY_INVITATION_CONTRACT.md`: `قيم جديد` is the host path, `دخول بدعوة` is the invitee path, each online invitation owns one exact reserved seat/color, and manual 2-digit entry resolves that invitation rather than a generic room. Link and code entry must converge on the same authoritative invitation record and claim outcome.
 
 Do not copy a Godot quirk merely because it is currently visible in Production. Do not rewrite the live backend merely because the Kit describes a cleaner target. Do not modify the Kit silently to match current backend behavior.
 
