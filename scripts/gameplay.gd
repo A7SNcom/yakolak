@@ -13,6 +13,11 @@ const SELECT_LIFT: float = 8.0 * U
 const MOVE_ARC: float = 12.0 * U
 const MOVE_DURATION_MS: float = 260.0
 const INPUT_DEBOUNCE_MS: int = 100
+const CELL_COORDS: Array[Vector2] = [
+	Vector2(-48.0, -48.0), Vector2(0.0, -48.0), Vector2(48.0, -48.0),
+	Vector2(-48.0, 0.0), Vector2(0.0, 0.0), Vector2(48.0, 0.0),
+	Vector2(-48.0, 48.0), Vector2(0.0, 48.0), Vector2(48.0, 48.0),
+]
 
 var table: Node3D
 var camera: Camera3D
@@ -190,11 +195,7 @@ func _handle_pointer(screen_position: Vector2) -> void:
 		var board_hit: Dictionary = _ray_pick(screen_position, BOARD_LAYER)
 		if not board_hit.is_empty():
 			var hit_position: Vector3 = board_hit["position"] as Vector3
-			_begin_move(Vector3(
-				clampf(hit_position.x, -BOARD_HALF_EXTENT, BOARD_HALF_EXTENT),
-				PIECE_Y,
-				clampf(hit_position.z, -BOARD_HALF_EXTENT, BOARD_HALF_EXTENT)
-			))
+			_begin_move(_nearest_cell_position(hit_position))
 			return
 		_clear_selection()
 
@@ -208,6 +209,18 @@ func _ray_pick(screen_position: Vector2, collision_mask: int) -> Dictionary:
 	query.collide_with_areas = false
 	query.collide_with_bodies = true
 	return table.get_world_3d().direct_space_state.intersect_ray(query)
+
+
+func _nearest_cell_position(hit_position: Vector3) -> Vector3:
+	var nearest := Vector3(CELL_COORDS[0].x * U, PIECE_Y, CELL_COORDS[0].y * U)
+	var nearest_distance: float = Vector2(hit_position.x - nearest.x, hit_position.z - nearest.z).length_squared()
+	for raw: Vector2 in CELL_COORDS:
+		var candidate := Vector3(raw.x * U, PIECE_Y, raw.y * U)
+		var distance: float = Vector2(hit_position.x - candidate.x, hit_position.z - candidate.z).length_squared()
+		if distance < nearest_distance:
+			nearest = candidate
+			nearest_distance = distance
+	return nearest
 
 
 func _select_piece(index: int) -> void:
@@ -317,6 +330,7 @@ func _publish_state(state: String) -> void:
 			"document.body.dataset.yakolakGameplay='" + state + "';" +
 			"document.body.dataset.yakolakPlayers='4';" +
 			"document.body.dataset.yakolakRules='none';" +
+			"document.body.dataset.yakolakPlacement='grid-centers';" +
 			"document.body.dataset.yakolakMoves='" + str(move_count) + "';",
 			true
 		)
