@@ -150,16 +150,15 @@ func _on_online_room_changed(remote: Dictionary, identity: Dictionary) -> void:
 	super._on_online_room_changed(remote, identity)
 	if remote.is_empty():
 		return
-	# An accepted owner change must revoke the previous local readiness before
-	# publishing the new authority. This keeps the legacy gameplay probe and the
-	# inherited input fallback from advertising/accepting the old owner during the
-	# presentation tween. The new local owner remains immediately actionable via
-	# _authoritative_online_pointer_ready(), independent of camera motion.
+	# Accepted online authority owns readiness immediately. Recompute readiness
+	# from the newly applied current player instead of waiting for the camera
+	# tween to finish: the previous local owner becomes waiting on its client,
+	# while the new local owner becomes ready in the same accepted room update.
 	if str(remote.get("status", "")) == "playing" and current_player_index != previous_player_index:
-		gameplay_ready = false
+		gameplay_ready = _current_mode() == "local"
 		turn_deadline_msec = 0
 		_update_hud()
-		_publish_gameplay_state("waiting")
+		_publish_gameplay_state("ready" if gameplay_ready else "waiting")
 	# OnlineSession emits only accepted room snapshots. Once that snapshot has
 	# been applied by gameplay_session, turnIndex/current_player_index is the
 	# authoritative owner presented here.
