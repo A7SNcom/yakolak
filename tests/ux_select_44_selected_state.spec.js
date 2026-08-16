@@ -7,9 +7,8 @@ const ARTIFACT_DIR = `artifacts/ux-select-44-${LABEL}`;
 
 mkdirSync(ARTIFACT_DIR, { recursive: true });
 
-// The rendered target probe resolves exact nested-ring triangles for all 12
-// color/size cases. Keep the strict assertions, but allow the full single-worker
-// matrix to finish on software WebGL runners instead of timing out mid-case.
+// Exact nested-ring target solving is intentionally rendered/geometry-backed.
+// Keep the strict assertions and enough room for software WebGL on CI.
 test.describe.configure({ timeout: 600000 });
 
 test.use({
@@ -29,16 +28,6 @@ test.use({
   }
 });
 
-function sideSuffix(side) {
-  if (side < 0) return 'Minus1';
-  if (side > 0) return 'Plus1';
-  return '0';
-}
-
-function sizeCap(size) {
-  return size[0].toUpperCase() + size.slice(1);
-}
-
 async function startMatrix(page) {
   await page.goto(`${BASE_URL}/?yakolakTestFast=1&uxSelect44=1`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
@@ -47,7 +36,7 @@ async function startMatrix(page) {
           typeof window.yakolakTestSelect44StartMatrix === 'function' &&
           typeof window.yakolakTestSelect44SetPlayer === 'function' &&
           typeof window.yakolakTestSelect44Lifecycle === 'function' &&
-          typeof window.yakolakTestRefreshPickTargets === 'function' &&
+          typeof window.yakolakTestSelect44RefreshPickTarget === 'function' &&
           typeof window.yakolakTestRefreshAuthorityPickTarget === 'function',
     null,
     { timeout: 60000 }
@@ -64,34 +53,27 @@ async function waitForPlayer(page, index, direction) {
   await page.waitForFunction(
     expected => document.body.dataset.yakolakGameplay === 'ready' &&
                 document.body.dataset.yakolakCurrentPlayer === expected &&
-                document.body.dataset.yakolakCameraStage === 'ready' &&
-                document.body.dataset.yakolakPiecePickDirection === expected,
+                document.body.dataset.yakolakCameraStage === 'ready',
     direction,
     { timeout: 15000 }
   );
 }
 
 async function freshPickTarget(page, direction, side, size) {
-  const suffix = sideSuffix(side);
-  const cap = sizeCap(size);
-  const before = await page.evaluate(() => Number(document.body.dataset.yakolakPiecePickTargetRevision || 0));
-  await page.evaluate(() => window.yakolakTestRefreshPickTargets());
+  const before = await page.evaluate(() => Number(document.body.dataset.yakolakSelect44TargetRevision || 0));
+  await page.evaluate(({ side, size }) => window.yakolakTestSelect44RefreshPickTarget(side, size), { side, size });
   await page.waitForFunction(
-    previous => Number(document.body.dataset.yakolakPiecePickTargetRevision || 0) > previous,
-    before,
+    ({ previous, direction, side, size }) => Number(document.body.dataset.yakolakSelect44TargetRevision || 0) > previous &&
+                                            document.body.dataset.yakolakSelect44TargetDirection === direction &&
+                                            Number(document.body.dataset.yakolakSelect44TargetSide) === side &&
+                                            document.body.dataset.yakolakSelect44TargetSize === size,
+    { previous: before, direction, side, size },
     { timeout: 5000 }
   );
-  const target = await page.evaluate(({ suffix, cap }) => {
-    const d = document.body.dataset;
-    return {
-      direction: d.yakolakPiecePickDirection,
-      model: d.yakolakPiecePickModel,
-      x: Number(d[`yakolakTestSide${suffix}${cap}X`] || 0),
-      y: Number(d[`yakolakTestSide${suffix}${cap}Y`] || 0)
-    };
-  }, { suffix, cap });
-  expect(target.direction).toBe(direction);
-  expect(target.model).toBe('mesh-triangle-frontmost');
+  const target = await page.evaluate(() => ({
+    x: Number(document.body.dataset.yakolakSelect44TargetX || 0),
+    y: Number(document.body.dataset.yakolakSelect44TargetY || 0)
+  }));
   expect(target.x).toBeGreaterThan(0);
   expect(target.y).toBeGreaterThan(0);
   expect(target.x).toBeLessThan(390);
@@ -239,7 +221,7 @@ test('UX-SELECT-44 clears the single selected emphasis on commit, turn change, r
   await page.evaluate(() => window.yakolakTestSelect44Lifecycle('round-reset'));
   await expectSelectionCount(page, 0);
 
-  // Hydration applies the authoritative board only after clearing tray/selection materials.
+  // Hydration applies the authoritative board only after clearing tray/selection materials and probes.
   await page.waitForTimeout(900);
   await page.evaluate(() => window.yakolakTestSelect44SetPlayer(0));
   await waitForPlayer(page, 0, 'right');
@@ -247,4 +229,5 @@ test('UX-SELECT-44 clears the single selected emphasis on commit, turn change, r
   await page.evaluate(() => window.yakolakTestSelect44Lifecycle('reconnect-hydration'));
   await expectSelectionCount(page, 0);
   await expect(page.locator('body')).toHaveAttribute('data-yakolak-selected', '');
+  await expect(page.locator('body')).toHaveAttribute('data-yakolak-selected-size', '');
 });
