@@ -10,6 +10,8 @@ var turn_presentation_applied_revision: int = -1
 var turn_presentation_serial: int = 0
 var turn_presentation_target_direction: String = ""
 var turn_presentation_settled_direction: String = ""
+var turn_presentation_target_revision: int = -1
+var turn_presentation_target_lifecycle: String = ""
 var turn_presentation_retarget_count: int = 0
 var turn_presentation_cancel_count: int = 0
 var turn_presentation_stale_finish_count: int = 0
@@ -53,19 +55,28 @@ func _retarget_authoritative_turn_presentation(snapshot: Dictionary) -> void:
 		return
 
 	var direction: String = str(snapshot.get("direction", ""))
+	var lifecycle: String = str(snapshot.get("lifecycle", ""))
 	if not DIRECTION_VECTORS.has(direction) or camera == null:
-		_cancel_turn_camera_presentation(revision, str(snapshot.get("lifecycle", "invalid-direction")))
+		_cancel_turn_camera_presentation(revision, "invalid-direction" if lifecycle.is_empty() else lifecycle)
 		return
 
 	if turn_camera_active and turn_presentation_target_direction == direction:
-		_publish_turn_presentation_state("retarget-adopted", revision, str(snapshot.get("lifecycle", "")))
+		# Same visual target, newer authority. Keep the in-flight motion instead of
+		# restarting it, but transfer its completion metadata to the latest revision
+		# so the old callback cannot settle/publish the previous authoritative owner.
+		turn_presentation_target_revision = revision
+		turn_presentation_target_lifecycle = lifecycle
+		turn_presentation_retarget_count += 1
+		_publish_turn_presentation_state("retarget-adopted", revision, lifecycle)
 		return
 	if not turn_camera_active and turn_presentation_settled_direction == direction:
 		turn_presentation_target_direction = direction
-		_publish_turn_presentation_state("settled", revision, str(snapshot.get("lifecycle", "")))
+		turn_presentation_target_revision = revision
+		turn_presentation_target_lifecycle = lifecycle
+		_publish_turn_presentation_state("settled", revision, lifecycle)
 		return
 
-	_start_authoritative_turn_camera(direction, revision, str(snapshot.get("lifecycle", "")))
+	_start_authoritative_turn_camera(direction, revision, lifecycle)
 
 
 func _start_authoritative_turn_camera(direction: String, revision: int, lifecycle: String) -> void:
@@ -85,6 +96,8 @@ func _start_authoritative_turn_camera(direction: String, revision: int, lifecycl
 	var target_fov: float = lerpf(50.0, 72.0, portrait_weight)
 
 	turn_presentation_target_direction = direction
+	turn_presentation_target_revision = revision
+	turn_presentation_target_lifecycle = lifecycle
 	turn_camera_direction = direction
 	turn_camera_start_position = camera.position
 	turn_camera_target_position = axis * radius + Vector3(0.0, height, 0.0)
@@ -107,7 +120,7 @@ func _start_authoritative_turn_camera(direction: String, revision: int, lifecycl
 		1.0,
 		CAMERA_TRANSITION
 	).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	camera_tween.finished.connect(_finish_authoritative_turn_camera.bind(serial, direction, revision, lifecycle))
+	camera_tween.finished.connect(_finish_authoritative_turn_camera.bind(serial, direction))
 	_apply_authoritative_turn_camera_progress(0.0, serial)
 	_publish_turn_camera(direction, aspect, radius, height, target_fov)
 	_publish_effective_turn_fov(target_fov, turn_camera_effective_fov)
@@ -125,7 +138,7 @@ func _apply_authoritative_turn_camera_progress(progress: float, serial: int) -> 
 	camera.look_at(turn_camera_focus, Vector3.UP)
 
 
-func _finish_authoritative_turn_camera(serial: int, direction: String, revision: int, lifecycle: String) -> void:
+func _finish_authoritative_turn_camera(serial: int, direction: String) -> void:
 	if serial != turn_presentation_serial:
 		turn_presentation_stale_finish_count += 1
 		return
@@ -136,14 +149,21 @@ func _finish_authoritative_turn_camera(serial: int, direction: String, revision:
 	if not bool(snapshot.get("valid", false)) or str(snapshot.get("direction", "")) != direction:
 		turn_presentation_stale_finish_count += 1
 		return
+	var settled_revision: int = int(snapshot.get("revision", turn_presentation_target_revision))
+	var settled_lifecycle: String = str(snapshot.get("lifecycle", turn_presentation_target_lifecycle))
+	if settled_revision < turn_presentation_target_revision:
+		turn_presentation_stale_finish_count += 1
+		return
 
 	camera_tween = null
+	turn_presentation_target_revision = settled_revision
+	turn_presentation_target_lifecycle = settled_lifecycle
 	turn_presentation_settled_direction = direction
 	# The inherited camera-safe finisher snaps exactly once, restores backdrop
 	# visibility, and preserves the existing offline readiness behavior. Online
 	# readiness remains authoritative and is never delayed by this presentation.
 	super._finish_camera_transition()
-	_publish_turn_presentation_state("settled", revision, lifecycle)
+	_publish_turn_presentation_state("settled", settled_revision, settled_lifecycle)
 
 
 func _cancel_turn_camera_presentation(revision: int, lifecycle: String) -> void:
@@ -156,6 +176,8 @@ func _cancel_turn_camera_presentation(revision: int, lifecycle: String) -> void:
 	camera_transition = false
 	turn_presentation_target_direction = ""
 	turn_presentation_settled_direction = ""
+	turn_presentation_target_revision = revision
+	turn_presentation_target_lifecycle = lifecycle
 	if camera != null:
 		camera.current = true
 		_ensure_game_scene_visible()
@@ -188,6 +210,7 @@ func _publish_turn_presentation_state(state: String, revision: int, lifecycle: S
 		"document.body.dataset.yakolakTurnPresentationSettled='%s';" % _turn_js(turn_presentation_settled_direction) +
 		"document.body.dataset.yakolakTurnPresentationTween='%s';" % tween_state +
 		"document.body.dataset.yakolakTurnPresentationSerial='%d';" % turn_presentation_serial +
+		"document.body.dataset.yakolakTurnPresentationTargetRevision='%d';" % turn_presentation_target_revision +
 		"document.body.dataset.yakolakTurnPresentationRetargets='%d';" % turn_presentation_retarget_count +
 		"document.body.dataset.yakolakTurnPresentationCancels='%d';" % turn_presentation_cancel_count +
 		"document.body.dataset.yakolakTurnPresentationStaleFinishes='%d';" % turn_presentation_stale_finish_count +
