@@ -8,10 +8,10 @@ export const PLAYER_BASE_COLOR_BY_SEAT = Object.freeze({
   front: 'green',
 });
 
-function assertVec(actual, expected, label, epsilon = 1e-9) {
-  if (!Array.isArray(actual) || actual.length !== expected.length || actual.some((value, index) => Math.abs(value - expected[index]) > epsilon)) {
-    throw new Error(`${label} drift`);
-  }
+function sameArray(actual, expected) {
+  return Array.isArray(actual)
+    && actual.length === expected.length
+    && actual.every((value, index) => value === expected[index]);
 }
 
 function applyAuthoritativeTransform(object, transform) {
@@ -37,7 +37,7 @@ function validateAuthority(worldLayout) {
   if (!worldLayout?.identities || !worldLayout?.bases || !worldLayout?.homeStacks) {
     throw new TypeError('Player bases require authoritative world-layout identities, bases and homeStacks');
   }
-  assertVec(worldLayout.turnRing, PLAYER_BASE_SEAT_ORDER, 'turnRing', 0);
+  if (!sameArray(worldLayout.turnRing, PLAYER_BASE_SEAT_ORDER)) throw new Error('Canonical player-base seat order drift');
   for (const seatId of PLAYER_BASE_SEAT_ORDER) {
     if (worldLayout.identities[seatId] !== PLAYER_BASE_COLOR_BY_SEAT[seatId]) {
       throw new Error(`Canonical seat/color mapping drift for ${seatId}`);
@@ -84,7 +84,7 @@ function distance(a, b) {
   return Math.hypot(dx, dy, dz);
 }
 
-function roundedVec(vector) {
+function vectorArray(vector) {
   return [vector.x, vector.y, vector.z];
 }
 
@@ -95,6 +95,9 @@ export function createPlayerBaseInstances({ runtimeAsset, geometryLayout, worldL
     throw new Error('Player-base geometry policy drift');
   }
   if (runtimeAsset.components?.length !== geometryLayout.source.componentCount) throw new Error('Player-base GLB component count drift');
+  if (!sameArray(geometryLayout.geometry.componentIndices, Array.from({ length: 12 }, (_, index) => index))) {
+    throw new Error('Player-base component mapping drift');
+  }
   validateAuthority(worldLayout);
 
   const root = new Group();
@@ -142,8 +145,8 @@ export function createPlayerBaseInstances({ runtimeAsset, geometryLayout, worldL
       for (const corner of corners) box.expandByPoint(assetSpace.localToWorld(new Vector3(...corner)));
       return Object.freeze({
         seatId,
-        min: Object.freeze(roundedVec(box.min)),
-        max: Object.freeze(roundedVec(box.max)),
+        min: Object.freeze(vectorArray(box.min)),
+        max: Object.freeze(vectorArray(box.max)),
       });
     }));
   }
@@ -154,7 +157,7 @@ export function createPlayerBaseInstances({ runtimeAsset, geometryLayout, worldL
       const { assetSpace } = seats.get(seatId);
       const authoritative = worldLayout.homeStacks[seatId];
       const visual = geometryLayout.geometry.visualStackGroups.map((group) => {
-        const point = roundedVec(assetSpace.localToWorld(new Vector3(...group.measuredSourceCenter)));
+        const point = vectorArray(assetSpace.localToWorld(new Vector3(...group.measuredSourceCenter)));
         const nearest = authoritative
           .map((homeCenter, homeIndex) => ({ homeIndex, homeCenter, error: distance(point, homeCenter) }))
           .sort((a, b) => a.error - b.error)[0];
