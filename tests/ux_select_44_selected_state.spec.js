@@ -7,7 +7,10 @@ const ARTIFACT_DIR = `artifacts/ux-select-44-${LABEL}`;
 
 mkdirSync(ARTIFACT_DIR, { recursive: true });
 
-test.describe.configure({ timeout: 120000 });
+// The rendered target probe resolves exact nested-ring triangles for all 12
+// color/size cases. Keep the strict assertions, but allow the full single-worker
+// matrix to finish on software WebGL runners instead of timing out mid-case.
+test.describe.configure({ timeout: 600000 });
 
 test.use({
   viewport: { width: 390, height: 844 },
