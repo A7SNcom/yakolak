@@ -1,36 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
-const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
+import { ASSET_LIST } from '../web/app/assets/asset-manifest.js';
 
-const pairs = Object.freeze([
-  ['YAKOLAK_PORTABLE_KIT/assets/ui/loading-star.svg', 'web/assets/kit/ui/loading-star.svg', 'text'],
-  ['YAKOLAK_PORTABLE_KIT/assets/layout/world-layout.json', 'web/assets/kit/layout/world-layout.json', 'json'],
-  ['YAKOLAK_PORTABLE_KIT/assets/layout/intro-scatter.csv', 'web/assets/kit/layout/intro-scatter.csv', 'text'],
-  ['YAKOLAK_PORTABLE_KIT/assets/reference/approved-contract.json', 'web/assets/kit/reference/approved-contract.json', 'json'],
-  ['YAKOLAK_PORTABLE_KIT/assets/table/table.svg', 'web/assets/kit/table/table.svg', 'text'],
-]);
+function gitBlobSha(bytes) {
+  return createHash('sha1').update(`blob ${bytes.byteLength}\0`).update(bytes).digest('hex');
+}
 
-test('staged runtime kit copies cannot drift from canonical portable sources', async () => {
-  for (const [sourcePath, runtimePath, mode] of pairs) {
-    const [source, runtime] = await Promise.all([read(sourcePath), read(runtimePath)]);
-    if (mode === 'json') {
-      assert.deepEqual(JSON.parse(runtime), JSON.parse(source), `${runtimePath} semantic content drifted from ${sourcePath}`);
-    } else {
-      assert.equal(runtime, source, `${runtimePath} byte/text content drifted from ${sourcePath}`);
-    }
+test('all generated runtime copies exactly match canonical portable assets', async () => {
+  for (const asset of ASSET_LIST) {
+    const source = await readFile(new URL(`../YAKOLAK_PORTABLE_KIT/assets/${asset.source.path}`, import.meta.url));
+    const runtime = await readFile(new URL(`../web/runtime-assets/${asset.source.path}`, import.meta.url));
+    assert.deepEqual(runtime, source, `runtime copy drifted: ${asset.source.path}`);
+    assert.equal(runtime.byteLength, asset.source.bytes);
+    assert.equal(gitBlobSha(runtime), asset.source.gitBlobSha);
   }
 });
 
-test('boot-critical assets load before renderer composition', async () => {
-  const boot = await read('web/app/boot/boot.js');
-  const loadIndex = boot.indexOf("await assetManager.loadGroup('boot-critical')");
-  const rendererIndex = boot.indexOf('createRendererOwner({ mount: appElement })');
-  assert.ok(loadIndex >= 0, 'boot must load boot-critical assets');
-  assert.ok(rendererIndex >= 0, 'boot must create renderer after asset validation');
-  assert.ok(loadIndex < rendererIndex, 'required assets must be ready before renderer composition');
-  assert.match(boot, /dataset\.assetState = 'boot-critical-ready'/);
+test('boot and scene required groups gate scene/shell exposure in order', async () => {
+  const boot = await readFile(new URL('../web/app/boot/boot.js', import.meta.url), 'utf8');
+  const bootLoad = boot.indexOf("await assetManager.loadGroup('boot-critical'");
+  const rendererCreate = boot.indexOf('rendererOwner = createRendererOwner({ mount: appElement })');
+  const sceneLoad = boot.indexOf("await assetManager.loadGroup('scene-critical'");
+  const sceneCreate = boot.indexOf('previewScene = createPreviewScene(rendererOwner)');
+  const exposeCall = boot.indexOf('exposeReadyShell();', sceneLoad);
+
+  assert.ok(bootLoad >= 0 && rendererCreate > bootLoad, 'boot-critical must gate renderer composition');
+  assert.ok(sceneLoad > rendererCreate, 'scene-critical must load after renderer/loading surface exists');
+  assert.ok(sceneCreate > sceneLoad, 'playable scene must wait for scene-critical assets');
+  assert.ok(exposeCall > sceneLoad, 'game shell must not be exposed before required scene assets');
   assert.match(boot, /dataset\.bootState = 'asset-load-failed'/);
-  assert.match(boot, /Required startup assets failed/);
+  assert.match(boot, /assetManager\.loadGroup\('optional'\)/);
 });
