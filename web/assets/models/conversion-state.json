@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "converter": {
+    "id": "yakolak-stl-to-glb",
+    "version": "1.0.0",
+    "node": "22.x"
+  },
+  "targets": {
+    "model.board-and-lid": {
+      "logicalId": "model.board-and-lid",
+      "sourcePath": "YAKOLAK_PORTABLE_KIT/assets/models/board-and-lid.stl",
+      "outputPath": "web/assets/models/board-and-lid.glb",
+      "sourceSha256": "e906901cbdc3a15c28912b5966a12dbf75a9b85d8cbeb890585c974e0c12def4",
+      "sourceGitBlobSha1": "024d109cea081d65eedc067b2fdaac46c9c10227",
+      "sourceBytes": 3114084,
+      "converter": {
+        "id": "yakolak-stl-to-glb",
+        "version": "1.0.0",
+        "node": "22.x"
+      },
+      "outputSha256": "eed21395fd22a6c679438d942333a87fac1d075002d2a57ad4efa47c57da6e8d",
+      "outputBytes": 2594764,
+      "triangleCount": 62280,
+      "componentCount": 29,
+      "transformPolicy": "identity-no-center-no-scale-no-rotation",
+      "normalPolicy": "source-face-normal-normalized; computed only when source normal is zero/invalid",
+      "componentPolicy": "connected-by-exact-float32-shared-vertex; stable first-triangle order"
+    },
+    "model.piece-large": {
+      "logicalId": "model.piece-large",
+      "sourcePath": "YAKOLAK_PORTABLE_KIT/assets/models/piece-large.stl",
+      "outputPath": "web/assets/models/piece-large.glb",
+      "sourceSha256": "14c4a58ed5d086ce5622cf665e18f88e1390cedae7f973c2428cdca16fd99715",
+      "sourceGitBlobSha1": "eca0a269a75aef8770a8eb653e016f69b7766b35",
+      "sourceBytes": 12084,
+      "converter": {
+        "id": "yakolak-stl-to-glb",
+        "version": "1.0.0",
+        "node": "22.x"
+      },
+      "outputSha256": "b38bbb349e39727b0ab6b2a2d128862561e18c37249a4f5ac786db78f1b774d2",
+      "outputBytes": 11608,
+      "triangleCount": 240,
+      "componentCount": 1,
+      "transformPolicy": "identity-no-center-no-scale-no-rotation",
+      "normalPolicy": "source-face-normal-normalized; computed only when source normal is zero/invalid",
+      "componentPolicy": "connected-by-exact-float32-shared-vertex; stable first-triangle order"
+    },
+    "model.piece-medium": {
+      "logicalId": "model.piece-medium",
+      "sourcePath": "YAKOLAK_PORTABLE_KIT/assets/models/piece-medium.stl",
+      "outputPath": "web/assets/models/piece-medium.glb",
+      "sourceSha256": "7b2cbf4690fc0906124bd56151c4e1cd29006f58e9fed75d6e2ecc4c8bed4936",
+      "sourceGitBlobSha1": "c32fc5cc37664af7860b3aa6e33e12b04eefa757",
+      "sourceBytes": 12084,
+      "converter": {
+        "id": "yakolak-stl-to-glb",
+        "version": "1.0.0",
+        "node": "22.x"
+      },
+      "outputSha256": "efd3dbc7c41b7eca1184f2daaebdbe3ac9c148ead9e62f15d13948ede28b0938",
+      "outputBytes": 11628,
+      "triangleCount": 240,
+      "componentCount": 1,
+      "transformPolicy": "identity-no-center-no-scale-no-rotation",
+      "normalPolicy": "source-face-normal-normalized; computed only when source normal is zero/invalid",
+      "componentPolicy": "connected-by-exact-float32-shared-vertex; stable first-triangle order"
+    },
+    "model.piece-small": {
+      "logicalId": "model.piece-small",
+      "sourcePath": "YAKOLAK_PORTABLE_KIT/assets/models/piece-small.stl",
+      "outputPath": "web/assets/models/piece-small.glb",
+      "sourceSha256": "48916af0357ca36737f7ec7e5de23cbe516a51b07675271c86339b9d12189cd6",
+      "sourceGitBlobSha1": "531812323efe43f7679f509f1ae06980227521a8",
+      "sourceBytes": 5884,
+      "converter": {
+        "id": "yakolak-stl-to-glb",
+        "version": "1.0.0",
+        "node": "22.x"
+      },
+      "outputSha256": "7e2d18cf638613a8e6565ada9f03ffdaa6c6124ea37be8916bac23556d39cd57",
+      "outputBytes": 6564,
+      "triangleCount": 116,
+      "componentCount": 1,
+      "transformPolicy": "identity-no-center-no-scale-no-rotation",
+      "normalPolicy": "source-face-normal-normalized; computed only when source normal is zero/invalid",
+      "componentPolicy": "connected-by-exact-float32-shared-vertex; stable first-triangle order"
+    },
+    "model.player-base": {
+      "logicalId": "model.player-base",
+      "sourcePath": "YAKOLAK_PORTABLE_KIT/assets/models/player-base.stl",
+      "outputPath": "web/assets/models/player-base.glb",
+      "sourceSha256": "21d963e52b5bd290141080eb66f9ef8c966c62786c3a1da10c67799603a65c1a",
+      "sourceGitBlobSha1": "066b3f95f5281a178b610611075cbab0689cdb12",
+      "sourceBytes": 9955084,
+      "converter": {
+        "id": "yakolak-stl-to-glb",
+        "version": "1.0.0",
+        "node": "22.x"
+      },
+      "outputSha256": "c8b3740a181c21ebf342ff11b2e8679989e9f85598fd13bd6b32bbd0b1bb060f",
+      "outputBytes": 1942888,
+      "triangleCount": 199100,
+      "componentCount": 12,
+      "transformPolicy": "identity-no-center-no-scale-no-rotation",
+      "normalPolicy": "source-face-normal-normalized; computed only when source normal is zero/invalid",
+      "componentPolicy": "connected-by-exact-float32-shared-vertex; stable first-triangle order"
+    },
+    "model.score-marker": {
+      "logicalId": "model.score-marker",
+      "sourcePath": "YAKOLAK_PORTABLE_KIT/assets/models/score-marker.stl",
+      "outputPath": "web/assets/models/score-marker.glb",
+      "sourceSha256": "f0dea38e795223d32c07921f194e612ce0ff270c9190f208666caebe31b6041b",
+      "sourceGitBlobSha1": "feb5d59eafe4547a529876344ff88d05ca95b37c",
+      "sourceBytes": 12884,
+      "converter": {
+        "id": "yakolak-stl-to-glb",
+        "version": "1.0.0",
+        "node": "22.x"
+      },
+      "outputSha256": "15839006f1182b337ef9ff0034f3c0ab1ace4035082cab560ae9c8a52872d9b7",
+      "outputBytes": 12408,
+      "triangleCount": 256,
+      "componentCount": 1,
+      "transformPolicy": "identity-no-center-no-scale-no-rotation",
+      "normalPolicy": "source-face-normal-normalized; computed only when source normal is zero/invalid",
+      "componentPolicy": "connected-by-exact-float32-shared-vertex; stable first-triangle order"
+    }
+  }
+}
