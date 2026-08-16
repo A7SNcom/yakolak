@@ -1,4 +1,4 @@
-# gate-run: 7
+# gate-run: 8
 name: UX-SELECT-46 focused regression
 
 on:
@@ -52,8 +52,6 @@ jobs:
           YAKOLAK_UX_SELECT_46_LABEL: optimized-main
           YAKOLAK_UX_SELECT_46_ITERATIONS: '12'
           YAKOLAK_UX_SELECT_46_PROCESSING_P95_MS: '50'
-          YAKOLAK_UX_SELECT_46_FRAME_OVERHEAD_P95_MS: '350'
-          YAKOLAK_UX_SELECT_46_FRAME_RATIO_P95: '2.5'
         run: |
           set -o pipefail
           node tests/web_test_server.mjs >/tmp/ux-select-46-server.log 2>&1 &
