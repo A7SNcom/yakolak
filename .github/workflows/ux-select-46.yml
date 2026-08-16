@@ -1,0 +1,69 @@
+name: UX-SELECT-46 focused regression
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/gameplay_selection_latency.gd'
+      - 'scenes/intro.tscn'
+      - 'tests/ux_select_46_tap_latency.spec.js'
+      - '.github/workflows/ux-select-46.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ux-select-46-focused-gate
+  cancel-in-progress: true
+
+jobs:
+  focused-gate:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message || '', '[ux-select-46-gate]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Restore Godot caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/yakolak-tools
+            ~/.local/share/godot/export_templates/4.7.1.stable
+            .godot
+          key: ux-select-46-godot-4.7.1-${{ hashFiles('project.godot', 'export_presets.cfg') }}
+          restore-keys: |
+            yakolak-flash-godot-4.7.1-
+            yakolak-godot-4.7.1-
+      - name: Build focused source artifact
+        run: bash scripts/vercel-flash-build.sh
+      - name: Install Chromium runner
+        run: |
+          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Run tap feedback and rapid-tap budgets
+        env:
+          YAKOLAK_UX_SELECT_46_LABEL: optimized-main
+          YAKOLAK_UX_SELECT_46_ITERATIONS: '12'
+          YAKOLAK_UX_SELECT_46_PROCESSING_P95_MS: '80'
+          YAKOLAK_UX_SELECT_46_VISIBLE_P95_MS: '250'
+        run: |
+          set -o pipefail
+          node tests/web_test_server.mjs >/tmp/ux-select-46-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
+          npx playwright test tests/ux_select_46_tap_latency.spec.js --workers=1 --reporter=line 2>&1 | tee /tmp/ux-select-46-main.log
+      - name: Upload focused measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ux-select-46-focused-${{ github.sha }}
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            artifacts/ux-select-46-*/
+            /tmp/ux-select-46-*.log
