@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createFrameGovernor, FRAME_GOVERNOR_POLICY } from '../camera/frame-governor.js';
+import { markOnce, STARTUP_MARKS } from '../perf/startup-marks.js';
 
 function createGpuFacingPreviewResources(group) {
   const geometry = new THREE.TorusKnotGeometry(1.05, 0.28, 128, 20);
@@ -91,7 +92,9 @@ export function createPreviewScene(rendererOwner) {
         lastFrameNow = null;
       }
 
-      rendererOwner.render(scene, camera);
+      if (rendererOwner.render(scene, camera)) {
+        markOnce(STARTUP_MARKS.firstVisibleFrame);
+      }
     },
   });
 
