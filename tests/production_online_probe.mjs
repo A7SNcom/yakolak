@@ -426,7 +426,6 @@ async function verifyFourPlayerTurnCycle() {
     await commitMove('p1', 0, 'small', 'p2', 'r1-m1-p1');
     await commitMove('p2', 8, 'large', 'p3', 'r1-m2-p2');
     await commitMove('p3', 7, 'medium', 'p4', 'r1-m3-p3');
-
     // ONLINE-03: refresh Player 4 while the authoritative turn belongs to p4.
     // Refresh is read-only and must preserve seat ownership without replaying a
     // previously committed p4 move from an earlier client lifetime.
@@ -460,7 +459,7 @@ async function verifyFourPlayerTurnCycle() {
     await assertFinishedLocked('round-2-finished', 'p2');
 
     assert.equal(Number(lastRoom.completedRounds), 2, 'ONLINE-03 must cross at least one full round boundary');
-    assert.equal(Number(lastRoom.moveNumber), 18, 'ONLINE-03 deterministic path must commit exactly 18 moves');
+    assert.equal(Number(lastRoom.moveNumber), 9, 'ONLINE-03 moveNumber resets at the round boundary and must count exactly 9 moves in round 2');
     assert.equal(clients.p4.movePosts, 4, 'Player 4 must remain able to commit every scheduled turn after reconnects');
     await syncAll('online-03-final-convergence', lastRoom);
     console.log('YAKOLAK_ONLINE_4P_TURN_CYCLE_OK', JSON.stringify(compactRoom(lastRoom)));
