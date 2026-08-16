@@ -195,7 +195,6 @@ async function boot() {
   });
 
   assetRetryButton?.addEventListener('click', () => loadRequiredAndStart({ retry: true }));
-  window.addEventListener('pagehide', () => assetManager.cancelAll('pagehide'), { once: true });
 
   try {
     await loadRequiredAndStart();
