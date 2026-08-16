@@ -1,4 +1,4 @@
-// THREEJS-013: presentation-only frame pacing / viewport governance.
+// THREEJS-013/014: presentation-only frame pacing / viewport and graphics-availability governance.
 // This module never owns authoritative game or lifecycle state.
 
 export const FRAME_GOVERNOR_POLICY = Object.freeze({
@@ -106,6 +106,9 @@ export function createFrameGovernor({
   if (!rendererOwner || typeof rendererOwner.resizeToDisplaySize !== 'function') {
     throw new TypeError('Frame governor requires the renderer owner');
   }
+  if (typeof rendererOwner.subscribeContextState !== 'function') {
+    throw new TypeError('Frame governor requires renderer context-state subscription');
+  }
   if (!camera || typeof camera.updateProjectionMatrix !== 'function') {
     throw new TypeError('Frame governor requires a perspective camera');
   }
@@ -129,6 +132,7 @@ export function createFrameGovernor({
   let disposed = false;
   let started = false;
   let visible = document.visibilityState !== 'hidden';
+  let graphicsAvailable = rendererOwner.getContextSnapshot?.().canUseGpu !== false;
   let continuous = false;
   let layoutDirty = true;
   let layoutReady = true;
@@ -139,6 +143,7 @@ export function createFrameGovernor({
   let resizeObserver = null;
   let dprMedia = null;
   let safeAreaProbe = null;
+  let unsubscribeContextState = null;
   let safeArea = Object.freeze({ top: 0, right: 0, bottom: 0, left: 0 });
   let viewport = null;
   let lastPresentedAt = Number.NEGATIVE_INFINITY;
@@ -162,7 +167,7 @@ export function createFrameGovernor({
   }
 
   function schedule() {
-    if (!started || disposed || !visible || frameId) return;
+    if (!started || disposed || !visible || !graphicsAvailable || frameId) return;
     frameId = requestAnimationFrame(tick);
   }
 
@@ -178,6 +183,11 @@ export function createFrameGovernor({
     renderRequested = true;
     cancelResizeDebounce();
 
+    if (!graphicsAvailable) {
+      layoutReady = true;
+      return;
+    }
+
     if (immediate || safeResizeDebounceMs === 0 || !visible) {
       layoutReady = true;
       schedule();
@@ -187,7 +197,7 @@ export function createFrameGovernor({
     layoutReady = false;
     resizeTimer = window.setTimeout(() => {
       resizeTimer = 0;
-      if (disposed || !visible) return;
+      if (disposed || !visible || !graphicsAvailable) return;
       layoutReady = true;
       schedule();
     }, safeResizeDebounceMs);
@@ -216,6 +226,25 @@ export function createFrameGovernor({
     visible = true;
     resumed = true;
     invalidateLayout({ immediate: true });
+  }
+
+  function onContextStateChange(contextState) {
+    const wasAvailable = graphicsAvailable;
+    graphicsAvailable = contextState?.state === 'ready' && contextState?.canUseGpu !== false;
+
+    if (!graphicsAvailable) {
+      cancelScheduledFrame();
+      cancelResizeDebounce();
+      return;
+    }
+
+    if (!wasAvailable) {
+      resumed = true;
+      layoutDirty = true;
+      layoutReady = true;
+      renderRequested = true;
+      schedule();
+    }
   }
 
   function onVisibilityChange() {
@@ -248,6 +277,8 @@ export function createFrameGovernor({
       height: cssSize.height,
       pixelRatio,
     });
+
+    if (display.skipped) return null;
 
     const aspect = display.width / display.height;
     const nextFov = refitPerspectiveFov({
@@ -295,9 +326,10 @@ export function createFrameGovernor({
 
   function tick(now) {
     frameId = 0;
-    if (!started || disposed || !visible) return;
+    if (!started || disposed || !visible || !graphicsAvailable) return;
 
     const layout = layoutDirty && layoutReady ? applyLayout() : null;
+    if (!graphicsAvailable) return;
     if (layoutDirty && !layoutReady) return;
 
     const didResume = resumed;
@@ -334,6 +366,7 @@ export function createFrameGovernor({
       started,
       disposed,
       visible,
+      graphicsAvailable,
       continuous,
       layoutDirty,
       framePending: Boolean(frameId),
@@ -352,6 +385,7 @@ export function createFrameGovernor({
     started = true;
     visible = document.visibilityState !== 'hidden';
     safeAreaProbe = createSafeAreaProbe();
+    unsubscribeContextState = rendererOwner.subscribeContextState(onContextStateChange);
 
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('pageshow', onPageShow);
@@ -376,6 +410,8 @@ export function createFrameGovernor({
     started = false;
     cancelScheduledFrame();
     cancelResizeDebounce();
+    unsubscribeContextState?.();
+    unsubscribeContextState = null;
     resizeObserver?.disconnect();
     resizeObserver = null;
 
@@ -401,6 +437,9 @@ export function createFrameGovernor({
     dispose,
     get visible() {
       return visible;
+    },
+    get graphicsAvailable() {
+      return graphicsAvailable;
     },
     get continuous() {
       return continuous;
