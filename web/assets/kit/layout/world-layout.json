@@ -1,0 +1,45 @@
+{
+  "units": "arbitrary; uniform scaling only",
+  "identities": {"right":"marble","back":"blue","left":"gold","front":"green"},
+  "turnRing": ["right","back","left","front"],
+  "introOrder": ["right","left","front","back"],
+  "zones": [
+    {"id":0,"position":[-48,2,-48]}, {"id":1,"position":[0,2,-48]}, {"id":2,"position":[48,2,-48]},
+    {"id":3,"position":[-48,2,0]}, {"id":4,"position":[0,2,0]}, {"id":5,"position":[48,2,0]},
+    {"id":6,"position":[-48,2,48]}, {"id":7,"position":[0,2,48]}, {"id":8,"position":[48,2,48]}
+  ],
+  "board": {"position":[0,6,0],"rotationDegrees":[-90,0,0]},
+  "bases": {
+    "right":{"position":[135,6,0],"rotationDegrees":[-90,0,0]},
+    "left":{"position":[-135,6,0],"rotationDegrees":[-90,0,180]},
+    "front":{"position":[0,6,135],"rotationDegrees":[-90,0,90]},
+    "back":{"position":[0,6,-135],"rotationDegrees":[-90,0,-90]}
+  },
+  "homeStacks": {
+    "right":[[135,2,-48],[135,2,0],[135,2,48]],
+    "left":[[-135,2,-48],[-135,2,0],[-135,2,48]],
+    "front":[[-48,2,135],[0,2,135],[48,2,135]],
+    "back":[[-48,2,-135],[0,2,-135],[48,2,-135]]
+  },
+  "pieceRotationDegrees": [-90,0,0],
+  "score": {"radius":85,"gap":11,"order":[0,-1,1,-2,2,-3,3]},
+  "room": {"minX":-2400,"maxX":2400,"floorY":-650,"ceilingY":1250,"backZ":-2400,"frontZ":2400,"tableTopY":-16,"gameClearance":0.8},
+  "cameras": {
+    "playDesktop":{"position":[520,430,520],"target":[0,0,0],"fov":43},
+    "playCompact":{"position":[245,325,285],"target":[0,0,0],"fov":45},
+    "playPortrait2":{"position":[330,560,455],"target":[0,18,0],"fov":46},
+    "playPortraitCrowded":{"position":[380,620,510],"target":[0,18,0],"fov":48},
+    "setupPrimaryDesktop":{"position":[0,250,-820],"target":[0,250,-2386],"fov":42},
+    "setupPrimaryCompact":{"position":[0,245,-560],"target":[0,245,-2386],"fov":46},
+    "setupPrimaryPortrait":{"position":[0,250,-260],"target":[0,250,-2386],"fov":48},
+    "setupSecondaryDesktop":{"position":[1080,260,0],"target":[2386,260,0],"fov":43},
+    "setupSecondaryCompact":{"position":[980,250,0],"target":[2386,250,0],"fov":47},
+    "setupSecondaryPortrait":{"position":[820,280,0],"target":[2386,280,0],"fov":49},
+    "entryStarDesktop":{"position":[0,250,-1534],"target":[0,250,-2354],"fov":42},
+    "entryStarCompact":{"position":[0,250,-1534],"target":[0,250,-2354],"fov":46},
+    "entryStarPortrait":{"position":[0,250,-1534],"target":[0,250,-2354],"fov":48},
+    "brandWallDesktop":{"position":[1050,275,0],"target":[2354,260,0],"fov":42},
+    "brandWallCompact":{"position":[820,285,0],"target":[2354,255,0],"fov":46},
+    "brandWallPortrait":{"position":[650,350,0],"target":[2354,260,0],"fov":48}
+  }
+}
