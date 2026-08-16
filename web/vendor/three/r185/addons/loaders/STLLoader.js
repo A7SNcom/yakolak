@@ -70,7 +70,7 @@ class STLLoader extends Loader {
 	 *
 	 * @param {string} url - The path/URL of the file to be loaded. This can also be a data URI.
 	 * @param {function(BufferGeometry)} onLoad - Executed when the loading process has been finished.
-	 * @param {onProgressCallback} onProgress - Executed while loading is in progress.
+	 * @param {onProgressCallback} onProgress - Executed while the loading process is in progress.
 	 * @param {onErrorCallback} onError - Executed when errors occur.
 	 */
 	load( url, onLoad, onProgress, onError ) {
@@ -290,7 +290,7 @@ class STLLoader extends Loader {
 
 			const patternFloat = /[\s]+([+-]?(?:\d*)(?:\.\d*)?(?:[eE][+-]?\d+)?)/.source;
 			const patternVertex = new RegExp( 'vertex' + patternFloat + patternFloat + patternFloat, 'g' );
-			const patternNormal = new RegExp( 'normal' + patternFloat + patternFloat + patternFloat, 'g' );
+			const patternNormal = new RegExp( 'normal' + patternFloat, 'g' );
 
 			const vertices = [];
 			const normals = [];
