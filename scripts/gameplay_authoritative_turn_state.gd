@@ -296,7 +296,8 @@ func _publish_authoritative_turn_probe(snapshot: Dictionary) -> void:
 		"document.body.dataset.yakolakAuthoritativeTurnLifecycle='%s';" % _turn_js(str(snapshot.get("lifecycle", ""))) +
 		"document.body.dataset.yakolakAuthoritativeTurnPlayer='%d';" % int(snapshot.get("player_number", 0)) +
 		"document.body.dataset.yakolakAuthoritativeTurnDirection='%s';" % _turn_js(str(snapshot.get("direction", ""))) +
-		"document.body.dataset.yakolakAuthoritativeTurnSource='%s';" % authoritative_source,
+		"document.body.dataset.yakolakAuthoritativeTurnSource='%s';" % authoritative_source +
+		"document.body.dataset.yakolakGameplayReady='%s';" % ("true" if gameplay_ready else "false"),
 		true
 	)
 
