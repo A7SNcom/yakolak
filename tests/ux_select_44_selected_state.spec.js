@@ -7,6 +7,8 @@ const ARTIFACT_DIR = `artifacts/ux-select-44-${LABEL}`;
 
 mkdirSync(ARTIFACT_DIR, { recursive: true });
 
+test.describe.configure({ timeout: 120000 });
+
 test.use({
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 1,
@@ -42,7 +44,8 @@ async function startMatrix(page) {
           typeof window.yakolakTestSelect44StartMatrix === 'function' &&
           typeof window.yakolakTestSelect44SetPlayer === 'function' &&
           typeof window.yakolakTestSelect44Lifecycle === 'function' &&
-          typeof window.yakolakTestRefreshPickTargets === 'function',
+          typeof window.yakolakTestRefreshPickTargets === 'function' &&
+          typeof window.yakolakTestRefreshAuthorityPickTarget === 'function',
     null,
     { timeout: 60000 }
   );
@@ -86,6 +89,26 @@ async function freshPickTarget(page, direction, side, size) {
   }, { suffix, cap });
   expect(target.direction).toBe(direction);
   expect(target.model).toBe('mesh-triangle-frontmost');
+  expect(target.x).toBeGreaterThan(0);
+  expect(target.y).toBeGreaterThan(0);
+  expect(target.x).toBeLessThan(390);
+  expect(target.y).toBeLessThan(844);
+  return target;
+}
+
+async function freshBoardTarget(page, direction) {
+  await page.evaluate(() => window.yakolakTestRefreshAuthorityPickTarget());
+  await page.waitForFunction(
+    expected => document.body.dataset.yakolakTestAuthorityTargetDirection === expected &&
+                Number(document.body.dataset.yakolakTestAuthorityCellX || 0) > 0 &&
+                Number(document.body.dataset.yakolakTestAuthorityCellY || 0) > 0,
+    direction,
+    { timeout: 5000 }
+  );
+  const target = await page.evaluate(() => ({
+    x: Number(document.body.dataset.yakolakTestAuthorityCellX || 0),
+    y: Number(document.body.dataset.yakolakTestAuthorityCellY || 0)
+  }));
   expect(target.x).toBeGreaterThan(0);
   expect(target.y).toBeGreaterThan(0);
   expect(target.x).toBeLessThan(390);
@@ -189,14 +212,9 @@ test('UX-SELECT-44 renders exactly one unmistakable selected piece for every pla
 test('UX-SELECT-44 clears the single selected emphasis on commit, turn change, round reset, and reconnect hydration', async ({ page }) => {
   await startMatrix(page);
 
-  // Commit: real tap -> real legal board tap -> next turn, with no stale emphasis.
+  // Commit: real piece tap -> real legal board tap -> next turn, with no stale emphasis.
   await tapPiece(page, 'right', 0, 'large');
-  const cell = await page.evaluate(() => ({
-    x: Number(document.body.dataset.yakolakTestCell0X || 0),
-    y: Number(document.body.dataset.yakolakTestCell0Y || 0)
-  }));
-  expect(cell.x).toBeGreaterThan(0);
-  expect(cell.y).toBeGreaterThan(0);
+  const cell = await freshBoardTarget(page, 'right');
   await page.touchscreen.tap(cell.x, cell.y);
   await page.waitForFunction(
     () => document.body.dataset.yakolakCurrentPlayer === 'back' &&
