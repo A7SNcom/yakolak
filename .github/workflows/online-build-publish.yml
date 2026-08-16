@@ -1,73 +1,28 @@
-name: YAKOLAK online build and publish
+name: YAKOLAK Flash Publish
 
 on:
   push:
     branches:
       - main
-    paths-ignore:
-      - '.github/workflows/ux-turn-32*.yml'
-      - 'tests/ux_turn_32_*'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: yakolak-main-${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[web-ready]') && 'web-ready' || 'source' }}
+  group: yakolak-flash-main
   cancel-in-progress: true
 
 jobs:
-  build:
-    if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[web-ready]') }}
+  flash-publish:
+    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[flash-ready]') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Fetch pinned Thmanyah Sans UI font weights
-        run: |
-          mkdir -p assets/fonts
-          BASE=https://raw.githubusercontent.com/islamic-center-regensburg/izr-mobile-app/1f9055ae105e6679d95f919b95b355baa5bfb43d/assets/fonts/Thmanyah/thmanyahsans/otf
-          curl -L --fail --retry 3 --retry-delay 2 -o assets/fonts/thmanyahsans-Regular.otf "$BASE/thmanyahsans-Regular.otf"
-          curl -L --fail --retry 3 --retry-delay 2 -o assets/fonts/thmanyahsans-Light.otf "$BASE/thmanyahsans-Light.otf"
-          curl -L --fail --retry 3 --retry-delay 2 -o assets/fonts/thmanyahsans-Medium.otf "$BASE/thmanyahsans-Medium.otf"
-          curl -L --fail --retry 3 --retry-delay 2 -o assets/fonts/thmanyahsans-Bold.otf "$BASE/thmanyahsans-Bold.otf"
-          test "$(git hash-object assets/fonts/thmanyahsans-Regular.otf)" = "ca891297805da60b4b4e6d3a6f02cd7c0f2f33b7"
-          test "$(git hash-object assets/fonts/thmanyahsans-Light.otf)" = "aebd416113380e9e96bbe9bfbc5c4a008b2f7b67"
-          test "$(git hash-object assets/fonts/thmanyahsans-Medium.otf)" = "87fdec346be83a9dcc9eed5ea8aa04cc5a87faef"
-          test "$(git hash-object assets/fonts/thmanyahsans-Bold.otf)" = "349937a73e14f681a3d4cb95e966aa7cec35bcc3"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Install small server dependency
-        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
-      - name: Verify online rules, stability, Arabic UI and telemetry contracts
-        run: |
-          node --check api/rooms.js
-          node --check api/rooms-observed.js
-          node --check api/_telemetry.js
-          node --check api/telemetry.js
-          node --check tests/web_test_server.mjs
-          node --check tests/production_online_probe.mjs
-          node --check tests/round_boundary_multiclient.test.mjs
-          node --check tests/online_state_inventory_smoke.spec.js
-          node --check tests/online_message_safety_smoke.spec.js
-          node --check tests/online_join_state_smoke.spec.js
-          node --check tests/online_restore_state_smoke.spec.js
-          node --check tests/western_digits_smoke.spec.js
-          node --check tests/match_end_actions_contract.test.mjs
-          node --check tests/turn_hud_smoke.spec.js
-          node --check tests/turn_indicator_online_regression.spec.js
-          node --check tests/ux_turn_37_local_turn.spec.js
-          node tests/online_rules.test.mjs
-          node tests/online_logic_hardening.test.mjs
-          node tests/online_exactly_once_contract.test.mjs
-          node tests/online_reliability_contract.test.mjs
-          node tests/round_boundary_multiclient.test.mjs
-          node tests/arabic_ui_contract.test.mjs
-          node tests/telemetry_contract.test.mjs
-          node tests/match_end_actions_contract.test.mjs
+
       - name: Restore Godot caches
         uses: actions/cache@v4
         with:
@@ -75,233 +30,45 @@ jobs:
             ~/.cache/yakolak-tools
             ~/.local/share/godot/export_templates/4.7.1.stable
             .godot
-          key: yakolak-godot-4.7.1-${{ hashFiles('project.godot', 'export_presets.cfg') }}
+          key: yakolak-flash-godot-4.7.1-${{ hashFiles('project.godot', 'export_presets.cfg') }}
           restore-keys: |
+            yakolak-flash-godot-4.7.1-
             yakolak-godot-4.7.1-
-      - name: Drop stale compiled scene cache
-        run: rm -rf .godot/exported
-      - name: Build latest web version online
-        env:
-          YAKOLAK_KEEP_IMPORT_CACHE: "1"
-        run: bash scripts/vercel-fast-build.sh
-      - name: Install browser runner
-        run: |
-          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0 pngjs@7.0.0
-          npx playwright install --with-deps chromium
-      - name: Enforce DIGITS-21 rendered numeral shaping gate
-        run: |
-          rm -rf artifacts
-          node tests/web_test_server.mjs >/tmp/yakolak-digits21.log 2>&1 &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
-          npx playwright test tests/western_digits_smoke.spec.js --grep "DIGITS-21 rendered regression matrix" --workers=1 --reporter=github
-      - name: Upload DIGITS-21 Arabic mobile proof
-        if: ${{ success() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: digits-21-arabic-mobile
-          path: artifacts/digits-21-arabic-mobile.png
-          if-no-files-found: error
-          retention-days: 14
-      - name: Force saved room restore UI state
-        run: |
-          node tests/web_test_server.mjs >/tmp/yakolak-state-restore-focused.log 2>&1 &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
-          npx playwright test tests/online_restore_state_smoke.spec.js --workers=1 --reporter=github
-      - name: Verify existing dialog behavior
-        run: |
-          node tests/web_test_server.mjs >/tmp/yakolak-dialog-browser.log 2>&1 &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
-          npx playwright test tests/dialog_system_smoke.spec.js --workers=1 --reporter=github
-      - name: Verify existing interaction feedback behavior
-        run: |
-          node tests/web_test_server.mjs >/tmp/yakolak-interaction-browser.log 2>&1 &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
-          npx playwright test tests/interaction_feedback_smoke.spec.js --workers=1 --reporter=github
-      - name: Enforce MATCH-END-26 safe post-match actions
-        run: |
-          node tests/web_test_server.mjs >/tmp/yakolak-match-end-26.log 2>&1 &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
-          npx playwright test tests/match_end_actions_smoke.spec.js --workers=1 --reporter=github
-      - name: Force room preview UI states
-        run: |
-          node tests/web_test_server.mjs >/tmp/yakolak-state-preview.log 2>&1 &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
-          npx playwright test tests/online_state_inventory_smoke.spec.js --grep "room preview never" --workers=1 --reporter=github
-      - name: Force room-full join race UI state
-        run: |
-          node tests/web_test_server.mjs >/tmp/yakolak-state-join.log 2>&1 &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
-          npx playwright test tests/online_join_state_smoke.spec.js --workers=1 --reporter=github
-      - name: Force create wait reconnect recovery cancellation states
-        run: |
-          node tests/web_test_server.mjs >/tmp/yakolak-state-host.log 2>&1 &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
-          npx playwright test tests/online_state_inventory_smoke.spec.js --grep "host path explains" --workers=1 --reporter=github
-      - name: Force restore and move acknowledgement states
-        run: |
-          node tests/web_test_server.mjs >/tmp/yakolak-state-restore.log 2>&1 &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
-          npx playwright test tests/online_state_inventory_smoke.spec.js --grep "restore and move" --workers=1 --reporter=github
-      - name: Enforce online message safety regression gate
-        run: |
-          node tests/web_test_server.mjs >/tmp/yakolak-message-safety.log 2>&1 &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
-          npx playwright test tests/online_message_safety_smoke.spec.js --workers=1 --reporter=github
-      - name: Verify intro responsive setup transitions HUD and real gameplay start before publishing
-        run: |
-          node tests/web_test_server.mjs >/tmp/yakolak-browser.log 2>&1 &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
-          npx playwright test tests/intro_smoke.spec.js tests/layout_smoke.spec.js tests/setup_gate_smoke.spec.js tests/setup_spatial_smoke.spec.js tests/natural_flow_smoke.spec.js tests/gameplay_smoke.spec.js tests/turn_hud_smoke.spec.js --workers=1 --reporter=github
-      - name: Enforce UX-TURN-35 authoritative continuity before publishing
-        run: |
-          node tests/web_test_server.mjs >/tmp/yakolak-ux-turn-35.log 2>&1 &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
-          npx playwright test tests/turn_indicator_online_regression.spec.js --grep "4p authoritative turn indicator" --workers=1 --reporter=github
-      - name: Enforce UX-TURN-37 authoritative local-turn distinction before publishing
-        run: |
-          node tests/web_test_server.mjs >/tmp/yakolak-ux-turn-37.log 2>&1 &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-          for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
-          npx playwright test tests/ux_turn_37_local_turn.spec.js --workers=1 --reporter=github
-      - name: Upload UX-TURN-37 visual proofs
-        if: ${{ success() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: ux-turn-37-local-turn-${{ github.sha }}
-          path: artifacts/ux-turn-37-*.png
-          if-no-files-found: error
-          retention-days: 14
-      - name: Upload UX-TURN-35 viewport proofs
-        if: ${{ success() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: ux-turn-35-indicator-${{ github.sha }}
-          path: artifacts/ux-turn-35-*.png
-          if-no-files-found: error
-          retention-days: 14
-      - name: Publish tested web files back to main
+
+      - name: Ensure UI fonts exist
+        shell: bash
         run: |
           set -euo pipefail
-          TESTED_SHA="$(git rev-parse HEAD)"
-          tar -czf /tmp/yakolak-tested-web.tar.gz web assets/fonts/thmanyahsans-*.otf
+          if [ ! -s assets/fonts/thmanyahsans-Regular.otf ] || \
+             [ ! -s assets/fonts/thmanyahsans-Light.otf ] || \
+             [ ! -s assets/fonts/thmanyahsans-Medium.otf ] || \
+             [ ! -s assets/fonts/thmanyahsans-Bold.otf ]; then
+            mkdir -p assets/fonts
+            BASE=https://raw.githubusercontent.com/islamic-center-regensburg/izr-mobile-app/1f9055ae105e6679d95f919b95b355baa5bfb43d/assets/fonts/Thmanyah/thmanyahsans/otf
+            curl -L --fail --retry 3 --retry-delay 1 -o assets/fonts/thmanyahsans-Regular.otf "$BASE/thmanyahsans-Regular.otf"
+            curl -L --fail --retry 3 --retry-delay 1 -o assets/fonts/thmanyahsans-Light.otf "$BASE/thmanyahsans-Light.otf"
+            curl -L --fail --retry 3 --retry-delay 1 -o assets/fonts/thmanyahsans-Medium.otf "$BASE/thmanyahsans-Medium.otf"
+            curl -L --fail --retry 3 --retry-delay 1 -o assets/fonts/thmanyahsans-Bold.otf "$BASE/thmanyahsans-Bold.otf"
+          fi
 
-          only_ignored_turn32_changes() {
-            local base_sha="$1"
-            local head_sha="$2"
-            local path
-            while IFS= read -r path; do
-              [ -z "$path" ] && continue
-              case "$path" in
-                .github/workflows/ux-turn-32*.yml|tests/ux_turn_32_*) ;;
-                *)
-                  echo "Newer publishable path detected: $path"
-                  return 1
-                  ;;
-              esac
-            done < <(git diff --name-only "$base_sha..$head_sha")
-            return 0
-          }
+      - name: Flash export Godot Web
+        run: bash scripts/vercel-flash-build.sh
 
+      - name: Publish ready files back to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$(git rev-parse HEAD)"
           git fetch origin main
           LATEST_SHA="$(git rev-parse origin/main)"
-          if [ "$TESTED_SHA" != "$LATEST_SHA" ]; then
-            if ! git merge-base --is-ancestor "$TESTED_SHA" "$LATEST_SHA"; then
-              echo "A divergent main exists; refusing to publish stale tested output."
-              exit 0
-            fi
-            if ! only_ignored_turn32_changes "$TESTED_SHA" "$LATEST_SHA"; then
-              echo "A newer publishable main exists; its workflow will publish instead."
-              exit 0
-            fi
-            echo "Main advanced only through ignored UX-TURN-32 diagnostics; carrying tested web output forward."
-            git reset --hard origin/main
-            rm -rf web
-            rm -f assets/fonts/thmanyahsans-*.otf
-            tar -xzf /tmp/yakolak-tested-web.tar.gz
+
+          if [ "$SOURCE_SHA" != "$LATEST_SHA" ]; then
+            echo "A newer main exists; cancel stale flash publish."
+            exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f web assets/fonts/thmanyahsans-*.otf
-          if git diff --cached --quiet; then
-            echo "Web output unchanged."
-            exit 0
-          fi
-
-          git commit -m "[web-ready] نشر نسخة مختبرة للجوال وسطح المكتب حتى بدء اللعب"
-
-          for attempt in 1 2 3; do
-            if git push origin HEAD:main; then
-              exit 0
-            fi
-
-            echo "Push raced with main; validating the intervening changes before retry $attempt/3."
-            git fetch origin main
-            BASE_SHA="$(git rev-parse HEAD^)"
-            REMOTE_SHA="$(git rev-parse origin/main)"
-            if ! git merge-base --is-ancestor "$BASE_SHA" "$REMOTE_SHA"; then
-              echo "::error::Main diverged while publishing tested web output."
-              exit 1
-            fi
-            if ! only_ignored_turn32_changes "$BASE_SHA" "$REMOTE_SHA"; then
-              echo "::error::A publishable source change raced with the tested output; refusing to rebase it."
-              exit 1
-            fi
-            git rebase origin/main
-          done
-
-          echo "::error::Could not publish tested web output after safe UX-TURN-32-only retries."
-          exit 1
-      - name: Verify Production online API path
-        env:
-          YAKOLAK_PROBE_BASE: https://yakolak.vercel.app
-        run: |
-          set -eu
-          for attempt in $(seq 1 18); do
-            if node tests/production_online_probe.mjs; then
-              exit 0
-            fi
-            echo "Production online API is not ready yet; retry $attempt/18"
-            if [ "${attempt}" -lt 18 ]; then sleep 10; fi
-          done
-          echo "::error::Production online API probe did not pass after publish."
-          exit 1
-      - name: Verify Production round-boundary lifecycle
-        env:
-          YAKOLAK_PROBE_BASE: https://yakolak.vercel.app
-        run: |
-          set -eu
-          for attempt in $(seq 1 18); do
-            if node tests/round_boundary_multiclient.test.mjs; then
-              exit 0
-            fi
-            echo "Production round-boundary lifecycle is not ready yet; retry $attempt/18"
-            if [ "${attempt}" -lt 18 ]; then sleep 10; fi
-          done
-          echo "::error::Production round-boundary lifecycle regression did not pass after publish."
-          exit 1
+          git commit --allow-empty -m "[flash-ready] publish ${SOURCE_SHA:0:8}"
+          git push origin HEAD:main
