@@ -2,7 +2,7 @@ import { chromium } from 'playwright';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ASSET_LIST } from '../web/app/assets/asset-manifest.js';
+import { ASSET_LIST, runtimePayloadBytes } from '../web/app/assets/asset-manifest.js';
 import {
   PERFORMANCE_CUTOVER_TARGETS,
   PERFORMANCE_REGRESSION_CEILINGS,
@@ -22,10 +22,10 @@ const PROFILE = Object.freeze({
   uploadKbps: REPRESENTATIVE_MOBILE_PROFILE.uploadKbps,
 });
 
-function sumSourceBytes(group = null) {
+function sumRuntimeBytes(group = null) {
   return ASSET_LIST
     .filter((asset) => !group || asset.group === group)
-    .reduce((sum, asset) => sum + asset.source.bytes, 0);
+    .reduce((sum, asset) => sum + runtimePayloadBytes(asset), 0);
 }
 
 async function decodedPngBytes() {
@@ -121,30 +121,26 @@ try {
     const shell = window.__YAKOLAK_THREEJS_SHELL__;
     const marks = shell.getStartupMarks();
 
-    const seenBuffers = new Set();
     const geometryBytes = (geometry) => {
       if (!geometry?.isBufferGeometry) return 0;
       let bytes = 0;
-      const countArray = (array) => {
-        if (!array?.buffer) return;
-        if (seenBuffers.has(array.buffer)) return;
-        seenBuffers.add(array.buffer);
-        bytes += array.byteLength ?? array.buffer.byteLength ?? 0;
-      };
       for (const attribute of Object.values(geometry.attributes || {})) {
-        countArray(attribute?.isInterleavedBufferAttribute ? attribute.data?.array : attribute?.array);
+        const array = attribute?.isInterleavedBufferAttribute ? attribute.data?.array : attribute?.array;
+        bytes += array?.byteLength || 0;
       }
-      if (geometry.index) countArray(geometry.index.array);
+      bytes += geometry.index?.array?.byteLength || 0;
       return bytes;
     };
 
     let decodedRequiredGeometryBytes = 0;
     const decodedGeometry = [];
-    for (const asset of manifest.filter((entry) => entry.runtime.type === 'stl' && entry.runtimeRequired)) {
+    for (const asset of manifest.filter((entry) => entry.runtimeRequired && ['stl', 'glb-components'].includes(entry.runtime.type))) {
       const value = shell.getAsset(asset.logicalId);
-      const bytes = geometryBytes(value);
+      const bytes = asset.runtime.type === 'glb-components'
+        ? (value?.components || []).reduce((sum, component) => sum + geometryBytes(component.geometry), 0)
+        : geometryBytes(value);
       decodedRequiredGeometryBytes += bytes;
-      decodedGeometry.push({ id: asset.logicalId, bytes });
+      decodedGeometry.push({ id: asset.logicalId, runtimeType: asset.runtime.type, bytes });
     }
 
     const resources = performance.getEntriesByType('resource');
@@ -166,8 +162,8 @@ try {
       allAtInteractive.requests += 1;
     }
 
-    const assetEntries = resources.filter((entry) => entry.name.includes('/runtime-assets/'));
-    const requiredAssetEntries = assetEntries.filter((entry) => entry.responseEnd <= startupCutoff + 0.001);
+    const requiredPaths = new Set(manifest.filter((asset) => asset.runtimeRequired).map((asset) => new URL(asset.runtime.url, location.href).pathname));
+    const requiredAssetEntries = resources.filter((entry) => requiredPaths.has(new URL(entry.name).pathname) && entry.responseEnd <= startupCutoff + 0.001);
     const rendererInfo = window.__YAKOLAK_RENDERER_INFO__;
 
     return {
@@ -198,11 +194,11 @@ try {
     schema: 'THREEJS-017-PERF-V1',
     profile: PROFILE,
     manifestBodyBytes: Object.freeze({
-      bootCritical: sumSourceBytes('boot-critical'),
-      sceneCritical: sumSourceBytes('scene-critical'),
-      requiredTotal: sumSourceBytes('boot-critical') + sumSourceBytes('scene-critical'),
-      optionalTotal: sumSourceBytes('optional'),
-      allAssets: sumSourceBytes(),
+      bootCritical: sumRuntimeBytes('boot-critical'),
+      sceneCritical: sumRuntimeBytes('scene-critical'),
+      requiredTotal: sumRuntimeBytes('boot-critical') + sumRuntimeBytes('scene-critical'),
+      optionalTotal: sumRuntimeBytes('optional'),
+      allAssets: sumRuntimeBytes(),
     }),
     decodedOptionalTextureRgba8Bytes: png.total,
     decodedOptionalTextures: png.entries,
