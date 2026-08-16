@@ -44,6 +44,8 @@ function asset(logicalId, group, sourceInfo, type, runtimeOverride = null) {
 
 const boardAndLidSource = source('models/board-and-lid.stl', 'board-and-intro-lid', true, '024d109cea081d65eedc067b2fdaac46c9c10227', 3114084);
 const boardAndLidRuntime = runtime('/assets/models/board-and-lid.glb', 'glb-components', '9a7e3410f641735e08a2944efa366cca2a66ee99', 2595544);
+const playerBaseSource = source('models/player-base.stl', 'player-base', true, '066b3f95f5281a178b610611075cbab0689cdb12', 9955084);
+const playerBaseRuntime = runtime('/assets/models/player-base.glb', 'glb-components', '63550f0eeb7aa9c004f251fb4238d751dfd4d06c', 1942888);
 
 export const ASSETS = Object.freeze({
   gameLogo: asset('brand.yakolak-logo', 'boot-critical', source('logos/YAKOLAK.svg', 'official-game-logo', true, 'ee3703615cd42c4979a0001f1261014f108c6956', 5736), 'text'),
@@ -55,7 +57,7 @@ export const ASSETS = Object.freeze({
 
   introScatter: asset('data.intro-scatter', 'scene-critical', source('layout/intro-scatter.csv', 'exact-36-piece-intro-start-transforms', true, '429265cd6a5c5474bdfa75c811963c743a057bd8', 2452), 'text'),
   boardAndLid: asset('model.board-and-lid', 'scene-critical', boardAndLidSource, 'stl', boardAndLidRuntime),
-  playerBase: asset('model.player-base', 'scene-critical', source('models/player-base.stl', 'player-base', true, '066b3f95f5281a178b610611075cbab0689cdb12', 9955084), 'stl'),
+  playerBase: asset('model.player-base', 'scene-critical', playerBaseSource, 'stl', playerBaseRuntime),
   pieceSmall: asset('model.piece-small', 'scene-critical', source('models/piece-small.stl', 'small-piece', true, '531812323efe43f7679f509f1ae06980227521a8', 5884), 'stl'),
   pieceMedium: asset('model.piece-medium', 'scene-critical', source('models/piece-medium.stl', 'medium-piece', true, 'c32fc5cc37664af7860b3aa6e33e12b04eefa757', 12084), 'stl'),
   pieceLarge: asset('model.piece-large', 'scene-critical', source('models/piece-large.stl', 'large-piece', true, 'eca0a269a75aef8770a8eb653e016f69b7766b35', 12084), 'stl'),
