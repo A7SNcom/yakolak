@@ -1,0 +1,53 @@
+name: THREEJS-016 bootstrap committed runtime assets
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - .github/workflows/threejs-016-bootstrap-assets.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: threejs-016-bootstrap-assets
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout migration branch
+        uses: actions/checkout@v4
+        with:
+          ref: threejs-rebuild
+          fetch-depth: 0
+
+      - name: Use pinned converter Node major
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Convert canonical STL sources
+        run: npm run assets:convert
+
+      - name: Verify committed conversion contract
+        run: |
+          npm run assets:check
+          node tests/threejs_asset_conversion_pipeline.test.mjs
+
+      - name: Commit generated GLB assets and retire bootstrap workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/threejs-016-bootstrap-assets.yml
+          git add web/assets/models
+          if git diff --cached --quiet; then
+            echo 'No asset/bootstrap changes to commit.'
+            exit 0
+          fi
+          git commit -m 'THREEJS-016 commit deterministic runtime GLB assets'
+          git push origin HEAD:threejs-rebuild
