@@ -1,13 +1,14 @@
 {
   "schemaVersion": 1,
+  "semanticProfile": "yakolak-board-intro-lid-v1",
   "source": {
     "canonicalPath": "YAKOLAK_PORTABLE_KIT/assets/models/board-and-lid.stl",
     "canonicalGitBlobSha1": "024d109cea081d65eedc067b2fdaac46c9c10227",
     "canonicalBytes": 3114084,
     "runtimePath": "web/assets/models/board-and-lid.glb",
-    "runtimeGitBlobSha1": "4e56d8ca053cd4e8e0c08cffbe8bff130192b8d8",
-    "runtimeSha256": "eed21395fd22a6c679438d942333a87fac1d075002d2a57ad4efa47c57da6e8d",
-    "runtimeBytes": 2594764,
+    "runtimeGitBlobSha1": "95636cecff02ab7caa9d08780995fcdce402ffb7",
+    "runtimeSha256": "15c20b66904087a66ffc8b60a9344a750b0f5186418f25b1344438259656c3b1",
+    "runtimeBytes": 2596032,
     "triangleCount": 62280,
     "componentCount": 29
   },
@@ -19,6 +20,7 @@
     "ruleCoordinatesReceiveMeshOffsets": false
   },
   "board": {
+    "semanticNode": "YakolakBoard",
     "componentIndices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27],
     "assetPivot": [90.00003051757812, 90, 6],
     "sourceBounds": {
@@ -48,8 +50,9 @@
     "visualCenterVerificationTolerance": 0.3
   },
   "lid": {
+    "semanticNode": "YakolakIntroLid",
     "componentIndices": [28],
-    "assetPivot": [90.00003051757812, 90.00003051757812, 4.999999523162842],
+    "assetPivot": [90.00003051757812, 90, 6],
     "sourceBounds": {
       "min": [6.551025390625, 6.55108642578125, 0],
       "max": [173.44903564453125, 173.448974609375, 9.999999046325684]
