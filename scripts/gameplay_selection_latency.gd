@@ -14,6 +14,20 @@ var _ux46_marker_generation: int = 0
 var _ux46_pointer_started_usec: int = 0
 var _ux46_pointer_kind: String = ""
 var _ux46_selection_serial: int = 0
+var _ux46_start_callback: Variant
+var _ux46_clear_callback: Variant
+
+
+func _ready() -> void:
+	super._ready()
+	if not OS.has_feature("web") or not browser_automation:
+		return
+	_ux46_start_callback = JavaScriptBridge.create_callback(_on_web_ux46_start_pass_play)
+	_ux46_clear_callback = JavaScriptBridge.create_callback(_on_web_ux46_clear_selection)
+	var window: JavaScriptObject = JavaScriptBridge.get_interface("window")
+	if window != null:
+		window.set("yakolakUx46StartPassPlay", _ux46_start_callback)
+		window.set("yakolakUx46ClearSelection", _ux46_clear_callback)
 
 
 func _input(event: InputEvent) -> void:
@@ -162,3 +176,29 @@ func _ux46_apply_legal_markers(size_name: String, piece_color: Color) -> void:
 		marker.visible = legal
 		if legal:
 			marker.material_override = marker_material
+
+
+func _on_web_ux46_start_pass_play(_arguments: Array) -> void:
+	if not browser_automation or match_initialized:
+		return
+	# The current Flash entry intentionally no longer exposes the old broad setup
+	# test callback. This focused hook enters the same configuration boundary and
+	# exists only under navigator.webdriver.
+	waiting_for_setup = true
+	if setup != null:
+		setup.call("reset_for_intro")
+	_on_configuration_ready({
+		"tutorial": false,
+		"rounds": 3,
+		"players": [
+			{"seat": "p1", "label": "أنا", "mode": "local", "color": "marble", "color_name": "أبيض", "direction": "right"},
+			{"seat": "p2", "label": "اللاعب 2", "mode": "local", "color": "blue", "color_name": "أزرق", "direction": "back"},
+		],
+		"online_join_code": "",
+	})
+
+
+func _on_web_ux46_clear_selection(_arguments: Array) -> void:
+	if not browser_automation or not match_initialized:
+		return
+	_clear_selection()
