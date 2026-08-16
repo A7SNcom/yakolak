@@ -77,11 +77,8 @@ function createSeatBase({ seatId, colorId, runtimeAsset, geometryLayout, transfo
   return { base, assetSpace };
 }
 
-function distance(a, b) {
-  const dx = a[0] - b[0];
-  const dy = a[1] - b[1];
-  const dz = a[2] - b[2];
-  return Math.hypot(dx, dy, dz);
+function distanceXZ(a, b) {
+  return Math.hypot(a[0] - b[0], a[2] - b[2]);
 }
 
 function vectorArray(vector) {
@@ -159,25 +156,25 @@ export function createPlayerBaseInstances({ runtimeAsset, geometryLayout, worldL
       const visual = geometryLayout.geometry.visualStackGroups.map((group) => {
         const point = vectorArray(assetSpace.localToWorld(new Vector3(...group.measuredSourceCenter)));
         const nearest = authoritative
-          .map((homeCenter, homeIndex) => ({ homeIndex, homeCenter, error: distance(point, homeCenter) }))
-          .sort((a, b) => a.error - b.error)[0];
+          .map((homeCenter, homeIndex) => ({ homeIndex, homeCenter, errorXZ: distanceXZ(point, homeCenter) }))
+          .sort((a, b) => a.errorXZ - b.errorXZ)[0];
         return Object.freeze({
           visualGroupId: group.id,
           worldCenter: Object.freeze(point),
           homeIndex: nearest.homeIndex,
           authoritativeCenter: Object.freeze([...nearest.homeCenter]),
-          error: nearest.error,
+          errorXZ: nearest.errorXZ,
         });
       });
       const uniqueHomes = new Set(visual.map((entry) => entry.homeIndex));
-      const maxError = Math.max(...visual.map((entry) => entry.error));
+      const maxErrorXZ = Math.max(...visual.map((entry) => entry.errorXZ));
       return Object.freeze({
         seatId,
         colorId: seats.get(seatId).colorId,
         visual: Object.freeze(visual),
-        maxError,
+        maxErrorXZ,
         uniqueHomeCount: uniqueHomes.size,
-        withinTolerance: uniqueHomes.size === 3 && maxError <= geometryLayout.geometry.homeAlignmentTolerance,
+        withinTolerance: uniqueHomes.size === 3 && maxErrorXZ <= geometryLayout.geometry.homeAlignmentTolerance,
       });
     }));
   }
