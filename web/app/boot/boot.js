@@ -35,6 +35,7 @@ async function boot() {
     shell = Object.freeze({
       runtime: 'threejs-static-esm',
       canvas: rendererOwner.canvas,
+      getPresentationSnapshot: () => previewScene?.getPresentationSnapshot() || null,
       dispose,
     });
     window.__YAKOLAK_THREEJS_SHELL__ = shell;

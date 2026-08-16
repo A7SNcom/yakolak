@@ -6,7 +6,6 @@ const DIAGNOSTICS_KEY = '__YAKOLAK_RENDERER_INFO__';
 export const RENDERER_BASELINE = Object.freeze({
   canvasId: 'scene',
   canvasClassName: 'scene',
-  maxPixelRatio: 1.5,
   clearColor: 0x0b1018,
   clearAlpha: 1,
   toneMappingExposure: 1,
@@ -58,8 +57,10 @@ function createOwnedCanvas(mount) {
   return canvas;
 }
 
-function getPixelRatio() {
-  return Math.min(Math.max(window.devicePixelRatio || 1, 1), RENDERER_BASELINE.maxPixelRatio);
+function positiveDimension(value, fallback) {
+  const number = Number(value);
+  if (Number.isFinite(number) && number > 0) return Math.max(1, Math.round(number));
+  return Math.max(1, Math.round(fallback || 1));
 }
 
 export function createRendererOwner({ mount }) {
@@ -89,30 +90,43 @@ export function createRendererOwner({ mount }) {
   renderer.toneMappingExposure = RENDERER_BASELINE.toneMappingExposure;
   renderer.autoClear = true;
   renderer.setClearColor(RENDERER_BASELINE.clearColor, RENDERER_BASELINE.clearAlpha);
-  renderer.setPixelRatio(getPixelRatio());
   renderer.shadowMap.enabled = false;
 
   let disposed = false;
   let diagnosticsTarget = null;
+  let displayState = Object.freeze({ width: 0, height: 0, pixelRatio: 0 });
 
   function assertLive() {
     if (disposed) throw new RendererOwnershipError('Renderer owner has been disposed');
   }
 
-  function resizeToDisplaySize() {
+  function resizeToDisplaySize({ width, height, pixelRatio } = {}) {
     assertLive();
 
-    const pixelRatio = getPixelRatio();
-    if (renderer.getPixelRatio() !== pixelRatio) renderer.setPixelRatio(pixelRatio);
+    const displayWidth = positiveDimension(width, canvas.clientWidth);
+    const displayHeight = positiveDimension(height, canvas.clientHeight);
+    const ratio = Number(pixelRatio);
+    if (!Number.isFinite(ratio) || ratio <= 0) {
+      throw new TypeError('Renderer resize requires a positive pixelRatio from the frame governor');
+    }
 
-    const width = Math.max(1, Math.floor(canvas.clientWidth));
-    const height = Math.max(1, Math.floor(canvas.clientHeight));
-    const targetWidth = Math.floor(width * pixelRatio);
-    const targetHeight = Math.floor(height * pixelRatio);
-    const resized = canvas.width !== targetWidth || canvas.height !== targetHeight;
+    const resized = displayState.width !== displayWidth
+      || displayState.height !== displayHeight
+      || Math.abs(displayState.pixelRatio - ratio) > 0.0001;
 
-    if (resized) renderer.setSize(width, height, false);
-    return Object.freeze({ width, height, resized });
+    if (resized) {
+      renderer.setDrawingBufferSize(displayWidth, displayHeight, ratio);
+      displayState = Object.freeze({ width: displayWidth, height: displayHeight, pixelRatio: ratio });
+    }
+
+    return Object.freeze({
+      width: displayWidth,
+      height: displayHeight,
+      pixelRatio: ratio,
+      drawingBufferWidth: canvas.width,
+      drawingBufferHeight: canvas.height,
+      resized,
+    });
   }
 
   function render(scene, camera) {

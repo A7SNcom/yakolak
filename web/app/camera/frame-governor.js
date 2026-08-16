@@ -1,9 +1,14 @@
 // THREEJS-013: presentation-only frame pacing / viewport governance.
 // This module never owns authoritative game or lifecycle state.
 
-const DEFAULT_BASE_FOV = 42;
-const DEFAULT_REFERENCE_ASPECT = 1;
-const DEFAULT_MAX_FOV = 72;
+export const FRAME_GOVERNOR_POLICY = Object.freeze({
+  maxPixelRatio: 1.5,
+  maxFramesPerSecond: 60,
+  resizeDebounceMs: 80,
+  baseFov: 42,
+  referenceAspect: 1,
+  maxFov: 72,
+});
 
 function finitePositive(value, fallback) {
   const number = Number(value);
@@ -14,24 +19,31 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
+function readRawDevicePixelRatio() {
+  return finitePositive(window.devicePixelRatio, 1);
+}
+
+function capPixelRatio(rawPixelRatio, maxPixelRatio) {
+  return clamp(rawPixelRatio, 1, finitePositive(maxPixelRatio, FRAME_GOVERNOR_POLICY.maxPixelRatio));
+}
+
 export function refitPerspectiveFov({
-  baseFov = DEFAULT_BASE_FOV,
+  baseFov = FRAME_GOVERNOR_POLICY.baseFov,
   aspect,
-  referenceAspect = DEFAULT_REFERENCE_ASPECT,
-  maxFov = DEFAULT_MAX_FOV,
+  referenceAspect = FRAME_GOVERNOR_POLICY.referenceAspect,
+  maxFov = FRAME_GOVERNOR_POLICY.maxFov,
 }) {
-  const safeBaseFov = finitePositive(baseFov, DEFAULT_BASE_FOV);
+  const safeBaseFov = finitePositive(baseFov, FRAME_GOVERNOR_POLICY.baseFov);
   const safeAspect = finitePositive(aspect, 1);
-  const safeReferenceAspect = finitePositive(referenceAspect, DEFAULT_REFERENCE_ASPECT);
-  const safeMaxFov = Math.max(safeBaseFov, finitePositive(maxFov, DEFAULT_MAX_FOV));
+  const safeReferenceAspect = finitePositive(referenceAspect, FRAME_GOVERNOR_POLICY.referenceAspect);
+  const safeMaxFov = Math.max(safeBaseFov, finitePositive(maxFov, FRAME_GOVERNOR_POLICY.maxFov));
 
   if (safeAspect >= safeReferenceAspect) return safeBaseFov;
 
   const baseRadians = safeBaseFov * Math.PI / 180;
   const referenceHorizontal = 2 * Math.atan(Math.tan(baseRadians / 2) * safeReferenceAspect);
   const fittedRadians = 2 * Math.atan(Math.tan(referenceHorizontal / 2) / safeAspect);
-  const fittedDegrees = fittedRadians * 180 / Math.PI;
-  return clamp(fittedDegrees, safeBaseFov, safeMaxFov);
+  return clamp(fittedRadians * 180 / Math.PI, safeBaseFov, safeMaxFov);
 }
 
 function createSafeAreaProbe() {
@@ -68,25 +80,28 @@ function sameInsets(a, b) {
   return a.top === b.top && a.right === b.right && a.bottom === b.bottom && a.left === b.left;
 }
 
-function readViewportSnapshot(safeArea) {
-  const visualViewport = window.visualViewport;
+function measureCanvasCssSize(canvas) {
+  const rect = canvas.getBoundingClientRect();
   return Object.freeze({
-    width: Math.max(1, Math.round(visualViewport?.width || window.innerWidth || 1)),
-    height: Math.max(1, Math.round(visualViewport?.height || window.innerHeight || 1)),
-    scale: finitePositive(visualViewport?.scale, 1),
-    devicePixelRatio: finitePositive(window.devicePixelRatio, 1),
-    orientation: screen.orientation?.type || (window.innerWidth >= window.innerHeight ? 'landscape' : 'portrait'),
-    safeArea,
+    width: Math.max(1, Math.round(rect.width || canvas.clientWidth || window.innerWidth || 1)),
+    height: Math.max(1, Math.round(rect.height || canvas.clientHeight || window.innerHeight || 1)),
   });
+}
+
+function readOrientation(width, height) {
+  return screen.orientation?.type || (width >= height ? 'landscape' : 'portrait');
 }
 
 export function createFrameGovernor({
   rendererOwner,
   camera,
   onFrame,
-  baseFov = DEFAULT_BASE_FOV,
-  referenceAspect = DEFAULT_REFERENCE_ASPECT,
-  maxFov = DEFAULT_MAX_FOV,
+  maxPixelRatio = FRAME_GOVERNOR_POLICY.maxPixelRatio,
+  maxFramesPerSecond = FRAME_GOVERNOR_POLICY.maxFramesPerSecond,
+  resizeDebounceMs = FRAME_GOVERNOR_POLICY.resizeDebounceMs,
+  baseFov = FRAME_GOVERNOR_POLICY.baseFov,
+  referenceAspect = FRAME_GOVERNOR_POLICY.referenceAspect,
+  maxFov = FRAME_GOVERNOR_POLICY.maxFov,
 }) {
   if (!rendererOwner || typeof rendererOwner.resizeToDisplaySize !== 'function') {
     throw new TypeError('Frame governor requires the renderer owner');
@@ -98,19 +113,37 @@ export function createFrameGovernor({
     throw new TypeError('Frame governor requires an onFrame callback');
   }
 
+  const safeMaxPixelRatio = finitePositive(maxPixelRatio, FRAME_GOVERNOR_POLICY.maxPixelRatio);
+  const safeMaxFramesPerSecond = finitePositive(maxFramesPerSecond, FRAME_GOVERNOR_POLICY.maxFramesPerSecond);
+  const safeResizeDebounceMs = Math.max(0, Number(resizeDebounceMs) || 0);
+  const frameIntervalMs = 1000 / safeMaxFramesPerSecond;
+  const activePolicy = Object.freeze({
+    maxPixelRatio: safeMaxPixelRatio,
+    maxFramesPerSecond: safeMaxFramesPerSecond,
+    resizeDebounceMs: safeResizeDebounceMs,
+    baseFov: finitePositive(baseFov, FRAME_GOVERNOR_POLICY.baseFov),
+    referenceAspect: finitePositive(referenceAspect, FRAME_GOVERNOR_POLICY.referenceAspect),
+    maxFov: Math.max(finitePositive(baseFov, FRAME_GOVERNOR_POLICY.baseFov), finitePositive(maxFov, FRAME_GOVERNOR_POLICY.maxFov)),
+  });
+
   let disposed = false;
   let started = false;
   let visible = document.visibilityState !== 'hidden';
   let continuous = false;
   let layoutDirty = true;
+  let layoutReady = true;
   let renderRequested = true;
   let resumed = false;
   let frameId = 0;
+  let resizeTimer = 0;
   let resizeObserver = null;
   let dprMedia = null;
   let safeAreaProbe = null;
   let safeArea = Object.freeze({ top: 0, right: 0, bottom: 0, left: 0 });
   let viewport = null;
+  let lastPresentedAt = Number.NEGATIVE_INFINITY;
+  let frameCount = 0;
+  let layoutCommitCount = 0;
 
   function assertLive() {
     if (disposed) throw new Error('Frame governor has been disposed');
@@ -120,6 +153,12 @@ export function createFrameGovernor({
     if (!frameId) return;
     cancelAnimationFrame(frameId);
     frameId = 0;
+  }
+
+  function cancelResizeDebounce() {
+    if (!resizeTimer) return;
+    clearTimeout(resizeTimer);
+    resizeTimer = 0;
   }
 
   function schedule() {
@@ -133,17 +172,31 @@ export function createFrameGovernor({
     schedule();
   }
 
-  function invalidateLayout() {
+  function invalidateLayout({ immediate = false } = {}) {
     if (disposed) return;
     layoutDirty = true;
     renderRequested = true;
-    schedule();
+    cancelResizeDebounce();
+
+    if (immediate || safeResizeDebounceMs === 0 || !visible) {
+      layoutReady = true;
+      schedule();
+      return;
+    }
+
+    layoutReady = false;
+    resizeTimer = window.setTimeout(() => {
+      resizeTimer = 0;
+      if (disposed || !visible) return;
+      layoutReady = true;
+      schedule();
+    }, safeResizeDebounceMs);
   }
 
   function bindDprWatcher() {
     if (dprMedia?.removeEventListener) dprMedia.removeEventListener('change', onDprChange);
-    const dpr = finitePositive(window.devicePixelRatio, 1);
-    dprMedia = window.matchMedia?.(`(resolution: ${dpr}dppx)`) || null;
+    const rawPixelRatio = readRawDevicePixelRatio();
+    dprMedia = window.matchMedia?.(`(resolution: ${rawPixelRatio}dppx)`) || null;
     dprMedia?.addEventListener?.('change', onDprChange);
   }
 
@@ -152,27 +205,34 @@ export function createFrameGovernor({
     invalidateLayout();
   }
 
-  function onVisibilityChange() {
-    if (document.visibilityState === 'hidden') {
-      visible = false;
-      cancelScheduledFrame();
-      return;
-    }
+  function pausePresentation() {
+    visible = false;
+    cancelScheduledFrame();
+    cancelResizeDebounce();
+  }
+
+  function resumePresentation() {
+    if (disposed) return;
     visible = true;
     resumed = true;
-    invalidateLayout();
+    invalidateLayout({ immediate: true });
+  }
+
+  function onVisibilityChange() {
+    if (document.visibilityState === 'hidden') {
+      pausePresentation();
+      return;
+    }
+    resumePresentation();
   }
 
   function onPageHide() {
-    visible = false;
-    cancelScheduledFrame();
+    pausePresentation();
   }
 
   function onPageShow() {
-    if (disposed) return;
-    visible = document.visibilityState !== 'hidden';
-    resumed = true;
-    invalidateLayout();
+    if (document.visibilityState === 'hidden') return;
+    resumePresentation();
   }
 
   function applyLayout() {
@@ -180,9 +240,22 @@ export function createFrameGovernor({
     const safeAreaChanged = !sameInsets(nextSafeArea, safeArea);
     safeArea = nextSafeArea;
 
-    const display = rendererOwner.resizeToDisplaySize();
+    const cssSize = measureCanvasCssSize(rendererOwner.canvas);
+    const rawPixelRatio = readRawDevicePixelRatio();
+    const pixelRatio = capPixelRatio(rawPixelRatio, activePolicy.maxPixelRatio);
+    const display = rendererOwner.resizeToDisplaySize({
+      width: cssSize.width,
+      height: cssSize.height,
+      pixelRatio,
+    });
+
     const aspect = display.width / display.height;
-    const nextFov = refitPerspectiveFov({ baseFov, aspect, referenceAspect, maxFov });
+    const nextFov = refitPerspectiveFov({
+      baseFov: activePolicy.baseFov,
+      aspect,
+      referenceAspect: activePolicy.referenceAspect,
+      maxFov: activePolicy.maxFov,
+    });
     const cameraChanged = Math.abs(camera.aspect - aspect) > 0.0001 || Math.abs(camera.fov - nextFov) > 0.0001;
 
     if (cameraChanged) {
@@ -191,8 +264,24 @@ export function createFrameGovernor({
       camera.updateProjectionMatrix();
     }
 
-    viewport = readViewportSnapshot(safeArea);
+    const visualViewport = window.visualViewport;
+    viewport = Object.freeze({
+      width: display.width,
+      height: display.height,
+      pixelRatio: display.pixelRatio,
+      rawDevicePixelRatio: rawPixelRatio,
+      drawingBufferWidth: display.drawingBufferWidth,
+      drawingBufferHeight: display.drawingBufferHeight,
+      visualWidth: Math.max(1, Math.round(visualViewport?.width || window.innerWidth || display.width)),
+      visualHeight: Math.max(1, Math.round(visualViewport?.height || window.innerHeight || display.height)),
+      scale: finitePositive(visualViewport?.scale, 1),
+      orientation: readOrientation(display.width, display.height),
+      safeArea,
+    });
+
     layoutDirty = false;
+    layoutReady = true;
+    layoutCommitCount += 1;
 
     return Object.freeze({
       width: display.width,
@@ -208,13 +297,19 @@ export function createFrameGovernor({
     frameId = 0;
     if (!started || disposed || !visible) return;
 
-    const layout = layoutDirty ? applyLayout() : null;
-    const shouldDraw = renderRequested || continuous || Boolean(layout);
-    const didResume = resumed;
-    resumed = false;
+    const layout = layoutDirty && layoutReady ? applyLayout() : null;
+    if (layoutDirty && !layoutReady) return;
 
-    if (shouldDraw) {
+    const didResume = resumed;
+    const hasWork = renderRequested || continuous || Boolean(layout) || didResume;
+    const elapsedSincePresentation = now - lastPresentedAt;
+    const pacingReady = Boolean(layout) || didResume || elapsedSincePresentation + 0.5 >= frameIntervalMs;
+
+    if (hasWork && pacingReady) {
+      resumed = false;
       renderRequested = false;
+      lastPresentedAt = now;
+      frameCount += 1;
       onFrame(Object.freeze({
         now,
         resumed: didResume,
@@ -234,6 +329,23 @@ export function createFrameGovernor({
     schedule();
   }
 
+  function snapshot() {
+    return Object.freeze({
+      started,
+      disposed,
+      visible,
+      continuous,
+      layoutDirty,
+      framePending: Boolean(frameId),
+      resizeDebouncePending: Boolean(resizeTimer),
+      frameCount,
+      layoutCommitCount,
+      lastPresentedAt: Number.isFinite(lastPresentedAt) ? lastPresentedAt : null,
+      viewport,
+      policy: activePolicy,
+    });
+  }
+
   function start() {
     assertLive();
     if (started) return;
@@ -251,12 +363,11 @@ export function createFrameGovernor({
 
     if (typeof ResizeObserver === 'function') {
       resizeObserver = new ResizeObserver(invalidateLayout);
-      resizeObserver.observe(rendererOwner.canvas);
       if (rendererOwner.canvas.parentElement) resizeObserver.observe(rendererOwner.canvas.parentElement);
     }
 
     bindDprWatcher();
-    invalidateLayout();
+    invalidateLayout({ immediate: true });
   }
 
   function dispose() {
@@ -264,6 +375,7 @@ export function createFrameGovernor({
     disposed = true;
     started = false;
     cancelScheduledFrame();
+    cancelResizeDebounce();
     resizeObserver?.disconnect();
     resizeObserver = null;
 
@@ -285,6 +397,7 @@ export function createFrameGovernor({
     requestRender,
     invalidateLayout,
     setContinuous,
+    snapshot,
     dispose,
     get visible() {
       return visible;

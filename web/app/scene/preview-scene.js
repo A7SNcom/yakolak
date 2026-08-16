@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createFrameGovernor } from '../camera/frame-governor.js';
+import { createFrameGovernor, FRAME_GOVERNOR_POLICY } from '../camera/frame-governor.js';
 
 export function createPreviewScene(rendererOwner) {
   if (!rendererOwner) throw new TypeError('Preview scene requires the renderer owner');
@@ -7,7 +7,7 @@ export function createPreviewScene(rendererOwner) {
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x0b1018, 0.085);
 
-  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  const camera = new THREE.PerspectiveCamera(FRAME_GOVERNOR_POLICY.baseFov, 1, 0.1, 100);
   camera.position.set(0, 1.6, 6.2);
   camera.lookAt(0, 0, 0);
 
@@ -51,9 +51,6 @@ export function createPreviewScene(rendererOwner) {
   const frameGovernor = createFrameGovernor({
     rendererOwner,
     camera,
-    baseFov: 42,
-    referenceAspect: 1,
-    maxFov: 72,
     onFrame({ now, resumed }) {
       if (!running || disposed) return;
 
@@ -92,6 +89,17 @@ export function createPreviewScene(rendererOwner) {
     frameGovernor.requestRender();
   }
 
+  function getPresentationSnapshot() {
+    return Object.freeze({
+      ...frameGovernor.snapshot(),
+      running,
+      reducedMotion,
+      animationElapsedMs,
+      cameraAspect: camera.aspect,
+      cameraFov: camera.fov,
+    });
+  }
+
   function dispose() {
     if (disposed) return;
     disposed = true;
@@ -110,6 +118,7 @@ export function createPreviewScene(rendererOwner) {
     camera,
     start,
     requestRender: () => frameGovernor.requestRender(),
+    getPresentationSnapshot,
     dispose,
   });
 }
