@@ -22,6 +22,7 @@ required=(
   scripts/lib/stl-glb-converter.mjs
   scripts/lib/asset-conversion-pipeline.mjs
   scripts/measure-threejs-performance.mjs
+  scripts/inspect-board-lid-components.mjs
   tests/threejs_renderer_owner_contract.test.mjs
   tests/threejs_frame_governor_contract.test.mjs
   tests/threejs_asset_loading_contract.test.mjs
@@ -35,6 +36,7 @@ for file in "${required[@]}"; do
 done
 
 node scripts/prepare-threejs-runtime-assets.mjs
+node scripts/inspect-board-lid-components.mjs
 
 if find web -type f \( -name '*.pck' -o -name '*.wasm' -o -name 'index.js' -o -name 'index.audio*.js' \) -print -quit | grep -q .; then
   echo "Forbidden Godot runtime artifact found under web/" >&2
