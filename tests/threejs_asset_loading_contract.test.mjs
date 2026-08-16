@@ -67,9 +67,9 @@ test('runtime manifest exactly covers definitive portable sources while derived 
   assert.equal(ASSETS.boardAndLid.source.path, 'models/board-and-lid.stl');
   assert.equal(ASSETS.boardAndLid.source.gitBlobSha, '024d109cea081d65eedc067b2fdaac46c9c10227');
   assert.equal(ASSETS.boardAndLid.runtime.type, 'glb-components');
-  assert.equal(ASSETS.boardAndLid.runtime.url, '/assets/models/board-and-lid.glb?v=95636cecff02ab7caa9d08780995fcdce402ffb7');
-  assert.equal(runtimePayloadBytes(ASSETS.boardAndLid), 2596032);
-  assert.equal(runtimePayloadGitBlobSha(ASSETS.boardAndLid), '95636cecff02ab7caa9d08780995fcdce402ffb7');
+  assert.equal(ASSETS.boardAndLid.runtime.url, '/assets/models/board-and-lid.glb?v=9a7e3410f641735e08a2944efa366cca2a66ee99');
+  assert.equal(runtimePayloadBytes(ASSETS.boardAndLid), 2595544);
+  assert.equal(runtimePayloadGitBlobSha(ASSETS.boardAndLid), '9a7e3410f641735e08a2944efa366cca2a66ee99');
 
   assert.deepEqual(unavailableRequiredAssets('boot-critical'), []);
   assert.deepEqual(unavailableRequiredAssets('scene-critical'), []);
