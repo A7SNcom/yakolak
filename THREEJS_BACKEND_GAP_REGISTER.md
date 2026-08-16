@@ -1,372 +1,388 @@
 # Three.js Backend Gap and Contradiction Register
 
-Status: **LOCKED by THREEJS-007 (2026-08-16)**
+Status: **LOCKED by THREEJS-007 (2026-08-16), ownership map corrected against the canonical THREEJS-001→100 task plan**
 
-Scope: `threejs-rebuild` only until explicit resolution/cutover tasks change the entries below. This register is a mandatory companion to `THREEJS_SOURCE_OF_TRUTH.md` and `THREEJS_ENTRY_INVITATION_CONTRACT.md`.
+Scope: `threejs-rebuild` only until the named later task explicitly resolves a gap. This register is a mandatory companion to `THREEJS_SOURCE_OF_TRUTH.md`, `THREEJS_ENTRY_INVITATION_CONTRACT.md`, and `THREEJS_MIGRATION.md`.
 
 ## 1. Non-negotiable rule
 
-Frontend code does **not** resolve any entry in this file.
+Frontend code does **not** resolve any `OPEN` item in this file.
 
-For every `OPEN` entry:
+For every unresolved item:
 
 - the Three.js client may render only state already authoritative under the current backend contract;
-- it may not invent seat ownership, ready state, deadlines, timeout outcomes, bot actions, invitation validity, room lifetime, session recovery, idempotency, or cutover behavior;
-- deterministic presentation derived from an authoritative snapshot is allowed, but a derived value must never become a second mutable authority;
-- the entry stays open until the exact owner task named below records the resolution and, where required, implements the authoritative backend change.
+- it may not invent seat ownership/order, readiness, invitation validity, deadlines, timeout outcomes, bot actions, room lifetime, session recovery, mutation semantics, telemetry trust, persistence compatibility, or cutover behavior;
+- deterministic presentation derived from an authoritative snapshot is allowed, but the derived value never becomes a second mutable authority;
+- a gap stays open until its exact owner task records the decision and, where authority is required, implements it on the migration protocol/backend;
+- a downstream UI task may consume a closed contract but may not silently close it.
 
-## 2. Audit baseline
+## 2. Re-audit baseline
 
-THREEJS-007 re-audited these sources before implementation:
+THREEJS-007 re-audited the portable kit and current migration/backend boundaries before implementation, including:
 
-- `YAKOLAK_PORTABLE_KIT/README.md`;
-- `THREEJS_SOURCE_OF_TRUTH.md`;
-- `THREEJS_ENTRY_INVITATION_CONTRACT.md`;
-- `rules/yakolak-rules.json`;
-- `api/game-rules.js`;
-- `api/rooms.js`;
-- `api/rooms-observed.js`;
-- `api/_telemetry.js` and `api/telemetry.js`;
-- Turso persistence/schema behavior embedded in `api/rooms.js`;
-- `.env.example`, `package.json`, `vercel.json`;
-- live Vercel project/deployment configuration observed during this task.
+- `YAKOLAK_PORTABLE_KIT/README.md` and machine-readable approved/layout data;
+- `THREEJS_SOURCE_OF_TRUTH.md` and `THREEJS_ENTRY_INVITATION_CONTRACT.md`;
+- `rules/yakolak-rules.json` and `api/game-rules.js`;
+- `api/rooms.js`, `api/rooms-observed.js`, `api/_telemetry.js`, and `api/telemetry.js`;
+- Turso room/presence/join-rate/telemetry persistence behavior;
+- `package.json`, `.env.example`, and `vercel.json`;
+- the connected Vercel project/deployment configuration;
+- the canonical 100-task migration plan, to ensure every gap is owned by the real later task rather than an invented task number.
 
-Observed migration baseline at audit time:
+Observed live baseline:
 
-- migration workspace: `threejs-rebuild`;
+- migration workspace: `threejs-rebuild` only;
 - Godot source/Production branch: `main`;
-- canonical Production domain remains `yakolak.vercel.app`;
-- Vercel `vercel.json` enables Git deployment for `main` and disables it for other branches;
-- current room persistence uses Turso tables `yakolak_online_rooms_v5`, `yakolak_online_presence_v1`, and `yakolak_online_join_rate_v1` with protocol `5`;
-- telemetry uses Turso table `yakolak_online_telemetry_v1`;
-- the current backend uses optimistic room `version` CAS and hashed seat credentials;
-- no current backend field represents an authoritative turn deadline, ready state, configured computer seat, or seat-specific invitation reservation.
+- Production domain remains `yakolak.vercel.app` until cutover;
+- `vercel.json` enables Git deployment for `main` and disables it for other branches;
+- room persistence is `yakolak_online_rooms_v5` with protocol `5`, plus `yakolak_online_presence_v1` and `yakolak_online_join_rate_v1`;
+- room inactivity TTL is currently 3 hours, with separate 20-minute waiting-room reuse, 15-minute finished-match reuse, and 60-second stale presence behavior;
+- room state uses optimistic integer `version` CAS and hashed bearer credentials;
+- current room mutations are not uniform: `move`/`rematch` use `mutationId`, `edit` does not, `leave` bypasses caller version, and create/join use request-id idempotency;
+- there is no authoritative ready field, configured Computer seat, seat-specific invitation reservation, absolute turn deadline, timeout mutation, or durable server-side bot trigger in protocol 5;
+- telemetry writes to `yakolak_online_telemetry_v1`, redacts credential-like detail keys, retains approximately 7 days via opportunistic cleanup, and accepts client batches without making telemetry authoritative gameplay evidence;
+- repository `package.json` currently says Node `22.x`, while the connected Vercel project currently reports Node `24.x`; cutover runtime compatibility remains unresolved.
 
-Resolved product decisions already locked by earlier tasks remain binding: `SRC-001` wins-to-match, `SRC-002` canonical `marble`, and `SRC-004` seat-specific invitation semantics. This register records the backend work still required to make those locked decisions interoperable.
+Already locked product decisions remain binding: `SRC-001` wins-to-match, `SRC-002` canonical `marble`, and `SRC-004` seat-specific invitation semantics.
 
-## 3. Ownership map
+## 3. Correct ownership map
 
-| Gap | Status | Exact resolution owner |
-|---|---|---|
-| GAP-001 Seat topology, turn order, round starter and no-legal-move handoff | OPEN | **THREEJS-008** |
-| GAP-002 Mixed Computer/Online seat authority | OPEN | **THREEJS-009** |
-| GAP-003 Invitation lifecycle, claim authority and lobby invalidation | OPEN | **THREEJS-010** |
-| GAP-004 Ready/start lifecycle | OPEN | **THREEJS-011** |
-| GAP-005 Authoritative 18-second deadline and timeout mutation | OPEN | **THREEJS-012** |
-| GAP-006 Vercel/serverless turn driver and bot triggering | OPEN | **THREEJS-013** |
-| GAP-007 Room TTL, presence and expiry/reuse policy | OPEN | **THREEJS-014** |
-| GAP-008 Restart-round contract | OPEN | **THREEJS-015** |
-| GAP-009 Mutation-ID/revision/idempotency coverage | OPEN | **THREEJS-016** |
-| GAP-010 Session recovery and reconnect identity | OPEN | **THREEJS-017** |
-| GAP-011 Telemetry schema, trust boundary and retention | OPEN | **THREEJS-018** |
-| GAP-012 Persistence/protocol migration compatibility | OPEN | **THREEJS-019** |
-| GAP-013 Cutover and Vercel runtime/deployment compatibility | OPEN | **THREEJS-020** |
+The earlier draft incorrectly assigned GAP-001…013 to THREEJS-008…020. That collided immediately with the real task plan (`THREEJS-008` is the static no-build architecture task). Those assignments are void.
 
-The task numbers above are ownership assignments, not permission to implement them inside THREEJS-007.
+| Gap | Status | Contract/resolution owner | Required implementation/closure tasks |
+|---|---|---|---|
+| GAP-001 Seat topology / turn ring / no-legal-move handoff | OPEN | **THREEJS-048** | THREEJS-054 for next-round starter/reset behavior; THREEJS-062/064/072 for online protocol implementation |
+| GAP-002 Mixed Computer/Online authority | OPEN | **THREEJS-062** | THREEJS-064 seat records, THREEJS-069 readiness, THREEJS-071 server-authoritative online Computer turns |
+| GAP-003 Invitation lifecycle / claim / invalidation | OPEN | **THREEJS-062** | THREEJS-063 schema, THREEJS-065 allocation, THREEJS-066 claim/session identity, THREEJS-068 invalidation |
+| GAP-004 Ready/start lifecycle | OPEN | **THREEJS-062** | **THREEJS-069** authoritative ready check and explicit start |
+| GAP-005 Authoritative 18-second online deadline / timeout | OPEN | **THREEJS-062** | **THREEJS-070** serverless-safe deadline reconciliation; THREEJS-072 shared transition semantics |
+| GAP-006 Serverless timeout/bot triggering | OPEN | **THREEJS-062** | **THREEJS-070** timeout reconciliation + **THREEJS-071** online Computer reconciliation |
+| GAP-007 Room TTL / presence / disconnect / expiry | OPEN | **THREEJS-075** | THREEJS-063 persistence support where needed |
+| GAP-008 Online restart-round / rematch consensus | OPEN | **THREEJS-076** | THREEJS-072 shared mutation/transition semantics |
+| GAP-009 Mutation-ID / revision / exactly-once coverage | OPEN | **THREEJS-072** | THREEJS-062 protocol envelope, THREEJS-063 receipt persistence |
+| GAP-010 Session recovery / reconnect identity | OPEN | **THREEJS-066 + THREEJS-074 + THREEJS-075** | THREEJS-067 multi-tab ownership; THREEJS-094 UX consumes the closed contract |
+| GAP-011 Telemetry schema / trust boundary / retention | OPEN | **THREEJS-079** | THREEJS-077 security/redaction constraints; THREEJS-098 acceptance verifies it |
+| GAP-012 Persistence / protocol migration compatibility | OPEN | **THREEJS-062 + THREEJS-063** | **THREEJS-099** owns active-v5-room cutover/rollback compatibility |
+| GAP-013 Production cutover / Vercel runtime compatibility | OPEN | **THREEJS-099** | THREEJS-009 owns Preview only; THREEJS-097 owns cache/header strategy before cutover |
+
+The owner column is about who is allowed to choose the contract. The implementation column identifies tasks that must make the chosen contract real. No earlier renderer/UI task inherits authority from needing an answer.
 
 ## 4. GAP-001 — Seat topology, turn order, round starter and skip evidence — OPEN
 
-**Conflict/gap**
+Current conflict:
 
-- The Kit defines a fixed canonical ring `marble → blue → gold → green`, rotated from the host preferred color.
-- Current `api/rooms.js` appends players in host/join order and advances `turnIndex` through the `players` array.
-- `advanceRoundState()` chooses the next starter from array position using the round number.
-- `nextPlayablePlayer()` can skip seats with no legal move, but the persisted/public state does not record the complete skipped sequence; `skippedSeat` is normally reset to `null`.
+- the Kit defines the canonical spatial/color ring `marble → blue → gold → green`, rotated from the host preference;
+- protocol 5 stores joined players in host/join array order and advances `turnIndex` through that array;
+- current next-round starter derives from array position;
+- legal-mover skipping can occur without a complete persisted skip sequence suitable for deterministic presentation.
 
-**Unresolved decisions**
+Unresolved decisions:
 
-- canonical seat IDs and their relationship to color/spatial positions;
-- whether online turn order migrates to the Kit ring or preserves a backend-defined seat order;
-- exact next-round starter rule after the seat topology is locked;
-- authoritative evidence for one or multiple no-legal-move skips so presentation does not guess what happened.
+- stable configured seat IDs and mapping to right/back/left/front + canonical colors;
+- canonical turn order independent of connection/join order;
+- representation of skip reason/evidence when one or more seats have no legal move;
+- next-round starter rule after seat order is locked.
 
-**Resolution owner: THREEJS-008 — LOCK AUTHORITATIVE SEAT TOPOLOGY AND TURN ORDER.**
+**Contract owner: THREEJS-048 — RESOLVE TURN-RING OWNERSHIP THEN IMPLEMENT LEGAL-MOVER SKIPPING.**
 
-Until THREEJS-008 resolves this, the Three.js frontend must follow the current authoritative `players`/`turnIndex` snapshot for live online play and must not substitute the visual color ring as online turn authority.
+THREEJS-054 consumes that decision for round starter/reset. Online protocol tasks must carry the same seat order; until then live protocol-5 play follows authoritative `players`/`turnIndex` rather than frontend color-ring guesses.
 
-## 5. GAP-002 — Mixed Computer/Online authority — OPEN
+## 5. GAP-002 — Mixed Computer/Online seat authority — OPEN
 
-**Conflict/gap**
+Current conflict:
 
-- The Kit requires every remaining configured seat to be `Computer` or `Online`, including mixed matches, with computer decisions made on the authoritative side whenever the session is online.
-- Current room state contains only joined human `players`; there is no persisted `seatType`, configured computer seat, bot identity, bot readiness, or bot mutation path.
+- target setup allows remaining seats to be `Computer` or `Online` in the same match;
+- protocol 5 has only joined human players and no persisted `seatType` or server bot actor.
 
-**Unresolved decisions**
+Unresolved decisions:
 
-- authoritative seat configuration schema (`local-human`/`online-human`/`computer` as applicable);
-- whether computer seats own normal seat credentials internally or use a server-only actor identity;
-- bot legal-intent generation, mutation identity and retry/idempotency semantics;
-- rematch/readiness requirements when configured seats include computers.
+- authoritative configured-seat schema and actor types;
+- server-only versus credentialed identity for Computer seats;
+- bot intent generation, retry, revision and idempotency behavior;
+- readiness/rematch participation rules for Computer seats in online/mixed rooms.
 
-**Resolution owner: THREEJS-009 — DEFINE AUTHORITATIVE SEAT TYPES AND MIXED COMPUTER AUTHORITY.**
+**Contract owner: THREEJS-062.**
 
-No browser may act as the authoritative bot for an online/mixed match before THREEJS-009 resolves this.
+THREEJS-064 materializes stable seat/type records; THREEJS-069 applies readiness; THREEJS-071 makes online Computer turns server-authoritative. A browser must never become the authoritative online bot.
 
 ## 6. GAP-003 — Invitation lifecycle, claim authority and lobby invalidation — OPEN
 
-**Conflict/gap**
+Locked target from THREEJS-006:
 
-- THREEJS-006 already locked the target contract: one exact invitation reservation per online seat; a 2-digit code resolves that invitation; link and code converge; claim returns the reserved seat/color.
-- Current `api/rooms.js` instead uses the 2-digit value as `room_code`, chooses the next free `p2/p3/p4`, accepts joiner-selected color, and has no invitation table/state.
-- The Kit invalidates existing invitations/lobby configuration after protected setup changes, except the narrow unjoined-online-seat → computer replacement case. Current `edit` mutates the same waiting room.
+- one invitation reservation per Online seat;
+- manual 2-digit entry resolves an invitation, not a generic room;
+- link and code entry converge on the same invitation record;
+- claim returns exactly the reserved seat/color and never falls back to another seat.
 
-**Unresolved decisions**
+Protocol-5 conflict:
 
-- invitation persistence schema and unique locator allocation when one room has multiple invitations;
-- states `open`, `claimed`, `expired`, `cancelled`, and stale-after-reconfiguration;
-- atomic claim/CAS behavior under concurrent link/code claims;
-- claim idempotency and same-identity recovery;
-- configuration revision binding and exact invalidation/recreation behavior;
-- cancellation/expiry rules and the one allowed online→computer replacement path;
-- lifecycle behavior when a claimed invitee later leaves the waiting lobby.
+- the 2-digit code is currently a room code;
+- join chooses the next free `p2`/`p3`/`p4` and accepts joiner-selected color;
+- no invitation persistence/lifecycle or lobby generation exists.
 
-**Resolution owner: THREEJS-010 — IMPLEMENT AUTHORITATIVE INVITATION LIFECYCLE AND LOBBY REVISION.**
+Unresolved decisions:
 
-The frontend must not emulate reservations with local state or reinterpret the old generic room code as compliant.
+- invitation storage, active-code uniqueness and 00–99 exhaustion behavior;
+- `open`/`claimed`/`expired`/`revoked`/stale-generation states;
+- atomic allocation/claim and duplicate/same-identity replay;
+- lobby-generation binding and revocation on configuration changes;
+- exact safe unclaimed Online→Computer replacement semantics;
+- behavior when a claimed invitee leaves before start.
+
+**Contract owner: THREEJS-062.**
+
+THREEJS-063 owns schema, THREEJS-065 allocation, THREEJS-066 idempotent claim/session identity, and THREEJS-068 invalidation. Frontend code must not fake invitation reservations locally.
 
 ## 7. GAP-004 — Ready/start lifecycle — OPEN
 
-**Conflict/gap**
+Current conflict:
 
-- The Kit requires explicit authoritative readiness and start only after all configured seats are ready; computer seats are ready immediately and online seats become ready after joining.
-- Current `joinState()` changes `status` to `playing` automatically when `players.length === targetPlayers`; there is no ready field or start mutation.
+- target contract requires explicit authoritative readiness and an explicit start gate;
+- protocol 5 auto-transitions `waiting → playing` when joined humans reach `targetPlayers` and has no ready field/start mutation.
 
-**Unresolved decisions**
+Unresolved decisions:
 
-- persisted readiness schema per configured seat;
-- whether joining automatically sets an online seat ready or readiness is a distinct acknowledgement;
-- who may issue/start the match and whether start itself needs a mutation ID/version;
-- what happens if readiness changes, a player disconnects, or an invitation is invalidated before start.
+- readiness state per configured seat;
+- exact condition that makes an Online seat ready after claim/hydration;
+- Computer readiness semantics;
+- who may Start and the revision/mutation envelope for Start;
+- behavior if readiness/session/invitation state changes before Start commits.
 
-**Resolution owner: THREEJS-011 — ADD AUTHORITATIVE READY/START LIFECYCLE.**
+**Contract owner: THREEJS-062; authoritative implementation owner: THREEJS-069.**
 
-The frontend may show current join status but may not invent a ready gate or locally delay/force authoritative start.
+No UI may claim the match is ready or delay/force server start using client-only state.
 
-## 8. GAP-005 — Authoritative 18-second deadline and timeout mutation — OPEN
+## 8. GAP-005 — Authoritative 18-second online deadline and timeout — OPEN
 
-**Conflict/gap**
+Current conflict:
 
-- The Kit requires one authoritative 18-second deadline per turn, client timers derived from that deadline, timeout skip without board/inventory mutation, and fresh deadline on handoff.
-- Current room state has no deadline/timer fields and no timeout mutation/action.
+- target behavior requires one absolute authoritative 18-second deadline per turn;
+- client countdown is display derived from that deadline;
+- timeout consumes no piece and advances exactly once;
+- protocol 5 has no deadline or timeout action.
 
-**Unresolved decisions**
+Unresolved decisions:
 
-- persisted deadline representation (`deadlineAt` or equivalent), server clock semantics and when it begins;
-- timeout claim/commit transaction and stale/duplicate timeout behavior;
-- version and mutation ID behavior for timeout commits;
-- deadline reset after accepted move, no-legal-move skip, bot turn, round reset, reconnect and start;
-- how clients display clock skew without owning timeout authority.
+- wire/persistence field (`deadlineAt` or equivalent) and server-clock semantics;
+- when a new deadline is created after start, accepted move, skip, bot turn, round reset and recovery;
+- expired-deadline reconciliation transaction;
+- duplicate/stale timeout handling and mutation/version identity;
+- presentation of clock skew without granting timeout authority to the client.
 
-**Resolution owner: THREEJS-012 — ADD AUTHORITATIVE 18-SECOND TURN DEADLINE AND TIMEOUT SKIP.**
+**Contract owner: THREEJS-062; implementation owner: THREEJS-070.**
 
-No client timer may advance `turnIndex` or write a timeout result before THREEJS-012 resolves this.
+THREEJS-072 must use the same timeout transition package as local authority. No browser timer may write the timeout outcome.
 
-## 9. GAP-006 — Vercel/serverless turn driver and bot triggering — OPEN
+## 9. GAP-006 — Vercel/serverless timeout and Computer triggering — OPEN
 
-**Conflict/gap**
+Constraint:
 
-- A persistent in-process timer cannot be assumed across Vercel Function invocations/instances.
-- The current API is request-driven and contains no durable turn driver, queue, cron/worker trigger, or server-side bot trigger.
-- Current `vercel.json` does not configure a gameplay-function `maxDuration` or any scheduled driver.
-- Vercel supports bounded function execution and explicit post-response/background primitives, but those are not themselves a durable 18-second game scheduler.
+- Vercel Functions are request-driven; a persistent 18-second in-process timer cannot be assumed to survive instance lifecycle;
+- current API has no durable worker/queue/cron gameplay driver;
+- keeping one request open merely to wait out a turn is not the migration contract.
 
-**Unresolved decisions**
+Unresolved decisions:
 
-- durable mechanism that causes timeout/bot work to be attempted after authority commits a deadline;
-- duplicate-safe compare-and-swap so multiple triggers cannot make two bot moves or two timeout skips;
-- retry/backoff and recovery when no trigger executes exactly at the deadline;
-- whether a request/queue/cron/poll-assisted driver is used and the maximum tolerated trigger lateness;
-- how bot computation fits inside Vercel execution limits without keeping a request open for 18 seconds.
+- which request/wake/poll path attempts reconciliation near or after deadline;
+- duplicate-safe CAS when several clients wake the same turn;
+- missed/delayed wake recovery and acceptable lateness;
+- server-authoritative Computer move trigger under the same concurrency conditions;
+- retry/backoff without creating two bot moves or two timeout skips.
 
-**Resolution owner: THREEJS-013 — DEFINE VERCEL-SAFE AUTHORITATIVE TURN DRIVER AND BOT TRIGGERING.**
+**Contract owner: THREEJS-062.**
 
-No frontend polling loop may be treated as the sole authority that makes a bot move or timeout happen.
+**Timeout execution owner: THREEJS-070. Computer execution owner: THREEJS-071.** Frontend polling/wake may trigger work but never decides the authoritative result.
 
-## 10. GAP-007 — Room TTL, presence and expiry/reuse policy — OPEN
+## 10. GAP-007 — Room TTL, presence, disconnect, expiry and reuse — OPEN
 
-**Conflict/gap**
+Current protocol-5 behavior:
 
-- The Kit permits room expiry after 8 hours without activity.
-- Current backend sets `ROOM_TTL_MS` to 3 hours and refreshes expiry on room update.
-- It also has separate reuse windows: waiting rooms may be deleted after 20 minutes and completed matches after 15 minutes when cleanup runs.
-- Presence uses a 60-second stale window; waiting-room reconciliation can remove a non-host seat after it is no longer present.
-- Cleanup is request-driven rather than a guaranteed wall-clock job.
+- room inactivity TTL: 3 hours;
+- waiting-room reuse cleanup: 20 minutes;
+- finished-match reuse cleanup: 15 minutes;
+- stale presence: 60 seconds;
+- waiting-room reconciliation may remove a stale non-host seat;
+- cleanup is request/opportunity driven rather than a guaranteed wall-clock job.
 
-**Unresolved decisions**
+Portable-kit conflict: it permits an 8-hour inactive-room lifetime.
 
-- one canonical inactivity TTL and which events refresh it;
-- whether waiting/finished reuse windows remain separate from room expiry;
-- canonical online presence stale threshold and whether stale presence may remove a seat;
-- exact user-visible expired/cancelled/session-stale errors;
-- cleanup scheduling/guarantees versus lazy cleanup on requests.
+Unresolved decisions:
 
-**Resolution owner: THREEJS-014 — LOCK ROOM TTL, PRESENCE, EXPIRY AND REUSE POLICY.**
+- canonical inactivity lifetime and what activity extends it;
+- whether waiting/finished reuse windows remain separate;
+- reconnect grace and stale presence meaning before versus after match start;
+- host leave/cancel and non-host departure semantics;
+- exact expired/cancelled/session-stale errors;
+- cleanup strategy and guarantee level.
 
-Frontend copy must not promise 8 hours, 3 hours, or any disconnect grace period as a product guarantee until THREEJS-014 resolves it.
+**Resolution owner: THREEJS-075 — RESOLVE ROOM TTL PRESENCE DISCONNECT AND EXPIRY CONTRACT.**
 
-## 11. GAP-008 — Restart-round contract — OPEN
+No frontend copy may promise 3 hours, 8 hours, or a grace period until THREEJS-075 closes this gap.
 
-**Conflict/gap**
+## 11. GAP-008 — Online restart-round and rematch consensus — OPEN
 
-- The Kit permits restart round only before a committed move and requires host/every-online-human confirmation according to authority mode.
-- Current backend exposes `move`, `rematch`, `edit`, and `leave`; no restart-round action exists.
+Current conflict:
 
-**Unresolved decisions**
+- the Kit permits restart-round only before a committed move and requires the appropriate confirmation quorum;
+- protocol 5 has no restart-round action;
+- its `rematch` action is overloaded: before match completion it advances rounds; after match completion it collects rematch votes/restarts.
 
-- exact eligibility condition (`moveNumber === 0` plus lifecycle guards);
-- confirmation quorum for offline, online and mixed seats;
-- mutation/revision/idempotency behavior;
-- whether restart preserves current starter or recomputes it;
-- cancellation and timeout of a pending restart vote.
+Unresolved decisions:
 
-**Resolution owner: THREEJS-015 — ADD AUTHORITATIVE RESTART-ROUND CONTRACT.**
+- exact restart eligibility and quorum for configured Online humans;
+- whether Computer seats participate implicitly;
+- starter preservation/recomputation;
+- pending-vote cancellation on move/leave/reconfigure;
+- unique mutation/revision semantics;
+- explicit separation of next-round advancement from match rematch.
 
-Do not render restart as a live online capability before that task closes this gap.
+**Resolution/implementation owner: THREEJS-076.**
 
-## 12. GAP-009 — Mutation-ID, revision and idempotency coverage — OPEN
+THREEJS-072 supplies the unified online transition/idempotency semantics. UI must not expose a live online restart contract earlier.
 
-**Conflict/gap**
+## 12. GAP-009 — Mutation-ID, revision and exactly-once coverage — OPEN
 
-- The Kit says every mutating request carries a unique request/move ID and current revision and every accepted mutation commits exactly once.
-- Current `move` and `rematch` require `mutationId` and version.
-- `edit` requires version but not mutation ID.
-- `leave` has no mutation ID and intentionally substitutes the current stored row version for caller version.
-- `create`/`join` use `requestId`-based idempotency but do not share the normal mutation/version contract.
-- The `rematch` action is also overloaded: before match completion it advances to the next round; after match completion it records rematch votes/restarts the match.
+Current protocol-5 inconsistency:
 
-**Unresolved decisions**
+- `move` and `rematch` require `mutationId` + current version;
+- `edit` requires version but no mutation ID;
+- `leave` has no mutation ID and substitutes the stored row version;
+- create/join use request IDs rather than the normal mutation envelope;
+- `_mutations` dedupe state has no migration contract for scope/retention/pruning.
 
-- canonical mutation envelope and identifier naming across create, claim/join, ready/start, move, timeout, bot, edit/reconfigure, restart-round, next-round, rematch and leave;
-- which actions legitimately have no prior room revision (for example initial create) and what replaces it;
-- whether leave remains version-bypassing or becomes CAS-protected;
-- dedupe retention/pruning policy for `_mutations` so state does not grow without bound;
-- separation or explicit naming of next-round advancement versus match rematch.
+Unresolved decisions:
 
-**Resolution owner: THREEJS-016 — COMPLETE MUTATION-ID, REVISION AND IDEMPOTENCY COVERAGE.**
+- canonical request/mutation envelope across create, claim, edit, ready/start, move, timeout, bot, restart, round advance, rematch and leave;
+- which operations legitimately lack a prior room revision;
+- duplicate replay result semantics;
+- mutation-receipt persistence and bounded retention;
+- leave conflict behavior;
+- explicit naming/separation of next-round versus rematch.
 
-Frontend networking must follow the current live per-action behavior until this task changes the backend; it must not assume one uniform envelope exists today.
+**Resolution owner: THREEJS-072 — UNIFY ONLINE MOVE SKIP TIMEOUT DRAW SCORE ROUND AND MUTATION SEMANTICS.**
 
-## 13. GAP-010 — Session recovery and reconnect identity — OPEN
+THREEJS-062 defines the protocol-level shape and THREEJS-063 provides persistence support.
 
-**Conflict/gap**
+## 13. GAP-010 — Session recovery, reconnect identity and hydration — OPEN
 
-- The Kit requires launch/refresh/resume/reconnect to restore identity and rebuild a complete snapshot before input.
-- THREEJS-006 requires a claimed invitation to recover the same seat identity.
-- Current backend hashes bearer credentials into `auth_json`, but session-token persistence/rotation/recovery policy is not defined as a migration contract.
-- Waiting-room presence reconciliation may remove a non-host after the 60-second stale window and filters that seat's auth entry; a later request with the old credential may therefore no longer recover that waiting seat.
-- Playing rooms are not reconciled the same way, so disconnect semantics differ by lifecycle state.
+Current conflict:
 
-**Unresolved decisions**
+- target behavior requires refresh/resume/reconnect to restore the exact claimed seat then hydrate one complete authoritative snapshot before input;
+- protocol 5 hashes bearer credentials at rest but does not define the migration credential lifecycle/rotation/recovery contract;
+- waiting-room stale presence can remove a non-host/auth entry, while started-room disconnect behavior differs;
+- remembered name/color alone is not sufficient identity.
 
-- client credential storage scope and security boundaries;
-- session credential issuance/rotation/revocation and same-device recovery;
-- reconnect grace behavior in waiting versus playing states;
-- full-snapshot resync contract and input unlock conditions;
-- stale pending mutation handling after a recovered snapshot;
-- relationship between invitation claim identity and recovered room session identity.
+Unresolved decisions and exact owners:
 
-**Resolution owner: THREEJS-017 — DEFINE SESSION RECOVERY, RECONNECT AND PRESENCE RECONCILIATION.**
+- invitation claim → high-entropy seat session issuance/recovery: **THREEJS-066**;
+- same seat open in multiple tabs/windows and controller takeover: **THREEJS-067**;
+- monotonic full-snapshot hydration, response ordering, reconnect barrier and stale pending intent cancellation: **THREEJS-074**;
+- disconnect grace, presence and room/session expiry: **THREEJS-075**.
 
-The frontend must never recreate seat ownership from remembered color/name alone.
+The UI task THREEJS-094 only presents these outcomes; it may not define them.
 
 ## 14. GAP-011 — Telemetry schema, trust boundary and retention — OPEN
 
-**Current behavior/gaps**
+Current telemetry behavior:
 
-- `api/_telemetry.js` writes client/server events into `yakolak_online_telemetry_v1`, redacts credential-like keys, caps detail size, and includes release SHA when available.
-- `api/telemetry.js` accepts client event batches but currently defines no room-session authentication requirement in the endpoint itself and no explicit ingest rate limit.
-- Client-controlled `eventId`, timestamps and details are stored after sanitization; therefore telemetry cannot be treated as authoritative gameplay evidence without a trust model.
-- `rooms-observed.js` captures request/response exchange telemetry with a 300 ms persistence deadline after returning the gameplay response.
-- telemetry retention is targeted at 7 days, but cleanup is opportunistic (every 200 writes) rather than a separate guaranteed retention job.
-- No migration document currently locks the required event taxonomy for invitation, ready/start, timeout, bot, recovery and cutover flows.
+- `yakolak_online_telemetry_v1` stores event/trace/request/room/seat/version/round/move context;
+- detail keys resembling credentials/auth/secrets are redacted and payload detail is bounded;
+- cleanup targets roughly 7 days but runs opportunistically;
+- client `eventId`, timestamps, event names and details can be submitted to `/api/telemetry` and therefore are not authoritative gameplay evidence by themselves;
+- telemetry delivery is diagnostic and must never sit in the gameplay commit path.
 
-**Unresolved decisions**
+Unresolved decisions:
 
-- authoritative event names/required fields for the rebuild;
-- which events are server-attested versus client-observed;
-- authentication, abuse/rate-limit policy and PII/redaction contract;
-- correlation IDs across UI intent, API request, mutation ID, room version and server commit;
-- exact retention/cleanup policy and operational query expectations;
-- whether `rooms-observed.js` remains the canonical room endpoint/wrapper or observability is integrated differently.
+- rebuild event taxonomy and required fields;
+- server-attested versus client-observed event trust classes;
+- correlation among intent, request, mutation, room version and server commit;
+- endpoint authentication/abuse/rate-limit posture;
+- PII/redaction rules and retention/cleanup guarantees;
+- which existing room-observation wrapper behavior remains useful after protocol migration.
 
-**Resolution owner: THREEJS-018 — LOCK TELEMETRY SCHEMA, TRUST BOUNDARY AND RETENTION.**
+**Resolution owner: THREEJS-079 — MIGRATE TELEMETRY OBSERVABILITY AND SEMANTIC WATCHDOGS TO THREE.JS.**
 
-Telemetry may diagnose authority; it never becomes authority and frontend behavior must not depend on telemetry delivery success.
+THREEJS-077 constrains secret/data exposure; THREEJS-098 verifies redaction and release behavior.
 
-## 15. GAP-012 — Persistence/protocol migration compatibility — OPEN
+## 15. GAP-012 — Persistence and protocol migration compatibility — OPEN
 
-**Current behavior/gaps**
+Current baseline:
 
-- Online room state is persisted as JSON in `yakolak_online_rooms_v5`; private credential hashes are in `auth_json`; optimistic concurrency is the integer `version`; public protocol is `5`.
-- Presence and join-rate data are separate tables.
-- Several target Three.js fields do not exist in protocol 5: configured seat types, invitation reservations, readiness, deadline/timeout state and durable driver metadata.
-- Inventory is currently derived from authoritative board occupancy via shared rules rather than stored as a separate mutable inventory object.
-- Winning patterns can be recomputed deterministically from the board/rules, but the current public room snapshot does not persist an explicit winning-slot payload.
-- Instance-local caches (`client`, `tablesReady`, `presenceTouchCache`) are performance conveniences and cannot be treated as durable correctness state.
+- authoritative protocol-5 room state is JSON in `yakolak_online_rooms_v5` with private `auth_json`, integer `version`, and separate presence/rate tables;
+- target migration fields do not exist there: configured seat types, lobby generations, invitation reservations, readiness, absolute deadline, timeout/driver metadata and uniform mutation receipts;
+- inventory is currently derived from board/rules rather than maintained as a second mutable inventory;
+- instance-local caches are performance conveniences, never durable correctness state.
 
-**Unresolved decisions**
+Unresolved decisions:
 
-- additive migration of v5 versus a new table/protocol version;
-- schema defaults and backward compatibility for rooms created by the Godot client;
-- whether active old rooms can be read/mutated by the Three.js client and vice versa during transition;
-- migration/rollback treatment for new invitation, ready, deadline and bot fields;
-- whether derived inventory/winning evidence remains derived or becomes explicit wire state, while retaining one rules authority;
-- pruning/size limits for accumulated room JSON state and idempotency metadata.
+- isolated new protocol/versioned route strategy versus additive v5 changes;
+- schema/table versioning, defaults, indexes and mutation-receipt bounds;
+- coexistence rules for Godot v5 rooms and Three.js preview rooms;
+- rollback treatment for new lobby/invitation/ready/deadline/bot state;
+- active-old-room support at final cutover;
+- whether derived inventory/winning evidence stays derived while preserving one rules authority.
 
-**Resolution owner: THREEJS-019 — LOCK PERSISTENCE SCHEMA AND PROTOCOL MIGRATION COMPATIBILITY.**
+**Protocol contract owner: THREEJS-062. Database/schema owner: THREEJS-063. Active-v5-room cutover/rollback owner: THREEJS-099.**
 
-Frontend models must not become the de facto schema migration layer.
+Frontend state models must not become an accidental schema migration layer.
 
-## 16. GAP-013 — Cutover and Vercel runtime/deployment compatibility — OPEN
+## 16. GAP-013 — Production cutover and Vercel runtime/deployment compatibility — OPEN
 
-**Current behavior/gaps**
+Current constraints:
 
-- `threejs-rebuild` is intentionally not a Production deployment path; `vercel.json` enables Git deployment for `main` and disables `*` other branches.
-- Godot Production remains `yakolak.vercel.app` until explicit cutover.
-- The live Vercel project observed during THREEJS-007 was serving READY Production deployments from `main`.
-- Repository `package.json` declares Node `22.x`, while the connected Vercel project currently reports Node `24.x`; the runtime version to carry into cutover is not yet locked.
-- Online API requires `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`; cutover must preserve the correct environment and database access without creating a parallel authoritative backend accidentally.
-- Current Flash/Godot publishing rules and the branch exception deliberately prevent the rebuild from silently replacing Production.
+- `threejs-rebuild` is intentionally not the Production deployment branch;
+- `vercel.json` currently enables Git deployment only for `main`;
+- `yakolak.vercel.app` remains Godot Production;
+- connected Vercel Production is READY from `main`;
+- repo engine declaration is Node `22.x`, connected Vercel project reports Node `24.x`;
+- API requires the existing Turso environment and must not accidentally fork authority into a second production database;
+- current Godot/Flash assumptions, cache headers and COOP/COEP policy cannot simply be copied blindly into final Three.js delivery.
 
-**Unresolved decisions**
+Unresolved decisions:
 
-- exact cutover commit/ref and how `main` changes from Godot to Three.js;
-- runtime version/configuration for API functions and any required `maxDuration`/background primitives;
-- environment-variable continuity and protocol/database compatibility at the switch;
-- whether old Godot clients/active rooms remain supported for a bounded compatibility window;
-- domain aliasing, rollback target, cache behavior and release-SHA observability;
-- removal/replacement of Godot Flash build assumptions without introducing a competing deployment path.
+- exact accepted cutover SHA/ref;
+- Node/function runtime and any function-duration/background settings actually required by the migration protocol;
+- environment-variable/database continuity;
+- active v5-room drain/routing/compatibility window;
+- domain alias switch, health verification and rollback target;
+- HTML/app-shell/cache/service-worker behavior across protocol changes;
+- retirement of Godot Flash publishing only after successful health checks.
 
-**Resolution owner: THREEJS-020 — EXECUTE AND VERIFY THREE.JS CUTOVER COMPATIBILITY.**
+**Final resolution owner: THREEJS-099 — CUT OVER PRODUCTION WITH ACTIVE-ROOM AND FULL BACKEND ROLLBACK SAFETY.**
 
-No earlier frontend task may enable branch Production deployment, retarget `yakolak.vercel.app`, or modify `main` as a workaround.
+THREEJS-009 owns one non-Production Preview path only. THREEJS-097 owns pre-cutover cache/update/security-header strategy. No earlier task may retarget `yakolak.vercel.app` or enable `threejs-rebuild` as a competing Production path.
 
-## 17. Cross-reference to existing contradiction register
+## 17. Source-of-truth cross-reference
 
-Existing `THREEJS_SOURCE_OF_TRUTH.md` entries map to this register as follows:
+- `SRC-003` seat order/color ownership → GAP-001 → THREEJS-048.
+- `SRC-004` invitation semantics are product-resolved by THREEJS-006; backend protocol/lifecycle → GAP-003 → THREEJS-062/063/065/066/068.
+- `SRC-005` Computer/mixed authority → GAP-002 → THREEJS-062/064/071.
+- `SRC-006` turn deadline/timeouts → GAP-005/GAP-006 → THREEJS-062/070/071.
+- `SRC-007` lobby editing/invalidation → GAP-003 → THREEJS-068.
+- `SRC-008` room expiry → GAP-007 → THREEJS-075.
+- `SRC-009` restart-round → GAP-008 → THREEJS-076.
+- `SRC-010` mutation coverage → GAP-009 → THREEJS-072.
+- `SRC-011` ready/start → GAP-004 → THREEJS-062/069.
+- session recovery → GAP-010 → THREEJS-066/067/074/075.
+- telemetry → GAP-011 → THREEJS-079.
+- protocol/persistence coexistence → GAP-012 → THREEJS-062/063/099.
+- Production cutover/Vercel compatibility → GAP-013 → THREEJS-099.
 
-- `SRC-003` → GAP-001 / THREEJS-008.
-- `SRC-004` target semantics are RESOLVED by THREEJS-006; backend implementation/lifecycle → GAP-003 / THREEJS-010 and recovery → GAP-010 / THREEJS-017.
-- `SRC-005` → GAP-002 / THREEJS-009.
-- `SRC-006` → GAP-005 / THREEJS-012 plus execution/triggering → GAP-006 / THREEJS-013.
-- `SRC-007` → GAP-003 / THREEJS-010.
-- `SRC-008` → GAP-007 / THREEJS-014.
-- `SRC-009` → GAP-008 / THREEJS-015.
-- `SRC-010` → GAP-009 / THREEJS-016.
-- `SRC-011` → GAP-004 / THREEJS-011.
+## 18. Architecture-task collision rule
 
-Additional audit gaps not previously explicit in the source-of-truth register are GAP-010 session recovery, GAP-011 telemetry, GAP-012 persistence/protocol migration, and GAP-013 cutover/Vercel compatibility.
+`THREEJS-008` is **DEFINE THE STATIC NO-BUILD THREE.JS ARCHITECTURE**. It does not resolve seat order or any backend authority gap. `THREEJS_MIGRATION.md` correctly warned about the earlier collision; this corrected register removes that collision and is the authoritative gap-owner mapping going forward.
 
-## 18. Closure rule
+Likewise, THREEJS-009 through THREEJS-020 are architecture/preview/renderer/assets tasks in the canonical plan, not backend-gap resolution tasks merely because an earlier draft assigned those numbers.
 
-A later owner task closes only its named gap. Closing one gap must not silently resolve another.
+## 19. Closure rule
 
-Every owner task must:
+A later task closes only the decisions it explicitly owns. Closing one gap must not silently close another.
 
-1. record the chosen contract in this file and the relevant source-of-truth/contract file;
-2. implement backend changes when authority is required;
-3. define migration/compatibility behavior for existing protocol/state where applicable;
-4. add focused contract/regression evidence appropriate to that task;
-5. leave `main` and Godot Production untouched unless the owner is the explicit cutover task.
+Every owner/closure task must:
 
-If a later task discovers another backend decision that could change gameplay authority, persistence, online identity, lifecycle or cutover behavior, it must append a new gap with one explicit owner **before** frontend code depends on that decision.
+1. record the chosen contract in this register and the relevant source-of-truth/contract file;
+2. implement backend authority changes when required;
+3. define v5/migration compatibility where applicable;
+4. add focused contract/regression evidence;
+5. keep `main` and Godot Production untouched unless the task is the explicit cutover owner;
+6. append a new gap and explicit owner before frontend code depends on any newly discovered authority/persistence/session/cutover decision.
