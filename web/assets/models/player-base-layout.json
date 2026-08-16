@@ -29,17 +29,17 @@
       {
         "id": "source-high",
         "componentIndices": [4, 5, 6],
-        "measuredSourceCenter": [33, 132.24295043945312, 0]
+        "measuredSourceCenter": [33, 132.24295043945312, 6]
       },
       {
         "id": "source-middle",
         "componentIndices": [0, 10, 11],
-        "measuredSourceCenter": [33, 84.49997138977051, 0]
+        "measuredSourceCenter": [33, 84.49997138977051, 6]
       },
       {
         "id": "source-low",
         "componentIndices": [7, 8, 9],
-        "measuredSourceCenter": [33, 36.75699043273926, 0]
+        "measuredSourceCenter": [33, 36.75699043273926, 6]
       }
     ],
     "homeAlignmentTolerance": 0.3
