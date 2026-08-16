@@ -5,6 +5,11 @@ on:
     branches:
       - threejs-rebuild
     paths:
+      - web/**
+      - api/build-info.js
+      - scripts/verify-threejs-browser.mjs
+      - vercel.json
+      - package.json
       - .github/workflows/threejs-010-shell-browser.yml
 
 permissions:
