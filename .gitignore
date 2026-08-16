@@ -4,6 +4,7 @@ generated/
 visual-review/
 test-results/
 node_modules/
+web/runtime-assets/
 *.import
 *.translation
 *.uid
