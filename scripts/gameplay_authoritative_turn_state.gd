@@ -15,10 +15,16 @@ var authoritative_online_snapshot_hydrated: bool = false
 var authoritative_input_dispatch_count: int = 0
 var authoritative_input_visual_motion_count: int = 0
 var authoritative_input_last_dispatch_msec: int = 0
+var authoritative_test_refresh_target_callback: Variant
 
 
 func _ready() -> void:
 	super._ready()
+	if OS.has_feature("web") and bool(JavaScriptBridge.eval("Boolean(navigator.webdriver)", true)):
+		authoritative_test_refresh_target_callback = JavaScriptBridge.create_callback(_on_authoritative_test_target_requested)
+		var window: JavaScriptObject = JavaScriptBridge.get_interface("window")
+		if window != null:
+			window.set("yakolakTestRefreshAuthorityPickTarget", authoritative_test_refresh_target_callback)
 	call_deferred("_publish_authoritative_turn_state", "ready")
 
 
@@ -87,6 +93,42 @@ func _authoritative_online_pointer_ready() -> bool:
 		return false
 	var authoritative_seat: String = str(snapshot.get("seat", ""))
 	return not authoritative_seat.is_empty() and authoritative_seat == str(online_identity.get("seat", ""))
+
+
+func _on_authoritative_test_target_requested(_arguments: Array) -> void:
+	# Automation-only observability. This does not dispatch input or alter rules;
+	# it exposes the exact live projection used by a real Playwright tap so TURN-42
+	# can prove pointer readiness while the camera is still moving.
+	if not OS.has_feature("web") or camera == null or piece_records.is_empty():
+		return
+	var direction: String = _current_direction()
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var viewport_center: Vector2 = viewport_size * 0.5
+	var best_point: Vector2 = Vector2(-1.0, -1.0)
+	var best_distance: float = INF
+	for index: int in range(piece_records.size()):
+		var record: Dictionary = piece_records[index] as Dictionary
+		if bool(record.get("played", false)) or str(record.get("dir", "")) != direction or str(record.get("type", "")) != "large":
+			continue
+		var mesh_instance := record.get("mesh", null) as MeshInstance3D
+		if mesh_instance == null:
+			continue
+		var point: Vector2 = camera.unproject_position(mesh_instance.to_global(Vector3(17.0, 0.0, 9.5)))
+		var visible: bool = point.x >= 2.0 and point.x <= viewport_size.x - 2.0 and point.y >= 2.0 and point.y <= viewport_size.y - 2.0
+		var distance: float = point.distance_squared_to(viewport_center) + (0.0 if visible else 100000000.0)
+		if distance < best_distance:
+			best_distance = distance
+			best_point = point
+	var cell_world_point: Vector3 = Vector3(CELL_COORDS[4].x * U, 0.52, CELL_COORDS[4].z * U)
+	var cell_point: Vector2 = camera.unproject_position(cell_world_point)
+	JavaScriptBridge.eval(
+		"document.body.dataset.yakolakTestAuthorityPieceX='%s';" % str(best_point.x) +
+		"document.body.dataset.yakolakTestAuthorityPieceY='%s';" % str(best_point.y) +
+		"document.body.dataset.yakolakTestAuthorityCellX='%s';" % str(cell_point.x) +
+		"document.body.dataset.yakolakTestAuthorityCellY='%s';" % str(cell_point.y) +
+		"document.body.dataset.yakolakTestAuthorityTargetDirection='%s';" % _turn_js(direction),
+		true
+	)
 
 
 func _start_online_host(configuration: Dictionary) -> void:
