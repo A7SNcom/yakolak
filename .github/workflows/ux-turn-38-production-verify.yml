@@ -1,0 +1,30 @@
+name: UX-TURN-38 Production verification
+
+on:
+  push:
+    branches:
+      - agent/ux-turn-38-prod-verify
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  production-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install server dependency
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Verify Production online API path
+        env:
+          YAKOLAK_PROBE_BASE: https://yakolak.vercel.app
+        run: node tests/production_online_probe.mjs
+      - name: Verify Production round-boundary lifecycle
+        env:
+          YAKOLAK_PROBE_BASE: https://yakolak.vercel.app
+        run: node tests/round_boundary_multiclient.test.mjs
