@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+// THREEJS-012: this module is the only renderer/canvas owner; post-processing needs a measured follow-up task.
 const DIAGNOSTICS_KEY = '__YAKOLAK_RENDERER_INFO__';
 
 export const RENDERER_BASELINE = Object.freeze({
