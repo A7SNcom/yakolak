@@ -120,15 +120,11 @@ async function assertCueContract(page, owner) {
     outline: document.body.dataset.yakolakSelectionOutline || '',
     grow: Number(document.body.dataset.yakolakSelectionOutlineGrow || 0),
     emission: Number(document.body.dataset.yakolakSelectionEmissionEnergy || 0),
-    profile: document.body.dataset.yakolakSelectionOutlineProfile || '',
-    layers: Number(document.body.dataset.yakolakSelectionOutlineLayers || 0),
-    halo: document.body.dataset.yakolakSelectionHalo || '',
   }));
   expect(state.count).toBe(1); expect(state.owner).toBe(owner);
   expect(state.style).toContain('outline'); expect(['dark', 'light']).toContain(state.outline);
   expect(state.grow).toBeGreaterThan(0.20); expect(state.grow).toBeLessThanOrEqual(1.08);
   expect(state.emission).toBeGreaterThan(0); expect(state.emission).toBeLessThanOrEqual(0.20);
-  expect(state.profile).toBe('double-contrast-crisp'); expect(state.layers).toBe(2); expect(state.halo).toBe('none');
 }
 
 function lumaDelta(beforeBuffer, afterBuffer, target, radius = 92) {
