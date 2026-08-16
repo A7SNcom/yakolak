@@ -8,6 +8,8 @@ on:
       - web/**
       - api/build-info.js
       - scripts/verify-threejs-browser.mjs
+      - scripts/prepare-threejs-runtime-assets.mjs
+      - YAKOLAK_PORTABLE_KIT/assets/**
       - vercel.json
       - package.json
       - .github/workflows/threejs-010-shell-browser.yml
@@ -38,6 +40,10 @@ jobs:
       - name: Install Chromium
         shell: bash
         run: npx playwright install --with-deps chromium
+
+      - name: Prepare verified runtime assets
+        shell: bash
+        run: node scripts/prepare-threejs-runtime-assets.mjs
 
       - name: Serve static web source
         shell: bash
