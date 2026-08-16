@@ -86,6 +86,18 @@ async function freshPickTarget(page, direction, side, size) {
   return target;
 }
 
+async function stablePickTarget(page, direction, side, size) {
+  let previous = await freshPickTarget(page, direction, side, size);
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await page.waitForTimeout(90);
+    const next = await freshPickTarget(page, direction, side, size);
+    const movement = Math.hypot(next.x - previous.x, next.y - previous.y);
+    if (movement <= 0.75) return next;
+    previous = next;
+  }
+  throw new Error(`nested target did not settle: ${direction}/${side}/${size}`);
+}
+
 async function clickOrTap(page, inputMode, point) {
   if (inputMode === 'touch') await page.touchscreen.tap(point.x, point.y);
   else await page.mouse.click(point.x, point.y);
@@ -101,18 +113,12 @@ async function waitSelected(page, direction, side, size) {
   return owner;
 }
 
-async function activatePiece(page, inputMode, direction, side, size, closedTarget = null) {
-  let point = closedTarget || await freshPickTarget(page, direction, side, size);
-  if (size !== 'large') {
-    const largeTarget = await freshPickTarget(page, direction, side, 'large');
-    await clickOrTap(page, inputMode, largeTarget);
-    await waitSelected(page, direction, side, 'large');
-    point = await freshPickTarget(page, direction, side, size);
-  }
-  await clickOrTap(page, inputMode, point);
-  const owner = await waitSelected(page, direction, side, size);
-  await page.waitForTimeout(360);
-  return { owner, target: point };
+async function prepareCaseTarget(page, inputMode, direction, side, size) {
+  if (size === 'large') return freshPickTarget(page, direction, side, size);
+  const largeTarget = await freshPickTarget(page, direction, side, 'large');
+  await clickOrTap(page, inputMode, largeTarget);
+  await waitSelected(page, direction, side, 'large');
+  return stablePickTarget(page, direction, side, size);
 }
 
 async function expectSelectionCount(page, count, owner = '') {
@@ -162,19 +168,21 @@ function lumaDelta(beforeBuffer, afterBuffer, target, radius = 92) {
 
 async function capturePair(page, kind, inputMode, player, side, size, reducedMotion = false) {
   await clearSelection(page);
-  const closedTarget = await freshPickTarget(page, player.direction, side, size);
+  const target = await prepareCaseTarget(page, inputMode, player.direction, side, size);
   const stem = `${kind}-${reducedMotion ? 'reduced-' : ''}${player.color}-${player.direction}-side${side}-${size}`;
   const before = await page.screenshot({ path: `${ARTIFACT_DIR}/${stem}-unselected.png`, fullPage: false });
-  const activated = await activatePiece(page, inputMode, player.direction, side, size, closedTarget);
-  await assertCueContract(page, activated.owner);
+  await clickOrTap(page, inputMode, target);
+  const owner = await waitSelected(page, player.direction, side, size);
+  await page.waitForTimeout(360);
+  await assertCueContract(page, owner);
   const after = await page.screenshot({ path: `${ARTIFACT_DIR}/${stem}-selected.png`, fullPage: false });
-  const delta = lumaDelta(before, after, activated.target);
+  const delta = lumaDelta(before, after, target);
   expect(delta.lumaChangedRatio, `${stem}: must remain visible in grayscale`).toBeGreaterThan(0.002);
   expect(delta.meanLumaDelta, `${stem}: outline/lift must have visible luminance separation`).toBeGreaterThan(0.12);
   expect(delta.rgbChangedRatio, `${stem}: selected pixels must render differently`).toBeGreaterThan(0.002);
   expect(delta.lumaChangedRatio, `${stem}: treatment must not obscure a large local region`).toBeLessThan(0.55);
-  await expectSelectionCount(page, 1, activated.owner);
-  return { owner: activated.owner, delta };
+  await expectSelectionCount(page, 1, owner);
+  return { owner, delta };
 }
 
 async function runFullMatrix(browser, kind) {
@@ -247,11 +255,13 @@ test('UX-SELECT-45 occupied-board context and reconnect hydration cannot leave s
     const direction = await page.evaluate(() => document.body.dataset.yakolakCurrentPlayer || '');
     const player = PLAYERS.find(p => p.direction === direction); expect(player).toBeTruthy();
     await clearSelection(page);
-    const closedTarget = await freshPickTarget(page, player.direction, 1, 'medium');
+    const target = await prepareCaseTarget(page, 'touch', player.direction, 1, 'medium');
     const before = await page.screenshot({ path: `${ARTIFACT_DIR}/board-occupied-${player.color}-medium-unselected.png`, fullPage: false });
-    const activated = await activatePiece(page, 'touch', player.direction, 1, 'medium', closedTarget); await assertCueContract(page, activated.owner);
+    await clickOrTap(page, 'touch', target);
+    const owner = await waitSelected(page, player.direction, 1, 'medium');
+    await page.waitForTimeout(360); await assertCueContract(page, owner);
     const after = await page.screenshot({ path: `${ARTIFACT_DIR}/board-occupied-${player.color}-medium-selected.png`, fullPage: false });
-    expect(lumaDelta(before, after, activated.target).lumaChangedRatio).toBeGreaterThan(0.002);
+    expect(lumaDelta(before, after, target).lumaChangedRatio).toBeGreaterThan(0.002);
     await page.screenshot({ path: `${ARTIFACT_DIR}/reconnect-before-selected.png`, fullPage: false });
     await page.evaluate(() => window.yakolakTestSelect44Lifecycle('reconnect-hydration'));
     await expectSelectionCount(page, 0); await expect(page.locator('body')).toHaveAttribute('data-yakolak-selected', '');
