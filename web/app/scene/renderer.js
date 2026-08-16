@@ -1,6 +1,7 @@
 import * as THREE from 'three';
+import { createContextRecoveryController } from './context-recovery.js';
 
-// THREEJS-012: this module is the only renderer/canvas owner; post-processing needs a measured follow-up task.
+// THREEJS-012/014: this module is the only renderer/canvas owner and owns WebGL context lifecycle.
 const DIAGNOSTICS_KEY = '__YAKOLAK_RENDERER_INFO__';
 
 export const RENDERER_BASELINE = Object.freeze({
@@ -95,6 +96,17 @@ export function createRendererOwner({ mount }) {
   let disposed = false;
   let diagnosticsTarget = null;
   let displayState = Object.freeze({ width: 0, height: 0, pixelRatio: 0 });
+  const resourceRestorers = new Set();
+
+  const contextRecovery = createContextRecoveryController({
+    canvas,
+    async restoreResources({ generation }) {
+      displayState = Object.freeze({ width: 0, height: 0, pixelRatio: 0 });
+      for (const restorer of [...resourceRestorers]) {
+        await restorer(Object.freeze({ generation }));
+      }
+    },
+  });
 
   function assertLive() {
     if (disposed) throw new RendererOwnershipError('Renderer owner has been disposed');
@@ -108,6 +120,18 @@ export function createRendererOwner({ mount }) {
     const ratio = Number(pixelRatio);
     if (!Number.isFinite(ratio) || ratio <= 0) {
       throw new TypeError('Renderer resize requires a positive pixelRatio from the frame governor');
+    }
+
+    if (!contextRecovery.canUseGpu) {
+      return Object.freeze({
+        width: displayWidth,
+        height: displayHeight,
+        pixelRatio: ratio,
+        drawingBufferWidth: canvas.width,
+        drawingBufferHeight: canvas.height,
+        resized: false,
+        skipped: true,
+      });
     }
 
     const resized = displayState.width !== displayWidth
@@ -126,12 +150,31 @@ export function createRendererOwner({ mount }) {
       drawingBufferWidth: canvas.width,
       drawingBufferHeight: canvas.height,
       resized,
+      skipped: false,
     });
   }
 
   function render(scene, camera) {
     assertLive();
+    if (!contextRecovery.canUseGpu) return false;
     renderer.render(scene, camera);
+    return true;
+  }
+
+  function registerResourceRestorer(restorer) {
+    assertLive();
+    if (typeof restorer !== 'function') throw new TypeError('Resource restorer must be a function');
+    resourceRestorers.add(restorer);
+    return () => resourceRestorers.delete(restorer);
+  }
+
+  function subscribeContextState(subscriber, options) {
+    assertLive();
+    return contextRecovery.subscribe(subscriber, options);
+  }
+
+  function getContextSnapshot() {
+    return contextRecovery.snapshot();
   }
 
   function exposeDevelopmentDiagnostics(target = window) {
@@ -163,6 +206,8 @@ export function createRendererOwner({ mount }) {
     if (disposed) return;
     disposed = true;
     revokeDevelopmentDiagnostics();
+    contextRecovery.dispose();
+    resourceRestorers.clear();
     renderer.setAnimationLoop(null);
     renderer.dispose();
     renderer.forceContextLoss();
@@ -177,6 +222,9 @@ export function createRendererOwner({ mount }) {
     },
     resizeToDisplaySize,
     render,
+    registerResourceRestorer,
+    subscribeContextState,
+    getContextSnapshot,
     exposeDevelopmentDiagnostics,
     dispose,
   });
