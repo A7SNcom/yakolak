@@ -16,10 +16,14 @@ required=(
   web/vendor/three/r185/three.core.js
   web/vendor/three/r185/addons/loaders/STLLoader.js
   scripts/prepare-threejs-runtime-assets.mjs
+  scripts/convert-threejs-assets.mjs
+  scripts/lib/stl-glb-converter.mjs
+  scripts/lib/asset-conversion-pipeline.mjs
   tests/threejs_renderer_owner_contract.test.mjs
   tests/threejs_frame_governor_contract.test.mjs
   tests/threejs_asset_loading_contract.test.mjs
   tests/threejs_asset_runtime_copies_contract.test.mjs
+  tests/threejs_asset_conversion_pipeline.test.mjs
 )
 
 for file in "${required[@]}"; do
@@ -44,10 +48,11 @@ node tests/threejs_renderer_owner_contract.test.mjs
 node tests/threejs_frame_governor_contract.test.mjs
 node tests/threejs_asset_loading_contract.test.mjs
 node tests/threejs_asset_runtime_copies_contract.test.mjs
+node tests/threejs_asset_conversion_pipeline.test.mjs
 
 if [ "${VERCEL_GIT_COMMIT_REF:-}" = "threejs-rebuild" ]; then
   test -n "${TURSO_DATABASE_URL:-}" || { echo "Missing TURSO_DATABASE_URL" >&2; exit 1; }
   test -n "${TURSO_AUTH_TOKEN:-}" || { echo "Missing TURSO_AUTH_TOKEN" >&2; exit 1; }
 fi
 
-echo "Verified YAKOLAK static Three.js shell with immutable atomic asset gate"
+echo "Verified YAKOLAK static Three.js shell with immutable asset gate and deterministic offline conversion contract"
