@@ -43,7 +43,7 @@ function asset(logicalId, group, sourceInfo, type, runtimeOverride = null) {
 }
 
 const boardAndLidSource = source('models/board-and-lid.stl', 'board-and-intro-lid', true, '024d109cea081d65eedc067b2fdaac46c9c10227', 3114084);
-const boardAndLidRuntime = runtime('/assets/models/board-and-lid.glb', 'glb-components', '95636cecff02ab7caa9d08780995fcdce402ffb7', 2596032);
+const boardAndLidRuntime = runtime('/assets/models/board-and-lid.glb', 'glb-components', '9a7e3410f641735e08a2944efa366cca2a66ee99', 2595544);
 
 export const ASSETS = Object.freeze({
   gameLogo: asset('brand.yakolak-logo', 'boot-critical', source('logos/YAKOLAK.svg', 'official-game-logo', true, 'ee3703615cd42c4979a0001f1261014f108c6956', 5736), 'text'),
