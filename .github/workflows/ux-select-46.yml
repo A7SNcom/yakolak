@@ -1,4 +1,4 @@
-# gate-run: 2
+# gate-run: 3
 name: UX-SELECT-46 focused regression
 
 on:
