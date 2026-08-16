@@ -9,19 +9,19 @@
       4
     ],
     "colors": [
-      "white",
+      "marble",
       "blue",
       "gold",
       "green"
     ],
     "turnRing": [
-      "white",
+      "marble",
       "blue",
       "gold",
       "green"
     ],
     "introOrder": [
-      "white",
+      "marble",
       "gold",
       "green",
       "blue"
@@ -59,13 +59,28 @@
     "touchDropRadius": 42,
     "dragHeight": 14
   },
+  "colorIdentity": {
+    "canonicalPlayableIds": [
+      "marble",
+      "blue",
+      "gold",
+      "green"
+    ],
+    "displayMaterial": {
+      "marble": {
+        "displayName": "white marble",
+        "materialKey": "marble"
+      }
+    },
+    "rule": "white is a visual/material description of marble, never a separate playable color ID"
+  },
   "materials": {
     "palette": {
       "wall": "#f7f7f4",
       "floor": "#deddd7",
       "table": "#aeb2b6",
       "board": "#4a5562",
-      "white": "#f1eee6",
+      "marble": "#f1eee6",
       "blue": "#3769a5",
       "gold": "#b78a44",
       "green": "#2f856a",
@@ -75,7 +90,7 @@
       "neutral room and table",
       "matte readable board",
       "four colors remain distinguishable on mobile and desktop",
-      "white may use subtle procedural veining without external image URLs",
+      "the marble playable color uses the white-marble material and may use subtle procedural veining without external image URLs",
       "table maps are optional but must not alter geometry or contact",
       "no visual state may depend on material brightness alone"
     ],
