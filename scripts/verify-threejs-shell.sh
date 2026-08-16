@@ -10,10 +10,18 @@ required=(
   web/app/scene/renderer.js
   web/app/scene/preview-scene.js
   web/app/camera/frame-governor.js
+  web/app/assets/asset-manifest.js
+  web/app/assets/asset-manager.js
+  web/assets/kit/ui/loading-star.svg
+  web/assets/kit/layout/world-layout.json
+  web/assets/kit/layout/intro-scatter.csv
+  web/assets/kit/reference/approved-contract.json
+  web/assets/kit/table/table.svg
   web/vendor/three/r185/three.module.js
   web/vendor/three/r185/three.core.js
   tests/threejs_renderer_owner_contract.test.mjs
   tests/threejs_frame_governor_contract.test.mjs
+  tests/threejs_asset_loading_contract.test.mjs
 )
 
 for file in "${required[@]}"; do
@@ -26,13 +34,15 @@ if find web -type f \( -name '*.pck' -o -name '*.wasm' -o -name 'index.js' -o -n
 fi
 
 if grep -Eqi 'index\.pck|index\.wasm|index\.audio|godot' \
-  web/index.html web/app/boot/boot.js web/app/scene/renderer.js web/app/scene/preview-scene.js web/app/camera/frame-governor.js; then
+  web/index.html web/app/boot/boot.js web/app/scene/renderer.js web/app/scene/preview-scene.js web/app/camera/frame-governor.js \
+  web/app/assets/asset-manifest.js web/app/assets/asset-manager.js; then
   echo "Forbidden Godot runtime dependency found in Three.js entry graph" >&2
   exit 1
 fi
 
 node tests/threejs_renderer_owner_contract.test.mjs
 node tests/threejs_frame_governor_contract.test.mjs
+node tests/threejs_asset_loading_contract.test.mjs
 
 if [ "${VERCEL_GIT_COMMIT_REF:-}" = "threejs-rebuild" ]; then
   test -n "${TURSO_DATABASE_URL:-}" || { echo "Missing TURSO_DATABASE_URL" >&2; exit 1; }
