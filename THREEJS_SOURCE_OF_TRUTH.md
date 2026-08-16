@@ -60,13 +60,17 @@ Status values: `OPEN`, `ADAPTER`, or `RESOLVED`. No entry may disappear without 
 - Preserve the spatial/identity mapping exactly: `right = marble`, `back = blue`, `left = gold`, `front = green`. Preserve the fixed spatial turn ring exactly as `right → back → left → front`, equivalent to canonical color ring `marble → blue → gold → green`.
 - Any old prose or artwork using the word `white` is descriptive only. Code must resolve presentation from canonical `marble`; it must not branch on `white` as a separate playable color or maintain parallel `white` and `marble` inventories/material identities.
 
-### SRC-003 — Seat order and color ownership — OPEN
+### SRC-003 — Seat order and color ownership — RESOLVED
 
-- The Kit's fixed canonical color/spatial ring is `marble → blue → gold → green`, mapped `right → back → left → front`, rotated so the preferred color is first for Kit-defined setup behavior; each Kit invitation model reserves one exact seat/color.
-- `api/rooms.js` stores players in host/join order, assigns the next free `p2`/`p3`/`p4` seat when a join occurs, and accepts the joining player's requested available color.
-- Turn advancement and round starters in the backend use the `players` array order rather than the Kit's fixed color ring.
-- THREEJS-005 resolves only color identity: it does **not** silently resolve this live seat/turn-authority contradiction. The fixed right/back/left/front spatial mapping and color ring remain the Kit presentation contract, while actual online ownership/turn state must still follow authoritative backend state until a separate explicit resolution changes that backend contract.
-- Rule for rewrite: do not make the UI imply fixed-ring online ownership when the live backend state says otherwise unless an explicit backend migration resolves this contract.
+- The Kit defines the canonical color ring `marble → blue → gold → green`; the configured match rotates it so the host preferred color is first and keeps the configured 2/3/4 seats.
+- **Resolution — THREEJS-008 (2026-08-16): `p1...pN` are stable canonical seat identities in that rotated ring. `p1` is the host; join arrival order never changes seat order or turn order.**
+- The migration backend now persists `seatTopology`, authoritative `turnSeat`, `roundStarterSeat`, ordered `skippedSeats`, and `lastHandoff`. Legacy `turnIndex` and `skippedSeat` remain compatibility mirrors only.
+- Round 1 starts at `p1`; each following round starter advances exactly one canonical seat and wraps.
+- After an accepted non-winning move, authority scans forward through the complete seat ring. Seats with no legal move are recorded and skipped. If all other seats are blocked but the acting seat still has a legal move, the scan returns the turn to that same seat; this is not a draw.
+- A round is a draw only when a complete authoritative scan finds no configured active seat with any legal move.
+- The fixed spatial mapping remains `right=marble`, `back=blue`, `left=gold`, `front=green`; presentation derives physical side from canonical color and never creates a second turn ring.
+- The binding details are in `THREEJS_SEAT_TURN_CONTRACT.md`.
+- This resolution does not decide invitation/lobby invalidation after topology-changing edits; that remains SRC-007 / GAP-003 / THREEJS-010. It also does not decide protocol/table compatibility for pre-existing v5 rooms; that remains GAP-012 / THREEJS-019.
 
 ### SRC-004 — Entry and invitation model — RESOLVED
 
@@ -96,8 +100,8 @@ Status values: `OPEN`, `ADAPTER`, or `RESOLVED`. No entry may disappear without 
 ### SRC-007 — Lobby editing/invalidation — OPEN
 
 - `YAKOLAK_PORTABLE_KIT/README.md` says changing color, player count, seat type, or round count after invitations exist invalidates the old lobby/invitations and creates a new lobby, with one narrow exception for replacing an unjoined online seat by a computer.
-- `api/rooms.js` allows the host to edit `color`, `targetPlayers`, and `targetRounds` in the existing waiting room without recreating it, subject to its allowlist and safety checks.
-- Rule for rewrite: preserve the live edit contract and do not claim old-room invalidation happened unless the backend actually changes.
+- `api/rooms.js` allows the host to edit `color`, `targetPlayers`, and `targetRounds` in the existing waiting room subject to safety checks; THREEJS-008 additionally rejects edits that would leave already joined seats inconsistent with the locked canonical topology, but does not define cancellation/recreation/invitation invalidation.
+- Rule for rewrite: do not claim old-room invalidation/recreation happened unless THREEJS-010 implements it authoritatively.
 
 ### SRC-008 — Room expiration — OPEN
 
@@ -137,6 +141,8 @@ Every implementation decision must be traceable to one of these outcomes:
 For `SRC-001` specifically, all future Three.js code, copy, adapters, fixtures, and tests must treat 3/5 as **wins-to-match**. No code path may terminate a match merely because `completedRounds` reaches 3 or 5.
 
 For `SRC-002` specifically, every playable color value crossing rules, state, persistence, network, turn, board, inventory, scoring, or tests must use canonical `marble`, never playable `white`. Rendering and copy for that ID must use the single approved white-marble display/material mapping rather than creating a second color identity. The canonical spatial identity is `right=marble`, `back=blue`, `left=gold`, `front=green`, with fixed spatial ring `right → back → left → front`.
+
+For `SRC-003` specifically, later code must use `THREEJS_SEAT_TURN_CONTRACT.md`: canonical topology is the host-color-rotated `marble → blue → gold → green` ring, `turnSeat` owns current turn, round starters rotate by canonical seat, authoritative skip evidence comes from `lastHandoff`/`skippedSeats`, and draw requires no legal move across the full active seat ring.
 
 For `SRC-004` specifically, every Three.js entry/invitation implementation must follow `THREEJS_ENTRY_INVITATION_CONTRACT.md`: `قيم جديد` is the host path, `دخول بدعوة` is the invitee path, each online invitation owns one exact reserved seat/color, and manual 2-digit entry resolves that invitation rather than a generic room. Link and code entry must converge on the same authoritative invitation record and claim outcome.
 
