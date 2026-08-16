@@ -1,0 +1,69 @@
+name: THREEJS-014 Context Recovery Contract
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - web/app/scene/context-recovery.js
+      - web/app/scene/renderer.js
+      - web/app/scene/preview-scene.js
+      - web/app/camera/frame-governor.js
+      - web/app/boot/boot.js
+      - web/app/session/canonical-online-session.js
+      - web/index.html
+      - web/styles/app.css
+      - tests/threejs_context_recovery_contract.test.mjs
+      - tests/threejs_renderer_owner_contract.test.mjs
+      - tests/threejs_frame_governor_contract.test.mjs
+      - scripts/verify-threejs-context-recovery.mjs
+      - .github/workflows/threejs-014-context-recovery.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: threejs-014-context-recovery
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact migration SHA
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify renderer owner contract
+        run: node tests/threejs_renderer_owner_contract.test.mjs
+
+      - name: Verify frame governor contract
+        run: node tests/threejs_frame_governor_contract.test.mjs
+
+      - name: Verify context recovery and session invariants
+        run: node tests/threejs_context_recovery_contract.test.mjs
+
+      - name: Install browser verifier only
+        run: npm install --no-save --package-lock=false playwright@1.55.0
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Serve static web source
+        shell: bash
+        run: |
+          python3 -m http.server 4173 --directory web > /tmp/threejs-014-http.log 2>&1 &
+          echo $! > /tmp/threejs-014-http.pid
+          for attempt in $(seq 1 20); do
+            curl --fail --silent http://127.0.0.1:4173/ >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/threejs-014-http.log
+          exit 1
+
+      - name: Force real WebGL context loss and restore
+        run: node scripts/verify-threejs-context-recovery.mjs
