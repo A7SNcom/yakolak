@@ -52,6 +52,7 @@ async function waitForPlayer(page, index, direction) {
   }
   await page.waitForFunction(
     expected => document.body.dataset.yakolakGameplay === 'ready' &&
+                document.body.dataset.yakolakGameplayReady === 'true' &&
                 document.body.dataset.yakolakCurrentPlayer === expected &&
                 document.body.dataset.yakolakCameraStage === 'ready',
     direction,
@@ -60,6 +61,14 @@ async function waitForPlayer(page, index, direction) {
 }
 
 async function freshPickTarget(page, direction, side, size) {
+  // Use the authoritative gameplay-ready probe rather than a fixed delay. After
+  // commit/turn changes the visible state can update a frame before input is valid.
+  await page.waitForFunction(
+    expected => document.body.dataset.yakolakGameplayReady === 'true' &&
+                document.body.dataset.yakolakCurrentPlayer === expected,
+    direction,
+    { timeout: 10000 }
+  );
   const before = await page.evaluate(() => Number(document.body.dataset.yakolakSelect44TargetRevision || 0));
   await page.evaluate(({ side, size }) => window.yakolakTestSelect44RefreshPickTarget(side, size), { side, size });
   await page.waitForFunction(
@@ -68,7 +77,7 @@ async function freshPickTarget(page, direction, side, size) {
                                             Number(document.body.dataset.yakolakSelect44TargetSide) === side &&
                                             document.body.dataset.yakolakSelect44TargetSize === size,
     { previous: before, direction, side, size },
-    { timeout: 5000 }
+    { timeout: 10000 }
   );
   const target = await page.evaluate(() => ({
     x: Number(document.body.dataset.yakolakSelect44TargetX || 0),
@@ -204,6 +213,7 @@ test('UX-SELECT-44 clears the single selected emphasis on commit, turn change, r
   await page.waitForFunction(
     () => document.body.dataset.yakolakCurrentPlayer === 'back' &&
           document.body.dataset.yakolakGameplay === 'ready' &&
+          document.body.dataset.yakolakGameplayReady === 'true' &&
           document.body.dataset.yakolakSelected === '' &&
           document.body.dataset.yakolakSelectionEmphasisCount === '0',
     null,
