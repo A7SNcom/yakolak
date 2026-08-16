@@ -8,6 +8,7 @@ on:
       - web/**
       - api/build-info.js
       - scripts/verify-threejs-browser.mjs
+      - scripts/measure-threejs-performance.mjs
       - scripts/prepare-threejs-runtime-assets.mjs
       - YAKOLAK_PORTABLE_KIT/assets/**
       - vercel.json
@@ -60,3 +61,7 @@ jobs:
       - name: Verify desktop mobile and network graph
         shell: bash
         run: node scripts/verify-threejs-browser.mjs
+
+      - name: Measure representative mobile startup and GPU baseline
+        shell: bash
+        run: node scripts/measure-threejs-performance.mjs
