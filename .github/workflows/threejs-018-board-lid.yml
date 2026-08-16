@@ -1,0 +1,41 @@
+name: THREEJS-018 board and lid verification
+
+on:
+  push:
+    branches: [threejs-rebuild]
+    paths:
+      - 'scripts/analyze-threejs-board-lid.mjs'
+      - 'scripts/verify-threejs-board-lid.mjs'
+      - 'web/app/scene/board-and-lid.js'
+      - 'web/assets/models/board-and-lid-layout.json'
+      - 'tests/threejs_board_and_lid_contract.test.mjs'
+      - '.github/workflows/threejs-018-board-lid.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - name: Inspect canonical board and lid geometry
+        run: node scripts/analyze-threejs-board-lid.mjs
+      - name: Verify committed deterministic asset conversion
+        run: npm run assets:check -- --only=model.board-and-lid
+      - name: Run THREEJS-018 contract test when present
+        shell: bash
+        run: |
+          if [[ -f tests/threejs_board_and_lid_contract.test.mjs ]]; then
+            node --test tests/threejs_board_and_lid_contract.test.mjs
+          fi
+      - name: Run semantic geometry verifier when present
+        shell: bash
+        run: |
+          if [[ -f scripts/verify-threejs-board-lid.mjs ]]; then
+            node scripts/verify-threejs-board-lid.mjs
+          fi
