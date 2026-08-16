@@ -8,6 +8,7 @@ on:
       - 'scripts/gameplay_turn_transition_stale_safe.gd'
       - 'tests/ux_turn_41_mobile_portrait.spec.js'
       - '.github/workflows/ux-turn-41.yml'
+      - 'export_presets.cfg'
       - 'web/**'
   workflow_dispatch:
 
@@ -51,6 +52,7 @@ jobs:
           grep -q "func _layout_quick_menu" scripts/gameplay_turn_transition_stale_safe.gd
           grep -q "48px-min" scripts/gameplay_turn_transition_stale_safe.gd
           grep -q "overlay-only-no-projection-change" scripts/gameplay_turn_transition_stale_safe.gd
+          grep -q 'res://scripts/gameplay_authoritative_turn_state.gd' export_presets.cfg
 
       - name: Install build dependency
         run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
