@@ -14,7 +14,7 @@ This folder is the only implementation source of truth for rebuilding YAKOLAK. H
 
 The mandatory sequence is:
 
-1. **Preferred color:** choose white, blue, gold, or green.
+1. **Preferred color:** choose white marble (`marble` internally), blue, gold, or green.
 2. **Total players:** choose 2, 3, or 4.
 3. **Remaining seats:** assign each remaining seat as `Computer` or `Online`.
 4. **Match length:** choose 3 or 5 rounds.
@@ -22,9 +22,11 @@ The mandatory sequence is:
 6. **Ready check:** computer seats are ready immediately; online seats are ready after joining.
 7. **Start:** begin only when every configured seat is ready.
 
+Playable color IDs are exactly `marble`, `blue`, `gold`, and `green`. The `marble` set is rendered and described as white marble; `white` is a visual description, never a separate playable color ID.
+
 Seat order uses the fixed ring:
 
-`white → blue → gold → green`
+`marble → blue → gold → green`
 
 Rotate the ring so the preferred color is first, then keep the selected number of seats. Each online invitation reserves one exact seat and color; the joining player does not choose another color.
 
@@ -58,7 +60,7 @@ Coordinate system: Y is up; board center is `(0,0,0)`. Any engine unit scale is 
 
 ### Pieces
 
-- Colors: white, blue, gold, green.
+- Canonical color IDs: `marble`, `blue`, `gold`, `green`. The `marble` set uses the white-marble visual/material treatment.
 - Sizes: small, medium, large.
 - Each color owns 3 pieces of each size: 9 per color, 36 total.
 - A placed piece never moves, captures, replaces, removes, or changes size during a round.
@@ -68,14 +70,14 @@ Coordinate system: Y is up; board center is `(0,0,0)`. Any engine unit scale is 
 | Object | Position X,Y,Z | Rotation X,Y,Z degrees |
 |---|---|---|
 | Board | `0,6,0` | `-90,0,0` |
-| White/right base | `135,6,0` | `-90,0,0` |
+| Marble/right base (white-marble material) | `135,6,0` | `-90,0,0` |
 | Blue/back base | `0,6,-135` | `-90,0,-90` |
 | Gold/left base | `-135,6,0` | `-90,0,180` |
 | Green/front base | `0,6,135` | `-90,0,90` |
 
 Home-stack centers:
 
-- White/right: `(135,2,-48)`, `(135,2,0)`, `(135,2,48)`
+- Marble/right (white-marble material): `(135,2,-48)`, `(135,2,0)`, `(135,2,48)`
 - Blue/back: `(-48,2,-135)`, `(0,2,-135)`, `(48,2,-135)`
 - Gold/left: `(-135,2,-48)`, `(-135,2,0)`, `(-135,2,48)`
 - Green/front: `(-48,2,135)`, `(0,2,135)`, `(48,2,135)`
@@ -263,7 +265,7 @@ All values are milliseconds. Default easing is smooth cubic ease-in-out. State c
 
 Intro order is:
 
-`white/right → gold/left → green/front → blue/back`
+`marble/right → gold/left → green/front → blue/back`
 
 - Lid initial transform: position `(0,62.5,0)`, rotation `(-90,180,0)`.
 - Lid shake `420`; lift `900`; lift height `740`.
@@ -320,7 +322,7 @@ Reference palette:
 - Floor `#deddd7`
 - Table `#aeb2b6`
 - Board `#4a5562`
-- White `#f1eee6`
+- Marble / white-marble material `#f1eee6`
 - Blue `#3769a5`
 - Gold `#b78a44`
 - Green `#2f856a`
