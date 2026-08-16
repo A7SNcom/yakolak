@@ -3,18 +3,23 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ASSET_LIST } from '../web/app/assets/asset-manifest.js';
+import {
+  PERFORMANCE_CUTOVER_TARGETS,
+  PERFORMANCE_REGRESSION_CEILINGS,
+  REPRESENTATIVE_MOBILE_PROFILE,
+} from '../web/app/perf/performance-budgets.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const baseUrl = process.env.SHELL_URL || 'http://127.0.0.1:4173/';
 
 const PROFILE = Object.freeze({
-  name: 'representative-mobile-390x844',
-  viewport: Object.freeze({ width: 390, height: 844 }),
-  deviceScaleFactor: 2,
-  cpuThrottleRate: 4,
-  latencyMs: 150,
-  downloadKbps: 1600,
-  uploadKbps: 750,
+  name: REPRESENTATIVE_MOBILE_PROFILE.name,
+  viewport: Object.freeze({ width: REPRESENTATIVE_MOBILE_PROFILE.width, height: REPRESENTATIVE_MOBILE_PROFILE.height }),
+  deviceScaleFactor: REPRESENTATIVE_MOBILE_PROFILE.deviceScaleFactor,
+  cpuThrottleRate: REPRESENTATIVE_MOBILE_PROFILE.cpuThrottleRate,
+  latencyMs: REPRESENTATIVE_MOBILE_PROFILE.latencyMs,
+  downloadKbps: REPRESENTATIVE_MOBILE_PROFILE.downloadKbps,
+  uploadKbps: REPRESENTATIVE_MOBILE_PROFILE.uploadKbps,
 });
 
 function sumSourceBytes(group = null) {
@@ -38,6 +43,33 @@ async function decodedPngBytes() {
     entries.push(Object.freeze({ id: asset.logicalId, width, height, rgba8Bytes }));
   }
   return Object.freeze({ total, entries: Object.freeze(entries) });
+}
+
+function budgetStatus(metrics, limits) {
+  const checks = [
+    ['requiredAssetBodyBytes', metrics.manifestBodyBytes.requiredTotal, limits.requiredAssetBodyBytes],
+    ['startupEncodedBytes', metrics.startupNetwork.encodedBytes, limits.startupEncodedBytes],
+    ['decodedRequiredGeometryBytes', metrics.decodedRequiredGeometryBytes, limits.decodedRequiredGeometryBytes],
+    ['decodedOptionalTextureRgba8Bytes', metrics.decodedOptionalTextureRgba8Bytes, limits.decodedOptionalTextureRgba8Bytes],
+    ['criticalAssetsReadyMs', metrics.marks.criticalAssetsReady, limits.criticalAssetsReadyMs],
+    ['firstInteractiveMs', metrics.marks.firstInteractive, limits.firstInteractiveMs],
+    ['firstVisibleFrameMs', metrics.marks.firstVisibleFrame, limits.firstVisibleFrameMs],
+    ['drawCalls', metrics.gpuFrame.drawCalls, limits.drawCalls],
+    ['triangles', metrics.gpuFrame.triangles, limits.triangles],
+  ].filter(([, , limit]) => Number.isFinite(limit));
+
+  if (Number.isFinite(limits.optionalAssetBodyBytes)) checks.push(['optionalAssetBodyBytes', metrics.manifestBodyBytes.optionalTotal, limits.optionalAssetBodyBytes]);
+  if (Number.isFinite(limits.allAssetBodyBytes)) checks.push(['allAssetBodyBytes', metrics.manifestBodyBytes.allAssets, limits.allAssetBodyBytes]);
+  if (Number.isFinite(limits.gpuGeometries)) checks.push(['gpuGeometries', metrics.gpuFrame.geometries, limits.gpuGeometries]);
+  if (Number.isFinite(limits.gpuTextures)) checks.push(['gpuTextures', metrics.gpuFrame.textures, limits.gpuTextures]);
+  if (Number.isFinite(limits.gpuPrograms)) checks.push(['gpuPrograms', metrics.gpuFrame.programs, limits.gpuPrograms]);
+
+  const results = checks.map(([name, actual, limit]) => Object.freeze({ name, actual, limit, ok: Number.isFinite(actual) && actual <= limit }));
+  return Object.freeze({
+    ok: results.every((entry) => entry.ok),
+    checks: Object.freeze(results),
+    failures: Object.freeze(results.filter((entry) => !entry.ok)),
+  });
 }
 
 const browser = await chromium.launch({
@@ -162,7 +194,7 @@ try {
   });
 
   const png = await decodedPngBytes();
-  const metrics = Object.freeze({
+  const baseMetrics = {
     schema: 'THREEJS-017-PERF-V1',
     profile: PROFILE,
     manifestBodyBytes: Object.freeze({
@@ -176,10 +208,16 @@ try {
     decodedOptionalTextures: png.entries,
     ...browserMetrics,
     pageErrors,
-  });
+  };
+  const regression = budgetStatus(baseMetrics, PERFORMANCE_REGRESSION_CEILINGS);
+  const cutover = budgetStatus(baseMetrics, PERFORMANCE_CUTOVER_TARGETS);
+  const metrics = Object.freeze({ ...baseMetrics, regression, cutover });
 
   console.log(`THREEJS-017_METRICS ${JSON.stringify(metrics)}`);
-  if (pageErrors.length) process.exitCode = 1;
+  if (pageErrors.length || !regression.ok) {
+    if (!regression.ok) console.error(`THREEJS-017 budget regression: ${JSON.stringify(regression.failures)}`);
+    process.exitCode = 1;
+  }
   await context.close();
 } finally {
   await browser.close();
