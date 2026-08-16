@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "semanticProfile": "yakolak-board-intro-lid-v1",
+  "semanticProfile": "yakolak-board-intro-lid-v2",
   "source": {
     "canonicalPath": "YAKOLAK_PORTABLE_KIT/assets/models/board-and-lid.stl",
     "canonicalGitBlobSha1": "024d109cea081d65eedc067b2fdaac46c9c10227",
     "canonicalBytes": 3114084,
     "runtimePath": "web/assets/models/board-and-lid.glb",
-    "runtimeGitBlobSha1": "95636cecff02ab7caa9d08780995fcdce402ffb7",
-    "runtimeSha256": "15c20b66904087a66ffc8b60a9344a750b0f5186418f25b1344438259656c3b1",
-    "runtimeBytes": 2596032,
+    "runtimeGitBlobSha1": "9a7e3410f641735e08a2944efa366cca2a66ee99",
+    "runtimeSha256": "014f272a992c7841c35cfe08d16b9037fb68df1281c4be37737d353d8e1ae264",
+    "runtimeBytes": 2595544,
     "triangleCount": 62280,
     "componentCount": 29
   },
@@ -23,19 +23,9 @@
     "semanticNode": "YakolakBoard",
     "componentIndices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27],
     "assetPivot": [90.00003051757812, 90, 6],
-    "sourceBounds": {
-      "min": [0, 0, 0],
-      "max": [180.00006103515625, 180, 12]
-    },
-    "finalTransform": {
-      "position": [0, 6, 0],
-      "rotationDegrees": [-90, 0, 0],
-      "scale": [1, 1, 1]
-    },
-    "worldBoundsAtFinal": {
-      "min": [-90.00003051757812, 0, -90],
-      "max": [90.00003051757812, 12, 90]
-    },
+    "sourceBounds": { "min": [0, 0, 0], "max": [180.00006103515625, 180, 12] },
+    "finalTransform": { "position": [0, 6, 0], "rotationDegrees": [-90, 0, 0], "scale": [1, 1, 1] },
+    "worldBoundsAtFinal": { "min": [-90.00003051757812, 0, -90], "max": [90.00003051757812, 12, 90] },
     "cellVisualGroups": [
       {"cellId": 0, "componentIndices": [18, 19, 20], "measuredSourceCenterXY": [42.22868347167969, 137.74302673339844], "authoritativeWorldCenter": [-48, 2, -48], "visualXZDeltaFromRuleCenter": [0.2286529541015625, 0.2569732666015625]},
       {"cellId": 1, "componentIndices": [6, 7, 8], "measuredSourceCenterXY": [90.00002034505208, 137.74302673339844], "authoritativeWorldCenter": [0, 2, -48], "visualXZDeltaFromRuleCenter": [0.000010172526041666667, 0.2569732666015625]},
@@ -53,29 +43,12 @@
     "semanticNode": "YakolakIntroLid",
     "componentIndices": [28],
     "assetPivot": [90.00003051757812, 90, 6],
-    "sourceBounds": {
-      "min": [6.551025390625, 6.55108642578125, 0],
-      "max": [173.44903564453125, 173.448974609375, 9.999999046325684]
-    },
-    "introStartTransform": {
-      "position": [0, 62.5, 0],
-      "rotationDegrees": [-90, 180, 0],
-      "scale": [1, 1, 1],
-      "visible": true
-    },
-    "introLiftedTransform": {
-      "position": [0, 802.5, 0],
-      "rotationDegrees": [-90, 180, 0],
-      "scale": [1, 1, 1],
-      "visible": true
-    },
-    "postIntroFinal": {
-      "position": [0, 802.5, 0],
-      "rotationDegrees": [-90, 180, 0],
-      "scale": [1, 1, 1],
-      "visible": false,
-      "snapAtMs": 4010
-    },
-    "liftHeight": 740
+    "sourceBounds": { "min": [6.551025390625, 6.55108642578125, 0], "max": [173.44903564453125, 173.448974609375, 9.999999046325684] },
+    "introStartTransform": { "position": [0, 62.5, 0], "rotationDegrees": [-90, 180, 0], "scale": [1, 1, 1], "visible": true },
+    "introLiftedTransform": { "position": [0, 802.5, 0], "rotationDegrees": [-90, 180, 0], "scale": [1, 1, 1], "visible": true },
+    "postIntroFinal": { "position": [0, 802.5, 0], "rotationDegrees": [-90, 180, 0], "scale": [1, 1, 1], "visible": false, "snapAtMs": 4010 },
+    "liftHeight": 740,
+    "worldBoundsAtStart": { "min": [-83.44900512695312, 56.5, -83.44891357421875], "max": [83.44900512695312, 66.49999904632568, 83.448974609375] },
+    "worldBoundsAtLifted": { "min": [-83.44900512695312, 796.5, -83.44891357421875], "max": [83.44900512695312, 806.4999990463257, 83.448974609375] }
   }
 }
