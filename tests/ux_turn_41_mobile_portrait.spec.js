@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs';
 
 const BASE_URL = process.env.YAKOLAK_UX_TURN_41_BASE_URL || 'http://127.0.0.1:8000';
 const RUN_LABEL = process.env.YAKOLAK_UX_TURN_41_LABEL || 'source';
+const ROOM_CODE = '4141';
 const BROWSER_ARGS = [
   '--use-gl=angle',
   '--use-angle=swiftshader',
@@ -29,8 +30,8 @@ function emptyBoard() {
 function makeRoom() {
   const players = COLORS.map((color, index) => ({ seat: `p${index + 1}`, color }));
   return {
-    code: '4141',
-    version: 1,
+    code: ROOM_CODE,
+    version: 3,
     protocol: 5,
     status: 'playing',
     targetPlayers: 4,
@@ -53,16 +54,30 @@ function makeRoom() {
   };
 }
 
-async function installRoomApi(page) {
+// UX-TURN-41 is a gameplay-only review. Boot through the same saved online-room
+// hydration path used by the authoritative turn regressions so this test does
+// not depend on setup-wizard test hooks or change setup behavior just to reach
+// the board. The local client is p1; P2-P4 are genuine remote-owner states.
+async function installRestoredRoom(page) {
   const state = {
     current: makeRoom(),
     reconnectFailures: 0,
-    createBody: null,
+    getRequests: 0,
+    moveRequests: 0,
   };
+
+  await page.addInitScript(({ savedCode }) => {
+    sessionStorage.setItem(`yakolak-online:${savedCode}`, JSON.stringify({
+      token: 'ux-turn-41-test',
+      seat: 'p1',
+      code: savedCode,
+    }));
+  }, { savedCode: ROOM_CODE });
 
   await page.route('**/api/rooms**', async route => {
     const request = route.request();
     if (request.method() === 'GET') {
+      state.getRequests += 1;
       if (state.reconnectFailures > 0) {
         state.reconnectFailures -= 1;
         return route.fulfill({
@@ -83,12 +98,12 @@ async function installRoomApi(page) {
     }
 
     const body = JSON.parse(request.postData() || '{}');
-    if (body.action === 'create') {
-      state.createBody = body;
+    if (body.action === 'move') {
+      state.moveRequests += 1;
       return route.fulfill({
-        status: 201,
+        status: 409,
         contentType: 'application/json',
-        body: JSON.stringify({ ok: true, token: body.clientToken, seat: 'p1', room: state.current }),
+        body: JSON.stringify({ ok: false, error: 'occupied_slot' }),
       });
     }
     if (body.action === 'rematch') {
@@ -98,30 +113,22 @@ async function installRoomApi(page) {
         body: JSON.stringify({ ok: false, error: 'round_not_finished' }),
       });
     }
-    return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ ok: false }) });
+    return route.fulfill({
+      status: 409,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: false, error: 'invalid_action' }),
+    });
   });
   return state;
 }
 
-async function openOnlineRoom(page) {
-  await page.goto(`${BASE_URL}/?yakolakTestFast=1`, { waitUntil: 'domcontentloaded' });
+async function openRestoredRoom(page) {
+  await page.goto(`${BASE_URL}/?yakolakTestFast=1&room=${ROOM_CODE}`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
-    () => document.body.dataset.yakolakIntro === 'complete' &&
-      document.body.dataset.yakolakSetup === 'visible' &&
-      document.body.dataset.yakolakSetupFlowStage === 'entry' &&
-      typeof window.yakolakTestSetupFlowAction === 'function',
+    () => document.body.dataset.yakolakIntroHandoffEvent === 'consumed',
     null,
-    { timeout: 60000 }
+    { timeout: 45000 }
   );
-  await page.evaluate(() => window.yakolakTestSetupFlowAction('new'));
-  await page.waitForFunction(() => document.body.dataset.yakolakSetupFlowStage === 'count');
-  await page.evaluate(() => window.yakolakTestSetupFlowAction('count', 4));
-  await page.waitForFunction(() => document.body.dataset.yakolakSetupFlowStage === 'mode:1');
-  await page.evaluate(() => window.yakolakTestSetupFlowAction('mode', 1, 'online'));
-  await page.waitForFunction(() => document.body.dataset.yakolakSetupFlowStage === 'rounds');
-  await page.evaluate(() => window.yakolakTestSetupFlowAction('rounds', 3));
-  await page.waitForFunction(() => document.body.dataset.yakolakSetupFlowStage === 'color');
-  await page.evaluate(() => window.yakolakTestSetupFlowAction('continue'));
   await page.waitForFunction(
     () => document.body.dataset.yakolakPlayers === '4' &&
       document.body.dataset.yakolakGameplay === 'ready' &&
@@ -129,7 +136,7 @@ async function openOnlineRoom(page) {
       document.body.dataset.yakolakTurnIndicatorContract === 'pass' &&
       document.body.dataset.yakolakTurn41QuickMenu === 'safe-turn-band',
     null,
-    { timeout: 30000 }
+    { timeout: 45000 }
   );
 }
 
@@ -307,7 +314,7 @@ async function screenshotAssert(page, viewport, stateName) {
 
 for (const viewport of VIEWPORTS) {
   test(`UX-TURN-41 ${viewport.name} 4p authoritative turn indicator mobile portrait interaction`, async ({ browser }) => {
-    test.setTimeout(150000);
+    test.setTimeout(120000);
     const context = await browser.newContext({
       viewport: { width: viewport.width, height: viewport.height },
       deviceScaleFactor: 1,
@@ -323,10 +330,9 @@ for (const viewport of VIEWPORTS) {
       if (message.type() === 'error' && !text.includes('favicon') && !intentionalMock) errors.push(`console: ${text}`);
     });
 
-    const state = await installRoomApi(page);
+    const state = await installRestoredRoom(page);
     try {
-      await openOnlineRoom(page);
-      expect(Number(state.createBody?.targetPlayers), 'host requests four seats').toBe(4);
+      await openRestoredRoom(page);
 
       await waitForPlayer(page, viewport, 1);
       await exerciseMenuTouch(page);
