@@ -1,0 +1,120 @@
+name: THREEJS-001 Production Baseline Capture
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - .github/workflows/threejs-baseline-capture.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: threejs-baseline-capture
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PROD_URL: https://yakolak.vercel.app/
+      PROD_DEPLOYMENT_URL: https://yakolak-b1evy5x1x-ahmdkcoms-projects.vercel.app
+      PROD_DEPLOYMENT_ID: dpl_BRayrP6BRbm2UQUbcLxAPXDVWE1j
+      PROD_SHA: 04c75be60501778028e8107992e85c74d113b3da
+      BASE_BRANCH: main
+      MIGRATION_BRANCH: threejs-rebuild
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: threejs-rebuild
+          fetch-depth: 0
+
+      - name: Confirm exact baseline relationship
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main threejs-rebuild
+          test "$(git rev-parse origin/main)" = "$PROD_SHA"
+          test "$(git merge-base origin/main origin/threejs-rebuild)" = "$PROD_SHA"
+          curl -fsSIL --retry 3 "$PROD_URL" >/tmp/prod-headers.txt
+
+      - name: Capture live Production screenshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs/threejs-baseline/screenshots
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          test -n "$CHROME"
+
+          capture() {
+            local width="$1" height="$2" out="$3"
+            "$CHROME" \
+              --headless=new \
+              --disable-gpu \
+              --no-sandbox \
+              --hide-scrollbars \
+              --run-all-compositor-stages-before-draw \
+              --virtual-time-budget=20000 \
+              --window-size="${width},${height}" \
+              --screenshot="$out" \
+              "$PROD_URL"
+            test -s "$out"
+          }
+
+          capture 320 568 docs/threejs-baseline/screenshots/production-320x568.png
+          capture 390 844 docs/threejs-baseline/screenshots/production-390x844.png
+          capture 1440 900 docs/threejs-baseline/screenshots/production-1440x900.png
+
+      - name: Write immutable baseline record
+        shell: bash
+        run: |
+          set -euo pipefail
+          CAPTURED_UTC="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          MAIN_SHA_NOW="$(git rev-parse origin/main)"
+          START_SHA="$(git merge-base origin/main origin/threejs-rebuild)"
+          H320="$(sha256sum docs/threejs-baseline/screenshots/production-320x568.png | awk '{print $1}')"
+          H390="$(sha256sum docs/threejs-baseline/screenshots/production-390x844.png | awk '{print $1}')"
+          H1440="$(sha256sum docs/threejs-baseline/screenshots/production-1440x900.png | awk '{print $1}')"
+
+          cat > docs/threejs-baseline/BASELINE.md <<EOF
+          # THREEJS-001 — Safe Migration Baseline
+
+          Captured from the live Godot Production before any Three.js rewrite work.
+
+          ## Source of truth
+
+          - Canonical Production URL: ${PROD_URL}
+          - Immutable Production deployment URL: ${PROD_DEPLOYMENT_URL}
+          - Vercel deployment ID: ${PROD_DEPLOYMENT_ID}
+          - Production Git SHA: \`${PROD_SHA}\`
+          - Latest \`main\` SHA at capture: \`${MAIN_SHA_NOW}\`
+          - Migration branch: \`${MIGRATION_BRANCH}\`
+          - Migration branch base SHA: \`${START_SHA}\`
+          - Captured UTC: ${CAPTURED_UTC}
+
+          ## Migration isolation rule
+
+          Until explicit cutover, all Three.js rewrite work belongs only on \`${MIGRATION_BRANCH}\`. Do not merge, fast-forward, or deploy this branch to Production. Existing Godot \`main\` and the canonical Production alias remain the reference implementation.
+
+          ## Reference screenshots
+
+          - \`screenshots/production-320x568.png\` — SHA-256 \`${H320}\`
+          - \`screenshots/production-390x844.png\` — SHA-256 \`${H390}\`
+          - \`screenshots/production-1440x900.png\` — SHA-256 \`${H1440}\`
+
+          These images were captured directly from ${PROD_URL} by the one-shot GitHub Actions baseline job.
+          EOF
+
+      - name: Commit baseline and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/threejs-baseline-capture.yml
+          git add docs/threejs-baseline
+          git commit -m "THREEJS-001 record safe migration baseline"
+          git push origin HEAD:threejs-rebuild
