@@ -50,18 +50,23 @@ Status values: `OPEN`, `ADAPTER`, or `RESOLVED`. No entry may disappear without 
 - `targetRounds` is a legacy API/config alias for this same threshold and must be interpreted as wins-to-match at the Three.js boundary. New rebuild naming, UI copy, state models, and tests should prefer `winsToMatch` / “wins required”, never “exactly 3/5 rounds”.
 - The Portable Kit's old fixed-round sentence is explicitly superseded **for rebuild match semantics only** by this resolution. Do not reintroduce “highest score after exactly 3/5 completed rounds” unless a later explicit product-rule migration changes the authoritative backend contract and this resolution record.
 
-### SRC-002 — White visual color vs `marble` backend token — ADAPTER
+### SRC-002 — White visual color vs `marble` backend token — RESOLVED
 
-- `YAKOLAK_PORTABLE_KIT/README.md` defines the physical/visual color as `white`.
-- `rules/yakolak-rules.json` and `api/` define the live backend token as `marble` alongside `blue`, `gold`, and `green`.
-- Rule for rewrite: the visual presentation may remain white, but any `white ↔ marble` translation must be an explicit named adapter at the backend boundary. Do not rename the live token silently.
+- `YAKOLAK_PORTABLE_KIT/README.md` historically describes the physical/visual set as `white`, while `rules/yakolak-rules.json` and `api/` use the live playable token `marble` alongside `blue`, `gold`, and `green`.
+- **Resolution — THREEJS-005 (2026-08-16): `marble` is the one canonical internal/playable color ID for the white-marble set everywhere in the Three.js rebuild.**
+- The canonical playable color IDs are exactly `marble`, `blue`, `gold`, `green`. `white` is not a fifth color, not a state token, not a backend alias, and must never be inserted into board, inventory, seat, score, winner, turn, persistence, mutation, fixture, or rules state as a playable ID.
+- Visual presentation may describe the `marble` set as **white marble**. `YAKOLAK_PORTABLE_KIT/assets/reference/approved-contract.json` owns the single display/material mapping from canonical ID `marble` to display name `white marble` and material key `marble`.
+- `YAKOLAK_PORTABLE_KIT/assets/reference/approved-contract.json` now uses `marble` in its playable color arrays, turn ring, intro order, and material palette; `YAKOLAK_PORTABLE_KIT/assets/layout/world-layout.json` now maps `right` to `marble`.
+- Preserve the spatial/identity mapping exactly: `right = marble`, `back = blue`, `left = gold`, `front = green`. Preserve the fixed spatial turn ring exactly as `right → back → left → front`, equivalent to canonical color ring `marble → blue → gold → green`.
+- Any old prose or artwork using the word `white` is descriptive only. Code must resolve presentation from canonical `marble`; it must not branch on `white` as a separate playable color or maintain parallel `white` and `marble` inventories/material identities.
 
 ### SRC-003 — Seat order and color ownership — OPEN
 
-- `YAKOLAK_PORTABLE_KIT/README.md` defines a fixed color ring `white → blue → gold → green`, rotated so the preferred color is first, and each invitation reserves one exact seat/color.
+- The Kit's fixed canonical color/spatial ring is `marble → blue → gold → green`, mapped `right → back → left → front`, rotated so the preferred color is first for Kit-defined setup behavior; each Kit invitation model reserves one exact seat/color.
 - `api/rooms.js` stores players in host/join order, assigns the next free `p2`/`p3`/`p4` seat when a join occurs, and accepts the joining player's requested available color.
 - Turn advancement and round starters in the backend use the `players` array order rather than the Kit's fixed color ring.
-- Rule for rewrite: do not make the UI imply fixed-ring ownership when the live backend state says otherwise unless an explicit backend migration resolves this contract.
+- THREEJS-005 resolves only color identity: it does **not** silently resolve this live seat/turn-authority contradiction. The fixed right/back/left/front spatial mapping and color ring remain the Kit presentation contract, while actual online ownership/turn state must still follow authoritative backend state until a separate explicit resolution changes that backend contract.
+- Rule for rewrite: do not make the UI imply fixed-ring online ownership when the live backend state says otherwise unless an explicit backend migration resolves this contract.
 
 ### SRC-004 — Invitation and ready-check model — OPEN
 
@@ -117,6 +122,8 @@ Every implementation decision must be traceable to one of these outcomes:
 - **Resolved contradiction:** a `RESOLVED` entry is a binding migration decision for later Three.js tasks. Follow its recorded resolution even if an older source still contains the superseded wording; reopening it requires another explicit product-rule or migration-resolution task.
 
 For `SRC-001` specifically, all future Three.js code, copy, adapters, fixtures, and tests must treat 3/5 as **wins-to-match**. No code path may terminate a match merely because `completedRounds` reaches 3 or 5.
+
+For `SRC-002` specifically, every playable color value crossing rules, state, persistence, network, turn, board, inventory, scoring, or tests must use canonical `marble`, never playable `white`. Rendering and copy for that ID must use the single approved white-marble display/material mapping rather than creating a second color identity. The canonical spatial identity is `right=marble`, `back=blue`, `left=gold`, `front=green`, with fixed spatial ring `right → back → left → front`.
 
 Do not copy a Godot quirk merely because it is currently visible in Production. Do not rewrite the live backend merely because the Kit describes a cleaner target. Do not modify the Kit silently to match current backend behavior.
 
