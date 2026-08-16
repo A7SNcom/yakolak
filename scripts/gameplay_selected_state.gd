@@ -11,6 +11,9 @@ const SELECT44_DARK_OUTLINE := Color("#11161a")
 var select44_start_callback: Variant
 var select44_player_callback: Variant
 var select44_lifecycle_callback: Variant
+var select44_target_callback: Variant
+var select44_target_revision: int = 0
+var select44_matrix_active: bool = false
 
 
 func _ready() -> void:
@@ -20,11 +23,13 @@ func _ready() -> void:
 	select44_start_callback = JavaScriptBridge.create_callback(_on_web_select44_start_matrix)
 	select44_player_callback = JavaScriptBridge.create_callback(_on_web_select44_set_player)
 	select44_lifecycle_callback = JavaScriptBridge.create_callback(_on_web_select44_lifecycle)
+	select44_target_callback = JavaScriptBridge.create_callback(_on_web_select44_refresh_pick_target)
 	var window: JavaScriptObject = JavaScriptBridge.get_interface("window")
 	if window != null:
 		window.set("yakolakTestSelect44StartMatrix", select44_start_callback)
 		window.set("yakolakTestSelect44SetPlayer", select44_player_callback)
 		window.set("yakolakTestSelect44Lifecycle", select44_lifecycle_callback)
+		window.set("yakolakTestSelect44RefreshPickTarget", select44_target_callback)
 	_publish_selection_emphasis_state("ready")
 
 
@@ -108,6 +113,15 @@ func _apply_online_board(board: Dictionary) -> void:
 	_publish_selection_cleared_probe("reconnect-hydration")
 
 
+func _publish_piece_test_targets() -> void:
+	# The inherited webdriver helper exhaustively resolves every nested ring and is
+	# useful to broad touch audits. UX-SELECT-44 needs only one exact rendered target
+	# per tap; suppress the broad refresh after this focused matrix starts.
+	if select44_matrix_active:
+		return
+	super._publish_piece_test_targets()
+
+
 func _selection_emphasis_count() -> int:
 	var count: int = 0
 	for record_value: Variant in piece_records:
@@ -160,6 +174,7 @@ func _publish_selection_cleared_probe(reason: String) -> void:
 func _on_web_select44_start_matrix(_arguments: Array) -> void:
 	if not browser_automation or not waiting_for_setup:
 		return
+	select44_matrix_active = true
 	if setup != null:
 		setup.call("reset_for_intro")
 	_on_configuration_ready({
@@ -199,3 +214,39 @@ func _on_web_select44_lifecycle(arguments: Array) -> void:
 		_:
 			return
 	_publish_selection_emphasis_state("test-" + action)
+
+
+func _on_web_select44_refresh_pick_target(arguments: Array) -> void:
+	if not browser_automation or not match_initialized or not gameplay_ready or camera == null or arguments.size() < 2:
+		return
+	var side: int = clampi(int(arguments[0]), -1, 1)
+	var size_name: String = str(arguments[1])
+	if not size_name in ["small", "medium", "large"]:
+		return
+	var direction: String = _current_direction()
+	var available: Array[int] = _available_stack_indices(direction, side)
+	var piece_index: int = -1
+	for candidate: int in available:
+		if str((piece_records[candidate] as Dictionary).get("type", "")) == size_name:
+			piece_index = candidate
+			break
+	var candidates: Array[int] = tray_indices if tray_open and tray_side == side else _current_piece_candidates()
+	var internal_point := Vector2(-1.0, -1.0)
+	if piece_index >= 0:
+		internal_point = _visible_piece_test_pointer(piece_index, candidates)
+	var canvas_rect: Rect2 = _gameplay_canvas_css_rect()
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var css_point := Vector2.ZERO
+	if internal_point.x >= 0.0 and internal_point.y >= 0.0 and canvas_rect.size.x >= 1.0 and canvas_rect.size.y >= 1.0 and viewport_size.x >= 1.0 and viewport_size.y >= 1.0:
+		var css_scale := Vector2(canvas_rect.size.x / viewport_size.x, canvas_rect.size.y / viewport_size.y)
+		css_point = canvas_rect.position + internal_point * css_scale
+	select44_target_revision += 1
+	JavaScriptBridge.eval(
+		"document.body.dataset.yakolakSelect44TargetDirection=" + JSON.stringify(direction) + ";" +
+		"document.body.dataset.yakolakSelect44TargetSide='%d';" % side +
+		"document.body.dataset.yakolakSelect44TargetSize=" + JSON.stringify(size_name) + ";" +
+		"document.body.dataset.yakolakSelect44TargetX='%s';" % str(css_point.x) +
+		"document.body.dataset.yakolakSelect44TargetY='%s';" % str(css_point.y) +
+		"document.body.dataset.yakolakSelect44TargetRevision='%d';" % select44_target_revision,
+		true
+	)
