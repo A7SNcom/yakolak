@@ -11,6 +11,7 @@
 - لا يُنشأ أي فرع ترحيل إضافي، ولا سلسلة Pull Requests، ولا مسار نشر منافس أو بديل.
 - لا تُنقل تغييرات Three.js إلى `main` ولا إلى Production إلا بمهمة cutover صريحة لاحقة.
 - جميع القواعد أدناه تستمر كما هي لـ`main` ومسار Godot، ويُستثنى منها فقط ما يلزم للسماح بالعمل داخل `threejs-rebuild` وفق البنود أعلاه.
+- كل مهمة `THREEJS-*` يجب أن تقرأ `THREEJS_SOURCE_OF_TRUTH.md` و`THREEJS_BACKEND_GAP_REGISTER.md` قبل تنفيذ سلوك يمس الـbackend أو online lifecycle. أي Gap حالته `OPEN` لا يجوز للواجهة حسمه أو اختراع authority محلي له؛ القرار والتنفيذ يملكه فقط رقم مهمة الـowner المسجل في الـregister.
 
 ## مصدر الحقيقة الوحيد
 
