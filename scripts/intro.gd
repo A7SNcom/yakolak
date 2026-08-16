@@ -89,7 +89,11 @@ func _ready() -> void:
 	if failed:
 		_publish_error("asset-load")
 		return
-	_restart_intro()
+	# Free-play opens on the final, stable table immediately. There is no intro,
+	# setup flow, player-count choice, or colour choice in this build.
+	_snap_final()
+	playing = false
+	_publish_complete()
 
 
 func _process(_delta: float) -> void:
@@ -105,12 +109,9 @@ func _process(_delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventScreenTouch and event.pressed:
-		_restart_intro()
-	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_restart_intro()
-	elif event is InputEventKey and event.pressed and event.keycode == KEY_R:
-		_restart_intro()
+	# All pointer input belongs to the free-play controller. The stable scene is
+	# never replayed as an intro.
+	pass
 
 
 func _build_environment() -> void:

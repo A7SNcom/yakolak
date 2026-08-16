@@ -1,51 +1,35 @@
 extends Node
 
-# YAKOLAK 2.9 — first playable interaction after the approved intro.
-# This script does not alter the loader, camera, table, lid, bases, or intro timeline.
-# Tap/click one remaining physical stone, then tap/click a legal board cell.
+# YAKOLAK Free Play — the approved 2.9 table with deliberately no game rules.
+# Tap/click any stone, then tap/click anywhere on the board. Every stone remains
+# movable forever. RESET returns all 36 stones to the four player bases.
 
 const U: float = 0.04
 const PIECE_LAYER: int = 1
-const TARGET_LAYER: int = 2
-const DROP_RADIUS: float = 31.0
-const MOVE_DURATION: float = 520.0
-const MOVE_ARC: float = 18.0
-const SELECT_LIFT: float = 8.0
-const INPUT_DEBOUNCE_MS: int = 120
+const BOARD_LAYER: int = 2
+const BOARD_HALF_EXTENT: float = 78.0 * U
+const PIECE_Y: float = 2.0 * U
+const SELECT_LIFT: float = 8.0 * U
+const MOVE_ARC: float = 12.0 * U
+const MOVE_DURATION_MS: float = 260.0
+const INPUT_DEBOUNCE_MS: int = 100
 
-const CELL_COORDS: Array[Vector3] = [
-	Vector3(-48.0, 2.0, -48.0),
-	Vector3(0.0, 2.0, -48.0),
-	Vector3(48.0, 2.0, -48.0),
-	Vector3(-48.0, 2.0, 0.0),
-	Vector3(0.0, 2.0, 0.0),
-	Vector3(48.0, 2.0, 0.0),
-	Vector3(-48.0, 2.0, 48.0),
-	Vector3(0.0, 2.0, 48.0),
-	Vector3(48.0, 2.0, 48.0),
-]
-
-var intro: Node3D
+var table: Node3D
 var camera: Camera3D
-var piece_records: Array = []
-var target_markers: Array[MeshInstance3D] = []
+var pieces: Array = []
+var home_states: Array[Dictionary] = []
 var initialized: bool = false
-var intro_was_playing: bool = true
 var gameplay_ready: bool = false
 
 var selected_index: int = -1
-var selected_home_position: Vector3 = Vector3.ZERO
-var selected_original_material: Material
-var occupied_slots: Dictionary = {}
-var move_count: int = 0
+var selected_position: Vector3 = Vector3.ZERO
+var selected_material: Material
 
 var move_active: bool = false
 var move_piece_index: int = -1
-var move_cell: int = -1
 var move_started_msec: int = 0
 var move_from: Vector3 = Vector3.ZERO
 var move_to: Vector3 = Vector3.ZERO
-var move_from_scale: Vector3 = Vector3.ONE
 
 var last_pointer_msec: int = -1000
 var last_pointer_position: Vector2 = Vector2(-9999.0, -9999.0)
@@ -53,36 +37,20 @@ var last_pointer_position: Vector2 = Vector2(-9999.0, -9999.0)
 
 func _ready() -> void:
 	process_priority = 20
-	intro = get_parent() as Node3D
+	table = get_parent() as Node3D
 	set_process(true)
-	set_process_input(true)
-	if not get_viewport().size_changed.is_connected(_on_viewport_resized):
-		get_viewport().size_changed.connect(_on_viewport_resized)
+	set_process_unhandled_input(true)
 
 
 func _process(_delta: float) -> void:
 	if not initialized:
 		initialized = _initialize_when_ready()
-		if not initialized:
-			return
-
-	var intro_playing: bool = bool(intro.get("playing"))
-	if intro_playing:
-		if not intro_was_playing:
-			_reset_for_intro()
-		intro_was_playing = true
-		gameplay_ready = false
 		return
-
-	if intro_was_playing:
-		intro_was_playing = false
-		_enable_gameplay()
-
 	if move_active:
 		_update_move()
 
 
-func _input(event: InputEvent) -> void:
+func _unhandled_input(event: InputEvent) -> void:
 	var pointer_position: Vector2
 	var pressed: bool = false
 	if event is InputEventScreenTouch:
@@ -95,294 +63,226 @@ func _input(event: InputEvent) -> void:
 		pointer_position = mouse.position
 	else:
 		return
-
-	if not pressed:
+	if not pressed or not gameplay_ready or move_active:
 		return
-	get_viewport().set_input_as_handled()
 
 	var now: int = Time.get_ticks_msec()
 	if now - last_pointer_msec < INPUT_DEBOUNCE_MS and pointer_position.distance_to(last_pointer_position) < 12.0:
 		return
 	last_pointer_msec = now
 	last_pointer_position = pointer_position
-
-	if not initialized or not gameplay_ready or move_active:
-		return
+	get_viewport().set_input_as_handled()
 	_handle_pointer(pointer_position)
 
 
 func _initialize_when_ready() -> bool:
-	if intro == null:
+	if table == null or bool(table.get("playing")):
 		return false
-	camera = intro.get("camera") as Camera3D
-	var records_value: Variant = intro.get("pieces")
+	camera = table.get("camera") as Camera3D
+	var records_value: Variant = table.get("pieces")
 	if camera == null or not records_value is Array:
 		return false
-	piece_records = records_value as Array
-	if piece_records.size() != 36:
+	pieces = records_value as Array
+	if pieces.size() != 36:
 		return false
 
+	for index: int in range(pieces.size()):
+		var record: Dictionary = pieces[index] as Dictionary
+		var mesh := record["mesh"] as MeshInstance3D
+		if mesh == null:
+			return false
+		home_states.append({
+			"position": mesh.position,
+			"rotation": mesh.rotation,
+			"scale": mesh.scale,
+			"material": mesh.material_override,
+		})
 	_build_piece_colliders()
-	_build_board_targets()
-	for index: int in range(piece_records.size()):
-		var record: Dictionary = piece_records[index] as Dictionary
-		record["played"] = false
-		piece_records[index] = record
-	print("YAKOLAK_GAMEPLAY_INTERACTION_INITIALIZED pieces=36 cells=9")
+	_build_board_surface()
+	_build_reset_button()
+	gameplay_ready = true
+	_publish_state("ready")
+	print("YAKOLAK_FREE_PLAY_READY players=4 pieces=36 rules=none")
 	return true
 
 
 func _build_piece_colliders() -> void:
-	for index: int in range(piece_records.size()):
-		var record: Dictionary = piece_records[index] as Dictionary
-		var mesh_instance := record["mesh"] as MeshInstance3D
-		if mesh_instance == null or mesh_instance.mesh == null:
-			continue
-		var faces: PackedVector3Array = mesh_instance.mesh.get_faces()
+	for index: int in range(pieces.size()):
+		var record: Dictionary = pieces[index] as Dictionary
+		var mesh := record["mesh"] as MeshInstance3D
+		var faces: PackedVector3Array = mesh.mesh.get_faces()
 		if faces.is_empty():
 			continue
 		var shape := ConcavePolygonShape3D.new()
 		shape.set_faces(faces)
 		var body := StaticBody3D.new()
-		body.name = "PiecePickBody_%02d" % index
+		body.name = "FreePiece_%02d" % index
 		body.collision_layer = PIECE_LAYER
 		body.collision_mask = 0
 		body.set_meta("piece_index", index)
 		var collision := CollisionShape3D.new()
 		collision.shape = shape
 		body.add_child(collision)
-		mesh_instance.add_child(body)
+		mesh.add_child(body)
 
 
-func _build_board_targets() -> void:
-	for cell: int in range(CELL_COORDS.size()):
-		var raw_position: Vector3 = CELL_COORDS[cell]
-		var body := StaticBody3D.new()
-		body.name = "BoardTarget_%d" % cell
-		body.collision_layer = TARGET_LAYER
-		body.collision_mask = 0
-		body.position = Vector3(raw_position.x * U, 0.25, raw_position.z * U)
-		body.set_meta("cell", cell)
-		var target_shape := CylinderShape3D.new()
-		target_shape.radius = DROP_RADIUS * U
-		target_shape.height = 0.50
-		var collision := CollisionShape3D.new()
-		collision.shape = target_shape
-		body.add_child(collision)
-		intro.add_child(body)
+func _build_board_surface() -> void:
+	var body := StaticBody3D.new()
+	body.name = "FreePlacementSurface"
+	body.collision_layer = BOARD_LAYER
+	body.collision_mask = 0
+	body.position = Vector3(0.0, 0.23, 0.0)
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(BOARD_HALF_EXTENT * 2.0, 0.45, BOARD_HALF_EXTENT * 2.0)
+	var collision := CollisionShape3D.new()
+	collision.shape = shape
+	body.add_child(collision)
+	table.add_child(body)
 
-		var marker_mesh := CylinderMesh.new()
-		marker_mesh.top_radius = 23.0 * U
-		marker_mesh.bottom_radius = 23.0 * U
-		marker_mesh.height = 0.025
-		marker_mesh.radial_segments = 48
-		var marker := MeshInstance3D.new()
-		marker.name = "LegalTarget_%d" % cell
-		marker.mesh = marker_mesh
-		marker.position = Vector3(raw_position.x * U, 0.515, raw_position.z * U)
-		marker.material_override = _marker_material(Color(1.0, 1.0, 1.0, 0.18))
-		marker.visible = false
-		marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		intro.add_child(marker)
-		target_markers.append(marker)
+
+func _build_reset_button() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 20
+	table.add_child(layer)
+	var reset := Button.new()
+	reset.name = "Reset"
+	reset.text = "RESET"
+	reset.focus_mode = Control.FOCUS_NONE
+	reset.anchor_left = 1.0
+	reset.anchor_right = 1.0
+	reset.offset_left = -128.0
+	reset.offset_right = -16.0
+	reset.offset_top = 18.0
+	reset.offset_bottom = 66.0
+	reset.add_theme_font_size_override("font_size", 16)
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Color(0.05, 0.05, 0.05, 0.88)
+	normal.corner_radius_top_left = 12
+	normal.corner_radius_top_right = 12
+	normal.corner_radius_bottom_left = 12
+	normal.corner_radius_bottom_right = 12
+	normal.content_margin_left = 18.0
+	normal.content_margin_right = 18.0
+	var hover := normal.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(0.12, 0.12, 0.12, 0.96)
+	var pressed := normal.duplicate() as StyleBoxFlat
+	pressed.bg_color = Color(0.0, 0.0, 0.0, 1.0)
+	reset.add_theme_stylebox_override("normal", normal)
+	reset.add_theme_stylebox_override("hover", hover)
+	reset.add_theme_stylebox_override("pressed", pressed)
+	reset.pressed.connect(_reset_all)
+	layer.add_child(reset)
 
 
 func _handle_pointer(screen_position: Vector2) -> void:
-	if selected_index >= 0:
-		var target_hit: Dictionary = _ray_pick(screen_position, TARGET_LAYER)
-		if not target_hit.is_empty():
-			var target_collider: Object = target_hit["collider"] as Object
-			if target_collider != null and target_collider.has_meta("cell"):
-				var cell: int = int(target_collider.get_meta("cell"))
-				if _is_legal_cell(cell, _selected_size()):
-					_begin_move(cell)
-				else:
-					_publish_invalid(cell)
-				return
-
 	var piece_hit: Dictionary = _ray_pick(screen_position, PIECE_LAYER)
 	if not piece_hit.is_empty():
-		var piece_collider: Object = piece_hit["collider"] as Object
-		if piece_collider != null and piece_collider.has_meta("piece_index"):
-			var piece_index: int = int(piece_collider.get_meta("piece_index"))
-			var record: Dictionary = piece_records[piece_index] as Dictionary
-			if not bool(record.get("played", false)):
-				_select_piece(piece_index)
-				return
+		var collider: Object = piece_hit["collider"] as Object
+		if collider != null and collider.has_meta("piece_index"):
+			_select_piece(int(collider.get_meta("piece_index")))
+			return
 
 	if selected_index >= 0:
+		var board_hit: Dictionary = _ray_pick(screen_position, BOARD_LAYER)
+		if not board_hit.is_empty():
+			var hit_position: Vector3 = board_hit["position"] as Vector3
+			_begin_move(Vector3(
+				clampf(hit_position.x, -BOARD_HALF_EXTENT, BOARD_HALF_EXTENT),
+				PIECE_Y,
+				clampf(hit_position.z, -BOARD_HALF_EXTENT, BOARD_HALF_EXTENT)
+			))
+			return
 		_clear_selection()
 
 
 func _ray_pick(screen_position: Vector2, collision_mask: int) -> Dictionary:
-	if camera == null or intro.get_world_3d() == null:
+	if camera == null or table.get_world_3d() == null:
 		return {}
 	var origin: Vector3 = camera.project_ray_origin(screen_position)
 	var direction: Vector3 = camera.project_ray_normal(screen_position)
 	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * 200.0, collision_mask)
 	query.collide_with_areas = false
 	query.collide_with_bodies = true
-	return intro.get_world_3d().direct_space_state.intersect_ray(query)
+	return table.get_world_3d().direct_space_state.intersect_ray(query)
 
 
-func _select_piece(piece_index: int) -> void:
-	if piece_index == selected_index:
+func _select_piece(index: int) -> void:
+	if index == selected_index:
 		_clear_selection()
 		return
 	_clear_selection()
-
-	selected_index = piece_index
-	var record: Dictionary = piece_records[selected_index] as Dictionary
-	var mesh_instance := record["mesh"] as MeshInstance3D
-	selected_home_position = mesh_instance.position
-	selected_original_material = mesh_instance.material_override
-	mesh_instance.position = selected_home_position + Vector3.UP * SELECT_LIFT * U
-	mesh_instance.scale = Vector3.ONE * U * 1.08
-	mesh_instance.material_override = _selection_material(selected_original_material)
-	_update_legal_markers(str(record["type"]), _piece_color(record))
-	_publish_selection(record)
+	selected_index = index
+	var record: Dictionary = pieces[index] as Dictionary
+	var mesh := record["mesh"] as MeshInstance3D
+	selected_position = mesh.position
+	selected_material = mesh.material_override
+	mesh.position = selected_position + Vector3.UP * SELECT_LIFT
+	mesh.material_override = _selection_material(selected_material)
+	_publish_state("selected")
 
 
 func _clear_selection() -> void:
 	if selected_index < 0:
-		_hide_markers()
 		return
-	var record: Dictionary = piece_records[selected_index] as Dictionary
-	var mesh_instance := record["mesh"] as MeshInstance3D
-	if mesh_instance != null and not bool(record.get("played", false)) and not move_active:
-		mesh_instance.position = selected_home_position
-		mesh_instance.scale = Vector3.ONE * U
-		mesh_instance.material_override = selected_original_material
+	var record: Dictionary = pieces[selected_index] as Dictionary
+	var mesh := record["mesh"] as MeshInstance3D
+	if not move_active:
+		mesh.position = selected_position
+		mesh.material_override = selected_material
 	selected_index = -1
-	selected_original_material = null
-	_hide_markers()
-	_publish_gameplay_state("ready")
+	selected_material = null
+	_publish_state("ready")
 
 
-func _begin_move(cell: int) -> void:
+func _begin_move(target: Vector3) -> void:
 	if selected_index < 0:
 		return
-	var record: Dictionary = piece_records[selected_index] as Dictionary
-	var size_name: String = str(record["type"])
-	if not _is_legal_cell(cell, size_name):
-		_publish_invalid(cell)
-		return
-
-	var mesh_instance := record["mesh"] as MeshInstance3D
+	var record: Dictionary = pieces[selected_index] as Dictionary
+	var mesh := record["mesh"] as MeshInstance3D
 	move_active = true
 	gameplay_ready = false
 	move_piece_index = selected_index
-	move_cell = cell
 	move_started_msec = Time.get_ticks_msec()
-	move_from = mesh_instance.position
-	move_to = CELL_COORDS[cell] * U
-	move_from_scale = mesh_instance.scale
-	_hide_markers()
-	_publish_move_started(record, cell)
+	move_from = mesh.position
+	move_to = target
+	_publish_state("moving")
 
 
 func _update_move() -> void:
-	if move_piece_index < 0:
-		move_active = false
-		return
-	var record: Dictionary = piece_records[move_piece_index] as Dictionary
-	var mesh_instance := record["mesh"] as MeshInstance3D
-	var elapsed: float = float(Time.get_ticks_msec() - move_started_msec)
-	var progress: float = clampf(elapsed / MOVE_DURATION, 0.0, 1.0)
+	var record: Dictionary = pieces[move_piece_index] as Dictionary
+	var mesh := record["mesh"] as MeshInstance3D
+	var progress: float = clampf(float(Time.get_ticks_msec() - move_started_msec) / MOVE_DURATION_MS, 0.0, 1.0)
 	var eased: float = _ease(progress)
-	mesh_instance.position = move_from.lerp(move_to, eased)
-	mesh_instance.position.y += sin(eased * PI) * MOVE_ARC * U
-	mesh_instance.scale = move_from_scale.lerp(Vector3.ONE * U, eased)
+	mesh.position = move_from.lerp(move_to, eased)
+	mesh.position.y += sin(eased * PI) * MOVE_ARC
 	if progress < 1.0:
 		return
-
-	mesh_instance.position = move_to
-	mesh_instance.scale = Vector3.ONE * U
-	mesh_instance.material_override = selected_original_material
-	record["played"] = true
-	piece_records[move_piece_index] = record
-	occupied_slots[_slot_key(move_cell, str(record["type"]))] = move_piece_index
-	move_count += 1
-	move_active = false
-	gameplay_ready = true
-	selected_index = -1
-	selected_original_material = null
-	var completed_cell: int = move_cell
-	move_piece_index = -1
-	move_cell = -1
-	_publish_move_complete(record, completed_cell)
-	_publish_test_targets.call_deferred()
-
-
-func _enable_gameplay() -> void:
-	gameplay_ready = true
-	move_active = false
-	_hide_markers()
-	_publish_gameplay_state("ready")
-	_publish_test_targets.call_deferred()
-	print("YAKOLAK_GAMEPLAY_READY selectable=36 cells=9")
-
-
-func _reset_for_intro() -> void:
-	if selected_index >= 0:
-		var selected_record: Dictionary = piece_records[selected_index] as Dictionary
-		var selected_mesh := selected_record["mesh"] as MeshInstance3D
-		if selected_mesh != null:
-			selected_mesh.material_override = selected_original_material
-	occupied_slots.clear()
-	move_count = 0
+	mesh.position = move_to
+	mesh.material_override = selected_material
 	move_active = false
 	move_piece_index = -1
-	move_cell = -1
 	selected_index = -1
-	selected_original_material = null
-	_hide_markers()
-	for index: int in range(piece_records.size()):
-		var record: Dictionary = piece_records[index] as Dictionary
-		record["played"] = false
-		piece_records[index] = record
-		var mesh_instance := record["mesh"] as MeshInstance3D
-		if mesh_instance != null:
-			mesh_instance.scale = Vector3.ONE * U
-	_publish_gameplay_state("intro")
+	selected_material = null
+	gameplay_ready = true
+	_publish_state("ready")
 
 
-func _is_legal_cell(cell: int, size_name: String) -> bool:
-	return cell >= 0 and cell < CELL_COORDS.size() and not occupied_slots.has(_slot_key(cell, size_name))
-
-
-func _slot_key(cell: int, size_name: String) -> String:
-	return "%d:%s" % [cell, size_name]
-
-
-func _selected_size() -> String:
-	if selected_index < 0:
-		return ""
-	var record: Dictionary = piece_records[selected_index] as Dictionary
-	return str(record["type"])
-
-
-func _piece_color(record: Dictionary) -> Color:
-	var mesh_instance := record["mesh"] as MeshInstance3D
-	var material := mesh_instance.material_override as StandardMaterial3D
-	if material != null:
-		return material.albedo_color
-	return Color.WHITE
-
-
-func _update_legal_markers(size_name: String, piece_color: Color) -> void:
-	for cell: int in range(target_markers.size()):
-		var marker: MeshInstance3D = target_markers[cell]
-		var legal: bool = _is_legal_cell(cell, size_name)
-		marker.visible = legal
-		if legal:
-			var marker_color := Color(piece_color.r, piece_color.g, piece_color.b, 0.22)
-			marker.material_override = _marker_material(marker_color)
-
-
-func _hide_markers() -> void:
-	for marker: MeshInstance3D in target_markers:
-		marker.visible = false
+func _reset_all() -> void:
+	move_active = false
+	move_piece_index = -1
+	selected_index = -1
+	selected_material = null
+	for index: int in range(pieces.size()):
+		var record: Dictionary = pieces[index] as Dictionary
+		var mesh := record["mesh"] as MeshInstance3D
+		var home: Dictionary = home_states[index]
+		mesh.position = home["position"] as Vector3
+		mesh.rotation = home["rotation"] as Vector3
+		mesh.scale = home["scale"] as Vector3
+		mesh.material_override = home["material"] as Material
+	gameplay_ready = true
+	_publish_state("ready")
+	print("YAKOLAK_FREE_PLAY_RESET players=4 pieces=36")
 
 
 func _selection_material(source: Material) -> StandardMaterial3D:
@@ -393,117 +293,22 @@ func _selection_material(source: Material) -> StandardMaterial3D:
 		result = StandardMaterial3D.new()
 		result.albedo_color = Color.WHITE
 	result.emission_enabled = true
-	result.emission = result.albedo_color.lightened(0.30)
-	result.emission_energy_multiplier = 1.4
+	result.emission = result.albedo_color.lightened(0.28)
+	result.emission_energy_multiplier = 1.25
 	return result
-
-
-func _marker_material(color: Color) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = color
-	material.emission_enabled = true
-	material.emission = Color(color.r, color.g, color.b, 1.0)
-	material.emission_energy_multiplier = 0.8
-	material.roughness = 0.45
-	return material
 
 
 func _ease(value: float) -> float:
 	var t: float = clampf(value, 0.0, 1.0)
-	return 4.0 * t * t * t if t < 0.5 else 1.0 - pow(-2.0 * t + 2.0, 3.0) / 2.0
+	return 1.0 - pow(1.0 - t, 3.0)
 
 
-func _publish_selection(record: Dictionary) -> void:
-	var mesh_instance := record["mesh"] as MeshInstance3D
-	print("YAKOLAK_PIECE_SELECTED name=%s size=%s" % [mesh_instance.name, str(record["type"])])
+func _publish_state(state: String) -> void:
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
-			"document.body.dataset.yakolakGameplay='piece-selected';" +
-			"document.body.dataset.yakolakSelected='" + str(mesh_instance.name) + "';" +
-			"document.body.dataset.yakolakSelectedSize='" + str(record["type"]) + "';",
-			true
-		)
-
-
-func _publish_move_started(record: Dictionary, cell: int) -> void:
-	print("YAKOLAK_MOVE_STARTED cell=%d size=%s" % [cell, str(record["type"])])
-	if OS.has_feature("web"):
-		JavaScriptBridge.eval(
-			"document.body.dataset.yakolakGameplay='placing';" +
-			"document.body.dataset.yakolakTargetCell='" + str(cell) + "';",
-			true
-		)
-
-
-func _publish_move_complete(record: Dictionary, cell: int) -> void:
-	print("YAKOLAK_MOVE_COMPLETE move=%d cell=%d size=%s dir=%s" % [move_count, cell, str(record["type"]), str(record["dir"])])
-	if OS.has_feature("web"):
-		JavaScriptBridge.eval(
-			"document.body.dataset.yakolakGameplay='ready';" +
-			"document.body.dataset.yakolakMoves='" + str(move_count) + "';" +
-			"document.body.dataset.yakolakLastCell='" + str(cell) + "';" +
-			"document.body.dataset.yakolakLastSize='" + str(record["type"]) + "';" +
-			"document.body.dataset.yakolakLastSide='" + str(record["dir"]) + "';" +
-			"document.body.dataset.yakolakSelected='';",
-			true
-		)
-
-
-func _publish_invalid(cell: int) -> void:
-	print("YAKOLAK_MOVE_INVALID cell=%d size=%s" % [cell, _selected_size()])
-	if OS.has_feature("web"):
-		JavaScriptBridge.eval(
-			"document.body.dataset.yakolakGameplay='invalid';" +
-			"document.body.dataset.yakolakInvalidCell='" + str(cell) + "';",
-			true
-		)
-	get_tree().create_timer(0.30).timeout.connect(_restore_selected_state)
-
-
-func _restore_selected_state() -> void:
-	if selected_index >= 0 and not move_active:
-		var record: Dictionary = piece_records[selected_index] as Dictionary
-		_publish_selection(record)
-
-
-func _publish_gameplay_state(state: String) -> void:
-	if OS.has_feature("web"):
-		JavaScriptBridge.eval(
+			"document.body.dataset.yakolakMode='free-play';" +
 			"document.body.dataset.yakolakGameplay='" + state + "';" +
-			"document.body.dataset.yakolakMoves='" + str(move_count) + "';" +
-			"document.body.dataset.yakolakSelected='';",
+			"document.body.dataset.yakolakPlayers='4';" +
+			"document.body.dataset.yakolakRules='none';",
 			true
 		)
-
-
-func _publish_test_targets() -> void:
-	if not gameplay_ready or camera == null:
-		return
-	var sample_index: int = -1
-	for index: int in range(piece_records.size()):
-		var record: Dictionary = piece_records[index] as Dictionary
-		if not bool(record.get("played", false)) and str(record["dir"]) == "right" and int(record["side"]) == 0 and str(record["type"]) == "large":
-			sample_index = index
-			break
-	if sample_index < 0:
-		return
-	var sample_record: Dictionary = piece_records[sample_index] as Dictionary
-	var sample_mesh := sample_record["mesh"] as MeshInstance3D
-	var piece_world_point: Vector3 = sample_mesh.to_global(Vector3(17.0, 0.0, 9.5))
-	var piece_screen: Vector2 = camera.unproject_position(piece_world_point)
-	var cell_world_point: Vector3 = Vector3(CELL_COORDS[4].x * U, 0.52, CELL_COORDS[4].z * U)
-	var cell_screen: Vector2 = camera.unproject_position(cell_world_point)
-	if OS.has_feature("web"):
-		JavaScriptBridge.eval(
-			"document.body.dataset.yakolakTestPieceX='" + str(piece_screen.x) + "';" +
-			"document.body.dataset.yakolakTestPieceY='" + str(piece_screen.y) + "';" +
-			"document.body.dataset.yakolakTestCellX='" + str(cell_screen.x) + "';" +
-			"document.body.dataset.yakolakTestCellY='" + str(cell_screen.y) + "';" +
-			"document.body.dataset.yakolakTestPiece='" + str(sample_mesh.name) + "';",
-			true
-		)
-
-
-func _on_viewport_resized() -> void:
-	_publish_test_targets.call_deferred()
