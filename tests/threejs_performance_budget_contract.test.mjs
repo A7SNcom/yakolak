@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { ASSET_LIST } from '../web/app/assets/asset-manifest.js';
+import { ASSET_LIST, runtimePayloadBytes } from '../web/app/assets/asset-manifest.js';
 import {
   PERFORMANCE_CUTOVER_TARGETS,
   PERFORMANCE_REGRESSION_CEILINGS,
@@ -15,17 +15,42 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const sourceRoot = path.join(repoRoot, 'YAKOLAK_PORTABLE_KIT/assets');
 
 function groupBytes(group) {
-  return ASSET_LIST.filter((asset) => asset.group === group).reduce((sum, asset) => sum + asset.source.bytes, 0);
+  return ASSET_LIST.filter((asset) => asset.group === group).reduce((sum, asset) => sum + runtimePayloadBytes(asset), 0);
+}
+
+function glbDecodedGeometryBytes(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  assert.equal(view.getUint32(0, true), 0x46546c67, 'GLB magic');
+  const jsonLength = view.getUint32(12, true);
+  assert.equal(view.getUint32(16, true), 0x4e4f534a, 'GLB JSON chunk');
+  const gltf = JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + jsonLength)).trim());
+  const used = new Set();
+  for (const mesh of gltf.meshes || []) {
+    for (const primitive of mesh.primitives || []) {
+      for (const accessorIndex of [primitive.attributes?.POSITION, primitive.attributes?.NORMAL, primitive.indices]) {
+        const accessor = gltf.accessors?.[accessorIndex];
+        assert.ok(accessor, `missing GLB accessor ${accessorIndex}`);
+        used.add(accessor.bufferView);
+      }
+    }
+  }
+  return [...used].reduce((sum, index) => sum + gltf.bufferViews[index].byteLength, 0);
 }
 
 async function decodedGeometryBytes() {
   let total = 0;
-  for (const asset of ASSET_LIST.filter((entry) => entry.runtime.type === 'stl' && entry.runtimeRequired)) {
-    const bytes = await readFile(path.join(sourceRoot, asset.source.path));
-    assert.ok(bytes.length >= 84, `${asset.source.path} must be binary STL`);
-    const triangles = bytes.readUInt32LE(80);
-    assert.equal(84 + triangles * 50, bytes.length, `${asset.source.path} binary STL length drift`);
-    total += triangles * 3 * 3 * 4 * 2; // position + normal Float32 arrays, matching STLLoader non-indexed decode.
+  for (const asset of ASSET_LIST.filter((entry) => entry.runtimeRequired && ['stl', 'glb-components'].includes(entry.runtime.type))) {
+    if (asset.runtime.type === 'stl') {
+      const bytes = await readFile(path.join(sourceRoot, asset.source.path));
+      assert.ok(bytes.length >= 84, `${asset.source.path} must be binary STL`);
+      const triangles = bytes.readUInt32LE(80);
+      assert.equal(84 + triangles * 50, bytes.length, `${asset.source.path} binary STL length drift`);
+      total += triangles * 3 * 3 * 4 * 2; // STLLoader: non-indexed position + normal Float32 arrays.
+    } else {
+      const runtimePath = asset.runtime.url.split('?')[0].replace(/^\//, '');
+      const bytes = await readFile(path.join(repoRoot, 'web', runtimePath));
+      total += glbDecodedGeometryBytes(bytes);
+    }
   }
   return total;
 }
@@ -54,7 +79,7 @@ test('representative mobile profile is fixed and DPR rendering remains capped', 
   assert.equal(REPRESENTATIVE_MOBILE_PROFILE.latencyMs, 150);
 });
 
-test('current manifest transfer bytes stay under hard regression ceilings', () => {
+test('current runtime transfer bytes stay under hard regression ceilings', () => {
   const boot = groupBytes('boot-critical');
   const scene = groupBytes('scene-critical');
   const optional = groupBytes('optional');
