@@ -13,13 +13,11 @@ var _ux46_marker_generation: int = 0
 var _ux46_pointer_started_usec: int = 0
 var _ux46_pointer_kind: String = ""
 var _ux46_selection_serial: int = 0
-var _ux46_idle_serial: int = 0
 var _ux46_test_enabled: bool = false
 var _ux46_start_requested: bool = false
 var _ux46_start_callback: Variant
 var _ux46_clear_callback: Variant
 var _ux46_refresh_callback: Variant
-var _ux46_idle_frame_callback: Variant
 
 
 func _ready() -> void:
@@ -37,13 +35,11 @@ func _ready() -> void:
 	_ux46_start_callback = JavaScriptBridge.create_callback(_on_web_ux46_start_pass_play)
 	_ux46_clear_callback = JavaScriptBridge.create_callback(_on_web_ux46_clear_selection)
 	_ux46_refresh_callback = JavaScriptBridge.create_callback(_on_web_ux46_refresh_pick_targets)
-	_ux46_idle_frame_callback = JavaScriptBridge.create_callback(_on_web_ux46_measure_idle_frame)
 	var window: JavaScriptObject = JavaScriptBridge.get_interface("window")
 	if window != null:
 		window.set("yakolakUx46StartPassPlay", _ux46_start_callback)
 		window.set("yakolakUx46ClearSelection", _ux46_clear_callback)
 		window.set("yakolakUx46RefreshPickTargets", _ux46_refresh_callback)
-		window.set("yakolakUx46MeasureIdleFrame", _ux46_idle_frame_callback)
 	JavaScriptBridge.eval("document.body.dataset.yakolakUxSelect46Bridge='ready';", true)
 
 
@@ -203,21 +199,6 @@ func _ux46_finish_after_selected_frame(
 		)
 
 
-func _ux46_measure_idle_frame(serial: int) -> void:
-	# A control measurement from the same Godot render signal separates software-
-	# renderer scheduling from selection processing. It mutates no game state.
-	var started_usec: int = Time.get_ticks_usec()
-	await RenderingServer.frame_post_draw
-	if not _ux46_test_enabled:
-		return
-	var idle_ms: float = maxf(0.0, float(Time.get_ticks_usec() - started_usec) / 1000.0)
-	JavaScriptBridge.eval(
-		"document.body.dataset.yakolakUxSelect46IdleSerial='%d';" % serial +
-		"document.body.dataset.yakolakUxSelect46IdleFrameMs='%.3f';" % idle_ms,
-		true
-	)
-
-
 func _on_web_ux46_start_pass_play(_arguments: Array) -> void:
 	if not _ux46_test_enabled or match_initialized:
 		return
@@ -236,10 +217,3 @@ func _on_web_ux46_refresh_pick_targets(_arguments: Array) -> void:
 	# Reuse the production mesh-triangle resolver; this hook only requests that the
 	# already-existing exact target coordinates be published for Playwright.
 	_publish_piece_test_targets()
-
-
-func _on_web_ux46_measure_idle_frame(_arguments: Array) -> void:
-	if not _ux46_test_enabled or not match_initialized or not gameplay_ready:
-		return
-	_ux46_idle_serial += 1
-	_ux46_measure_idle_frame(_ux46_idle_serial)
