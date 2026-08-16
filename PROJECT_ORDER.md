@@ -1,5 +1,15 @@
 # مسار تطوير YAKOLAK
 
+## استثناء مؤقت لترحيل Three.js
+
+حتى تنفيذ cutover صريح لاحقًا، ينطبق الاستثناء التالي **فقط** على `threejs-rebuild`:
+
+- `threejs-rebuild` هو مساحة العمل الوحيدة لإعادة بناء Three.js ولكل مهام `THREEJS-*`.
+- يبقى `main` مسار Godot المعتمد، ويبقى https://yakolak.vercel.app/ هو Godot Production حتى cutover صريح.
+- لا يُنشأ أي فرع ترحيل إضافي، ولا سلسلة Pull Requests، ولا مسار نشر منافس أو بديل.
+- لا تنتقل تغييرات Three.js إلى `main` أو Production إلا ضمن مهمة cutover صريحة لاحقة.
+- بقية هذا الملف يظل حاكمًا لمسار `main`/Godot، ولا يوسّع هذا الاستثناء نطاقه خارج `threejs-rebuild`.
+
 ## النظام المعتمد
 
 المشروع كله في وضع **Flash Mode** للتطوير المباشر.
