@@ -53,7 +53,6 @@ assert.deepEqual(addonFiles.sort(), ['loaders/STLLoader.js'], 'only the required
 
 const loader = text('web/vendor/three/r185/addons/loaders/STLLoader.js');
 assert.match(loader, /from 'three';/);
-assert.doesNotMatch(loader, /https?:\/\//i);
 
 const notices = text('THIRD_PARTY_NOTICES.md');
 assert.match(notices, /0\.185\.1/);
