@@ -48,11 +48,11 @@ jobs:
       - name: Verify context recovery and session invariants
         run: node tests/threejs_context_recovery_contract.test.mjs
 
+      - name: Install runtime and browser verifier dependencies
+        run: npm install --no-save --package-lock=false playwright@1.55.0
+
       - name: Verify live online exactly-once and authoritative seat contract
         run: node tests/online_exactly_once_contract.test.mjs
-
-      - name: Install browser verifier only
-        run: npm install --no-save --package-lock=false playwright@1.55.0
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
