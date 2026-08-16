@@ -3,7 +3,15 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
-import { ASSET_LIST, ASSET_GROUPS, PORTABLE_MANIFEST, unavailableRequiredAssets } from '../web/app/assets/asset-manifest.js';
+import {
+  ASSET_LIST,
+  ASSET_GROUPS,
+  ASSETS,
+  PORTABLE_MANIFEST,
+  runtimePayloadBytes,
+  runtimePayloadGitBlobSha,
+  unavailableRequiredAssets,
+} from '../web/app/assets/asset-manifest.js';
 import {
   AssetGroupLoadError,
   AssetIntegrityError,
@@ -35,7 +43,7 @@ function response(body, status = 200) {
   return new Response(bytes, { status, headers: { 'content-length': String(bytes.byteLength) } });
 }
 
-test('runtime manifest exactly covers definitive portable manifest with immutable identifiers', () => {
+test('runtime manifest exactly covers definitive portable sources while derived payloads keep their own immutable identities', () => {
   assert.equal(gitBlobSha(portableBytes), PORTABLE_MANIFEST.gitBlobSha);
   assert.deepEqual(ASSET_LIST.map((asset) => asset.source.path).sort(), portable.assets.map((asset) => asset.path).sort());
   assert.equal(ASSET_LIST.length, 18);
@@ -47,12 +55,21 @@ test('runtime manifest exactly covers definitive portable manifest with immutabl
     assert.equal(asset.runtimeRequired, portableEntry.required);
     assert.ok(ASSET_GROUPS[asset.group]);
     assert.match(asset.source.gitBlobSha, /^[0-9a-f]{40}$/);
-    assert.equal(asset.runtime.versionId, `git:${asset.source.gitBlobSha}`);
-    assert.equal(asset.runtime.integrity, `git-blob-sha1:${asset.source.gitBlobSha}`);
-    assert.match(asset.runtime.url, new RegExp(`^/runtime-assets/.+\\?v=${asset.source.gitBlobSha}$`));
+    assert.match(runtimePayloadGitBlobSha(asset), /^[0-9a-f]{40}$/);
+    assert.ok(Number.isInteger(runtimePayloadBytes(asset)) && runtimePayloadBytes(asset) > 0);
+    assert.equal(asset.runtime.versionId, `git:${runtimePayloadGitBlobSha(asset)}`);
+    assert.equal(asset.runtime.integrity, `git-blob-sha1:${runtimePayloadGitBlobSha(asset)}`);
+    assert.match(asset.runtime.url, new RegExp(`\\?v=${runtimePayloadGitBlobSha(asset)}$`));
     if (portableEntry.required) assert.equal(ASSET_GROUPS[asset.group].blocking, true);
     else assert.equal(asset.group, 'optional');
   }
+
+  assert.equal(ASSETS.boardAndLid.source.path, 'models/board-and-lid.stl');
+  assert.equal(ASSETS.boardAndLid.source.gitBlobSha, '024d109cea081d65eedc067b2fdaac46c9c10227');
+  assert.equal(ASSETS.boardAndLid.runtime.type, 'glb-components');
+  assert.equal(ASSETS.boardAndLid.runtime.url, '/assets/models/board-and-lid.glb?v=4e56d8ca053cd4e8e0c08cffbe8bff130192b8d8');
+  assert.equal(runtimePayloadBytes(ASSETS.boardAndLid), 2594764);
+  assert.equal(runtimePayloadGitBlobSha(ASSETS.boardAndLid), '4e56d8ca053cd4e8e0c08cffbe8bff130192b8d8');
 
   assert.deepEqual(unavailableRequiredAssets('boot-critical'), []);
   assert.deepEqual(unavailableRequiredAssets('scene-critical'), []);
