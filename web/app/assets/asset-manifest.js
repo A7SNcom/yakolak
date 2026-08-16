@@ -1,5 +1,5 @@
 // THREEJS-015 — runtime assets derived exactly from YAKOLAK_PORTABLE_KIT/assets/manifest.json.
-// The portable kit is canonical; this file only classifies and versions browser runtime resources.
+// The portable kit is canonical; runtime payload metadata may point at deterministic derived assets.
 
 export const PORTABLE_MANIFEST = Object.freeze({
   path: 'YAKOLAK_PORTABLE_KIT/assets/manifest.json',
@@ -19,25 +19,31 @@ function source(path, role, required, gitBlobSha, bytes) {
   return Object.freeze({ path, role, required, gitBlobSha, bytes });
 }
 
-function runtime(path, type, gitBlobSha) {
+function runtime(path, type, gitBlobSha, bytes) {
+  const urlPath = path.startsWith('/') ? path : `${RUNTIME_ROOT}/${path}`;
   return Object.freeze({
-    url: `${RUNTIME_ROOT}/${path}?v=${gitBlobSha}`,
+    url: `${urlPath}?v=${gitBlobSha}`,
     type,
     ready: true,
     versionId: `git:${gitBlobSha}`,
     integrity: `git-blob-sha1:${gitBlobSha}`,
+    gitBlobSha,
+    bytes,
   });
 }
 
-function asset(logicalId, group, sourceInfo, type) {
+function asset(logicalId, group, sourceInfo, type, runtimeOverride = null) {
   return Object.freeze({
     logicalId,
     group,
     source: sourceInfo,
-    runtime: runtime(sourceInfo.path, type, sourceInfo.gitBlobSha),
+    runtime: runtimeOverride || runtime(sourceInfo.path, type, sourceInfo.gitBlobSha, sourceInfo.bytes),
     runtimeRequired: sourceInfo.required,
   });
 }
+
+const boardAndLidSource = source('models/board-and-lid.stl', 'board-and-intro-lid', true, '024d109cea081d65eedc067b2fdaac46c9c10227', 3114084);
+const boardAndLidRuntime = runtime('/assets/models/board-and-lid.glb', 'glb-components', '4e56d8ca053cd4e8e0c08cffbe8bff130192b8d8', 2594764);
 
 export const ASSETS = Object.freeze({
   gameLogo: asset('brand.yakolak-logo', 'boot-critical', source('logos/YAKOLAK.svg', 'official-game-logo', true, 'ee3703615cd42c4979a0001f1261014f108c6956', 5736), 'text'),
@@ -48,7 +54,7 @@ export const ASSETS = Object.freeze({
   approvedContract: asset('data.approved-contract', 'boot-critical', source('reference/approved-contract.json', 'rules-materials-lighting-icons-audio-motion-network-reference', true, '46f2ce804dab8d77f4d1287746c180fa2b38fee4', 5261), 'json'),
 
   introScatter: asset('data.intro-scatter', 'scene-critical', source('layout/intro-scatter.csv', 'exact-36-piece-intro-start-transforms', true, '429265cd6a5c5474bdfa75c811963c743a057bd8', 2452), 'text'),
-  boardAndLid: asset('model.board-and-lid', 'scene-critical', source('models/board-and-lid.stl', 'board-and-intro-lid', true, '024d109cea081d65eedc067b2fdaac46c9c10227', 3114084), 'stl'),
+  boardAndLid: asset('model.board-and-lid', 'scene-critical', boardAndLidSource, 'stl', boardAndLidRuntime),
   playerBase: asset('model.player-base', 'scene-critical', source('models/player-base.stl', 'player-base', true, '066b3f95f5281a178b610611075cbab0689cdb12', 9955084), 'stl'),
   pieceSmall: asset('model.piece-small', 'scene-critical', source('models/piece-small.stl', 'small-piece', true, '531812323efe43f7679f509f1ae06980227521a8', 5884), 'stl'),
   pieceMedium: asset('model.piece-medium', 'scene-critical', source('models/piece-medium.stl', 'medium-piece', true, 'c32fc5cc37664af7860b3aa6e33e12b04eefa757', 12084), 'stl'),
@@ -65,3 +71,5 @@ export const ASSETS = Object.freeze({
 export const ASSET_LIST = Object.freeze(Object.values(ASSETS));
 export const assetsForGroup = (group) => ASSET_LIST.filter((entry) => entry.group === group);
 export const unavailableRequiredAssets = (group) => assetsForGroup(group).filter((entry) => entry.runtimeRequired && !entry.runtime.ready);
+export const runtimePayloadBytes = (asset) => asset.runtime.bytes ?? asset.source.bytes;
+export const runtimePayloadGitBlobSha = (asset) => asset.runtime.gitBlobSha ?? asset.source.gitBlobSha;
