@@ -6,14 +6,17 @@ on:
     paths:
       - 'scripts/analyze-threejs-board-lid.mjs'
       - 'scripts/verify-threejs-board-lid.mjs'
-      - 'web/app/scene/board-and-lid.js'
-      - 'web/assets/models/board-and-lid-layout.json'
+      - 'scripts/convert-threejs-assets.mjs'
+      - 'scripts/lib/asset-conversion-pipeline.mjs'
+      - 'scripts/lib/board-lid-semantic-glb.mjs'
+      - 'web/assets/models/board-and-lid.glb'
+      - 'web/assets/models/conversion-state.json'
       - 'tests/threejs_board_and_lid_contract.test.mjs'
       - '.github/workflows/threejs-018-board-lid.yml'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -25,17 +28,22 @@ jobs:
           node-version: '22.x'
       - name: Inspect canonical board and lid geometry
         run: node scripts/analyze-threejs-board-lid.mjs
-      - name: Verify committed deterministic asset conversion
-        run: npm run assets:check -- --only=model.board-and-lid
-      - name: Run THREEJS-018 contract test when present
+      - name: Generate semantic board and lid GLB
+        run: npm run assets:convert -- --only=model.board-and-lid
+      - name: Verify semantic geometry and authoritative layout
+        run: node scripts/verify-threejs-board-lid.mjs
+      - name: Run THREEJS-018 contract test
+        run: node --test tests/threejs_board_and_lid_contract.test.mjs
+      - name: Commit deterministic runtime asset
         shell: bash
         run: |
-          if [[ -f tests/threejs_board_and_lid_contract.test.mjs ]]; then
-            node --test tests/threejs_board_and_lid_contract.test.mjs
+          if git diff --quiet -- web/assets/models/board-and-lid.glb web/assets/models/conversion-state.json; then
+            echo 'Semantic runtime asset already committed.'
+            exit 0
           fi
-      - name: Run semantic geometry verifier when present
-        shell: bash
-        run: |
-          if [[ -f scripts/verify-threejs-board-lid.mjs ]]; then
-            node scripts/verify-threejs-board-lid.mjs
-          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/assets/models/board-and-lid.glb web/assets/models/conversion-state.json
+          git commit -m 'THREEJS-018 commit semantic board lid runtime asset'
+          git pull --rebase origin threejs-rebuild
+          git push origin HEAD:threejs-rebuild
