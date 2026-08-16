@@ -8,6 +8,7 @@ const gameplayNestedPick = fs.readFileSync(new URL('../scripts/gameplay_session_
 const gameplayDesign = fs.readFileSync(new URL('../scripts/gameplay_design_system.gd', import.meta.url), 'utf8');
 const authoritativeTurn = fs.readFileSync(new URL('../scripts/gameplay_authoritative_turn_state.gd', import.meta.url), 'utf8');
 const turnTransition = fs.readFileSync(new URL('../scripts/gameplay_turn_transition_stale_safe.gd', import.meta.url), 'utf8');
+const selectedState = fs.readFileSync(new URL('../scripts/gameplay_selected_state.gd', import.meta.url), 'utf8');
 const turnHud = fs.readFileSync(new URL('../scripts/turn_clarity_hud.gd', import.meta.url), 'utf8');
 const turnHudDesign = fs.readFileSync(new URL('../scripts/turn_clarity_hud_design_system.gd', import.meta.url), 'utf8');
 const setup = fs.readFileSync(new URL('../scripts/session_setup_arabic.gd', import.meta.url), 'utf8');
@@ -37,7 +38,8 @@ assert.ok(setupDialog.includes('extends "res://scripts/session_setup_flow.gd"'),
 assert.ok(setupFlow.includes('extends "res://scripts/session_setup_arabic.gd"'), 'the user-journey layer must preserve the Arabic setup layer');
 assert.ok(scene.includes('res://scripts/gameplay_design_system.gd'), 'gameplay chrome must use the shared design adapter');
 assert.ok(gameplayDesign.includes('extends "res://scripts/gameplay_rematch_lifecycle.gd"'), 'gameplay design must preserve the rematch/gameplay chain');
-assert.ok(scene.includes('res://scripts/gameplay_turn_transition_stale_safe.gd'), 'production gameplay must use the stale-safe turn presentation layer');
+assert.ok(scene.includes('res://scripts/gameplay_selected_state.gd'), 'production gameplay must use the selected-state presentation leaf');
+assert.ok(selectedState.includes('extends "res://scripts/gameplay_turn_transition_stale_safe.gd"'), 'selected-state presentation must preserve the stale-safe turn presentation layer');
 assert.ok(turnTransition.includes('extends "res://scripts/gameplay_authoritative_turn_state.gd"'), 'stale-safe presentation must preserve the authoritative turn observer layer');
 assert.ok(authoritativeTurn.includes('signal authoritative_turn_changed'), 'turn presentation must subscribe to one authoritative gameplay event');
 assert.ok(authoritativeTurn.includes('authoritative_online_snapshot_hydrated'), 'reconnect must stay hidden until a fresh accepted room snapshot hydrates turn state');
