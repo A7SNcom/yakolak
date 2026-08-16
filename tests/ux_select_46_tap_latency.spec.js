@@ -36,14 +36,13 @@ async function startPassPlay(page) {
   await page.goto(`${BASE_URL}/?yakolakTestFast=1&uxSelect46=1`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
     () => document.body.dataset.yakolakIntro === 'complete' &&
-      document.body.dataset.yakolakSetup === 'visible' &&
-      typeof window.yakolakTestStartPassPlay === 'function' &&
-      typeof window.yakolakTestClearSelection === 'function' &&
+      typeof window.yakolakUx46StartPassPlay === 'function' &&
+      typeof window.yakolakUx46ClearSelection === 'function' &&
       typeof window.yakolakTestRefreshPickTargets === 'function',
     null,
     { timeout: 60000 },
   );
-  await page.evaluate(() => window.yakolakTestStartPassPlay());
+  await page.evaluate(() => window.yakolakUx46StartPassPlay());
   await page.waitForFunction(
     () => document.body.dataset.yakolakGameplay === 'ready' &&
       document.body.dataset.yakolakCurrentPlayer === 'right' &&
@@ -84,14 +83,12 @@ async function tap(page, mode, target) {
 }
 
 async function clear(page) {
-  await page.evaluate(() => window.yakolakTestClearSelection());
+  await page.evaluate(() => window.yakolakUx46ClearSelection());
   await page.waitForFunction(
     () => (document.body.dataset.yakolakSelected || '') === '' && document.body.dataset.yakolakGameplay === 'ready',
     null,
     { timeout: 5000 },
   );
-  // The tray close animation is presentation only. Let it settle before the next
-  // sample so each tap starts from the same rendered geometry.
   await page.waitForTimeout(340);
 }
 
@@ -173,8 +170,6 @@ async function rapidTapInvariant(browser, mode) {
     const targets = await refreshTargets(page);
     const beforeSerial = await page.evaluate(() => Number(document.body.dataset.yakolakUxSelect46Serial || 0));
 
-    // Distinct stack taps bypass same-point debounce and exercise stale deferred
-    // work. No move target is tapped, so this can never submit an authoritative move.
     await tap(page, mode, targets.side0);
     await tap(page, mode, targets.side1);
 
