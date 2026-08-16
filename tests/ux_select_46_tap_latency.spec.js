@@ -35,7 +35,7 @@ function contextOptions(mode) {
 async function startPassPlay(page) {
   await page.goto(`${BASE_URL}/?yakolakTestFast=1&uxSelect46=1`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
-    () => document.body.dataset.yakolakIntro === 'complete' &&
+    () => document.body.dataset.yakolakIntroHandoffEvent === 'consumed' &&
       typeof window.yakolakUx46StartPassPlay === 'function' &&
       typeof window.yakolakUx46ClearSelection === 'function' &&
       typeof window.yakolakTestRefreshPickTargets === 'function',
