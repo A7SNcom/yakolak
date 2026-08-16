@@ -25,10 +25,11 @@ const DIRECTION_COLOR: Dictionary = {
 	"back": "blue",
 }
 const STONE_COLORS: Dictionary = {
-	"marble": Color("#ffffff"),
-	"gold": Color("#8a570f"),
-	"green": Color("#006144"),
-	"blue": Color("#001f8f"),
+	# Approved neutral gameplay palette from the stable portable contract.
+	"marble": Color("#f1eee6"),
+	"gold": Color("#b78a44"),
+	"green": Color("#2f856a"),
+	"blue": Color("#3769a5"),
 }
 
 # Exact accepted Three.js timing values, milliseconds.
@@ -89,7 +90,11 @@ func _ready() -> void:
 	if failed:
 		_publish_error("asset-load")
 		return
-	_restart_intro()
+	# Free-play opens on the final, stable table immediately. There is no intro,
+	# setup flow, player-count choice, or colour choice in this build.
+	_snap_final()
+	playing = false
+	_publish_complete()
 
 
 func _process(_delta: float) -> void:
@@ -105,50 +110,47 @@ func _process(_delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventScreenTouch and event.pressed:
-		_restart_intro()
-	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_restart_intro()
-	elif event is InputEventKey and event.pressed and event.keycode == KEY_R:
-		_restart_intro()
+	# All pointer input belongs to the free-play controller. The stable scene is
+	# never replayed as an intro.
+	pass
 
 
 func _build_environment() -> void:
 	var world: WorldEnvironment = WorldEnvironment.new()
 	var environment: Environment = Environment.new()
 	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color("#777777")
+	environment.background_color = Color("#c9c8c3")
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color("#fff5e6")
-	environment.ambient_light_energy = 0.62
+	environment.ambient_light_color = Color("#f4f2ed")
+	environment.ambient_light_energy = 0.38
 	environment.tonemap_mode = Environment.TONE_MAPPER_ACES
-	environment.tonemap_exposure = 1.04
+	environment.tonemap_exposure = 0.82
 	world.environment = environment
 	add_child(world)
 
 	var key: DirectionalLight3D = DirectionalLight3D.new()
 	key.rotation_degrees = Vector3(-52.0, -42.0, 0.0)
-	key.light_color = Color("#ffe8c8")
-	key.light_energy = 1.15
+	key.light_color = Color("#fff8ed")
+	key.light_energy = 0.82
 	key.shadow_enabled = true
 	add_child(key)
 
 	var fill: DirectionalLight3D = DirectionalLight3D.new()
 	fill.rotation_degrees = Vector3(-38.0, 136.0, 0.0)
-	fill.light_color = Color("#c8d8ff")
-	fill.light_energy = 0.28
+	fill.light_color = Color("#dce8f4")
+	fill.light_energy = 0.16
 	add_child(fill)
 
 	var rim: DirectionalLight3D = DirectionalLight3D.new()
 	rim.rotation_degrees = Vector3(-34.0, -145.0, 0.0)
 	rim.light_color = Color.WHITE
-	rim.light_energy = 0.38
+	rim.light_energy = 0.14
 	add_child(rim)
 
 	var top: OmniLight3D = OmniLight3D.new()
 	top.position = Vector3(0.0, 8.4, 0.0)
-	top.light_color = Color("#fff1d6")
-	top.light_energy = 0.24
+	top.light_color = Color("#fff4e2")
+	top.light_energy = 0.10
 	top.omni_range = 20.8
 	add_child(top)
 
