@@ -10,7 +10,7 @@
       "logicalId": "model.board-and-lid",
       "sourcePath": "YAKOLAK_PORTABLE_KIT/assets/models/board-and-lid.stl",
       "outputPath": "web/assets/models/board-and-lid.glb",
-      "conversionProfile": "yakolak-board-intro-lid-v1",
+      "conversionProfile": "yakolak-board-intro-lid-v2",
       "sourceSha256": "e906901cbdc3a15c28912b5966a12dbf75a9b85d8cbeb890585c974e0c12def4",
       "sourceGitBlobSha1": "024d109cea081d65eedc067b2fdaac46c9c10227",
       "sourceBytes": 3114084,
@@ -19,20 +19,20 @@
         "version": "1.0.0",
         "node": "22.x"
       },
-      "outputSha256": "15c20b66904087a66ffc8b60a9344a750b0f5186418f25b1344438259656c3b1",
-      "outputBytes": 2596032,
+      "outputSha256": "014f272a992c7841c35cfe08d16b9037fb68df1281c4be37737d353d8e1ae264",
+      "outputBytes": 2595544,
       "triangleCount": 62280,
       "componentCount": 29,
       "transformPolicy": "identity-no-center-no-scale-no-rotation",
       "normalPolicy": "source-face-normal-normalized; computed only when source normal is zero/invalid",
       "componentPolicy": "connected-by-exact-float32-shared-vertex; stable first-triangle order",
-      "semanticProfile": "yakolak-board-intro-lid-v1",
+      "semanticProfile": "yakolak-board-intro-lid-v2",
       "sourcePivot": [
         90.00003051757812,
         90,
         6
       ],
-      "pivotPolicy": "full-source-bounds-center-owned-by-semantic-geometry-child"
+      "pivotPolicy": "full-source-bounds-center-applied-only-by-runtime-addressable-wrapper"
     },
     "model.piece-large": {
       "logicalId": "model.piece-large",
