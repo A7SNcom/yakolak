@@ -13,20 +13,59 @@ var _ux46_marker_generation: int = 0
 var _ux46_pointer_started_usec: int = 0
 var _ux46_pointer_kind: String = ""
 var _ux46_selection_serial: int = 0
+var _ux46_test_enabled: bool = false
+var _ux46_start_requested: bool = false
 var _ux46_start_callback: Variant
 var _ux46_clear_callback: Variant
+var _ux46_refresh_callback: Variant
 
 
 func _ready() -> void:
 	super._ready()
-	if not OS.has_feature("web") or not browser_automation:
+	if not OS.has_feature("web"):
+		return
+	# The focused bridge is available only to webdriver or an explicit task query.
+	# Normal Production visits pay no test-hook cost and cannot enter this path.
+	_ux46_test_enabled = browser_automation or bool(JavaScriptBridge.eval(
+		"new URLSearchParams(window.location.search).has('uxSelect46')",
+		true
+	))
+	if not _ux46_test_enabled:
 		return
 	_ux46_start_callback = JavaScriptBridge.create_callback(_on_web_ux46_start_pass_play)
 	_ux46_clear_callback = JavaScriptBridge.create_callback(_on_web_ux46_clear_selection)
+	_ux46_refresh_callback = JavaScriptBridge.create_callback(_on_web_ux46_refresh_pick_targets)
 	var window: JavaScriptObject = JavaScriptBridge.get_interface("window")
 	if window != null:
 		window.set("yakolakUx46StartPassPlay", _ux46_start_callback)
 		window.set("yakolakUx46ClearSelection", _ux46_clear_callback)
+		window.set("yakolakUx46RefreshPickTargets", _ux46_refresh_callback)
+	JavaScriptBridge.eval("document.body.dataset.yakolakUxSelect46Bridge='ready';", true)
+
+
+func _process(delta: float) -> void:
+	super._process(delta)
+	if not _ux46_start_requested or match_initialized:
+		return
+	# Do not guess about lifecycle timing from DOM labels. Start through the same
+	# configuration boundary only after gameplay has consumed the intro handoff and
+	# captured every physical home transform/material.
+	if not waiting_for_setup:
+		return
+	if piece_records.is_empty() or home_transforms.size() != piece_records.size() or home_materials.size() != piece_records.size():
+		return
+	_ux46_start_requested = false
+	if setup != null:
+		setup.call("reset_for_intro")
+	_on_configuration_ready({
+		"tutorial": false,
+		"rounds": 3,
+		"players": [
+			{"seat": "p1", "label": "أنا", "mode": "local", "color": "marble", "color_name": "أبيض", "direction": "right"},
+			{"seat": "p2", "label": "اللاعب 2", "mode": "local", "color": "blue", "color_name": "أزرق", "direction": "back"},
+		],
+		"online_join_code": "",
+	})
 
 
 func _input(event: InputEvent) -> void:
@@ -138,7 +177,7 @@ func _ux46_finish_after_selected_frame(
 
 	# Publish the first-draw measurement before painting secondary legal markers,
 	# so the metric represents selected-state feedback rather than hint rendering.
-	if OS.has_feature("web") and browser_automation:
+	if OS.has_feature("web") and _ux46_test_enabled:
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakUxSelect46Serial='%d';" % serial +
 			"document.body.dataset.yakolakUxSelect46Owner=" + JSON.stringify(owner_name) + ";" +
@@ -152,7 +191,7 @@ func _ux46_finish_after_selected_frame(
 	# Preserve the exact production marker pulse/material behavior; only its work is
 	# moved behind the first selected-state frame.
 	super._update_legal_markers(size_name, piece_color)
-	if OS.has_feature("web") and browser_automation:
+	if OS.has_feature("web") and _ux46_test_enabled:
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakUxSelect46MarkerSerial='%d';" % serial +
 			"document.body.dataset.yakolakUxSelect46MarkerOwner=" + JSON.stringify(owner_name) + ";",
@@ -161,26 +200,20 @@ func _ux46_finish_after_selected_frame(
 
 
 func _on_web_ux46_start_pass_play(_arguments: Array) -> void:
-	if not browser_automation or match_initialized:
+	if not _ux46_test_enabled or match_initialized:
 		return
-	# The current Flash entry intentionally no longer exposes the old broad setup
-	# test callback. This focused hook enters the same configuration boundary and
-	# exists only under navigator.webdriver.
-	waiting_for_setup = true
-	if setup != null:
-		setup.call("reset_for_intro")
-	_on_configuration_ready({
-		"tutorial": false,
-		"rounds": 3,
-		"players": [
-			{"seat": "p1", "label": "أنا", "mode": "local", "color": "marble", "color_name": "أبيض", "direction": "right"},
-			{"seat": "p2", "label": "اللاعب 2", "mode": "local", "color": "blue", "color_name": "أزرق", "direction": "back"},
-		],
-		"online_join_code": "",
-	})
+	_ux46_start_requested = true
 
 
 func _on_web_ux46_clear_selection(_arguments: Array) -> void:
-	if not browser_automation or not match_initialized:
+	if not _ux46_test_enabled or not match_initialized:
 		return
 	_clear_selection()
+
+
+func _on_web_ux46_refresh_pick_targets(_arguments: Array) -> void:
+	if not _ux46_test_enabled or not match_initialized or not gameplay_ready or camera == null:
+		return
+	# Reuse the production mesh-triangle resolver; this hook only requests that the
+	# already-existing exact target coordinates be published for Playwright.
+	_publish_piece_test_targets()
