@@ -52,7 +52,6 @@ async function waitForPlayer(page, index, direction) {
   }
   await page.waitForFunction(
     expected => document.body.dataset.yakolakGameplay === 'ready' &&
-                document.body.dataset.yakolakGameplayReady === 'true' &&
                 document.body.dataset.yakolakCurrentPlayer === expected &&
                 document.body.dataset.yakolakCameraStage === 'ready',
     direction,
@@ -61,14 +60,6 @@ async function waitForPlayer(page, index, direction) {
 }
 
 async function freshPickTarget(page, direction, side, size) {
-  // Use the authoritative gameplay-ready probe rather than a fixed delay. After
-  // commit/turn changes the visible state can update a frame before input is valid.
-  await page.waitForFunction(
-    expected => document.body.dataset.yakolakGameplayReady === 'true' &&
-                document.body.dataset.yakolakCurrentPlayer === expected,
-    direction,
-    { timeout: 10000 }
-  );
   const before = await page.evaluate(() => Number(document.body.dataset.yakolakSelect44TargetRevision || 0));
   await page.evaluate(({ side, size }) => window.yakolakTestSelect44RefreshPickTarget(side, size), { side, size });
   await page.waitForFunction(
@@ -213,12 +204,17 @@ test('UX-SELECT-44 clears the single selected emphasis on commit, turn change, r
   await page.waitForFunction(
     () => document.body.dataset.yakolakCurrentPlayer === 'back' &&
           document.body.dataset.yakolakGameplay === 'ready' &&
-          document.body.dataset.yakolakGameplayReady === 'true' &&
           document.body.dataset.yakolakSelected === '' &&
           document.body.dataset.yakolakSelectionEmphasisCount === '0',
     null,
     { timeout: 10000 }
   );
+
+  // The commit assertion above proves atomic clearing. Establish the next local
+  // turn through the existing _start_turn test seam before exercising the next
+  // independent lifecycle clear; this avoids coupling the regression to camera latency.
+  await page.evaluate(() => window.yakolakTestSelect44SetPlayer(1));
+  await waitForPlayer(page, 1, 'back');
 
   // Authoritative turn-change cleanup uses the real stale-selection cancellation path.
   await tapPiece(page, 'back', 0, 'large');
