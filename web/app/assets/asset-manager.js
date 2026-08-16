@@ -1,4 +1,4 @@
-import { ASSET_LIST, ASSET_GROUPS, assetsForGroup, unavailableRequiredAssets } from './asset-manifest.js';
+import { ASSET_LIST, ASSET_GROUPS } from './asset-manifest.js';
 
 export class AssetUnavailableError extends Error {
   constructor(asset) {
@@ -67,20 +67,26 @@ export function createAssetManager({
 } = {}) {
   if (typeof fetchImpl !== 'function') throw new TypeError('Asset manager requires fetch');
 
-  const byId = new Map(manifest.map((asset) => [asset.logicalId, asset]));
-  const states = new Map(manifest.map((asset) => [asset.logicalId, initialState(asset)]));
+  const localManifest = Object.freeze([...manifest]);
+  const byId = new Map(localManifest.map((asset) => [asset.logicalId, asset]));
+  const states = new Map(localManifest.map((asset) => [asset.logicalId, initialState(asset)]));
   const cache = new Map();
   const inFlight = new Map();
   const listeners = new Set();
   if (typeof onProgress === 'function') listeners.add(onProgress);
 
+  function groupEntries(group) {
+    return localManifest.filter((asset) => asset.group === group);
+  }
+
   function groupSnapshot(group = null) {
-    const selected = group ? manifest.filter((asset) => asset.group === group) : manifest;
+    const selected = group ? groupEntries(group) : localManifest;
     const assetStates = selected.map((asset) => states.get(asset.logicalId));
+    const runtimeReadyCount = selected.filter((asset) => asset.runtime.ready).length;
     const knownTotals = assetStates.filter((state) => Number.isFinite(state.totalBytes));
     const loadedBytes = assetStates.reduce((sum, state) => sum + state.loadedBytes, 0);
     const totalKnownBytes = knownTotals.reduce((sum, state) => sum + state.totalBytes, 0);
-    const allTotalsKnown = selected.length > 0 && knownTotals.length === selected.filter((asset) => asset.runtime.ready).length;
+    const allTotalsKnown = runtimeReadyCount > 0 && knownTotals.length === runtimeReadyCount;
     return Object.freeze({
       group,
       totalAssets: selected.length,
@@ -205,8 +211,8 @@ export function createAssetManager({
 
   async function loadGroup(group, { signal = null, retry = false } = {}) {
     if (!ASSET_GROUPS[group]) throw new TypeError(`Unknown asset group: ${group}`);
-    const entries = assetsForGroup(group);
-    const blockers = unavailableRequiredAssets(group);
+    const entries = groupEntries(group);
+    const blockers = entries.filter((asset) => asset.runtimeRequired && !asset.runtime.ready);
     if (blockers.length) throw new AssetGroupNotReadyError(group, blockers);
 
     const settled = await Promise.allSettled(entries.map((asset) => loadAsset(asset.logicalId, { signal, retry })));
@@ -272,7 +278,7 @@ export function createAssetManager({
       return;
     }
     cache.clear();
-    for (const asset of manifest) if (!inFlight.has(asset.logicalId)) states.set(asset.logicalId, initialState(asset));
+    for (const asset of localManifest) if (!inFlight.has(asset.logicalId)) states.set(asset.logicalId, initialState(asset));
   }
 
   return Object.freeze({
