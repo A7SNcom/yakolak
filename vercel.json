@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "test -s web/index.html && { [ \"$VERCEL_GIT_COMMIT_REF\" != \"threejs-rebuild\" ] || { test -n \"$TURSO_DATABASE_URL\" && test -n \"$TURSO_AUTH_TOKEN\"; }; } && echo \"Using YAKOLAK web build\"",
+  "buildCommand": "test -s web/index.html && test -s web/styles/app.css && test -s web/app/boot/boot.js && test -s web/app/scene/renderer.js && test -s web/vendor/three/r185/three.module.js && test -s web/vendor/three/r185/three.core.js && ! find web -type f \\( -name '*.pck' -o -name '*.wasm' -o -name 'index.js' -o -name 'index.audio*.js' \\) -print -quit | grep -q . && ! grep -Eqi 'index\\.pck|index\\.wasm|index\\.audio|godot' web/index.html web/app/boot/boot.js web/app/scene/renderer.js && { [ \"$VERCEL_GIT_COMMIT_REF\" != \"threejs-rebuild\" ] || { test -n \"$TURSO_DATABASE_URL\" && test -n \"$TURSO_AUTH_TOKEN\"; }; } && echo \"Using YAKOLAK static Three.js shell\"",
   "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" = \"threejs-rebuild\" ]; then exit 1; fi; git log -1 --pretty=%s | grep -q '^\\[flash-ready\\]' && exit 1 || exit 0",
   "outputDirectory": "web",
   "framework": null,
