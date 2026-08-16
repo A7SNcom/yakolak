@@ -1,4 +1,4 @@
-# gate-run: 5
+# gate-run: 6
 name: UX-SELECT-46 focused regression
 
 on:
@@ -7,6 +7,7 @@ on:
     paths:
       - 'scripts/gameplay_selection_latency.gd'
       - 'scenes/intro.tscn'
+      - 'export_presets.cfg'
       - 'tests/ux_select_46_tap_latency.spec.js'
       - 'tests/ux_select_46_startup_probe.spec.js'
       - '.github/workflows/ux-select-46.yml'
