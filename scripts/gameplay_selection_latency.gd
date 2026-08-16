@@ -9,7 +9,6 @@ extends "res://scripts/gameplay_selected_state.gd"
 # render opportunity. A generation token cancels stale marker work on rapid taps.
 
 var _ux46_selection_material_cache: Dictionary = {}
-var _ux46_marker_material_cache: Dictionary = {}
 var _ux46_marker_generation: int = 0
 var _ux46_pointer_started_usec: int = 0
 var _ux46_pointer_kind: String = ""
@@ -150,32 +149,15 @@ func _ux46_finish_after_selected_frame(
 			true
 		)
 
-	_ux46_apply_legal_markers(size_name, piece_color)
+	# Preserve the exact production marker pulse/material behavior; only its work is
+	# moved behind the first selected-state frame.
+	super._update_legal_markers(size_name, piece_color)
 	if OS.has_feature("web") and browser_automation:
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakUxSelect46MarkerSerial='%d';" % serial +
 			"document.body.dataset.yakolakUxSelect46MarkerOwner=" + JSON.stringify(owner_name) + ";",
 			true
 		)
-
-
-func _ux46_apply_legal_markers(size_name: String, piece_color: Color) -> void:
-	var marker_color := Color(piece_color.r, piece_color.g, piece_color.b, 0.22)
-	var cache_key: String = marker_color.to_html(true)
-	var cached: Variant = _ux46_marker_material_cache.get(cache_key, null)
-	var marker_material: StandardMaterial3D
-	if cached is StandardMaterial3D:
-		marker_material = cached as StandardMaterial3D
-	else:
-		marker_material = _marker_material(marker_color)
-		_ux46_marker_material_cache[cache_key] = marker_material
-
-	for cell: int in range(target_markers.size()):
-		var marker: MeshInstance3D = target_markers[cell]
-		var legal: bool = _is_legal_cell(cell, size_name)
-		marker.visible = legal
-		if legal:
-			marker.material_override = marker_material
 
 
 func _on_web_ux46_start_pass_play(_arguments: Array) -> void:
