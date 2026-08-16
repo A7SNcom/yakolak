@@ -4,7 +4,9 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 const BASE_URL = (process.env.YAKOLAK_UX_SELECT_46_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
 const LABEL = process.env.YAKOLAK_UX_SELECT_46_LABEL || 'source';
 const ARTIFACT_DIR = `artifacts/ux-select-46-${LABEL}`;
-const ITERATIONS = Number(process.env.YAKOLAK_UX_SELECT_46_ITERATIONS || 24);
+const ITERATIONS = Number(process.env.YAKOLAK_UX_SELECT_46_ITERATIONS || 12);
+const PROCESSING_P95_BUDGET_MS = Number(process.env.YAKOLAK_UX_SELECT_46_PROCESSING_P95_MS || 80);
+const VISIBLE_P95_BUDGET_MS = Number(process.env.YAKOLAK_UX_SELECT_46_VISIBLE_P95_MS || 250);
 const ARGS = [
   '--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl',
   '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-dev-shm-usage',
@@ -36,7 +38,8 @@ async function startPassPlay(page) {
     () => document.body.dataset.yakolakIntro === 'complete' &&
       document.body.dataset.yakolakSetup === 'visible' &&
       typeof window.yakolakTestStartPassPlay === 'function' &&
-      typeof window.yakolakTestClearSelection === 'function',
+      typeof window.yakolakTestClearSelection === 'function' &&
+      typeof window.yakolakTestRefreshPickTargets === 'function',
     null,
     { timeout: 60000 },
   );
@@ -50,87 +53,69 @@ async function startPassPlay(page) {
   );
 }
 
-async function freshTarget(page) {
-  const hasRefreshHook = await page.evaluate(() => typeof window.yakolakTestRefreshPickTargets === 'function');
-  if (hasRefreshHook) {
-    const before = await page.evaluate(() => Number(document.body.dataset.yakolakPiecePickTargetRevision || 0));
-    await page.evaluate(() => window.yakolakTestRefreshPickTargets());
-    await page.waitForFunction(
-      previous => Number(document.body.dataset.yakolakPiecePickTargetRevision || 0) > previous,
-      before,
-      { timeout: 6000 },
-    );
-  } else {
-    // Canonical Production can intentionally lag source. Its browser bridge
-    // publishes the same visible large-piece coordinate on a short cadence,
-    // but predates the explicit refresh callback/revision used by latest main.
-    await page.waitForFunction(
-      () => Number(document.body.dataset.yakolakTestLargeX || document.body.dataset.yakolakTestPieceX || 0) > 0 &&
-        Number(document.body.dataset.yakolakTestLargeY || document.body.dataset.yakolakTestPieceY || 0) > 0,
-      null,
-      { timeout: 6000 },
-    );
-  }
-  const target = await page.evaluate(() => ({
-    x: Number(document.body.dataset.yakolakTestSide0LargeX || document.body.dataset.yakolakTestLargeX || document.body.dataset.yakolakTestPieceX || 0),
-    y: Number(document.body.dataset.yakolakTestSide0LargeY || document.body.dataset.yakolakTestLargeY || document.body.dataset.yakolakTestPieceY || 0),
+async function refreshTargets(page) {
+  const before = await page.evaluate(() => Number(document.body.dataset.yakolakPiecePickTargetRevision || 0));
+  await page.evaluate(() => window.yakolakTestRefreshPickTargets());
+  await page.waitForFunction(
+    previous => Number(document.body.dataset.yakolakPiecePickTargetRevision || 0) > previous,
+    before,
+    { timeout: 6000 },
+  );
+  const targets = await page.evaluate(() => ({
+    side0: {
+      x: Number(document.body.dataset.yakolakTestSide0LargeX || 0),
+      y: Number(document.body.dataset.yakolakTestSide0LargeY || 0),
+    },
+    side1: {
+      x: Number(document.body.dataset.yakolakTestSidePlus1LargeX || 0),
+      y: Number(document.body.dataset.yakolakTestSidePlus1LargeY || 0),
+    },
   }));
-  expect(target.x).toBeGreaterThan(0);
-  expect(target.y).toBeGreaterThan(0);
-  return target;
+  for (const target of [targets.side0, targets.side1]) {
+    expect(target.x).toBeGreaterThan(0);
+    expect(target.y).toBeGreaterThan(0);
+  }
+  return targets;
 }
 
-async function installProbe(page) {
-  await page.evaluate(() => {
-    window.__uxSelect46 = { eventAt: 0, selectedAt: 0, rafAt: 0, selected: '' };
-    const recordEvent = () => {
-      const state = window.__uxSelect46;
-      if (state && !state.eventAt) state.eventAt = performance.now();
-    };
-    addEventListener('pointerdown', recordEvent, true);
-    addEventListener('touchstart', recordEvent, true);
-    addEventListener('mousedown', recordEvent, true);
-    const observer = new MutationObserver(() => {
-      const selected = document.body.dataset.yakolakSelected || '';
-      const state = window.__uxSelect46;
-      if (!state || !selected || state.selectedAt) return;
-      state.selected = selected;
-      state.selectedAt = performance.now();
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (window.__uxSelect46 === state) state.rafAt = performance.now();
-        });
-      });
-    });
-    observer.observe(document.body, { attributes: true, attributeFilter: ['data-yakolak-selected'] });
-    window.__uxSelect46Observer = observer;
-  });
-}
-
-async function oneTap(page, mode, target) {
-  await page.evaluate(() => { window.__uxSelect46 = { eventAt: 0, selectedAt: 0, rafAt: 0, selected: '' }; });
-  const commandAt = await page.evaluate(() => performance.now());
+async function tap(page, mode, target) {
   if (mode === 'mobile') await page.touchscreen.tap(target.x, target.y);
   else await page.mouse.click(target.x, target.y);
-  await page.waitForFunction(() => {
-    const s = window.__uxSelect46;
-    return s && s.eventAt > 0 && s.selectedAt > 0 && s.rafAt > 0;
-  }, null, { timeout: 6000 });
-  return page.evaluate(commandAtValue => {
-    const s = window.__uxSelect46;
-    return {
-      commandToEvent: s.eventAt - commandAtValue,
-      processing: s.selectedAt - s.eventAt,
-      frameAfterState: s.rafAt - s.selectedAt,
-      tapToVisibleOpportunity: s.rafAt - s.eventAt,
-      selected: s.selected,
-    };
-  }, commandAt);
 }
 
 async function clear(page) {
   await page.evaluate(() => window.yakolakTestClearSelection());
-  await page.waitForFunction(() => (document.body.dataset.yakolakSelected || '') === '' && document.body.dataset.yakolakGameplay === 'ready', null, { timeout: 5000 });
+  await page.waitForFunction(
+    () => (document.body.dataset.yakolakSelected || '') === '' && document.body.dataset.yakolakGameplay === 'ready',
+    null,
+    { timeout: 5000 },
+  );
+  // The tray close animation is presentation only. Let it settle before the next
+  // sample so each tap starts from the same rendered geometry.
+  await page.waitForTimeout(340);
+}
+
+async function oneTap(page, mode) {
+  await clear(page);
+  const targets = await refreshTargets(page);
+  const beforeSerial = await page.evaluate(() => Number(document.body.dataset.yakolakUxSelect46Serial || 0));
+  await tap(page, mode, targets.side0);
+  await page.waitForFunction(
+    previous => Number(document.body.dataset.yakolakUxSelect46Serial || 0) > previous,
+    beforeSerial,
+    { timeout: 6000 },
+  );
+  return page.evaluate(() => ({
+    processing: Number(document.body.dataset.yakolakUxSelect46ProcessingMs || 0),
+    frameAfterProcessing: Number(document.body.dataset.yakolakUxSelect46FrameMs || 0),
+    visible: Number(document.body.dataset.yakolakUxSelect46VisibleMs || 0),
+    selected: document.body.dataset.yakolakSelected || '',
+    emphasisCount: Number(document.body.dataset.yakolakSelectionEmphasisCount || 0),
+    emphasisOwner: document.body.dataset.yakolakSelectionEmphasisOwner || '',
+    markerOwner: document.body.dataset.yakolakUxSelect46MarkerOwner || '',
+    markerSerial: Number(document.body.dataset.yakolakUxSelect46MarkerSerial || 0),
+    serial: Number(document.body.dataset.yakolakUxSelect46Serial || 0),
+  }));
 }
 
 async function measureMode(browser, mode) {
@@ -138,17 +123,19 @@ async function measureMode(browser, mode) {
   const page = await context.newPage();
   try {
     await startPassPlay(page);
-    await installProbe(page);
-    const target = await freshTarget(page);
     const samples = [];
     for (let i = 0; i < ITERATIONS; i += 1) {
-      await clear(page);
-      const sample = await oneTap(page, mode, target);
+      const sample = await oneTap(page, mode);
       expect(sample.selected).toContain('Stone_right_0_large');
+      expect(sample.emphasisCount).toBe(1);
+      expect(sample.emphasisOwner).toBe(sample.selected);
+      expect(sample.markerSerial).toBe(sample.serial);
+      expect(sample.markerOwner).toBe(sample.selected);
       samples.push(sample);
     }
+
     const summary = {};
-    for (const key of ['commandToEvent', 'processing', 'frameAfterState', 'tapToVisibleOpportunity']) {
+    for (const key of ['processing', 'frameAfterProcessing', 'visible']) {
       const values = samples.map(s => s[key]);
       summary[key] = {
         p50: percentile(values, 0.50),
@@ -156,19 +143,79 @@ async function measureMode(browser, mode) {
         max: Math.max(...values),
       };
     }
-    writeFileSync(`${ARTIFACT_DIR}/${mode}.json`, JSON.stringify({ label: LABEL, mode, iterations: ITERATIONS, summary, samples }, null, 2));
+    writeFileSync(`${ARTIFACT_DIR}/${mode}.json`, JSON.stringify({
+      label: LABEL,
+      mode,
+      iterations: ITERATIONS,
+      budgets: { processingP95Ms: PROCESSING_P95_BUDGET_MS, visibleP95Ms: VISIBLE_P95_BUDGET_MS },
+      summary,
+      samples,
+    }, null, 2));
+
     console.log(`UX_SELECT_46_METRIC label=${LABEL} mode=${mode} ` +
       `processing_p50=${summary.processing.p50.toFixed(2)} processing_p95=${summary.processing.p95.toFixed(2)} ` +
-      `frame_p50=${summary.frameAfterState.p50.toFixed(2)} frame_p95=${summary.frameAfterState.p95.toFixed(2)} ` +
-      `visible_p50=${summary.tapToVisibleOpportunity.p50.toFixed(2)} visible_p95=${summary.tapToVisibleOpportunity.p95.toFixed(2)}`);
-    expect(summary.tapToVisibleOpportunity.p95).toBeLessThan(500);
+      `frame_p50=${summary.frameAfterProcessing.p50.toFixed(2)} frame_p95=${summary.frameAfterProcessing.p95.toFixed(2)} ` +
+      `visible_p50=${summary.visible.p50.toFixed(2)} visible_p95=${summary.visible.p95.toFixed(2)}`);
+
+    expect(summary.processing.p95).toBeLessThan(PROCESSING_P95_BUDGET_MS);
+    expect(summary.visible.p95).toBeLessThan(VISIBLE_P95_BUDGET_MS);
+  } finally {
+    await context.close();
+  }
+}
+
+async function rapidTapInvariant(browser, mode) {
+  const context = await browser.newContext(contextOptions(mode));
+  const page = await context.newPage();
+  try {
+    await startPassPlay(page);
+    await clear(page);
+    const targets = await refreshTargets(page);
+    const beforeSerial = await page.evaluate(() => Number(document.body.dataset.yakolakUxSelect46Serial || 0));
+
+    // Distinct stack taps bypass same-point debounce and exercise stale deferred
+    // work. No move target is tapped, so this can never submit an authoritative move.
+    await tap(page, mode, targets.side0);
+    await tap(page, mode, targets.side1);
+
+    await page.waitForFunction(
+      previous => Number(document.body.dataset.yakolakUxSelect46Serial || 0) > previous,
+      beforeSerial,
+      { timeout: 6000 },
+    );
+    await page.waitForFunction(
+      () => Number(document.body.dataset.yakolakUxSelect46MarkerSerial || 0) === Number(document.body.dataset.yakolakUxSelect46Serial || -1),
+      null,
+      { timeout: 6000 },
+    );
+
+    const state = await page.evaluate(() => ({
+      selected: document.body.dataset.yakolakSelected || '',
+      emphasisCount: Number(document.body.dataset.yakolakSelectionEmphasisCount || 0),
+      emphasisOwner: document.body.dataset.yakolakSelectionEmphasisOwner || '',
+      markerOwner: document.body.dataset.yakolakUxSelect46MarkerOwner || '',
+      markerSerial: Number(document.body.dataset.yakolakUxSelect46MarkerSerial || 0),
+      serial: Number(document.body.dataset.yakolakUxSelect46Serial || 0),
+      moves: Number(document.body.dataset.yakolakMoves || 0),
+    }));
+
+    expect(state.selected).toContain('Stone_right_1_large');
+    expect(state.emphasisCount).toBe(1);
+    expect(state.emphasisOwner).toBe(state.selected);
+    expect(state.markerOwner).toBe(state.selected);
+    expect(state.markerSerial).toBe(state.serial);
+    expect(state.moves).toBe(0);
+    console.log(`UX_SELECT_46_RAPID_TAP_OK mode=${mode} selected=${state.selected} serial=${state.serial}`);
   } finally {
     await context.close();
   }
 }
 
 for (const mode of ['desktop', 'mobile']) {
-  test(`UX-SELECT-46 measures ${mode} valid tap to selected feedback`, async ({ browser }) => {
+  test(`UX-SELECT-46 ${mode} tap feedback budget`, async ({ browser }) => {
     await measureMode(browser, mode);
+  });
+  test(`UX-SELECT-46 ${mode} rapid taps keep one selection`, async ({ browser }) => {
+    await rapidTapInvariant(browser, mode);
   });
 }
