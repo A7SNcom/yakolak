@@ -1,6 +1,38 @@
 import * as THREE from 'three';
 import { createFrameGovernor, FRAME_GOVERNOR_POLICY } from '../camera/frame-governor.js';
 
+function createGpuFacingPreviewResources(group) {
+  const geometry = new THREE.TorusKnotGeometry(1.05, 0.28, 128, 20);
+  const material = new THREE.MeshStandardMaterial({
+    color: 0xeef2f7,
+    metalness: 0.36,
+    roughness: 0.28,
+  });
+  const hero = new THREE.Mesh(geometry, material);
+  group.add(hero);
+
+  const ringGeometry = new THREE.TorusGeometry(1.85, 0.025, 12, 128);
+  const ringMaterial = new THREE.MeshBasicMaterial({
+    color: 0x7385a6,
+    transparent: true,
+    opacity: 0.5,
+  });
+  const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+  ring.rotation.x = Math.PI * 0.54;
+  ring.rotation.z = Math.PI * 0.18;
+  group.add(ring);
+
+  function dispose() {
+    group.remove(hero, ring);
+    geometry.dispose();
+    material.dispose();
+    ringGeometry.dispose();
+    ringMaterial.dispose();
+  }
+
+  return Object.freeze({ ring, dispose });
+}
+
 export function createPreviewScene(rendererOwner) {
   if (!rendererOwner) throw new TypeError('Preview scene requires the renderer owner');
 
@@ -13,25 +45,8 @@ export function createPreviewScene(rendererOwner) {
 
   const group = new THREE.Group();
   scene.add(group);
-
-  const geometry = new THREE.TorusKnotGeometry(1.05, 0.28, 128, 20);
-  const material = new THREE.MeshStandardMaterial({
-    color: 0xeef2f7,
-    metalness: 0.36,
-    roughness: 0.28,
-  });
-  group.add(new THREE.Mesh(geometry, material));
-
-  const ringGeometry = new THREE.TorusGeometry(1.85, 0.025, 12, 128);
-  const ringMaterial = new THREE.MeshBasicMaterial({
-    color: 0x7385a6,
-    transparent: true,
-    opacity: 0.5,
-  });
-  const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-  ring.rotation.x = Math.PI * 0.54;
-  ring.rotation.z = Math.PI * 0.18;
-  group.add(ring);
+  let resources = createGpuFacingPreviewResources(group);
+  let restoredResourceGeneration = 0;
 
   scene.add(new THREE.HemisphereLight(0xeef5ff, 0x101722, 2.15));
   const key = new THREE.DirectionalLight(0xffffff, 3.4);
@@ -48,6 +63,14 @@ export function createPreviewScene(rendererOwner) {
   let running = false;
   let disposed = false;
 
+  const unregisterResourceRestorer = rendererOwner.registerResourceRestorer(({ generation }) => {
+    if (disposed || generation <= restoredResourceGeneration) return;
+    resources.dispose();
+    resources = createGpuFacingPreviewResources(group);
+    restoredResourceGeneration = generation;
+    lastFrameNow = null;
+  });
+
   const frameGovernor = createFrameGovernor({
     rendererOwner,
     camera,
@@ -63,7 +86,7 @@ export function createPreviewScene(rendererOwner) {
         const t = animationElapsedMs * 0.00022;
         group.rotation.y = t;
         group.rotation.x = Math.sin(t * 0.8) * 0.11;
-        ring.rotation.z = Math.PI * 0.18 - t * 0.42;
+        resources.ring.rotation.z = Math.PI * 0.18 - t * 0.42;
       } else {
         lastFrameNow = null;
       }
@@ -95,6 +118,7 @@ export function createPreviewScene(rendererOwner) {
       running,
       reducedMotion,
       animationElapsedMs,
+      restoredResourceGeneration,
       cameraAspect: camera.aspect,
       cameraFov: camera.fov,
     });
@@ -105,11 +129,9 @@ export function createPreviewScene(rendererOwner) {
     disposed = true;
     running = false;
     reducedMotionQuery.removeEventListener?.('change', onReducedMotionChange);
+    unregisterResourceRestorer();
     frameGovernor.dispose();
-    geometry.dispose();
-    material.dispose();
-    ringGeometry.dispose();
-    ringMaterial.dispose();
+    resources.dispose();
     scene.clear();
   }
 
