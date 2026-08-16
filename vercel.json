@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "test -s web/index.html && echo 'Using flash-ready YAKOLAK web build'",
-  "ignoreCommand": "git log -1 --pretty=%s | grep -q '^\\[flash-ready\\]' && exit 1 || exit 0",
+  "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" = \"threejs-rebuild\" ]; then exit 1; fi; git log -1 --pretty=%s | grep -q '^\\[flash-ready\\]' && exit 1 || exit 0",
   "outputDirectory": "web",
   "framework": null,
   "github": {
@@ -10,6 +10,7 @@
   "git": {
     "deploymentEnabled": {
       "main": true,
+      "threejs-rebuild": true,
       "*": false
     }
   },
