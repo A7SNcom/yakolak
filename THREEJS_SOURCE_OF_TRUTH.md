@@ -39,13 +39,16 @@ Any contradiction discovered later by a `THREEJS-*` task must be appended here i
 
 Status values: `OPEN`, `ADAPTER`, or `RESOLVED`. No entry may disappear without a recorded resolution.
 
-### SRC-001 — Match length semantics — OPEN
+### SRC-001 — Match length semantics — RESOLVED
 
-- `YAKOLAK_PORTABLE_KIT/README.md` specifies a match as **exactly 3 or 5 completed rounds**, with highest score after the final round deciding the match.
-- `rules/yakolak-rules.json` exposes the same numeric options as `winsToMatchOptions`.
-- `api/rooms.js` treats the selected value as `winsToMatch` and completes the match only when one seat's score reaches that number; draws increase `completedRounds` but do not complete the match.
-- Consequence: the live backend can run for more than 3 or 5 completed rounds, which contradicts the rebuild guide's fixed-round contract.
-- Rule for rewrite: do not disguise this as equivalent behavior. Preserve live API compatibility until a separate backend-contract task resolves it.
+- `YAKOLAK_PORTABLE_KIT/README.md` describes a match as **exactly 3 or 5 completed rounds**, with highest score after the final round deciding the match.
+- `rules/yakolak-rules.json` defines the current product choices as `winsToMatchOptions: [3, 5]`.
+- `api/rooms.js` stores the selected value as `winsToMatch`, awards one score point only to a round winner, increments `completedRounds` for both wins and draws, and sets `matchComplete` only when one seat's score reaches `winsToMatch`.
+- **Resolution — THREEJS-004 (2026-08-16): the rebuild is locked to the current product/backend meaning. `3` or `5` means round wins required to win the match, not total completed rounds.**
+- A drawn round awards **no point** to any seat. It may increment `completedRounds`, but `completedRounds` is informational/history state and must never be used as a hidden fixed-length match terminator.
+- Therefore a match may contain more than 3 or 5 completed rounds when draws or split wins occur; it ends only when one seat reaches the configured `winsToMatch` threshold.
+- `targetRounds` is a legacy API/config alias for this same threshold and must be interpreted as wins-to-match at the Three.js boundary. New rebuild naming, UI copy, state models, and tests should prefer `winsToMatch` / “wins required”, never “exactly 3/5 rounds”.
+- The Portable Kit's old fixed-round sentence is explicitly superseded **for rebuild match semantics only** by this resolution. Do not reintroduce “highest score after exactly 3/5 completed rounds” unless a later explicit product-rule migration changes the authoritative backend contract and this resolution record.
 
 ### SRC-002 — White visual color vs `marble` backend token — ADAPTER
 
@@ -111,6 +114,9 @@ Every implementation decision must be traceable to one of these outcomes:
 - **Backend-owned:** implement the current `rules/` + `api/` contract exactly.
 - **Agreement:** when Kit, backend, and Production agree, Production may be used as a supporting behavioral/visual reference.
 - **Contradiction:** record it here and use only an explicit compatibility adapter that does not alter either authoritative contract; otherwise stop that affected decision for a later resolution task.
+- **Resolved contradiction:** a `RESOLVED` entry is a binding migration decision for later Three.js tasks. Follow its recorded resolution even if an older source still contains the superseded wording; reopening it requires another explicit product-rule or migration-resolution task.
+
+For `SRC-001` specifically, all future Three.js code, copy, adapters, fixtures, and tests must treat 3/5 as **wins-to-match**. No code path may terminate a match merely because `completedRounds` reaches 3 or 5.
 
 Do not copy a Godot quirk merely because it is currently visible in Production. Do not rewrite the live backend merely because the Kit describes a cleaner target. Do not modify the Kit silently to match current backend behavior.
 
