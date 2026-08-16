@@ -42,15 +42,18 @@ function normalizePlan(plan) {
     ids.add(entry.logicalId);
     if (!entry.sourcePath.endsWith('.stl')) throw new Error(`Only canonical STL sources may be converted by this pipeline: ${entry.sourcePath}`);
     if (!entry.outputPath.endsWith('.glb')) throw new Error(`Runtime conversion output must be GLB: ${entry.outputPath}`);
+    if (entry.convert !== undefined && typeof entry.convert !== 'function') throw new TypeError(`Conversion profile for ${entry.logicalId} must be a function`);
+    if (entry.profileId !== undefined && (typeof entry.profileId !== 'string' || !entry.profileId)) throw new TypeError(`Conversion profile ID for ${entry.logicalId} must be a non-empty string`);
     return Object.freeze({ ...entry });
   });
 }
 
-function entrySignature({ logicalId, sourcePath, outputPath, sourceSha256, sourceGitBlobSha1, sourceBytes }) {
+function entrySignature({ logicalId, sourcePath, outputPath, profileId, sourceSha256, sourceGitBlobSha1, sourceBytes }) {
   return {
     logicalId,
     sourcePath,
     outputPath,
+    ...(profileId ? { conversionProfile: profileId } : {}),
     sourceSha256,
     sourceGitBlobSha1,
     sourceBytes,
@@ -70,6 +73,7 @@ function sameInputSignature(previous, current) {
     && previous.sourceBytes === current.sourceBytes
     && previous.sourcePath === current.sourcePath
     && previous.outputPath === current.outputPath
+    && (previous.conversionProfile || null) === (current.conversionProfile || null)
     && previous.converter?.id === current.converter.id
     && previous.converter?.version === current.converter.version
     && previous.converter?.node === current.converter.node;
@@ -132,7 +136,8 @@ export async function runAssetConversionPipeline({
       continue;
     }
 
-    const converted = stlToGlb(sourceBytes, {
+    const convert = target.convert || stlToGlb;
+    const converted = convert(sourceBytes, {
       sourcePath: target.sourcePath,
       sourceGitBlobSha1: sourceSignature.sourceGitBlobSha1,
     });
@@ -146,6 +151,9 @@ export async function runAssetConversionPipeline({
       transformPolicy: converted.provenance.geometry.transformPolicy,
       normalPolicy: converted.provenance.geometry.normalPolicy,
       componentPolicy: converted.provenance.geometry.componentPolicy,
+      ...(converted.provenance.geometry.semanticProfile ? { semanticProfile: converted.provenance.geometry.semanticProfile } : {}),
+      ...(converted.provenance.geometry.sourcePivot ? { sourcePivot: converted.provenance.geometry.sourcePivot } : {}),
+      ...(converted.provenance.geometry.pivotPolicy ? { pivotPolicy: converted.provenance.geometry.pivotPolicy } : {}),
     };
     summary.converted.push(target.logicalId);
   }
