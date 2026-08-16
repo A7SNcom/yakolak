@@ -2,6 +2,7 @@ import { hydrateBuildMarker } from './build-marker.js';
 import { installFatalErrorHandlers } from './fatal-error.js';
 import { createRendererOwner, WebGLNotSupportedError } from '../scene/renderer.js';
 import { createPreviewScene } from '../scene/preview-scene.js';
+import { markOnce, STARTUP_MARKS, startupMarkSnapshot } from '../perf/startup-marks.js';
 import {
   AssetGroupLoadError,
   AssetGroupNotReadyError,
@@ -52,6 +53,7 @@ function formatProgress(group) {
 }
 
 async function boot() {
+  markOnce(STARTUP_MARKS.bootStart);
   document.documentElement.dataset.runtime = 'threejs-static-esm';
   document.documentElement.dataset.bootState = 'booting';
   document.documentElement.dataset.requiredAssets = 'pending';
@@ -103,6 +105,7 @@ async function boot() {
       getAssetState: (id) => assetManager.getState(id),
       getAssetProgress: (group = null) => assetManager.snapshot(group),
       getAsset: (id) => assetManager.get(id),
+      getStartupMarks: startupMarkSnapshot,
       dispose,
     });
     window.__YAKOLAK_THREEJS_SHELL__ = shell;
@@ -137,6 +140,7 @@ async function boot() {
     requiredOperation = (async () => {
       const bootRetry = retry && ['failed', 'cancelled'].includes(assetManager.snapshot('boot-critical').status);
       await assetManager.loadGroup('boot-critical', { retry: bootRetry });
+      markOnce(STARTUP_MARKS.bootCriticalReady);
       document.documentElement.dataset.assetState = 'boot-critical-ready';
 
       if (!rendererOwner) {
@@ -146,6 +150,7 @@ async function boot() {
 
       const sceneRetry = retry && ['failed', 'cancelled'].includes(assetManager.snapshot('scene-critical').status);
       await assetManager.loadGroup('scene-critical', { retry: sceneRetry });
+      markOnce(STARTUP_MARKS.criticalAssetsReady);
       document.documentElement.dataset.requiredAssets = 'ready';
 
       if (!previewScene) {
@@ -157,6 +162,7 @@ async function boot() {
       if (assetErrorElement) assetErrorElement.hidden = true;
       if (statusElement) statusElement.textContent = 'Static Three.js shell ready';
       document.documentElement.dataset.bootState = 'ready';
+      markOnce(STARTUP_MARKS.firstInteractive);
 
       assetManager.loadGroup('optional').then((result) => {
         if (disposed) return;
