@@ -73,7 +73,6 @@ export function decodeGlbComponents(input) {
 
   const components = [];
   for (const [nodeIndex, node] of (gltf.nodes || []).entries()) {
-    // Semantic root/pivot nodes are hierarchy-only. Component mesh nodes remain transform-free.
     if (!Number.isInteger(node.mesh)) continue;
     if (node.matrix || node.translation || node.rotation || node.scale) throw new Error(`GLB component node ${nodeIndex} contains a hidden transform`);
     const mesh = gltf.meshes?.[node.mesh];
@@ -115,6 +114,7 @@ export function decodeGlbComponents(input) {
   if (Number.isInteger(geometryProvenance.componentCount) && geometryProvenance.componentCount !== components.length) {
     throw new Error(`GLB provenance/component count mismatch: ${geometryProvenance.componentCount}/${components.length}`);
   }
+  const semanticGroups = Object.freeze([...(geometryProvenance.semanticGroups || geometryProvenance.semanticRoots || [])]);
 
   let disposed = false;
   return Object.freeze({
@@ -122,7 +122,8 @@ export function decodeGlbComponents(input) {
     components: Object.freeze(components),
     provenance,
     semanticProfile: geometryProvenance.semanticProfile || null,
-    semanticRoots: Object.freeze([...(geometryProvenance.semanticRoots || [])]),
+    semanticGroups,
+    semanticRoots: semanticGroups,
     sourcePivot: geometryProvenance.sourcePivot ? Object.freeze([...geometryProvenance.sourcePivot]) : null,
     getComponent: (index) => components[index] || null,
     dispose() {
