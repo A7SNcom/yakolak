@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'tests/ux_turn_42_player4_turn.spec.js'
+      - 'tests/ux_turn_42_player4_turn_v3.spec.js'
       - '.github/workflows/ux-turn-42.yml'
       - 'scripts/gameplay_authoritative_turn_state.gd'
       - 'scripts/gameplay_turn_transition_stale_safe.gd'
@@ -51,6 +52,7 @@ jobs:
       - name: Validate focused gate source
         run: |
           node --check tests/ux_turn_42_player4_turn.spec.js
+          node --check tests/ux_turn_42_player4_turn_v3.spec.js
           grep -q "const CODE = '42'" tests/ux_turn_42_player4_turn.spec.js
           grep -q "_authoritative_online_pointer_ready" scripts/gameplay_authoritative_turn_state.gd
           grep -q "authoritative-revision-controller" scripts/gameplay_turn_transition_stale_safe.gd
@@ -102,7 +104,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
           path: |
-            artifacts/ux-turn-42-source/**
+            artifacts/ux-turn-42-source/
             /tmp/yakolak-ux-turn-42-server.log
             /tmp/yakolak-ux-turn-42-playwright.log
 
@@ -157,5 +159,5 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
           path: |
-            artifacts/ux-turn-42-production/**
+            artifacts/ux-turn-42-production/
             /tmp/yakolak-ux-turn-42-production.log
