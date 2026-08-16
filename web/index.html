@@ -38,6 +38,12 @@
       <span>Your game/session identity is preserved, but the GPU context could not be restored safely.</span>
       <button id="graphics-recovery-reload" class="recovery-action" type="button">Reload and retry</button>
     </section>
+
+    <section id="asset-load-error" class="unsupported recovery" hidden role="alert">
+      <strong>Required assets unavailable.</strong>
+      <span id="asset-load-error-message">The game was not initialized because required assets failed to load.</span>
+      <button id="asset-load-retry" class="recovery-action" type="button">Retry required assets</button>
+    </section>
   </main>
 
   <noscript>
