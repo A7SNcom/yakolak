@@ -1,6 +1,6 @@
 import { connectedTriangleComponents, parseStl, sha256, stlToGlb } from './stl-glb-converter.mjs';
 
-export const BOARD_LID_PROFILE_ID = 'yakolak-board-intro-lid-v1';
+export const BOARD_LID_PROFILE_ID = 'yakolak-board-intro-lid-v2';
 export const BOARD_NODE_NAME = 'YakolakBoard';
 export const LID_NODE_NAME = 'YakolakIntroLid';
 
@@ -70,8 +70,7 @@ function parseGlb(glb) {
   const binLength = bytes.readUInt32LE(offset); offset += 4;
   const binType = bytes.readUInt32LE(offset); offset += 4;
   if (binType !== 0x004e4942) throw new Error('GLB second chunk is not BIN');
-  const binary = bytes.subarray(offset, offset + binLength);
-  return { json, binary };
+  return { json, binary: bytes.subarray(offset, offset + binLength) };
 }
 
 function encodeGlb(json, binary) {
@@ -124,55 +123,29 @@ export function stlToBoardAndLidGlb(bytes, metadata = {}) {
   if (gltf.nodes.length !== EXPECTED_COMPONENTS || gltf.scenes?.[0]?.nodes?.length !== EXPECTED_COMPONENTS) {
     throw new Error('Base GLB component-node structure drift');
   }
+  for (const [index, node] of gltf.nodes.entries()) {
+    if (!Number.isInteger(node.mesh) || node.matrix || node.translation || node.rotation || node.scale) {
+      throw new Error(`Component node ${index} must remain a transform-free mesh for runtime decoding`);
+    }
+  }
 
   const sourceBounds = unionBounds(records);
   const sourcePivot = centerOf(sourceBounds);
   assertVec(sourcePivot, [90.00003051757812, 90, 6], 'full source pivot');
-  const pivotTranslation = sourcePivot.map((value) => -value);
   const boardBounds = unionBounds(BOARD_COMPONENTS.map((index) => records[index]));
   const lidBounds = unionBounds(LID_COMPONENTS.map((index) => records[index]));
-
-  const boardPivotNode = gltf.nodes.push({
-    name: 'YakolakBoardGeometryPivot',
-    translation: pivotTranslation,
-    children: [...BOARD_COMPONENTS],
-    extras: { role: 'geometry-pivot', sourcePivot },
-  }) - 1;
-  const boardRootNode = gltf.nodes.push({
-    name: BOARD_NODE_NAME,
-    children: [boardPivotNode],
-    extras: { semanticRole: 'board', temporary: false },
-  }) - 1;
-  const lidPivotNode = gltf.nodes.push({
-    name: 'YakolakIntroLidGeometryPivot',
-    translation: pivotTranslation,
-    children: [...LID_COMPONENTS],
-    extras: { role: 'geometry-pivot', sourcePivot },
-  }) - 1;
-  const lidRootNode = gltf.nodes.push({
-    name: LID_NODE_NAME,
-    children: [lidPivotNode],
-    extras: { semanticRole: 'intro-lid', temporary: true },
-  }) - 1;
-  gltf.scenes[0].nodes = [boardRootNode, lidRootNode];
-
   const provenance = gltf.extras?.yakolakConversion || base.provenance;
   provenance.geometry.semanticProfile = BOARD_LID_PROFILE_ID;
   provenance.geometry.vertexTransformPolicy = 'source-float32-positions-unchanged';
-  provenance.geometry.pivotPolicy = 'full-source-bounds-center-owned-by-semantic-geometry-child';
+  provenance.geometry.pivotPolicy = 'full-source-bounds-center-applied-only-by-runtime-addressable-wrapper';
   provenance.geometry.sourceBounds = sourceBounds;
   provenance.geometry.sourcePivot = sourcePivot;
-  provenance.geometry.semanticRoots = [
-    { name: BOARD_NODE_NAME, node: boardRootNode, componentIndices: [...BOARD_COMPONENTS], triangleCount: EXPECTED_BOARD_TRIANGLES, sourceBounds: boardBounds },
-    { name: LID_NODE_NAME, node: lidRootNode, componentIndices: [...LID_COMPONENTS], triangleCount: EXPECTED_LID_TRIANGLES, sourceBounds: lidBounds, temporary: true },
+  provenance.geometry.semanticGroups = [
+    { name: BOARD_NODE_NAME, semanticRole: 'board', componentIndices: [...BOARD_COMPONENTS], triangleCount: EXPECTED_BOARD_TRIANGLES, sourceBounds: boardBounds },
+    { name: LID_NODE_NAME, semanticRole: 'intro-lid', componentIndices: [...LID_COMPONENTS], triangleCount: EXPECTED_LID_TRIANGLES, sourceBounds: lidBounds, temporary: true },
   ];
   gltf.extras = { ...(gltf.extras || {}), yakolakConversion: provenance };
 
   const glb = encodeGlb(gltf, binary);
-  return {
-    glb,
-    provenance,
-    outputSha256: sha256(glb),
-    outputBytes: glb.byteLength,
-  };
+  return { glb, provenance, outputSha256: sha256(glb), outputBytes: glb.byteLength };
 }
