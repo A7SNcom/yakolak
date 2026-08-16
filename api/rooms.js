@@ -16,10 +16,8 @@ const TABLE = 'yakolak_online_rooms_v5';
 const PRESENCE_TABLE = 'yakolak_online_presence_v1';
 const RATE_TABLE = 'yakolak_online_join_rate_v1';
 const PROTOCOL = 5;
-const SEAT_CONTRACT_VERSION = 1;
 const COLORS = RULE_COLORS;
 const SIZES = RULE_SIZES;
-const CANONICAL_COLOR_RING = Object.freeze(['marble', 'blue', 'gold', 'green']);
 const ROOM_TTL_MS = 3 * 60 * 60 * 1000;
 const WAITING_REUSE_MS = 20 * 60 * 1000;
 const FINISHED_MATCH_REUSE_MS = 15 * 60 * 1000;
@@ -176,69 +174,15 @@ function hasLegalMove(state, color) {
   return rulesHasLegalMove(state.board, color);
 }
 
-function canonicalSeatTopology(hostColor, targetPlayers) {
-  if (!validColor(hostColor)) throw new Error('invalid_color');
-  if (!validPlayers(targetPlayers)) throw new Error('invalid_player_count');
-  const start = CANONICAL_COLOR_RING.indexOf(String(hostColor));
-  return Array.from({ length: Number(targetPlayers) }, (_, index) => ({
-    seat: `p${index + 1}`,
-    color: CANONICAL_COLOR_RING[(start + index) % CANONICAL_COLOR_RING.length],
-  }));
-}
-
-function topologyForState(state) {
-  const stored = Array.isArray(state?.seatTopology) ? state.seatTopology : [];
-  if (stored.length) return stored.map(entry => ({ seat: String(entry.seat), color: String(entry.color) }));
-  return (state?.players || []).map(player => ({ seat: String(player.seat), color: String(player.color) }));
-}
-
-function seatOrder(state) {
-  return topologyForState(state).map(entry => entry.seat);
-}
-
-function playerForSeat(state, seat) {
-  return (state?.players || []).find(player => player.seat === seat) || null;
-}
-
-function sortPlayersByTopology(state, players) {
-  const order = seatOrder(state);
-  const rank = new Map(order.map((seat, index) => [seat, index]));
-  return [...players].sort((a, b) => (rank.get(a.seat) ?? 99) - (rank.get(b.seat) ?? 99));
-}
-
-function authoritativeTurnSeat(state) {
-  const explicit = String(state?.turnSeat || '');
-  if (explicit && playerForSeat(state, explicit)) return explicit;
-  return String(state?.players?.[Number(state?.turnIndex)]?.seat || '');
-}
-
-function turnIndexForSeat(state, seat, players = null) {
-  const list = players || state?.players || [];
-  return list.findIndex(player => player.seat === seat);
-}
-
-function nextPlayableHandoff(state, fromSeat, allowedSeats = null) {
-  const order = seatOrder(state);
-  const allowed = allowedSeats ? new Set(allowedSeats) : null;
-  const start = order.indexOf(String(fromSeat || ''));
-  if (start < 0 || !order.length) return { seat: null, turnIndex: -1, skippedSeats: [] };
-  const skippedSeats = [];
-  for (let offset = 1; offset <= order.length; offset += 1) {
-    const candidateSeat = order[(start + offset) % order.length];
-    if (allowed && !allowed.has(candidateSeat)) continue;
-    const player = playerForSeat(state, candidateSeat);
-    if (!player) continue;
-    if (hasLegalMove(state, player.color)) {
-      return { seat: candidateSeat, turnIndex: turnIndexForSeat(state, candidateSeat), skippedSeats };
-    }
-    skippedSeats.push(candidateSeat);
-  }
-  return { seat: null, turnIndex: -1, skippedSeats };
-}
-
 function nextPlayablePlayer(state, fromIndex, allowedSeats = null) {
-  const fromSeat = state?.players?.[fromIndex]?.seat || authoritativeTurnSeat(state);
-  return nextPlayableHandoff(state, fromSeat, allowedSeats).turnIndex;
+  const allowed = allowedSeats ? new Set(allowedSeats) : null;
+  for (let offset = 1; offset < state.players.length; offset += 1) {
+    const index = (fromIndex + offset) % state.players.length;
+    const player = state.players[index];
+    if (allowed && !allowed.has(player.seat)) continue;
+    if (hasLegalMove(state, player.color)) return index;
+  }
+  return -1;
 }
 
 function createState(hostColor, targetPlayers, targetRounds) {
@@ -246,53 +190,40 @@ function createState(hostColor, targetPlayers, targetRounds) {
   if (!validPlayers(targetPlayers)) throw new Error('invalid_player_count');
   if (!validRounds(targetRounds)) throw new Error('invalid_round_count');
   const winsToMatch = Number(targetRounds);
-  const seatTopology = canonicalSeatTopology(hostColor, targetPlayers);
-  const host = { ...seatTopology[0] };
   return {
     protocol: PROTOCOL,
-    seatContract: SEAT_CONTRACT_VERSION,
     status: 'waiting',
     targetPlayers: Number(targetPlayers),
     targetRounds: winsToMatch,
     winsToMatch,
-    seatTopology,
-    players: [host],
-    turnSeat: host.seat,
+    players: [{ seat: 'p1', color: hostColor }],
     turnIndex: 0,
-    roundStarterSeat: host.seat,
     board: emptyBoard(),
     round: 1,
     completedRounds: 0,
-    scores: { [host.seat]: 0 },
+    scores: { p1: 0 },
     winner: null,
     draw: false,
     lastMove: null,
-    lastHandoff: null,
     moveNumber: 0,
     matchComplete: false,
     matchWinner: null,
     matchWinners: [],
-    rematch: { [host.seat]: false },
+    rematch: { p1: false },
     skippedSeat: null,
-    skippedSeats: [],
     _mutations: [],
   };
 }
 
-function joinState(state, seat, color = null) {
+function joinState(state, seat, color) {
+  if (!validColor(color)) throw new Error('invalid_color');
   if (state.status !== 'waiting') throw new Error('room_not_waiting');
   if (state.players.length >= state.targetPlayers) throw new Error('room_full');
-  if (state.players.some(player => player.seat === seat)) throw new Error('invalid_seat');
-  const expected = topologyForState(state).find(entry => entry.seat === seat);
-  if (!expected) throw new Error('invalid_seat');
-  if (color != null && String(color || '') !== expected.color) throw new Error('seat_color_mismatch');
-  const players = sortPlayersByTopology(state, [...state.players, { seat, color: expected.color }]);
-  const turnSeat = authoritativeTurnSeat({ ...state, players }) || seatOrder(state)[0];
+  if (state.players.some(player => player.color === color)) throw new Error('color_taken');
+  const players = [...state.players, { seat, color }];
   return {
     ...state,
     players,
-    turnSeat,
-    turnIndex: turnIndexForSeat(state, turnSeat, players),
     scores: { ...state.scores, [seat]: 0 },
     rematch: { ...state.rematch, [seat]: false },
     status: players.length === state.targetPlayers ? 'playing' : 'waiting'
@@ -322,16 +253,13 @@ function finishRound(state, { color = null, seat = null, draw = false, lastMove 
     matchWinner: leaders.length === 1 ? { seat: leaders[0].seat, color: leaders[0].color, wins: Number(scores[leaders[0].seat] || 0) } : null,
     matchWinners: leaders.map(player => ({ seat: player.seat, color: player.color, wins: Number(scores[player.seat] || 0) })),
     rematch: Object.fromEntries(state.players.map(player => [player.seat, false])),
-    skippedSeat: state.skippedSeat || null,
-    skippedSeats: Array.isArray(state.skippedSeats) ? [...state.skippedSeats] : [],
-    lastHandoff: state.lastHandoff || null,
+    skippedSeat: null,
   };
 }
 
 function applyMove(state, seat, move) {
   if (state.status !== 'playing') throw new Error('room_not_playing');
-  const currentSeat = authoritativeTurnSeat(state);
-  const current = playerForSeat(state, currentSeat);
+  const current = state.players[state.turnIndex];
   if (!current || current.seat !== seat) throw new Error('not_your_turn');
   const placementError = validatePlacement(state.board, current.color, move);
   if (placementError) throw new Error(placementError);
@@ -341,73 +269,41 @@ function applyMove(state, seat, move) {
   board[String(cell)] ||= {};
   board[String(cell)][size] = current.color;
   const lastMove = { cell, size, color: current.color, seat };
-  const next = {
-    ...state,
-    board,
-    lastMove,
-    lastHandoff: null,
-    moveNumber: Number(state.moveNumber || 0) + 1,
-    winner: null,
-    draw: false,
-    skippedSeat: null,
-    skippedSeats: [],
-  };
+  const next = { ...state, board, lastMove, moveNumber: Number(state.moveNumber || 0) + 1, winner: null, draw: false, skippedSeat: null };
   if (winner(board, current.color)) return finishRound(next, { color: current.color, seat, lastMove });
-  const handoff = nextPlayableHandoff(next, currentSeat);
-  const lastHandoff = {
-    fromSeat: currentSeat,
-    toSeat: handoff.seat,
-    skippedSeats: [...handoff.skippedSeats],
-    reason: handoff.seat ? (handoff.skippedSeats.length ? 'no-legal-move-skip' : 'move') : 'no-legal-move-draw',
-  };
-  const withHandoff = {
-    ...next,
-    skippedSeat: handoff.skippedSeats[0] || null,
-    skippedSeats: [...handoff.skippedSeats],
-    lastHandoff,
-  };
-  if (!handoff.seat) return finishRound(withHandoff, { draw: true, lastMove });
-  return { ...withHandoff, turnSeat: handoff.seat, turnIndex: handoff.turnIndex };
+  const turnIndex = nextPlayablePlayer(next, state.turnIndex);
+  if (turnIndex < 0) return finishRound(next, { draw: true, lastMove });
+  return { ...next, turnIndex };
 }
 
 function advanceRoundState(state, seat) {
   if (state.status !== 'finished' || state.matchComplete) throw new Error('round_not_finished');
   if (!state.players.some(player => player.seat === seat)) throw new Error('invalid_seat');
   const cleared = Object.fromEntries(state.players.map(player => [player.seat, false]));
-  const order = seatOrder(state);
-  const nextRound = Number(state.round || 1) + 1;
-  const starterSeat = order[(nextRound - 1) % order.length];
   return {
     ...state,
     status: 'playing',
-    turnSeat: starterSeat,
-    turnIndex: turnIndexForSeat(state, starterSeat),
-    roundStarterSeat: starterSeat,
+    turnIndex: Number(state.round || 1) % state.players.length,
     board: emptyBoard(),
-    round: nextRound,
+    round: Number(state.round || 1) + 1,
     winner: null,
     draw: false,
     lastMove: null,
-    lastHandoff: null,
     moveNumber: 0,
     matchComplete: false,
     matchWinner: null,
     matchWinners: [],
     rematch: cleared,
     skippedSeat: null,
-    skippedSeats: [],
   };
 }
 
 function restartMatchState(state) {
   const cleared = Object.fromEntries(state.players.map(player => [player.seat, false]));
-  const starterSeat = seatOrder(state)[0] || state.players[0]?.seat || 'p1';
   return {
     ...state,
     status: 'playing',
-    turnSeat: starterSeat,
-    turnIndex: turnIndexForSeat(state, starterSeat),
-    roundStarterSeat: starterSeat,
+    turnIndex: 0,
     board: emptyBoard(),
     round: 1,
     completedRounds: 0,
@@ -415,14 +311,12 @@ function restartMatchState(state) {
     winner: null,
     draw: false,
     lastMove: null,
-    lastHandoff: null,
     moveNumber: 0,
     matchComplete: false,
     matchWinner: null,
     matchWinners: [],
     rematch: cleared,
     skippedSeat: null,
-    skippedSeats: [],
   };
 }
 
@@ -463,12 +357,15 @@ function applyRoomEdit(state, seat, changes) {
 
   let targetPlayers = Number(state.targetPlayers);
   let winsToMatch = Number(state.winsToMatch ?? state.targetRounds);
-  let hostColor = String(playerForSeat(state, 'p1')?.color || topologyForState(state)[0]?.color || '');
+  let players = state.players.map(player => ({ ...player }));
 
   if (Object.hasOwn(changes, 'targetPlayers')) {
     const requestedPlayers = Number(changes.targetPlayers);
     if (!validPlayers(requestedPlayers)) throw new Error('invalid_player_count');
-    if (requestedPlayers <= state.players.length) throw new Error('unsafe_room_edit');
+    // Editing must never become an alternate "start now" transition. A waiting
+    // lobby always retains at least one open seat; joinState remains the sole
+    // transition that turns a filled lobby into a playing match.
+    if (requestedPlayers <= players.length) throw new Error('unsafe_room_edit');
     targetPlayers = requestedPlayers;
   }
 
@@ -481,33 +378,16 @@ function applyRoomEdit(state, seat, changes) {
   if (Object.hasOwn(changes, 'color')) {
     const requestedColor = String(changes.color || '');
     if (!validColor(requestedColor)) throw new Error('invalid_color');
-    hostColor = requestedColor;
+    if (players.some(player => player.seat !== 'p1' && player.color === requestedColor)) throw new Error('color_taken');
+    players = players.map(player => player.seat === 'p1' ? { ...player, color: requestedColor } : player);
   }
-
-  const seatTopology = canonicalSeatTopology(hostColor, targetPlayers);
-  const expectedBySeat = new Map(seatTopology.map(entry => [entry.seat, entry.color]));
-  for (const player of state.players) {
-    const expectedColor = expectedBySeat.get(player.seat);
-    if (!expectedColor) throw new Error('unsafe_room_edit');
-    if (player.seat !== 'p1' && player.color !== expectedColor) throw new Error('unsafe_room_edit');
-  }
-  const players = sortPlayersByTopology({ ...state, seatTopology }, state.players.map(player => ({
-    ...player,
-    color: expectedBySeat.get(player.seat),
-  })));
-  const turnSeat = authoritativeTurnSeat({ ...state, players }) || 'p1';
 
   return {
     ...state,
-    seatContract: SEAT_CONTRACT_VERSION,
     targetPlayers,
     targetRounds: winsToMatch,
     winsToMatch,
-    seatTopology,
     players,
-    turnSeat,
-    turnIndex: turnIndexForSeat(state, turnSeat, players),
-    roundStarterSeat: String(state.roundStarterSeat || 'p1'),
   };
 }
 
@@ -522,14 +402,12 @@ function reconcilePresenceState(state, connectedSeats) {
   const connected = new Set(connectedSeats || []);
   if (!connected.size) return state;
   if (state.status === 'waiting') {
-    const kept = state.players.filter(player => player.seat === 'p1' || connected.has(player.seat));
-    if (kept.length === state.players.length) return state;
-    const players = sortPlayersByTopology(state, kept);
+    const players = state.players.filter(player => player.seat === 'p1' || connected.has(player.seat));
+    if (players.length === state.players.length) return state;
     const keptSeats = new Set(players.map(player => player.seat));
     const scores = Object.fromEntries(Object.entries(state.scores || {}).filter(([seat]) => keptSeats.has(seat)));
     const rematch = Object.fromEntries(Object.entries(state.rematch || {}).filter(([seat]) => keptSeats.has(seat)));
-    const turnSeat = authoritativeTurnSeat({ ...state, players }) || players[0]?.seat || 'p1';
-    return { ...state, players, scores, rematch, turnSeat, turnIndex: turnIndexForSeat(state, turnSeat, players), status: 'waiting' };
+    return { ...state, players, scores, rematch, status: 'waiting' };
   }
   return state;
 }
@@ -714,6 +592,8 @@ async function joinRoom(db, code, color, clientToken, requestId) {
     const ownership = seatOwnership(state, authEntries(row));
     const auth = ownership.auth;
 
+    // Ownership outranks request idempotency. Re-entering with the same
+    // credential can never reserve another seat or change the seat's color.
     const ownedSeat = ownership.hashToSeat.get(tokenDigest) || null;
     if (ownedSeat) {
       await touchPresence(db, code, ownedSeat, true);
@@ -727,12 +607,9 @@ async function joinRoom(db, code, color, clientToken, requestId) {
       return { token, seat: prior.seat, room: publicRoom(row) };
     }
 
-    const order = seatOrder(state);
-    const seat = order.find(candidate => !state.players.some(player => player.seat === candidate));
+    const seat = ['p2', 'p3', 'p4'].find(candidate => !state.players.some(player => player.seat === candidate));
     if (!seat) throw new Error('room_full');
-    const expectedColor = topologyForState(state).find(entry => entry.seat === seat)?.color;
-    if (!expectedColor) throw new Error('identity_conflict');
-    const next = joinState(state, seat, expectedColor);
+    const next = joinState(state, seat, color);
     await touchPresence(db, code, seat, true);
     const result = await db.execute({ sql: `UPDATE ${TABLE} SET auth_json = ?, state_json = ?, status = ?, version = version + 1, updated_at = ?, expires_at = ? WHERE room_code = ? AND version = ?`, args: [JSON.stringify([...auth, { seat, hash: tokenDigest, joinKey }]), JSON.stringify(next), next.status, new Date().toISOString(), isoAfter(ROOM_TTL_MS), code, Number(row.version)] });
     if (Number(result.rowsAffected || 0) === 1) return { token, seat, room: { code, version: Number(row.version) + 1, ...publicState(next) } };
@@ -743,19 +620,7 @@ async function joinRoom(db, code, color, clientToken, requestId) {
 function preview(row) {
   const state = JSON.parse(String(row.state_json));
   const winsToMatch = Number(state.winsToMatch ?? state.targetRounds);
-  const topology = topologyForState(state);
-  const occupied = new Set((state.players || []).map(player => player.seat));
-  const openSeats = topology.filter(entry => !occupied.has(entry.seat));
-  return {
-    code: String(row.room_code),
-    status: state.status,
-    targetPlayers: state.targetPlayers,
-    targetRounds: winsToMatch,
-    winsToMatch,
-    seatTopology: topology,
-    openSeats,
-    availableColors: openSeats.map(entry => entry.color),
-  };
+  return { code: String(row.room_code), status: state.status, targetPlayers: state.targetPlayers, targetRounds: winsToMatch, winsToMatch, availableColors: COLORS.filter(color => !state.players.some(player => player.color === color)) };
 }
 
 function statusFor(error) {
@@ -765,7 +630,7 @@ function statusFor(error) {
   if (code === 'unauthorized') return 401;
   if (code === 'rate_limited') return 429;
   if (code === 'room_code_exhausted') return 503;
-  if (['not_your_turn', 'room_full', 'room_not_waiting', 'room_edit_forbidden', 'version_conflict', 'color_taken', 'seat_color_mismatch', 'room_not_playing', 'round_not_finished', 'occupied_slot', 'no_piece_remaining', 'identity_conflict'].includes(code)) return 409;
+  if (['not_your_turn', 'room_full', 'room_not_waiting', 'room_edit_forbidden', 'version_conflict', 'color_taken', 'room_not_playing', 'round_not_finished', 'occupied_slot', 'no_piece_remaining', 'identity_conflict'].includes(code)) return 409;
   if (['invalid_color', 'invalid_player_count', 'invalid_round_count', 'invalid_move', 'invalid_room_code', 'invalid_payload', 'invalid_action', 'invalid_seat', 'invalid_session', 'invalid_mutation_id', 'unsafe_room_edit'].includes(code)) return 400;
   return 500;
 }
@@ -845,39 +710,4 @@ export default async function handler(req, res) {
   }
 }
 
-export const __testing = {
-  PROTOCOL,
-  SEAT_CONTRACT_VERSION,
-  CANONICAL_COLOR_RING,
-  PLAYER_STALE_MS,
-  PRESENCE_WRITE_INTERVAL_MS,
-  advanceRoundState,
-  applyMove,
-  applyRoomEdit,
-  authoritativeTurnSeat,
-  canonicalSeatTopology,
-  createState,
-  emptyBoard,
-  hasLegalMove,
-  joinState,
-  leaveState,
-  materializeUpdatedRow,
-  mutationApplied,
-  nextPlayableHandoff,
-  nextPlayablePlayer,
-  normalizeCode,
-  preview,
-  publicRoom,
-  publicState,
-  reconcilePresenceState,
-  recordMutation,
-  rematchState,
-  requireCurrentVersion,
-  seatOrder,
-  seatOwnership,
-  topologyForState,
-  validMutationId,
-  validatePlacement,
-  winner,
-  winningPatterns: rulesWinningPatterns,
-};
+export const __testing = { PROTOCOL, PLAYER_STALE_MS, PRESENCE_WRITE_INTERVAL_MS, advanceRoundState, applyMove, applyRoomEdit, createState, emptyBoard, hasLegalMove, joinState, leaveState, materializeUpdatedRow, mutationApplied, normalizeCode, preview, publicRoom, publicState, reconcilePresenceState, recordMutation, rematchState, requireCurrentVersion, seatOwnership, validMutationId, validatePlacement, winner, winningPatterns: rulesWinningPatterns };
