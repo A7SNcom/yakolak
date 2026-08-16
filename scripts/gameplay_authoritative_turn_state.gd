@@ -96,36 +96,39 @@ func _authoritative_online_pointer_ready() -> bool:
 
 
 func _on_authoritative_test_target_requested(_arguments: Array) -> void:
-	# Automation-only observability. This does not dispatch input or alter rules;
-	# it exposes the exact live projection used by a real Playwright tap so TURN-42
-	# can prove pointer readiness while the camera is still moving.
+	# Automation-only observability. Reuse the production mesh-triangle picker to
+	# expose a point that a real touch actually resolves to the authoritative
+	# player's large stone. A simple mesh projection can land in a ring hole or
+	# behind another nested stone and is not evidence of interactive readiness.
 	if not OS.has_feature("web") or camera == null or piece_records.is_empty():
 		return
 	var direction: String = _current_direction()
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
-	var viewport_center: Vector2 = viewport_size * 0.5
-	var best_point: Vector2 = Vector2(-1.0, -1.0)
-	var best_distance: float = INF
-	for index: int in range(piece_records.size()):
+	var canvas_rect: Rect2 = _gameplay_canvas_css_rect()
+	if viewport_size.x < 1.0 or viewport_size.y < 1.0 or canvas_rect.size.x < 1.0 or canvas_rect.size.y < 1.0:
+		return
+	var css_scale := Vector2(canvas_rect.size.x / viewport_size.x, canvas_rect.size.y / viewport_size.y)
+	var candidates: Array[int] = _current_piece_candidates()
+	var piece_internal: Vector2 = Vector2(-1.0, -1.0)
+	for index: int in candidates:
 		var record: Dictionary = piece_records[index] as Dictionary
-		if bool(record.get("played", false)) or str(record.get("dir", "")) != direction or str(record.get("type", "")) != "large":
+		if str(record.get("type", "")) != "large":
 			continue
-		var mesh_instance := record.get("mesh", null) as MeshInstance3D
-		if mesh_instance == null:
-			continue
-		var point: Vector2 = camera.unproject_position(mesh_instance.to_global(Vector3(17.0, 0.0, 9.5)))
-		var visible: bool = point.x >= 2.0 and point.x <= viewport_size.x - 2.0 and point.y >= 2.0 and point.y <= viewport_size.y - 2.0
-		var distance: float = point.distance_squared_to(viewport_center) + (0.0 if visible else 100000000.0)
-		if distance < best_distance:
-			best_distance = distance
-			best_point = point
+		var candidate_point: Vector2 = _visible_piece_test_pointer(index, candidates)
+		if candidate_point.x >= 0.0 and candidate_point.y >= 0.0:
+			piece_internal = candidate_point
+			break
+	var piece_css: Vector2 = Vector2(-1.0, -1.0)
+	if piece_internal.x >= 0.0 and piece_internal.y >= 0.0:
+		piece_css = canvas_rect.position + piece_internal * css_scale
 	var cell_world_point: Vector3 = Vector3(CELL_COORDS[4].x * U, 0.52, CELL_COORDS[4].z * U)
-	var cell_point: Vector2 = camera.unproject_position(cell_world_point)
+	var cell_internal: Vector2 = camera.unproject_position(cell_world_point)
+	var cell_css: Vector2 = canvas_rect.position + cell_internal * css_scale
 	JavaScriptBridge.eval(
-		"document.body.dataset.yakolakTestAuthorityPieceX='%s';" % str(best_point.x) +
-		"document.body.dataset.yakolakTestAuthorityPieceY='%s';" % str(best_point.y) +
-		"document.body.dataset.yakolakTestAuthorityCellX='%s';" % str(cell_point.x) +
-		"document.body.dataset.yakolakTestAuthorityCellY='%s';" % str(cell_point.y) +
+		"document.body.dataset.yakolakTestAuthorityPieceX='%s';" % str(piece_css.x) +
+		"document.body.dataset.yakolakTestAuthorityPieceY='%s';" % str(piece_css.y) +
+		"document.body.dataset.yakolakTestAuthorityCellX='%s';" % str(cell_css.x) +
+		"document.body.dataset.yakolakTestAuthorityCellY='%s';" % str(cell_css.y) +
 		"document.body.dataset.yakolakTestAuthorityTargetDirection='%s';" % _turn_js(direction),
 		true
 	)
