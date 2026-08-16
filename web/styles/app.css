@@ -117,6 +117,23 @@ h1 {
 .unsupported span { display: block; }
 .unsupported span { margin-top: 8px; color: rgba(247, 248, 251, 0.72); line-height: 1.5; }
 
+.recovery-action {
+  min-height: 44px;
+  margin-top: 16px;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: #f7f8fb;
+  color: #0b1018;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.recovery-action:focus-visible {
+  outline: 3px solid rgba(247, 248, 251, 0.42);
+  outline-offset: 3px;
+}
+
 @media (max-width: 360px) {
   .overlay { top: max(16px, env(safe-area-inset-top)); }
   .build-marker { left: max(10px, env(safe-area-inset-left)); right: auto; max-width: calc(100vw - 20px); }
