@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createFrameGovernor } from '../camera/frame-governor.js';
 
 export function createPreviewScene(rendererOwner) {
   if (!rendererOwner) throw new TypeError('Preview scene requires the renderer owner');
@@ -40,44 +41,63 @@ export function createPreviewScene(rendererOwner) {
   rim.position.set(-3.2, 0.8, 2.4);
   scene.add(rim);
 
-  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const startedAt = performance.now();
-  let frameId = 0;
+  const reducedMotionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+  let reducedMotion = reducedMotionQuery.matches;
+  let animationElapsedMs = 0;
+  let lastFrameNow = null;
   let running = false;
   let disposed = false;
 
-  function draw(now) {
-    if (!running || disposed) return;
+  const frameGovernor = createFrameGovernor({
+    rendererOwner,
+    camera,
+    baseFov: 42,
+    referenceAspect: 1,
+    maxFov: 72,
+    onFrame({ now, resumed }) {
+      if (!running || disposed) return;
 
-    const { width, height, resized } = rendererOwner.resizeToDisplaySize();
-    const aspect = width / height;
-    if (resized || camera.aspect !== aspect) {
-      camera.aspect = aspect;
-      camera.updateProjectionMatrix();
-    }
+      if (!reducedMotion) {
+        if (lastFrameNow == null || resumed) lastFrameNow = now;
+        const deltaMs = Math.min(Math.max(now - lastFrameNow, 0), 50);
+        lastFrameNow = now;
+        animationElapsedMs += deltaMs;
 
-    if (!reducedMotion) {
-      const t = (now - startedAt) * 0.00022;
-      group.rotation.y = t;
-      group.rotation.x = Math.sin(t * 0.8) * 0.11;
-      ring.rotation.z = Math.PI * 0.18 - t * 0.42;
-    }
+        const t = animationElapsedMs * 0.00022;
+        group.rotation.y = t;
+        group.rotation.x = Math.sin(t * 0.8) * 0.11;
+        ring.rotation.z = Math.PI * 0.18 - t * 0.42;
+      } else {
+        lastFrameNow = null;
+      }
 
-    rendererOwner.render(scene, camera);
-    frameId = requestAnimationFrame(draw);
+      rendererOwner.render(scene, camera);
+    },
+  });
+
+  function onReducedMotionChange(event) {
+    reducedMotion = event.matches;
+    lastFrameNow = null;
+    frameGovernor.setContinuous(!reducedMotion);
+    frameGovernor.requestRender();
   }
+
+  reducedMotionQuery.addEventListener?.('change', onReducedMotionChange);
 
   function start() {
     if (running || disposed) return;
     running = true;
-    frameId = requestAnimationFrame(draw);
+    frameGovernor.start();
+    frameGovernor.setContinuous(!reducedMotion);
+    frameGovernor.requestRender();
   }
 
   function dispose() {
     if (disposed) return;
     disposed = true;
     running = false;
-    cancelAnimationFrame(frameId);
+    reducedMotionQuery.removeEventListener?.('change', onReducedMotionChange);
+    frameGovernor.dispose();
     geometry.dispose();
     material.dispose();
     ringGeometry.dispose();
@@ -85,5 +105,11 @@ export function createPreviewScene(rendererOwner) {
     scene.clear();
   }
 
-  return Object.freeze({ scene, camera, start, dispose });
+  return Object.freeze({
+    scene,
+    camera,
+    start,
+    requestRender: () => frameGovernor.requestRender(),
+    dispose,
+  });
 }
