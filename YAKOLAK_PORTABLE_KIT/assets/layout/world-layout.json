@@ -1,6 +1,6 @@
 {
   "units": "arbitrary; uniform scaling only",
-  "identities": {"right":"white","back":"blue","left":"gold","front":"green"},
+  "identities": {"right":"marble","back":"blue","left":"gold","front":"green"},
   "turnRing": ["right","back","left","front"],
   "introOrder": ["right","left","front","back"],
   "zones": [
