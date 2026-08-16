@@ -1,0 +1,25 @@
+name: THREEJS-019 player base verification
+
+on:
+  push:
+    branches: [threejs-rebuild]
+    paths:
+      - 'scripts/analyze-threejs-player-base.mjs'
+      - '.github/workflows/threejs-019-player-base.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact migration SHA
+        uses: actions/checkout@v4
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Analyze canonical player base geometry
+        run: node scripts/analyze-threejs-player-base.mjs
