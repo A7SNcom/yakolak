@@ -1,18 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
-import { ASSET_LIST, ASSET_GROUPS, unavailableRequiredAssets } from '../web/app/assets/asset-manifest.js';
-import { createAssetManager, AssetGroupNotReadyError } from '../web/app/assets/asset-manager.js';
+import { ASSET_LIST, ASSET_GROUPS, PORTABLE_MANIFEST, unavailableRequiredAssets } from '../web/app/assets/asset-manifest.js';
+import {
+  AssetGroupLoadError,
+  AssetIntegrityError,
+  AssetLoadCancelledError,
+  createAssetManager,
+} from '../web/app/assets/asset-manager.js';
 
-const portable = JSON.parse(await readFile(new URL('../YAKOLAK_PORTABLE_KIT/assets/manifest.json', import.meta.url), 'utf8'));
+const portableBytes = await readFile(new URL('../YAKOLAK_PORTABLE_KIT/assets/manifest.json', import.meta.url));
+const portable = JSON.parse(portableBytes.toString('utf8'));
 
-function mockAsset({ id = 'test.asset', group = 'boot-critical', type = 'text', ready = true, required = true } = {}) {
+function gitBlobSha(bytes) {
+  return createHash('sha1').update(`blob ${bytes.byteLength}\0`).update(bytes).digest('hex');
+}
+
+function mockAsset({ id = 'test.asset', group = 'boot-critical', body = 'test', required = true, type = 'text', sha = null, bytes = null } = {}) {
+  const bodyBytes = new TextEncoder().encode(body);
+  const hash = sha || gitBlobSha(bodyBytes);
   return Object.freeze({
     logicalId: id,
     group,
-    source: Object.freeze({ path: `test/${id}`, role: 'test', required, gitBlobSha: 'a'.repeat(40), bytes: 4 }),
-    runtime: Object.freeze({ url: ready ? `/assets/${id}?v=aaaaaaaaaaaa` : null, type, ready, plannedUrl: ready ? null : `/assets/runtime/${id}` }),
+    source: Object.freeze({ path: `test/${id}`, role: 'test', required, gitBlobSha: hash, bytes: bytes ?? bodyBytes.byteLength }),
+    runtime: Object.freeze({ url: `/runtime-assets/test/${id}?v=${hash}`, type, ready: true, versionId: `git:${hash}`, integrity: `git-blob-sha1:${hash}` }),
     runtimeRequired: required,
   });
 }
@@ -22,111 +35,109 @@ function response(body, status = 200) {
   return new Response(bytes, { status, headers: { 'content-length': String(bytes.byteLength) } });
 }
 
-test('runtime manifest covers the definitive portable manifest exactly', () => {
-  const sourcePaths = ASSET_LIST.map((asset) => asset.source.path).sort();
-  const portablePaths = portable.assets.map((asset) => asset.path).sort();
-  assert.deepEqual(sourcePaths, portablePaths);
+test('runtime manifest exactly covers definitive portable manifest with immutable identifiers', () => {
+  assert.equal(gitBlobSha(portableBytes), PORTABLE_MANIFEST.gitBlobSha);
+  assert.deepEqual(ASSET_LIST.map((asset) => asset.source.path).sort(), portable.assets.map((asset) => asset.path).sort());
+  assert.equal(ASSET_LIST.length, 18);
 
-  for (const item of portable.assets) {
-    const runtime = ASSET_LIST.find((asset) => asset.source.path === item.path);
-    assert.ok(runtime, `missing runtime manifest entry for ${item.path}`);
-    assert.equal(runtime.source.required, item.required, `portable required flag drift for ${item.path}`);
-    assert.match(runtime.source.gitBlobSha, /^[0-9a-f]{40}$/);
-    assert.ok(ASSET_GROUPS[runtime.group], `unknown group for ${item.path}`);
+  for (const portableEntry of portable.assets) {
+    const asset = ASSET_LIST.find((entry) => entry.source.path === portableEntry.path);
+    assert.ok(asset);
+    assert.equal(asset.source.required, portableEntry.required);
+    assert.equal(asset.runtimeRequired, portableEntry.required);
+    assert.ok(ASSET_GROUPS[asset.group]);
+    assert.match(asset.source.gitBlobSha, /^[0-9a-f]{40}$/);
+    assert.equal(asset.runtime.versionId, `git:${asset.source.gitBlobSha}`);
+    assert.equal(asset.runtime.integrity, `git-blob-sha1:${asset.source.gitBlobSha}`);
+    assert.match(asset.runtime.url, new RegExp(`^/runtime-assets/.+\\?v=${asset.source.gitBlobSha}$`));
+    if (portableEntry.required) assert.equal(ASSET_GROUPS[asset.group].blocking, true);
+    else assert.equal(asset.group, 'optional');
   }
-});
 
-test('ready runtime URLs are local, immutable-versioned and boot group is loadable', () => {
-  const ready = ASSET_LIST.filter((asset) => asset.runtime.ready);
-  assert.ok(ready.length >= 5);
-  for (const asset of ready) {
-    assert.match(asset.runtime.url, /^\/assets\//);
-    assert.match(asset.runtime.url, /\?v=[0-9a-f]{12}$/);
-    assert.doesNotMatch(asset.runtime.url, /^https?:\/\//);
-  }
   assert.deepEqual(unavailableRequiredAssets('boot-critical'), []);
+  assert.deepEqual(unavailableRequiredAssets('scene-critical'), []);
 });
 
-test('scene-critical readiness is honest until conversion tasks land', () => {
-  const blockers = unavailableRequiredAssets('scene-critical');
-  const ids = blockers.map((asset) => asset.logicalId);
-  assert.ok(ids.includes('model.board-and-lid'));
-  assert.ok(ids.includes('model.player-base'));
-  assert.ok(ids.includes('model.piece-small'));
-  assert.ok(ids.includes('model.piece-medium'));
-  assert.ok(ids.includes('model.piece-large'));
-  assert.ok(ids.includes('model.score-marker'));
-  assert.ok(ids.includes('scene.room-spec'));
-});
-
-test('manager deduplicates concurrent loads and caches successful results', async () => {
+test('concurrent group loads deduplicate to one operation', async () => {
   const asset = mockAsset();
   let calls = 0;
-  const manager = createAssetManager({
-    manifest: [asset],
-    fetchImpl: async () => {
-      calls += 1;
-      await Promise.resolve();
-      return response('test');
-    },
-  });
-
-  const first = manager.loadAsset(asset.logicalId);
-  const second = manager.loadAsset(asset.logicalId);
-  assert.equal(first, second, 'concurrent requests must share one loader promise');
-  assert.equal(await first, 'test');
-  assert.equal(await manager.loadAsset(asset.logicalId), 'test');
-  assert.equal(calls, 1, 'cache/dedupe must prevent duplicate network loads');
+  const manager = createAssetManager({ manifest: [asset], fetchImpl: async () => { calls += 1; await Promise.resolve(); return response('test'); } });
+  const first = manager.loadGroup('boot-critical');
+  const second = manager.loadGroup('boot-critical');
+  assert.equal(first, second);
+  await first;
+  assert.equal(calls, 1);
+  assert.equal(manager.get(asset.logicalId), 'test');
+  assert.equal(manager.snapshot('boot-critical').status, 'ready');
 });
 
-test('failed assets require explicit retry and retry does not duplicate attempts', async () => {
+test('required group failure rolls back successful siblings and exposes no partial cache', async () => {
+  const good = mockAsset({ id: 'good.asset', body: 'good' });
+  const missing = mockAsset({ id: 'missing.asset', body: 'miss' });
+  const manager = createAssetManager({
+    manifest: [good, missing],
+    fetchImpl: async (url) => url.includes('missing.asset') ? response('nope', 503) : response('good'),
+  });
+  await assert.rejects(manager.loadGroup('boot-critical'), AssetGroupLoadError);
+  assert.equal(manager.get(good.logicalId), undefined);
+  assert.equal(manager.get(missing.logicalId), undefined);
+  assert.equal(manager.snapshot('boot-critical').status, 'failed');
+});
+
+test('integrity mismatch fails closed for required assets', async () => {
+  const badSha = 'a'.repeat(40);
+  const asset = mockAsset({ id: 'integrity.asset', body: 'test', sha: badSha });
+  const manager = createAssetManager({ manifest: [asset], fetchImpl: async () => response('test') });
+  await assert.rejects(manager.loadGroup('boot-critical'), (error) => {
+    assert.equal(error.name, 'AssetGroupLoadError');
+    assert.equal(error.failures[0].name, AssetIntegrityError.name);
+    return true;
+  });
+  assert.equal(manager.get(asset.logicalId), undefined);
+});
+
+test('optional failures degrade safely while successful optional assets commit', async () => {
+  const good = mockAsset({ id: 'optional.good', group: 'optional', body: 'good', required: false });
+  const bad = mockAsset({ id: 'optional.bad', group: 'optional', body: 'bad!', required: false });
+  const manager = createAssetManager({
+    manifest: [good, bad],
+    fetchImpl: async (url) => url.includes('optional.bad') ? response('nope', 404) : response('good'),
+  });
+  const result = await manager.loadGroup('optional');
+  assert.equal(result.progress.status, 'degraded');
+  assert.equal(manager.get(good.logicalId), 'good');
+  assert.equal(manager.get(bad.logicalId), undefined);
+});
+
+test('cancellation rolls back staged required resources', async () => {
+  const asset = mockAsset({ id: 'cancel.asset' });
+  const manager = createAssetManager({
+    manifest: [asset],
+    fetchImpl: (_url, { signal }) => new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new DOMException('cancelled', 'AbortError')), { once: true })),
+  });
+  const operation = manager.startGroupLoad('boot-critical');
+  operation.cancel('test-cancel');
+  await assert.rejects(operation.promise, AssetLoadCancelledError);
+  assert.equal(manager.snapshot('boot-critical').status, 'cancelled');
+  assert.equal(manager.get(asset.logicalId), undefined);
+});
+
+test('explicit retry starts exactly one fresh group run after failure', async () => {
   const asset = mockAsset({ id: 'retry.asset' });
   let calls = 0;
   const manager = createAssetManager({
     manifest: [asset],
     fetchImpl: async () => {
       calls += 1;
-      return calls === 1 ? response('no', 503) : response('ok');
+      return calls === 1 ? response('nope', 503) : response('test');
     },
   });
-
-  await assert.rejects(manager.loadAsset(asset.logicalId), /HTTP 503/);
-  await assert.rejects(manager.loadAsset(asset.logicalId), /HTTP 503|Previous attempt failed/);
-  assert.equal(calls, 1, 'failed state must not secretly retry');
-  assert.equal(await manager.loadAsset(asset.logicalId, { retry: true }), 'ok');
+  await assert.rejects(manager.loadGroup('boot-critical'), AssetGroupLoadError);
+  const firstRetry = manager.loadGroup('boot-critical', { retry: true });
+  const duplicateRetry = manager.loadGroup('boot-critical', { retry: true });
+  assert.equal(firstRetry, duplicateRetry);
+  await firstRetry;
   assert.equal(calls, 2);
-  assert.equal(manager.getState(asset.logicalId).attempts, 2);
-});
-
-test('group cancellation aborts in-flight work and leaves a cancellable state', async () => {
-  const asset = mockAsset({ id: 'cancel.asset' });
-  const manager = createAssetManager({
-    manifest: [asset],
-    fetchImpl: (_url, { signal }) => new Promise((_resolve, reject) => {
-      signal.addEventListener('abort', () => reject(new DOMException('cancelled', 'AbortError')), { once: true });
-    }),
-  });
-
-  const operation = manager.startGroupLoad('boot-critical');
-  operation.cancel('test-cancel');
-  await assert.rejects(operation.promise, (error) => error?.name === 'AssetGroupLoadError' || error?.name === 'AbortError');
-  assert.equal(manager.getState(asset.logicalId).status, 'cancelled');
-});
-
-test('required unavailable scene assets block the group before any fetch occurs', async () => {
-  const blocked = mockAsset({ id: 'blocked.asset', group: 'scene-critical', ready: false, required: true });
-  let calls = 0;
-  const manager = createAssetManager({ manifest: [blocked], fetchImpl: async () => { calls += 1; return response('unexpected'); } });
-  await assert.rejects(manager.loadGroup('scene-critical'), AssetGroupNotReadyError);
-  assert.equal(calls, 0);
-});
-
-test('optional unavailable assets degrade to null without network fetch or authoritative guess', async () => {
-  const optional = mockAsset({ id: 'optional.asset', group: 'optional', ready: false, required: false });
-  let calls = 0;
-  const manager = createAssetManager({ manifest: [optional], fetchImpl: async () => { calls += 1; return response('unexpected'); } });
-  const result = await manager.loadGroup('optional');
-  assert.equal(result.values.get(optional.logicalId), null);
-  assert.equal(manager.getState(optional.logicalId).status, 'optional-unavailable');
-  assert.equal(calls, 0);
+  assert.equal(manager.snapshot('boot-critical').attempt, 2);
+  assert.equal(manager.get(asset.logicalId), 'test');
 });
