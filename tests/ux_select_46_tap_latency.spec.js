@@ -36,8 +36,7 @@ async function startPassPlay(page) {
     () => document.body.dataset.yakolakIntro === 'complete' &&
       document.body.dataset.yakolakSetup === 'visible' &&
       typeof window.yakolakTestStartPassPlay === 'function' &&
-      typeof window.yakolakTestClearSelection === 'function' &&
-      typeof window.yakolakTestRefreshPickTargets === 'function',
+      typeof window.yakolakTestClearSelection === 'function',
     null,
     { timeout: 60000 },
   );
@@ -52,16 +51,29 @@ async function startPassPlay(page) {
 }
 
 async function freshTarget(page) {
-  const before = await page.evaluate(() => Number(document.body.dataset.yakolakPiecePickTargetRevision || 0));
-  await page.evaluate(() => window.yakolakTestRefreshPickTargets());
-  await page.waitForFunction(
-    previous => Number(document.body.dataset.yakolakPiecePickTargetRevision || 0) > previous,
-    before,
-    { timeout: 6000 },
-  );
+  const hasRefreshHook = await page.evaluate(() => typeof window.yakolakTestRefreshPickTargets === 'function');
+  if (hasRefreshHook) {
+    const before = await page.evaluate(() => Number(document.body.dataset.yakolakPiecePickTargetRevision || 0));
+    await page.evaluate(() => window.yakolakTestRefreshPickTargets());
+    await page.waitForFunction(
+      previous => Number(document.body.dataset.yakolakPiecePickTargetRevision || 0) > previous,
+      before,
+      { timeout: 6000 },
+    );
+  } else {
+    // Canonical Production can intentionally lag source. Its browser bridge
+    // publishes the same visible large-piece coordinate on a short cadence,
+    // but predates the explicit refresh callback/revision used by latest main.
+    await page.waitForFunction(
+      () => Number(document.body.dataset.yakolakTestLargeX || document.body.dataset.yakolakTestPieceX || 0) > 0 &&
+        Number(document.body.dataset.yakolakTestLargeY || document.body.dataset.yakolakTestPieceY || 0) > 0,
+      null,
+      { timeout: 6000 },
+    );
+  }
   const target = await page.evaluate(() => ({
-    x: Number(document.body.dataset.yakolakTestSide0LargeX || document.body.dataset.yakolakTestPieceX || 0),
-    y: Number(document.body.dataset.yakolakTestSide0LargeY || document.body.dataset.yakolakTestPieceY || 0),
+    x: Number(document.body.dataset.yakolakTestSide0LargeX || document.body.dataset.yakolakTestLargeX || document.body.dataset.yakolakTestPieceX || 0),
+    y: Number(document.body.dataset.yakolakTestSide0LargeY || document.body.dataset.yakolakTestLargeY || document.body.dataset.yakolakTestPieceY || 0),
   }));
   expect(target.x).toBeGreaterThan(0);
   expect(target.y).toBeGreaterThan(0);
