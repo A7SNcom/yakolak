@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "canonicalPath": "YAKOLAK_PORTABLE_KIT/assets/models/player-base.stl",
+    "canonicalGitBlobSha1": "066b3f95f5281a178b610611075cbab0689cdb12",
+    "canonicalBytes": 9955084,
+    "runtimePath": "web/assets/models/player-base.glb",
+    "runtimeGitBlobSha1": "63550f0eeb7aa9c004f251fb4238d751dfd4d06c",
+    "runtimeSha256": "c8b3740a181c21ebf342ff11b2e8679989e9f85598fd13bd6b32bbd0b1bb060f",
+    "runtimeBytes": 1942888,
+    "triangleCount": 199100,
+    "componentCount": 12
+  },
+  "axisPolicy": {
+    "sourcePlane": "XY",
+    "sourceDepthAxis": "+Z",
+    "worldUp": "+Y",
+    "uniformScale": 1,
+    "ownershipDerivedFromMeshPosition": false
+  },
+  "geometry": {
+    "assetPivot": [33, 84.5, 6],
+    "sourceBounds": {
+      "min": [0, 0, 0],
+      "max": [66, 169, 12]
+    },
+    "componentIndices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+    "visualStackGroups": [
+      {
+        "id": "source-high",
+        "componentIndices": [4, 5, 6],
+        "measuredSourceCenter": [33, 132.24295043945312, 0]
+      },
+      {
+        "id": "source-middle",
+        "componentIndices": [0, 10, 11],
+        "measuredSourceCenter": [33, 84.49997138977051, 0]
+      },
+      {
+        "id": "source-low",
+        "componentIndices": [7, 8, 9],
+        "measuredSourceCenter": [33, 36.75699043273926, 0]
+      }
+    ],
+    "homeAlignmentTolerance": 0.3
+  },
+  "verifiedWorldBounds": {
+    "right": {"min": [102, 0, -84.5], "max": [168, 12, 84.5]},
+    "back": {"min": [-84.5, 0, -168], "max": [84.5, 12, -102]},
+    "left": {"min": [-168, 0, -84.5], "max": [-102, 12, 84.5]},
+    "front": {"min": [-84.5, 0, 102], "max": [84.5, 12, 168]}
+  }
+}
