@@ -154,11 +154,11 @@ func _build_reset_button() -> void:
 	reset.focus_mode = Control.FOCUS_NONE
 	reset.anchor_left = 1.0
 	reset.anchor_right = 1.0
-	reset.offset_left = -128.0
+	reset.offset_left = -160.0
 	reset.offset_right = -16.0
 	reset.offset_top = 18.0
-	reset.offset_bottom = 66.0
-	reset.add_theme_font_size_override("font_size", 16)
+	reset.offset_bottom = 102.0
+	reset.add_theme_font_size_override("font_size", 18)
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = Color(0.05, 0.05, 0.05, 0.88)
 	normal.corner_radius_top_left = 12
