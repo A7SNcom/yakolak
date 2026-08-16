@@ -12,13 +12,10 @@ required=(
   web/app/camera/frame-governor.js
   web/app/assets/asset-manifest.js
   web/app/assets/asset-manager.js
-  web/assets/kit/ui/loading-star.svg
-  web/assets/kit/layout/world-layout.json
-  web/assets/kit/layout/intro-scatter.csv
-  web/assets/kit/reference/approved-contract.json
-  web/assets/kit/table/table.svg
   web/vendor/three/r185/three.module.js
   web/vendor/three/r185/three.core.js
+  web/vendor/three/r185/addons/loaders/STLLoader.js
+  scripts/prepare-threejs-runtime-assets.mjs
   tests/threejs_renderer_owner_contract.test.mjs
   tests/threejs_frame_governor_contract.test.mjs
   tests/threejs_asset_loading_contract.test.mjs
@@ -28,6 +25,8 @@ required=(
 for file in "${required[@]}"; do
   test -s "$file" || { echo "Missing required Three.js shell file: $file" >&2; exit 1; }
 done
+
+node scripts/prepare-threejs-runtime-assets.mjs
 
 if find web -type f \( -name '*.pck' -o -name '*.wasm' -o -name 'index.js' -o -name 'index.audio*.js' \) -print -quit | grep -q .; then
   echo "Forbidden Godot runtime artifact found under web/" >&2
@@ -51,4 +50,4 @@ if [ "${VERCEL_GIT_COMMIT_REF:-}" = "threejs-rebuild" ]; then
   test -n "${TURSO_AUTH_TOKEN:-}" || { echo "Missing TURSO_AUTH_TOKEN" >&2; exit 1; }
 fi
 
-echo "Verified YAKOLAK zero-Godot static Three.js shell"
+echo "Verified YAKOLAK static Three.js shell with immutable atomic asset gate"
