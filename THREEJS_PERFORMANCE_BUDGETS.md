@@ -23,7 +23,7 @@ The canonical values live in `web/app/perf/performance-budgets.js`; the browser 
 
 ## Measured baseline — 2026-08-16
 
-GitHub Actions run `31973050538`, commit `d64c95507e3e9e09ca7d14482388c56c68d7b464` measured:
+GitHub Actions run `31974482208`, commit `6eee44e0996df83d564e73f4bcf59b239500bc43` revalidated the current candidate after THREEJS-016:
 
 | Metric | Baseline |
 | --- | ---: |
@@ -35,11 +35,11 @@ GitHub Actions run `31973050538`, commit `d64c95507e3e9e09ca7d14482388c56c68d7b4
 | Startup encoded bytes through first interactive | 15,313,804 B / 14.604 MiB |
 | Required decoded STL geometry | 18,880,704 B / 18.006 MiB |
 | Optional decoded table textures (RGBA8 estimate) | 50,331,648 B / 48.000 MiB |
-| Boot module starts | 11,676.3 ms |
-| Boot-critical ready | 12,105.8 ms |
-| All critical assets ready | 78,393.8 ms |
-| First interactive shell | 78,444.1 ms |
-| First visible WebGL frame | 78,578.9 ms |
+| Boot module starts | 11,689.5 ms |
+| Boot-critical ready | 12,120.2 ms |
+| All critical assets ready | 78,338.2 ms |
+| First interactive shell | 78,381.7 ms |
+| First visible WebGL frame | 78,508.8 ms |
 | Current placeholder draw calls | 2 |
 | Current placeholder triangles | 8,192 |
 | Current GPU geometry objects | 2 |
@@ -51,6 +51,8 @@ GitHub Actions run `31973050538`, commit `d64c95507e3e9e09ca7d14482388c56c68d7b4
 ### What the baseline means
 
 The current placeholder frame is cheap. The dominant problem is the pre-render asset path: the browser transfers about 13.14 MB of required portable assets and decodes the required STL files to about 18.88 MB of BufferGeometry before exposing the shell. The optional three 2048×2048 table maps would consume 48 MiB if decoded as RGBA8, so they remain presentation-only and must never become a blocking startup dependency.
+
+THREEJS-016 has committed deterministic GLB maintenance outputs, but they are not yet in the startup request graph: current browser verification still requests the canonical runtime STL copies. The baseline therefore measures the actual current load path rather than counting repository files the browser does not request. Revalidation after THREEJS-016 produced zero payload/decode/GPU delta; timing differences from the prior baseline were only hosted-runner jitter.
 
 This is a deliberately honest baseline, not an acceptance claim. `THREEJS-018` through `THREEJS-021` are expected to improve the asset path while preserving canonical geometry/layout semantics.
 
@@ -114,3 +116,9 @@ The timing targets intentionally use the same slow mobile profile. They are not 
 5. Optional PNG decode cost is an RGBA8 footprint estimate (`width × height × 4`) and is intentionally independent of compressed PNG file size.
 6. Renderer frame counters come from the single renderer owner (`renderer.info`); rendering/UI code may not create a second renderer to evade the counters.
 7. A later optimization may lower a ceiling. Raising a ceiling requires an explicit migration decision, rationale and a new measured baseline; it must never be an automatic response to a failing gate.
+
+## Current-head verification
+
+- GitHub Actions run `31974482208` passed the full desktop/mobile shell verification and every THREEJS-017 regression ceiling on runtime commit `6eee44e0996df83d564e73f4bcf59b239500bc43`.
+- Vercel Preview for the same runtime commit passed the deterministic THREEJS-017 contract and remained a non-Production deployment with only the `threejs-rebuild` branch alias.
+- This documentation update changes no runtime asset, module, renderer or budget value; it records the verified result only.
