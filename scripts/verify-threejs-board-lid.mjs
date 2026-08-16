@@ -189,8 +189,10 @@ export async function verifyBoardAndLid() {
 
   const manifestEntry = manifest.assets.find((entry) => entry.path === 'models/board-and-lid.stl');
   assert(manifestEntry, 'Portable manifest is missing models/board-and-lid.stl');
-  assert(gitBlobSha1(sourceBytes) === manifestEntry.gitBlobSha, 'Canonical board-and-lid STL Git blob SHA drift');
-  assert(sourceBytes.byteLength === manifestEntry.bytes, 'Canonical board-and-lid STL byte-size drift');
+  assert(manifest.status === 'definitive' && manifest.scalePolicy === 'uniform-only', 'Portable manifest authority/scale policy drift');
+  assert(manifestEntry.role === 'board-and-intro-lid', `Portable board/lid role drift: ${manifestEntry.role}`);
+  assert(manifestEntry.instances === '1 board + 1 temporary lid', `Portable board/lid instance contract drift: ${manifestEntry.instances}`);
+  assert(manifestEntry.required === true, 'Portable board/lid asset must remain required');
   assert(stl.triangleCount === 62280, `Expected 62280 source triangles, got ${stl.triangleCount}`);
   assert(components.length === 29, `Expected 29 connected components, got ${components.length}`);
   assertVec(sourceBounds.min, EXPECTED_SOURCE_BOUNDS.min, 'source bounds min');
@@ -240,6 +242,8 @@ export async function verifyBoardAndLid() {
   assert(stateEntry.conversionProfile === BOARD_LID_PROFILE_ID, 'Conversion state profile drift');
   assert(stateEntry.semanticProfile === BOARD_LID_PROFILE_ID, 'Conversion state semantic profile drift');
   assertVec(stateEntry.sourcePivot, EXPECTED_SOURCE_PIVOT, 'conversion-state source pivot');
+  assert(stateEntry.sourceGitBlobSha1 === gitBlobSha1(sourceBytes), 'Conversion state source Git blob SHA drift');
+  assert(stateEntry.sourceBytes === sourceBytes.byteLength, 'Conversion state source byte-size drift');
   assert(stateEntry.outputSha256 === sha256(glbBytes), 'Committed GLB SHA-256 does not match conversion state');
   assert(stateEntry.outputBytes === glbBytes.byteLength, 'Committed GLB byte count does not match conversion state');
 
