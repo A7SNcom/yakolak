@@ -2,6 +2,7 @@ import { hydrateBuildMarker } from './build-marker.js';
 import { installFatalErrorHandlers } from './fatal-error.js';
 import { createRendererOwner, WebGLNotSupportedError } from '../scene/renderer.js';
 import { createPreviewScene } from '../scene/preview-scene.js';
+import { createAssetManager } from '../assets/asset-manager.js';
 
 const appElement = document.querySelector('#app');
 const statusElement = document.querySelector('#boot-status');
@@ -40,16 +41,32 @@ function presentGraphicsState(contextState) {
   }
 }
 
+function createBootAssetManager() {
+  return createAssetManager({
+    onProgress: ({ group }) => {
+      if (!statusElement || group.group !== 'boot-critical') return;
+      const progress = group.percent === null
+        ? `${group.readyAssets}/${group.totalAssets}`
+        : `${Math.round(group.percent)}%`;
+      statusElement.textContent = `Loading required assets… ${progress}`;
+    },
+  });
+}
+
 async function boot() {
   document.documentElement.dataset.runtime = 'threejs-static-esm';
   document.documentElement.dataset.bootState = 'booting';
 
   const markerPromise = hydrateBuildMarker(buildMarkerElement);
+  const assetManager = createBootAssetManager();
   let rendererOwner = null;
   let previewScene = null;
   let unsubscribeContextState = null;
 
   try {
+    await assetManager.loadGroup('boot-critical');
+    document.documentElement.dataset.assetState = 'boot-critical-ready';
+
     rendererOwner = createRendererOwner({ mount: appElement });
     unsubscribeContextState = rendererOwner.subscribeContextState(presentGraphicsState);
     previewScene = createPreviewScene(rendererOwner);
@@ -61,6 +78,7 @@ async function boot() {
       unsubscribeContextState = null;
       previewScene?.dispose();
       rendererOwner?.dispose();
+      assetManager.clear();
       if (window.__YAKOLAK_THREEJS_SHELL__ === shell) {
         delete window.__YAKOLAK_THREEJS_SHELL__;
       }
@@ -71,6 +89,8 @@ async function boot() {
       canvas: rendererOwner.canvas,
       getPresentationSnapshot: () => previewScene?.getPresentationSnapshot() || null,
       getGraphicsContextSnapshot: () => rendererOwner?.getContextSnapshot() || null,
+      getAssetState: (id) => assetManager.getState(id),
+      getAssetProgress: (group = null) => assetManager.snapshot(group),
       dispose,
     });
     window.__YAKOLAK_THREEJS_SHELL__ = shell;
@@ -91,6 +111,12 @@ async function boot() {
     if (error instanceof WebGLNotSupportedError) {
       fatal.showUnsupportedWebGL();
       return;
+    }
+
+    if (!rendererOwner) {
+      document.documentElement.dataset.assetState = 'boot-critical-failed';
+      document.documentElement.dataset.bootState = 'asset-load-failed';
+      if (statusElement) statusElement.textContent = 'Required startup assets failed — reload or retry before entering the game.';
     }
     throw error;
   } finally {
