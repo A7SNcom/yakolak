@@ -1,4 +1,4 @@
-# gate-run: 4
+# gate-run: 5
 name: UX-SELECT-46 focused regression
 
 on:
@@ -8,6 +8,7 @@ on:
       - 'scripts/gameplay_selection_latency.gd'
       - 'scenes/intro.tscn'
       - 'tests/ux_select_46_tap_latency.spec.js'
+      - 'tests/ux_select_46_startup_probe.spec.js'
       - '.github/workflows/ux-select-46.yml'
   workflow_dispatch:
 
@@ -45,7 +46,7 @@ jobs:
         run: |
           npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @playwright/test@1.55.0
           npx playwright install --with-deps chromium
-      - name: Run tap feedback and rapid-tap budgets
+      - name: Run startup probe and focused budgets
         env:
           YAKOLAK_UX_SELECT_46_LABEL: optimized-main
           YAKOLAK_UX_SELECT_46_ITERATIONS: '12'
@@ -57,6 +58,7 @@ jobs:
           SERVER_PID=$!
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
           for i in {1..40}; do if curl -fsS http://127.0.0.1:8000/ >/dev/null; then break; fi; sleep 0.25; done
+          npx playwright test tests/ux_select_46_startup_probe.spec.js --workers=1 --reporter=line 2>&1 | tee /tmp/ux-select-46-startup.log
           npx playwright test tests/ux_select_46_tap_latency.spec.js --workers=1 --reporter=line 2>&1 | tee /tmp/ux-select-46-main.log
       - name: Upload focused measurements
         if: always()
