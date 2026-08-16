@@ -71,6 +71,13 @@ test('runtime manifest exactly covers definitive portable sources while derived 
   assert.equal(runtimePayloadBytes(ASSETS.boardAndLid), 2595544);
   assert.equal(runtimePayloadGitBlobSha(ASSETS.boardAndLid), '9a7e3410f641735e08a2944efa366cca2a66ee99');
 
+  assert.equal(ASSETS.playerBase.source.path, 'models/player-base.stl');
+  assert.equal(ASSETS.playerBase.source.gitBlobSha, '066b3f95f5281a178b610611075cbab0689cdb12');
+  assert.equal(ASSETS.playerBase.runtime.type, 'glb-components');
+  assert.equal(ASSETS.playerBase.runtime.url, '/assets/models/player-base.glb?v=63550f0eeb7aa9c004f251fb4238d751dfd4d06c');
+  assert.equal(runtimePayloadBytes(ASSETS.playerBase), 1942888);
+  assert.equal(runtimePayloadGitBlobSha(ASSETS.playerBase), '63550f0eeb7aa9c004f251fb4238d751dfd4d06c');
+
   assert.deepEqual(unavailableRequiredAssets('boot-critical'), []);
   assert.deepEqual(unavailableRequiredAssets('scene-critical'), []);
 });
