@@ -1,11 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "test -s web/index.html && echo 'Using ready YAKOLAK web build'",
-  "ignoreCommand": "test \"$(git log -1 --pretty=%s | cut -c1-11)\" = \"[web-ready]\" && exit 1 || exit 0",
+  "buildCommand": "test -s web/index.html && echo 'Using flash-ready YAKOLAK web build'",
+  "ignoreCommand": "git log -1 --pretty=%s | grep -q '^\\[flash-ready\\]' && exit 1 || exit 0",
   "outputDirectory": "web",
   "framework": null,
   "github": {
-    "autoJobCancelation": false
+    "autoJobCancelation": true
   },
   "git": {
     "deploymentEnabled": {
