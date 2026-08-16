@@ -22,6 +22,7 @@ required=(
   tests/threejs_renderer_owner_contract.test.mjs
   tests/threejs_frame_governor_contract.test.mjs
   tests/threejs_asset_loading_contract.test.mjs
+  tests/threejs_asset_runtime_copies_contract.test.mjs
 )
 
 for file in "${required[@]}"; do
@@ -43,6 +44,7 @@ fi
 node tests/threejs_renderer_owner_contract.test.mjs
 node tests/threejs_frame_governor_contract.test.mjs
 node tests/threejs_asset_loading_contract.test.mjs
+node tests/threejs_asset_runtime_copies_contract.test.mjs
 
 if [ "${VERCEL_GIT_COMMIT_REF:-}" = "threejs-rebuild" ]; then
   test -n "${TURSO_DATABASE_URL:-}" || { echo "Missing TURSO_DATABASE_URL" >&2; exit 1; }
