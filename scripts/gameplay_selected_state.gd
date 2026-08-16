@@ -102,7 +102,10 @@ func _reset_session_transients() -> void:
 
 func _apply_online_board(board: Dictionary) -> void:
 	super._apply_online_board(board)
-	_publish_selection_emphasis_state("reconnect-hydration")
+	# Hydration clears selected_index/materials in the authoritative session layer,
+	# but that path does not publish gameplay state. Clear all browser selection
+	# observability in the same JS operation so no stale selected owner survives.
+	_publish_selection_cleared_probe("reconnect-hydration")
 
 
 func _selection_emphasis_count() -> int:
@@ -136,6 +139,19 @@ func _publish_selection_emphasis_state(reason: String) -> void:
 	JavaScriptBridge.eval(
 		"document.body.dataset.yakolakSelectionEmphasisCount='%d';" % count +
 		"document.body.dataset.yakolakSelectionEmphasisOwner=" + JSON.stringify(owner) + ";" +
+		"document.body.dataset.yakolakSelectionEmphasisReason=" + JSON.stringify(reason) + ";",
+		true
+	)
+
+
+func _publish_selection_cleared_probe(reason: String) -> void:
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.eval(
+		"document.body.dataset.yakolakSelected='';" +
+		"document.body.dataset.yakolakSelectedSize='';" +
+		"document.body.dataset.yakolakSelectionEmphasisCount='0';" +
+		"document.body.dataset.yakolakSelectionEmphasisOwner='';" +
 		"document.body.dataset.yakolakSelectionEmphasisReason=" + JSON.stringify(reason) + ";",
 		true
 	)
