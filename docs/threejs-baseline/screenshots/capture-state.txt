@@ -1,2 +1,3 @@
-url=https://vercel.com/login?next=%2Fsso-api%3Furl%3Dhttps%253A%252F%252Fyakolak-b1evy5x1x-ahmdkcoms-projects.vercel.app%252F%26nonce%3Db457ade2dfb4fa7544737cd1f694d4ae30cdcf59bb5a7937c70fe5c14497b2b8
-title=Login – Vercel
+url=https://yakolak.vercel.app/
+title=YAKOLAK 2.6 Corrected Intro
+canvas=present
