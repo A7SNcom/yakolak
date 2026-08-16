@@ -1,8 +1,9 @@
-import { ASSET_LIST, ASSET_GROUPS } from './asset-manifest.js';
+import { ASSET_LIST, ASSET_GROUPS, runtimePayloadBytes, runtimePayloadGitBlobSha } from './asset-manifest.js';
 
 const textDecoder = new TextDecoder();
 const textEncoder = new TextEncoder();
 let stlLoaderPromise = null;
+let glbDecoderPromise = null;
 
 export class AssetUnavailableError extends Error {
   constructor(asset) {
@@ -23,9 +24,10 @@ export class AssetLoadError extends Error {
 
 export class AssetIntegrityError extends AssetLoadError {
   constructor(asset, actualHash) {
-    super(asset, new Error(`integrity mismatch: expected ${asset.source.gitBlobSha}, got ${actualHash}`));
+    const expectedHash = runtimePayloadGitBlobSha(asset);
+    super(asset, new Error(`integrity mismatch: expected ${expectedHash}, got ${actualHash}`));
     this.name = 'AssetIntegrityError';
-    this.expectedHash = asset.source.gitBlobSha;
+    this.expectedHash = expectedHash;
     this.actualHash = actualHash;
   }
 }
@@ -64,7 +66,7 @@ function initialState(asset) {
     status: asset.runtime.ready ? 'idle' : (asset.runtimeRequired ? 'unavailable' : 'optional-unavailable'),
     attempts: 0,
     loadedBytes: 0,
-    totalBytes: asset.source.bytes,
+    totalBytes: runtimePayloadBytes(asset),
     error: null,
   };
 }
@@ -103,7 +105,7 @@ async function verifyGitBlobSha(asset, bytes) {
   payload.set(bytes, header.byteLength);
   const digest = await globalThis.crypto.subtle.digest('SHA-1', payload);
   const actualHash = toHex(digest);
-  if (actualHash !== asset.source.gitBlobSha) throw new AssetIntegrityError(asset, actualHash);
+  if (actualHash !== runtimePayloadGitBlobSha(asset)) throw new AssetIntegrityError(asset, actualHash);
 }
 
 async function getStlLoader() {
@@ -113,12 +115,23 @@ async function getStlLoader() {
   return stlLoaderPromise;
 }
 
+async function getGlbDecoder() {
+  if (!glbDecoderPromise) {
+    glbDecoderPromise = import('./glb-components.js').then(({ decodeGlbComponents }) => decodeGlbComponents);
+  }
+  return glbDecoderPromise;
+}
+
 async function defaultDecode(asset, bytes) {
   if (asset.runtime.type === 'json') return JSON.parse(textDecoder.decode(bytes));
   if (asset.runtime.type === 'text') return textDecoder.decode(bytes);
   if (asset.runtime.type === 'stl') {
     const loader = await getStlLoader();
     return loader.parse(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+  }
+  if (asset.runtime.type === 'glb-components') {
+    const decode = await getGlbDecoder();
+    return decode(bytes);
   }
   if (asset.runtime.type === 'png') {
     const blob = new Blob([bytes], { type: 'image/png' });
@@ -148,8 +161,10 @@ export function createAssetManager({
   if (byId.size !== localManifest.length) throw new TypeError('Asset manifest contains duplicate logical IDs');
   for (const asset of localManifest) {
     if (!ASSET_GROUPS[asset.group]) throw new TypeError(`Unknown asset group: ${asset.group}`);
-    if (!/^[0-9a-f]{40}$/.test(asset.source?.gitBlobSha || '')) throw new TypeError(`Missing immutable Git blob SHA for ${asset.logicalId}`);
-    if (!Number.isInteger(asset.source?.bytes) || asset.source.bytes <= 0) throw new TypeError(`Missing exact byte size for ${asset.logicalId}`);
+    if (!/^[0-9a-f]{40}$/.test(asset.source?.gitBlobSha || '')) throw new TypeError(`Missing immutable canonical Git blob SHA for ${asset.logicalId}`);
+    if (!Number.isInteger(asset.source?.bytes) || asset.source.bytes <= 0) throw new TypeError(`Missing exact canonical byte size for ${asset.logicalId}`);
+    if (!/^[0-9a-f]{40}$/.test(runtimePayloadGitBlobSha(asset) || '')) throw new TypeError(`Missing immutable runtime Git blob SHA for ${asset.logicalId}`);
+    if (!Number.isInteger(runtimePayloadBytes(asset)) || runtimePayloadBytes(asset) <= 0) throw new TypeError(`Missing exact runtime byte size for ${asset.logicalId}`);
     if (asset.runtimeRequired && !ASSET_GROUPS[asset.group].blocking) throw new TypeError(`Required asset ${asset.logicalId} cannot be optional`);
   }
 
@@ -261,19 +276,20 @@ export function createAssetManager({
     if (previous.status === 'failed' && !retry) return Promise.reject(previous.error || new AssetLoadError(asset, new Error('Explicit retry required')));
 
     const promise = (async () => {
+      const expectedBytes = runtimePayloadBytes(asset);
       setAssetState(asset, {
         status: 'loading',
         attempts: previous.attempts + 1,
         loadedBytes: 0,
-        totalBytes: asset.source.bytes,
+        totalBytes: expectedBytes,
         error: null,
       });
       try {
         if (signal?.aborted) throw new DOMException('cancelled', 'AbortError');
         const response = await fetchImpl(asset.runtime.url, { signal, credentials: 'same-origin', cache: 'default' });
         const bytes = await readResponse(response, asset, signal);
-        if (bytes.byteLength !== asset.source.bytes) {
-          throw new AssetLoadError(asset, new Error(`byte-size mismatch: expected ${asset.source.bytes}, got ${bytes.byteLength}`));
+        if (bytes.byteLength !== expectedBytes) {
+          throw new AssetLoadError(asset, new Error(`byte-size mismatch: expected ${expectedBytes}, got ${bytes.byteLength}`));
         }
         setAssetState(asset, { status: 'verifying' });
         await integrityImpl(asset, bytes);
