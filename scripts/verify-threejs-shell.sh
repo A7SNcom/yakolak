@@ -42,7 +42,6 @@ for file in "${required[@]}"; do
 done
 
 node scripts/prepare-threejs-runtime-assets.mjs
-node scripts/convert-threejs-assets.mjs --check --only=model.board-and-lid
 node scripts/verify-threejs-board-lid.mjs
 
 if find web -type f \( -name '*.pck' -o -name '*.wasm' -o -name 'index.js' -o -name 'index.audio*.js' \) -print -quit | grep -q .; then
