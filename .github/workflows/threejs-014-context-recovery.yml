@@ -11,8 +11,11 @@ on:
       - web/app/camera/frame-governor.js
       - web/app/boot/boot.js
       - web/app/session/canonical-online-session.js
+      - web/app/assets/**
       - web/index.html
       - web/styles/app.css
+      - YAKOLAK_PORTABLE_KIT/assets/**
+      - scripts/prepare-threejs-runtime-assets.mjs
       - tests/threejs_context_recovery_contract.test.mjs
       - tests/online_exactly_once_contract.test.mjs
       - tests/threejs_renderer_owner_contract.test.mjs
@@ -56,6 +59,9 @@ jobs:
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
+
+      - name: Prepare verified runtime assets
+        run: node scripts/prepare-threejs-runtime-assets.mjs
 
       - name: Serve static web source
         shell: bash
