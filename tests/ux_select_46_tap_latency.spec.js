@@ -35,12 +35,12 @@ function contextOptions(mode) {
 async function startPassPlay(page) {
   await page.goto(`${BASE_URL}/?yakolakTestFast=1&uxSelect46=1`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
-    () => document.body.dataset.yakolakIntroHandoffEvent === 'consumed' &&
+    () => document.body.dataset.yakolakUxSelect46Bridge === 'ready' &&
       typeof window.yakolakUx46StartPassPlay === 'function' &&
       typeof window.yakolakUx46ClearSelection === 'function' &&
-      typeof window.yakolakTestRefreshPickTargets === 'function',
+      typeof window.yakolakUx46RefreshPickTargets === 'function',
     null,
-    { timeout: 60000 },
+    { timeout: 15000 },
   );
   await page.evaluate(() => window.yakolakUx46StartPassPlay());
   await page.waitForFunction(
@@ -48,13 +48,13 @@ async function startPassPlay(page) {
       document.body.dataset.yakolakCurrentPlayer === 'right' &&
       document.body.dataset.yakolakCameraStage === 'ready',
     null,
-    { timeout: 20000 },
+    { timeout: 60000 },
   );
 }
 
 async function refreshTargets(page) {
   const before = await page.evaluate(() => Number(document.body.dataset.yakolakPiecePickTargetRevision || 0));
-  await page.evaluate(() => window.yakolakTestRefreshPickTargets());
+  await page.evaluate(() => window.yakolakUx46RefreshPickTargets());
   await page.waitForFunction(
     previous => Number(document.body.dataset.yakolakPiecePickTargetRevision || 0) > previous,
     before,
