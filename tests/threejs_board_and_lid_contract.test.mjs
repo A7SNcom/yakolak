@@ -4,7 +4,7 @@ import { verifyBoardAndLid } from '../scripts/verify-threejs-board-lid.mjs';
 
 test('THREEJS-018 board and intro lid geometry stays aligned to authoritative layout', async () => {
   const report = await verifyBoardAndLid();
-  assert.equal(report.profile, 'yakolak-board-intro-lid-v1');
+  assert.equal(report.profile, 'yakolak-board-intro-lid-v2');
   assert.deepEqual(report.boardPose.position, [0, 6, 0]);
   assert.deepEqual(report.boardPose.rotationDegrees, [-90, 0, 0]);
   assert.ok(report.maxCellCenterError <= report.cellCenterTolerance);
