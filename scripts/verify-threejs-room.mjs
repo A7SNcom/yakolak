@@ -71,7 +71,7 @@ assert.ok(travel.travel.every((entry) => entry.samples === 129));
 assert.match(roomSpecText, /Build a neutral enclosed room from six surfaces; no imported room mesh is required\./);
 assert.match(runtimeSource, /new THREE\.PlaneGeometry\(dimensions\.width, dimensions\.depth, 1, 1\)/);
 assert.match(runtimeSource, /new THREE\.PlaneGeometry\(dimensions\.width, dimensions\.height, 1, 1\)/);
-assert.equal((runtimeSource.match(/addSurface\(root,/g) || []).length, 6, 'runtime must create exactly six room surfaces');
+assert.equal((runtimeSource.match(/(?:floor|ceiling|back|front|left|right): addSurface\(root,/g) || []).length, 6, 'runtime must create exactly six room surfaces');
 assert.doesNotMatch(runtimeSource, /GLTFLoader|STLLoader|OBJLoader|room-plan\.svg/, 'room runtime must not import a historical or guide mesh');
 assert.match(runtimeSource, /roughness:\s*1/);
 assert.match(runtimeSource, /metalness:\s*0/);
