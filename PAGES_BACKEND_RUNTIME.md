@@ -54,11 +54,25 @@ The exact public `API_ORIGIN` is intentionally not guessed. It becomes locked on
 - `.github/workflows/pages-005-cloudflare-backend.yml`
   - runs the Worker contract test;
   - runs a Wrangler dry-run bundle;
-  - requires Cloudflare/Turso secrets;
+  - deploys only on explicit `workflow_dispatch` after credentials exist;
   - deploys through Cloudflare Wrangler Action;
   - executes the live write/read probe against the deployment URL.
 
 The in-memory test is implementation evidence, not a substitute for the required live Turso round trip. PAGES-005 is not complete until the deployment job succeeds and the exact public `API_ORIGIN` is recorded.
+
+## Verified execution evidence
+
+GitHub Actions run `32019036397` completed successfully on `threejs-rebuild` after the workflow was changed so ordinary pushes verify only:
+
+- Worker contract tests: **PASS**
+- Wrangler v4 dry-run bundle: **PASS**
+- deploy job on push: **SKIPPED by design**
+
+An earlier deployment attempt (`32018877918`) proved the remaining blocker exactly: the deployment job reached its credential gate and all four required values were empty. It stopped before invoking Cloudflare and before any live endpoint was claimed.
+
+A repository/environment audit also confirmed that the `cloudflare-backend` GitHub environment exists, but the connected GitHub integration cannot expose any configured secret values; the workflow execution itself is the authoritative evidence that no usable values were injected into that environment at run time.
+
+Do not weaken this gate, synthesize a `workers.dev` hostname, reuse a Vercel hostname, or create `API_ORIGIN.txt` merely to make the task appear complete.
 
 ## Required secret boundary
 
@@ -69,7 +83,7 @@ GitHub environment `cloudflare-backend` must provide these secrets for the deplo
 - `TURSO_DATABASE_URL`
 - `TURSO_AUTH_TOKEN`
 
-No secret value may be committed to this repository or copied into GitHub Pages.
+Cloudflare's current GitHub Actions guidance requires a Cloudflare API token and account ID for non-interactive Wrangler CI authentication. No secret value may be committed to this repository or copied into GitHub Pages.
 
 ## Public API_ORIGIN lock rule
 
