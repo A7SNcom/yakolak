@@ -13,6 +13,8 @@ required=(
   web/app/scene/player-bases.js
   web/app/scene/table-score-layout.js
   web/app/scene/table-and-score.js
+  web/app/scene/room-layout.js
+  web/app/scene/neutral-room.js
   web/app/camera/frame-governor.js
   web/app/assets/asset-manifest.js
   web/app/assets/asset-manager.js
@@ -37,6 +39,7 @@ required=(
   scripts/verify-threejs-board-lid.mjs
   scripts/verify-threejs-board-lid-runtime-contract.mjs
   scripts/verify-threejs-table-score.mjs
+  scripts/verify-threejs-room.mjs
   scripts/measure-threejs-performance.mjs
   tests/threejs_renderer_owner_contract.test.mjs
   tests/threejs_frame_governor_contract.test.mjs
@@ -47,6 +50,7 @@ required=(
   tests/threejs_board_and_lid_contract.test.mjs
   tests/threejs_player_bases_contract.test.mjs
   tests/threejs_table_score_contract.test.mjs
+  tests/threejs_room_contract.test.mjs
 )
 
 for file in "${required[@]}"; do
@@ -60,6 +64,7 @@ node scripts/verify-threejs-board-lid.mjs
 node scripts/verify-threejs-board-lid-runtime-contract.mjs
 node scripts/verify-threejs-player-bases.mjs
 node scripts/verify-threejs-table-score.mjs
+node scripts/verify-threejs-room.mjs
 
 if find web -type f \( -name '*.pck' -o -name '*.wasm' -o -name 'index.js' -o -name 'index.audio*.js' \) -print -quit | grep -q .; then
   echo "Forbidden Godot runtime artifact found under web/" >&2
@@ -67,8 +72,8 @@ if find web -type f \( -name '*.pck' -o -name '*.wasm' -o -name 'index.js' -o -n
 fi
 
 if grep -Eqi 'index\.pck|index\.wasm|index\.audio|godot' \
-  web/index.html web/app/boot/boot.js web/app/scene/renderer.js web/app/scene/preview-scene.js web/app/camera/frame-governor.js \
-  web/app/assets/asset-manifest.js web/app/assets/asset-manager.js; then
+  web/index.html web/app/boot/boot.js web/app/scene/renderer.js web/app/scene/preview-scene.js web/app/scene/neutral-room.js \
+  web/app/camera/frame-governor.js web/app/assets/asset-manifest.js web/app/assets/asset-manager.js; then
   echo "Forbidden Godot runtime dependency found in Three.js entry graph" >&2
   exit 1
 fi
@@ -82,10 +87,11 @@ node tests/threejs_performance_budget_contract.test.mjs
 node tests/threejs_board_and_lid_contract.test.mjs
 node tests/threejs_player_bases_contract.test.mjs
 node tests/threejs_table_score_contract.test.mjs
+node tests/threejs_room_contract.test.mjs
 
 if [ "${VERCEL_GIT_COMMIT_REF:-}" = "threejs-rebuild" ]; then
   test -n "${TURSO_DATABASE_URL:-}" || { echo "Missing TURSO_DATABASE_URL" >&2; exit 1; }
   test -n "${TURSO_AUTH_TOKEN:-}" || { echo "Missing TURSO_AUTH_TOKEN" >&2; exit 1; }
 fi
 
-echo "Verified YAKOLAK static Three.js shell with canonical board/base/score GLB assets, authoritative table/score layout, exact spatial transforms, and performance budgets"
+echo "Verified YAKOLAK static Three.js shell with canonical board/base/score GLB assets, definitive six-surface neutral room, authoritative camera-safe spatial transforms, and performance budgets"
