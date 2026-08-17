@@ -69,7 +69,7 @@ assert.ok(nearArray(positionAccessor.max, [25, -47, 10], 1e-9));
 const markerPivot = deriveScoreMarkerContactPivot({ min: positionAccessor.min, max: positionAccessor.max });
 assert.ok(nearArray(markerPivot, [20, -52, 5.329070518200751e-15], 1e-9));
 
-const scoreState = conversionState.assets?.['model.score-marker'];
+const scoreState = conversionState.targets?.['model.score-marker'];
 assert.equal(scoreState?.sourceGitBlobSha1, scoreAsset.source.gitBlobSha);
 assert.equal(scoreState?.outputBytes, scoreGlbBytes.length);
 assert.equal(scoreState?.outputSha256, sha256(scoreGlbBytes));
