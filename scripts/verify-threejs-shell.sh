@@ -7,6 +7,7 @@ required=(
   web/app/boot/boot.js
   web/app/boot/fatal-error.js
   web/app/boot/build-marker.js
+  web/app/data/runtime-data.js
   web/app/scene/renderer.js
   web/app/scene/preview-scene.js
   web/app/scene/board-and-lid.js
@@ -40,6 +41,7 @@ required=(
   scripts/verify-threejs-board-lid-runtime-contract.mjs
   scripts/verify-threejs-table-score.mjs
   scripts/verify-threejs-room.mjs
+  scripts/verify-threejs-runtime-data.mjs
   scripts/measure-threejs-performance.mjs
   tests/threejs_renderer_owner_contract.test.mjs
   tests/threejs_frame_governor_contract.test.mjs
@@ -51,6 +53,7 @@ required=(
   tests/threejs_player_bases_contract.test.mjs
   tests/threejs_table_score_contract.test.mjs
   tests/threejs_room_contract.test.mjs
+  tests/threejs_runtime_data_contract.test.mjs
 )
 
 for file in "${required[@]}"; do
@@ -65,6 +68,7 @@ node scripts/verify-threejs-board-lid-runtime-contract.mjs
 node scripts/verify-threejs-player-bases.mjs
 node scripts/verify-threejs-table-score.mjs
 node scripts/verify-threejs-room.mjs
+node scripts/verify-threejs-runtime-data.mjs
 
 if find web -type f \( -name '*.pck' -o -name '*.wasm' -o -name 'index.js' -o -name 'index.audio*.js' \) -print -quit | grep -q .; then
   echo "Forbidden Godot runtime artifact found under web/" >&2
@@ -88,10 +92,11 @@ node tests/threejs_board_and_lid_contract.test.mjs
 node tests/threejs_player_bases_contract.test.mjs
 node tests/threejs_table_score_contract.test.mjs
 node tests/threejs_room_contract.test.mjs
+node tests/threejs_runtime_data_contract.test.mjs
 
 if [ "${VERCEL_GIT_COMMIT_REF:-}" = "threejs-rebuild" ]; then
   test -n "${TURSO_DATABASE_URL:-}" || { echo "Missing TURSO_DATABASE_URL" >&2; exit 1; }
   test -n "${TURSO_AUTH_TOKEN:-}" || { echo "Missing TURSO_AUTH_TOKEN" >&2; exit 1; }
 fi
 
-echo "Verified YAKOLAK static Three.js shell with canonical board/base/score GLB assets, definitive six-surface neutral room, authoritative camera-safe spatial transforms, and performance budgets"
+echo "Verified YAKOLAK static Three.js shell with one validated immutable canonical runtime dataset, canonical board/base/score assets, definitive neutral room, and performance budgets"
