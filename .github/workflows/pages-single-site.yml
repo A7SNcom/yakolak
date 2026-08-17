@@ -1,14 +1,21 @@
 name: YAKOLAK Composite Pages
 
 on:
+  # Human/direct [flash-ready] pushes can deploy immediately. Ordinary source
+  # pushes are skipped here and first flow through YAKOLAK Flash Publish.
   push:
     branches:
       - main
-      - threejs-rebuild
+  # GITHUB_TOKEN pushes do not recursively trigger push workflows, so completed
+  # producer workflows are the reliable bridge for both Godot and Three.js.
+  workflow_run:
+    workflows:
+      - YAKOLAK Flash Publish
+      - YAKOLAK Pages Three.js Signal
+    types:
+      - completed
   workflow_dispatch:
 
-# This exact workflow definition must exist on both watched refs because push
-# workflows are evaluated from the pushed ref, not only from the default branch.
 permissions:
   contents: read
   pages: write
@@ -20,13 +27,13 @@ concurrency:
 
 jobs:
   compose:
-    # Ordinary main source pushes are intentionally ignored. The Godot flash
-    # publisher will later create a [flash-ready] commit, which is the only main
-    # push allowed to publish. Every Three.js branch push may refresh /threejs/.
     if: >-
       ${{ github.event_name == 'workflow_dispatch' ||
-          github.ref_name == 'threejs-rebuild' ||
-          (github.ref_name == 'main' && contains(github.event.head_commit.message, '[flash-ready]')) }}
+          (github.event_name == 'push' && startsWith(github.event.head_commit.message, '[flash-ready]')) ||
+          (github.event_name == 'workflow_run' &&
+           github.event.workflow_run.conclusion == 'success' &&
+           ((github.event.workflow_run.name == 'YAKOLAK Flash Publish' && github.event.workflow_run.head_branch == 'main') ||
+            (github.event.workflow_run.name == 'YAKOLAK Pages Three.js Signal' && github.event.workflow_run.head_branch == 'threejs-rebuild'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -41,21 +48,48 @@ jobs:
           path: root-history
           fetch-depth: 0
 
-      - name: Resolve latest successful Godot flash artifact
+      - name: Resolve exact successful Godot flash artifact
         id: root
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DIRECT_SHA: ${{ github.sha }}
+          RUN_NAME: ${{ github.event.workflow_run.name }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          sha="$(git -C root-history log --grep='^\[flash-ready\]' --format='%H' -n 1)"
-          if [ -z "${sha}" ]; then
-            echo 'No [flash-ready] commit exists yet; publishing remains a no-op.'
-            echo 'ready=false' >> "$GITHUB_OUTPUT"
-            exit 0
+          sha=''
+
+          if [ "${EVENT_NAME}" = 'workflow_run' ] && [ "${RUN_NAME}" = 'YAKOLAK Flash Publish' ]; then
+            source_short="${RUN_SHA:0:8}"
+            sha="$(git -C root-history log \
+              --grep="^\[flash-ready\] publish ${source_short}$" \
+              --format='%H' -n 1)"
+            if [ -z "${sha}" ]; then
+              echo "Flash workflow completed without a matching [flash-ready] commit for ${RUN_SHA}; no deploy."
+              echo 'ready=false' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          elif [ "${EVENT_NAME}" = 'push' ]; then
+            subject="$(git -C root-history log -1 --format='%s' "${DIRECT_SHA}")"
+            if [[ "${subject}" != \[flash-ready\]* ]]; then
+              echo 'Ordinary main source push; Pages waits for Flash Publish.'
+              echo 'ready=false' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sha="${DIRECT_SHA}"
+          else
+            sha="$(git -C root-history log --grep='^\[flash-ready\]' --format='%H' -n 1)"
+            if [ -z "${sha}" ]; then
+              echo 'No [flash-ready] commit exists yet; publishing remains a no-op.'
+              echo 'ready=false' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
           fi
 
           subject="$(git -C root-history log -1 --format='%s' "${sha}")"
           echo "Using Godot root ${sha}: ${subject}"
-          echo "ready=true" >> "$GITHUB_OUTPUT"
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout exact Godot flash-ready tree
@@ -66,11 +100,27 @@ jobs:
           path: godot-ready
           fetch-depth: 1
 
+      - name: Resolve Three.js candidate ref
+        if: steps.root.outputs.ready == 'true'
+        id: candidate-ref
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_NAME: ${{ github.event.workflow_run.name }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ "${EVENT_NAME}" = 'workflow_run' ] && [ "${RUN_NAME}" = 'YAKOLAK Pages Three.js Signal' ]; then
+            echo "ref=${RUN_SHA}" >> "$GITHUB_OUTPUT"
+          else
+            echo 'ref=threejs-rebuild' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout Three.js candidate tree
         if: steps.root.outputs.ready == 'true'
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name == 'threejs-rebuild' && github.sha || 'threejs-rebuild' }}
+          ref: ${{ steps.candidate-ref.outputs.ref }}
           path: threejs-source
           fetch-depth: 1
 
@@ -93,7 +143,7 @@ jobs:
             exit 1
           fi
           if ! grep -Fq 'THREEJS REBUILD' threejs-source/web/index.html; then
-            echo 'Refusing to publish: threejs-rebuild/web is not the expected Three.js candidate.' >&2
+            echo 'Refusing to publish: Three.js candidate entry is missing its rebuild marker.' >&2
             exit 1
           fi
 
@@ -109,8 +159,6 @@ jobs:
           rsync -a threejs-source/web/ pages-site/threejs/
           touch pages-site/.nojekyll
 
-          # Root may only come from the flash-ready Godot tree; /threejs/ may
-          # only come from the Three.js branch.
           cmp godot-ready/web/index.html pages-site/index.html
           cmp threejs-source/web/index.html pages-site/threejs/index.html
           diff -qr --exclude=threejs --exclude=.nojekyll godot-ready/web pages-site
