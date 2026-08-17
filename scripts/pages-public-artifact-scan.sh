@@ -67,8 +67,36 @@ service_worker_registration_hits="$(grep -RIlE --binary-files=without-match \
   'serviceWorker[[:space:]]*\.[[:space:]]*register[[:space:]]*\(' \
   "${site_dir}" || true)"
 if [[ -n "${service_worker_registration_hits}" ]]; then
-  printf '%s\n' "${service_worker_registration_hits}" >&2
-  fail 'PAGES-011 forbids Service Worker registration anywhere in the composed Pages artifact while decision=none'
+  # Godot's generated engine helper contains a dormant register() implementation even
+  # when the exported GODOT_CONFIG has no Service Worker configured. PAGES-011 governs
+  # actual registration/control, so permit only that single known root helper and only
+  # when the delivered root HTML proves serviceWorker is absent/empty/false.
+  inert_godot_runtime="${site_dir%/}/index.js"
+  inert_godot_config="${site_dir%/}/index.html"
+  godot_helper_is_inert=false
+  if [[ "${service_worker_registration_hits}" == "${inert_godot_runtime}" ]] \
+     && grep -Fq "if (this.config.serviceWorker && 'serviceWorker' in navigator)" "${inert_godot_runtime}" \
+     && grep -Fq "serviceWorker: ''" "${inert_godot_runtime}" \
+     && [[ -s "${inert_godot_config}" ]]; then
+    if node - "${inert_godot_config}" <<'NODE'
+const fs = require('node:fs');
+const html = fs.readFileSync(process.argv[2], 'utf8');
+const match = html.match(/const\s+GODOT_CONFIG\s*=\s*(\{[^\n]*\})\s*;/);
+if (!match) process.exit(1);
+let config;
+try { config = JSON.parse(match[1]); } catch { process.exit(1); }
+if (config.serviceWorker) process.exit(1);
+NODE
+    then
+      godot_helper_is_inert=true
+    fi
+  fi
+
+  if [[ "${godot_helper_is_inert}" != true ]]; then
+    printf '%s\n' "${service_worker_registration_hits}" >&2
+    fail 'PAGES-011 forbids active or unproven Service Worker registration in the composed Pages artifact while decision=none'
+  fi
+  echo 'PAGES-011: inert Godot Service Worker helper verified disabled by delivered GODOT_CONFIG'
 fi
 
 # Keep patterns specific enough for a public repository: declarations/documentation
