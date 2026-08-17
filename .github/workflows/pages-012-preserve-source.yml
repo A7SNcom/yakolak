@@ -1,0 +1,110 @@
+name: PAGES-012 Preserve Exact Source Bytes
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - ".github/workflows/pages-012-preserve-source.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: pages-012-preserve-source
+  cancel-in-progress: false
+
+env:
+  SOURCE_PAGES_RUN_ID: "32030598002"
+  SOURCE_PAGES_ARTIFACT_ID: "9288731607"
+  GODOT_ROOT_SHA: fbc0d15c574a40c4a9f31c96d42c2f03b424bb39
+  THREEJS_CANDIDATE_SHA: 6b125c04938330e1d6de4621e60a9f9e7757b556
+
+jobs:
+  preserve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Recover exact successful Pages artifact bytes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_PAGES_RUN_ID}")"
+          RUN_JSON="${run_json}" node <<'NODE'
+          const run = JSON.parse(process.env.RUN_JSON);
+          if (run.status !== 'completed' || run.conclusion !== 'success') {
+            throw new Error(`source Pages run is not successful: ${run.status}/${run.conclusion}`);
+          }
+          NODE
+
+          artifacts_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_PAGES_RUN_ID}/artifacts")"
+          ARTIFACTS_JSON="${artifacts_json}" EXPECTED_ID="${SOURCE_PAGES_ARTIFACT_ID}" node <<'NODE'
+          const payload = JSON.parse(process.env.ARTIFACTS_JSON);
+          const expected = Number(process.env.EXPECTED_ID);
+          const artifact = payload.artifacts.find((item) => item.id === expected);
+          if (!artifact) throw new Error(`source artifact ${expected} not found`);
+          if (artifact.name !== 'github-pages') throw new Error(`unexpected artifact name: ${artifact.name}`);
+          if (artifact.expired) throw new Error('source Pages artifact already expired');
+          NODE
+
+          rm -rf preserve-source preserve-site
+          mkdir -p preserve-source preserve-site
+          gh run download "${SOURCE_PAGES_RUN_ID}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --name github-pages \
+            --dir preserve-source
+
+          test -s preserve-source/artifact.tar
+          tar -xf preserve-source/artifact.tar -C preserve-site
+          test -s preserve-site/index.html
+          test -s preserve-site/threejs/index.html
+          test -s preserve-site/threejs/runtime-config.json
+          ! grep -Fq 'THREEJS REBUILD' preserve-site/index.html
+          grep -Fq 'THREEJS REBUILD' preserve-site/threejs/index.html
+
+          FRONTEND_SHA="${THREEJS_CANDIDATE_SHA}" node <<'NODE'
+          const fs = require('node:fs');
+          const config = JSON.parse(fs.readFileSync('preserve-site/threejs/runtime-config.json', 'utf8'));
+          if (config.frontendSha !== process.env.FRONTEND_SHA) {
+            throw new Error(`runtime-config frontendSha ${config.frontendSha} != ${process.env.FRONTEND_SHA}`);
+          }
+          NODE
+
+      - name: Record exact-byte provenance and SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_sha="$(sha256sum preserve-source/artifact.tar | awk '{print $1}')"
+          printf '%s  artifact.tar\n' "${artifact_sha}" > preserve-source/ARTIFACT_SHA256SUMS
+          jq -n \
+            --arg schemaVersion "1" \
+            --arg sourcePagesRunId "${SOURCE_PAGES_RUN_ID}" \
+            --arg sourcePagesArtifactId "${SOURCE_PAGES_ARTIFACT_ID}" \
+            --arg godotRootSha "${GODOT_ROOT_SHA}" \
+            --arg threejsCandidateSha "${THREEJS_CANDIDATE_SHA}" \
+            --arg artifactSha256 "${artifact_sha}" \
+            '{
+              schemaVersion: ($schemaVersion|tonumber),
+              sourcePagesRunId: ($sourcePagesRunId|tonumber),
+              sourcePagesArtifactId: ($sourcePagesArtifactId|tonumber),
+              godotRootSha: $godotRootSha,
+              threejsCandidateSha: $threejsCandidateSha,
+              artifactName: "artifact.tar",
+              artifactSha256: $artifactSha256,
+              purpose: "temporary exact-byte preservation before immutable GitHub Release publication"
+            }' > preserve-source/SOURCE_PROVENANCE.json
+          sha256sum -c preserve-source/ARTIFACT_SHA256SUMS
+          cat preserve-source/SOURCE_PROVENANCE.json
+
+      - name: Preserve exact payload for release preparation
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages012-exact-byte-source-32030598002
+          path: preserve-source/
+          retention-days: 90
+          compression-level: 0
+          if-no-files-found: error
