@@ -10,6 +10,7 @@ on:
       - 'web/app/**'
       - 'scripts/verify-threejs-runtime-data.mjs'
       - 'scripts/verify-threejs-runtime-data-browser.mjs'
+      - 'scripts/verify-threejs-shell.sh'
       - 'tests/threejs_runtime_data_contract.test.mjs'
       - '.github/workflows/threejs-023-runtime-data.yml'
   workflow_dispatch:
