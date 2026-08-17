@@ -38,6 +38,9 @@ test('PAGES-011 locks one explicit no-service-worker decision and THREEJS-097 co
   assert.match(decision, /deployment-manifest\.json/);
   assert.match(decision, /seat credentials/i);
   assert.match(decision, /THREEJS-017/);
+  assert.match(decision, /Generated Godot helper is inert/i);
+  assert.match(decision, /GODOT_CONFIG\.serviceWorker/);
+  assert.match(decision, /additional registration call/i);
 
   assert.match(migrationContract, /PAGES-011 is complete and locked/i);
   assert.match(migrationContract, /SERVICE_WORKER_DECISION=none/);
@@ -88,5 +91,9 @@ test('the final composed Pages artifact scanner fail-closes PAGES-011 before upl
   assert.match(scanner, /serviceworker\.js/);
   assert.match(scanner, /sw\.js/);
   assert.match(scanner, /serviceWorker\[\[:space:\]\]\*\\\.\[\[:space:\]\]\*register/);
+  assert.match(scanner, /inert Godot Service Worker helper/i);
+  assert.match(scanner, /GODOT_CONFIG/);
+  assert.match(scanner, /config\.serviceWorker/);
+  assert.match(scanner, /active or unproven Service Worker registration/i);
   assert.match(scanner, /composed Pages artifact while decision=none/i);
 });
