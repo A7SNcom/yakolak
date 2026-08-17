@@ -7,6 +7,9 @@ on:
     paths:
       - 'web/**'
       - 'scripts/pages-size-guard.sh'
+      - 'scripts/pages-public-artifact-scan.sh'
+      - 'tests/pages_public_runtime_config.test.mjs'
+      - 'PAGES_PUBLIC_ARTIFACT_CONTRACT.md'
       - '.github/workflows/pages-threejs-signal.yml'
 
 permissions:
