@@ -242,6 +242,7 @@ export function createCanonicalRuntimeData({ worldLayout, introScatterText, appr
     room: validated.room,
     cameras: validated.cameras,
     rules: clonePlain(contract.rules, 'rules'),
+    colorIdentity: clonePlain(contract.colorIdentity, 'colorIdentity'),
     materials: clonePlain(contract.materials, 'materials'),
     motion: clonePlain(contract.motion, 'motion'),
     network: clonePlain(contract.network, 'network'),
