@@ -1,6 +1,6 @@
 # YAKOLAK GitHub Pages Migration Contract
 
-Status: **LOCKED by PAGES-004 (2026-08-17); backend provider selected by PAGES-005; origin/storage security locked by PAGES-006**
+Status: **LOCKED by PAGES-004 (2026-08-17); backend provider selected by PAGES-005; origin/storage security locked by PAGES-006; browser cache/Service Worker decision locked by PAGES-011**
 
 Scope: `threejs-rebuild` migration documentation and every later deployment/backend decision until an explicit cutover or hosting-migration task supersedes this contract.
 
@@ -91,7 +91,19 @@ Authorization must depend on backend-validated, high-entropy session/seat creden
 
 **PAGES-006 is complete and locked.** `PAGES_ORIGIN_STORAGE_SECURITY.md` is the detailed authority for origin/CORS, LocalStorage, IndexedDB, CacheStorage, BroadcastChannel, bearer persistence, takeover/recovery, and secret handling. All YAKOLAK browser persistence must be namespaced under `YAKOLAK`; broad `clear()` operations are forbidden; seat bearer credentials remain memory-only; datastore/admin secrets remain backend-only and must never enter Pages artifacts or Actions logs. `.github/workflows/pages-006-origin-security.yml` and `tests/pages_origin_storage_security.test.mjs` are the regression gate.
 
-## 7. Final cutover contract
+## 7. Browser cache / Service Worker rule
+
+**PAGES-011 is complete and locked.** `PAGES_SERVICE_WORKER_DECISION.md` is the measured authority for browser caching and Service Worker scope during migration, and its current marker is exactly:
+
+```text
+SERVICE_WORKER_DECISION=none
+```
+
+The healthy baseline is native GitHub Pages/browser HTTP caching; no Service Worker may control `/yakolak/` or `/yakolak/threejs/` while that marker remains `none`. THREEJS-097 must consume the PAGES-011 decision and may not silently reverse it. Warm-cache improvements must never replace or relax THREEJS-017 cold-load budgets.
+
+Any future change to `enabled` requires a new explicit measured decision. During migration it must be scoped only to `/yakolak/threejs/`, namespace caches by YAKOLAK + exact build/protocol identity, never cache API responses or seat/bearer credentials, and always network-pass `runtime-config.json` plus PAGES-014 `deployment-manifest.json`. `tests/pages_service_worker_decision.test.mjs` is the repository regression guard.
+
+## 8. Final cutover contract
 
 Final frontend cutover requires an explicit later task and must satisfy all of the following:
 
@@ -106,11 +118,11 @@ Final frontend cutover requires an explicit later task and must satisfy all of t
 
 Until that cutover task completes, the migration invariant remains: **Godot root + Three.js `/threejs/` candidate inside one GitHub Pages site.**
 
-## 8. Documentation precedence
+## 9. Documentation precedence
 
 For migration deployment/backend-hosting questions, use this order:
 
-1. `PAGES_MIGRATION_CONTRACT.md`, `PAGES_ORIGIN_STORAGE_SECURITY.md`, and completed `PAGES-*` contracts for hosting/deployment/origin/security boundaries.
+1. `PAGES_MIGRATION_CONTRACT.md`, `PAGES_ORIGIN_STORAGE_SECURITY.md`, `PAGES_SERVICE_WORKER_DECISION.md`, and completed `PAGES-*` contracts for hosting/deployment/origin/security/cache boundaries.
 2. `THREEJS_SOURCE_OF_TRUTH.md` for product/spatial/backend semantics by domain.
 3. `THREEJS_BACKEND_GAP_REGISTER.md` for unresolved authority/protocol decisions and task ownership.
 4. `THREEJS_MIGRATION.md` for browser/runtime architecture.
