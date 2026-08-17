@@ -3,6 +3,7 @@ import { installFatalErrorHandlers } from './fatal-error.js';
 import { createRendererOwner, WebGLNotSupportedError } from '../scene/renderer.js';
 import { createPreviewScene } from '../scene/preview-scene.js';
 import { createCanonicalRuntimeData } from '../data/runtime-data.js';
+import { createCanonicalMaterialSystem } from '../materials/canonical-materials.js';
 import { markOnce, STARTUP_MARKS, startupMarkSnapshot } from '../perf/startup-marks.js';
 import {
   AssetGroupLoadError,
@@ -77,6 +78,7 @@ async function boot() {
   let rendererOwner = null;
   let previewScene = null;
   let canonicalRuntimeData = null;
+  let materialSystem = null;
   let unsubscribeContextState = null;
   let shell = null;
   let requiredOperation = null;
@@ -90,6 +92,8 @@ async function boot() {
     unsubscribeContextState = null;
     previewScene?.dispose();
     previewScene = null;
+    materialSystem?.dispose();
+    materialSystem = null;
     canonicalRuntimeData = null;
     rendererOwner?.dispose();
     rendererOwner = null;
@@ -109,6 +113,7 @@ async function boot() {
       getAssetProgress: (group = null) => assetManager.snapshot(group),
       getAsset: (id) => assetManager.get(id),
       getRuntimeData: () => canonicalRuntimeData,
+      getMaterialSnapshot: () => materialSystem?.snapshot() || null,
       getStartupMarks: startupMarkSnapshot,
       dispose,
     });
@@ -159,9 +164,12 @@ async function boot() {
         introScatterText: assetManager.get('data.intro-scatter'),
         approvedContract: assetManager.get('data.approved-contract'),
       });
+      materialSystem?.dispose();
+      materialSystem = createCanonicalMaterialSystem({ runtimeData: canonicalRuntimeData });
       markOnce(STARTUP_MARKS.criticalAssetsReady);
       document.documentElement.dataset.requiredAssets = 'ready';
       document.documentElement.dataset.canonicalRuntimeData = 'validated';
+      document.documentElement.dataset.canonicalMaterials = 'ready';
 
       if (!previewScene) {
         previewScene = createPreviewScene(rendererOwner);
