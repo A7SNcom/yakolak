@@ -37,7 +37,7 @@ jobs:
           ROOT_URL: https://a7sncom.github.io/yakolak/
           THREEJS_URL: https://a7sncom.github.io/yakolak/threejs/
         run: |
-          cat > /tmp/pages-011-probe.mjs <<'EOF'
+          cat > ./pages-011-probe.mjs <<'EOF'
           import { chromium } from 'playwright';
 
           const rootUrl = process.env.ROOT_URL;
@@ -84,8 +84,6 @@ jobs:
             await page.waitForTimeout(3500);
           }
 
-          // Scope proof: visit root first, reload it, then visit Three.js and reload it in the same clean profile.
-          // A root-scoped worker would therefore have a chance to install and take control before Three.js is checked.
           {
             const context = await browser.newContext();
             const page = await context.newPage();
@@ -102,7 +100,6 @@ jobs:
             await context.close();
           }
 
-          // Repeat-load evidence: use a second clean browser profile so the Three.js first pass is cold.
           {
             const context = await browser.newContext();
             const page = await context.newPage();
@@ -215,4 +212,5 @@ jobs:
           console.log('PAGES_011_LIVE_PROBE=PASS');
           EOF
 
-          node /tmp/pages-011-probe.mjs
+          node ./pages-011-probe.mjs
+          rm -f ./pages-011-probe.mjs
