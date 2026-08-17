@@ -1,0 +1,28 @@
+name: PAGES-006 origin and storage security
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - 'web/**'
+      - 'tests/pages_origin_storage_security.test.mjs'
+      - 'PAGES_ORIGIN_STORAGE_SECURITY.md'
+      - 'PAGES_MIGRATION_CONTRACT.md'
+      - '.github/workflows/pages-006-origin-security.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Pages origin/storage security contract
+        run: node --test tests/pages_origin_storage_security.test.mjs
