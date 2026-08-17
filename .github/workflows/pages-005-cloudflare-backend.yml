@@ -1,0 +1,88 @@
+name: PAGES-005 Cloudflare backend
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - 'backend/cloudflare/**'
+      - 'scripts/probe-pages005-cloudflare-roundtrip.mjs'
+      - 'tests/pages_backend_runtime_contract.test.mjs'
+      - '.github/workflows/pages-005-cloudflare-backend.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-005-cloudflare-backend
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Install runtime dependency
+        run: npm install --ignore-scripts
+      - name: Worker contract tests
+        run: node --test tests/pages_backend_runtime_contract.test.mjs
+      - name: Wrangler dry-run bundle
+        run: npx --yes wrangler@4 deploy --dry-run --config backend/cloudflare/wrangler.jsonc --outdir .tmp/pages005-worker
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: cloudflare-backend
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Install runtime dependency
+        run: npm install --ignore-scripts
+      - name: Require deployment credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo 'missing CLOUDFLARE_API_TOKEN'; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo 'missing CLOUDFLARE_ACCOUNT_ID'; exit 1; }
+          test -n "$TURSO_DATABASE_URL" || { echo 'missing TURSO_DATABASE_URL'; exit 1; }
+          test -n "$TURSO_AUTH_TOKEN" || { echo 'missing TURSO_AUTH_TOKEN'; exit 1; }
+      - name: Deploy Worker
+        id: deploy
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: backend/cloudflare
+          wranglerVersion: '4'
+          command: deploy
+          secrets: |
+            TURSO_DATABASE_URL
+            TURSO_AUTH_TOKEN
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+      - name: Prove live room write/read round trip
+        env:
+          API_ORIGIN: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          set -euo pipefail
+          test -n "$API_ORIGIN" || { echo 'Wrangler did not return deployment-url'; exit 1; }
+          case "$API_ORIGIN" in
+            https://*.vercel.app*) echo 'refusing Vercel API_ORIGIN'; exit 1 ;;
+            https://*) ;;
+            *) echo "invalid API_ORIGIN: $API_ORIGIN"; exit 1 ;;
+          esac
+          node scripts/probe-pages005-cloudflare-roundtrip.mjs "$API_ORIGIN"
+          echo "PAGES005_API_ORIGIN=$API_ORIGIN" >> "$GITHUB_STEP_SUMMARY"
