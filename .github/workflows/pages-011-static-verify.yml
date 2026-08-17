@@ -1,0 +1,32 @@
+name: PAGES-011 Temporary Static Verify
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - ".github/workflows/pages-011-static-verify.yml"
+      - "PAGES_SERVICE_WORKER_DECISION.md"
+      - "PAGES_MIGRATION_CONTRACT.md"
+      - "tests/pages_service_worker_decision.test.mjs"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-011-temporary-static-verify
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact migration SHA
+        uses: actions/checkout@v4
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify locked Service Worker decision
+        run: node --test tests/pages_service_worker_decision.test.mjs
