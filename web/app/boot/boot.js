@@ -2,6 +2,7 @@ import { hydrateBuildMarker } from './build-marker.js';
 import { installFatalErrorHandlers } from './fatal-error.js';
 import { createRendererOwner, WebGLNotSupportedError } from '../scene/renderer.js';
 import { createPreviewScene } from '../scene/preview-scene.js';
+import { createCanonicalRuntimeData } from '../data/runtime-data.js';
 import { markOnce, STARTUP_MARKS, startupMarkSnapshot } from '../perf/startup-marks.js';
 import {
   AssetGroupLoadError,
@@ -75,6 +76,7 @@ async function boot() {
 
   let rendererOwner = null;
   let previewScene = null;
+  let canonicalRuntimeData = null;
   let unsubscribeContextState = null;
   let shell = null;
   let requiredOperation = null;
@@ -88,6 +90,7 @@ async function boot() {
     unsubscribeContextState = null;
     previewScene?.dispose();
     previewScene = null;
+    canonicalRuntimeData = null;
     rendererOwner?.dispose();
     rendererOwner = null;
     assetManager.dispose();
@@ -105,6 +108,7 @@ async function boot() {
       getAssetState: (id) => assetManager.getState(id),
       getAssetProgress: (group = null) => assetManager.snapshot(group),
       getAsset: (id) => assetManager.get(id),
+      getRuntimeData: () => canonicalRuntimeData,
       getStartupMarks: startupMarkSnapshot,
       dispose,
     });
@@ -150,8 +154,14 @@ async function boot() {
 
       const sceneRetry = retry && ['failed', 'cancelled'].includes(assetManager.snapshot('scene-critical').status);
       await assetManager.loadGroup('scene-critical', { retry: sceneRetry });
+      canonicalRuntimeData = createCanonicalRuntimeData({
+        worldLayout: assetManager.get('data.world-layout'),
+        introScatterText: assetManager.get('data.intro-scatter'),
+        approvedContract: assetManager.get('data.approved-contract'),
+      });
       markOnce(STARTUP_MARKS.criticalAssetsReady);
       document.documentElement.dataset.requiredAssets = 'ready';
+      document.documentElement.dataset.canonicalRuntimeData = 'validated';
 
       if (!previewScene) {
         previewScene = createPreviewScene(rendererOwner);
