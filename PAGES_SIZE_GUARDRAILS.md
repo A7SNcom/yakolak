@@ -34,27 +34,25 @@ These are intentionally far below the platform ceilings and are enforced by `scr
 
 **Do not raise these constants merely to make a deployment pass.** A budget breach is an architecture signal to use the external immutable-asset strategy below.
 
-## Exact measured baseline
+## Exact guarded deployment baseline
 
-Measurement date: **2026-08-17**.
+Measurement date: **2026-08-17**. These values are the output of the hard guard in the successful composite Pages deployment itself, not an offline estimate.
 
-Inputs used by the successful composite deployment:
-
-- Godot root: `024306d9cf42a20c6d2eac9b8a8db8a2669fc844` (`[flash-ready] publish 56d2a434`).
-- Three.js candidate web tree: `084305c39acb61e59ca6e602ccc52e608cc945d9` (subsequent PAGES-007 script/docs commits do not change `web/`).
-- Composite raw published tree: **83,929,880 bytes = 80.042 MiB**, **75 files** including the zero-byte `.nojekyll`.
+- Godot root: `c733b5ec5988ce1ae6c90f685d063ba5c58c36f0` (`[flash-ready] publish 751751d8`).
+- Three.js candidate checked out by that run: `e14d18844c8c287e50cd0a4ab3cbfdda4faec519`.
+- Composite raw published tree: **83,932,918 bytes = 80.045 MiB**, **76 files** including the zero-byte `.nojekyll`.
 - Root route tree: **49,402,483 bytes = 47.114 MiB**.
-- `/threejs/` route tree: **34,527,397 bytes = 32.928 MiB**.
+- `/threejs/` route tree: **34,530,435 bytes = 32.931 MiB**.
 - Largest published file: `index.wasm`, **39,513,091 bytes = 37.683 MiB**.
-- GitHub repository API-reported size at measurement: **103,993 KiB = 101.556 MiB**.
-- Successful Pages Actions run: `32005312224`.
-- Uploaded `github-pages` Actions artifact: artifact id `9279789282`, **37,674,223 bytes = 35.929 MiB** compressed, digest `sha256:322d03b59dcd06f5af68ad9c848491d48f11b8306e1d4aca45a9b04810c219cd`.
+- GitHub repository API-reported size during the guard: **103,993 KiB = 101.556 MiB**.
+- Successful guarded Pages Actions run: `32018932606`.
+- Guard step `Enforce Pages delivery and repository size guardrails`: **success**, before artifact upload.
+- Deploy job and post-deploy HTTP smoke for root and `/threejs/`: **success**.
+- Uploaded `github-pages` Actions artifact: artifact id `9284591314`, **37,674,513 bytes = 35.929 MiB** compressed, digest `sha256:10cd38ef318266e02fbeab6723a0f0e479dbd9cb2bdd5e261593c530e79a8560`.
 
 The raw tree is the number governed by the published-site and route/cache budgets. The Actions artifact byte count is recorded separately because upload packaging/compression is not the published uncompressed footprint.
 
-## Exact runtime-file inventory
-
-All byte counts below are exact blob sizes for the composite tree above.
+## Exact runtime-file inventory from guarded run `32018932606`
 
 | Published path | Bytes | MiB |
 | --- | ---: | ---: |
@@ -91,6 +89,7 @@ All byte counts below are exact blob sizes for the composite tree above.
 | `threejs/app/scene/room-layout.js` | 7,880 | 0.008 |
 | `threejs/app/scene/table-and-score.js` | 7,178 | 0.007 |
 | `threejs/app/scene/table-score-layout.js` | 7,459 | 0.007 |
+| `threejs/app/security/pages-origin-security.js` | 3,038 | 0.003 |
 | `threejs/app/session/canonical-online-session.js` | 2,232 | 0.002 |
 | `threejs/assets/kit/layout/intro-scatter.csv` | 2,452 | 0.002 |
 | `threejs/assets/kit/layout/world-layout.json` | 2,645 | 0.003 |
