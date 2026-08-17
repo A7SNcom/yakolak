@@ -18,6 +18,7 @@
 - آلية `[flash-ready]` تبقى فقط مصدر Godot المؤهل للجذر أثناء مرحلة الترحيل؛ Push عادي إلى `main` لا يصبح تلقائيًا root artifact جديدًا.
 - GitHub Pages static فقط. Online backend منفصل خلف `API_ORIGIN`؛ لا تفترض same-origin `/api` ولا رابط Vercel ثابتًا.
 - PAGES-005 يملك اختيار/قفل backend runtime/provider و`API_ORIGIN` العام.
+- PAGES-011 يملك قرار Service Worker/cache-scope المقاس في `PAGES_SERVICE_WORKER_DECISION.md`؛ القرار الحالي `none`، وTHREEJS-097 ملزم باستهلاكه ولا يحق له عكسه ضمنيًا.
 
 ## Vercel بعد PAGES-004
 
@@ -31,6 +32,7 @@
 4. لا تسمح لتغيير Three.js باستبدال Godot root قبل cutover.
 5. لا تضع أسرار backend داخل Pages artifact أو frontend config.
 6. أي سلوك online يحترم `THREEJS_SOURCE_OF_TRUTH.md` و`THREEJS_BACKEND_GAP_REGISTER.md` و`API_ORIGIN`؛ frontend لا يغلق Gap مفتوحًا من تلقاء نفسه.
+7. لا تسجل Service Worker أو تضف cache interception ما دام `PAGES_SERVICE_WORKER_DECISION.md` يقرر `none`؛ تغيير ذلك يحتاج قرارًا مقاسًا جديدًا وصريحًا.
 
 ## cutover النهائي
 
