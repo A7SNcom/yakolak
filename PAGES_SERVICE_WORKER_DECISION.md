@@ -85,6 +85,12 @@ The successful compose used Godot root `fbc0d15c574a40c4a9f31c96d42c2f03b424bb39
 
 The branch later advanced from that deployed candidate to the current PAGES-011 cleanup state only through decision-document and regression-test changes; no `web/**`, runtime asset, or deploy-scanner bytes changed after the published `77f23a8` candidate. Therefore no additional production deploy is required merely to publish the evidence/cleanup commits.
 
+### Latest follow-up deployment proof
+
+A later `main` flash-ready publication triggered normal composite Pages run `32046241168`. Its compose job again passed the PAGES-011 final-artifact scan, the PAGES-007 size guard, Pages configuration, and artifact upload without any code change to the PAGES-011 scanner or to `web/**` after the previously published `77f23a8` candidate. The first deployment attempts hit GitHub Pages API `503` server errors; rerunning only the failed deploy job preserved the already-verified artifact.
+
+Run `32046241168` attempt 3 then completed successfully. `actions/deploy-pages@v4` created the Pages deployment for build version `93f4d145b8bfeece660da3c7926bfdbe2700e0b8`, and the workflow HTTP smoke passed for the public root, `/threejs/`, and `/threejs/runtime-config.json`. The delivered runtime config reported `frontendSha=b471584c94b7962fe24d31f3df4de04519756331`. This follow-up proves the no-Service-Worker guard remains compatible with the current composite Pages pipeline after the Vercel Git-deployment shutdown changes.
+
 ## Evidence lifecycle
 
 The live browser workflow used to obtain run `32032833893` is temporary measurement scaffolding and must be removed after this decision and its regression guard are committed. The durable evidence is this report plus the normal repository regression test; PAGES-011 does not add a permanent per-push browser workflow.
