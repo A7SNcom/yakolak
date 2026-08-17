@@ -124,6 +124,14 @@ Status values: `OPEN`, `ADAPTER`, or `RESOLVED`. No entry may disappear without 
 - THREEJS-006 intentionally resolves entry/invitation reservation only; it does not invent a client-only ready authority or silently change the live start transition.
 - Rule for rewrite: keep readiness/start-gating unresolved until an explicit backend migration defines authoritative ready state and start behavior.
 
+### SRC-012 — Table top and game-clearance contact plane — OPEN
+
+- `YAKOLAK_PORTABLE_KIT/assets/layout/world-layout.json` defines the room table top as `Y=-16` and separately defines `gameClearance=0.8`; `YAKOLAK_PORTABLE_KIT/assets/room/ROOM.md` says to align the game assembly to the measured table top plus that `0.8` clearance.
+- The same Kit-owned board transform, verified from the canonical `board-and-lid.stl` by THREEJS-018, places the board's final world bounds at `Y=0..12`. With the table top fixed at `Y=-16`, the measured table-to-board-bottom gap is therefore `16`, not `0.8`.
+- These values are inside the same definitive spatial source and cannot be reconciled by silently translating the board, table, rule cells, pieces, or score geometry. A hidden `15.2`-unit presentation offset would break the locked world-coordinate contract.
+- THREEJS-021 therefore preserves all three facts explicitly: table top `-16`, declared clearance `0.8`, and verified board bottom `0`; its runtime contact report records the mismatch and applies **no hidden game offset**. The table is constructed at the exact declared top plane, while game/rule coordinates remain untouched.
+- THREEJS-022 must preserve these exact planes while building the neutral room. A later explicit spatial-contract resolution is required before any release claim that the physical board clearance itself equals `0.8`; until then no renderer or camera code may conceal the discrepancy.
+
 ## 4. Implementation rule for future Three.js tasks
 
 Every implementation decision must be traceable to one of these outcomes:
