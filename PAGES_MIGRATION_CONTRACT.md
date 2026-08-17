@@ -1,6 +1,6 @@
 # YAKOLAK GitHub Pages Migration Contract
 
-Status: **LOCKED by PAGES-004 (2026-08-17); backend provider selected by PAGES-005**
+Status: **LOCKED by PAGES-004 (2026-08-17); backend provider selected by PAGES-005; origin/storage security locked by PAGES-006**
 
 Scope: `threejs-rebuild` migration documentation and every later deployment/backend decision until an explicit cutover or hosting-migration task supersedes this contract.
 
@@ -87,7 +87,9 @@ Current `rules/` + `api/` behavior remains valuable authoritative product/protoc
 
 The browser origin for the Pages site is `https://a7sncom.github.io`. URL paths do not create separate security origins, so `/yakolak/` and `/yakolak/threejs/` cannot be treated as different origins for authorization.
 
-Authorization must depend on backend-validated, high-entropy session/seat credentials and protocol state—not CORS/path trust. PAGES-006 owns the detailed storage, CORS, cross-origin and recovery model.
+Authorization must depend on backend-validated, high-entropy session/seat credentials and protocol state—not CORS/path trust.
+
+**PAGES-006 is complete and locked.** `PAGES_ORIGIN_STORAGE_SECURITY.md` is the detailed authority for origin/CORS, LocalStorage, IndexedDB, CacheStorage, BroadcastChannel, bearer persistence, takeover/recovery, and secret handling. All YAKOLAK browser persistence must be namespaced under `YAKOLAK`; broad `clear()` operations are forbidden; seat bearer credentials remain memory-only; datastore/admin secrets remain backend-only and must never enter Pages artifacts or Actions logs. `.github/workflows/pages-006-origin-security.yml` and `tests/pages_origin_storage_security.test.mjs` are the regression gate.
 
 ## 7. Final cutover contract
 
@@ -108,7 +110,7 @@ Until that cutover task completes, the migration invariant remains: **Godot root
 
 For migration deployment/backend-hosting questions, use this order:
 
-1. `PAGES_MIGRATION_CONTRACT.md` and completed `PAGES-*` contracts for hosting/deployment/origin boundaries.
+1. `PAGES_MIGRATION_CONTRACT.md`, `PAGES_ORIGIN_STORAGE_SECURITY.md`, and completed `PAGES-*` contracts for hosting/deployment/origin/security boundaries.
 2. `THREEJS_SOURCE_OF_TRUTH.md` for product/spatial/backend semantics by domain.
 3. `THREEJS_BACKEND_GAP_REGISTER.md` for unresolved authority/protocol decisions and task ownership.
 4. `THREEJS_MIGRATION.md` for browser/runtime architecture.
