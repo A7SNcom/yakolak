@@ -27,12 +27,7 @@ try {
       return Object.isFrozen(value) && Object.values(value).every(recursiveFrozen);
     };
 
-    let mutationBlocked = false;
-    try {
-      data.cells[0].position[0] = 9999;
-    } catch {
-      mutationBlocked = true;
-    }
+    const mutationRejected = Reflect.set(data.cells[0].position, 0, 9999) === false;
 
     return {
       bootState: document.documentElement.dataset.bootState,
@@ -59,7 +54,7 @@ try {
       introIds: data.introStarts.map((entry) => entry.id),
       introLogicalIds: data.introStarts.map((entry) => entry.logicalSlotId),
       recursiveFrozen: recursiveFrozen(data),
-      mutationBlocked,
+      mutationRejected,
       firstCellAfterMutationAttempt: data.cells[0].position[0],
     };
   });
@@ -85,7 +80,7 @@ try {
     scatterComplete: result.introIds.length === 36
       && result.introIds.every((id, index) => id === index)
       && new Set(result.introLogicalIds).size === 36,
-    deeplyImmutable: result.recursiveFrozen === true && result.mutationBlocked === true && result.firstCellAfterMutationAttempt === -48,
+    deeplyImmutable: result.recursiveFrozen === true && result.mutationRejected === true && result.firstCellAfterMutationAttempt === -48,
   };
 
   const ok = Object.values(checks).every(Boolean);
