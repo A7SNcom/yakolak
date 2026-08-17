@@ -1,0 +1,24 @@
+name: YAKOLAK Pages Three.js Signal
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+
+permissions:
+  contents: read
+
+jobs:
+  candidate-ready:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Three.js candidate
+        uses: actions/checkout@v4
+
+      - name: Validate candidate entry point
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s web/index.html
+          grep -Fq 'THREEJS REBUILD' web/index.html
