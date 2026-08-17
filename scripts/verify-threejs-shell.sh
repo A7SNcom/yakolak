@@ -11,6 +11,8 @@ required=(
   web/app/scene/preview-scene.js
   web/app/scene/board-and-lid.js
   web/app/scene/player-bases.js
+  web/app/scene/table-score-layout.js
+  web/app/scene/table-and-score.js
   web/app/camera/frame-governor.js
   web/app/assets/asset-manifest.js
   web/app/assets/asset-manager.js
@@ -21,6 +23,7 @@ required=(
   web/assets/models/board-and-lid-layout.json
   web/assets/models/player-base.glb
   web/assets/models/player-base-layout.json
+  web/assets/models/score-marker.glb
   web/vendor/three/r185/three.module.js
   web/vendor/three/r185/three.core.js
   web/vendor/three/r185/addons/loaders/STLLoader.js
@@ -33,6 +36,7 @@ required=(
   scripts/verify-threejs-player-bases.mjs
   scripts/verify-threejs-board-lid.mjs
   scripts/verify-threejs-board-lid-runtime-contract.mjs
+  scripts/verify-threejs-table-score.mjs
   scripts/measure-threejs-performance.mjs
   tests/threejs_renderer_owner_contract.test.mjs
   tests/threejs_frame_governor_contract.test.mjs
@@ -42,6 +46,7 @@ required=(
   tests/threejs_performance_budget_contract.test.mjs
   tests/threejs_board_and_lid_contract.test.mjs
   tests/threejs_player_bases_contract.test.mjs
+  tests/threejs_table_score_contract.test.mjs
 )
 
 for file in "${required[@]}"; do
@@ -50,9 +55,11 @@ done
 
 node scripts/prepare-threejs-runtime-assets.mjs
 npm run assets:check -- --only=model.board-and-lid
+npm run assets:check -- --only=model.score-marker
 node scripts/verify-threejs-board-lid.mjs
 node scripts/verify-threejs-board-lid-runtime-contract.mjs
 node scripts/verify-threejs-player-bases.mjs
+node scripts/verify-threejs-table-score.mjs
 
 if find web -type f \( -name '*.pck' -o -name '*.wasm' -o -name 'index.js' -o -name 'index.audio*.js' \) -print -quit | grep -q .; then
   echo "Forbidden Godot runtime artifact found under web/" >&2
@@ -74,10 +81,11 @@ node tests/threejs_asset_conversion_pipeline.test.mjs
 node tests/threejs_performance_budget_contract.test.mjs
 node tests/threejs_board_and_lid_contract.test.mjs
 node tests/threejs_player_bases_contract.test.mjs
+node tests/threejs_table_score_contract.test.mjs
 
 if [ "${VERCEL_GIT_COMMIT_REF:-}" = "threejs-rebuild" ]; then
   test -n "${TURSO_DATABASE_URL:-}" || { echo "Missing TURSO_DATABASE_URL" >&2; exit 1; }
   test -n "${TURSO_AUTH_TOKEN:-}" || { echo "Missing TURSO_AUTH_TOKEN" >&2; exit 1; }
 fi
 
-echo "Verified YAKOLAK static Three.js shell with board/lid and four canonical player-base GLB instances, exact authoritative transforms, and performance budgets"
+echo "Verified YAKOLAK static Three.js shell with canonical board/base/score GLB assets, authoritative table/score layout, exact spatial transforms, and performance budgets"
