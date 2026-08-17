@@ -59,8 +59,13 @@ Every current or future Three.js online entry point must resolve the deployed pu
 
 If the guard fails, the UI must present online play as unavailable and keep local/offline play usable. It must not attempt a network request to a previous endpoint.
 
+## Live delivery verification boundary
+
+PAGES-010 verifies the actual composite GitHub Pages artifact at `/yakolak/threejs/` after deployment, including the file types and cache validators the current runtime really uses. Follow-up cache/update work must consume those observations rather than assuming custom headers, rewrites, MIME overrides, or byte-range behavior that GitHub Pages does not guarantee.
+
 ## Ownership
 
 - PAGES-005 owns provider selection and the proven canonical value of `backend/cloudflare/API_ORIGIN.txt`.
 - PAGES-009 owns what may enter the public Pages artifact, public runtime metadata shape, client fail-closed config semantics and deploy-time public-artifact scanning.
+- PAGES-010 owns observation of the actual GitHub Pages delivery behavior used as input to PAGES-011 and THREEJS-097.
 - Database/admin secrets remain server-side only and never cross this boundary.
