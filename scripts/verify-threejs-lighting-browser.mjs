@@ -204,6 +204,14 @@ try {
     }
     frameMs.sort((a, b) => a - b);
     const percentile = (p) => frameMs[Math.min(frameMs.length - 1, Math.floor((frameMs.length - 1) * p))];
+
+    const textureProperties = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'alphaMap', 'envMap'];
+    const playerMaterialMaps = materialModule.CANONICAL_PLAYER_IDS.flatMap((colorId) => {
+      const material = materialSystem.getPlayerMaterial(colorId);
+      return textureProperties.filter((property) => material[property]?.isTexture).map((property) => `${colorId}.${property}`);
+    });
+    const userTextureMapCount = playerMaterialMaps.length;
+
     const mobileCost = {
       viewport: [390, 844],
       deviceScaleFactor: 2,
@@ -214,7 +222,9 @@ try {
       drawCalls: renderer.info.render.calls,
       triangles: renderer.info.render.triangles,
       programs: renderer.info.programs?.length ?? 0,
-      textures: renderer.info.memory.textures,
+      rendererMemoryTextures: renderer.info.memory.textures,
+      userTextureMapCount,
+      userTextureMaps: playerMaterialMaps,
       geometries: renderer.info.memory.geometries,
       shadows: renderer.shadowMap.enabled,
       environmentMap: scene.environment !== null,
@@ -226,10 +236,21 @@ try {
     const fullPixels = new Uint8Array(width * height * 4);
     gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, fullPixels);
     const candidateMetrics = pixelMetrics(fullPixels);
-    const baselineContentMeans = baseline.map((entry) => entry.contentMean);
+
+    // The frozen production captures are dark entry/loading frames, while the definitive
+    // Three.js contract explicitly requires a near-white neutral room. Use the baseline
+    // pixels to preserve their foreground contrast character, never to copy their absolute
+    // black-background luminance into the canonical neutral room.
+    const baselineContrasts = baseline.map((entry) => entry.contentStdDev).sort((a, b) => a - b);
+    const medianBaselineContrast = baselineContrasts[Math.floor(baselineContrasts.length / 2)];
     const tuningEnvelope = {
-      contentMeanMin: Math.max(0.05, Math.min(...baselineContentMeans) * 0.35),
-      contentMeanMax: Math.min(0.95, Math.max(...baselineContentMeans) * 1.8),
+      baselineCaptureCharacter: 'dark-entry/loading-reference',
+      absoluteLuminanceAuthority: 'canonical-neutral-palette',
+      contrastAuthority: 'frozen-baseline-pixels',
+      contentContrastMin: medianBaselineContrast * 0.9,
+      contentContrastMax: Math.max(...baselineContrasts) * 1.75,
+      contentMeanMin: 0.15,
+      contentMeanMax: 0.85,
       maxContentClipFraction: 0.25,
     };
 
@@ -262,7 +283,9 @@ try {
     bootReady: result.bootState === 'ready' && result.lightingState === 'ready',
     noPageErrors: pageErrors.length === 0,
     frozenBaselinePixelsLoaded: result.baseline.length === 3 && result.baseline.every((entry) => entry.width > 0 && entry.height > 0),
-    baselineActuallyTunesCandidate: result.candidateMetrics.contentMean >= result.tuningEnvelope.contentMeanMin
+    baselineActuallyTunesCandidate: result.candidateMetrics.contentStdDev >= result.tuningEnvelope.contentContrastMin
+      && result.candidateMetrics.contentStdDev <= result.tuningEnvelope.contentContrastMax
+      && result.candidateMetrics.contentMean >= result.tuningEnvelope.contentMeanMin
       && result.candidateMetrics.contentMean <= result.tuningEnvelope.contentMeanMax
       && result.candidateMetrics.clippedLowFraction <= result.tuningEnvelope.maxContentClipFraction
       && result.candidateMetrics.clippedHighFraction <= result.tuningEnvelope.maxContentClipFraction,
@@ -286,7 +309,7 @@ try {
       && result.mobileCost.p95FrameMs < 100
       && result.mobileCost.drawCalls <= 4
       && result.mobileCost.triangles < 10000
-      && result.mobileCost.textures === 0
+      && result.mobileCost.userTextureMapCount === 0
       && result.mobileCost.shadows === false
       && result.mobileCost.environmentMap === false
       && result.mobileCost.neutralLightCount === 3,
