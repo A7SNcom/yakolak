@@ -75,6 +75,16 @@ THREEJS-097 must read this file and consume the decision marker before implement
 
 If THREEJS-097 finds this file missing, the marker malformed, or a later decision contradictory without fresh measured evidence, it must fail closed and leave Service Workers off rather than choosing a policy itself.
 
+## Post-hardening production proof
+
+After the composed-artifact guard was hardened to distinguish the inert generated Godot helper from an active registration, the normal composite Pages workflow successfully deployed the guarded artifact in run `32042174607` (attempt 5).
+
+The successful compose used Godot root `fbc0d15c574a40c4a9f31c96d42c2f03b424bb39` and Three.js candidate `77f23a8db9be61c508be2700c41baf12c1db348c`. The PAGES-011 final-artifact scan passed with the explicit message that the Godot helper was verified inert by the delivered `GODOT_CONFIG`; the Pages inventory was 78 files / 83,936,022 bytes and remained inside the PAGES-007 internal budgets. The uploaded `github-pages` artifact ID was `9292187198`.
+
+`actions/deploy-pages@v4` then reported success, and the workflow's HTTP smoke passed for the public root, `/threejs/`, and `/threejs/runtime-config.json`, with `frontendSha=77f23a8db9be61c508be2700c41baf12c1db348c`.
+
+The branch later advanced from that deployed candidate to the current PAGES-011 cleanup state only through decision-document and regression-test changes; no `web/**`, runtime asset, or deploy-scanner bytes changed after the published `77f23a8` candidate. Therefore no additional production deploy is required merely to publish the evidence/cleanup commits.
+
 ## Evidence lifecycle
 
 The live browser workflow used to obtain run `32032833893` is temporary measurement scaffolding and must be removed after this decision and its regression guard are committed. The durable evidence is this report plus the normal repository regression test; PAGES-011 does not add a permanent per-push browser workflow.
