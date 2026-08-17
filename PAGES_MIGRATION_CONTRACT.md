@@ -1,6 +1,6 @@
 # YAKOLAK GitHub Pages Migration Contract
 
-Status: **LOCKED by PAGES-004 (2026-08-17)**
+Status: **LOCKED by PAGES-004 (2026-08-17); backend provider selected by PAGES-005**
 
 Scope: `threejs-rebuild` migration documentation and every later deployment/backend decision until an explicit cutover or hosting-migration task supersedes this contract.
 
@@ -78,7 +78,8 @@ Rules:
 3. Transport code owns construction of backend URLs from `API_ORIGIN`; scene/UI modules never hard-code backend hosts.
 4. Private datastore/admin credentials remain backend-only and never enter the Pages artifact, source-visible config, or browser storage.
 5. If `API_ORIGIN` is missing/incompatible, offline/local play may continue where its own contract permits, but online entry points must fail clearly as unavailable rather than falling back to an old Vercel endpoint.
-6. PAGES-005 selects and locks the non-Vercel authoritative backend provider/runtime and one public `API_ORIGIN`. Until that task closes, documentation and implementation must not invent a provider-specific runtime contract.
+6. **PAGES-005 selects Cloudflare Workers as the sole future authoritative backend runtime, with the existing Turso Cloud datastore contract.** `PAGES_BACKEND_RUNTIME.md` owns the evaluation and deployment proof. No later task may silently substitute Vercel or another provider.
+7. The exact public `API_ORIGIN` must not be guessed from an account name. It becomes locked only after an authenticated Cloudflare deployment returns the real HTTPS deployment URL and `scripts/probe-pages005-cloudflare-roundtrip.mjs` proves a live Turso-backed room write/read round trip. Until that succeeds, online Pages entry points must remain unavailable rather than fall back to Vercel.
 
 Current `rules/` + `api/` behavior remains valuable authoritative product/protocol evidence until an explicit backend migration changes those semantics; that does **not** imply that Vercel remains the future host for those semantics.
 
