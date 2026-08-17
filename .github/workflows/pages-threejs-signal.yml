@@ -1,0 +1,25 @@
+name: YAKOLAK Pages Three.js Signal
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - 'web/**'
+      - 'scripts/pages-size-guard.sh'
+      - '.github/workflows/pages-threejs-signal.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: yakolak-pages-threejs-signal
+  cancel-in-progress: true
+
+jobs:
+  candidate-ready:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Signal exact Three.js candidate to default-branch composite deploy
+        run: echo "Three.js candidate $GITHUB_SHA is ready for composite Pages assembly"

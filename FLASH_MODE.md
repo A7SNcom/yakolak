@@ -9,8 +9,8 @@ Current Godot loop during migration:
 - Fast exporter/source workflow: `.github/workflows/online-build-publish.yml`.
 - Minimal exporter remains `scripts/vercel-flash-build.sh`; its legacy filename does **not** make Vercel the current deployment authority.
 - A normal `main` push is not itself the new Pages root; the composite pipeline consumes an eligible `[flash-ready]` result.
-- Three.js changes on `threejs-rebuild` are published by `.github/workflows/pages-single-site.yml`, which directly composes the latest `[flash-ready]` Godot root plus the exact pushed Three.js candidate under `/yakolak/threejs/`.
-- `pages-threejs-signal.yml` is retired: ordinary Three.js pushes must not fan out through a proxy workflow.
+- Ordinary Three.js frontend pushes no longer fan out into task-specific regression workflows. Only the tiny `YAKOLAK Pages Three.js Signal` bridge runs on relevant `web/**` changes, because the repository's `github-pages` environment currently rejects deployments whose workflow head branch is `threejs-rebuild`.
+- The bridge does not build, test, compose, upload, or deploy anything. The default-branch `YAKOLAK Composite Pages` workflow remains the sole Pages deployment owner and receives the exact Three.js push SHA through `workflow_run`.
 - Completed task-specific regression workflows are retired from automatic pushes. Optional consolidated checks live in `.github/workflows/threejs-optional-checks.yml` and are manual only; the immutable vendor refresh is also manual only.
 - `PAGES-006 origin and storage security` is manual regression coverage, not a daily deployment gate.
 - `PAGES-005 Cloudflare backend` may retain its narrowly targeted backend-only verification while that backend migration is active; it is not part of ordinary frontend edit-to-Pages delivery.
