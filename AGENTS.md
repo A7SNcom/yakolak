@@ -2,38 +2,64 @@
 
 هذه التعليمات إلزامية لأي نموذج ذكاء اصطناعي أو مطور يعمل على المشروع.
 
+## عقد النشر الحالي أثناء ترحيل Three.js — PAGES-004
+
+على `threejs-rebuild`، المرجع الأعلى لقرارات الاستضافة/النشر/حدود الـbackend هو `PAGES_MIGRATION_CONTRACT.md`.
+
+- هدف الواجهة الثابتة الحالي هو **GitHub Pages**.
+- موقع المشروع: `https://a7sncom.github.io/yakolak/`.
+- أثناء الترحيل يبقى الجذر `/yakolak/` هو آخر Godot-ready معروف من `main/web`، ويظهر مرشح Three.js فقط تحت `/yakolak/threejs/` داخل **نفس** Pages artifact.
+- GitHub Actions/Pages هو مالك نشر الواجهة. PAGES-002 يملك مسار الـcomposite Pages deployment، وPAGES-003 يملك قابلية نقل العميل بين `/yakolak/threejs/` والجذر النهائي.
+- GitHub Pages واجهة static فقط؛ لا يستضيف room server ولا أسرار ولا منطق backend تفاعلي.
+- كل اتصال Online من عميل Three.js يمر عبر `API_ORIGIN`. PAGES-005 هو المالك الوحيد لاختيار/قفل runtime غير Vercel وقيمة `API_ORIGIN` العامة.
+- أي افتراضات أو روابط أو إعدادات أو Preview deployments تخص Vercel في المهام/الوثائق القديمة هي **historical evidence فقط** بعد PAGES-004، ولا يجوز أن تحكم قرار نشر أو backend جديد.
+- Final cutover لاحق وصريح: ينقل Three.js المقبول إلى `/yakolak/` في نفس GitHub Pages site، يتقاعد `/yakolak/threejs/` عمدًا، ويتوقف Godot root فقط بعد تحقق الصحة/التوافق. لا يوجد Vercel promote/alias switch ضمن عقد cutover الجديد.
+
 ## استثناء مؤقت لترحيل Three.js
 
-هذا الاستثناء ينطبق **فقط** على الفرع الموجود `threejs-rebuild` وحتى تنفيذ cutover صريح لاحقًا:
+هذا الاستثناء ينطبق **فقط** على الفرع الموجود `threejs-rebuild` وحتى cutover صريح لاحقًا:
 
-- `threejs-rebuild` هو مساحة العمل الوحيدة لكل مهام `THREEJS-*` وإعادة البناء بـThree.js.
-- يبقى `main` مصدر Godot المعتمد، ويبقى https://yakolak.vercel.app/ هو Production الخاص بـGodot حتى cutover صريح.
-- لا يُنشأ أي فرع ترحيل إضافي، ولا سلسلة Pull Requests، ولا مسار نشر منافس أو بديل.
-- لا تُنقل تغييرات Three.js إلى `main` ولا إلى Production إلا بمهمة cutover صريحة لاحقة.
-- جميع القواعد أدناه تستمر كما هي لـ`main` ومسار Godot، ويُستثنى منها فقط ما يلزم للسماح بالعمل داخل `threejs-rebuild` وفق البنود أعلاه.
-- كل مهمة `THREEJS-*` يجب أن تقرأ `THREEJS_SOURCE_OF_TRUTH.md` و`THREEJS_BACKEND_GAP_REGISTER.md` قبل تنفيذ سلوك يمس الـbackend أو online lifecycle. أي Gap حالته `OPEN` لا يجوز للواجهة حسمه أو اختراع authority محلي له؛ القرار والتنفيذ يملكه فقط رقم مهمة الـowner المسجل في الـregister.
+- `threejs-rebuild` هو مساحة العمل الوحيدة لكل مهام `THREEJS-*` و`PAGES-*` الخاصة بإعادة البناء/الترحيل.
+- يبقى `main` مصدر Godot المعتمد أثناء مرحلة الترحيل، ولا تُنقل تغييرات Three.js إليه إلا بمهمة cutover صريحة.
+- لا يُنشأ فرع ترحيل إضافي، ولا سلسلة Pull Requests، ولا موقع Pages ثانٍ، ولا مسار frontend منافس.
+- كل مهمة Three.js تمس backend أو online lifecycle يجب أن تقرأ `THREEJS_SOURCE_OF_TRUTH.md` و`THREEJS_BACKEND_GAP_REGISTER.md` و`PAGES_MIGRATION_CONTRACT.md` قبل التنفيذ.
+- أي Gap حالته `OPEN` لا يجوز للواجهة حسمه أو اختراع authority محلي له؛ القرار والتنفيذ يملكه رقم المهمة المسجل في الـregister.
+- لا تستخدم وجود `api/` أو `vercel.json` أو نجاح Vercel سابقًا كدليل على أن Vercel هو runtime المستقبلي؛ هذه مواد legacy/history إلى أن يختار PAGES-005 الـbackend target.
 
-## مصدر الحقيقة الوحيد
+## مصدر الحقيقة حسب المسار
 
-- الفرع الوحيد للتطوير الحالي هو `main`.
-- أحدث `main` هو دائمًا نقطة البداية لأي تعديل.
-- الرابط الأساسي الوحيد للمستخدم هو: https://yakolak.vercel.app/
-- يجب أن يعرض الرابط الأساسي أحدث نسخة منشورة من `main`.
+### ترحيل Three.js
 
-## وضع التطوير المعتمد: Flash Mode
+1. `PAGES_MIGRATION_CONTRACT.md` + عقود `PAGES-*` المكتملة: الاستضافة، Pages paths، Actions ownership، `API_ORIGIN` وcutover boundary.
+2. `THREEJS_SOURCE_OF_TRUTH.md`: المصدر المعتمد حسب مجال القرار.
+3. `THREEJS_BACKEND_GAP_REGISTER.md`: الفجوات المفتوحة ومالك القرار.
+4. `THREEJS_MIGRATION.md`: حدود بنية العميل/runtime.
+5. Vercel-era reports/deployments: دليل تاريخي فقط.
 
-الهدف هو أقصر طريق ممكن من تعديل الكود إلى الرابط الأساسي:
+### Godot على `main` أثناء الترحيل
 
-**تعديل `main` → Godot Web Export فقط → `[flash-ready]` → Vercel → نفس الرابط الأساسي.**
+- `main` يبقى مصدر Godot root المعروف أثناء مرحلة الانتقال.
+- آلية `[flash-ready]` يمكن أن تستمر لإنتاج الـGodot artifact الذي يغذي Pages root أثناء الترحيل.
+- هذا لا يجعل Vercel مرجع النشر الحالي للترحيل، ولا يغيّر عقد Pages.
 
-- لا تشغّل اختبارات CI أو Playwright أو regression أو quality gates تلقائيًا أثناء التطوير اليومي.
-- لا تجعل نجاح الاختبارات شرطًا للنشر اليومي.
-- الاختبارات الثقيلة تبقى أدوات اختيارية وتُشغّل يدويًا فقط عندما يطلب المستخدم اختبارًا أو نسخة مستقرة.
-- لا تجعل Vercel يبني Godot؛ GitHub Actions يصدر ملفات `web/` الجاهزة، ثم Vercel يعرضها فقط.
-- Workflow النشر السريع الوحيد هو `.github/workflows/online-build-publish.yml`.
-- سكربت التصدير السريع هو `scripts/vercel-flash-build.sh`، ويجب أن يبقى بلا اختبارات.
-- Commit بعلامة `[flash-ready]` هو النسخة الجاهزة التي يسمح لـVercel بنشرها.
-- عند وصول تعديل أحدث، ألغِ التصدير الأقدم بدل تكوين طابور.
+## وضع التطوير السريع
+
+### Three.js
+
+الهدف:
+
+**تعديل HTML/CSS/JS على `threejs-rebuild` → commit static files → composite GitHub Pages deploy → نفس `/yakolak/threejs/`.**
+
+- لا bundler ولا Godot export ولا npm application build للتعديل الطبيعي.
+- لا تجعل الاختبارات الثقيلة بوابة يومية إلا إذا كانت المهمة نفسها تطلب gate محددًا.
+- لا تنشئ Workflow تلقائيًا جديدًا لكل مهمة بلا حاجة؛ PAGES-008 يملك توحيد/تقليل الـworkflows لاحقًا.
+- لا تستخدم root-relative URLs ثابتة تكسر `/yakolak/threejs/` أو cutover إلى `/yakolak/`.
+
+### Godot root أثناء الترحيل
+
+- استمر في إنتاج آخر `[flash-ready]` صالح من `main` عند الحاجة لتحديث root Godot artifact.
+- لا تجعل تعديل Three.js يشغّل Godot build.
+- لا تسمح لفرع Three.js أن يستبدل root قبل cutover.
 
 ## ممنوع التشتت
 
@@ -41,34 +67,17 @@
 - لا تنشئ سلسلة فروع أو روابط معاينة متعددة.
 - لا تبدأ من فرع قديم حتى لو كان اسمه perfect أو approved أو release أو archive.
 - لا تستخدم Pull Request كمسار التطوير الطبيعي إلا بطلب صريح من المستخدم.
-- لا تضف Workflow تلقائيًا جديدًا يعمل على كل Push دون طلب صريح.
-- لا تعيد الاختبارات الثقيلة إلى مسار Flash Mode.
+- لا تعيد Vercel إلى المسار الحاكم لمجرد أن مهام قديمة استخدمته.
+- لا تضع database/admin secrets أو bearer credentials داخل Pages artifact أو frontend config.
 
-## طريقة العمل المعتمدة
+## عند إنهاء تعديل Three.js
 
-1. اقرأ أحدث `main`.
-2. نفذ التعديل مباشرة فوقه.
-3. احفظ التعديل في `main`.
-4. دع Flash Publish يصدر Godot Web فقط.
-5. انتظر Commit `[flash-ready]` الناتج آليًا.
-6. Vercel ينشر هذا الـCommit على الرابط الأساسي.
-7. أي تطوير تالٍ يبدأ من أحدث `main`.
+تحقق فقط مما يلزم للمهمة الحالية، ثم تأكد من:
 
-## متى نختبر؟
+- التعديل موجود على أحدث `threejs-rebuild` دون الكتابة فوق عمل وكيل آخر.
+- عقد base-path بقي صالحًا لـ`/yakolak/threejs/` والجذر النهائي.
+- لا توجد محاولة لنقل authority إلى Pages أو إلى browser state.
+- أي Online transport جديد يعتمد `API_ORIGIN` ولا يتصل صامتًا بعنوان Vercel قديم.
+- root Godot لم يُستبدل إلا إذا كانت المهمة Cutover صريحة.
 
-الاختبار الكامل ليس جزءًا من كل تعديل. شغّله يدويًا فقط عندما يطلب المستخدم واحدًا من الآتي:
-
-- فحص شامل.
-- نسخة مستقرة أو Release.
-- تشخيص خطأ محدد يحتاج اختبارًا.
-- التأكد من Regression قبل محطة مهمة.
-
-## عند إنهاء أي تعديل
-
-تحقق فقط من:
-
-- التعديل موجود في `main`.
-- Flash Publish أنتج `[flash-ready]` لنفس التعديل أو لأحدث تعديل بعده.
-- https://yakolak.vercel.app/ يعرض النسخة الجديدة.
-
-الفكرة: **نسخة بعد نسخة في خط واحد، بأقل انتظار ممكن.**
+الفكرة: **مسار ترحيل واحد، موقع Pages واحد، frontend static واضح، وbackend authority خلف `API_ORIGIN` منفصل.**
