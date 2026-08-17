@@ -9,8 +9,16 @@ Current Godot loop during migration:
 - Fast exporter/source workflow: `.github/workflows/online-build-publish.yml`.
 - Minimal exporter remains `scripts/vercel-flash-build.sh`; its legacy filename does **not** make Vercel the current deployment authority.
 - A normal `main` push is not itself the new Pages root; the composite pipeline consumes an eligible `[flash-ready]` result.
-- Three.js changes on `threejs-rebuild` are composed separately under `/yakolak/threejs/` and must not trigger Godot export.
+- Three.js changes on `threejs-rebuild` are published by `.github/workflows/pages-single-site.yml`, which directly composes the latest `[flash-ready]` Godot root plus the exact pushed Three.js candidate under `/yakolak/threejs/`.
+- `pages-threejs-signal.yml` is retired: ordinary Three.js pushes must not fan out through a proxy workflow.
+- Completed task-specific regression workflows are retired from automatic pushes. Optional consolidated checks live in `.github/workflows/threejs-optional-checks.yml` and are manual only; the immutable vendor refresh is also manual only.
+- `PAGES-006 origin and storage security` is manual regression coverage, not a daily deployment gate.
+- `PAGES-005 Cloudflare backend` may retain its narrowly targeted backend-only verification while that backend migration is active; it is not part of ordinary frontend edit-to-Pages delivery.
 - GitHub Actions/Pages owns static frontend publishing under `PAGES_MIGRATION_CONTRACT.md` / PAGES-002.
 - Automatic broad gameplay/Playwright/regression/latency/visual gates are not part of the daily export path unless a task/release gate explicitly requires them.
+
+## Cutover rule
+
+`YAKOLAK Flash Publish` exists only to keep producing the temporary Godot root during migration. The explicit final Three.js cutover must disable its automatic `main` trigger after the accepted Three.js candidate becomes the root. It must not remain as a hidden post-cutover build/deploy lane.
 
 Historical Vercel Production/Preview behavior may still be used as evidence for old runs, but it is non-normative after PAGES-004.

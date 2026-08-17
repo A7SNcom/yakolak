@@ -1,0 +1,81 @@
+name: YAKOLAK Three.js Optional Checks
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Check suite to run
+        required: true
+        default: fast
+        type: choice
+        options:
+          - fast
+          - browser
+          - full
+
+permissions:
+  contents: read
+
+concurrency:
+  group: yakolak-threejs-optional-${{ github.ref }}-${{ inputs.suite }}
+  cancel-in-progress: true
+
+jobs:
+  fast:
+    if: inputs.suite == 'fast' || inputs.suite == 'full'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact migration SHA
+        uses: actions/checkout@v4
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run consolidated static and contract checks
+        run: |
+          bash scripts/verify-threejs-shell.sh
+          node --test tests/threejs_vendor_contract.test.mjs
+          node --test tests/pages_origin_storage_security.test.mjs
+
+  browser:
+    if: inputs.suite == 'browser' || inputs.suite == 'full'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact migration SHA
+        uses: actions/checkout@v4
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser verifier only
+        run: npm install --no-save --package-lock=false playwright@1.55.0
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Prepare verified runtime assets
+        run: node scripts/prepare-threejs-runtime-assets.mjs
+      - name: Expose frozen baseline screenshots
+        run: |
+          rm -f web/__baseline
+          ln -s ../docs/threejs-baseline/screenshots web/__baseline
+      - name: Serve static web source
+        shell: bash
+        run: |
+          python3 -m http.server 4173 --directory web > /tmp/threejs-optional-http.log 2>&1 &
+          echo $! > /tmp/threejs-optional-http.pid
+          for attempt in $(seq 1 20); do
+            curl --fail --silent http://127.0.0.1:4173/ >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/threejs-optional-http.log
+          exit 1
+      - name: Run consolidated browser checks
+        run: |
+          node scripts/verify-threejs-browser.mjs
+          node scripts/verify-threejs-context-recovery.mjs
+          node scripts/verify-threejs-table-score-browser.mjs
+          node scripts/verify-threejs-room-browser.mjs
+          node scripts/verify-threejs-runtime-data-browser.mjs
+          node scripts/verify-threejs-materials-browser.mjs
+          node scripts/verify-threejs-lighting-browser.mjs
