@@ -1,8 +1,22 @@
 # Three.js Backend Gap and Contradiction Register
 
-Status: **LOCKED by THREEJS-007 (2026-08-16), ownership map corrected against the canonical THREEJS-001→100 task plan**
+Status: **LOCKED by THREEJS-007 (2026-08-16); deployment/runtime ownership superseded by PAGES-004 (2026-08-17)**
 
-Scope: `threejs-rebuild` only until the named later task explicitly resolves a gap. This register is a mandatory companion to `THREEJS_SOURCE_OF_TRUTH.md`, `THREEJS_ENTRY_INVITATION_CONTRACT.md`, and `THREEJS_MIGRATION.md`.
+Scope: `threejs-rebuild` only until the named later task explicitly resolves a gap. This register is a mandatory companion to `THREEJS_SOURCE_OF_TRUTH.md`, `THREEJS_ENTRY_INVITATION_CONTRACT.md`, `THREEJS_MIGRATION.md`, and `PAGES_MIGRATION_CONTRACT.md`.
+
+## PAGES-004 hosting/runtime override
+
+This register continues to own unresolved gameplay/protocol/persistence authority questions, but it no longer treats Vercel as the future deployment/runtime constraint.
+
+- GitHub Pages is the static frontend target.
+- During migration the single Pages site serves Godot at `/yakolak/` and Three.js at `/yakolak/threejs/`.
+- GitHub Pages cannot host the authoritative interactive room API.
+- Online authority is reached through public `API_ORIGIN`.
+- PAGES-005 selects and locks the non-Vercel authoritative backend runtime/provider and the public `API_ORIGIN`.
+- Historical Vercel Function behavior, deployment IDs, Node/runtime observations, `vercel.json`, aliases and `yakolak.vercel.app` remain evidence about the old implementation only. They do not constrain the provider/runtime selected by PAGES-005.
+- Final static frontend cutover is GitHub Pages root replacement, not a Vercel promotion/alias switch. THREEJS-099 may still own active-room/protocol cutover compatibility, but must execute against the Pages + `API_ORIGIN` architecture selected by PAGES-*.
+
+Any older Vercel-specific wording retained below must be read through this override.
 
 ## 1. Non-negotiable rule
 
@@ -18,36 +32,35 @@ For every unresolved item:
 
 ## 2. Re-audit baseline
 
-THREEJS-007 re-audited the portable kit and current migration/backend boundaries before implementation, including:
+THREEJS-007 re-audited the portable kit and then-current migration/backend boundaries before implementation, including:
 
 - `YAKOLAK_PORTABLE_KIT/README.md` and machine-readable approved/layout data;
 - `THREEJS_SOURCE_OF_TRUTH.md` and `THREEJS_ENTRY_INVITATION_CONTRACT.md`;
 - `rules/yakolak-rules.json` and `api/game-rules.js`;
 - `api/rooms.js`, `api/rooms-observed.js`, `api/_telemetry.js`, and `api/telemetry.js`;
 - Turso room/presence/join-rate/telemetry persistence behavior;
-- `package.json`, `.env.example`, and `vercel.json`;
-- the connected Vercel project/deployment configuration;
-- the canonical 100-task migration plan, to ensure every gap is owned by the real later task rather than an invented task number.
+- `package.json`, `.env.example`, and historical `vercel.json`;
+- historical Vercel project/deployment configuration;
+- the canonical migration task plan, to ensure every gap is owned by the real later task rather than an invented task number.
 
-Observed live baseline:
+Observed semantic/backend baseline at that time:
 
 - migration workspace: `threejs-rebuild` only;
-- Godot source/Production branch: `main`;
-- Production domain remains `yakolak.vercel.app` until cutover;
-- `vercel.json` enables Git deployment for `main` and disables it for other branches;
-- room persistence is `yakolak_online_rooms_v5` with protocol `5`, plus `yakolak_online_presence_v1` and `yakolak_online_join_rate_v1`;
-- room inactivity TTL is currently 3 hours, with separate 20-minute waiting-room reuse, 15-minute finished-match reuse, and 60-second stale presence behavior;
+- Godot source branch: `main`;
+- room persistence: `yakolak_online_rooms_v5` with protocol `5`, plus `yakolak_online_presence_v1` and `yakolak_online_join_rate_v1`;
+- room inactivity TTL: 3 hours, with separate 20-minute waiting-room reuse, 15-minute finished-match reuse, and 60-second stale presence behavior;
 - room state uses optimistic integer `version` CAS and hashed bearer credentials;
 - current room mutations are not uniform: `move`/`rematch` use `mutationId`, `edit` does not, `leave` bypasses caller version, and create/join use request-id idempotency;
 - there is no authoritative ready field, configured Computer seat, seat-specific invitation reservation, absolute turn deadline, timeout mutation, or durable server-side bot trigger in protocol 5;
-- telemetry writes to `yakolak_online_telemetry_v1`, redacts credential-like detail keys, retains approximately 7 days via opportunistic cleanup, and accepts client batches without making telemetry authoritative gameplay evidence;
-- repository `package.json` currently says Node `22.x`, while the connected Vercel project currently reports Node `24.x`; cutover runtime compatibility remains unresolved.
+- telemetry writes to `yakolak_online_telemetry_v1`, redacts credential-like detail keys, retains approximately 7 days via opportunistic cleanup, and accepts client batches without making telemetry authoritative gameplay evidence.
+
+Historical Vercel-specific observations—including Vercel Production/Preview state and Node version mismatch—remain audit evidence only. PAGES-004 removes them as future runtime constraints; PAGES-005 owns the new runtime selection.
 
 Already locked product decisions remain binding: `SRC-001` wins-to-match, `SRC-002` canonical `marble`, and `SRC-004` seat-specific invitation semantics.
 
 ## 3. Correct ownership map
 
-The earlier draft incorrectly assigned GAP-001…013 to THREEJS-008…020. That collided immediately with the real task plan (`THREEJS-008` is the static no-build architecture task). Those assignments are void.
+The earlier draft incorrectly assigned GAP-001…013 to THREEJS-008…020. Those assignments are void.
 
 | Gap | Status | Contract/resolution owner | Required implementation/closure tasks |
 |---|---|---|---|
@@ -55,15 +68,15 @@ The earlier draft incorrectly assigned GAP-001…013 to THREEJS-008…020. That 
 | GAP-002 Mixed Computer/Online authority | OPEN | **THREEJS-062** | THREEJS-064 seat records, THREEJS-069 readiness, THREEJS-071 server-authoritative online Computer turns |
 | GAP-003 Invitation lifecycle / claim / invalidation | OPEN | **THREEJS-062** | THREEJS-063 schema, THREEJS-065 allocation, THREEJS-066 claim/session identity, THREEJS-068 invalidation |
 | GAP-004 Ready/start lifecycle | OPEN | **THREEJS-062** | **THREEJS-069** authoritative ready check and explicit start |
-| GAP-005 Authoritative 18-second online deadline / timeout | OPEN | **THREEJS-062** | **THREEJS-070** serverless-safe deadline reconciliation; THREEJS-072 shared transition semantics |
-| GAP-006 Serverless timeout/bot triggering | OPEN | **THREEJS-062** | **THREEJS-070** timeout reconciliation + **THREEJS-071** online Computer reconciliation |
+| GAP-005 Authoritative 18-second online deadline / timeout | OPEN | **THREEJS-062** | **THREEJS-070** request-safe deadline reconciliation; THREEJS-072 shared transition semantics |
+| GAP-006 Request-driven timeout/bot triggering | OPEN | **THREEJS-062 + PAGES-005 runtime boundary** | **THREEJS-070** timeout reconciliation + **THREEJS-071** online Computer reconciliation |
 | GAP-007 Room TTL / presence / disconnect / expiry | OPEN | **THREEJS-075** | THREEJS-063 persistence support where needed |
 | GAP-008 Online restart-round / rematch consensus | OPEN | **THREEJS-076** | THREEJS-072 shared mutation/transition semantics |
 | GAP-009 Mutation-ID / revision / exactly-once coverage | OPEN | **THREEJS-072** | THREEJS-062 protocol envelope, THREEJS-063 receipt persistence |
 | GAP-010 Session recovery / reconnect identity | OPEN | **THREEJS-066 + THREEJS-074 + THREEJS-075** | THREEJS-067 multi-tab ownership; THREEJS-094 UX consumes the closed contract |
 | GAP-011 Telemetry schema / trust boundary / retention | OPEN | **THREEJS-079** | THREEJS-077 security/redaction constraints; THREEJS-098 acceptance verifies it |
 | GAP-012 Persistence / protocol migration compatibility | OPEN | **THREEJS-062 + THREEJS-063** | **THREEJS-099** owns active-v5-room cutover/rollback compatibility |
-| GAP-013 Production cutover / Vercel runtime compatibility | OPEN | **THREEJS-099** | THREEJS-009 owns Preview only; THREEJS-097 owns cache/header strategy before cutover |
+| GAP-013 Pages frontend cutover + external backend runtime compatibility | OPEN | **PAGES-004 + PAGES-005 + THREEJS-099** | PAGES-002/003 frontend lane, PAGES-005 `API_ORIGIN`, PAGES-012 immutable rollback assets, THREEJS-099 active-room/protocol cutover |
 
 The owner column is about who is allowed to choose the contract. The implementation column identifies tasks that must make the chosen contract real. No earlier renderer/UI task inherits authority from needing an answer.
 
@@ -173,23 +186,25 @@ Unresolved decisions:
 
 THREEJS-072 must use the same timeout transition package as local authority. No browser timer may write the timeout outcome.
 
-## 9. GAP-006 — Vercel/serverless timeout and Computer triggering — OPEN
+## 9. GAP-006 — Request-driven timeout and Computer triggering — OPEN
 
 Constraint:
 
-- Vercel Functions are request-driven; a persistent 18-second in-process timer cannot be assumed to survive instance lifecycle;
-- current API has no durable worker/queue/cron gameplay driver;
-- keeping one request open merely to wait out a turn is not the migration contract.
+- the authoritative backend must tolerate request-driven/serverless execution and cannot assume a persistent in-process 18-second timer survives runtime lifecycle;
+- the current protocol has no durable gameplay driver;
+- keeping one browser/API request open merely to wait out a turn is not the migration contract;
+- the exact future runtime/provider is intentionally not assumed here: PAGES-005 selects it and must verify the required deadline/bot reconciliation primitives.
 
 Unresolved decisions:
 
-- which request/wake/poll path attempts reconciliation near or after deadline;
-- duplicate-safe CAS when several clients wake the same turn;
+- which request/wake/poll/scheduled path attempts reconciliation near or after deadline;
+- duplicate-safe CAS when several clients or runtime wakes reconcile the same turn;
 - missed/delayed wake recovery and acceptable lateness;
 - server-authoritative Computer move trigger under the same concurrency conditions;
-- retry/backoff without creating two bot moves or two timeout skips.
+- retry/backoff without creating two bot moves or two timeout skips;
+- runtime/provider capabilities required by this contract after PAGES-005 selection.
 
-**Contract owner: THREEJS-062.**
+**Gameplay contract owner: THREEJS-062. Runtime boundary owner: PAGES-005.**
 
 **Timeout execution owner: THREEJS-070. Computer execution owner: THREEJS-071.** Frontend polling/wake may trigger work but never decides the authoritative result.
 
@@ -288,7 +303,7 @@ Current telemetry behavior:
 - `yakolak_online_telemetry_v1` stores event/trace/request/room/seat/version/round/move context;
 - detail keys resembling credentials/auth/secrets are redacted and payload detail is bounded;
 - cleanup targets roughly 7 days but runs opportunistically;
-- client `eventId`, timestamps, event names and details can be submitted to `/api/telemetry` and therefore are not authoritative gameplay evidence by themselves;
+- client `eventId`, timestamps, event names and details can be submitted and therefore are not authoritative gameplay evidence by themselves;
 - telemetry delivery is diagnostic and must never sit in the gameplay commit path.
 
 Unresolved decisions:
@@ -298,7 +313,7 @@ Unresolved decisions:
 - correlation among intent, request, mutation, room version and server commit;
 - endpoint authentication/abuse/rate-limit posture;
 - PII/redaction rules and retention/cleanup guarantees;
-- which existing room-observation wrapper behavior remains useful after protocol migration.
+- which existing room-observation behavior remains useful after protocol/runtime migration.
 
 **Resolution owner: THREEJS-079 — MIGRATE TELEMETRY OBSERVABILITY AND SEMANTIC WATCHDOGS TO THREE.JS.**
 
@@ -317,47 +332,47 @@ Unresolved decisions:
 
 - isolated new protocol/versioned route strategy versus additive v5 changes;
 - schema/table versioning, defaults, indexes and mutation-receipt bounds;
-- coexistence rules for Godot v5 rooms and Three.js preview rooms;
+- coexistence rules for Godot v5 rooms and Three.js migration rooms;
 - rollback treatment for new lobby/invitation/ready/deadline/bot state;
 - active-old-room support at final cutover;
-- whether derived inventory/winning evidence stays derived while preserving one rules authority.
+- whether derived inventory/winning evidence stays derived while preserving one rules authority;
+- how the selected PAGES-005 runtime reaches approved durable storage without leaking credentials to Pages.
 
-**Protocol contract owner: THREEJS-062. Database/schema owner: THREEJS-063. Active-v5-room cutover/rollback owner: THREEJS-099.**
+**Protocol contract owner: THREEJS-062. Database/schema owner: THREEJS-063. Active-v5-room cutover/rollback owner: THREEJS-099. Runtime-provider boundary: PAGES-005.**
 
 Frontend state models must not become an accidental schema migration layer.
 
-## 16. GAP-013 — Production cutover and Vercel runtime/deployment compatibility — OPEN
+## 16. GAP-013 — GitHub Pages frontend cutover and external backend runtime compatibility — OPEN
 
-Current constraints:
+Resolved hosting facts from PAGES-001/PAGES-004:
 
-- `threejs-rebuild` is intentionally not the Production deployment branch;
-- `vercel.json` currently enables Git deployment only for `main`;
-- `yakolak.vercel.app` remains Godot Production;
-- connected Vercel Production is READY from `main`;
-- repo engine declaration is Node `22.x`, connected Vercel project reports Node `24.x`;
-- API requires the existing Turso environment and must not accidentally fork authority into a second production database;
-- current Godot/Flash assumptions, cache headers and COOP/COEP policy cannot simply be copied blindly into final Three.js delivery.
+- GitHub Pages is the static frontend target;
+- migration layout is one Pages site with Godot at `/yakolak/` and Three.js at `/yakolak/threejs/`;
+- final frontend cutover moves accepted Three.js bytes to `/yakolak/` and deliberately retires `/yakolak/threejs/`;
+- GitHub Pages is never the authoritative room server;
+- no Vercel alias/promote/domain switch is part of the new frontend cutover.
 
-Unresolved decisions:
+Still unresolved:
 
-- exact accepted cutover SHA/ref;
-- Node/function runtime and any function-duration/background settings actually required by the migration protocol;
-- environment-variable/database continuity;
+- PAGES-005 selection of the authoritative non-Vercel backend runtime/provider and one public `API_ORIGIN`;
+- provider/runtime limits actually required by room mutations, timeout/bot reconciliation, Web Crypto, datastore access, CORS, scheduled cleanup and rollback;
+- environment/database continuity when protocol migrations land;
 - active v5-room drain/routing/compatibility window;
-- domain alias switch, health verification and rollback target;
-- HTML/app-shell/cache/service-worker behavior across protocol changes;
-- retirement of Godot Flash publishing only after successful health checks.
+- exact accepted frontend release identity and health verification;
+- cache/service-worker/storage transition across `/yakolak/threejs/` → `/yakolak/`;
+- immutable release/rollback asset selection and protocol/API compatibility metadata;
+- retirement of Godot root publishing only after successful cutover health checks.
 
-**Final resolution owner: THREEJS-099 — CUT OVER PRODUCTION WITH ACTIVE-ROOM AND FULL BACKEND ROLLBACK SAFETY.**
+**Hosting boundary owner: PAGES-004. Backend runtime/API_ORIGIN owner: PAGES-005. Immutable release rollback owner: PAGES-012. Active-room/protocol cutover owner: THREEJS-099.**
 
-THREEJS-009 owns one non-Production Preview path only. THREEJS-097 owns pre-cutover cache/update/security-header strategy. No earlier task may retarget `yakolak.vercel.app` or enable `threejs-rebuild` as a competing Production path.
+Historical THREEJS-009 Vercel Preview and historical Vercel Production evidence may be used for comparison only. No later task may reintroduce Vercel as the governing migration architecture without an explicit new hosting-migration decision.
 
 ## 17. Source-of-truth cross-reference
 
 - `SRC-003` seat order/color ownership → GAP-001 → THREEJS-048.
 - `SRC-004` invitation semantics are product-resolved by THREEJS-006; backend protocol/lifecycle → GAP-003 → THREEJS-062/063/065/066/068.
 - `SRC-005` Computer/mixed authority → GAP-002 → THREEJS-062/064/071.
-- `SRC-006` turn deadline/timeouts → GAP-005/GAP-006 → THREEJS-062/070/071.
+- `SRC-006` turn deadline/timeouts → GAP-005/GAP-006 → THREEJS-062/070/071 + PAGES-005 runtime capabilities.
 - `SRC-007` lobby editing/invalidation → GAP-003 → THREEJS-068.
 - `SRC-008` room expiry → GAP-007 → THREEJS-075.
 - `SRC-009` restart-round → GAP-008 → THREEJS-076.
@@ -365,14 +380,14 @@ THREEJS-009 owns one non-Production Preview path only. THREEJS-097 owns pre-cuto
 - `SRC-011` ready/start → GAP-004 → THREEJS-062/069.
 - session recovery → GAP-010 → THREEJS-066/067/074/075.
 - telemetry → GAP-011 → THREEJS-079.
-- protocol/persistence coexistence → GAP-012 → THREEJS-062/063/099.
-- Production cutover/Vercel compatibility → GAP-013 → THREEJS-099.
+- protocol/persistence coexistence → GAP-012 → THREEJS-062/063/099 + PAGES-005.
+- deployment/runtime/cutover compatibility → GAP-013 → PAGES-004/005/012 + THREEJS-099.
 
 ## 18. Architecture-task collision rule
 
 `THREEJS-008` is **DEFINE THE STATIC NO-BUILD THREE.JS ARCHITECTURE**. It does not resolve seat order or any backend authority gap. `THREEJS_MIGRATION.md` correctly warned about the earlier collision; this corrected register removes that collision and is the authoritative gap-owner mapping going forward.
 
-Likewise, THREEJS-009 through THREEJS-020 are architecture/preview/renderer/assets tasks in the canonical plan, not backend-gap resolution tasks merely because an earlier draft assigned those numbers.
+Likewise, THREEJS-009 through THREEJS-020 are historical architecture/preview/renderer/assets tasks in the canonical plan, not backend-gap resolution tasks merely because an earlier draft assigned those numbers. THREEJS-009's Vercel Preview contract is specifically superseded for future hosting decisions by PAGES-004.
 
 ## 19. Closure rule
 
@@ -384,5 +399,6 @@ Every owner/closure task must:
 2. implement backend authority changes when required;
 3. define v5/migration compatibility where applicable;
 4. add focused contract/regression evidence;
-5. keep `main` and Godot Production untouched unless the task is the explicit cutover owner;
-6. append a new gap and explicit owner before frontend code depends on any newly discovered authority/persistence/session/cutover decision.
+5. keep the Godot root and Three.js migration path separated until explicit cutover;
+6. obey `PAGES_MIGRATION_CONTRACT.md` for frontend hosting and `API_ORIGIN` boundaries;
+7. append a new gap and explicit owner before frontend code depends on any newly discovered authority/persistence/session/cutover decision.
