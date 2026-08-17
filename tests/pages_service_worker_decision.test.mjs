@@ -5,6 +5,7 @@ import test from 'node:test';
 
 const root = process.cwd();
 const decisionPath = path.join(root, 'PAGES_SERVICE_WORKER_DECISION.md');
+const migrationContractPath = path.join(root, 'PAGES_MIGRATION_CONTRACT.md');
 const webRoot = path.join(root, 'web');
 const textExtensions = new Set(['.html', '.js', '.mjs', '.css', '.json', '.md']);
 
@@ -22,8 +23,11 @@ async function walkTextFiles(directory) {
   return files;
 }
 
-test('PAGES-011 locks one explicit no-service-worker decision', async () => {
-  const decision = await readFile(decisionPath, 'utf8');
+test('PAGES-011 locks one explicit no-service-worker decision and THREEJS-097 consumption', async () => {
+  const [decision, migrationContract] = await Promise.all([
+    readFile(decisionPath, 'utf8'),
+    readFile(migrationContractPath, 'utf8'),
+  ]);
   const markers = decision.match(/^SERVICE_WORKER_DECISION=(none|enabled)$/gm) ?? [];
 
   assert.deepEqual(markers, ['SERVICE_WORKER_DECISION=none']);
@@ -33,6 +37,14 @@ test('PAGES-011 locks one explicit no-service-worker decision', async () => {
   assert.match(decision, /deployment-manifest\.json/);
   assert.match(decision, /seat credentials/i);
   assert.match(decision, /THREEJS-017/);
+
+  assert.match(migrationContract, /PAGES-011 is complete and locked/i);
+  assert.match(migrationContract, /SERVICE_WORKER_DECISION=none/);
+  assert.match(migrationContract, /THREEJS-097 must consume the PAGES-011 decision/i);
+  assert.match(migrationContract, /may not silently reverse it/i);
+  assert.match(migrationContract, /runtime-config\.json/);
+  assert.match(migrationContract, /deployment-manifest\.json/);
+  assert.match(migrationContract, /THREEJS-017 cold-load budgets/i);
 });
 
 test('served Three.js source does not register or package an obvious Service Worker while decision is none', async () => {
