@@ -50,11 +50,11 @@ function boundsFromPositions(positions) {
   return { min, max };
 }
 
-function radialEnvelope(positions) {
+function radialEnvelope(positions, pivot) {
   let min = Infinity;
   let max = 0;
   for (let scalar = 0; scalar < positions.length; scalar += 3) {
-    const radius = Math.hypot(positions[scalar], positions[scalar + 1]);
+    const radius = Math.hypot(positions[scalar] - pivot[0], positions[scalar + 1] - pivot[1]);
     min = Math.min(min, radius);
     max = Math.max(max, radius);
   }
@@ -99,8 +99,9 @@ function rotateXYZ(point, rotationDegrees) {
   ];
 }
 
-function transformPoint(point, center, rotationDegrees) {
-  const rotated = rotateXYZ(point, rotationDegrees);
+function transformPoint(point, sourcePivot, center, rotationDegrees) {
+  const local = point.map((value, axis) => value - sourcePivot[axis]);
+  const rotated = rotateXYZ(local, rotationDegrees);
   return rotated.map((value, axis) => value + center[axis]);
 }
 
@@ -137,7 +138,7 @@ export async function verifyPieces() {
   assert(!/InstancedMesh|instanceIndex/.test(logicalLayoutSource), 'Logical piece identity must not depend on mesh or instance index');
   assert(/renderSlotByPieceId/.test(rendererSource), 'Renderer must keep logical identity separate from private render slots');
   assert(/new InstancedMesh\s*\(/.test(rendererSource), 'Piece renderer must use shared InstancedMesh resources');
-  assert(/matrixAt\(destination\.center, rotation\)/.test(rendererSource), 'Piece renderer must place directly at authoritative centers');
+  assert(/matrixAt\(destination\.center, rotation, resourceBySize\.get\(piece\.size\)\.sourcePivot\)/.test(rendererSource), 'Piece renderer must place from authoritative centers plus one asset-derived size pivot');
   assert(!/magicOffset|pieceOffset|offsetByPiece|offsetsByPiece/.test(rendererSource), 'Per-piece magic offsets are forbidden');
 
   const geometry = {};
@@ -151,7 +152,9 @@ export async function verifyPieces() {
     const gltf = parseGlbJson(glbBytes);
     const sourceBounds = boundsFromPositions(stl.positions);
     const runtimeBounds = glbPositionBounds(gltf);
-    const envelope = radialEnvelope(stl.positions);
+    const sourcePivot = footprintPivot(sourceBounds);
+    const runtimePivot = footprintPivot(runtimeBounds);
+    const envelope = radialEnvelope(stl.positions, sourcePivot);
     const stateEntry = state.targets?.[spec.logicalId];
 
     assert(stateEntry, `Conversion state missing ${spec.logicalId}`);
@@ -165,9 +168,7 @@ export async function verifyPieces() {
     assert(stateEntry.transformPolicy === 'identity-no-center-no-scale-no-rotation', `${size} conversion transform policy drift`);
     assertVec(runtimeBounds.min, sourceBounds.min, `${size} GLB/source min bounds`);
     assertVec(runtimeBounds.max, sourceBounds.max, `${size} GLB/source max bounds`);
-    assert(near((sourceBounds.min[0] + sourceBounds.max[0]) / 2, 0), `${size} source X pivot must remain centered at zero`);
-    assert(near((sourceBounds.min[1] + sourceBounds.max[1]) / 2, 0), `${size} source Y pivot must remain centered at zero`);
-    assert(near(sourceBounds.min[2], 0), `${size} source contact plane must remain Z=0`);
+    assertVec(runtimePivot, sourcePivot, `${size} GLB/source placement pivot`);
     assert(gltf.extras?.yakolakConversion?.geometry?.transformPolicy === 'identity-no-center-no-scale-no-rotation', `${size} GLB provenance transform policy drift`);
     assert(gltf.extras?.yakolakConversion?.source?.gitBlobSha1 === gitBlobSha1(sourceBytes), `${size} GLB provenance source identity drift`);
 
@@ -176,7 +177,7 @@ export async function verifyPieces() {
     assert(manifestSource.includes(runtimeNeedle), `${size} manifest must load the committed GLB with immutable runtime identity`);
     assert(manifestSource.includes(`piece${size[0].toUpperCase()}${size.slice(1)}: asset('${spec.logicalId}'`), `${size} logical manifest entry drift`);
 
-    geometry[size] = { sourceBounds, runtimeBounds, envelope, triangles: stl.triangleCount, sourceGitSha: gitBlobSha1(sourceBytes), runtimeGitSha };
+    geometry[size] = { sourceBounds, runtimeBounds, sourcePivot, envelope, triangles: stl.triangleCount, sourceGitSha: gitBlobSha1(sourceBytes), runtimeGitSha };
   }
 
   assert(geometry.small.envelope.max < geometry.medium.envelope.min - EPSILON, 'Small piece no longer nests cleanly inside medium at one center');
@@ -186,7 +187,7 @@ export async function verifyPieces() {
   for (const piece of catalog.pieces) {
     const destination = catalog.getHomeDestination(piece.id);
     const pivot = footprintPivot(geometry[piece.size].sourceBounds);
-    const landed = transformPoint(pivot, destination.center, catalog.rotationDegrees);
+    const landed = transformPoint(pivot, geometry[piece.size].sourcePivot, destination.center, catalog.rotationDegrees);
     assertVec(landed, destination.center, `${piece.id} home center`, EPSILON);
     homePlacementsVerified += 1;
   }
@@ -196,7 +197,7 @@ export async function verifyPieces() {
   for (const size of PIECE_SIZES) {
     for (const zone of worldLayout.zones) {
       const destination = catalog.getBoardDestination(zone.id);
-      const landed = transformPoint(footprintPivot(geometry[size].sourceBounds), destination.center, catalog.rotationDegrees);
+      const landed = transformPoint(footprintPivot(geometry[size].sourceBounds), geometry[size].sourcePivot, destination.center, catalog.rotationDegrees);
       assertVec(landed, zone.position, `${size} board slot ${zone.id}`, EPSILON);
       boardSlotDestinationsVerified += 1;
     }
@@ -207,7 +208,7 @@ export async function verifyPieces() {
   for (const piece of catalog.pieces) {
     for (const zone of worldLayout.zones) {
       const destination = catalog.getBoardDestination(zone.id);
-      const landed = transformPoint(footprintPivot(geometry[piece.size].sourceBounds), destination.center, catalog.rotationDegrees);
+      const landed = transformPoint(footprintPivot(geometry[piece.size].sourceBounds), geometry[piece.size].sourcePivot, destination.center, catalog.rotationDegrees);
       assertVec(landed, zone.position, `${piece.id} candidate board cell ${zone.id}`, EPSILON);
       boardPlacementCandidatesVerified += 1;
     }
@@ -219,6 +220,7 @@ export async function verifyPieces() {
       instances: logicalBySize[size],
       triangles: geometry[size].triangles,
       sourceBounds: Object.freeze(geometry[size].sourceBounds),
+      sourcePivot: Object.freeze(geometry[size].sourcePivot),
       radialEnvelope: Object.freeze(geometry[size].envelope),
       sourceGitSha: geometry[size].sourceGitSha,
       runtimeGitSha: geometry[size].runtimeGitSha,

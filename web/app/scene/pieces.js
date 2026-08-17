@@ -8,7 +8,6 @@ import {
   createLogicalPieceCatalog,
 } from './piece-layout.js';
 
-const EPSILON = 1e-5;
 const ONE = new Vector3(1, 1, 1);
 
 function requireSharedGeometry(runtimeAsset, size) {
@@ -19,14 +18,15 @@ function requireSharedGeometry(runtimeAsset, size) {
   const bounds = geometry.userData?.sourceBounds;
   if (!bounds?.min || !bounds?.max) throw new Error(`${size} piece GLB is missing source bounds provenance`);
 
-  // Canonical piece STL origins are already the placement pivots. The footprint must
-  // be centered on source X/Y so no runtime centering or per-piece offset is allowed.
-  const sourceCenterX = (bounds.min[0] + bounds.max[0]) / 2;
-  const sourceCenterY = (bounds.min[1] + bounds.max[1]) / 2;
-  if (Math.abs(sourceCenterX) > EPSILON || Math.abs(sourceCenterY) > EPSILON) {
-    throw new Error(`${size} canonical footprint is not centered on the preserved STL pivot`);
+  const sourcePivot = new Vector3(
+    (bounds.min[0] + bounds.max[0]) / 2,
+    (bounds.min[1] + bounds.max[1]) / 2,
+    bounds.min[2],
+  );
+  if (![sourcePivot.x, sourcePivot.y, sourcePivot.z].every(Number.isFinite)) {
+    throw new Error(`${size} piece GLB has invalid source pivot bounds`);
   }
-  return geometry;
+  return Object.freeze({ geometry, sourcePivot });
 }
 
 function quaternionFor(rotationDegrees) {
@@ -39,15 +39,19 @@ function quaternionFor(rotationDegrees) {
   return new Quaternion().setFromEuler(euler);
 }
 
-function matrixAt(center, rotation) {
-  return new Matrix4().compose(new Vector3().fromArray(center), rotation, ONE);
+function matrixAt(center, rotation, sourcePivot) {
+  // One asset-level pivot correction per canonical size: T(center) * R * T(-sourcePivot).
+  // It is derived from immutable GLB source bounds, never from a logical piece or destination.
+  return new Matrix4()
+    .compose(new Vector3().fromArray(center), rotation, ONE)
+    .multiply(new Matrix4().makeTranslation(-sourcePivot.x, -sourcePivot.y, -sourcePivot.z));
 }
 
 export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approvedContract, materialsByColor } = {}) {
   const catalog = createLogicalPieceCatalog({ worldLayout, approvedContract });
   const rotation = quaternionFor(catalog.rotationDegrees);
-  const geometryBySize = new Map();
-  for (const size of PIECE_SIZES) geometryBySize.set(size, requireSharedGeometry(runtimeAssetsBySize?.[size], size));
+  const resourceBySize = new Map();
+  for (const size of PIECE_SIZES) resourceBySize.set(size, requireSharedGeometry(runtimeAssetsBySize?.[size], size));
   for (const colorId of PIECE_COLOR_IDS) {
     if (!materialsByColor?.[colorId]) throw new TypeError(`Missing shared piece material for canonical color ${colorId}`);
   }
@@ -65,7 +69,7 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
   for (const size of PIECE_SIZES) {
     for (const colorId of PIECE_COLOR_IDS) {
       const mesh = new InstancedMesh(
-        geometryBySize.get(size),
+        resourceBySize.get(size).geometry,
         materialsByColor[colorId],
         PIECE_COPIES_PER_SIZE_PER_COLOR,
       );
@@ -84,7 +88,7 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
     renderSlotByPieceId.set(piece.id, { mesh, instanceIndex });
     const destination = catalog.getHomeDestination(piece.id);
     destinationByPieceId.set(piece.id, destination);
-    mesh.setMatrixAt(instanceIndex, matrixAt(destination.center, rotation));
+    mesh.setMatrixAt(instanceIndex, matrixAt(destination.center, rotation, resourceBySize.get(piece.size).sourcePivot));
   }
 
   for (const mesh of meshByKey.values()) {
@@ -96,7 +100,7 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
     const piece = catalog.getPiece(pieceId);
     const slot = renderSlotByPieceId.get(pieceId);
     if (!piece || !slot) throw new TypeError(`Unknown logical piece ${pieceId}`);
-    slot.mesh.setMatrixAt(slot.instanceIndex, matrixAt(destination.center, rotation));
+    slot.mesh.setMatrixAt(slot.instanceIndex, matrixAt(destination.center, rotation, resourceBySize.get(piece.size).sourcePivot));
     slot.mesh.instanceMatrix.needsUpdate = true;
     slot.mesh.computeBoundingSphere();
     destinationByPieceId.set(pieceId, destination);
