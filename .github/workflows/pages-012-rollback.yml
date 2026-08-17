@@ -1,0 +1,166 @@
+name: PAGES-012 Immutable Exact-Byte Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Immutable release tag to restore
+        required: true
+        default: pages-archive-2026-08-17-gfbc0d15-t6b125c04
+        type: string
+      asset_name:
+        description: Immutable release asset to restore
+        required: true
+        default: pages-composite.tar
+        type: string
+      deploy_pages:
+        description: Deploy to GitHub Pages after verification
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: yakolak-pages-composite
+  cancel-in-progress: false
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      deploy: ${{ steps.mode.outputs.deploy }}
+    steps:
+      - name: Restrict rollback to the exact composite archive format
+        shell: bash
+        env:
+          ASSET_NAME: ${{ inputs.asset_name }}
+        run: |
+          set -euo pipefail
+          if [ "${ASSET_NAME}" != "pages-composite.tar" ]; then
+            echo "Only pages-composite.tar is deployable by this rollback workflow." >&2
+            exit 1
+          fi
+
+      - name: Verify immutable release, release attestation, asset attestation and recorded SHA-256
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          ASSET_NAME: ${{ inputs.asset_name }}
+        run: |
+          set -euo pipefail
+          immutable="$(gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --json isImmutable --jq '.isImmutable')"
+          if [ "${immutable}" != "true" ]; then
+            echo "Refusing rollback: release is not Immutable." >&2
+            exit 1
+          fi
+
+          gh release verify "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}"
+          rm -rf restore-download restore-site
+          mkdir -p restore-download restore-site
+
+          gh release download "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "${ASSET_NAME}" \
+            --pattern ARCHIVE_SHA256SUMS \
+            --pattern IMMUTABLE_FACTS.json \
+            --dir restore-download
+
+          for file in "${ASSET_NAME}" ARCHIVE_SHA256SUMS IMMUTABLE_FACTS.json; do
+            gh release verify-asset "${RELEASE_TAG}" "restore-download/${file}" --repo "${GITHUB_REPOSITORY}"
+          done
+
+          expected="$(awk -v name="${ASSET_NAME}" '$2==name{print $1}' restore-download/ARCHIVE_SHA256SUMS)"
+          actual="$(sha256sum "restore-download/${ASSET_NAME}" | awk '{print $1}')"
+          test -n "${expected}"
+          test "${expected}" = "${actual}"
+
+          facts_digest="$(jq -r --arg asset "${ASSET_NAME}" '.archives[$asset].sha256' restore-download/IMMUTABLE_FACTS.json)"
+          test "${facts_digest}" = "${actual}"
+
+          tar -xf "restore-download/${ASSET_NAME}" -C restore-site
+
+          actual_content="$(cd restore-site && find . -type f -printf '%P\n' | LC_ALL=C sort | while IFS= read -r rel; do digest="$(sha256sum "${rel}" | awk '{print $1}')"; printf '%s  %s\n' "${digest}" "${rel}"; done | sha256sum | awk '{print $1}')"
+          expected_content="$(jq -r --arg asset "${ASSET_NAME}" '.archives[$asset].contentManifestSha256' restore-download/IMMUTABLE_FACTS.json)"
+          test "${actual_content}" = "${expected_content}"
+
+          test -s restore-site/index.html
+          test -s restore-site/threejs/index.html
+          ! grep -Fq 'THREEJS REBUILD' restore-site/index.html
+          grep -Fq 'THREEJS REBUILD' restore-site/threejs/index.html
+          echo "Exact-byte restore verified; no source checkout or build occurred."
+
+      - name: Record requested mode
+        id: mode
+        shell: bash
+        env:
+          DEPLOY_PAGES: ${{ inputs.deploy_pages }}
+        run: echo "deploy=${DEPLOY_PAGES}" >> "${GITHUB_OUTPUT}"
+
+      - name: Configure GitHub Pages
+        if: steps.mode.outputs.deploy == 'true'
+        uses: actions/configure-pages@v5
+
+      - name: Upload verified exact-byte restore tree
+        if: steps.mode.outputs.deploy == 'true'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: restore-site
+
+      - name: Non-production restore proof
+        if: steps.mode.outputs.deploy != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8088 --directory restore-site >/tmp/pages012-rollback-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "${server_pid}" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:8088/ >/tmp/root.html \
+              && curl --fail --silent http://127.0.0.1:8088/threejs/ >/tmp/three.html; then
+              break
+            fi
+            sleep 0.25
+          done
+          test -s /tmp/root.html
+          test -s /tmp/three.html
+          echo "Manual non-production rollback proof passed."
+
+  deploy:
+    if: needs.restore.outputs.deploy == 'true'
+    needs: restore
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy exact verified release bytes
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: HTTP smoke restored root and Three.js
+        shell: bash
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          base="${PAGE_URL%/}/"
+          for attempt in $(seq 1 12); do
+            root="$(curl --fail --silent --show-error --location "${base}" || true)"
+            three="$(curl --fail --silent --show-error --location "${base}threejs/" || true)"
+            if [ -n "${root}" ] && [ -n "${three}" ] \
+              && ! grep -Fq 'THREEJS REBUILD' <<<"${root}" \
+              && grep -Fq 'THREEJS REBUILD' <<<"${three}"; then
+              echo "Rollback HTTP smoke passed."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Rollback HTTP smoke failed." >&2
+          exit 1
