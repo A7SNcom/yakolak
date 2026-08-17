@@ -27,6 +27,12 @@ All four scope checks reported `navigator.serviceWorker.controller === null` and
 
 The separate cold/repeat Three.js measurement also reported zero Service-Worker-served responses and zero registrations on both passes.
 
+### Generated Godot helper is inert, not a registration
+
+The preserved Godot root's generated `index.js` contains Godot's generic `Engine.installServiceWorker()` support helper, including a dormant `navigator.serviceWorker.register(this.config.serviceWorker)` code path. The delivered root `index.html` does **not** configure a truthy `GODOT_CONFIG.serviceWorker`, and no Service Worker script is packaged. That is consistent with the live proof above: the helper is library capability, not an installed or active worker.
+
+The final composed-artifact scanner therefore permits only this exact generated root helper when the delivered `GODOT_CONFIG` can be parsed and proves `serviceWorker` absent/empty/false. Any packaged worker script, any additional registration call, an unparseable root configuration, or a truthy Godot `serviceWorker` setting fails closed while this decision remains `none`.
+
 ## Repeat-load evidence
 
 The measurement used a second clean browser profile so the first Three.js pass was cold.
