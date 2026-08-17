@@ -1,17 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "test -s web/index.html && echo 'Using flash-ready YAKOLAK web build'",
-  "ignoreCommand": "git log -1 --pretty=%s | grep -q '^\\[flash-ready\\]' && exit 1 || exit 0",
+  "ignoreCommand": "exit 0",
   "outputDirectory": "web",
   "framework": null,
   "github": {
     "autoJobCancelation": true
   },
   "git": {
-    "deploymentEnabled": {
-      "main": true,
-      "*": false
-    }
+    "deploymentEnabled": false
   },
   "headers": [
     {
