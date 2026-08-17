@@ -10,10 +10,14 @@ on:
       - 'web/app/boot/boot.js'
       - 'web/app/scene/player-bases.js'
       - 'web/app/scene/table-and-score.js'
+      - 'web/app/scene/lighting-rig.js'
       - 'scripts/verify-threejs-materials.mjs'
       - 'scripts/verify-threejs-materials-browser.mjs'
+      - 'scripts/verify-threejs-lighting.mjs'
       - 'scripts/verify-threejs-shell.sh'
       - 'tests/threejs_materials_contract.test.mjs'
+      - 'tests/threejs_asset_runtime_copies_contract.test.mjs'
+      - 'tests/threejs_lighting_contract.test.mjs'
       - '.github/workflows/threejs-024-materials.yml'
   workflow_dispatch:
 
