@@ -1,23 +1,15 @@
-const FALLBACK = Object.freeze({ environment: 'development', branch: 'threejs-rebuild', sha: 'local' });
+import { loadPublicRuntimeConfig } from '../core/public-runtime-config.js';
 
 export async function hydrateBuildMarker(element) {
-  if (!element) return FALLBACK;
+  const info = await loadPublicRuntimeConfig();
+  if (!element) return info;
 
-  let info = FALLBACK;
-  try {
-    const response = await fetch('/api/build-info', {
-      headers: { accept: 'application/json' },
-      cache: 'no-store',
-    });
-    if (response.ok) info = { ...FALLBACK, ...(await response.json()) };
-  } catch (error) {
-    console.warn('[threejs-shell] build marker unavailable', error);
-  }
-
-  const sha = String(info.sha || 'local').slice(0, 8);
+  const sha = String(info.frontendSha || 'local').slice(0, 8);
   const branch = String(info.branch || 'threejs-rebuild');
-  element.textContent = `DEV / ${branch} / ${sha}`;
-  element.title = `Development preview — ${branch} — ${info.sha || 'local'}`;
-  element.dataset.sha = String(info.sha || 'local');
+  const label = info.environment === 'production' ? 'PROD' : 'DEV';
+  element.textContent = `${label} / ${branch} / ${sha}`;
+  element.title = `${label === 'PROD' ? 'Production' : 'Development'} frontend — ${branch} — ${info.frontendSha || 'local'}`;
+  element.dataset.sha = String(info.frontendSha || 'local');
+  element.dataset.onlineAvailable = String(info.onlineAvailable);
   return info;
 }
