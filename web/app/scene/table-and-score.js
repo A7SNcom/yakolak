@@ -68,11 +68,11 @@ export function createTableSurface({ footprintSvg, worldLayout, material } = {})
 }
 
 export function createScoreMaterials(approvedContract) {
-  const materials = {};
-  for (const colorId of ['marble', 'blue', 'gold', 'green']) {
-    materials[colorId] = colorMaterial(approvedContract, colorId);
+  const colorIds = approvedContract?.rules?.colors;
+  if (!Array.isArray(colorIds) || colorIds.length !== 4 || new Set(colorIds).size !== 4) {
+    throw new Error('Approved contract must provide four unique playable color IDs');
   }
-  return Object.freeze(materials);
+  return Object.freeze(Object.fromEntries(colorIds.map((colorId) => [colorId, colorMaterial(approvedContract, colorId)])));
 }
 
 function materialFor(materialsByColor, colorId) {
