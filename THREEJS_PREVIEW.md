@@ -1,75 +1,97 @@
-# Three.js Vercel Preview Contract
+# Three.js Preview and Migration Hosting Contract
 
-Status: **LOCKED by THREEJS-009 (2026-08-16)**
+Status: **SUPERSEDED by PAGES-004 (2026-08-17)**
 
-Scope: `threejs-rebuild` only. This document defines the one allowed non-Production deployment path for the Three.js migration. It does not authorize cutover, a second Vercel project, or any Production alias change.
+The Vercel Preview contract originally locked by THREEJS-009 is retained below only as historical evidence. It no longer governs where the Three.js migration frontend is published, how preview URLs are chosen, where the future backend runs, or how final cutover occurs.
 
-## 1. Single deployment path
+Current authority: `PAGES_MIGRATION_CONTRACT.md`.
 
-Use the existing Vercel project `yakolak` and its normal **Preview** environment.
+## 1. Current migration preview
 
-- Vercel project: `yakolak` (`prj_bs47prs871H9tPwEwDVH8RMlCfHm`).
-- Vercel team: `ahmdkcoms-projects` (`team_eaC5mTND8Ct6uEFQTQwdQJ5v`).
-- Git branch allowed for migration Preview: `threejs-rebuild` only.
-- `main` remains the Production/Godot path.
-- `https://yakolak.vercel.app/` remains Production and must never be assigned to a `threejs-rebuild` deployment.
-- Do not create another Vercel project, custom Production domain, staging project, migration branch, or alternate preview lane.
+The canonical migration frontend is the GitHub Pages subpath:
 
-`vercel.json` on `threejs-rebuild` is intentionally branch-scoped: it enables Git deployment for `main` and `threejs-rebuild`, keeps the wildcard disabled, and makes the existing ignored-build rule continue immediately for `threejs-rebuild`. The equivalent `main` file remains unchanged, so this exception cannot loosen Production policy.
+`https://a7sncom.github.io/yakolak/threejs/`
 
-## 2. Preview URL: discovery and refresh
+During migration the same Pages site keeps:
 
-The canonical human-facing migration URL is the Vercel **branch alias** attached to the latest READY Preview deployment whose Git metadata says `githubCommitRef=threejs-rebuild`.
+- `/yakolak/` = latest known-good Godot-ready root from `main/web`;
+- `/yakolak/threejs/` = Three.js candidate from `threejs-rebuild/web`.
 
-Discovery workflow:
+There is one site and one composite artifact. A Three.js update must not replace the Godot root before explicit cutover.
 
-1. Open the existing Vercel project `yakolak` -> Deployments.
-2. Filter/identify the latest deployment with environment/target `Preview` and Git branch `threejs-rebuild`.
-3. Confirm it is `READY`.
-4. Use its `branchAlias` (the stable `*-git-threejs-rebuild-*.vercel.app` URL), not the per-deployment hash URL, as the one shared preview URL.
-5. Confirm deployment metadata points to the expected `threejs-rebuild` commit SHA before testing.
+PAGES-001 owns this single-site layout. PAGES-002 owns the composite no-build Pages Actions deployment pipeline and its cross-branch triggers. PAGES-003 owns relocatable client/base-path behavior so the same Three.js files can later run at `/yakolak/`.
 
-Refresh workflow:
+## 2. Backend boundary
 
-1. Commit the next Three.js migration change to `threejs-rebuild`.
-2. Vercel creates a new Preview deployment in the same `yakolak` project.
-3. Wait only for that deployment to reach `READY`; do not promote it.
-4. The same branch alias moves to the new READY deployment automatically. No new project/domain/path is created.
-5. Re-check the branch alias and deployment SHA before treating the refresh as current.
+GitHub Pages is static and cannot host the authoritative room API.
 
-The immutable hash URL may be used for diagnosis, but it is not a second supported preview path and must not be circulated as the canonical migration URL.
+The Three.js client must reach online authority through one explicit public `API_ORIGIN` boundary. PAGES-005 selects and locks the non-Vercel backend runtime/provider and the public `API_ORIGIN`.
 
-## 3. API functions and environment variables
+Until PAGES-005 closes:
 
-Preview uses the same repository `api/` functions as Production, packaged from the `threejs-rebuild` commit. No browser-side mock backend is allowed merely to make Preview work.
+- do not hard-code a new backend provider;
+- do not treat same-origin `/api/...` as the migration contract;
+- do not silently fall back to a historical Vercel endpoint;
+- keep current `rules/` + `api/` semantics as backend/product evidence where still authoritative, without assuming their future hosting platform.
 
-Required private-online-room variables are the existing contract from `.env.example`:
+## 3. Current preview acceptance
 
-- `TURSO_DATABASE_URL`
-- `TURSO_AUTH_TOKEN`
+A current Pages migration preview is acceptable only when:
 
-They must exist in Vercel's **Preview** environment for `threejs-rebuild` (a branch-scoped Preview value is preferred when isolation is required). Secrets must never be committed to Git.
+- the root remains the approved Godot artifact during migration;
+- the Three.js candidate is isolated under `/yakolak/threejs/`;
+- module/static asset URLs work through the relocatable base-path contract;
+- the public artifact contains no secrets or server-only credentials;
+- online entry points use the selected `API_ORIGIN` once PAGES-005 provides it, and fail clearly if it is unavailable;
+- no workflow or client path makes Vercel deployment state authoritative again.
 
-Operational verification before accepting a Preview:
+## 4. Final cutover
 
-- request a read-only/simple API route to prove the branch deployment packaged the Serverless Functions;
-- exercise `/api/rooms` far enough to distinguish a valid configured service from `service_unavailable` caused by missing Turso credentials;
-- if credentials are absent, configure them in Vercel Preview for `threejs-rebuild`; do not copy secret values into repository files;
-- never use a Production-only environment target as a workaround.
+Final cutover is not a Vercel promotion or alias switch.
 
-## 4. Production-safety gate
+A later explicit cutover task must:
 
-A `threejs-rebuild` deployment is acceptable only when all are true:
+1. choose one accepted Three.js artifact by exact source/content identity;
+2. publish it at `/yakolak/` in the same GitHub Pages site;
+3. deliberately retire the migration `/yakolak/threejs/` lane;
+4. stop serving the Godot root only after health/protocol checks pass;
+5. keep authoritative online services behind the selected `API_ORIGIN`;
+6. preserve a tested rollback to known-good archived bytes/protocol-compatible backend state.
 
-- target/environment is Preview, never Production;
-- Git metadata is `githubCommitRef=threejs-rebuild`;
-- the stable branch alias is the only canonical migration URL;
-- aliases do not include `yakolak.vercel.app` or `yakolak-git-main-ahmdkcoms-projects.vercel.app`;
-- `yakolak.vercel.app` still resolves to a READY deployment from `main`;
-- no domain was added/transferred and no deployment was promoted.
+See `PAGES_MIGRATION_CONTRACT.md` for the complete binding contract.
 
-If any check fails, the Preview must not be used and the alias/configuration must be corrected before further migration testing.
+---
 
-## 5. Cutover boundary
+# Historical THREEJS-009 Vercel Preview Evidence
 
-THREEJS-009 creates Preview capability only. It grants no authority to merge/copy the rebuild to `main`, promote a deployment, attach the Production alias, modify Production environment variables, or replace the Godot site. Those actions require the later explicit cutover task recorded by the migration contracts.
+Status at the time: **LOCKED by THREEJS-009 (2026-08-16)**
+
+This section is intentionally non-normative after PAGES-004. It documents what was proven during the Vercel-era migration phase and may be used only for historical comparison/debugging.
+
+## Historical single deployment path
+
+THREEJS-009 used the existing Vercel project `yakolak` and its Preview environment:
+
+- project: `yakolak` (`prj_bs47prs871H9tPwEwDVH8RMlCfHm`);
+- team: `ahmdkcoms-projects` (`team_eaC5mTND8Ct6uEFQTQwdQJ5v`);
+- migration branch: `threejs-rebuild`;
+- `main` was kept on the Godot/Vercel Production path;
+- the branch alias was treated as the one human-facing Vercel preview URL;
+- alternate projects, production aliases and promotion were prohibited.
+
+Those constraints were correct for THREEJS-009's historical Vercel phase. They are **not** the active hosting contract after PAGES-004.
+
+## Historical API/environment behavior
+
+The historical Vercel preview packaged repository `api/` functions and used Vercel Preview environment variables such as:
+
+- `TURSO_DATABASE_URL`;
+- `TURSO_AUTH_TOKEN`.
+
+This proved the then-current backend could operate in Vercel Preview. It does not select Vercel as the future authoritative runtime. Private datastore credentials remain backend-only under the new architecture as well.
+
+## Historical production-safety evidence
+
+THREEJS-009 verified that `threejs-rebuild` preview deployments did not acquire the old Production alias and did not replace the Godot deployment. Those checks remain useful evidence that the migration was isolated at that time.
+
+After PAGES-004, equivalent isolation is expressed by the GitHub Pages layout: Godot root + Three.js `/threejs/` candidate in one Pages site.
