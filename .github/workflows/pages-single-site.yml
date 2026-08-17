@@ -199,6 +199,13 @@ jobs:
             exit 1
           fi
 
+      - name: Enforce Pages delivery and repository size guardrails
+        if: steps.root.outputs.ready == 'true'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash root-history/scripts/pages-size-guard.sh pages-site
+
       - name: Configure GitHub Pages
         if: steps.root.outputs.ready == 'true'
         uses: actions/configure-pages@v5
