@@ -46,6 +46,12 @@ const boardAndLidSource = source('models/board-and-lid.stl', 'board-and-intro-li
 const boardAndLidRuntime = runtime('/assets/models/board-and-lid.glb', 'glb-components', '9a7e3410f641735e08a2944efa366cca2a66ee99', 2595544);
 const playerBaseSource = source('models/player-base.stl', 'player-base', true, '066b3f95f5281a178b610611075cbab0689cdb12', 9955084);
 const playerBaseRuntime = runtime('/assets/models/player-base.glb', 'glb-components', '63550f0eeb7aa9c004f251fb4238d751dfd4d06c', 1942888);
+const pieceSmallSource = source('models/piece-small.stl', 'small-piece', true, '531812323efe43f7679f509f1ae06980227521a8', 5884);
+const pieceSmallRuntime = runtime('/assets/models/piece-small.glb', 'glb-components', '17b911dad8ac9175fd1d29e1308db1e17d7c164b', 6564);
+const pieceMediumSource = source('models/piece-medium.stl', 'medium-piece', true, 'c32fc5cc37664af7860b3aa6e33e12b04eefa757', 12084);
+const pieceMediumRuntime = runtime('/assets/models/piece-medium.glb', 'glb-components', '9fa8ace253919968bbba40c3c3fd2f79629f1960', 11628);
+const pieceLargeSource = source('models/piece-large.stl', 'large-piece', true, 'eca0a269a75aef8770a8eb653e016f69b7766b35', 12084);
+const pieceLargeRuntime = runtime('/assets/models/piece-large.glb', 'glb-components', 'cbbcf94ce009240b6fe40274783317d8512be5c2', 11608);
 
 export const ASSETS = Object.freeze({
   gameLogo: asset('brand.yakolak-logo', 'boot-critical', source('logos/YAKOLAK.svg', 'official-game-logo', true, 'ee3703615cd42c4979a0001f1261014f108c6956', 5736), 'text'),
@@ -58,9 +64,9 @@ export const ASSETS = Object.freeze({
   introScatter: asset('data.intro-scatter', 'scene-critical', source('layout/intro-scatter.csv', 'exact-36-piece-intro-start-transforms', true, '429265cd6a5c5474bdfa75c811963c743a057bd8', 2452), 'text'),
   boardAndLid: asset('model.board-and-lid', 'scene-critical', boardAndLidSource, 'stl', boardAndLidRuntime),
   playerBase: asset('model.player-base', 'scene-critical', playerBaseSource, 'stl', playerBaseRuntime),
-  pieceSmall: asset('model.piece-small', 'scene-critical', source('models/piece-small.stl', 'small-piece', true, '531812323efe43f7679f509f1ae06980227521a8', 5884), 'stl'),
-  pieceMedium: asset('model.piece-medium', 'scene-critical', source('models/piece-medium.stl', 'medium-piece', true, 'c32fc5cc37664af7860b3aa6e33e12b04eefa757', 12084), 'stl'),
-  pieceLarge: asset('model.piece-large', 'scene-critical', source('models/piece-large.stl', 'large-piece', true, 'eca0a269a75aef8770a8eb653e016f69b7766b35', 12084), 'stl'),
+  pieceSmall: asset('model.piece-small', 'scene-critical', pieceSmallSource, 'stl', pieceSmallRuntime),
+  pieceMedium: asset('model.piece-medium', 'scene-critical', pieceMediumSource, 'stl', pieceMediumRuntime),
+  pieceLarge: asset('model.piece-large', 'scene-critical', pieceLargeSource, 'stl', pieceLargeRuntime),
   scoreMarker: asset('model.score-marker', 'scene-critical', source('models/score-marker.stl', 'score-point', true, 'feb5d59eafe4547a529876344ff88d05ca95b37c', 12884), 'stl'),
   tableFootprint: asset('scene.table-footprint', 'scene-critical', source('table/table.svg', 'extruded-table-footprint', true, '1591a82d2f3498f25a566f650b4f2d7f9787b1e9', 1057), 'text'),
 
