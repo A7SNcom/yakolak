@@ -8,6 +8,7 @@ on:
       - ".github/workflows/pages-012-immutable-release.yml"
       - "PAGES_RELEASE_ARCHIVES.md"
       - "scripts/verify-release-qualification.mjs"
+  workflow_dispatch:
 
 permissions:
   actions: read
@@ -23,68 +24,18 @@ env:
   THREEJS_CANDIDATE_SHA: 6b125c04938330e1d6de4621e60a9f9e7757b556
   SOURCE_PAGES_RUN_ID: "32030598002"
   SOURCE_PAGES_ARTIFACT_ID: "9288731607"
+  PRESERVED_SOURCE_RUN_ID: "32040323006"
+  PRESERVED_SOURCE_ARTIFACT_NAME: pages012-exact-byte-source-32030598002
+  PRESERVED_PAGES_TAR_SHA256: 799befc38e6dd6a86851bb62337093a1c1c863da68015d08b94f8235677efa9a
 
 jobs:
-  archive:
+  prepare:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      composite_archive_sha: ${{ steps.facts.outputs.composite_archive_sha }}
+      composite_content_sha: ${{ steps.facts.outputs.composite_content_sha }}
     steps:
-      - name: Verify repository release immutability before any release mutation
-        id: immutable
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ADMIN_TOKEN: ${{ secrets.PAGES_RELEASE_ADMIN_TOKEN }}
-        run: |
-          set -euo pipefail
-          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/immutable-releases"
-          token="${ADMIN_TOKEN:-${GH_TOKEN}}"
-
-          check() {
-            curl --silent --show-error \
-              --output immutable-releases.json \
-              --write-out '%{http_code}' \
-              --header "Accept: application/vnd.github+json" \
-              --header "Authorization: Bearer ${token}" \
-              --header "X-GitHub-Api-Version: 2022-11-28" \
-              "${api}"
-          }
-
-          code="$(check)"
-          if [ "${code}" = "404" ] && [ -n "${ADMIN_TOKEN}" ]; then
-            echo "Release immutability is disabled; enabling it before the first release."
-            put_code="$(curl --silent --show-error \
-              --output enable-immutable-releases.json \
-              --write-out '%{http_code}' \
-              --request PUT \
-              --header "Accept: application/vnd.github+json" \
-              --header "Authorization: Bearer ${ADMIN_TOKEN}" \
-              --header "X-GitHub-Api-Version: 2022-11-28" \
-              "${api}")"
-            if [ "${put_code}" != "204" ]; then
-              echo "Failed to enable release immutability (HTTP ${put_code}). No release was created." >&2
-              cat enable-immutable-releases.json >&2 || true
-              exit 1
-            fi
-            code="$(check)"
-          fi
-
-          if [ "${code}" != "200" ]; then
-            echo "Cannot prove repository release immutability (HTTP ${code})." >&2
-            echo "No release was created. Configure PAGES_RELEASE_ADMIN_TOKEN with repository Administration read/write or enable immutability and provide Administration read." >&2
-            cat immutable-releases.json >&2 || true
-            exit 1
-          fi
-
-          if ! jq -e '.enabled == true' immutable-releases.json >/dev/null; then
-            echo "Repository release immutability is not enabled. No release was created." >&2
-            cat immutable-releases.json >&2
-            exit 1
-          fi
-
-          echo "Repository release immutability verified enabled."
-          echo "verified=true" >> "${GITHUB_OUTPUT}"
-
       - name: Checkout exact Godot root for byte-source verification
         uses: actions/checkout@v4
         with:
@@ -101,49 +52,59 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Recover exact already-deployed Pages artifact bytes
+      - name: Recover preserved exact Pages bytes
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          run_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_PAGES_RUN_ID}")"
+          rm -rf preserve-source release-assets extracted-site godot-root-site threejs-site
+          mkdir -p preserve-source release-assets extracted-site godot-root-site threejs-site
+
+          run_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${PRESERVED_SOURCE_RUN_ID}")"
           RUN_JSON="${run_json}" node <<'NODE'
           const run = JSON.parse(process.env.RUN_JSON);
           if (run.status !== 'completed' || run.conclusion !== 'success') {
-            throw new Error(`source Pages run is not successful: ${run.status}/${run.conclusion}`);
+            throw new Error(`preserved-source run is not successful: ${run.status}/${run.conclusion}`);
           }
           NODE
 
-          artifact_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_PAGES_RUN_ID}/artifacts")"
-          ARTIFACT_JSON="${artifact_json}" EXPECTED_ID="${SOURCE_PAGES_ARTIFACT_ID}" node <<'NODE'
-          const payload = JSON.parse(process.env.ARTIFACT_JSON);
-          const id = Number(process.env.EXPECTED_ID);
-          const artifact = payload.artifacts.find((item) => item.id === id);
-          if (!artifact) throw new Error(`artifact ${id} not found on source run`);
-          if (artifact.name !== 'github-pages') throw new Error(`unexpected artifact name ${artifact.name}`);
-          if (artifact.expired) throw new Error('source Pages artifact is expired');
-          NODE
-
-          rm -rf source-pages release-assets extracted-site godot-root-site threejs-site
-          mkdir -p source-pages release-assets extracted-site godot-root-site threejs-site
-
-          gh run download "${SOURCE_PAGES_RUN_ID}" \
+          gh run download "${PRESERVED_SOURCE_RUN_ID}" \
             --repo "${GITHUB_REPOSITORY}" \
-            --name github-pages \
-            --dir source-pages
+            --name "${PRESERVED_SOURCE_ARTIFACT_NAME}" \
+            --dir preserve-source
 
-          test -s source-pages/artifact.tar
-          cp source-pages/artifact.tar release-assets/pages-composite.tar
+          test -s preserve-source/artifact.tar
+          test -s preserve-source/ARTIFACT_SHA256SUMS
+          test -s preserve-source/SOURCE_PROVENANCE.json
+          (
+            cd preserve-source
+            sha256sum -c ARTIFACT_SHA256SUMS
+          )
+
+          actual_preserved_sha="$(sha256sum preserve-source/artifact.tar | awk '{print $1}')"
+          test "${actual_preserved_sha}" = "${PRESERVED_PAGES_TAR_SHA256}"
+
+          jq -e \
+            --argjson sourceRun "${SOURCE_PAGES_RUN_ID}" \
+            --argjson sourceArtifact "${SOURCE_PAGES_ARTIFACT_ID}" \
+            --arg godot "${GODOT_ROOT_SHA}" \
+            --arg three "${THREEJS_CANDIDATE_SHA}" \
+            --arg digest "${PRESERVED_PAGES_TAR_SHA256}" \
+            '.sourcePagesRunId == $sourceRun and
+             .sourcePagesArtifactId == $sourceArtifact and
+             .godotRootSha == $godot and
+             .threejsCandidateSha == $three and
+             .artifactSha256 == $digest' \
+            preserve-source/SOURCE_PROVENANCE.json >/dev/null
+
+          cp preserve-source/artifact.tar release-assets/pages-composite.tar
           tar -xf release-assets/pages-composite.tar -C extracted-site
 
           test -s extracted-site/index.html
           test -s extracted-site/threejs/index.html
           test -s extracted-site/threejs/runtime-config.json
-          if grep -Fq 'THREEJS REBUILD' extracted-site/index.html; then
-            echo "Recovered root is not the expected Godot root." >&2
-            exit 1
-          fi
+          ! grep -Fq 'THREEJS REBUILD' extracted-site/index.html
           grep -Fq 'THREEJS REBUILD' extracted-site/threejs/index.html
 
           FRONTEND_SHA="${THREEJS_CANDIDATE_SHA}" node <<'NODE'
@@ -155,7 +116,7 @@ jobs:
           if (config.protocolVersion !== '1') throw new Error('unexpected protocolVersion');
           NODE
 
-      - name: Prove recovered bytes correspond to the pinned source SHAs
+      - name: Prove recovered bytes correspond to pinned source SHAs
         shell: bash
         run: |
           set -euo pipefail
@@ -199,6 +160,7 @@ jobs:
           godot_archive_sha="$(sha256sum release-assets/godot-root.tar | awk '{print $1}')"
           three_archive_sha="$(sha256sum release-assets/threejs-candidate.tar | awk '{print $1}')"
           composite_archive_sha="$(sha256sum release-assets/pages-composite.tar | awk '{print $1}')"
+          test "${composite_archive_sha}" = "${PRESERVED_PAGES_TAR_SHA256}"
 
           godot_content_sha="$(sha256sum godot-root-files.sha256 | awk '{print $1}')"
           three_content_sha="$(sha256sum threejs-files.sha256 | awk '{print $1}')"
@@ -220,6 +182,8 @@ jobs:
             --arg threejsCandidateSha "${THREEJS_CANDIDATE_SHA}" \
             --arg sourcePagesRunId "${SOURCE_PAGES_RUN_ID}" \
             --arg sourcePagesArtifactId "${SOURCE_PAGES_ARTIFACT_ID}" \
+            --arg preservedSourceRunId "${PRESERVED_SOURCE_RUN_ID}" \
+            --arg preservedTarSha "${PRESERVED_PAGES_TAR_SHA256}" \
             --arg godotArchiveSha "${godot_archive_sha}" \
             --arg threeArchiveSha "${three_archive_sha}" \
             --arg compositeArchiveSha "${composite_archive_sha}" \
@@ -235,7 +199,9 @@ jobs:
                 godotRootSha: $godotRootSha,
                 threejsCandidateSha: $threejsCandidateSha,
                 pagesRunId: ($sourcePagesRunId|tonumber),
-                pagesArtifactId: ($sourcePagesArtifactId|tonumber)
+                pagesArtifactId: ($sourcePagesArtifactId|tonumber),
+                preservedSourceRunId: ($preservedSourceRunId|tonumber),
+                preservedPagesTarSha256: $preservedTarSha
               },
               archives: {
                 "godot-root.tar": {sha256: $godotArchiveSha, contentManifestSha256: $godotContentSha},
@@ -254,7 +220,7 @@ jobs:
           echo "composite_archive_sha=${composite_archive_sha}" >> "${GITHUB_OUTPUT}"
           echo "composite_content_sha=${composite_content_sha}" >> "${GITHUB_OUTPUT}"
 
-      - name: Verify archive SHA-256 locally before draft release
+      - name: Verify every prepared archive SHA-256
         shell: bash
         run: |
           set -euo pipefail
@@ -263,7 +229,133 @@ jobs:
             sha256sum -c ARCHIVE_SHA256SUMS
           )
 
-      - name: Create draft release, attach all immutable assets, then publish
+      - name: Prove prepared exact-byte restore without rebuilding
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf restore-proof
+          mkdir -p restore-proof/site
+          tar -xf release-assets/pages-composite.tar -C restore-proof/site
+
+          actual_content="$(cd restore-proof/site && find . -type f -printf '%P\n' | LC_ALL=C sort | while IFS= read -r rel; do digest="$(sha256sum "${rel}" | awk '{print $1}')"; printf '%s  %s\n' "${digest}" "${rel}"; done | sha256sum | awk '{print $1}')"
+          expected_content="$(jq -r '.archives["pages-composite.tar"].contentManifestSha256' release-assets/IMMUTABLE_FACTS.json)"
+          test "${actual_content}" = "${expected_content}"
+
+          python3 -m http.server 8088 --directory restore-proof/site >/tmp/pages012-prepare-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "${server_pid}" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:8088/ >/tmp/root.html \
+              && curl --fail --silent http://127.0.0.1:8088/threejs/ >/tmp/three.html; then
+              break
+            fi
+            sleep 0.25
+          done
+          test -s /tmp/root.html
+          test -s /tmp/three.html
+          ! grep -Fq 'THREEJS REBUILD' /tmp/root.html
+          grep -Fq 'THREEJS REBUILD' /tmp/three.html
+          echo "Prepared exact-byte restore proof passed without rebuild."
+
+      - name: Preserve fully prepared release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages012-release-assets
+          path: release-assets/
+          retention-days: 90
+          compression-level: 0
+          if-no-files-found: error
+
+  publish:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Verify repository release immutability before any release mutation
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ADMIN_TOKEN: ${{ secrets.PAGES_RELEASE_ADMIN_TOKEN }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/immutable-releases"
+          token="${ADMIN_TOKEN:-${GH_TOKEN}}"
+
+          check() {
+            curl --silent --show-error \
+              --output immutable-releases.json \
+              --write-out '%{http_code}' \
+              --header "Accept: application/vnd.github+json" \
+              --header "Authorization: Bearer ${token}" \
+              --header "X-GitHub-Api-Version: 2026-03-10" \
+              "${api}"
+          }
+
+          code="$(check)"
+          if [ "${code}" = "404" ] && [ -n "${ADMIN_TOKEN}" ]; then
+            echo "Release immutability is disabled; enabling it before the first release."
+            put_code="$(curl --silent --show-error \
+              --output enable-immutable-releases.json \
+              --write-out '%{http_code}' \
+              --request PUT \
+              --header "Accept: application/vnd.github+json" \
+              --header "Authorization: Bearer ${ADMIN_TOKEN}" \
+              --header "X-GitHub-Api-Version: 2026-03-10" \
+              "${api}")"
+            if [ "${put_code}" != "204" ]; then
+              echo "Failed to enable release immutability (HTTP ${put_code}). No release was created." >&2
+              cat enable-immutable-releases.json >&2 || true
+              exit 1
+            fi
+            code="$(check)"
+          fi
+
+          if [ "${code}" != "200" ]; then
+            echo "Cannot prove repository release immutability (HTTP ${code})." >&2
+            echo "No release was created. PAGES_RELEASE_ADMIN_TOKEN needs repository Administration read/write." >&2
+            cat immutable-releases.json >&2 || true
+            exit 1
+          fi
+
+          jq -e '.enabled == true' immutable-releases.json >/dev/null || {
+            echo "Repository release immutability is not enabled. No release was created." >&2
+            cat immutable-releases.json >&2
+            exit 1
+          }
+          echo "Repository release immutability verified enabled."
+
+      - name: Download prepared exact release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: pages012-release-assets
+          path: release-assets
+
+      - name: Re-verify prepared bytes before release creation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s release-assets/pages-composite.tar
+          test -s release-assets/IMMUTABLE_FACTS.json
+          test -s release-assets/ARCHIVE_SHA256SUMS
+          actual="$(sha256sum release-assets/pages-composite.tar | awk '{print $1}')"
+          test "${actual}" = "${PRESERVED_PAGES_TAR_SHA256}"
+          (
+            cd release-assets
+            sha256sum -c ARCHIVE_SHA256SUMS
+          )
+          jq -e \
+            --arg tag "${RELEASE_TAG}" \
+            --arg godot "${GODOT_ROOT_SHA}" \
+            --arg three "${THREEJS_CANDIDATE_SHA}" \
+            --arg digest "${PRESERVED_PAGES_TAR_SHA256}" \
+            '.releaseTag == $tag and
+             .source.godotRootSha == $godot and
+             .source.threejsCandidateSha == $three and
+             .archives["pages-composite.tar"].sha256 == $digest and
+             .mutationPolicy == "immutable-release-bytes-never-change"' \
+            release-assets/IMMUTABLE_FACTS.json >/dev/null
+
+      - name: Create draft, attach all final assets, then publish once
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -272,12 +364,12 @@ jobs:
 
           if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
             immutable="$(gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --json isImmutable --jq '.isImmutable')"
-            if [ "${immutable}" != "true" ]; then
-              echo "Release tag already exists but is not Immutable; refusing mutation." >&2
-              exit 1
+            if [ "${immutable}" = "true" ]; then
+              echo "Immutable release already exists; bytes will only be verified, never mutated."
+              exit 0
             fi
-            echo "Immutable release already exists; verification will be idempotent."
-            exit 0
+            echo "Release tag already exists but is not Immutable; refusing to edit or publish it automatically." >&2
+            exit 1
           fi
 
           cat > release-notes.md <<EOF
@@ -286,6 +378,7 @@ jobs:
           Godot root source SHA: ${GODOT_ROOT_SHA}
           Three.js candidate source SHA: ${THREEJS_CANDIDATE_SHA}
           Exact deployed Pages artifact ID: ${SOURCE_PAGES_ARTIFACT_ID}
+          Exact composite SHA-256: ${PRESERVED_PAGES_TAR_SHA256}
 
           Immutable release bytes are final at publication. Deployment-generation and backend-compatibility evidence are recorded only in the version-controlled additive RELEASE_QUALIFICATION ledger.
           EOF
@@ -295,6 +388,7 @@ jobs:
             --target "${THREEJS_CANDIDATE_SHA}" \
             --title "YAKOLAK exact-byte Pages archive ${RELEASE_TAG}" \
             --notes-file release-notes.md \
+            --latest=false \
             --draft
 
           gh release upload "${RELEASE_TAG}" release-assets/* \
@@ -304,20 +398,29 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --draft=false
 
-      - name: Verify published release is Immutable and verify release attestation
+      - name: Verify published release is Immutable and attested
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          immutable="$(gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --json isImmutable --jq '.isImmutable')"
-          if [ "${immutable}" != "true" ]; then
-            echo "Published release is not reported Immutable." >&2
+          verified=false
+          for attempt in $(seq 1 12); do
+            immutable="$(gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --json isImmutable --jq '.isImmutable' 2>/dev/null || true)"
+            if [ "${immutable}" = "true" ] && gh release verify "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/tmp/pages012-release-verify.txt 2>&1; then
+              cat /tmp/pages012-release-verify.txt
+              verified=true
+              break
+            fi
+            sleep 5
+          done
+          if [ "${verified}" != "true" ]; then
+            echo "Release did not become verifiably Immutable/attested." >&2
+            cat /tmp/pages012-release-verify.txt >&2 2>/dev/null || true
             exit 1
           fi
-          gh release verify "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}"
 
-      - name: Download release assets and prove attestation plus recorded SHA-256
+      - name: Download and verify every immutable release asset
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -340,14 +443,12 @@ jobs:
             sha256sum -c ARCHIVE_SHA256SUMS
           )
 
-      - name: Prove non-production exact-byte restore path without rebuilding
+      - name: Prove non-production restore from immutable downloaded bytes
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          immutable="$(gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --json isImmutable --jq '.isImmutable')"
-          test "${immutable}" = "true"
           gh release verify "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}"
           gh release verify-asset "${RELEASE_TAG}" "downloaded-release/pages-composite.tar" --repo "${GITHUB_REPOSITORY}"
 
@@ -355,6 +456,7 @@ jobs:
           actual="$(sha256sum downloaded-release/pages-composite.tar | awk '{print $1}')"
           test -n "${expected}"
           test "${expected}" = "${actual}"
+          test "${actual}" = "${PRESERVED_PAGES_TAR_SHA256}"
 
           rm -rf restore-proof
           mkdir -p restore-proof/site
@@ -364,7 +466,7 @@ jobs:
           expected_content="$(jq -r '.archives["pages-composite.tar"].contentManifestSha256' downloaded-release/IMMUTABLE_FACTS.json)"
           test "${actual_content}" = "${expected_content}"
 
-          python3 -m http.server 8088 --directory restore-proof/site >/tmp/pages012-restore-http.log 2>&1 &
+          python3 -m http.server 8088 --directory restore-proof/site >/tmp/pages012-release-restore-http.log 2>&1 &
           server_pid=$!
           trap 'kill "${server_pid}" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 20); do
@@ -378,14 +480,14 @@ jobs:
           test -s /tmp/three.html
           ! grep -Fq 'THREEJS REBUILD' /tmp/root.html
           grep -Fq 'THREEJS REBUILD' /tmp/three.html
-          echo "Non-production restore proof passed from immutable pages-composite.tar without rebuild."
+          echo "Immutable non-production restore proof passed without rebuild."
 
       - name: Append verified archive evidence to qualification ledger
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          COMPOSITE_ARCHIVE_SHA: ${{ steps.facts.outputs.composite_archive_sha }}
-          COMPOSITE_CONTENT_SHA: ${{ steps.facts.outputs.composite_content_sha }}
+          COMPOSITE_ARCHIVE_SHA: ${{ needs.prepare.outputs.composite_archive_sha }}
+          COMPOSITE_CONTENT_SHA: ${{ needs.prepare.outputs.composite_content_sha }}
         run: |
           set -euo pipefail
           record="$(jq -cn \
