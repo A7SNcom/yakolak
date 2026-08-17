@@ -15,13 +15,14 @@ const BASELINES = Object.freeze([
   Object.freeze({ file: 'production-1440x900.png', sha256: 'dba7b25c571b49c609594fcbcdbd0aa423a084ca11f91ef405a42e193ae9baab' }),
 ]);
 
-const [contract, baselineDoc, lightingSource, previewSource, bootSource, performanceBudgets] = await Promise.all([
+const [contract, baselineDoc, lightingSource, previewSource, bootSource, performanceBudgets, lightingReport] = await Promise.all([
   readJson('YAKOLAK_PORTABLE_KIT', 'assets', 'reference', 'approved-contract.json'),
   readText('docs', 'threejs-baseline', 'BASELINE.md'),
   readText('web', 'app', 'scene', 'lighting-rig.js'),
   readText('web', 'app', 'scene', 'preview-scene.js'),
   readText('web', 'app', 'boot', 'boot.js'),
   readText('THREEJS_PERFORMANCE_BUDGETS.md'),
+  readText('THREEJS_LIGHTING.md'),
 ]);
 
 const ratios = contract.materials?.lightingReferenceOnly?.normalizedRatios;
@@ -68,6 +69,25 @@ assert.match(performanceBudgets, /Representative mobile profile/i);
 assert.match(performanceBudgets, /390/);
 assert.match(performanceBudgets, /844/);
 
+// The committed report is the before-state for THREEJS-026. Keep the successful
+// Chromium measurement and its interpretation reviewable instead of losing it in CI logs.
+assert.match(lightingReport, /GitHub Actions `31994592220`/);
+assert.match(lightingReport, /commit `1901e48b1fb2402470a05f2283cd81114f9c6b02`/);
+assert.match(lightingReport, /content standard deviation: `0\.19992487820908872`/);
+assert.match(lightingReport, /minimum sampled material luminance: `0\.16794666666666666`/);
+assert.match(lightingReport, /maximum sampled material luminance: `0\.8033396078431372`/);
+assert.match(lightingReport, /minimum RGB pair distance[^\n]*`0\.20248361793608763`/);
+assert.match(lightingReport, /p95 synchronized frame \| `0\.4000000000014552 ms`/);
+assert.match(lightingReport, /Draw calls \| `4`/);
+assert.match(lightingReport, /Triangles \| `2880`/);
+assert.match(lightingReport, /User\/material texture maps \| `0`/);
+assert.match(lightingReport, /Shadows \| `false`/);
+assert.match(lightingReport, /Environment map \| `false`/);
+assert.match(lightingReport, /dark entry\/loading references/i);
+assert.match(lightingReport, /foreground contrast character/i);
+assert.match(lightingReport, /Do not add a fourth neutral light/i);
+assert.match(lightingReport, /Do not relax the independent THREEJS-017/i);
+
 console.log('THREEJS025_VERIFY_BEGIN');
 console.log(JSON.stringify({
   sourceRatios: ratios,
@@ -85,5 +105,14 @@ console.log(JSON.stringify({
   },
   baselineScreenshots: baselineReports,
   tuningAuthority: 'frozen baseline screenshot pixels + portable normalized ratios; never Godot engine light units',
+  measuredBeforeState: {
+    githubRun: 31994592220,
+    p95FrameMs: 0.4000000000014552,
+    drawCalls: 4,
+    triangles: 2880,
+    userTextureMaps: 0,
+    shadows: false,
+    environmentMap: false,
+  },
 }, null, 2));
 console.log('THREEJS025_VERIFY_OK');
