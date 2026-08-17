@@ -6,6 +6,7 @@ import test from 'node:test';
 const root = process.cwd();
 const decisionPath = path.join(root, 'PAGES_SERVICE_WORKER_DECISION.md');
 const migrationContractPath = path.join(root, 'PAGES_MIGRATION_CONTRACT.md');
+const artifactScannerPath = path.join(root, 'scripts', 'pages-public-artifact-scan.sh');
 const webRoot = path.join(root, 'web');
 const textExtensions = new Set(['.html', '.js', '.mjs', '.css', '.json', '.md']);
 
@@ -52,7 +53,12 @@ test('served Three.js source does not register or package an obvious Service Wor
   const registrations = [];
   const packagedWorkers = [];
   const registerPattern = /(?:navigator\s*\.\s*)?serviceWorker\s*\.\s*register\s*\(/i;
-  const workerBasenames = new Set(['service-worker.js', 'service_worker.js', 'sw.js']);
+  const workerBasenames = new Set([
+    'service-worker.js', 'service-worker.mjs', 'service-worker.cjs',
+    'service_worker.js', 'service_worker.mjs', 'service_worker.cjs',
+    'serviceworker.js', 'serviceworker.mjs', 'serviceworker.cjs',
+    'sw.js', 'sw.mjs', 'sw.cjs',
+  ]);
 
   for (const file of files) {
     const relative = path.relative(root, file).replaceAll(path.sep, '/');
@@ -67,4 +73,20 @@ test('served Three.js source does not register or package an obvious Service Wor
 
   assert.deepEqual(packagedWorkers, [], `Unexpected Service Worker scripts packaged: ${packagedWorkers.join(', ')}`);
   assert.deepEqual(registrations, [], `Unexpected Service Worker registration found: ${registrations.join(', ')}`);
+});
+
+test('the final composed Pages artifact scanner fail-closes PAGES-011 before upload', async () => {
+  const scanner = await readFile(artifactScannerPath, 'utf8');
+
+  assert.match(scanner, /PAGES-011 is a final-artifact invariant/i);
+  assert.match(scanner, /PAGES_SERVICE_WORKER_DECISION\.md/);
+  assert.match(scanner, /SERVICE_WORKER_DECISION=\(none\|enabled\)/);
+  assert.match(scanner, /SERVICE_WORKER_DECISION=none/);
+  assert.match(scanner, /enabled mode requires a new measured decision/i);
+  assert.match(scanner, /service-worker\.js/);
+  assert.match(scanner, /service_worker\.js/);
+  assert.match(scanner, /serviceworker\.js/);
+  assert.match(scanner, /sw\.js/);
+  assert.match(scanner, /serviceWorker\[\[:space:\]\]\*\\\.\[\[:space:\]\]\*register/);
+  assert.match(scanner, /composed Pages artifact while decision=none/i);
 });
