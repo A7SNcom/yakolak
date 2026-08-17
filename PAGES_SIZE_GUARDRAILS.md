@@ -1,38 +1,48 @@
 # GitHub Pages delivery and repository size guardrails
 
-Status: **LOCKED** for the GitHub Pages migration.
+Status: **LOCKED** for the GitHub Pages migration. PAGES-013 corrected the mutable GitHub-policy snapshot/unit wording without changing any PAGES-007 internal guard.
 
 The public game URL remains the GitHub Pages URL. Large runtime assets may move to a tested external immutable asset host only when these internal budgets require it; moving assets must never move or replace the public game URL.
 
-## Platform ceilings
+## Platform policy snapshot — not architecture constants
 
-Current GitHub documentation establishes these platform constraints:
+GitHub platform limits are mutable external policy and must not be hard-coded as YAKOLAK architecture constants. The authoritative timestamped snapshot and release-checkpoint re-read procedure are in `PAGES_STATIC_HOST_TRAFFIC_BOUNDARY.md`.
 
-- Published GitHub Pages site: **1 GiB maximum**.
-- Normal Git object/file: GitHub enforces **100 MiB maximum** for a single regular Git object.
+At **2026-08-17T18:59Z**, current official GitHub documentation states:
+
+- GitHub Pages source repositories have a **recommended limit of 1 GB**.
+- Published GitHub Pages sites may be no larger than **1 GB**.
+- GitHub Pages deployments time out after **10 minutes**.
+- GitHub Pages sites have a soft bandwidth limit of **100 GB/month**.
+- GitHub Pages sites have a soft limit of **10 builds/hour**, but that build-frequency limit **does not apply** when building/publishing with a custom GitHub Actions workflow.
+- GitHub Pages request rate limiting may return HTTP **429**.
+- GitHub blocks regular Git files larger than **100 MiB**.
 - Git LFS **cannot be used with GitHub Pages sites** and is not a Pages delivery mechanism.
-- GitHub Pages has a soft bandwidth limit of **100 GB/month**; this is another reason to keep cold-transfer/cache cost intentionally small.
 
-References:
+References re-read for that checkpoint:
 
 - https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits
 - https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-large-files-on-github
 - https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-git-large-file-storage
 
+**Unit correction:** GitHub's current Pages documentation says `1 GB`; this document must not silently rewrite that as `1 GiB`. The current internal 128 MiB tree budget is **134,217,728 bytes**, about **13.42%** of a decimal 1,000,000,000-byte GB, leaving about **86.58%** byte headroom; the current platform-to-internal ratio is about **7.45x**, not an exact `8x`. This comparison is descriptive only and must be recalculated if GitHub policy changes.
+
 ## Hard internal budgets
 
-These are intentionally far below the platform ceilings and are enforced by `scripts/pages-size-guard.sh` in the actual composite Pages workflow before `upload-pages-artifact`:
+These are intentionally far below current platform policy and are enforced by `scripts/pages-size-guard.sh` in the actual composite Pages workflow before `upload-pages-artifact`:
 
 | Guard | Hard internal budget | Reason |
 | --- | ---: | --- |
-| Composite published tree | **128 MiB** | 8x safety margin below the 1 GiB Pages ceiling |
+| Composite published tree | **128 MiB** | fixed YAKOLAK delivery budget; independent of mutable GitHub policy |
 | Root route cold-cache footprint | **64 MiB** | practical transfer/cache envelope |
 | `/threejs/` route cold-cache footprint | **64 MiB** | practical transfer/cache envelope |
-| Any one published/committed runtime file | **64 MiB** | substantial margin below GitHub's 100 MiB regular-Git limit |
-| GitHub repository API-reported size | **512 MiB** | preserve repository health and margin below the Pages source guidance |
+| Any one published/committed runtime file | **64 MiB** | fixed internal file budget with substantial current headroom below GitHub's regular-file policy |
+| GitHub repository API-reported size | **512 MiB** | preserve repository health and a deliberately conservative source-repository envelope |
 | Git LFS pointer in the published tree | **0 allowed** | Pages must receive real files, never LFS pointers |
 
-**Do not raise these constants merely to make a deployment pass.** A budget breach is an architecture signal to use the external immutable-asset strategy below.
+**Do not raise these constants merely to make a deployment pass.** A budget breach is an architecture signal to use the external immutable-asset strategy below. A future GitHub policy relaxation does not automatically relax these budgets; a future GitHub policy tightening that conflicts with them blocks release qualification until the static-host/delivery architecture is deliberately adapted.
+
+`pages-size-guard.sh` deliberately enforces only these internal budgets. It no longer embeds a `1 GiB`/GitHub-platform byte constant; current external policy belongs in the timestamped PAGES-013 snapshot and must be re-read at every release checkpoint.
 
 ## Exact guarded deployment baseline
 
@@ -148,3 +158,5 @@ If a future change approaches or crosses an internal budget, deployment must sta
 9. Re-measure Pages raw bytes, each route footprint, external cold-transfer bytes, and largest committed file after the move. The internal budgets remain unchanged unless a separate architecture decision explicitly supersedes this contract.
 
 Until such a strategy is tested and recorded, the correct response to a size-budget failure is to reduce/dedupe/compress assets—not to increase the limits.
+
+If Pages policy or static traffic itself outgrows GitHub Pages, follow `PAGES_STATIC_HOST_TRAFFIC_BOUNDARY.md`: migrate only the static-host layer deliberately while GitHub remains source/control and backend authority remains separate.
