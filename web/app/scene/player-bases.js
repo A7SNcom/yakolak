@@ -1,12 +1,7 @@
 import { Box3, Group, MathUtils, Mesh, Vector3 } from 'three';
+import { CANONICAL_PLAYER_IDS } from '../materials/canonical-materials.js';
 
 export const PLAYER_BASE_SEAT_ORDER = Object.freeze(['right', 'back', 'left', 'front']);
-export const PLAYER_BASE_COLOR_BY_SEAT = Object.freeze({
-  right: 'marble',
-  back: 'blue',
-  left: 'gold',
-  front: 'green',
-});
 
 function sameArray(actual, expected) {
   return Array.isArray(actual)
@@ -38,10 +33,9 @@ function validateAuthority(worldLayout) {
     throw new TypeError('Player bases require authoritative world-layout identities, bases and homeStacks');
   }
   if (!sameArray(worldLayout.turnRing, PLAYER_BASE_SEAT_ORDER)) throw new Error('Canonical player-base seat order drift');
+  const identityColors = PLAYER_BASE_SEAT_ORDER.map((seatId) => worldLayout.identities[seatId]);
+  if (!sameArray(identityColors, CANONICAL_PLAYER_IDS)) throw new Error('Canonical player-base seat/color mapping drift');
   for (const seatId of PLAYER_BASE_SEAT_ORDER) {
-    if (worldLayout.identities[seatId] !== PLAYER_BASE_COLOR_BY_SEAT[seatId]) {
-      throw new Error(`Canonical seat/color mapping drift for ${seatId}`);
-    }
     if (!worldLayout.bases[seatId]?.position || !worldLayout.bases[seatId]?.rotationDegrees) {
       throw new Error(`Missing authoritative base transform for ${seatId}`);
     }
