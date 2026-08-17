@@ -67,14 +67,16 @@ test('runtime manifest exactly covers definitive portable sources while derived 
   assert.equal(ASSETS.boardAndLid.source.path, 'models/board-and-lid.stl');
   assert.equal(ASSETS.boardAndLid.source.gitBlobSha, '024d109cea081d65eedc067b2fdaac46c9c10227');
   assert.equal(ASSETS.boardAndLid.runtime.type, 'glb-components');
-  assert.equal(ASSETS.boardAndLid.runtime.url, '/assets/models/board-and-lid.glb?v=9a7e3410f641735e08a2944efa366cca2a66ee99');
+  assert.equal(new URL(ASSETS.boardAndLid.runtime.url).pathname, new URL('../web/assets/models/board-and-lid.glb', import.meta.url).pathname);
+  assert.equal(new URL(ASSETS.boardAndLid.runtime.url).search, '?v=9a7e3410f641735e08a2944efa366cca2a66ee99');
   assert.equal(runtimePayloadBytes(ASSETS.boardAndLid), 2595544);
   assert.equal(runtimePayloadGitBlobSha(ASSETS.boardAndLid), '9a7e3410f641735e08a2944efa366cca2a66ee99');
 
   assert.equal(ASSETS.playerBase.source.path, 'models/player-base.stl');
   assert.equal(ASSETS.playerBase.source.gitBlobSha, '066b3f95f5281a178b610611075cbab0689cdb12');
   assert.equal(ASSETS.playerBase.runtime.type, 'glb-components');
-  assert.equal(ASSETS.playerBase.runtime.url, '/assets/models/player-base.glb?v=63550f0eeb7aa9c004f251fb4238d751dfd4d06c');
+  assert.equal(new URL(ASSETS.playerBase.runtime.url).pathname, new URL('../web/assets/models/player-base.glb', import.meta.url).pathname);
+  assert.equal(new URL(ASSETS.playerBase.runtime.url).search, '?v=63550f0eeb7aa9c004f251fb4238d751dfd4d06c');
   assert.equal(runtimePayloadBytes(ASSETS.playerBase), 1942888);
   assert.equal(runtimePayloadGitBlobSha(ASSETS.playerBase), '63550f0eeb7aa9c004f251fb4238d751dfd4d06c');
 

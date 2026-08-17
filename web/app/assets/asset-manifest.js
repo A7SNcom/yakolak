@@ -1,3 +1,5 @@
+import { APP_BASE_URL, resolveAppUrl } from '../core/app-url.js';
+
 // THREEJS-015 — runtime assets derived exactly from YAKOLAK_PORTABLE_KIT/assets/manifest.json.
 // The portable kit is canonical; runtime payload metadata may point at deterministic derived assets.
 
@@ -13,16 +15,27 @@ export const ASSET_GROUPS = Object.freeze({
   optional: Object.freeze({ blocking: false, description: 'Presentation-only assets that may degrade safely.' }),
 });
 
-const RUNTIME_ROOT = '/runtime-assets';
+const RUNTIME_ROOT = 'runtime-assets';
 
 function source(path, role, required, gitBlobSha, bytes) {
   return Object.freeze({ path, role, required, gitBlobSha, bytes });
 }
 
+// A leading slash in an existing runtime override means "directly under the app root",
+// never the origin root. This preserves the existing manifest shape without coupling it
+// to either the migration /threejs/ prefix or the post-cutover application prefix.
+export function runtimeAssetUrl(path, gitBlobSha, baseUrl = APP_BASE_URL) {
+  const original = String(path ?? '');
+  const normalized = original.replace(/^\/+/, '');
+  const appPath = original.startsWith('/') ? normalized : `${RUNTIME_ROOT}/${normalized}`;
+  const url = resolveAppUrl(appPath, baseUrl);
+  url.searchParams.set('v', gitBlobSha);
+  return url.href;
+}
+
 function runtime(path, type, gitBlobSha, bytes) {
-  const urlPath = path.startsWith('/') ? path : `${RUNTIME_ROOT}/${path}`;
   return Object.freeze({
-    url: `${urlPath}?v=${gitBlobSha}`,
+    url: runtimeAssetUrl(path, gitBlobSha),
     type,
     ready: true,
     versionId: `git:${gitBlobSha}`,
