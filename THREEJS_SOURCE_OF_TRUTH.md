@@ -1,6 +1,20 @@
 # Three.js Source-of-Truth Order
 
-This contract applies only to the `threejs-rebuild` workspace until an explicit cutover task changes it. It does not change `main`, the Godot production path, or `https://yakolak.vercel.app/`.
+## PAGES-004 deployment/backend-hosting override — 2026-08-17
+
+For hosting, deployment, origin, and final-cutover decisions, `PAGES_MIGRATION_CONTRACT.md` is now the higher-order authority.
+
+- GitHub Pages is the static frontend target.
+- During migration `/yakolak/` is the known-good Godot root and `/yakolak/threejs/` is the Three.js candidate in one composite Pages site.
+- GitHub Actions/Pages owns frontend publishing; PAGES-002 owns the deployment pipeline and PAGES-003 owns relocatable base paths.
+- GitHub Pages never becomes the authoritative room server. Online transport crosses one explicit `API_ORIGIN`; PAGES-005 owns selection of the non-Vercel backend runtime/provider and public origin.
+- Any Vercel project, preview alias, production deployment, serverless-runtime observation, header/cache behavior, `vercel.json` rule, or `yakolak.vercel.app` reference below is retained as historical evidence only. It cannot govern a new frontend/backend/cutover decision after PAGES-004.
+- The current `rules/` + `api/` implementation remains authoritative evidence for live product/protocol semantics until a backend migration explicitly changes those semantics; this does not select Vercel as their future host.
+- Final frontend cutover is a deliberate GitHub Pages move of accepted Three.js bytes to `/yakolak/`, retirement of `/yakolak/threejs/`, coordinated `API_ORIGIN` compatibility, and tested rollback. It is not a Vercel promotion or alias switch.
+
+All non-hosting source-of-truth rules and contradiction records below remain binding unless explicitly resolved by their named owner task.
+
+This contract applies only to the `threejs-rebuild` workspace until an explicit cutover task changes it. It does not change `main` or resolve an `OPEN` backend contract merely because the frontend needs an answer.
 
 ## 1. Authoritative order by domain
 
@@ -12,7 +26,8 @@ For every `THREEJS-*` task, determine which domain owns the decision before impl
 
 2. **Current `rules/` + `api/` — authoritative live backend contract.**
    - Owns the currently served rule tokens, validation behavior, room/session protocol, mutations, versioning, identity/seat ownership, persistence, lifecycle transitions, network errors, and any server-authoritative state actually accepted by the live API.
-   - The Three.js client must interoperate with this contract unless a separate explicit backend-migration task changes it.
+   - The Three.js client must interoperate with this semantic contract unless a separate explicit backend-migration task changes it.
+   - Hosting of that authority is now a separate Pages-era decision behind `API_ORIGIN`; do not infer Vercel hosting from these files.
 
 3. **Current Godot Production — visual/behavioral reference only where it agrees with the applicable authoritative source above.**
    - Production may be used to understand feel, pacing, or currently visible behavior only when that behavior agrees with `YAKOLAK_PORTABLE_KIT/` for rebuild/presentation matters and with `rules/` + `api/` for live backend matters.
@@ -137,7 +152,7 @@ Status values: `OPEN`, `ADAPTER`, or `RESOLVED`. No entry may disappear without 
 Every implementation decision must be traceable to one of these outcomes:
 
 - **Kit-owned:** implement the Kit exactly.
-- **Backend-owned:** implement the current `rules/` + `api/` contract exactly.
+- **Backend-owned:** implement the current `rules/` + `api/` semantic contract exactly.
 - **Agreement:** when Kit, backend, and Production agree, Production may be used as a supporting behavioral/visual reference.
 - **Contradiction:** record it here and use only an explicit compatibility adapter that does not alter either authoritative contract; otherwise stop that affected decision for a later resolution task.
 - **Resolved contradiction:** a `RESOLVED` entry is a binding migration decision for later Three.js tasks. Follow its recorded resolution even if an older source still contains the superseded wording; reopening it requires another explicit product-rule or migration-resolution task.
@@ -153,6 +168,9 @@ Do not copy a Godot quirk merely because it is currently visible in Production. 
 ## 5. Workspace and deployment boundary
 
 - This file and all Three.js rebuild work stay on `threejs-rebuild` until explicit cutover.
-- `main` remains the Godot source branch.
-- `https://yakolak.vercel.app/` remains Godot Production until explicit cutover.
-- No competing migration branch, PR chain, or alternate production path is authorized by this contract.
+- `main` remains the Godot source branch during migration.
+- The static frontend deployment target is the one GitHub Pages site defined by `PAGES_MIGRATION_CONTRACT.md`.
+- Migration layout remains Godot root `/yakolak/` + Three.js candidate `/yakolak/threejs/` until explicit cutover.
+- Backend hosting is separated behind `API_ORIGIN`; PAGES-005 selects the non-Vercel authoritative runtime.
+- Historical `yakolak.vercel.app`/Vercel Preview evidence does not authorize a competing migration or production path.
+- No competing migration branch, PR chain, second Pages site, or alternate production frontend path is authorized by this contract.
