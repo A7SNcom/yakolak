@@ -2,12 +2,18 @@ const SCATTER_HEADER = Object.freeze(['id', 'color', 'side', 'size', 'x', 'y', '
 const SIZE_CODE_TO_ID = Object.freeze({ s: 'small', m: 'medium', l: 'large' });
 
 function finiteNumber(value, label) {
+  if (value === null || typeof value === 'boolean' || (typeof value === 'string' && value.trim() === '')) {
+    throw new TypeError(`${label} must be finite`);
+  }
   const number = Number(value);
   if (!Number.isFinite(number)) throw new TypeError(`${label} must be finite`);
   return number;
 }
 
 function integer(value, label) {
+  if (value === null || typeof value === 'boolean' || (typeof value === 'string' && value.trim() === '')) {
+    throw new TypeError(`${label} must be an integer`);
+  }
   const number = Number(value);
   if (!Number.isInteger(number)) throw new TypeError(`${label} must be an integer`);
   return number;
