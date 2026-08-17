@@ -2,8 +2,10 @@
 set -euo pipefail
 
 site_dir="${1:-pages-site}"
-PAGES_PLATFORM_BYTES=$((1024 * 1024 * 1024))
-GIT_PLATFORM_FILE_BYTES=$((100 * 1024 * 1024))
+
+# These are YAKOLAK internal architecture guards, not mirrors of mutable GitHub
+# platform policy. Current official GitHub policy is timestamped separately in
+# PAGES_STATIC_HOST_TRAFFIC_BOUNDARY.md and must be re-read at release checkpoints.
 SITE_BUDGET_BYTES=$((128 * 1024 * 1024))
 ROUTE_CACHE_BUDGET_BYTES=$((64 * 1024 * 1024))
 FILE_BUDGET_BYTES=$((64 * 1024 * 1024))
@@ -36,8 +38,7 @@ printf 'Route envelopes: root=%s bytes, threejs=%s bytes\n' "${root_bytes}" "${t
 printf 'Largest file: %s bytes %s\n' "${largest_bytes}" "${largest_path}"
 printf 'Internal budgets: site=%s, route-cache=%s, file=%s bytes\n' \
   "${SITE_BUDGET_BYTES}" "${ROUTE_CACHE_BUDGET_BYTES}" "${FILE_BUDGET_BYTES}"
-printf 'Platform ceilings: Pages=%s bytes, regular-Git-file=%s bytes\n' \
-  "${PAGES_PLATFORM_BYTES}" "${GIT_PLATFORM_FILE_BYTES}"
+printf 'Mutable GitHub platform policy: see timestamped PAGES_STATIC_HOST_TRAFFIC_BOUNDARY.md snapshot\n'
 cat "${manifest}"
 
 if (( total_bytes > SITE_BUDGET_BYTES )); then
@@ -54,14 +55,14 @@ for route_bytes in "${root_bytes}" "${threejs_bytes}"; do
 done
 if (( largest_bytes > FILE_BUDGET_BYTES )); then
   echo "Refusing Pages delivery: ${largest_path} is ${largest_bytes} bytes, above the 64 MiB internal file budget." >&2
-  echo 'This also preserves a large margin below GitHub regular Git’s 100 MiB hard limit.' >&2
+  echo 'The internal file budget is intentionally independent of mutable GitHub file-size policy.' >&2
   exit 1
 fi
 
 while IFS= read -r -d '' file; do
   if LC_ALL=C head -c 42 "${file}" 2>/dev/null \
     | grep -aFqx 'version https://git-lfs.github.com/spec/v1'; then
-    echo "Refusing Pages delivery: Git LFS pointer detected in ${file}. Git LFS is not supported for Pages sites." >&2
+    echo "Refusing Pages delivery: Git LFS pointer detected in ${file}. YAKOLAK Pages artifacts require real public static bytes." >&2
     exit 1
   fi
 done < <(find "${site_dir}" -type f -print0)
