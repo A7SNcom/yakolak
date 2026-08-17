@@ -12,7 +12,9 @@ on:
       - 'YAKOLAK_PORTABLE_KIT/assets/reference/approved-contract.json'
       - 'THREEJS_SOURCE_OF_TRUTH.md'
       - 'scripts/convert-threejs-assets.mjs'
+      - 'scripts/prepare-threejs-runtime-assets.mjs'
       - 'scripts/verify-threejs-table-score.mjs'
+      - 'scripts/verify-threejs-table-score-browser.mjs'
       - 'web/app/assets/asset-manifest.js'
       - 'web/app/assets/glb-components.js'
       - 'web/app/scene/table-score-layout.js'
@@ -43,3 +45,24 @@ jobs:
         run: node scripts/verify-threejs-table-score.mjs
       - name: Run THREEJS-021 contract test
         run: node --test tests/threejs_table_score_contract.test.mjs
+      - name: Install browser verifier only
+        shell: bash
+        run: npm install --no-save --package-lock=false playwright@1.55.0
+      - name: Install Chromium
+        shell: bash
+        run: npx playwright install --with-deps chromium
+      - name: Prepare verified runtime assets
+        run: node scripts/prepare-threejs-runtime-assets.mjs
+      - name: Serve static web source
+        shell: bash
+        run: |
+          python3 -m http.server 4173 --directory web > /tmp/threejs-021-http.log 2>&1 &
+          echo $! > /tmp/threejs-021-http.pid
+          for attempt in $(seq 1 20); do
+            curl --fail --silent http://127.0.0.1:4173/ >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/threejs-021-http.log
+          exit 1
+      - name: Verify table and score runtime in Chromium
+        run: node scripts/verify-threejs-table-score-browser.mjs
