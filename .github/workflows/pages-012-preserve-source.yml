@@ -97,7 +97,10 @@ jobs:
               artifactSha256: $artifactSha256,
               purpose: "temporary exact-byte preservation before immutable GitHub Release publication"
             }' > preserve-source/SOURCE_PROVENANCE.json
-          sha256sum -c preserve-source/ARTIFACT_SHA256SUMS
+          (
+            cd preserve-source
+            sha256sum -c ARTIFACT_SHA256SUMS
+          )
           cat preserve-source/SOURCE_PROVENANCE.json
 
       - name: Preserve exact payload for release preparation
