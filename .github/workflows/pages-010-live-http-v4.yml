@@ -1,0 +1,120 @@
+name: PAGES-010 Final Live Pages Probe
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - .github/workflows/pages-010-live-http-v4.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: threejs-rebuild
+          fetch-depth: 1
+      - name: Finish live delivery verification
+        shell: bash
+        env:
+          BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+
+          header() {
+            local file="$1" name="$2"
+            awk -v key="$name" 'BEGIN{IGNORECASE=1} index(tolower($0),tolower(key) ":")==1 {sub(/\r$/,""); sub(/^[^:]+:[[:space:]]*/,""); v=$0} END{print v}' "$file"
+          }
+
+          ic="$(curl -sS -L -o "$tmp/index" -w '%{http_code}' "$BASE_URL")"
+          rc="$(curl -sS -L -o "$tmp/config" -w '%{http_code}' "${BASE_URL}runtime-config.json")"
+          echo "PAGES010_READY_FINAL|index=${ic}|runtime_config=${rc}"
+          test "$ic" = 200
+          test "$rc" = 200
+          grep -Fq 'THREEJS REBUILD' "$tmp/index"
+
+          node --input-type=module <<'NODE'
+          import { ASSET_LIST } from './web/app/assets/asset-manifest.js';
+          const ready = ASSET_LIST.filter((a) => a.runtime?.ready && a.runtime?.url);
+          const extensions = [...new Set(ready.map((a) => new URL(a.runtime.url, 'https://example.invalid/').pathname.match(/\.([^.\/]+)$/)?.[1]?.toLowerCase()).filter(Boolean))].sort();
+          const image = extensions.filter((x) => ['png','jpg','jpeg','webp','gif','avif','svg'].includes(x));
+          const audio = extensions.filter((x) => ['mp3','ogg','oga','wav','m4a','aac','opus'].includes(x));
+          console.log(`PAGES010_RUNTIME_EXTENSIONS|${extensions.join(',')}`);
+          console.log(`PAGES010_IMAGE_FORMATS|${image.join(',') || 'none'}`);
+          console.log(`PAGES010_AUDIO_FORMATS|${audio.join(',') || 'none'}`);
+          NODE
+
+          if grep -RniE '@font-face|url\([^)]*\.(woff2?|ttf|otf)([?#][^)]*)?' web --include='*.css' --include='*.html' --include='*.js' > "$tmp/fonts"; then
+            cat "$tmp/fonts"
+            echo 'PAGES010_FONT_ASSETS|present'
+            exit 1
+          else
+            echo 'PAGES010_FONT_ASSETS|none|system_and_named_fallbacks_only'
+          fi
+
+          node <<'NODE' > "$tmp/imports"
+          const fs=require('node:fs'), path=require('node:path');
+          const root=path.resolve('web'), files=[];
+          (function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory())walk(p);else if(e.isFile()&&p.endsWith('.js')&&p.includes(`${path.sep}app${path.sep}`))files.push(p)}})(path.join(root,'app'));
+          const out=new Set();
+          const rx=/(?:import|export)\s+(?:[^'";]*?\s+from\s*)?['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+          for(const f of files){const text=fs.readFileSync(f,'utf8');let m;while((m=rx.exec(text))){const s=m[1]||m[2];let t;if(s.startsWith('.'))t=path.resolve(path.dirname(f),s);else if(s==='three')t=path.join(root,'vendor/three/r185/three.module.js');else if(s.startsWith('three/addons/'))t=path.join(root,'vendor/three/r185/addons',s.slice('three/addons/'.length));else continue;if(!fs.existsSync(t)||!fs.statSync(t).isFile()){console.error(`BROKEN_IMPORT ${path.relative(root,f)} -> ${s} -> ${path.relative(root,t)}`);process.exit(1)}out.add(path.relative(root,t).split(path.sep).join('/'))}}
+          for(const p of [...out].sort())console.log(p);
+          NODE
+          count=0
+          while IFS= read -r rel; do
+            [ -n "$rel" ] || continue
+            code="$(curl -sS -L -o /dev/null -w '%{http_code}' "${BASE_URL}${rel}")"
+            if [ "$code" != 200 ]; then echo "PAGES010_BROKEN_DEPLOYED_IMPORT|${rel}|${code}"; exit 1; fi
+            count=$((count+1))
+          done < "$tmp/imports"
+          echo "PAGES010_IMPORTS|resolved_source_and_deployed=${count}"
+
+          curl -fsSL "${BASE_URL}app/boot/boot.js" -o "$tmp/plain"
+          curl -fsSL "${BASE_URL}app/boot/boot.js?pages010=refresh" -o "$tmp/query"
+          cmp "$tmp/plain" "$tmp/query"
+          echo 'PAGES010_QUERY_REFRESH|GET=200|bytes=identical'
+          curl -fsSL "${BASE_URL}app/boot/boot.js#pages010-refresh" -o "$tmp/hash"
+          cmp "$tmp/plain" "$tmp/hash"
+          echo 'PAGES010_HASH_REFRESH|GET=200|bytes=identical|fragment_not_sent_to_server'
+
+          curl -fsSL -D "$tmp/modh" "${BASE_URL}app/boot/boot.js" -o /dev/null
+          et="$(header "$tmp/modh" etag)"
+          lm="$(header "$tmp/modh" last-modified)"
+          cc="$(header "$tmp/modh" cache-control)"
+          echo "PAGES010_MODULE_VALIDATORS|CC=${cc}|ETAG=${et}|LM=${lm}"
+          if [ -n "$et" ]; then
+            code="$(curl -sS -o /dev/null -w '%{http_code}' -H "If-None-Match: $et" "${BASE_URL}app/boot/boot.js")"
+            echo "PAGES010_REVALIDATE_ETAG|status=${code}|etag=${et}"
+            test "$code" = 304
+          else
+            echo 'PAGES010_REVALIDATE_ETAG|validator=absent'
+          fi
+          if [ -n "$lm" ]; then
+            code="$(curl -sS -o /dev/null -w '%{http_code}' -H "If-Modified-Since: $lm" "${BASE_URL}app/boot/boot.js")"
+            echo "PAGES010_REVALIDATE_LM|status=${code}|last_modified=${lm}"
+            test "$code" = 304
+          else
+            echo 'PAGES010_REVALIDATE_LM|validator=absent'
+          fi
+
+          missing="${BASE_URL}__pages010_missing_552c3244__.js"
+          mg="$(curl -sS -L -D "$tmp/mgh" -o "$tmp/mgb" -w '%{http_code}' "$missing")"
+          mh="$(curl -sS -L -I -D "$tmp/mhh" -o /dev/null -w '%{http_code}' "$missing")"
+          echo "PAGES010_404|GET=${mg}|HEAD=${mh}|CT=$(header "$tmp/mgh" content-type)|CC=$(header "$tmp/mgh" cache-control)|ETAG=$(header "$tmp/mgh" etag)|LM=$(header "$tmp/mgh" last-modified)"
+          test "$mg" = 404
+          test "$mh" = 404
+
+          if grep -nE 'Range|range:' web/app/assets/asset-manager.js web/app/assets/glb-components.js; then
+            echo 'PAGES010_RANGE|unexpected_loader_range_code=yes'
+            exit 1
+          fi
+          grep -Fq "fetchImpl(asset.runtime.url, { signal, credentials: 'same-origin', cache: 'default' })" web/app/assets/asset-manager.js
+          echo 'PAGES010_RANGE|requested_by_runtime=no|probe=not_issued|loader=full_GET'
