@@ -24,7 +24,7 @@ test('boot and scene required groups gate scene/shell exposure in order', async 
   const bootLoad = boot.indexOf("await assetManager.loadGroup('boot-critical'");
   const rendererCreate = boot.indexOf('rendererOwner = createRendererOwner({ mount: appElement })');
   const sceneLoad = boot.indexOf("await assetManager.loadGroup('scene-critical'");
-  const sceneCreate = boot.indexOf('previewScene = createPreviewScene(rendererOwner)');
+  const sceneCreate = boot.indexOf('previewScene = createPreviewScene(rendererOwner');
   const exposeCall = boot.indexOf('exposeReadyShell();', sceneLoad);
 
   assert.ok(bootLoad >= 0 && rendererCreate > bootLoad, 'boot-critical must gate renderer composition');
