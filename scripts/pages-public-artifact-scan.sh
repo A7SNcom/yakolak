@@ -34,6 +34,43 @@ if find "${site_dir}" -type f -links +1 -print -quit | grep -q .; then
   fail 'hard-linked files are not allowed'
 fi
 
+# PAGES-011 is a final-artifact invariant, not merely a Three.js-source invariant.
+# The composite Pages tree contains the Godot root plus /threejs/, so enforce the
+# measured decision here immediately before upload. Any later enabled decision must
+# deliberately update this scanner; a marker edit alone is not allowed to turn SW on.
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+decision_file="${repo_root}/PAGES_SERVICE_WORKER_DECISION.md"
+[[ -s "${decision_file}" ]] || fail 'PAGES-011 decision file is missing'
+mapfile -t service_worker_decisions < <(grep -E '^SERVICE_WORKER_DECISION=(none|enabled)$' "${decision_file}" || true)
+if [[ "${#service_worker_decisions[@]}" -ne 1 ]]; then
+  fail 'PAGES-011 decision marker must appear exactly once'
+fi
+if [[ "${service_worker_decisions[0]}" != 'SERVICE_WORKER_DECISION=none' ]]; then
+  fail 'PAGES-011 enabled mode requires a new measured decision and a deliberate artifact-scanner update'
+fi
+
+service_worker_paths="$(find "${site_dir}" -type f \
+  \( -iname 'sw.js' -o -iname 'sw.mjs' -o -iname 'sw.cjs' \
+     -o -iname 'service-worker.js' -o -iname 'service-worker.mjs' -o -iname 'service-worker.cjs' \
+     -o -iname 'service_worker.js' -o -iname 'service_worker.mjs' -o -iname 'service_worker.cjs' \
+     -o -iname 'serviceworker.js' -o -iname 'serviceworker.mjs' -o -iname 'serviceworker.cjs' \) \
+  -print)"
+if [[ -n "${service_worker_paths}" ]]; then
+  printf '%s\n' "${service_worker_paths}" >&2
+  fail 'PAGES-011 forbids Service Worker files anywhere in the composed Pages artifact while decision=none'
+fi
+
+service_worker_registration_hits="$(grep -RIlE --binary-files=without-match \
+  --exclude='*.wasm' --exclude='*.pck' --exclude='*.png' --exclude='*.jpg' --exclude='*.jpeg' \
+  --exclude='*.webp' --exclude='*.ico' --exclude='*.glb' --exclude='*.stl' --exclude='*.ttf' \
+  --exclude='*.otf' --exclude='*.woff' --exclude='*.woff2' --exclude='*.mp3' --exclude='*.ogg' \
+  'serviceWorker[[:space:]]*\.[[:space:]]*register[[:space:]]*\(' \
+  "${site_dir}" || true)"
+if [[ -n "${service_worker_registration_hits}" ]]; then
+  printf '%s\n' "${service_worker_registration_hits}" >&2
+  fail 'PAGES-011 forbids Service Worker registration anywhere in the composed Pages artifact while decision=none'
+fi
+
 # Keep patterns specific enough for a public repository: declarations/documentation
 # elsewhere are fine, but concrete secret-shaped values inside the delivered tree are not.
 secret_hits="$(grep -RIlE --binary-files=without-match \
