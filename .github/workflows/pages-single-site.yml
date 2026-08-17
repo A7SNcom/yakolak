@@ -164,6 +164,55 @@ jobs:
           diff -qr --exclude=threejs --exclude=.nojekyll godot-ready/web pages-site
           diff -qr threejs-source/web pages-site/threejs
 
+      - name: Write secret-free public Three.js runtime config
+        if: steps.root.outputs.ready == 'true'
+        shell: bash
+        env:
+          FRONTEND_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          set -euo pipefail
+          raw_origin=''
+          origin_state='absent'
+          if [ -s threejs-source/backend/cloudflare/API_ORIGIN.txt ]; then
+            raw_origin="$(tr -d '\r\n' < threejs-source/backend/cloudflare/API_ORIGIN.txt)"
+            origin_state='configured'
+          fi
+
+          RAW_API_ORIGIN="${raw_origin}" API_ORIGIN_STATE="${origin_state}" node <<'NODE'
+          const fs = require('node:fs');
+
+          const raw = String(process.env.RAW_API_ORIGIN || '').trim();
+          let apiOrigin = null;
+          let apiOriginState = process.env.API_ORIGIN_STATE === 'configured' ? 'configured' : 'absent';
+
+          if (raw) {
+            let url = null;
+            try { url = new URL(raw); } catch {}
+            const valid = url
+              && url.protocol === 'https:'
+              && !url.username
+              && !url.password
+              && url.pathname === '/'
+              && !url.search
+              && !url.hash
+              && !/(^|\.)vercel\.app$/i.test(url.hostname);
+            if (valid) apiOrigin = url.origin;
+            else apiOriginState = 'invalid';
+          }
+
+          const config = {
+            frontendSha: process.env.FRONTEND_SHA,
+            protocolVersion: '1',
+            apiOrigin,
+            environment: 'production',
+            branch: 'threejs-rebuild',
+            apiOriginState,
+          };
+          fs.writeFileSync('pages-site/threejs/runtime-config.json', `${JSON.stringify(config, null, 2)}\n`);
+          NODE
+
+          cat pages-site/threejs/runtime-config.json
+
       - name: Verify artifact structure and secrecy
         if: steps.root.outputs.ready == 'true'
         shell: bash
@@ -171,6 +220,7 @@ jobs:
           set -euo pipefail
           test -s pages-site/index.html
           test -s pages-site/threejs/index.html
+          test -s pages-site/threejs/runtime-config.json
           test ! -e pages-site/.git
           test ! -e pages-site/.github
 
@@ -198,6 +248,11 @@ jobs:
             echo 'Refusing to publish content matching private-key/token signatures.' >&2
             exit 1
           fi
+
+      - name: Enforce PAGES-009 public artifact contract
+        if: steps.root.outputs.ready == 'true'
+        shell: bash
+        run: bash threejs-source/scripts/pages-public-artifact-scan.sh pages-site
 
       - name: Enforce Pages delivery and repository size guardrails
         if: steps.root.outputs.ready == 'true'
@@ -229,20 +284,24 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      - name: HTTP smoke root and Three.js indexes
+      - name: HTTP smoke root, Three.js, and public runtime config
         shell: bash
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          FRONTEND_SHA: ${{ needs.compose.outputs.candidate_sha }}
         run: |
           set -euo pipefail
           base="${PAGE_URL%/}/"
           for attempt in $(seq 1 12); do
             root="$(curl --fail --silent --show-error --location "${base}" || true)"
             three="$(curl --fail --silent --show-error --location "${base}threejs/" || true)"
-            if [ -n "${root}" ] && [ -n "${three}" ] \
+            config="$(curl --fail --silent --show-error --location "${base}threejs/runtime-config.json" || true)"
+            if [ -n "${root}" ] && [ -n "${three}" ] && [ -n "${config}" ] \
                && ! grep -Fq 'THREEJS REBUILD' <<<"${root}" \
-               && grep -Fq 'THREEJS REBUILD' <<<"${three}"; then
-              echo "HTTP smoke passed: ${base} and ${base}threejs/"
+               && grep -Fq 'THREEJS REBUILD' <<<"${three}" \
+               && FRONTEND_SHA="${FRONTEND_SHA}" CONFIG_JSON="${config}" node -e \
+                  'const c=JSON.parse(process.env.CONFIG_JSON); if(c.frontendSha!==process.env.FRONTEND_SHA||c.protocolVersion!=="1"||!["configured","absent","invalid"].includes(c.apiOriginState)) process.exit(1)'; then
+              echo "HTTP smoke passed: ${base}, ${base}threejs/, and runtime-config.json"
               exit 0
             fi
             sleep 5
