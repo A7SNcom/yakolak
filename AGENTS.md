@@ -12,6 +12,7 @@
 - GitHub Actions/Pages هو مالك نشر الواجهة. PAGES-002 يملك مسار الـcomposite Pages deployment، وPAGES-003 يملك قابلية نقل العميل بين `/yakolak/threejs/` والجذر النهائي.
 - GitHub Pages واجهة static فقط؛ لا يستضيف room server ولا أسرار ولا منطق backend تفاعلي.
 - كل اتصال Online من عميل Three.js يمر عبر `API_ORIGIN`. PAGES-005 هو المالك الوحيد لاختيار/قفل runtime غير Vercel وقيمة `API_ORIGIN` العامة.
+- **PAGES-006 مكتمل ومقفل:** `PAGES_ORIGIN_STORAGE_SECURITY.md` هو مرجع origin/CORS والتخزين والتعافي. الأصل الأمني هو `https://a7sncom.github.io` كاملًا؛ المسارات ليست origins منفصلة؛ كل تخزين YAKOLAK يجب أن يكون namespaced تحت `YAKOLAK`؛ يمنع أي `clear()` عام؛ bearer الخاص بالمقعد memory-only؛ والأسرار الإدارية/قاعدة البيانات backend-only.
 - أي افتراضات أو روابط أو إعدادات أو Preview deployments تخص Vercel في المهام/الوثائق القديمة هي **historical evidence فقط** بعد PAGES-004، ولا يجوز أن تحكم قرار نشر أو backend جديد.
 - Final cutover لاحق وصريح: ينقل Three.js المقبول إلى `/yakolak/` في نفس GitHub Pages site، يتقاعد `/yakolak/threejs/` عمدًا، ويتوقف Godot root فقط بعد تحقق الصحة/التوافق. لا يوجد Vercel promote/alias switch ضمن عقد cutover الجديد.
 
@@ -22,7 +23,7 @@
 - `threejs-rebuild` هو مساحة العمل الوحيدة لكل مهام `THREEJS-*` و`PAGES-*` الخاصة بإعادة البناء/الترحيل.
 - يبقى `main` مصدر Godot المعتمد أثناء مرحلة الترحيل، ولا تُنقل تغييرات Three.js إليه إلا بمهمة cutover صريحة.
 - لا يُنشأ فرع ترحيل إضافي، ولا سلسلة Pull Requests، ولا موقع Pages ثانٍ، ولا مسار frontend منافس.
-- كل مهمة Three.js تمس backend أو online lifecycle يجب أن تقرأ `THREEJS_SOURCE_OF_TRUTH.md` و`THREEJS_BACKEND_GAP_REGISTER.md` و`PAGES_MIGRATION_CONTRACT.md` قبل التنفيذ.
+- كل مهمة Three.js تمس backend أو online lifecycle يجب أن تقرأ `THREEJS_SOURCE_OF_TRUTH.md` و`THREEJS_BACKEND_GAP_REGISTER.md` و`PAGES_MIGRATION_CONTRACT.md` و`PAGES_ORIGIN_STORAGE_SECURITY.md` قبل التنفيذ.
 - أي Gap حالته `OPEN` لا يجوز للواجهة حسمه أو اختراع authority محلي له؛ القرار والتنفيذ يملكه رقم المهمة المسجل في الـregister.
 - لا تستخدم وجود `api/` أو `vercel.json` أو نجاح Vercel سابقًا كدليل على أن Vercel هو runtime المستقبلي؛ هذه مواد legacy/history إلى أن يختار PAGES-005 الـbackend target.
 
@@ -30,7 +31,7 @@
 
 ### ترحيل Three.js
 
-1. `PAGES_MIGRATION_CONTRACT.md` + عقود `PAGES-*` المكتملة: الاستضافة، Pages paths، Actions ownership، `API_ORIGIN` وcutover boundary.
+1. `PAGES_MIGRATION_CONTRACT.md` + `PAGES_ORIGIN_STORAGE_SECURITY.md` + عقود `PAGES-*` المكتملة: الاستضافة، Pages paths، Actions ownership، `API_ORIGIN`، origin/security/storage وcutover boundary.
 2. `THREEJS_SOURCE_OF_TRUTH.md`: المصدر المعتمد حسب مجال القرار.
 3. `THREEJS_BACKEND_GAP_REGISTER.md`: الفجوات المفتوحة ومالك القرار.
 4. `THREEJS_MIGRATION.md`: حدود بنية العميل/runtime.
@@ -69,6 +70,7 @@
 - لا تستخدم Pull Request كمسار التطوير الطبيعي إلا بطلب صريح من المستخدم.
 - لا تعيد Vercel إلى المسار الحاكم لمجرد أن مهام قديمة استخدمته.
 - لا تضع database/admin secrets أو bearer credentials داخل Pages artifact أو frontend config.
+- لا تستخدم CORS أو pathname كـauthorization boundary، ولا تخزن seat bearer في LocalStorage/IndexedDB/CacheStorage/BroadcastChannel، ولا تنفذ broad `clear()` على storage مشترك مع نفس origin.
 
 ## عند إنهاء تعديل Three.js
 
@@ -78,6 +80,8 @@
 - عقد base-path بقي صالحًا لـ`/yakolak/threejs/` والجذر النهائي.
 - لا توجد محاولة لنقل authority إلى Pages أو إلى browser state.
 - أي Online transport جديد يعتمد `API_ORIGIN` ولا يتصل صامتًا بعنوان Vercel قديم.
+- أي browser persistence جديد يستخدم namespace `YAKOLAK` ويحذف مفاتيحه هو فقط؛ لا broad clears ولا bearer persistence.
+- أي takeover/recovery لمقعد يتم عبر backend rotation/revocation والتحقق من generation الحالية، لا عبر الثقة في client state.
 - root Godot لم يُستبدل إلا إذا كانت المهمة Cutover صريحة.
 
 الفكرة: **مسار ترحيل واحد، موقع Pages واحد، frontend static واضح، وbackend authority خلف `API_ORIGIN` منفصل.**
