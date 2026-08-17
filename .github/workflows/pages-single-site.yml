@@ -1,0 +1,196 @@
+name: YAKOLAK Composite Pages
+
+on:
+  push:
+    branches:
+      - main
+      - threejs-rebuild
+  workflow_dispatch:
+
+# This exact workflow definition must exist on both watched refs because push
+# workflows are evaluated from the pushed ref, not only from the default branch.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: yakolak-pages-composite
+  cancel-in-progress: false
+
+jobs:
+  compose:
+    # Ordinary main source pushes are intentionally ignored. The Godot flash
+    # publisher will later create a [flash-ready] commit, which is the only main
+    # push allowed to publish. Every Three.js branch push may refresh /threejs/.
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          github.ref_name == 'threejs-rebuild' ||
+          (github.ref_name == 'main' && contains(github.event.head_commit.message, '[flash-ready]')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      root_ready: ${{ steps.root.outputs.ready }}
+      root_sha: ${{ steps.root.outputs.sha }}
+      candidate_sha: ${{ steps.candidate.outputs.sha }}
+    steps:
+      - name: Checkout main history only
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: root-history
+          fetch-depth: 0
+
+      - name: Resolve latest successful Godot flash artifact
+        id: root
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="$(git -C root-history log --grep='^\[flash-ready\]' --format='%H' -n 1)"
+          if [ -z "${sha}" ]; then
+            echo 'No [flash-ready] commit exists yet; publishing remains a no-op.'
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          subject="$(git -C root-history log -1 --format='%s' "${sha}")"
+          echo "Using Godot root ${sha}: ${subject}"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact Godot flash-ready tree
+        if: steps.root.outputs.ready == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.root.outputs.sha }}
+          path: godot-ready
+          fetch-depth: 1
+
+      - name: Checkout Three.js candidate tree
+        if: steps.root.outputs.ready == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name == 'threejs-rebuild' && github.sha || 'threejs-rebuild' }}
+          path: threejs-source
+          fetch-depth: 1
+
+      - name: Record candidate SHA
+        if: steps.root.outputs.ready == 'true'
+        id: candidate
+        shell: bash
+        run: echo "sha=$(git -C threejs-source rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Validate source ownership
+        if: steps.root.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s godot-ready/web/index.html
+          test -s threejs-source/web/index.html
+
+          if grep -Fq 'THREEJS REBUILD' godot-ready/web/index.html; then
+            echo 'Refusing to publish: flash-ready Godot root looks like the Three.js candidate.' >&2
+            exit 1
+          fi
+          if ! grep -Fq 'THREEJS REBUILD' threejs-source/web/index.html; then
+            echo 'Refusing to publish: threejs-rebuild/web is not the expected Three.js candidate.' >&2
+            exit 1
+          fi
+
+      - name: Compose one static Pages tree
+        if: steps.root.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf pages-site
+          mkdir -p pages-site
+          rsync -a godot-ready/web/ pages-site/
+          mkdir -p pages-site/threejs
+          rsync -a threejs-source/web/ pages-site/threejs/
+          touch pages-site/.nojekyll
+
+          # Root may only come from the flash-ready Godot tree; /threejs/ may
+          # only come from the Three.js branch.
+          cmp godot-ready/web/index.html pages-site/index.html
+          cmp threejs-source/web/index.html pages-site/threejs/index.html
+          diff -qr --exclude=threejs --exclude=.nojekyll godot-ready/web pages-site
+          diff -qr threejs-source/web pages-site/threejs
+
+      - name: Verify artifact structure and secrecy
+        if: steps.root.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s pages-site/index.html
+          test -s pages-site/threejs/index.html
+          test ! -e pages-site/.git
+          test ! -e pages-site/.github
+
+          if find pages-site -type l -print -quit | grep -q .; then
+            echo 'Refusing to publish symbolic links.' >&2
+            exit 1
+          fi
+          if find pages-site -type f -links +1 -print -quit | grep -q .; then
+            echo 'Refusing to publish hard-linked files.' >&2
+            exit 1
+          fi
+
+          leaked_paths="$(find pages-site -type f \
+            \( -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' \
+               -o -name '*.p12' -o -name '*.pfx' -o -name 'id_rsa*' -o -name 'id_ed25519*' \) -print)"
+          if [ -n "${leaked_paths}" ]; then
+            echo 'Refusing to publish secret-shaped files:' >&2
+            printf '%s\n' "${leaked_paths}" >&2
+            exit 1
+          fi
+
+          if grep -RIlE --exclude='*.pck' --exclude='*.wasm' --exclude='*.png' --exclude='*.jpg' --exclude='*.jpeg' \
+            'BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY|github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}' pages-site \
+            | grep -q .; then
+            echo 'Refusing to publish content matching private-key/token signatures.' >&2
+            exit 1
+          fi
+
+      - name: Configure GitHub Pages
+        if: steps.root.outputs.ready == 'true'
+        uses: actions/configure-pages@v5
+
+      - name: Upload one Pages artifact
+        if: steps.root.outputs.ready == 'true'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: pages-site
+
+  deploy:
+    if: needs.compose.outputs.root_ready == 'true'
+    needs: compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy composite artifact
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: HTTP smoke root and Three.js indexes
+        shell: bash
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          base="${PAGE_URL%/}/"
+          for attempt in $(seq 1 12); do
+            root="$(curl --fail --silent --show-error --location "${base}" || true)"
+            three="$(curl --fail --silent --show-error --location "${base}threejs/" || true)"
+            if [ -n "${root}" ] && [ -n "${three}" ] \
+               && ! grep -Fq 'THREEJS REBUILD' <<<"${root}" \
+               && grep -Fq 'THREEJS REBUILD' <<<"${three}"; then
+              echo "HTTP smoke passed: ${base} and ${base}threejs/"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'HTTP smoke failed after deployment.' >&2
+          exit 1
