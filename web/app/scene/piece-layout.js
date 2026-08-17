@@ -29,7 +29,7 @@ function validateContract(worldLayout, approvedContract) {
   if (!Array.isArray(worldLayout.turnRing) || worldLayout.turnRing.length !== PIECE_COLOR_IDS.length) {
     throw new Error('Canonical physical seat ring drift');
   }
-  if (!sameArray(worldLayout.pieceRotationDegrees, [-90, 0, 0])) throw new Error('Canonical piece rotation drift');
+  freezeCenter(worldLayout.pieceRotationDegrees, 'authoritative piece rotation');
 
   const seenColors = new Set();
   for (const seatId of worldLayout.turnRing) {
