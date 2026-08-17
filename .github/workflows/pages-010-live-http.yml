@@ -55,6 +55,28 @@ jobs:
             test "$hs" = 200
           }
 
+          # A Pages deployment can briefly return 404 while the new artifact propagates.
+          # Measure the stable artifact only after both the Three.js index and generated
+          # runtime config are simultaneously available and the expected rebuild marker is present.
+          ready=false
+          for attempt in $(seq 1 24); do
+            index_code="$(curl -sS -L -o "$tmp/ready-index" -w '%{http_code}' "${BASE_URL}")"
+            config_code="$(curl -sS -L -o "$tmp/ready-config" -w '%{http_code}' "${BASE_URL}runtime-config.json")"
+            if [ "$index_code" = 200 ] && [ "$config_code" = 200 ] && grep -Fq 'THREEJS REBUILD' "$tmp/ready-index"; then
+              sleep 2
+              stable_index="$(curl -sS -L -o "$tmp/stable-index" -w '%{http_code}' "${BASE_URL}")"
+              stable_config="$(curl -sS -L -o "$tmp/stable-config" -w '%{http_code}' "${BASE_URL}runtime-config.json")"
+              if [ "$stable_index" = 200 ] && [ "$stable_config" = 200 ] && grep -Fq 'THREEJS REBUILD' "$tmp/stable-index"; then
+                ready=true
+                echo "PAGES010_READY|attempt=${attempt}|index=${stable_index}|config=${stable_config}"
+                break
+              fi
+            fi
+            echo "PAGES010_NOT_READY|attempt=${attempt}|index=${index_code}|config=${config_code}"
+            sleep 5
+          done
+          test "$ready" = true
+
           probe index ''
           probe module 'app/boot/boot.js'
           probe css 'styles/app.css'
@@ -67,7 +89,7 @@ jobs:
           probe manifest_md 'runtime-assets/room/ROOM.md?v=408382524358e1347427c8e5b956a682b9ac5d63'
           probe manifest_svg 'runtime-assets/table/table.svg?v=1591a82d2f3498f25a566f650b4f2d7f9787b1e9'
 
-          # Source-of-truth audit: there is no packaged font or audio request today.
+          # Source-of-truth audit: only test font/audio files if the current runtime references them.
           if grep -RniE '@font-face|url\([^)]*\.(woff2?|ttf|otf)([?#][^)]*)?' web --include='*.css' --include='*.html' --include='*.js'; then
             echo 'PAGES010_FONT_ASSETS|present'
           else
@@ -126,14 +148,14 @@ jobs:
 
           # Query refresh: exact same resource bytes under a harmless query string.
           curl -fsSL "${BASE_URL}app/boot/boot.js" -o "$tmp/plain.js"
-          curl -fsSL "${BASE_URL}app/boot/boot.js?pages010=a896ac4f903fd066ecbee2af8f7962433332fb9e" -o "$tmp/query.js"
+          curl -fsSL "${BASE_URL}app/boot/boot.js?pages010=live" -o "$tmp/query.js"
           cmp "$tmp/plain.js" "$tmp/query.js"
-          echo "PAGES010_QUERY_REFRESH|status=200|bytes=identical"
+          echo 'PAGES010_QUERY_REFRESH|status=200|bytes=identical'
 
-          # URL fragments are client-side only and are not sent in HTTP requests; curl must receive identical bytes.
+          # URL fragments are client-side only and are never sent to the server.
           curl -fsSL "${BASE_URL}app/boot/boot.js#pages010" -o "$tmp/hash.js"
           cmp "$tmp/plain.js" "$tmp/hash.js"
-          echo "PAGES010_HASH_REFRESH|status=200|bytes=identical|fragment_not_server_visible"
+          echo 'PAGES010_HASH_REFRESH|status=200|bytes=identical|fragment_not_server_visible'
 
           # Record conditional behavior using observed validators from the representative module.
           curl -fsSL -D "$tmp/module.h" "${BASE_URL}app/boot/boot.js" -o /dev/null
