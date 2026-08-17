@@ -37,6 +37,7 @@ jobs:
           bash scripts/verify-threejs-shell.sh
           node --test tests/threejs_vendor_contract.test.mjs
           node --test tests/pages_origin_storage_security.test.mjs
+          node --test tests/pages_public_runtime_config.test.mjs
 
   browser:
     if: inputs.suite == 'browser' || inputs.suite == 'full'
