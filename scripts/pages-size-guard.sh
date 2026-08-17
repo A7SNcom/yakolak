@@ -66,10 +66,11 @@ if (( largest_bytes > FILE_BUDGET_BYTES )); then
   exit 1
 fi
 
-# Git LFS pointer files are never a delivery mechanism for Pages.
+# Git LFS pointer files are never a delivery mechanism for Pages. Keep this scan
+# binary-safe: no shell command substitution of arbitrary asset bytes.
 while IFS= read -r -d '' file; do
-  prefix="$(LC_ALL=C head -c 42 "${file}" 2>/dev/null || true)"
-  if [[ "${prefix}" == 'version https://git-lfs.github.com/spec/v1' ]]; then
+  if LC_ALL=C head -c 42 "${file}" 2>/dev/null \
+    | grep -aFqx 'version https://git-lfs.github.com/spec/v1'; then
     echo "Refusing Pages delivery: Git LFS pointer detected in ${file}. Git LFS is not supported for Pages sites." >&2
     exit 1
   fi
