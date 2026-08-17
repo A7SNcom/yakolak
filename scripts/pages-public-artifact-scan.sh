@@ -39,7 +39,7 @@ fi
 secret_hits="$(grep -RIlE --binary-files=without-match \
   --exclude='*.wasm' --exclude='*.pck' --exclude='*.png' --exclude='*.jpg' --exclude='*.jpeg' \
   --exclude='*.webp' --exclude='*.ico' --exclude='*.glb' --exclude='*.stl' \
-  'BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY|github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|sk_live_[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}|TURSO_AUTH_TOKEN[[:space:]]*[:=][[:space:]]*["'"'']?[^"'"''][[:graph:]]{12,}|CLOUDFLARE_API_TOKEN[[:space:]]*[:=][[:space:]]*["'"'']?[^"'"''][[:graph:]]{12,}|DATABASE_URL[[:space:]]*[:=][[:space:]]*["'"'']?(postgres|mysql|libsql|sqlite):' \
+  'BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY|github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|sk_live_[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}|TURSO_AUTH_TOKEN[[:space:]]*[:=][[:space:]]*"?[^"[:space:]]{12,}|CLOUDFLARE_API_TOKEN[[:space:]]*[:=][[:space:]]*"?[^"[:space:]]{12,}|DATABASE_URL[[:space:]]*[:=][[:space:]]*"?(postgres|mysql|libsql|sqlite):' \
   "${site_dir}" || true)"
 if [[ -n "${secret_hits}" ]]; then
   printf '%s\n' "${secret_hits}" >&2
