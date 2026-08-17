@@ -108,6 +108,8 @@ async function boot() {
       runtime: 'threejs-static-esm',
       canvas: rendererOwner.canvas,
       getPresentationSnapshot: () => previewScene?.getPresentationSnapshot() || null,
+      getLightingSnapshot: () => previewScene?.getLightingSnapshot() || null,
+      setPreviewTurnEmphasis: (playerId = null) => previewScene?.setTurnEmphasis(playerId) || null,
       getGraphicsContextSnapshot: () => rendererOwner?.getContextSnapshot() || null,
       getAssetState: (id) => assetManager.getState(id),
       getAssetProgress: (group = null) => assetManager.snapshot(group),
@@ -172,9 +174,13 @@ async function boot() {
       document.documentElement.dataset.canonicalMaterials = 'ready';
 
       if (!previewScene) {
-        previewScene = createPreviewScene(rendererOwner);
+        previewScene = createPreviewScene(rendererOwner, {
+          runtimeData: canonicalRuntimeData,
+          materialSystem,
+        });
         previewScene.start();
       }
+      document.documentElement.dataset.canonicalLighting = 'ready';
 
       exposeReadyShell();
       if (assetErrorElement) assetErrorElement.hidden = true;
@@ -185,9 +191,7 @@ async function boot() {
       assetManager.loadGroup('optional').then((result) => {
         if (disposed) return;
         document.documentElement.dataset.optionalAssets = result.progress.status;
-        if (result.progress.status === 'degraded') {
-          console.warn('[threejs-assets] optional assets degraded safely', result.degraded);
-        }
+        if (result.progress.status === 'degraded') console.warn('[threejs-assets] optional assets degraded safely', result.degraded);
       }).catch((error) => {
         if (disposed || error instanceof AssetLoadCancelledError) return;
         document.documentElement.dataset.optionalAssets = 'degraded';
