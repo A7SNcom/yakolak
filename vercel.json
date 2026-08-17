@@ -1,18 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "bash scripts/verify-threejs-shell.sh",
-  "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" = \"threejs-rebuild\" ]; then exit 1; fi; git log -1 --pretty=%s | grep -q '^\\[flash-ready\\]' && exit 1 || exit 0",
+  "ignoreCommand": "exit 0",
   "outputDirectory": "web",
   "framework": null,
   "github": {
     "autoJobCancelation": true
   },
   "git": {
-    "deploymentEnabled": {
-      "main": true,
-      "threejs-rebuild": true,
-      "*": false
-    }
+    "deploymentEnabled": false
   },
   "headers": [
     {
