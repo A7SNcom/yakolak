@@ -1,0 +1,218 @@
+name: PAGES-011 Live Service Worker Probe
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - .github/workflows/pages-011-live-probe.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-011-live-service-worker-probe
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact migration SHA
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install isolated browser probe
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Prove live service-worker scope and repeat-load behavior
+        env:
+          ROOT_URL: https://a7sncom.github.io/yakolak/
+          THREEJS_URL: https://a7sncom.github.io/yakolak/threejs/
+        run: |
+          cat > /tmp/pages-011-probe.mjs <<'EOF'
+          import { chromium } from 'playwright';
+
+          const rootUrl = process.env.ROOT_URL;
+          const threeUrl = process.env.THREEJS_URL;
+          const originPrefix = 'https://a7sncom.github.io/yakolak/';
+          const browser = await chromium.launch({ headless: true });
+
+          async function swSnapshot(page, label) {
+            const snapshot = await page.evaluate(async () => {
+              const supported = 'serviceWorker' in navigator;
+              const registrations = supported
+                ? await navigator.serviceWorker.getRegistrations()
+                : [];
+              const controller = supported && navigator.serviceWorker.controller
+                ? {
+                    scriptURL: navigator.serviceWorker.controller.scriptURL,
+                    state: navigator.serviceWorker.controller.state,
+                  }
+                : null;
+              return {
+                url: location.href,
+                supported,
+                controller,
+                registrations: registrations.map((registration) => ({
+                  scope: registration.scope,
+                  active: registration.active?.scriptURL ?? null,
+                  waiting: registration.waiting?.scriptURL ?? null,
+                  installing: registration.installing?.scriptURL ?? null,
+                })),
+              };
+            });
+            console.log(`SW_SCOPE ${label} ${JSON.stringify(snapshot)}`);
+            if (snapshot.controller || snapshot.registrations.length !== 0) {
+              throw new Error(`Service Worker unexpectedly present at ${label}: ${JSON.stringify(snapshot)}`);
+            }
+            return snapshot;
+          }
+
+          async function navigateAndSettle(page, url) {
+            const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+            if (!response || !response.ok()) {
+              throw new Error(`Navigation failed for ${url}: ${response?.status()}`);
+            }
+            await page.waitForTimeout(3500);
+          }
+
+          // Scope proof: visit root first, reload it, then visit Three.js and reload it in the same clean profile.
+          // A root-scoped worker would therefore have a chance to install and take control before Three.js is checked.
+          {
+            const context = await browser.newContext();
+            const page = await context.newPage();
+            await navigateAndSettle(page, rootUrl);
+            await swSnapshot(page, 'root-first');
+            await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
+            await page.waitForTimeout(3500);
+            await swSnapshot(page, 'root-repeat');
+            await navigateAndSettle(page, threeUrl);
+            await swSnapshot(page, 'threejs-after-root');
+            await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
+            await page.waitForTimeout(3500);
+            await swSnapshot(page, 'threejs-after-root-repeat');
+            await context.close();
+          }
+
+          // Repeat-load evidence: use a second clean browser profile so the Three.js first pass is cold.
+          {
+            const context = await browser.newContext();
+            const page = await context.newPage();
+            const cdp = await context.newCDPSession(page);
+            await cdp.send('Network.enable');
+
+            let activePass = null;
+            const requestPass = new Map();
+            const metrics = new Map();
+
+            function pass(label) {
+              const value = {
+                label,
+                requests: 0,
+                responses: 0,
+                cacheEvents: 0,
+                diskCacheResponses: 0,
+                serviceWorkerResponses: 0,
+                status200: 0,
+                status304: 0,
+                encodedWireBytes: 0,
+              };
+              metrics.set(label, value);
+              return value;
+            }
+
+            cdp.on('Network.requestWillBeSent', (event) => {
+              if (!activePass || !event.request.url.startsWith(originPrefix)) return;
+              requestPass.set(event.requestId, activePass);
+              metrics.get(activePass).requests += 1;
+            });
+            cdp.on('Network.requestServedFromCache', (event) => {
+              const label = requestPass.get(event.requestId);
+              if (label) metrics.get(label).cacheEvents += 1;
+            });
+            cdp.on('Network.responseReceived', (event) => {
+              const label = requestPass.get(event.requestId);
+              if (!label) return;
+              const target = metrics.get(label);
+              target.responses += 1;
+              if (event.response.fromDiskCache) target.diskCacheResponses += 1;
+              if (event.response.fromServiceWorker) target.serviceWorkerResponses += 1;
+              if (event.response.status === 200) target.status200 += 1;
+              if (event.response.status === 304) target.status304 += 1;
+            });
+            cdp.on('Network.loadingFinished', (event) => {
+              const label = requestPass.get(event.requestId);
+              if (!label) return;
+              metrics.get(label).encodedWireBytes += event.encodedDataLength ?? 0;
+            });
+
+            async function collect(label, action) {
+              pass(label);
+              activePass = label;
+              await action();
+              await page.waitForTimeout(3500);
+              activePass = null;
+
+              const sw = await swSnapshot(page, label);
+              const perf = await page.evaluate((prefix) => {
+                const resources = performance.getEntriesByType('resource')
+                  .filter((entry) => entry.name.startsWith(prefix));
+                return {
+                  resourceCount: resources.length,
+                  transferSize: resources.reduce((sum, entry) => sum + (entry.transferSize || 0), 0),
+                  encodedBodySize: resources.reduce((sum, entry) => sum + (entry.encodedBodySize || 0), 0),
+                  decodedBodySize: resources.reduce((sum, entry) => sum + (entry.decodedBodySize || 0), 0),
+                  zeroTransferResources: resources.filter((entry) => (entry.transferSize || 0) === 0).length,
+                };
+              }, originPrefix);
+              const result = { ...metrics.get(label), perf, sw };
+              console.log(`REPEAT_LOAD ${label} ${JSON.stringify(result)}`);
+              if (result.serviceWorkerResponses !== 0) {
+                throw new Error(`Service Worker served responses during ${label}`);
+              }
+              return result;
+            }
+
+            const cold = await collect('threejs-cold', async () => {
+              await navigateAndSettle(page, threeUrl);
+            });
+            const warm = await collect('threejs-repeat', async () => {
+              await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
+            });
+
+            console.log(`REPEAT_LOAD_SUMMARY ${JSON.stringify({
+              cold: {
+                requests: cold.requests,
+                responses: cold.responses,
+                cacheEvents: cold.cacheEvents,
+                diskCacheResponses: cold.diskCacheResponses,
+                wireBytes: cold.encodedWireBytes,
+                perfTransferSize: cold.perf.transferSize,
+                zeroTransferResources: cold.perf.zeroTransferResources,
+              },
+              repeat: {
+                requests: warm.requests,
+                responses: warm.responses,
+                cacheEvents: warm.cacheEvents,
+                diskCacheResponses: warm.diskCacheResponses,
+                wireBytes: warm.encodedWireBytes,
+                perfTransferSize: warm.perf.transferSize,
+                zeroTransferResources: warm.perf.zeroTransferResources,
+              },
+            })}`);
+            await context.close();
+          }
+
+          await browser.close();
+          console.log('PAGES_011_LIVE_PROBE=PASS');
+          EOF
+
+          node /tmp/pages-011-probe.mjs
