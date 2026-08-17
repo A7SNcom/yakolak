@@ -35,6 +35,7 @@ jobs:
         run: npx --yes wrangler@4 deploy --dry-run --config backend/cloudflare/wrangler.jsonc --outdir .tmp/pages005-worker
 
   deploy:
+    if: github.event_name == 'workflow_dispatch'
     needs: verify
     runs-on: ubuntu-latest
     environment: cloudflare-backend
