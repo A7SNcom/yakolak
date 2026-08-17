@@ -52,6 +52,8 @@ const pieceMediumSource = source('models/piece-medium.stl', 'medium-piece', true
 const pieceMediumRuntime = runtime('/assets/models/piece-medium.glb', 'glb-components', '9fa8ace253919968bbba40c3c3fd2f79629f1960', 11628);
 const pieceLargeSource = source('models/piece-large.stl', 'large-piece', true, 'eca0a269a75aef8770a8eb653e016f69b7766b35', 12084);
 const pieceLargeRuntime = runtime('/assets/models/piece-large.glb', 'glb-components', 'cbbcf94ce009240b6fe40274783317d8512be5c2', 11608);
+const scoreMarkerSource = source('models/score-marker.stl', 'score-point', true, 'feb5d59eafe4547a529876344ff88d05ca95b37c', 12884);
+const scoreMarkerRuntime = runtime('/assets/models/score-marker.glb', 'glb-components', 'f5385f033a9ade6b195abed58bdba97aeaadb247', 12408);
 
 export const ASSETS = Object.freeze({
   gameLogo: asset('brand.yakolak-logo', 'boot-critical', source('logos/YAKOLAK.svg', 'official-game-logo', true, 'ee3703615cd42c4979a0001f1261014f108c6956', 5736), 'text'),
@@ -67,7 +69,7 @@ export const ASSETS = Object.freeze({
   pieceSmall: asset('model.piece-small', 'scene-critical', pieceSmallSource, 'stl', pieceSmallRuntime),
   pieceMedium: asset('model.piece-medium', 'scene-critical', pieceMediumSource, 'stl', pieceMediumRuntime),
   pieceLarge: asset('model.piece-large', 'scene-critical', pieceLargeSource, 'stl', pieceLargeRuntime),
-  scoreMarker: asset('model.score-marker', 'scene-critical', source('models/score-marker.stl', 'score-point', true, 'feb5d59eafe4547a529876344ff88d05ca95b37c', 12884), 'stl'),
+  scoreMarker: asset('model.score-marker', 'scene-critical', scoreMarkerSource, 'stl', scoreMarkerRuntime),
   tableFootprint: asset('scene.table-footprint', 'scene-critical', source('table/table.svg', 'extruded-table-footprint', true, '1591a82d2f3498f25a566f650b4f2d7f9787b1e9', 1057), 'text'),
 
   tableAlbedo: asset('texture.table-albedo', 'optional', source('table/albedo.png', 'table-albedo', false, '4a0a43903e308d1443eb4ae735e22ceb908af0c6', 5062989), 'png'),
