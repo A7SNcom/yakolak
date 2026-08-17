@@ -2,39 +2,35 @@
 
 هذا هو مستودع التطوير الحي للعبة ياكلك.
 
-## القاعدة الوحيدة
+## حالة الترحيل
 
-**`main` هو اللعبة الحالية، وهو مكان التطوير، وهو النسخة التي يجب أن تظهر على الرابط الأساسي.**
+اقرأ `AGENTS.md` و`PAGES_MIGRATION_CONTRACT.md` قبل أي تعديل يمس النشر أو الـbackend.
 
-الرابط الأساسي الوحيد للمستخدم:
+حتى cutover صريح:
 
-https://yakolak.vercel.app/
+- `main` هو مصدر Godot الحالي.
+- `threejs-rebuild` هو مساحة Three.js الوحيدة.
+- GitHub Pages هو هدف الواجهة الثابتة في موقع واحد:
 
-لا ننشئ فروعًا جديدة لكل تجربة، ولا نحافظ على مسارات تطوير متوازية، ولا نرسل روابط معاينة متعددة. أي تعديل جديد يبدأ من أحدث `main` ثم يدخل إلى `main` مباشرة.
+```text
+https://a7sncom.github.io/yakolak/          Godot root أثناء الترحيل
+https://a7sncom.github.io/yakolak/threejs/ Three.js candidate
+```
 
-## طريقة العمل
+GitHub Actions/Pages يملك نشر الواجهة. Three.js تطبيق static browser-native؛ تعديلات HTML/CSS/JS العادية لا تحتاج bundler أو Godot export أو npm application build.
 
-1. ابدأ دائمًا من أحدث نسخة في `main`.
-2. عدّل المطلوب فقط.
-3. اختبر أونلاين.
-4. انشر آخر نسخة مباشرة.
-5. تأكد أن https://yakolak.vercel.app/ يعرض آخر نسخة.
-6. أكمل التطوير القادم فوق هذه النسخة نفسها.
+## Online backend
 
-## النشر والمعاينة
+GitHub Pages لا يستضيف API تفاعليًا. كل اتصال Online من Three.js يمر عبر transport واحد يستخدم `API_ORIGIN`. لا تفترض same-origin `/api` ولا hard-code لـVercel.
 
-- لا نعتمد على جهاز محلي.
-- التجهيز والاختبارات تتم أونلاين.
-- الاختبارات الثقيلة مكانها GitHub Actions، وليس عملية نشر Vercel العادية.
-- Vercel مهمته عرض النسخة الجاهزة بأسرع شكل ممكن.
-- أي تشغيل قديم أو عالق يُلغى بدل تكديس عمليات نشر جديدة خلفه.
+`rules/` + `api/` يبقيان مرجعًا حاكمًا لسلوك/بروتوكول الـbackend الحالي حيث تنص عقود الهجرة، لكن هذا لا يختار مزود الاستضافة المستقبلي. PAGES-005 يملك اختيار/قفل runtime و`API_ORIGIN`.
 
-## اللعبة المعتمدة
+## Vercel
 
-محرك المباراة الكامل مأخوذ من `agent/yakolak-3.0-local-match` ومركب على الانترو الحالي، وهو أساس التطوير الآن.
+نتائج Vercel السابقة—Preview/Production URLs، aliases، project/runtime/environment settings وdeployment evidence—تاريخية فقط بعد PAGES-004، ولا تحكم frontend/backend/cutover جديدًا.
 
-## تعليمات الوكلاء والمطورين
+## cutover
 
-اقرأ [`AGENTS.md`](AGENTS.md) قبل أي تعديل. تعليماته إلزامية وهي المرجع الأعلى لطريقة تطوير المشروع.
+وجود المرشح تحت `/yakolak/threejs/` ليس cutover. المهمة الصريحة فقط تنقل artifact مقبولًا إلى `/yakolak/`، تتقاعد lane الهجرة وGodot root بعد health checks، وتثبت backend/active-room/rollback compatibility.
 
-الفروع القديمة موجودة للتاريخ فقط ولا تستخدم كأساس لأي تطوير جديد.
+الفروع والمسارات القديمة موجودة للتاريخ فقط ولا تستخدم كأساس لتطوير جديد.

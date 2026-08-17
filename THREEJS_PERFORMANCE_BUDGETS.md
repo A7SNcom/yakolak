@@ -4,6 +4,8 @@ Status: **locked before visual polish** on `threejs-rebuild`.
 
 This document records the measured pre-polish baseline and the guardrails that later asset, lighting, shadow, cache and cutover tasks must respect. These limits are presentation/delivery constraints only; they never own gameplay authority.
 
+PAGES-004 note: GitHub Pages is now the static frontend target. Vercel Preview/verification observations recorded by THREEJS-017 remain dated historical evidence only; they do not define the current preview lane, verification owner, backend runtime, or cutover contract. Current delivery decisions follow `PAGES_MIGRATION_CONTRACT.md`, and online backend access is separated through `API_ORIGIN`.
+
 ## Fixed representative mobile profile
 
 All comparable startup timing measurements use the same cold profile:
@@ -77,7 +79,7 @@ These are hard gates. Later tasks may reduce them but must not raise them merely
 | GPU textures | 8 |
 | GPU programs | 12 |
 
-Deterministic transfer/decode ceilings run in Vercel's normal verification gate. The throttled browser timing/GPU ceilings run in GitHub Actions with the fixed mobile profile.
+Deterministic transfer/decode ceilings and the throttled browser timing/GPU ceilings are repository/GitHub Actions verification gates using the fixed mobile profile. They are not tied to a Vercel deployment lifecycle.
 
 ## Production cutover targets
 
@@ -104,8 +106,8 @@ The timing targets intentionally use the same slow mobile profile. They are not 
 - `THREEJS-020` pieces: 36 pieces must use shared geometry/material resources; stable logical identities must not require 36 geometry uploads.
 - `THREEJS-021` table/score: optional texture maps must remain non-blocking; downscaling/compression should drive decoded texture cost toward the cutover target.
 - `THREEJS-025/026` lighting/shadows: must stay inside draw-call/program/triangle ceilings; visual polish cannot silently add an unbounded pass count.
-- `THREEJS-097` caching/headers: may improve repeat visits but cannot be used to disguise an oversized cold load; cold-cache gates remain authoritative for these budgets.
-- `THREEJS-098/099`: must enforce the cutover targets on the final candidate before Production cutover.
+- `THREEJS-097` caching/headers: may improve repeat visits but cannot be used to disguise an oversized cold load; cold-cache gates remain authoritative for these budgets. Delivery/header decisions must follow the Pages-era contract rather than historical Vercel behavior.
+- `THREEJS-098/099`: must enforce the cutover targets on the accepted final Pages candidate before explicit cutover.
 
 ## Measurement rules
 
@@ -117,8 +119,11 @@ The timing targets intentionally use the same slow mobile profile. They are not 
 6. Renderer frame counters come from the single renderer owner (`renderer.info`); rendering/UI code may not create a second renderer to evade the counters.
 7. A later optimization may lower a ceiling. Raising a ceiling requires an explicit migration decision, rationale and a new measured baseline; it must never be an automatic response to a failing gate.
 
-## Current-head verification
+## Historical/current verification interpretation
 
 - GitHub Actions run `31974482208` passed the full desktop/mobile shell verification and every THREEJS-017 regression ceiling on runtime commit `6eee44e0996df83d564e73f4bcf59b239500bc43`.
-- Vercel Preview for the same runtime commit passed the deterministic THREEJS-017 contract and remained a non-Production deployment with only the `threejs-rebuild` branch alias.
-- This documentation update changes no runtime asset, module, renderer or budget value; it records the verified result only.
+- The Vercel Preview recorded for that same runtime commit passed the then-current deterministic contract and remained non-Production. After PAGES-004 this is **historical evidence only**; it is not the canonical preview/deployment path and does not constrain backend hosting.
+- Future equivalent verification must evaluate the GitHub Pages candidate and, where online behavior is involved, the selected `API_ORIGIN` boundary.
+- This documentation amendment changes no runtime asset, module, renderer or budget value; it changes only deployment/verification ownership semantics.
+
+See `PAGES_MIGRATION_CONTRACT.md` for deployment precedence.

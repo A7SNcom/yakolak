@@ -1,52 +1,46 @@
 # مسار تطوير YAKOLAK
 
-## استثناء مؤقت لترحيل Three.js
+## عقد الترحيل الحالي — PAGES-004
 
-حتى تنفيذ cutover صريح لاحقًا، ينطبق الاستثناء التالي **فقط** على `threejs-rebuild`:
+حتى cutover صريح لاحقًا، ينطبق هذا المسار على `threejs-rebuild` وتعلو أحكام `PAGES_MIGRATION_CONTRACT.md` على أي افتراض نشر/استضافة أقدم.
 
-- `threejs-rebuild` هو مساحة العمل الوحيدة لإعادة بناء Three.js ولكل مهام `THREEJS-*`.
-- يبقى `main` مسار Godot المعتمد، ويبقى https://yakolak.vercel.app/ هو Godot Production حتى cutover صريح.
-- لا يُنشأ أي فرع ترحيل إضافي، ولا سلسلة Pull Requests، ولا مسار نشر منافس أو بديل.
-- لا تنتقل تغييرات Three.js إلى `main` أو Production إلا ضمن مهمة cutover صريحة لاحقة.
-- بقية هذا الملف يظل حاكمًا لمسار `main`/Godot، ولا يوسّع هذا الاستثناء نطاقه خارج `threejs-rebuild`.
+- `main` يبقى مصدر Godot أثناء الترحيل.
+- `threejs-rebuild` هو مساحة Three.js الوحيدة.
+- هدف الواجهة الثابتة هو GitHub Pages في موقع واحد:
 
-## النظام المعتمد
+```text
+/yakolak/           = آخر Godot-ready مؤهل من main أثناء الترحيل
+/yakolak/threejs/   = مرشح Three.js من threejs-rebuild/web
+```
 
-المشروع كله في وضع **Flash Mode** للتطوير المباشر.
+- GitHub Actions/Pages هو مالك نشر الواجهة؛ PAGES-002 يملك الـcomposite deployment وcross-branch trigger contract.
+- تعديل Three.js العادي يبقى no-build: لا bundler ولا Godot export ولا npm application build.
+- آلية `[flash-ready]` تبقى فقط مصدر Godot المؤهل للجذر أثناء مرحلة الترحيل؛ Push عادي إلى `main` لا يصبح تلقائيًا root artifact جديدًا.
+- GitHub Pages static فقط. Online backend منفصل خلف `API_ORIGIN`؛ لا تفترض same-origin `/api` ولا رابط Vercel ثابتًا.
+- PAGES-005 يملك اختيار/قفل backend runtime/provider و`API_ORIGIN` العام.
 
-**هناك خط واحد فقط:**
+## Vercel بعد PAGES-004
 
-`main` → Godot Web Export سريع → `[flash-ready]` → الرابط الأساسي → التعديل التالي.
+أي Preview/Production deployment أو alias أو runtime أو environment أو `yakolak.vercel.app` أو `vercel.json` من مهام مكتملة سابقة هو **historical evidence فقط**. يمكن الرجوع إليه للمقارنة أو rollback research، لكنه لا يحكم أي قرار frontend/backend/cutover جديد.
 
-الرابط الأساسي: https://yakolak.vercel.app/
+## قواعد العمل
 
-## كل مهمة
+1. لا تنشئ فرع ترحيل إضافيًا أو موقع Pages ثانيًا أو frontend lane منافسًا.
+2. لا تستخدم PR كمسار التطوير الطبيعي إلا بطلب صريح.
+3. لا تشغّل gates ثقيلة تلقائيًا إلا عندما تطلبها المهمة أو release/cutover verification.
+4. لا تسمح لتغيير Three.js باستبدال Godot root قبل cutover.
+5. لا تضع أسرار backend داخل Pages artifact أو frontend config.
+6. أي سلوك online يحترم `THREEJS_SOURCE_OF_TRUTH.md` و`THREEJS_BACKEND_GAP_REGISTER.md` و`API_ORIGIN`؛ frontend لا يغلق Gap مفتوحًا من تلقاء نفسه.
 
-1. خذ أحدث `main`.
-2. نفذ المطلوب مباشرة.
-3. احفظه في `main`.
-4. لا تشغّل اختبارات تلقائية.
-5. Workflow الفلاش يصدر ملفات `web/` فقط.
-6. ينشئ `[flash-ready]` وينشر Vercel النسخة على الرابط الأساسي.
-7. المهمة التالية تبدأ من أحدث `main`.
+## cutover النهائي
 
-## الاختبارات
+نجاح `/yakolak/threejs/` لا يعني cutover. المهمة الصريحة فقط تملك:
 
-- ليست جزءًا من دورة التطوير اليومية.
-- تبقى ملفات الاختبارات داخل المشروع للاستعمال عند الحاجة.
-- تُشغّل يدويًا فقط بطلب صريح لاختبار أو Release مستقر أو تشخيص مشكلة.
+- اعتماد Three.js artifact/SHA محدد؛
+- إثبات backend/CORS/session/persistence/active-room/rollback compatibility؛
+- نقل Three.js المقبول إلى `/yakolak/` داخل نفس Pages site؛
+- تقاعد `/yakolak/threejs/` وGodot root عمدًا بعد health checks؛
+- الحفاظ على backend authority خلف `API_ORIGIN`؛
+- rollback إلى bytes وحالة protocol معروفة، لا إعادة بناء تقريبية من branch heads متحركة.
 
-## الممنوع
-
-- إنشاء فرع جديد تلقائيًا.
-- استخدام Pull Request كمسار اعتيادي.
-- تشغيل Playwright أو regression أو quality gates عند كل Push.
-- إضافة Workflow تلقائي ينافس Flash Publish.
-- جعل Vercel يعيد بناء Godot.
-- تطوير نسختين في نفس الوقت.
-- إرسال روابط مختلفة للمستخدم إذا كان الرابط الأساسي يعمل.
-- الرجوع إلى فرع قديم كأساس للتطوير.
-
-## الأرشيف
-
-الفروع والـWorkflows القديمة موجودة في تاريخ Git ويمكن الرجوع لها عند الحاجة، لكنها ليست جزءًا من مسار التطوير الحالي.
+المرجع الأعلى لهذه الحدود: `PAGES_MIGRATION_CONTRACT.md`.

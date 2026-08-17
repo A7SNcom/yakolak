@@ -2,6 +2,8 @@
 
 `THREEJS-016` defines one deterministic, offline maintenance path for canonical 3D sources. It does **not** change the source-of-truth order: `YAKOLAK_PORTABLE_KIT/assets/` remains canonical and is read-only input to conversion.
 
+PAGES-004 delivery note: GitHub Pages is the static frontend target. Asset conversion is a developer-maintenance exception only; it is never an ordinary Pages publish/build step. Any older `vercel.json` reference is historical evidence, not a deployment requirement.
+
 ## Commands
 
 - `npm run assets:convert` — convert only stale/missing STL targets to committed GLB outputs.
@@ -9,7 +11,7 @@
 - `npm run assets:convert -- --force` — rebuild selected targets even when provenance says they are current.
 - `npm run assets:check` — read-only verification that committed GLBs still match source hashes, converter version and recorded output hashes.
 
-These commands are developer asset-maintenance operations. They are intentionally absent from `vercel.json`, `prebuild`, `postinstall`, and the normal shell build path. Ordinary JS/CSS edits must not trigger canonical model conversion.
+These commands are developer asset-maintenance operations. They are intentionally absent from the normal GitHub Pages static publish path, `prebuild`, and `postinstall`. Ordinary JS/CSS edits must not trigger canonical model conversion.
 
 ## Inputs and outputs
 
@@ -45,3 +47,5 @@ SVG, PNG and canonical data files are not conversion targets for this pipeline a
 A target is skipped only when all of these still match the recorded state: source SHA-256, source Git-blob SHA-1, source byte size, converter ID/version/Node major, output path and output SHA-256. A changed source therefore rebuilds only its own GLB. Writes use a same-directory temporary file followed by rename so an interrupted conversion cannot leave a partially written committed asset.
 
 `npm run assets:check` never repairs or rewrites anything; it fails on missing, stale or corrupted outputs so maintainers can deliberately run the conversion command and review the resulting binary/state diff.
+
+See `PAGES_MIGRATION_CONTRACT.md` for deployment precedence.
