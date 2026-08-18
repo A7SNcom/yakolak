@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  resolve-window:
+  resolve_window:
     runs-on: ubuntu-latest
     outputs:
       frontends: ${{ steps.window.outputs.frontends }}
@@ -56,14 +56,14 @@ jobs:
           echo "frontends=$(jq -c '.frontends' "$window")" >> "$GITHUB_OUTPUT"
 
   archive:
-    needs: resolve-window
+    needs: resolve_window
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: 1
       matrix:
-        frontend: ${{ fromJSON(needs.resolve-window.outputs.frontends) }}
+        frontend: ${{ fromJSON(needs.resolve_window.outputs.frontends) }}
     env:
       ROLE: ${{ matrix.frontend.role }}
       RELEASE_TAG: ${{ matrix.frontend.releaseTag }}
