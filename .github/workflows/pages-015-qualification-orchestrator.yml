@@ -62,6 +62,7 @@ jobs:
           node --test tests/pages015_archive_admin_preflight_contract.test.mjs
           node --test tests/pages015_release_target_staging_contract.test.mjs
           node --test tests/pages015_release_admin_preflight_contract.test.mjs
+          node --test tests/pages015_single_resume_path_contract.test.mjs
 
       - name: Record fresh explicit credential probe receipt
         if: github.event_name != 'schedule'
