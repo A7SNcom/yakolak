@@ -148,8 +148,8 @@ record_status() {
         backendCredentialsReady: $backendCredentialsReady
       },
       activeArchiveQualified: $activeArchiveReady,
-      previousArchiveQualified: $previous_archive,
-      workerRollbackWindowLocked: $worker,
+      previousArchiveQualified: $previousArchiveReady,
+      workerRollbackWindowLocked: $workerWindowReady,
       completeQualification: $complete,
       containsSecretValues: false,
       qualificationEvidence: false
