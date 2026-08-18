@@ -150,6 +150,7 @@ jobs:
         run: |
           set -euo pipefail
           log="$RUNNER_TEMP/pages015-stage-${ROLE}.log"
+          echo 'state=checking' >> "$GITHUB_OUTPUT"
           set +e
           bash scripts/pages015-archive-window-entry-v2.sh >"$log" 2>&1
           rc=$?
@@ -157,21 +158,25 @@ jobs:
           cat "$log"
 
           if [ "$rc" -eq 0 ]; then
+            echo 'state=completed-or-existing-immutable' >> "$GITHUB_OUTPUT"
             echo "${ROLE} archive was already immutable/qualified or otherwise completed safely."
             exit 0
           fi
 
           if grep -Fq 'PAGES_RELEASE_ADMIN_TOKEN is required before publishing the exact draft.' "$log"; then
             bash scripts/pages015-record-exact-draft-stage.sh
+            echo 'state=exact-draft-verified' >> "$GITHUB_OUTPUT"
             echo "${ROLE} exact draft verified; publication remains WAITING for immutable-release admin proof."
             exit 0
           fi
 
           if grep -Fq 'HTTP 403: Resource not accessible by integration' "$log" && grep -Fq '/releases' "$log"; then
+            echo 'state=waiting-admin-to-create-draft' >> "$GITHUB_OUTPUT"
             echo "::notice title=PAGES-015 draft creation waiting for admin credential::${ROLE} has no reusable draft and github.token cannot create it. It will be created with PAGES_RELEASE_ADMIN_TOKEN once that credential exists."
             exit 0
           fi
 
+          echo 'state=unexpected-failure' >> "$GITHUB_OUTPUT"
           echo "archive helper failed before an expected external credential gate" >&2
           exit "$rc"
 
@@ -185,6 +190,7 @@ jobs:
         env:
           ADMIN_READY: ${{ steps.admin.outputs.ready }}
           STAGE_OUTCOME: ${{ steps.stage.outcome }}
+          STAGE_STATE: ${{ steps.stage.outputs.state }}
           PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
         shell: bash
         run: |
@@ -198,6 +204,7 @@ jobs:
             --arg assetSha256 "$SOURCE_ARTIFACT_TAR_SHA256" \
             --arg adminReady "${ADMIN_READY:-}" \
             --arg stageOutcome "${STAGE_OUTCOME:-}" \
+            --arg stageState "${STAGE_STATE:-}" \
             --arg publishOutcome "${PUBLISH_OUTCOME:-}" \
             --arg runId "$GITHUB_RUN_ID" \
             --arg recordedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
@@ -208,6 +215,7 @@ jobs:
               assetSha256: $assetSha256,
               immutableAdminReady: ($adminReady == "true"),
               stageOutcome: $stageOutcome,
+              stageState: $stageState,
               publishOutcome: $publishOutcome,
               workflowRunId: ($runId|tonumber),
               recordedAt: $recordedAt,
