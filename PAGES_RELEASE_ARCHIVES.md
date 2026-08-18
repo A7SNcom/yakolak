@@ -19,24 +19,27 @@ A mutable GitHub draft may be staged before the repository-level immutable-relea
 
 A repository secret named `PAGES_RELEASE_ADMIN_TOKEN` may supply a fine-grained token with repository Administration read/write so the workflow can enable the setting when disabled and verify it afterward. The token is never put in a public artifact.
 
+The current workflow also fail-closes before archive recovery when `PAGES_RELEASE_ADMIN_TOKEN` is absent. This preflight is intentional: a missing Administration credential is an execution-permission blocker, not evidence that the retained exact bytes are invalid, so retries must not repeatedly recover and hash the same retained bundle until that credential exists.
+
 Publication order is strict:
 
-1. recover the retained prepared release-assets bundle and validate its artifact digest;
-2. verify every archive SHA-256, immutable fact, source SHA, source run/artifact ID, and content-manifest digest;
-3. create or validate the release as a mutable draft only;
-4. attach exactly the eight final assets while the release is still a draft;
-5. re-download every draft asset and compare it byte-for-byte with the prepared copy, then record additive `draft_staged` evidence;
-6. prove repository release immutability is enabled through GitHub's Administration API;
-7. publish the already-verified draft exactly once;
-8. require GitHub to report `isImmutable=true` and verify the release attestation;
-9. re-download every immutable asset, compare it byte-for-byte again, validate `ARCHIVE_SHA256SUMS`, and run GitHub asset verification;
-10. prove a non-production restore from the immutable downloaded `pages-composite.tar`, then append `archive_verified` to the additive qualification ledger.
+1. require `PAGES_RELEASE_ADMIN_TOKEN` before any archive recovery or release mutation;
+2. recover the retained prepared release-assets bundle and validate its artifact digest;
+3. verify every archive SHA-256, immutable fact, source SHA, source run/artifact ID, and content-manifest digest;
+4. create or validate the release as a mutable draft only;
+5. attach exactly the eight final assets while the release is still a draft;
+6. re-download every draft asset and compare it byte-for-byte with the prepared copy, then record additive `draft_staged` evidence;
+7. prove repository release immutability is enabled through GitHub's Administration API;
+8. publish the already-verified draft exactly once;
+9. require GitHub to report `isImmutable=true` and verify the release attestation;
+10. re-download every immutable asset, compare it byte-for-byte again, validate `ARCHIVE_SHA256SUMS`, and run GitHub asset verification;
+11. prove a non-production restore from the immutable downloaded `pages-composite.tar`, then append `archive_verified` to the additive qualification ledger.
 
-If step 6 cannot prove immutability, the exact-byte draft remains unpublished and no `archive_verified` event is written. Nothing in the immutable assets contains a pending deployment-generation or backend-compatibility state.
+If the Administration preflight or immutability proof cannot succeed, nothing is published and no `archive_verified` event is written. Nothing in the immutable assets contains a pending deployment-generation or backend-compatibility state.
 
 ## Operational retry
 
-Re-running PAGES-012 is expected to revalidate the same retained prepared bundle and the same draft assets. A retry must never publish unless the Administration check proves immutable releases enabled, and it must never treat `draft_staged` as archive qualification.
+Re-running PAGES-012 is expected to revalidate the same retained prepared bundle and the same draft assets once the Administration credential exists. Before that credential exists, the workflow should fail immediately at preflight instead of redoing exact-byte recovery. A retry must never publish unless the Administration check proves immutable releases enabled, and it must never treat `draft_staged` as archive qualification.
 
 ## Immutable release assets
 
