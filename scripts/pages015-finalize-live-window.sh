@@ -86,17 +86,29 @@ jq -e --arg apiOrigin "$api_origin" '
   (.activeWorkerVersionId | type == "string" and length > 0) and
   (.previousWorkerVersionId | type == "string" and length > 0) and
   .activeWorkerVersionId != .previousWorkerVersionId and
+  .protocolIdentity == "yakolak-online-room@1" and
+  .capabilityIdentity == "yakolak-online-room-capabilities-v1" and
+  (.capabilities | type == "array") and
+  (.capabilities | sort) == ["health.compatibility.v1","room-probe.read.v1","room-probe.write.v1"] and
+  .tursoSchemaId == "yakolak-pages005-room-probe" and
+  .tursoSchemaVersion == 1 and
   .traffic.activePercent == 100 and
   .traffic.previousPercent == 0 and
   .versionOverrideProof == true and
   .browserCorsVerified == true and
   .liveTursoRoundTripVerified == true and
+  (.finalEvidenceSha256 | test("^[a-f0-9]{64}$")) and
   .migrationPolicy == "expand-contract-forward-only" and
   .tursoDataRollbackRequired == false
 ' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json >/dev/null
 
 active_worker="$(jq -r '.activeWorkerVersionId' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json)"
 previous_worker="$(jq -r '.previousWorkerVersionId' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json)"
+locked_protocol_identity="$(jq -r '.protocolIdentity' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json)"
+locked_capability_identity="$(jq -r '.capabilityIdentity' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json)"
+locked_capabilities_json="$(jq -c '.capabilities | sort' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json)"
+locked_turso_schema_id="$(jq -r '.tursoSchemaId' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json)"
+locked_turso_schema_version="$(jq -r '.tursoSchemaVersion' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json)"
 evidence="$RUNNER_TEMP/pages015-live-evidence.json"
 frontends="$RUNNER_TEMP/pages015-frontends"
 rm -rf "$frontends" "$evidence"
@@ -114,6 +126,43 @@ ACTIVE_WORKER_VERSION="$active_worker" \
 PREVIOUS_WORKER_VERSION="$previous_worker" \
 PAGES015_EVIDENCE_PATH="$evidence" \
 node scripts/probe-pages015-live-compatibility.mjs
+
+jq -e \
+  --arg apiOrigin "$api_origin" \
+  --arg protocol "$locked_protocol_identity" \
+  --arg capability "$locked_capability_identity" \
+  --argjson capabilities "$locked_capabilities_json" \
+  --arg tursoId "$locked_turso_schema_id" \
+  --argjson tursoVersion "$locked_turso_schema_version" \
+  --arg active "$active_worker" \
+  --arg previous "$previous_worker" '
+  .gate == "PAGES-015" and
+  .verified == true and
+  .apiOrigin == $apiOrigin and
+  .protocolIdentity == $protocol and
+  .capabilityIdentity == $capability and
+  (.capabilities | sort) == $capabilities and
+  .tursoSchemaId == $tursoId and
+  .tursoSchemaVersion == $tursoVersion and
+  .migrationPolicy == "expand-contract-forward-only" and
+  .tursoDataRollbackRequired == false and
+  .liveHealthVerified == true and
+  .corsHeadersVerified == true and
+  .liveTursoRoundTripVerified == true and
+  (.workerWindow | length) == 2 and
+  any(.workerWindow[];
+    .role == "active" and
+    .workerVersionId == $active and
+    .healthVerified == true and
+    .tursoRoundTripVerified == true
+  ) and
+  any(.workerWindow[];
+    .role == "previous" and
+    .workerVersionId == $previous and
+    .healthVerified == true and
+    .tursoRoundTripVerified == true
+  )
+' "$evidence" >/dev/null
 
 gh release view "$active_tag" --repo "$GITHUB_REPOSITORY" --json isImmutable --jq '.isImmutable' | grep -qx true
 gh release view "$previous_tag" --repo "$GITHUB_REPOSITORY" --json isImmutable --jq '.isImmutable' | grep -qx true
