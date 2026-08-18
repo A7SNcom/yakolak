@@ -55,30 +55,31 @@ The Worker exposes the same compatibility identity on `/health`, probe writes an
 
 ## Immutable frontend window proof
 
-`.github/workflows/pages-015-window-archive.yml` resolves both frontend entries from the locked window and processes them serially (`max-parallel: 1`). `scripts/pages015-archive-window-entry.sh`:
+`.github/workflows/pages-015-window-archive.yml` resolves both frontend entries from the locked window and processes them serially (`max-parallel: 1`). `scripts/pages015-archive-window-entry-v2.sh`:
 
 - recovers the exact successful Pages Actions artifact and verifies its SHA-256;
-- validates root SHA, candidate SHA, generation, runtime/protocol hash, content identity and archived online descriptor;
+- validates root SHA, candidate SHA, generation, runtime/protocol hash, content identity and the exact archived online-descriptor SHA;
 - verifies the recorded PAGES-014 run **and job** succeeded and re-reads its job logs to match root/candidate/generation/runtime/content/live-manifest identities;
+- keeps PAGES-014 qualification evidence outside immutable release assets, so `IMMUTABLE_FACTS.json` remains byte/source facts only and can reuse the already-staged active draft byte-for-byte;
 - stages or reuses only an exact mutable draft and byte-compares every draft asset;
 - requires the repository immutable-release Admin API to prove/enable immutability **before publication**;
 - after publication, requires `isImmutable=true`, release/asset verification, exact SHA equality and a non-production restore;
-- only then appends `archive_verified` and matching `deployment_generation_verified` to the additive ledger.
+- only then appends `archive_verified` and matching strong `deployment_generation_verified` to the additive ledger.
 
 Immutable release assets are never edited or re-uploaded after publication.
 
 ## Worker/Turso live proof and automatic resume
 
-PAGES-005 must complete an authenticated Cloudflare deploy with Turso secrets, prove health/browser-CORS/live Turso round trips, retain distinct active+previous Worker versions in the current deployment, and commit only proven `backend/cloudflare/API_ORIGIN.txt` + `WORKER_ROLLBACK_WINDOW.json`.
+PAGES-005 must complete an authenticated Cloudflare deploy with Turso secrets. Its workflow uses Wrangler structured NDJSON output for the exact deployment URL/version IDs, then keeps distinct active+previous Worker versions in the current deployment (100%/0%), proves both by exact Version Override, proves browser CORS + live Turso, and commits only proven `backend/cloudflare/API_ORIGIN.txt` + `WORKER_ROLLBACK_WINDOW.json`.
 
-`.github/workflows/pages-015-online-compatibility.yml` automatically re-evaluates when the frontend window, ledger, API origin or Worker window changes. It exits cleanly without qualification while prerequisites are incomplete. Once both exact frontend keys have `archive_verified` + matching `deployment_generation_verified` and PAGES-005 has a proven Worker window, it:
+`.github/workflows/pages-015-online-compatibility.yml` automatically re-evaluates when the frontend window, ledger, API origin or Worker window changes. It exits cleanly without qualification while prerequisites are incomplete. Once both exact frontend keys have strong `archive_verified` + matching PAGES-014 `deployment_generation_verified` and PAGES-005 has a proven Worker window, it:
 
 - re-probes both Worker versions by exact Version Override;
-- re-downloads and verifies both immutable frontend archives and archived descriptors;
+- re-downloads and verifies both immutable frontend archives and exact archived descriptor digests;
 - proves browser CORS from the real GitHub Pages origin;
 - proves live Turso write/read behavior;
 - materializes and validates all four frontend×Worker pairings;
-- appends `backend_compatibility_verified` for both exact immutable archive keys and verifies complete release qualification.
+- appends `backend_compatibility_verified` for both exact immutable archive keys and runs the hardened complete-release verifier.
 
 ## Current external blockers
 
