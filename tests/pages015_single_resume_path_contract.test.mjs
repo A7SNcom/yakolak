@@ -37,11 +37,12 @@ test('PAGES-015 archive fallback shares the qualification-ledger lock', () => {
   sharedLedgerLock(archive);
 });
 
-test('PAGES-005 may verify on push but live deploy stays manual-only', () => {
+test('PAGES-005 may verify on push but live deploy stays manual-only and serialized with PAGES-015', () => {
   assert.match(onBlock(pages005), /\bpush:/);
   const deploy = pages005.indexOf('\n  deploy:\n');
   assert.ok(deploy >= 0, 'PAGES-005 workflow must keep a deploy job');
   const deployBlock = pages005.slice(deploy);
   assert.match(deployBlock, /if: github\.event_name == 'workflow_dispatch'/);
   assert.match(deployBlock, /bash scripts\/pages005-bootstrap-live\.sh/);
+  sharedLedgerLock(deployBlock);
 });
