@@ -9,6 +9,7 @@ for name in "${required[@]}"; do
   test -n "${!name:-}" || { echo "missing required environment value: ${name}" >&2; exit 2; }
 done
 [[ "$SOURCE_ARTIFACT_TAR_SHA256" =~ ^[a-f0-9]{64}$ ]]
+[[ "$THREEJS_CANDIDATE_SHA" =~ ^[a-f0-9]{40}$ ]]
 
 work="$RUNNER_TEMP/pages015-draft-record-${ROLE:-entry}"
 rm -rf "$work"
@@ -35,13 +36,30 @@ test -n "$release_id"
 
 gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}" > "$work/release.json"
 jq -e \
-  --arg tag "$RELEASE_TAG" \
-  --arg target "$THREEJS_CANDIDATE_SHA" '
+  --arg tag "$RELEASE_TAG" '
     .tag_name == $tag and
-    .target_commitish == $target and
     .draft == true and
     (.immutable // false) == false
   ' "$work/release.json" >/dev/null
+
+release_target_commitish="$(jq -r '.target_commitish' "$work/release.json")"
+if [ "$release_target_commitish" = "$THREEJS_CANDIDATE_SHA" ]; then
+  :
+elif [ "${ROLE:-}" = previous ]; then
+  expected_branch="pages015-release-target-previous-${THREEJS_CANDIDATE_SHA:0:8}"
+  test "$release_target_commitish" = "$expected_branch" || {
+    echo "previous draft target mismatch: expected ${THREEJS_CANDIDATE_SHA} or ${expected_branch}, got ${release_target_commitish}" >&2
+    exit 1
+  }
+  target_ref_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${expected_branch}" --jq '.object.sha')"
+  test "$target_ref_sha" = "$THREEJS_CANDIDATE_SHA" || {
+    echo "previous draft target branch moved: expected ${THREEJS_CANDIDATE_SHA}, got ${target_ref_sha}" >&2
+    exit 1
+  }
+else
+  echo "draft target mismatch: expected ${THREEJS_CANDIDATE_SHA}, got ${release_target_commitish}" >&2
+  exit 1
+fi
 
 gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?per_page=100" > "$work/assets.json"
 jq -r '.[].name' "$work/assets.json" | LC_ALL=C sort > "$work/remote-assets.txt"
