@@ -222,21 +222,27 @@ test('25 setup/play/rematch/return generations do not grow GPU objects, handles 
   assert.equal(shared.disposeCalls, 1);
 });
 
-test('presentation source has no ad-hoc Three/WebGL resource destruction outside the registry', async () => {
+test('web app source has no ad-hoc presentation resource destruction outside the registry', async () => {
   async function javascriptFiles(directory) {
     const entries = await readdir(directory, { withFileTypes: true });
-    return entries
-      .filter((entry) => entry.isFile() && entry.name.endsWith('.js'))
-      .map((entry) => `${directory}/${entry.name}`);
+    const nested = await Promise.all(entries.map(async (entry) => {
+      const path = `${directory}/${entry.name}`;
+      if (entry.isDirectory()) return javascriptFiles(path);
+      if (
+        entry.isFile()
+        && entry.name.endsWith('.js')
+        && path !== 'web/app/core/resource-registry.js'
+      ) {
+        return [path];
+      }
+      return [];
+    }));
+    return nested.flat().sort();
   }
 
-  const files = [
-    ...await javascriptFiles('web/app/scene'),
-    ...await javascriptFiles('web/app/materials'),
-    ...await javascriptFiles('web/app/assets'),
-    ...await javascriptFiles('web/app/camera'),
-    ...await javascriptFiles('web/app/boot'),
-  ];
+  const files = await javascriptFiles('web/app');
+  assert.ok(files.length > 0, 'web/app lifecycle audit must inspect application JavaScript');
+  assert.ok(files.includes('web/app/scene/renderer.js'), 'lifecycle audit must recurse into presentation directories');
 
   for (const file of files) {
     const source = await readFile(file, 'utf8');
@@ -250,8 +256,13 @@ test('presentation source has no ad-hoc Three/WebGL resource destruction outside
     );
     assert.doesNotMatch(
       source,
-      /\b(?:window|document|canvas|reducedMotionQuery|dprMedia|visualViewport)\s*\.\s*removeEventListener\s*\(/,
+      /\b[A-Za-z_$][\w$]*\s*\.\s*removeEventListener\s*\(/,
       `${file} must delegate listener removal to resource-registry.js`,
+    );
+    assert.doesNotMatch(
+      source,
+      /\b[A-Za-z_$][\w$]*observer\s*\.\s*disconnect\s*\(/i,
+      `${file} must delegate observer disconnection to resource-registry.js`,
     );
     assert.doesNotMatch(
       source,
