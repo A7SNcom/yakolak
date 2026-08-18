@@ -1,0 +1,179 @@
+name: PAGES-015 Recover Expired Exact Pages Sources
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - '.github/workflows/pages-015-recover-expired-sources.yml'
+      - 'scripts/pages015-recover-expired-source.sh'
+      - 'RELEASE_QUALIFICATION/PAGES015_TAR_LAYOUT/**'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: pages-015-recover-expired-sources
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout recovery controls
+        uses: actions/checkout@v4
+        with:
+          ref: threejs-rebuild
+          path: control
+          fetch-depth: 0
+
+      - name: Checkout exact Godot root
+        uses: actions/checkout@v4
+        with:
+          ref: eeb3b8e15ded95c4343aed303f781b533c2e13a0
+          path: root-source
+          fetch-depth: 1
+
+      - name: Checkout exact active Three.js candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 4e4e5dec72ee71a06940c6db561dde8d24abd2d0
+          path: active-source
+          fetch-depth: 1
+
+      - name: Checkout exact previous Three.js candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 5cc89e05653b6461ed6a41332f374eaadb360945
+          path: previous-source
+          fetch-depth: 1
+
+      - name: Validate recovery helper syntax
+        run: bash -n control/scripts/pages015-recover-expired-source.sh
+
+      - name: Recover active exact Pages tar from immutable Git sources
+        env:
+          ROLE: active
+          GODOT_ROOT_SHA: eeb3b8e15ded95c4343aed303f781b533c2e13a0
+          THREEJS_CANDIDATE_SHA: 4e4e5dec72ee71a06940c6db561dde8d24abd2d0
+          EXPECTED_ARTIFACT_SHA256: 3bb476e2ee76f372b9b945d160f6f1e9faad865eaacd9baef2b1384bd434fa5f
+          EXPECTED_DEPLOYMENT_GENERATION: sha256:984f30cf5df2117d86ae4c6fc304c0ad7b2efdf3dc4db3b3ab6557d16b7bba28
+          EXPECTED_RUNTIME_SHA256: 7c40dd25ded3a3e7ffbb48b274365feaa9d8a7d67156444620bb6dde14132a37
+          EXPECTED_CONTENT_IDENTITY_SHA256: 0b425af69983b9aa5ceed2ec379259af9b9f5495d21bb89462a149d5740115c2
+        run: |
+          bash control/scripts/pages015-recover-expired-source.sh \
+            root-source active-source \
+            control/RELEASE_QUALIFICATION/PAGES015_TAR_LAYOUT/active.json \
+            recovered-active
+
+      - name: Recover previous exact Pages tar from immutable Git sources
+        env:
+          ROLE: previous
+          GODOT_ROOT_SHA: eeb3b8e15ded95c4343aed303f781b533c2e13a0
+          THREEJS_CANDIDATE_SHA: 5cc89e05653b6461ed6a41332f374eaadb360945
+          EXPECTED_ARTIFACT_SHA256: 6769843ee45a807cffe8af8c8450e0afd7d08c45270e66512f1ad52462dfb560
+          EXPECTED_DEPLOYMENT_GENERATION: sha256:e4e2eaa97bcced485e456dd5a3e7f9ef2c0fad6db2255f8ce1f0bfaa88530b51
+          EXPECTED_RUNTIME_SHA256: f778d8a3c2214f077dba7739304b3451c2e9560a03a95d69156b4151b19be9c6
+          EXPECTED_CONTENT_IDENTITY_SHA256: bfb80df2f416306af050f98ad161e7959e6795fbbbdf68b47ca4cb5036b9815c
+        run: |
+          bash control/scripts/pages015-recover-expired-source.sh \
+            root-source previous-source \
+            control/RELEASE_QUALIFICATION/PAGES015_TAR_LAYOUT/previous.json \
+            recovered-previous
+
+      - name: Upload active recovered exact source
+        id: upload-active
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages015-recovered-active-exact-source
+          path: |
+            recovered-active/artifact.tar
+            recovered-active/ARTIFACT_SHA256SUMS
+            recovered-active/SOURCE_RECOVERY_PROVENANCE.json
+          retention-days: 90
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Upload previous recovered exact source
+        id: upload-previous
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages015-recovered-previous-exact-source
+          path: |
+            recovered-previous/artifact.tar
+            recovered-previous/ARTIFACT_SHA256SUMS
+            recovered-previous/SOURCE_RECOVERY_PROVENANCE.json
+          retention-days: 90
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Record durable recovered-source artifact identities
+        env:
+          ACTIVE_ARTIFACT_ID: ${{ steps.upload-active.outputs.artifact-id }}
+          ACTIVE_ARTIFACT_DIGEST: ${{ steps.upload-active.outputs.artifact-digest }}
+          PREVIOUS_ARTIFACT_ID: ${{ steps.upload-previous.outputs.artifact-id }}
+          PREVIOUS_ARTIFACT_DIGEST: ${{ steps.upload-previous.outputs.artifact-digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ACTIVE_ARTIFACT_ID" && test -n "$PREVIOUS_ARTIFACT_ID"
+          test "$ACTIVE_ARTIFACT_ID" != "$PREVIOUS_ARTIFACT_ID"
+          git -C control fetch --quiet origin threejs-rebuild
+          git -C control reset --hard origin/threejs-rebuild
+          mkdir -p control/RELEASE_QUALIFICATION
+
+          jq -n \
+            --arg runId "$GITHUB_RUN_ID" \
+            --arg activeArtifactId "$ACTIVE_ARTIFACT_ID" \
+            --arg activeArtifactDigest "$ACTIVE_ARTIFACT_DIGEST" \
+            --arg previousArtifactId "$PREVIOUS_ARTIFACT_ID" \
+            --arg previousArtifactDigest "$PREVIOUS_ARTIFACT_DIGEST" \
+            --arg activeLayoutSha "$(sha256sum control/RELEASE_QUALIFICATION/PAGES015_TAR_LAYOUT/active.json | awk '{print $1}')" \
+            --arg previousLayoutSha "$(sha256sum control/RELEASE_QUALIFICATION/PAGES015_TAR_LAYOUT/previous.json | awk '{print $1}')" \
+            --arg recordedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
+            {
+              schemaVersion: 1,
+              recovery: "exact-byte-git-sources-plus-historical-tar-layout-v1",
+              workflowRunId: ($runId|tonumber),
+              retentionDays: 90,
+              artifacts: [
+                {
+                  role: "active",
+                  artifactName: "pages015-recovered-active-exact-source",
+                  artifactId: ($activeArtifactId|tonumber),
+                  actionsArtifactDigest: $activeArtifactDigest,
+                  pagesTarSha256: "3bb476e2ee76f372b9b945d160f6f1e9faad865eaacd9baef2b1384bd434fa5f",
+                  originalPagesRunId: 32110008705,
+                  originalPagesArtifactId: 9314508471,
+                  tarLayoutSha256: $activeLayoutSha
+                },
+                {
+                  role: "previous",
+                  artifactName: "pages015-recovered-previous-exact-source",
+                  artifactId: ($previousArtifactId|tonumber),
+                  actionsArtifactDigest: $previousArtifactDigest,
+                  pagesTarSha256: "6769843ee45a807cffe8af8c8450e0afd7d08c45270e66512f1ad52462dfb560",
+                  originalPagesRunId: 32108243496,
+                  originalPagesArtifactId: 9313917543,
+                  tarLayoutSha256: $previousLayoutSha
+                }
+              ],
+              exactSha256MatchRequired: true,
+              qualificationEvidence: false,
+              recordedAt: $recordedAt
+            }' > control/RELEASE_QUALIFICATION/PAGES015_RECOVERED_SOURCES.json
+
+          git -C control config user.name 'github-actions[bot]'
+          git -C control config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C control add RELEASE_QUALIFICATION/PAGES015_RECOVERED_SOURCES.json
+          if git -C control diff --cached --quiet; then
+            echo 'Recovered source identities already current.'
+            exit 0
+          fi
+          git -C control diff --cached --name-only | grep -qx 'RELEASE_QUALIFICATION/PAGES015_RECOVERED_SOURCES.json'
+          test "$(git -C control diff --cached --name-only | wc -l)" -eq 1
+          git -C control commit -m 'PAGES-015 preserve recovered exact Pages sources'
+          git -C control push origin HEAD:threejs-rebuild
