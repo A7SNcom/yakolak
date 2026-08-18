@@ -483,7 +483,6 @@ export function createResourceRegistry({
     holder.handle = delay == null ? scheduleFn(wrapped) : scheduleFn(wrapped, delay);
     token = register(holder, {
       ...prepared,
-      kind,
       cleanup: () => cancelFn(holder.handle),
     });
     return token;
@@ -520,7 +519,6 @@ export function createResourceRegistry({
     const holder = { handle: setIntervalFn(callback, Math.max(0, Number(delay) || 0)) };
     return register(holder, {
       ...prepared,
-      kind: RESOURCE_KINDS.INTERVAL,
       cleanup: () => clearIntervalFn(holder.handle),
     });
   }
