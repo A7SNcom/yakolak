@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "matrixId": "pages015-online-compatibility-v1",
+  "frontendWindowSource": "RELEASE_QUALIFICATION/ONLINE_FRONTEND_WINDOW.json",
   "verifiedRowsSource": "RELEASE_QUALIFICATION/ledger.jsonl#event=backend_compatibility_verified",
   "noPendingRows": true,
   "columns": [
@@ -15,14 +16,8 @@
     "tursoSchemaVersion"
   ],
   "rollbackWindow": {
-    "frontends": [
-      "active",
-      "previous"
-    ],
-    "workers": [
-      "active",
-      "previous"
-    ],
+    "frontends": ["active", "previous"],
+    "workers": ["active", "previous"],
     "requiredPairings": [
       "active-frontend/active-worker",
       "active-frontend/previous-worker",
@@ -46,6 +41,7 @@
     "immutableFrontendArchiveRedownloadAndSha256",
     "frontendCompatibilityDescriptorFromArchivedBytes",
     "archiveVerified",
+    "successfulPages014LiveGenerationEvidence",
     "deploymentGenerationVerified"
   ],
   "verifiedRows": []
