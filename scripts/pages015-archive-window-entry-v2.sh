@@ -21,6 +21,26 @@ GENERATION='^sha256:[a-f0-9]{64}$'
 [[ "$PAGES014_LIVE_MANIFEST_SHA256" =~ $HEX64 ]]
 [[ "$DEPLOYMENT_GENERATION" =~ $GENERATION ]]
 
+
+# A mutable draft for the locked previous frontend may target one dedicated branch
+# because github.token cannot target the raw workflow-bearing candidate SHA. This
+# branch is never trusted by name: it must resolve to the exact locked candidate SHA.
+release_target_ref="${RELEASE_TARGET_REF:-}"
+if [ -z "$release_target_ref" ] && [ "${ROLE:-}" = previous ]; then
+  candidate_branch="pages015-release-target-previous-${THREEJS_CANDIDATE_SHA:0:8}"
+  if gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${candidate_branch}" >/dev/null 2>&1; then
+    release_target_ref="$candidate_branch"
+  fi
+fi
+release_target="$THREEJS_CANDIDATE_SHA"
+if [ -n "$release_target_ref" ]; then
+  test "${ROLE:-}" = previous || { echo 'branch release target is allowed only for previous frontend staging' >&2; exit 1; }
+  [[ "$release_target_ref" =~ ^pages015-release-target-previous-[a-f0-9]{8}$ ]] || { echo 'invalid PAGES-015 release target branch name' >&2; exit 1; }
+  target_ref_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${release_target_ref}" --jq '.object.sha')"
+  test "$target_ref_sha" = "$THREEJS_CANDIDATE_SHA" || { echo 'release target branch does not resolve to the locked candidate SHA' >&2; exit 1; }
+  release_target="$release_target_ref"
+fi
+
 work="$RUNNER_TEMP/pages015-archive-${ROLE:-entry}"
 rm -rf "$work"
 mkdir -p "$work"/{source,site,release-assets,draft-download,immutable-download,restore-proof,root-component,threejs-component}
@@ -213,7 +233,7 @@ gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > "$work/releases.json
 release_id="$(jq -r --arg tag "$RELEASE_TAG" '.[] | select(.tag_name == $tag) | .id' "$work/releases.json" | head -n1)"
 if [ -z "$release_id" ]; then
   gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
-    --target "$THREEJS_CANDIDATE_SHA" \
+    --target "$release_target" \
     --title "YAKOLAK exact-byte Pages archive ${RELEASE_TAG}" \
     --notes "Exact deployed Pages bytes from run ${SOURCE_PAGES_RUN_ID}. Qualification remains external in RELEASE_QUALIFICATION/ledger.jsonl." \
     --latest=false --draft
@@ -223,7 +243,12 @@ fi
 test -n "$release_id"
 gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}" > "$work/release.json"
 test "$(jq -r '.tag_name' "$work/release.json")" = "$RELEASE_TAG"
-test "$(jq -r '.target_commitish' "$work/release.json")" = "$THREEJS_CANDIDATE_SHA"
+release_target_commitish="$(jq -r '.target_commitish' "$work/release.json")"
+test "$release_target_commitish" = "$release_target" || { echo "release target mismatch: expected ${release_target}, got ${release_target_commitish}" >&2; exit 1; }
+if [ -n "$release_target_ref" ]; then
+  target_ref_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${release_target_ref}" --jq '.object.sha')"
+  test "$target_ref_sha" = "$THREEJS_CANDIDATE_SHA" || { echo 'release target branch moved after draft creation' >&2; exit 1; }
+fi
 release_immutable="$(jq -r '.immutable // false' "$work/release.json")"
 release_draft="$(jq -r '.draft' "$work/release.json")"
 
@@ -257,6 +282,10 @@ if [ "$release_immutable" != true ]; then
     echo 'PAGES_RELEASE_ADMIN_TOKEN is required before publishing the exact draft.' >&2
     exit 1
   }
+  if [ -n "$release_target_ref" ]; then
+  target_ref_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${release_target_ref}" --jq '.object.sha')"
+  test "$target_ref_sha" = "$THREEJS_CANDIDATE_SHA" || { echo 'release target branch moved before immutable publication' >&2; exit 1; }
+fi
   immutable_api="https://api.github.com/repos/${GITHUB_REPOSITORY}/immutable-releases"
   code="$(curl --silent --show-error --output "$work/immutable-setting.json" --write-out '%{http_code}' \
     --header 'Accept: application/vnd.github+json' \
@@ -289,6 +318,21 @@ for attempt in $(seq 1 12); do
   sleep 5
 done
 test "$ok" = true || { echo 'published release did not verify as immutable/attested' >&2; exit 1; }
+
+
+tag_ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}")"
+tag_object_type="$(jq -r '.object.type' <<<"$tag_ref_json")"
+tag_object_sha="$(jq -r '.object.sha' <<<"$tag_ref_json")"
+case "$tag_object_type" in
+  commit) published_tag_commit_sha="$tag_object_sha" ;;
+  tag)
+    annotated_tag_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object_sha}")"
+    test "$(jq -r '.object.type' <<<"$annotated_tag_json")" = commit
+    published_tag_commit_sha="$(jq -r '.object.sha' <<<"$annotated_tag_json")"
+    ;;
+  *) echo "unsupported release tag object type: ${tag_object_type}" >&2; exit 1 ;;
+esac
+test "$published_tag_commit_sha" = "$THREEJS_CANDIDATE_SHA" || { echo 'published immutable release tag does not resolve to locked candidate SHA' >&2; exit 1; }
 
 gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$work/immutable-download"
 while IFS= read -r name; do
