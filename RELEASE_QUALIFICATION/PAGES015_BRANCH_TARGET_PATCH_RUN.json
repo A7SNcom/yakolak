@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "gate": "PAGES-015",
+  "event": "branch_target_staging_patch_started",
+  "workflowRunId": 32164138280,
+  "triggerHeadSha": "3714c86bc4cdcf7ad147f6cee5442f13c1391a3f",
+  "qualificationEvidence": false,
+  "recordedAt": "2026-08-18T17:10:03Z"
+}
