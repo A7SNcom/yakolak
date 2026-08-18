@@ -90,7 +90,26 @@ jobs:
         with:
           ref: threejs-rebuild
           fetch-depth: 0
+
+      - name: Resolve immutable-release admin readiness
+        id: admin
+        shell: bash
+        run: |
+          if [ -n "${ADMIN_TOKEN:-}" ]; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo '::notice title=PAGES-015 waiting for immutable-release admin credential::PAGES_RELEASE_ADMIN_TOKEN is absent; no release is published and no qualification row is written.'
+          fi
+
+      - name: Finish cleanly while immutable-release admin credential is absent
+        if: steps.admin.outputs.ready != 'true'
+        run: echo 'PAGES-015 archive qualification remains intentionally WAITING.'
+
       - name: Validate archive helper syntax
+        if: steps.admin.outputs.ready == 'true'
         run: bash -n scripts/pages015-archive-window-entry-v2.sh
+
       - name: Qualify immutable frontend archive serially
+        if: steps.admin.outputs.ready == 'true'
         run: bash scripts/pages015-archive-window-entry-v2.sh
