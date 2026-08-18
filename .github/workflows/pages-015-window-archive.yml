@@ -11,6 +11,7 @@ on:
       - 'scripts/pages015-resolve-exact-pages-source.sh'
       - 'scripts/pages015-recover-expired-source.sh'
       - 'scripts/pages015-record-exact-draft-stage.sh'
+      - 'tests/pages015_archive_admin_preflight_contract.test.mjs'
       - 'RELEASE_QUALIFICATION/ONLINE_FRONTEND_WINDOW.json'
       - 'RELEASE_QUALIFICATION/PAGES015_ARCHIVE_TRIGGER'
       - 'RELEASE_QUALIFICATION/PAGES015_RECOVERED_SOURCES.json'
@@ -139,9 +140,7 @@ jobs:
           bash -n scripts/pages015-resolve-exact-pages-source.sh
           bash -n scripts/pages015-recover-expired-source.sh
           bash -n scripts/pages015-record-exact-draft-stage.sh
-
-      - name: Install exact-source recovery bridge
-        run: bash scripts/pages015-install-source-recovery-gh-shim.sh
+          node --test tests/pages015_archive_admin_preflight_contract.test.mjs
 
       - name: Resolve immutable-release admin readiness
         id: admin
@@ -151,45 +150,53 @@ jobs:
             echo 'ready=true' >> "$GITHUB_OUTPUT"
           else
             echo 'ready=false' >> "$GITHUB_OUTPUT"
-            echo '::notice title=PAGES-015 waiting for immutable-release admin credential::Existing exact drafts are byte-verified; missing drafts cannot be created or published until the admin credential exists. No eligibility event is written.'
+            echo '::notice title=PAGES-015 waiting for immutable-release admin credential::Archive recovery and release mutation are skipped until the Administration credential exists. Existing exact draft receipts remain non-qualification evidence only.'
           fi
 
-      - name: Stage or verify exact mutable draft while admin credential is absent
+      - name: Resolve existing exact draft receipt
+        id: draft
+        shell: bash
+        run: |
+          set -euo pipefail
+          ledger='RELEASE_QUALIFICATION/ledger.jsonl'
+          test -s "$ledger"
+          if jq -s -e \
+            --arg tag "$RELEASE_TAG" \
+            --arg digest "$SOURCE_ARTIFACT_TAR_SHA256" '
+              any(.[];
+                .event == "draft_staged" and
+                .releaseTag == $tag and
+                .assetName == "pages-composite.tar" and
+                .assetSha256 == $digest and
+                .draft == true and
+                .published == false and
+                .exactDraftBytesVerified == true
+              )
+            ' "$ledger" >/dev/null; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install exact-source recovery bridge
+        if: steps.admin.outputs.ready == 'true'
+        run: bash scripts/pages015-install-source-recovery-gh-shim.sh
+
+      - name: Record safe wait state while admin credential is absent
         id: stage
         if: steps.admin.outputs.ready != 'true'
         shell: bash
         run: |
           set -euo pipefail
-          log="$RUNNER_TEMP/pages015-stage-${ROLE}.log"
-          echo 'state=checking' >> "$GITHUB_OUTPUT"
-          set +e
-          bash scripts/pages015-archive-window-entry-v2.sh >"$log" 2>&1
-          rc=$?
-          set -e
-          cat "$log"
-
-          if [ "$rc" -eq 0 ]; then
-            echo 'state=completed-or-existing-immutable' >> "$GITHUB_OUTPUT"
-            echo "${ROLE} archive was already immutable/qualified or otherwise completed safely."
-            exit 0
+          if [ "${DRAFT_PRESENT:-false}" = true ]; then
+            echo 'state=exact-draft-already-staged' >> "$GITHUB_OUTPUT"
+            echo "::notice title=PAGES-015 exact draft already staged::${ROLE} has an exact draft_staged receipt for ${RELEASE_TAG}/${SOURCE_ARTIFACT_TAR_SHA256}. Recovery and re-hashing are intentionally skipped until Administration authority exists."
+          else
+            echo 'state=waiting-admin-before-recovery' >> "$GITHUB_OUTPUT"
+            echo "::notice title=PAGES-015 waiting before archive recovery::${ROLE} has no exact draft_staged receipt. Recovery and release mutation remain fail-closed until PAGES_RELEASE_ADMIN_TOKEN exists."
           fi
-
-          if grep -Fq 'PAGES_RELEASE_ADMIN_TOKEN is required before publishing the exact draft.' "$log"; then
-            bash scripts/pages015-record-exact-draft-stage.sh
-            echo 'state=exact-draft-verified' >> "$GITHUB_OUTPUT"
-            echo "${ROLE} exact draft verified; publication remains WAITING for immutable-release admin proof."
-            exit 0
-          fi
-
-          if grep -Fq 'HTTP 403: Resource not accessible by integration' "$log" && grep -Fq '/releases' "$log"; then
-            echo 'state=waiting-admin-to-create-draft' >> "$GITHUB_OUTPUT"
-            echo "::notice title=PAGES-015 draft creation waiting for admin credential::${ROLE} has no reusable draft and github.token cannot create it. It will be created with PAGES_RELEASE_ADMIN_TOKEN once that credential exists."
-            exit 0
-          fi
-
-          echo 'state=unexpected-failure' >> "$GITHUB_OUTPUT"
-          echo "archive helper failed before an expected external credential gate" >&2
-          exit "$rc"
+        env:
+          DRAFT_PRESENT: ${{ steps.draft.outputs.present }}
 
       - name: Publish and fully qualify immutable frontend archive serially
         id: publish
