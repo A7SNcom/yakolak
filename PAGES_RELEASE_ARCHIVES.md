@@ -5,7 +5,7 @@
 PAGES-012 archives the exact bytes from successful `YAKOLAK Composite Pages` run `32030598002`:
 
 - Godot root source SHA: `fbc0d15c574a40c4a9f31c96d42c2f03b424bb39`
-- Three.js candidate source SHA: `6b125c04938330e1d6de4621e60a9f9e7757b556`
+- Three.js candidate SHA: `6b125c04938330e1d6de4621e60a9f9e7757b556`
 - successful Pages artifact ID: `9288731607`
 - release tag: `pages-archive-2026-08-17-gfbc0d15-t6b125c04`
 
@@ -33,6 +33,10 @@ Publication order is strict:
 10. prove a non-production restore from the immutable downloaded `pages-composite.tar`, then append `archive_verified` to the additive qualification ledger.
 
 If step 6 cannot prove immutability, the exact-byte draft remains unpublished and no `archive_verified` event is written. Nothing in the immutable assets contains a pending deployment-generation or backend-compatibility state.
+
+## Operational retry
+
+Re-running PAGES-012 is expected to revalidate the same retained prepared bundle and the same draft assets. A retry must never publish unless the Administration check proves immutable releases enabled, and it must never treat `draft_staged` as archive qualification.
 
 ## Immutable release assets
 
