@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "role": "previous",
+  "releaseTag": "pages-archive-2026-08-18-geeb3b8e1-t5cc89e05",
+  "assetSha256": "6769843ee45a807cffe8af8c8450e0afd7d08c45270e66512f1ad52462dfb560",
+  "immutableAdminReady": false,
+  "stageOutcome": "failure",
+  "publishOutcome": "skipped",
+  "workflowRunId": 32132943157,
+  "recordedAt": "2026-08-18T11:41:53Z",
+  "qualificationEvidence": false
+}
