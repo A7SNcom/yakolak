@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "role": "active",
+  "entries": [
+    {
+      "index": 0,
+      "name": ".",
+      "type": "dir",
+      "mode": "0755",
+      "uid": 1001,
+      "gid": 1001,
+      "uname": "runner",
+      "gname": "runner",
+      "mtime": 1787036902,
+      "size": 0
+    },
+    {
+      "index": 1,
+      "name": "./index.html",
+      "type": "file",
+      "mode": "0644",
+      "uid": 1001,
+      "gid": 1001,
+      "uname": "runner",
+      "gname": "runner",
+      "mtime": 1787036898,
+      "size": 31020
+    },
+    {
+      "index": 2,
+      "name": "./index.audio.worklet.js",
+      "type": "file",
+      "mode": "0644",
+      "uid": 1001,
+      "gid": 1001,
+      "uname": "runner",
+      "gname": "runner",
+      "mtime": 1787036898,
+      "size": 7298
+    },
+    {
+      "index": 3,
+      "name": "./yakolak-logo.svg",
+      "type": "file",
+      "mode": "0644",
+      "uid": 1001,
+      "gid": 1001,
+      "uname": "runner",
+      "gname": "runner",
+      "mtime": 1787036898,
+      "size": 5763
+    },
+    {
+      "index": 4,
+      "name": "./index.pck",
+      "type": "file",
+      "mode": "0644",
+      "uid": 1001,
+      "gid": 1001,
+      "uname": "runner",
+      "gname": "runner",
+      "mtime": 1787036898,
+      "size": 9541080
+    },
+    {
+      "index": 5,
+      "name": "./index.png",
+      "type": "file",
+      "mode": "0644",
+      "uid": 1001,
+      "gid": 1001,
+      "uname": "runner",
+      "gname": "runner",
+      "mtime": 1787036898,
+      "size": 21443
+    },
+    {
+      "index": 6,
+      "name": "./threejs",
+      "type": "dir",
+      "mode": "0755",
+      "uid": 1001,
+      "gid": 1001,
+      "uname": "runner",
+      "gname": "runner",
+      "mtime": 1787036902,
+      "size": 0
+    },
+    {
+      "index": 7,
+      "name": "./threejs/app",
+      "type": "dir",
+      "mode": "0755",
+      "uid": 1001,
+      "gid": 1001,
+      "uname": "runner",
+      "gname": "runner",
+      "mtime": 1787036899,
+      "size": 0
+    },
+    {
+      "index": 8,
+      "name": "./threejs/app/boot",
+      "type": "dir",
+      "mode": "0755",
+      "uid": 1001,
+      "gid": 1001,
+      "uname": "runner",
+      "gname": "runner",
+      "mtime": 1787036899,
+      "size": 0
+    },
+    {
+      "index": 9,
+      "name": "./threejs/app/boot/fatal-error.js",
+      "type": "file",
+      "mode": "0644",
+      "uid": 1001,
+      "gid": 1001,
+      "uname": "runner",
+      "gname": "runner",
+      "mtime": 1787036899,
+      "size": 965
+    },
+    {
+      "index": 10,
+      "name": "./threejs/app/boot/build-marker.js",
+      "type": "file",
+      "mode": "0644",
+      "uid": 1001,
+      "gid": 1001,
+      "uname": "runner",
+      "gname": "runner",
+      "mtime": 1787036899,
+      "size": 728
+    },
+    {
+      "index": 11,
+      "name": "./threejs/app/boot/boot.js",
+      "type": "file",
+      "mode": "0644",
+      "uid": 1001,
+      "gid": 1001,
+      "uname": "runner",
+      "gname": "runner",
+      "mtime": 1787036899,
+      "size": 10483
+    }
+  ],
+  "note": "TRUNCATED PLACEHOLDER — do not use for reconstruction"
+}
