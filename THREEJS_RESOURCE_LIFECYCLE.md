@@ -47,6 +47,7 @@ Future THREEJS-026 shadow resources, THREEJS-096 motion resources, and every lat
 11. Replacement is transactional at external setup boundaries. In particular, a listener with a stable replacement key remains authoritative until the replacement listener has been installed successfully; if installation throws, the prior listener and its registry token remain active and no teardown is committed.
 12. Non-shared resource identity has one active scope owner. A second scope may borrow only `shared-immutable` identity; moving transient/generation ownership requires explicit `reclassify: true`. Cross-scope observer claims must fail before `observer.observe()` runs, so an ownership rejection cannot create an untracked observation.
 13. External setup is rollback-safe against reentrant registration failure. If listener installation, subscription setup, observer activation, RAF scheduling, timeout scheduling or interval scheduling succeeds but the registry becomes unusable before ownership is recorded, the new external handle is synchronously removed/unsubscribed/disconnected/cancelled and the original registration error is rethrown.
+14. One-shot scheduling is completion-safe even under a synchronous platform adapter. If RAF/timeout invokes its callback before the registry token can be created, the handle is treated as already completed, cancelled best-effort, no lifecycle entry is created, and the returned token is inactive.
 
 ## WebGL context loss
 
@@ -67,7 +68,7 @@ After any completed `setup → play → rematch → return` cycle, the registry 
 - DOM/window/media listeners;
 - subscriptions.
 
-The THREEJS-027 contract tests run consecutive lifecycle cycles and also verify context-loss/idempotent destruction, shared-resource reuse, post-release scope closure, replacement-key integrity, scope-local deep-release ownership, metadata-preflight side-effect safety, transactional listener replacement failure, cross-scope ownership isolation and reentrant external-setup rollback.
+The THREEJS-027 contract tests run consecutive lifecycle cycles and also verify context-loss/idempotent destruction, shared-resource reuse, post-release scope closure, replacement-key integrity, scope-local deep-release ownership, metadata-preflight side-effect safety, transactional listener replacement failure, cross-scope ownership isolation, reentrant external-setup rollback and synchronous one-shot completion without stale handles.
 
 ## Diagnostics
 
