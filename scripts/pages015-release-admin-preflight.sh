@@ -19,6 +19,7 @@ created_refs=()
 cleanup() {
   local ref api_ref
   for ref in "${created_refs[@]:-}"; do
+    test -n "$ref" || continue
     api_ref="${ref#refs/}"
     gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/${api_ref}" >/dev/null 2>&1 || true
   done
@@ -27,13 +28,13 @@ trap cleanup EXIT
 
 gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=1" >/dev/null
 
-probe_ref() {
+probe_tag_ref() {
   local role="$1" target="$2" ref api_ref actual
-  ref="refs/pages015-probe/${GITHUB_RUN_ID}-${role}-${target:0:8}"
+  ref="refs/tags/pages015-admin-capability-probe-${GITHUB_RUN_ID}-${role}-${target:0:8}"
   api_ref="${ref#refs/}"
 
   if gh api "repos/${GITHUB_REPOSITORY}/git/ref/${api_ref}" >/dev/null 2>&1; then
-    echo "release-admin preflight ref collision: ${ref}" >&2
+    echo "release-admin preflight tag collision: ${ref}" >&2
     exit 1
   fi
 
@@ -43,7 +44,7 @@ probe_ref() {
 
   actual="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${api_ref}" --jq '.object.sha')"
   test "$actual" = "$target" || {
-    echo "release-admin preflight ref target mismatch for ${role}" >&2
+    echo "release-admin preflight tag target mismatch for ${role}" >&2
     exit 1
   }
 
@@ -51,11 +52,12 @@ probe_ref() {
   created_refs=("${created_refs[@]:0:${#created_refs[@]}-1}")
 }
 
-# These temporary non-head/non-tag refs deliberately point at the exact locked candidate
-# commits. GitHub requires Workflows write permission when a ref would introduce workflow
-# file changes; this catches an under-scoped admin credential before expensive archive work.
-probe_ref active "$active_sha"
-probe_ref previous "$previous_sha"
+# Temporary tag refs deliberately exercise the same class of ref mutation required when
+# GitHub publishes the locked releases. This catches an under-scoped token (notably missing
+# Workflows write permission for candidate history containing workflow-file changes) before
+# expensive exact-byte archive work. Every probe tag is deleted immediately.
+probe_tag_ref active "$active_sha"
+probe_tag_ref previous "$previous_sha"
 
 trap - EXIT
-echo 'PAGES-015 release-admin preflight passed: release read + exact candidate ref create/read/delete capability.'
+echo 'PAGES-015 release-admin preflight passed: release read + exact candidate tag create/read/delete capability.'
