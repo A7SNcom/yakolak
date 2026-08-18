@@ -86,6 +86,8 @@ The temporary recovery workflow was retired after proving those exact SHA matche
 
 All eight expected release assets are byte-checked before a `draft_staged` receipt is accepted. Neither draft is immutable or eligible yet; publication remains blocked on the Admin credential.
 
+Run `32169299197` then proved the low-cost waiting path for both locked keys: each resolved its exact `draft_staged` receipt, reported `stageState=exact-draft-already-staged`, skipped the source-recovery bridge, skipped publication, and completed successfully. Recovery and re-hashing resume only when the Administration credential exists, at which point the archive helper re-downloads and re-verifies the mutable draft before any immutable publication.
+
 Neither state is an `archive_verified` event. The strict verifier ignores `draft_staged`, recovery metadata and diagnostics.
 
 ### Verified release/tag permission requirement
@@ -123,18 +125,20 @@ The authoritative automatic-resume path is `.github/workflows/pages-015-qualific
 
 Each run checks the five required credentials without storing values. Semantic changes are recorded in `RELEASE_QUALIFICATION/PAGES015_ORCHESTRATOR_STATUS.json`; explicit push/manual runs also write `RELEASE_QUALIFICATION/PAGES015_ORCHESTRATOR_RUN.json` so a fresh Run ID and credential-presence receipt exists even when the semantic state is unchanged. Both files are `qualificationEvidence=false` and never store secret values.
 
-The same workflow installs the exact-source recovery bridge before any archive work. If credentials permit, the run proceeds directly and serially:
+When `PAGES_RELEASE_ADMIN_TOKEN` is present, the workflow runs the release-admin capability preflight and only then installs the exact-source recovery bridge before archive work. When the Admin credential is absent, both steps are skipped; Cloudflare/Turso readiness and all non-archive status checks continue independently. If credentials permit, the run proceeds directly and serially:
 
 1. With `PAGES_RELEASE_ADMIN_TOKEN`, strongly qualify active then previous immutable frontend archives.
 2. With all four Cloudflare/Turso credentials, run `pages005-bootstrap-live.sh` if a proven Worker rollback window is not already locked.
 3. Once both strong frontend archive keys and the Worker window exist, run `scripts/pages015-finalize-live-window.sh`.
 4. The finalizer re-proves both Worker versions, live Turso, real browser CORS, both immutable archive downloads/attestations/descriptor digests, materializes all four frontend×Worker pairings, appends `backend_compatibility_verified` for both exact keys, and runs the strict release verifier.
 
+The orchestrator validation step also runs the archive immutable-facts, archive Admin-preflight, release-target staging/readback and release-admin capability contract tests before any live action.
+
 The earlier nested credential-probe/supervisor experiments were retired after GitHub returned `422` for nested workflow dispatch. The one-time tag-permission probe was also removed after recording the exact blocker. None of those diagnostic workflows are part of the production qualification path.
 
 ## Verified current blocker evidence
 
-Fresh explicit orchestrator run `32156873552` completed successfully at `2026-08-18T15:50:53Z`. Its non-secret receipt proves the current credential state without relying on an older unchanged semantic-status timestamp:
+Fresh explicit orchestrator run `32175709664` completed successfully at `2026-08-18T19:16:58Z`. Its non-secret receipt proves the current credential state without relying on an older unchanged semantic-status timestamp:
 
 - `PAGES_RELEASE_ADMIN_TOKEN`: absent
 - `CLOUDFLARE_API_TOKEN`: absent
@@ -144,7 +148,7 @@ Fresh explicit orchestrator run `32156873552` completed successfully at `2026-08
 - backend credentials ready: false
 - Worker lock files present: false
 
-The same run completed the full orchestrator job successfully and remained fail-closed. The additive ledger now contains initialization plus exact `draft_staged` events for both active and previous archives; there are still no strong archive, deployment-generation, or backend-compatibility qualification rows.
+The same run completed the full orchestrator job successfully. Release-admin preflight and exact-source recovery bridge were both skipped because the Admin credential was absent, while the remaining contract validation and readiness logic succeeded. The additive ledger still contains initialization plus exact `draft_staged` events for both active and previous archives; there are no strong archive, deployment-generation, or backend-compatibility qualification rows.
 
 `backend/cloudflare/API_ORIGIN.txt` and `backend/cloudflare/WORKER_ROLLBACK_WINDOW.json` remain absent. Therefore no authenticated Cloudflare/Turso bootstrap or live four-pair compatibility proof can occur, both mutable release drafts are staged but neither can yet be published/verified immutable without the required release/workflows/Admin authority, and no `backend_compatibility_verified` event may be written.
 
