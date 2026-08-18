@@ -18,6 +18,7 @@ concurrency:
 env:
   PAGES_PROTOCOL_VERSION: "1"
   PAGE_BASE_URL: https://a7sncom.github.io/yakolak/
+  EVIDENCE_BRANCH: pages-014-evidence
 
 jobs:
   qualify:
@@ -27,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - name: Checkout latest main and qualification ledger
+      - name: Checkout latest main
         uses: actions/checkout@v4
         with:
           ref: main
@@ -35,7 +36,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Checkout latest Three.js branch and ledger
+      - name: Checkout latest Three.js qualification ledger
         uses: actions/checkout@v4
         with:
           ref: threejs-rebuild
@@ -43,7 +44,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Resolve the currently desired deployable inputs
+      - name: Resolve currently desired deployable inputs
         id: desired
         shell: bash
         run: |
@@ -52,16 +53,16 @@ jobs:
             '+refs/heads/main:refs/remotes/origin/main' \
             '+refs/heads/threejs-rebuild:refs/remotes/origin/threejs-rebuild'
 
-          desired_root="$(git -C main-repo log refs/remotes/origin/main --grep='^\[flash-ready\]' --format='%H' -n 1)"
-          desired_candidate="$(git -C main-repo rev-parse refs/remotes/origin/threejs-rebuild)"
-          test -n "${desired_root}"
-          test -n "${desired_candidate}"
+          root="$(git -C main-repo log refs/remotes/origin/main --grep='^\[flash-ready\]' --format='%H' -n 1)"
+          candidate="$(git -C main-repo rev-parse refs/remotes/origin/threejs-rebuild)"
+          test -n "${root}"
+          test -n "${candidate}"
 
-          echo "root_sha=${desired_root}" >> "$GITHUB_OUTPUT"
-          echo "candidate_sha=${desired_candidate}" >> "$GITHUB_OUTPUT"
-          echo "Desired root=${desired_root} candidate=${desired_candidate}"
+          echo "root_sha=${root}" >> "$GITHUB_OUTPUT"
+          echo "candidate_sha=${candidate}" >> "$GITHUB_OUTPUT"
+          echo "Desired root=${root} candidate=${candidate}"
 
-      - name: Poll public deployment manifest until current desired generation is live
+      - name: Poll public manifest and prove current desired generation is live
         id: live
         shell: bash
         env:
@@ -90,7 +91,7 @@ jobs:
                  .generationSchema == "pages-deployment-generation-v1" and
                  .godotRootSha == $root and
                  .threejsCandidateSha == $candidate and
-                 (.deploymentGeneration | type == "string") and
+                 (.deploymentGeneration | test("^sha256:[a-f0-9]{64}$")) and
                  (.publicRuntimeProtocol.sha256 | test("^[a-f0-9]{64}$")) and
                  .publicRuntimeProtocol.protocolVersion == "1" and
                  (.contentIdentity.sha256 | test("^[a-f0-9]{64}$"))' \
@@ -99,12 +100,13 @@ jobs:
                 break
               fi
             fi
-            echo "Live Pages is not the current desired generation yet (attempt ${attempt}, HTTP ${code:-000}, observed=${observed:-unknown})."
+
+            echo "Live Pages not current desired generation yet (attempt ${attempt}, HTTP ${code:-000}, observed=${observed:-unknown})."
             sleep 5
           done
 
           if [ "${ready}" != true ]; then
-            echo "::notice title=PAGES-014 pre-readiness/supersession::Current desired generation is not live yet; no qualification will be written."
+            echo "::notice title=PAGES-014 pre-readiness/supersession::Current desired generation is not live; no evidence or qualification is written."
             echo 'ready=false' >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -119,27 +121,93 @@ jobs:
           manifest_runtime_hash="$(jq -r '.publicRuntimeProtocol.sha256' live-deployment-manifest.json)"
           test "${runtime_hash}" = "${manifest_runtime_hash}"
 
-          root_sha="$(jq -r '.godotRootSha' live-deployment-manifest.json)"
-          candidate_sha="$(jq -r '.threejsCandidateSha' live-deployment-manifest.json)"
           expected_generation="$(
             printf 'pages-deployment-generation-v1\n%s\n%s\n%s\n' \
-              "${root_sha}" "${candidate_sha}" "${runtime_hash}" \
+              "${DESIRED_ROOT_SHA}" "${DESIRED_CANDIDATE_SHA}" "${runtime_hash}" \
               | sha256sum | awk '{print "sha256:"$1}'
           )"
           actual_generation="$(jq -r '.deploymentGeneration' live-deployment-manifest.json)"
           test "${expected_generation}" = "${actual_generation}"
 
           live_manifest_sha="$(sha256sum live-deployment-manifest.json | awk '{print $1}')"
+          content_identity="$(jq -r '.contentIdentity.sha256' live-deployment-manifest.json)"
+
           echo 'ready=true' >> "$GITHUB_OUTPUT"
           echo "deployment_generation=${actual_generation}" >> "$GITHUB_OUTPUT"
           echo "runtime_hash=${runtime_hash}" >> "$GITHUB_OUTPUT"
-          echo "content_identity=$(jq -r '.contentIdentity.sha256' live-deployment-manifest.json)" >> "$GITHUB_OUTPUT"
+          echo "content_identity=${content_identity}" >> "$GITHUB_OUTPUT"
           echo "live_manifest_sha=${live_manifest_sha}" >> "$GITHUB_OUTPUT"
           echo "Live desired generation verified: ${actual_generation}"
 
-      - name: Match verified immutable archive by exact restored bytes
+      - name: Persist independently observable live-acceptance evidence
         if: steps.live.outputs.ready == 'true'
-        id: archive
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ROOT_SHA: ${{ steps.desired.outputs.root_sha }}
+          CANDIDATE_SHA: ${{ steps.desired.outputs.candidate_sha }}
+          DEPLOYMENT_GENERATION: ${{ steps.live.outputs.deployment_generation }}
+          RUNTIME_HASH: ${{ steps.live.outputs.runtime_hash }}
+          CONTENT_IDENTITY: ${{ steps.live.outputs.content_identity }}
+          LIVE_MANIFEST_SHA: ${{ steps.live.outputs.live_manifest_sha }}
+          SOURCE_COMPOSITE_RUN_ID: ${{ github.event.workflow_run.id || github.run_id }}
+        run: |
+          set -euo pipefail
+          rm -rf evidence-repo
+          git clone --quiet --branch "${EVIDENCE_BRANCH}" \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" evidence-repo
+          git -C evidence-repo config user.name "github-actions[bot]"
+          git -C evidence-repo config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          record="$(jq -n \
+            --arg root "${ROOT_SHA}" \
+            --arg candidate "${CANDIDATE_SHA}" \
+            --arg generation "${DEPLOYMENT_GENERATION}" \
+            --arg runtime "${RUNTIME_HASH}" \
+            --arg content "${CONTENT_IDENTITY}" \
+            --arg manifest "${LIVE_MANIFEST_SHA}" \
+            --arg pageUrl "${PAGE_BASE_URL}" \
+            --arg sourceRun "${SOURCE_COMPOSITE_RUN_ID}" \
+            --arg verifierRun "${GITHUB_RUN_ID}" \
+            --arg verifiedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{
+              schemaVersion: 1,
+              event: "pages014_live_generation_verified",
+              verified: true,
+              godotRootSha: $root,
+              threejsCandidateSha: $candidate,
+              deploymentGeneration: $generation,
+              publicRuntimeProtocolSha256: $runtime,
+              contentIdentitySha256: $content,
+              liveManifestSha256: $manifest,
+              pageUrl: $pageUrl,
+              sourceCompositeRunId: ($sourceRun|tonumber),
+              verifierWorkflowRunId: ($verifierRun|tonumber),
+              verifiedAt: $verifiedAt
+            }')"
+
+          for attempt in 1 2 3 4; do
+            git -C evidence-repo fetch --quiet origin "${EVIDENCE_BRANCH}"
+            git -C evidence-repo reset --hard "origin/${EVIDENCE_BRANCH}" >/dev/null
+            printf '%s\n' "${record}" > evidence-repo/PAGES_014_LIVE_VERIFICATION.json
+            git -C evidence-repo add PAGES_014_LIVE_VERIFICATION.json
+            if git -C evidence-repo diff --cached --quiet; then
+              echo 'Identical live verification evidence already recorded.'
+              exit 0
+            fi
+            git -C evidence-repo commit -m 'PAGES-014 record verified live generation'
+            if git -C evidence-repo push --quiet origin HEAD:"${EVIDENCE_BRANCH}"; then
+              echo 'Live generation evidence recorded on isolated evidence branch.'
+              exit 0
+            fi
+            echo 'Evidence branch raced; retrying.'
+          done
+
+          echo 'Could not persist PAGES-014 live evidence after retries.' >&2
+          exit 1
+
+      - name: Match immutable archive by exact restored bytes and append qualification
+        if: steps.live.outputs.ready == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -148,6 +216,8 @@ jobs:
           LIVE_GENERATION: ${{ steps.live.outputs.deployment_generation }}
           LIVE_RUNTIME_HASH: ${{ steps.live.outputs.runtime_hash }}
           LIVE_CONTENT_IDENTITY: ${{ steps.live.outputs.content_identity }}
+          LIVE_MANIFEST_SHA: ${{ steps.live.outputs.live_manifest_sha }}
+          SOURCE_COMPOSITE_RUN_ID: ${{ github.event.workflow_run.id || github.run_id }}
         run: |
           set -euo pipefail
           ledger='qualification-repo/RELEASE_QUALIFICATION/ledger.jsonl'
@@ -171,8 +241,7 @@ jobs:
           )
 
           if [ "${#candidates[@]}" -eq 0 ]; then
-            echo "::notice title=PAGES-014 archive qualification pending::No verified PAGES-012 archive exists for the live root/candidate pair. No pending row is written."
-            echo 'matched=false' >> "$GITHUB_OUTPUT"
+            echo "::notice title=PAGES-014 archive qualification pending::No verified PAGES-012 archive exists for the live root/candidate pair. Deployment is valid; no pending ledger row is written."
             exit 0
           fi
 
@@ -192,13 +261,8 @@ jobs:
             immutable="$(gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" --json isImmutable --jq '.isImmutable' 2>/dev/null || true)"
             [ "${immutable}" = true ] || continue
             gh release verify "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null
-            gh release download "${tag}" --repo "${GITHUB_REPOSITORY}" \
-              --pattern 'pages-composite.tar' --dir "${dir}"
-            gh release download "${tag}" --repo "${GITHUB_REPOSITORY}" \
-              --pattern 'IMMUTABLE_FACTS.json' --dir "${dir}"
-
-            test -s "${dir}/pages-composite.tar"
-            test -s "${dir}/IMMUTABLE_FACTS.json"
+            gh release download "${tag}" --repo "${GITHUB_REPOSITORY}" --pattern 'pages-composite.tar' --dir "${dir}"
+            gh release download "${tag}" --repo "${GITHUB_REPOSITORY}" --pattern 'IMMUTABLE_FACTS.json' --dir "${dir}"
             gh release verify-asset "${tag}" "${dir}/pages-composite.tar" --repo "${GITHUB_REPOSITORY}" >/dev/null
 
             actual_asset_sha="$(sha256sum "${dir}/pages-composite.tar" | awk '{print $1}')"
@@ -251,68 +315,47 @@ jobs:
           done
 
           if [ "${#matches[@]}" -eq 0 ]; then
-            echo "::notice title=PAGES-014 archive qualification pending::Verified PAGES-012 rows exist for these source SHAs, but no immutable archive restores to the exact live generation bytes. No ledger row is written."
-            echo 'matched=false' >> "$GITHUB_OUTPUT"
+            echo "::notice title=PAGES-014 archive qualification pending::Verified archive rows exist for the source SHAs, but no immutable archive restores to the exact live generation bytes. No ledger row is written."
             exit 0
           fi
 
-          printf '%s\n' "${matches[@]}" > matched-archives.txt
-          echo 'matched=true' >> "$GITHUB_OUTPUT"
-          echo "Matched ${#matches[@]} immutable archive(s) to exact live bytes."
-
-      - name: Append deployment-generation qualification events
-        if: steps.archive.outputs.matched == 'true'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ROOT_SHA: ${{ steps.desired.outputs.root_sha }}
-          CANDIDATE_SHA: ${{ steps.desired.outputs.candidate_sha }}
-          DEPLOYMENT_GENERATION: ${{ steps.live.outputs.deployment_generation }}
-          RUNTIME_HASH: ${{ steps.live.outputs.runtime_hash }}
-          CONTENT_IDENTITY: ${{ steps.live.outputs.content_identity }}
-          LIVE_MANIFEST_SHA: ${{ steps.live.outputs.live_manifest_sha }}
-          SOURCE_PAGES_RUN_ID: ${{ github.event.workflow_run.id || github.run_id }}
-        run: |
-          set -euo pipefail
-          recorded_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-
-          records_file="$(mktemp)"
-          while IFS='|' read -r tag asset_sha; do
+          records="$(mktemp)"
+          for match in "${matches[@]}"; do
+            tag="${match%%|*}"
+            asset_sha="${match#*|}"
             jq -cn \
               --arg releaseTag "${tag}" \
               --arg assetSha256 "${asset_sha}" \
-              --arg deploymentGeneration "${DEPLOYMENT_GENERATION}" \
-              --arg godotRootSha "${ROOT_SHA}" \
-              --arg threejsCandidateSha "${CANDIDATE_SHA}" \
-              --arg runtimeHash "${RUNTIME_HASH}" \
-              --arg protocolVersion "${PAGES_PROTOCOL_VERSION}" \
-              --arg contentIdentity "${CONTENT_IDENTITY}" \
-              --arg pageUrl "${PAGE_BASE_URL}" \
-              --arg liveManifestSha256 "${LIVE_MANIFEST_SHA}" \
-              --arg workflowRunId "${SOURCE_PAGES_RUN_ID}" \
-              --arg recordedAt "${recorded_at}" \
+              --arg generation "${LIVE_GENERATION}" \
+              --arg root "${ROOT_SHA}" \
+              --arg candidate "${CANDIDATE_SHA}" \
+              --arg runtime "${LIVE_RUNTIME_HASH}" \
+              --arg content "${LIVE_CONTENT_IDENTITY}" \
+              --arg manifest "${LIVE_MANIFEST_SHA}" \
+              --arg sourceRun "${SOURCE_COMPOSITE_RUN_ID}" \
+              --arg recordedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
               '{
                 schemaVersion: 1,
                 event: "deployment_generation_verified",
                 releaseTag: $releaseTag,
                 assetName: "pages-composite.tar",
                 assetSha256: $assetSha256,
-                deploymentGeneration: $deploymentGeneration,
-                godotRootSha: $godotRootSha,
-                threejsCandidateSha: $threejsCandidateSha,
-                publicRuntimeProtocolSha256: $runtimeHash,
-                protocolVersion: $protocolVersion,
-                contentIdentitySha256: $contentIdentity,
+                deploymentGeneration: $generation,
+                godotRootSha: $root,
+                threejsCandidateSha: $candidate,
+                publicRuntimeProtocolSha256: $runtime,
+                protocolVersion: "1",
+                contentIdentitySha256: $content,
                 pagesDeploymentStatus: "succeed",
-                pageUrl: $pageUrl,
-                liveManifestSha256: $liveManifestSha256,
+                pageUrl: env.PAGE_BASE_URL,
+                liveManifestSha256: $manifest,
                 manifestVerified: true,
                 archiveMatchVerified: true,
                 verified: true,
-                workflowRunId: ($workflowRunId|tonumber),
+                workflowRunId: ($sourceRun|tonumber),
                 recordedAt: $recordedAt
-              }' >> "${records_file}"
-          done < matched-archives.txt
+              }' >> "${records}"
+          done
 
           rm -rf ledger-writer
           git clone --quiet --branch threejs-rebuild \
@@ -330,35 +373,32 @@ jobs:
               asset="$(jq -r '.assetSha256' <<<"${record}")"
               generation="$(jq -r '.deploymentGeneration' <<<"${record}")"
               if jq -s -e \
-                --arg tag "${tag}" \
-                --arg asset "${asset}" \
-                --arg generation "${generation}" \
+                --arg tag "${tag}" --arg asset "${asset}" --arg generation "${generation}" \
                 'any(.[];
                   .event == "deployment_generation_verified" and
                   .releaseTag == $tag and
                   .assetSha256 == $asset and
                   .deploymentGeneration == $generation and
-                  .verified == true
-                )' \
+                  .verified == true)' \
                 ledger-writer/RELEASE_QUALIFICATION/ledger.jsonl >/dev/null; then
                 continue
               fi
               printf '%s\n' "${record}" >> ledger-writer/RELEASE_QUALIFICATION/ledger.jsonl
               changed=true
-            done < "${records_file}"
+            done < "${records}"
 
             if [ "${changed}" != true ]; then
-              echo 'All matching deployment-generation qualifications are already recorded.'
+              echo 'All exact deployment-generation qualifications already recorded.'
               exit 0
             fi
 
             git -C ledger-writer add RELEASE_QUALIFICATION/ledger.jsonl
             git -C ledger-writer commit -m 'PAGES-014 qualify exact live deployment generation'
             if git -C ledger-writer push --quiet origin HEAD:threejs-rebuild; then
-              echo 'PAGES-014 exact-byte deployment-generation qualification appended.'
+              echo 'Exact-byte deployment-generation qualification appended.'
               exit 0
             fi
-            echo 'Qualification ledger push raced with another writer; retrying.'
+            echo 'Qualification ledger push raced; retrying.'
           done
 
           echo 'Could not append PAGES-014 qualification after retries.' >&2
