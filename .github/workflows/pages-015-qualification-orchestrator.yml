@@ -59,6 +59,7 @@ jobs:
           bash -n scripts/pages005-bootstrap-live.sh
           bash -n scripts/pages015-finalize-live-window.sh
           node --test tests/pages015_archive_facts_contract.test.mjs
+          node --test tests/pages015_release_admin_preflight_contract.test.mjs
 
       - name: Record fresh explicit credential probe receipt
         if: github.event_name != 'schedule'
