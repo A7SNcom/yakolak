@@ -1,0 +1,129 @@
+name: PAGES-015 Draft Release Branch Target Probe
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/pages-015-release-branch-target-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  TARGET_BRANCH: pages015-probe-target-5cc89e05
+  TARGET_SHA: 5cc89e05653b6461ed6a41332f374eaadb360945
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: threejs-rebuild
+          fetch-depth: 0
+
+      - name: Probe draft release via pre-resolved branch target
+        id: probe
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -u
+          tag="pages015-branch-target-probe-${GITHUB_RUN_ID}"
+          draft_created=false
+          release_deleted=false
+          tag_deleted=true
+          branch_deleted=false
+          release_id=''
+          error_class='none'
+
+          if gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
+            --target "$TARGET_BRANCH" \
+            --title "PAGES-015 disposable branch-target probe" \
+            --notes "Disposable non-qualification probe; must be deleted in this run." \
+            --latest=false --draft >/tmp/pages015-probe.out 2>/tmp/pages015-probe.err; then
+            draft_created=true
+            release_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+              --jq ".[] | select(.tag_name == \"${tag}\") | .id" | head -n1)"
+          else
+            if grep -qi 'Resource not accessible by integration' /tmp/pages015-probe.err; then
+              error_class='resource-not-accessible-by-integration'
+            elif grep -qi 'workflow' /tmp/pages015-probe.err; then
+              error_class='workflow-permission-related'
+            else
+              error_class='other-create-failure'
+            fi
+          fi
+
+          if [ -n "$release_id" ]; then
+            if gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}" >/dev/null 2>&1; then
+              release_deleted=true
+            fi
+          fi
+
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" >/dev/null 2>&1; then
+            tag_deleted=false
+            if gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${tag}" >/dev/null 2>&1; then
+              tag_deleted=true
+            fi
+          fi
+
+          if gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${TARGET_BRANCH}" >/dev/null 2>&1; then
+            branch_deleted=true
+          fi
+
+          printf 'draft_created=%s\n' "$draft_created" >> "$GITHUB_OUTPUT"
+          printf 'release_deleted=%s\n' "$release_deleted" >> "$GITHUB_OUTPUT"
+          printf 'tag_deleted=%s\n' "$tag_deleted" >> "$GITHUB_OUTPUT"
+          printf 'branch_deleted=%s\n' "$branch_deleted" >> "$GITHUB_OUTPUT"
+          printf 'error_class=%s\n' "$error_class" >> "$GITHUB_OUTPUT"
+
+      - name: Record non-qualification probe receipt
+        env:
+          DRAFT_CREATED: ${{ steps.probe.outputs.draft_created }}
+          RELEASE_DELETED: ${{ steps.probe.outputs.release_deleted }}
+          TAG_DELETED: ${{ steps.probe.outputs.tag_deleted }}
+          BRANCH_DELETED: ${{ steps.probe.outputs.branch_deleted }}
+          ERROR_CLASS: ${{ steps.probe.outputs.error_class }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin threejs-rebuild
+          git reset --hard origin/threejs-rebuild
+          mkdir -p RELEASE_QUALIFICATION
+          jq -n \
+            --arg runId "$GITHUB_RUN_ID" \
+            --arg targetBranch "$TARGET_BRANCH" \
+            --arg targetSha "$TARGET_SHA" \
+            --argjson draftCreated "$DRAFT_CREATED" \
+            --argjson releaseDeleted "$RELEASE_DELETED" \
+            --argjson tagDeleted "$TAG_DELETED" \
+            --argjson branchDeleted "$BRANCH_DELETED" \
+            --arg errorClass "$ERROR_CLASS" \
+            --arg recordedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
+            {
+              schemaVersion: 1,
+              gate: "PAGES-015",
+              event: "draft_release_branch_target_probe",
+              workflowRunId: ($runId|tonumber),
+              targetBranch: $targetBranch,
+              targetSha: $targetSha,
+              draftCreated: $draftCreated,
+              cleanup: {
+                releaseDeleted: $releaseDeleted,
+                tagDeleted: $tagDeleted,
+                branchDeleted: $branchDeleted
+              },
+              errorClass: $errorClass,
+              containsSecretValues: false,
+              qualificationEvidence: false,
+              recordedAt: $recordedAt
+            }
+          ' > RELEASE_QUALIFICATION/PAGES015_BRANCH_TARGET_RELEASE_PROBE.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add RELEASE_QUALIFICATION/PAGES015_BRANCH_TARGET_RELEASE_PROBE.json
+          git commit -m 'PAGES-015 record branch-target draft release probe'
+          git push origin HEAD:threejs-rebuild
