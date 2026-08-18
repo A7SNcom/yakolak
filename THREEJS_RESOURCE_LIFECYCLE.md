@@ -49,6 +49,7 @@ Future THREEJS-026 shadow resources, THREEJS-096 motion resources, and every lat
 13. External setup is rollback-safe against reentrant registration failure. If listener installation, subscription setup, observer activation, RAF scheduling, timeout scheduling or interval scheduling succeeds but the registry becomes unusable before ownership is recorded, the new external handle is synchronously removed/unsubscribed/disconnected/cancelled and the original registration error is rethrown.
 14. One-shot scheduling is completion-safe even under a synchronous platform adapter. If RAF/timeout invokes its callback before the registry token can be created, the handle is treated as already completed, cancelled best-effort, no lifecycle entry is created, and the returned token is inactive.
 15. Shared factories must return a concrete resource. If a newly created shared resource cannot be registered because the registry becomes unusable or registration otherwise fails, that unowned resource is cleaned up immediately with its explicit cleanup/default disposal path. A resource that was already actively owned before the shared claim is never destroyed by this rollback.
+16. Shared diagnostics ownership is stable across consumer lifetimes. `scope.getOrCreateShared()` uses the explicit `metadata.scope` when provided and otherwise registers the shared resource under the stable `shared` scope, never under the short-lived consumer scope. Releasing a consumer therefore cannot leave that closed scope visible as the authoritative owner of a live shared resource.
 
 ## WebGL context loss
 
@@ -69,7 +70,7 @@ After any completed `setup → play → rematch → return` cycle, the registry 
 - DOM/window/media listeners;
 - subscriptions.
 
-The THREEJS-027 contract tests run consecutive lifecycle cycles and also verify context-loss/idempotent destruction, shared-resource reuse, post-release scope closure, replacement-key integrity, scope-local deep-release ownership, metadata-preflight side-effect safety, transactional listener replacement failure, cross-scope ownership isolation, reentrant external-setup rollback, synchronous one-shot completion without stale handles and failed shared-factory rollback without damaging pre-owned resources.
+The THREEJS-027 contract tests run consecutive lifecycle cycles and also verify context-loss/idempotent destruction, shared-resource reuse, post-release scope closure, replacement-key integrity, scope-local deep-release ownership, metadata-preflight side-effect safety, transactional listener replacement failure, cross-scope ownership isolation, reentrant external-setup rollback, synchronous one-shot completion without stale handles, failed shared-factory rollback without damaging pre-owned resources and stable shared diagnostics ownership across released consumer scopes.
 
 ## Diagnostics
 
