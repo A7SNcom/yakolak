@@ -30,6 +30,16 @@ PAGES-015 appends `backend_compatibility_verified` for the same key, with the ve
 
 Do not write pending placeholders for deployment-generation or backend-compatibility state. Absence of a later evidence event means it has not yet been qualified.
 
+## Writer ownership
+
+PAGES-015 has one authoritative automatic-resume writer: `.github/workflows/pages-015-qualification-orchestrator.yml` on `main`, which serializes archive qualification, PAGES-005 bootstrap and final compatibility qualification through the version-controlled helpers.
+
+`.github/workflows/pages-015-online-compatibility.yml` is a manual `workflow_dispatch` fallback only. It must not regain `push` or `schedule` triggers because a second automatic ledger writer can race the orchestrator when frontend archive rows or Worker lock files appear.
+
+`.github/workflows/pages-005-cloudflare-backend.yml` may verify backend contracts on pushes, but its live deploy job is manual-only. Automatic PAGES-015 qualification must continue through the orchestrator.
+
+`tests/pages015_single_resume_path_contract.test.mjs` locks the manual-only legacy compatibility workflow contract and runs in the main PAGES-015 orchestrator validation step.
+
 ## Complete qualification
 
 THREEJS-098/099 may consume an archive only when `node scripts/verify-release-qualification.mjs <releaseTag> <assetSha256>` exits successfully. The verifier requires all three events for the exact same key and validates the PAGES-014 and PAGES-015 evidence shapes.
