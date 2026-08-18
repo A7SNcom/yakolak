@@ -41,6 +41,8 @@ If the Administration preflight or immutability proof cannot succeed, nothing is
 
 Re-running PAGES-012 is expected to revalidate the same retained prepared bundle and the same draft assets once the Administration credential exists. Before that credential exists, the workflow should fail immediately at preflight instead of redoing exact-byte recovery. A retry must never publish unless the Administration check proves immutable releases enabled, and it must never treat `draft_staged` as archive qualification.
 
+A retry against the current workflow definition is intentionally fail-fast: when explicitly retried to test newly supplied credentials, the first step must prove the Administration secret is present before any archive recovery, draft mutation, hashing, or download work begins.
+
 ## Immutable release assets
 
 The release contains exactly:
