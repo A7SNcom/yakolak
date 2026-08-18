@@ -3,6 +3,7 @@
   "windowId": "pages015-frontend-window-2026-08-18-v1",
   "purpose": "candidate-active-previous-window-only-not-qualification-evidence",
   "qualificationSource": "RELEASE_QUALIFICATION/ledger.jsonl",
+  "pages014EvidencePolicy": "successful-live-verifier-run-plus-exact-live-identity-required-before-deployment-generation-qualification",
   "frontends": [
     {
       "role": "active",
@@ -14,7 +15,15 @@
       "sourcePagesRunId": 32110008705,
       "sourcePagesArtifactId": 9314508471,
       "deploymentGeneration": "sha256:984f30cf5df2117d86ae4c6fc304c0ad7b2efdf3dc4db3b3ab6557d16b7bba28",
-      "contentIdentitySha256": "0b425af69983b9aa5ceed2ec379259af9b9f5495d21bb89462a149d5740115c2"
+      "publicRuntimeProtocolSha256": "7c40dd25ded3a3e7ffbb48b274365feaa9d8a7d67156444620bb6dde14132a37",
+      "contentIdentitySha256": "0b425af69983b9aa5ceed2ec379259af9b9f5495d21bb89462a149d5740115c2",
+      "pages014LiveEvidence": {
+        "verifierWorkflowRunId": 32110138422,
+        "verifierJobId": 95627570148,
+        "liveManifestSha256": "ab6fed5a9d7b00e3f07da8ebd9e648525d62a86d19efebd116f2868eaa2f3b26",
+        "pageUrl": "https://a7sncom.github.io/yakolak/",
+        "verified": true
+      }
     },
     {
       "role": "previous",
@@ -26,7 +35,15 @@
       "sourcePagesRunId": 32108243496,
       "sourcePagesArtifactId": 9313917543,
       "deploymentGeneration": "sha256:e4e2eaa97bcced485e456dd5a3e7f9ef2c0fad6db2255f8ce1f0bfaa88530b51",
-      "contentIdentitySha256": "bfb80df2f416306af050f98ad161e7959e6795fbbbdf68b47ca4cb5036b9815c"
+      "publicRuntimeProtocolSha256": "f778d8a3c2214f077dba7739304b3451c2e9560a03a95d69156b4151b19be9c6",
+      "contentIdentitySha256": "bfb80df2f416306af050f98ad161e7959e6795fbbbdf68b47ca4cb5036b9815c",
+      "pages014LiveEvidence": {
+        "verifierWorkflowRunId": 32108312542,
+        "verifierJobId": 95622202376,
+        "liveManifestSha256": "7acbfb04d9228fa4a0caef6b0d31b67b5f71117d54842861e0c2caa8341a77fa",
+        "pageUrl": "https://a7sncom.github.io/yakolak/",
+        "verified": true
+      }
     }
   ],
   "rules": {
@@ -34,6 +51,7 @@
     "archiveKeysMustBeDistinct": true,
     "bothRequireArchiveVerified": true,
     "bothRequireDeploymentGenerationVerified": true,
+    "bothRequireSuccessfulPages014LiveEvidence": true,
     "thisFileDoesNotConferEligibility": true
   }
 }
