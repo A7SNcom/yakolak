@@ -312,12 +312,21 @@ export function createResourceRegistry({
     if (typeof factory !== 'function') throw new TypeError('Shared resource factory must be a function');
     const preflight = normaliseMetadata({
       ...metadata,
+      scope: metadata.scope || 'shared',
       ownership: RESOURCE_OWNERSHIP.SHARED_IMMUTABLE,
       replacementKey: `shared:${sharedKey}`,
     });
     const activeId = sharedEntries.get(sharedKey);
     const active = activeId ? entries.get(activeId) : null;
-    if (active && !active.released) return active.resource;
+    if (active && !active.released) {
+      if (metadata.kind && active.kind !== metadata.kind) {
+        throw new Error(`Shared resource key collision: ${sharedKey} kind ${active.kind} != ${metadata.kind}`);
+      }
+      if (metadata.scope && active.scope !== metadata.scope) {
+        throw new Error(`Shared resource key collision: ${sharedKey} scope ${active.scope} != ${metadata.scope}`);
+      }
+      return active.resource;
+    }
 
     const resource = factory();
     if (resource == null) throw new TypeError('Shared resource factory must return a resource');
@@ -656,10 +665,7 @@ export function createResourceRegistry({
       registerCleanup: (cleanup, metadata) => registerCleanup(cleanup, scopedMetadata(metadata)),
       getOrCreateShared(key, factory, metadata = {}) {
         assertScopeLive();
-        return getOrCreateShared(key, factory, {
-          ...metadata,
-          scope: metadata.scope || 'shared',
-        });
+        return getOrCreateShared(key, factory, metadata);
       },
       release(reason = 'scope-released') {
         if (released) return 0;
