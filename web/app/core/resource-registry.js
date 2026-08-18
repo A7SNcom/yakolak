@@ -518,7 +518,9 @@ export function createResourceRegistry({
     const cancelFn = platformFunction(cancelName);
     const holder = { handle: null };
     let token = null;
+    let firedBeforeRegistration = false;
     const wrapped = (...args) => {
+      if (!token) firedBeforeRegistration = true;
       if (token?.active) {
         const entry = entries.get(token.id);
         if (entry) {
@@ -531,6 +533,10 @@ export function createResourceRegistry({
     };
     holder.handle = delay == null ? scheduleFn(wrapped) : scheduleFn(wrapped, delay);
     const rollback = () => cancelFn(holder.handle);
+    if (firedBeforeRegistration) {
+      rollbackExternalSetup(rollback);
+      return createNoopToken();
+    }
     token = registerAfterExternalSetup(holder, {
       ...prepared,
       cleanup: rollback,
