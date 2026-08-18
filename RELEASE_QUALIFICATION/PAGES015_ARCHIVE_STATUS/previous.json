@@ -4,9 +4,9 @@
   "releaseTag": "pages-archive-2026-08-18-geeb3b8e1-t5cc89e05",
   "assetSha256": "6769843ee45a807cffe8af8c8450e0afd7d08c45270e66512f1ad52462dfb560",
   "immutableAdminReady": false,
-  "stageOutcome": "failure",
+  "stageOutcome": "success",
   "publishOutcome": "skipped",
-  "workflowRunId": 32133329401,
-  "recordedAt": "2026-08-18T11:46:37Z",
+  "workflowRunId": 32133400098,
+  "recordedAt": "2026-08-18T11:47:37Z",
   "qualificationEvidence": false
 }
