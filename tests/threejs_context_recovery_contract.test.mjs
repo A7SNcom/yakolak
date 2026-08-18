@@ -29,10 +29,16 @@ assert.equal((htmlSource.match(/id="graphics-recovery-reload"/g) || []).length, 
 assert.doesNotMatch(sessionSource, /\bTHREE\b|WebGLRenderer|canvas|getContext\(/, 'canonical online session state must not depend on GPU objects');
 
 let transportSubmissions = 0;
+const compatibilityGate = Object.freeze({
+  assertMutationAllowed: () => Object.freeze({ protocolVersion: 'test' }),
+  observeSnapshot: () => Object.freeze({ protocolVersion: 'test' }),
+  snapshot: () => Object.freeze({ state: 'compatible', compatible: true, identity: Object.freeze({ protocolVersion: 'test' }), errorCode: null }),
+});
 const session = createCanonicalOnlineSession({
   roomId: 'ROOM-014',
   seatId: 'seat-4',
   playerId: 'player-4',
+  compatibilityGate,
   async submitMove(intent, seatIdentity) {
     transportSubmissions += 1;
     return Object.freeze({ accepted: true, moveId: intent.moveId, seatId: seatIdentity.seatId });
