@@ -20,9 +20,10 @@ test('legacy PAGES-015 compatibility workflow is manual fallback only', () => {
   assert.doesNotMatch(block, /\bschedule:/);
 });
 
-test('legacy fallback keeps a distinct manual-only identity', () => {
+test('legacy fallback keeps a distinct manual-only identity and shared ledger lock', () => {
   assert.match(legacy, /^name: PAGES-015 online compatibility qualification/m);
   assert.match(legacy, /backend_compatibility_verified|append-pages015-qualification/);
+  assert.match(legacy, /concurrency:\n\s+group: pages-release-qualification-ledger\n\s+cancel-in-progress: false/);
 });
 
 test('PAGES-005 may verify on push but live deploy stays manual-only', () => {
