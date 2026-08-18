@@ -96,7 +96,8 @@ jq -e \
    .mutationRequiresHealthProof == true' \
   "$site/threejs/online-compatibility.json" >/dev/null
 
-# PAGES-014 live proof stays external to immutable release bytes.
+# PAGES-014 live proof is revalidated externally. The immutable facts asset retains only
+# immutable identities that were already known when the original draft contract was staged.
 pages014_run="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${PAGES014_VERIFIER_RUN_ID}")"
 jq -e '.status == "completed" and .conclusion == "success"' <<<"$pages014_run" >/dev/null
 pages014_job="$(gh api "repos/${GITHUB_REPOSITORY}/actions/jobs/${PAGES014_VERIFIER_JOB_ID}")"
@@ -118,8 +119,8 @@ grep -Fq "CONTENT_IDENTITY: ${CONTENT_IDENTITY_SHA256}" "$pages014_log"
 grep -Fq "LIVE_MANIFEST_SHA: ${PAGES014_LIVE_MANIFEST_SHA256}" "$pages014_log"
 grep -Fq "Live desired generation verified: ${DEPLOYMENT_GENERATION}" "$pages014_log"
 
-# Deterministic release assets. IMMUTABLE_FACTS deliberately contains byte/source facts,
-# not later qualification state, so it matches the already-staged active draft contract.
+# Deterministic release assets. Preserve the original immutable-facts byte contract used
+# by the first exact draft; later qualification state remains external in the ledger.
 (
   cd "$site"
   find . -type f -printf '%P\n' | LC_ALL=C sort | while IFS= read -r rel; do
@@ -174,6 +175,8 @@ jq -n \
   --arg descriptorSha "$EXPECTED_ONLINE_DESCRIPTOR_SHA256" \
   --arg generation "$DEPLOYMENT_GENERATION" \
   --arg contentIdentity "$CONTENT_IDENTITY_SHA256" \
+  --arg liveManifestSha "$PAGES014_LIVE_MANIFEST_SHA256" \
+  --argjson pages014VerifierRunId "$PAGES014_VERIFIER_RUN_ID" \
   '{
     schemaVersion: 1,
     releaseTag: $releaseTag,
@@ -187,6 +190,8 @@ jq -n \
     },
     deploymentGeneration: $generation,
     contentIdentitySha256: $contentIdentity,
+    liveManifestSha256: $liveManifestSha,
+    pages014VerifierRunId: $pages014VerifierRunId,
     onlineCompatibilityDescriptorSha256: $descriptorSha,
     archives: {
       "pages-composite.tar": {sha256: $pagesSha, contentManifestSha256: $pagesManifestSha},
