@@ -7,6 +7,7 @@ const rendererSource = await readFile('web/app/scene/renderer.js', 'utf8');
 const governorSource = await readFile('web/app/camera/frame-governor.js', 'utf8');
 const previewSource = await readFile('web/app/scene/preview-scene.js', 'utf8');
 const bootSource = await readFile('web/app/boot/boot.js', 'utf8');
+const registrySource = await readFile('web/app/core/resource-registry.js', 'utf8');
 const htmlSource = await readFile('web/index.html', 'utf8');
 const sessionSource = await readFile('web/app/session/canonical-online-session.js', 'utf8');
 
@@ -15,9 +16,12 @@ assert.match(rendererSource, /if \(!contextRecovery\.canUseGpu\)[\s\S]*skipped: 
 assert.match(rendererSource, /if \(!contextRecovery\.canUseGpu\) return false;[\s\S]*renderer\.render\(scene, camera\)/, 'render calls must be blocked while context is unavailable');
 assert.match(rendererSource, /registerResourceRestorer/, 'renderer owner must expose one controlled resource-rebind boundary');
 assert.match(governorSource, /graphicsAvailable/, 'frame governor must model graphics availability');
-assert.match(governorSource, /!graphicsAvailable \|\| frameId/, 'RAF scheduling must stop while graphics are unavailable');
+assert.match(governorSource, /!graphicsAvailable \|\| frameToken\?\.active/, 'registry-owned RAF scheduling must stop while graphics are unavailable');
 assert.match(previewSource, /registerResourceRestorer\(\(\{ generation \}\)/, 'preview GPU-facing resources must rebind through the renderer recovery boundary');
 assert.match(previewSource, /generation <= restoredResourceGeneration/, 'resource rebind must be idempotent per recovery generation');
+assert.match(previewSource, /resources\.release\(\);[\s\S]*createGpuFacingPreviewResources/, 'old generation resources must release before restored resources are created');
+assert.match(registrySource, /markContextLost/, 'registry must explicitly model context loss');
+assert.match(registrySource, /if \(!contextLost\) resource\.forceContextLoss\?\.\(\)/, 'registry teardown must be safe after an already-lost context');
 assert.match(bootSource, /getGraphicsContextSnapshot/, 'shell must expose read-only context diagnostics');
 assert.match(bootSource, /window\.location\.reload\(\)/, 'failed recovery must expose one actionable reload path');
 assert.equal((htmlSource.match(/id="graphics-recovery"/g) || []).length, 1, 'there must be exactly one graphics recovery failure state');
@@ -101,4 +105,4 @@ assert.match(failedRecovery.snapshot().failure.message, /synthetic restore failu
 recovery.dispose();
 failedRecovery.dispose();
 
-console.log('Verified THREEJS-014 context loss/restore, exactly-once rebind, seat identity and move dedupe invariants');
+console.log('Verified THREEJS-014 context loss/restore, exactly-once registry rebind, seat identity and move dedupe invariants');

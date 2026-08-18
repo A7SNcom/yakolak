@@ -1,4 +1,5 @@
 import { Euler, Group, InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
+import { RESOURCE_KINDS, RESOURCE_OWNERSHIP } from '../core/resource-registry.js';
 import {
   PIECE_COLOR_IDS,
   PIECE_COPIES_PER_SIZE_PER_COLOR,
@@ -47,7 +48,11 @@ function matrixAt(center, rotation, sourcePivot) {
     .multiply(new Matrix4().makeTranslation(-sourcePivot.x, -sourcePivot.y, -sourcePivot.z));
 }
 
-export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approvedContract, materialsByColor } = {}) {
+export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approvedContract, materialsByColor, resourceRegistry } = {}) {
+  if (!resourceRegistry?.createScope) throw new TypeError('Piece instances require the THREEJS-027 resource registry');
+  const lifecycle = resourceRegistry.createScope('piece-instances', {
+    ownership: RESOURCE_OWNERSHIP.GENERATION_SCOPED,
+  });
   const catalog = createLogicalPieceCatalog({ worldLayout, approvedContract });
   const rotation = quaternionFor(catalog.rotationDegrees);
   const resourceBySize = new Map();
@@ -66,35 +71,51 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
   const meshByKey = new Map();
   const destinationByPieceId = new Map();
 
-  for (const size of PIECE_SIZES) {
-    for (const colorId of PIECE_COLOR_IDS) {
-      const mesh = new InstancedMesh(
-        resourceBySize.get(size).geometry,
-        materialsByColor[colorId],
-        PIECE_COPIES_PER_SIZE_PER_COLOR,
-      );
-      mesh.name = `pieces:${colorId}:${size}`;
-      mesh.userData.presentationOnly = true;
-      mesh.userData.size = size;
-      mesh.userData.colorId = colorId;
-      meshByKey.set(`${colorId}:${size}`, mesh);
-      root.add(mesh);
+  try {
+    for (const size of PIECE_SIZES) {
+      for (const colorId of PIECE_COLOR_IDS) {
+        const mesh = new InstancedMesh(
+          resourceBySize.get(size).geometry,
+          materialsByColor[colorId],
+          PIECE_COPIES_PER_SIZE_PER_COLOR,
+        );
+        lifecycle.register(mesh, {
+          kind: RESOURCE_KINDS.INSTANCED_MESH,
+          label: `piece-instanced-mesh:${colorId}:${size}`,
+        });
+        mesh.name = `pieces:${colorId}:${size}`;
+        mesh.userData.presentationOnly = true;
+        mesh.userData.size = size;
+        mesh.userData.colorId = colorId;
+        meshByKey.set(`${colorId}:${size}`, mesh);
+        root.add(mesh);
+      }
     }
+
+    for (const piece of catalog.pieces) {
+      const mesh = meshByKey.get(`${piece.colorId}:${piece.size}`);
+      const instanceIndex = piece.copyIndex;
+      renderSlotByPieceId.set(piece.id, { mesh, instanceIndex });
+      const destination = catalog.getHomeDestination(piece.id);
+      destinationByPieceId.set(piece.id, destination);
+      mesh.setMatrixAt(instanceIndex, matrixAt(destination.center, rotation, resourceBySize.get(piece.size).sourcePivot));
+    }
+
+    for (const mesh of meshByKey.values()) {
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+    }
+  } catch (error) {
+    lifecycle.release('piece-instance-construction-failed');
+    throw error;
   }
 
-  for (const piece of catalog.pieces) {
-    const mesh = meshByKey.get(`${piece.colorId}:${piece.size}`);
-    const instanceIndex = piece.copyIndex;
-    renderSlotByPieceId.set(piece.id, { mesh, instanceIndex });
-    const destination = catalog.getHomeDestination(piece.id);
-    destinationByPieceId.set(piece.id, destination);
-    mesh.setMatrixAt(instanceIndex, matrixAt(destination.center, rotation, resourceBySize.get(piece.size).sourcePivot));
-  }
-
-  for (const mesh of meshByKey.values()) {
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
-  }
+  lifecycle.registerCleanup(() => {
+    root.clear();
+    meshByKey.clear();
+    renderSlotByPieceId.clear();
+    destinationByPieceId.clear();
+  }, { label: 'piece-instance-structure-release' });
 
   function syncPresentation(pieceId, destination) {
     const piece = catalog.getPiece(pieceId);
@@ -142,15 +163,7 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
     }));
   }
 
-  function dispose() {
-    // Geometry is AssetManager-owned and shared by all colors of a size.
-    // Materials are scene-owned and shared by all sizes of a color.
-    root.clear();
-    meshByKey.clear();
-    renderSlotByPieceId.clear();
-    destinationByPieceId.clear();
-  }
-
+  const release = () => lifecycle.release('piece-instances-released');
   return Object.freeze({
     root,
     pieceIds: catalog.pieceIds,
@@ -160,6 +173,7 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
     syncPieceToBoard,
     getInstanceCounts,
     getPlacementSnapshot,
-    dispose,
+    release,
+    dispose: release,
   });
 }

@@ -7,12 +7,16 @@ required=(
   web/app/boot/boot.js
   web/app/boot/fatal-error.js
   web/app/boot/build-marker.js
+  web/app/core/resource-registry.js
   web/app/data/runtime-data.js
   web/app/materials/canonical-materials.js
   web/app/scene/renderer.js
+  web/app/scene/context-recovery.js
   web/app/scene/preview-scene.js
   web/app/scene/lighting-rig.js
   web/app/scene/board-and-lid.js
+  web/app/scene/piece-layout.js
+  web/app/scene/pieces.js
   web/app/scene/player-bases.js
   web/app/scene/table-score-layout.js
   web/app/scene/table-and-score.js
@@ -39,6 +43,7 @@ required=(
   scripts/lib/board-lid-semantic-glb.mjs
   scripts/analyze-threejs-player-base.mjs
   scripts/verify-threejs-player-bases.mjs
+  scripts/verify-threejs-pieces.mjs
   scripts/verify-threejs-board-lid.mjs
   scripts/verify-threejs-board-lid-runtime-contract.mjs
   scripts/verify-threejs-table-score.mjs
@@ -48,13 +53,16 @@ required=(
   scripts/verify-threejs-lighting.mjs
   scripts/measure-threejs-performance.mjs
   tests/threejs_renderer_owner_contract.test.mjs
+  tests/threejs_context_recovery_contract.test.mjs
   tests/threejs_frame_governor_contract.test.mjs
+  tests/threejs_resource_registry_contract.test.mjs
   tests/threejs_asset_loading_contract.test.mjs
   tests/threejs_asset_runtime_copies_contract.test.mjs
   tests/threejs_asset_conversion_pipeline.test.mjs
   tests/threejs_performance_budget_contract.test.mjs
   tests/threejs_board_and_lid_contract.test.mjs
   tests/threejs_player_bases_contract.test.mjs
+  tests/threejs_pieces_contract.test.mjs
   tests/threejs_table_score_contract.test.mjs
   tests/threejs_room_contract.test.mjs
   tests/threejs_runtime_data_contract.test.mjs
@@ -72,6 +80,7 @@ npm run assets:check -- --only=model.score-marker
 node scripts/verify-threejs-board-lid.mjs
 node scripts/verify-threejs-board-lid-runtime-contract.mjs
 node scripts/verify-threejs-player-bases.mjs
+node scripts/verify-threejs-pieces.mjs
 node scripts/verify-threejs-table-score.mjs
 node scripts/verify-threejs-room.mjs
 node scripts/verify-threejs-runtime-data.mjs
@@ -91,13 +100,16 @@ if grep -Eqi 'index\.pck|index\.wasm|index\.audio|godot' \
 fi
 
 node tests/threejs_renderer_owner_contract.test.mjs
+node tests/threejs_context_recovery_contract.test.mjs
 node tests/threejs_frame_governor_contract.test.mjs
+node tests/threejs_resource_registry_contract.test.mjs
 node tests/threejs_asset_loading_contract.test.mjs
 node tests/threejs_asset_runtime_copies_contract.test.mjs
 node tests/threejs_asset_conversion_pipeline.test.mjs
 node tests/threejs_performance_budget_contract.test.mjs
 node tests/threejs_board_and_lid_contract.test.mjs
 node tests/threejs_player_bases_contract.test.mjs
+node tests/threejs_pieces_contract.test.mjs
 node tests/threejs_table_score_contract.test.mjs
 node tests/threejs_room_contract.test.mjs
 node tests/threejs_runtime_data_contract.test.mjs
@@ -109,4 +121,4 @@ if [ "${VERCEL_GIT_COMMIT_REF:-}" = "threejs-rebuild" ]; then
   test -n "${TURSO_AUTH_TOKEN:-}" || { echo "Missing TURSO_AUTH_TOKEN" >&2; exit 1; }
 fi
 
-echo "Verified YAKOLAK static Three.js shell with immutable canonical runtime data, approved materials, three-light baseline-tuned neutral rig, canonical assets, definitive room, and locked performance budgets"
+echo "Verified YAKOLAK static Three.js shell with one lifecycle registry, immutable shared resources, leak-safe rematch/context restore, canonical assets and locked performance budgets"

@@ -1,5 +1,7 @@
-// THREEJS-013/014: presentation-only frame pacing / viewport and graphics-availability governance.
-// This module never owns authoritative game or lifecycle state.
+import { createResourceRegistry, RESOURCE_KINDS, RESOURCE_OWNERSHIP } from '../core/resource-registry.js';
+
+// THREEJS-013/014/027: presentation-only frame pacing / viewport and graphics-availability governance.
+// All animation handles, timers, observers and subscriptions are owned by the lifecycle registry.
 
 export const FRAME_GOVERNOR_POLICY = Object.freeze({
   maxPixelRatio: 1.5,
@@ -96,6 +98,7 @@ export function createFrameGovernor({
   rendererOwner,
   camera,
   onFrame,
+  resourceRegistry = null,
   maxPixelRatio = FRAME_GOVERNOR_POLICY.maxPixelRatio,
   maxFramesPerSecond = FRAME_GOVERNOR_POLICY.maxFramesPerSecond,
   resizeDebounceMs = FRAME_GOVERNOR_POLICY.resizeDebounceMs,
@@ -115,6 +118,12 @@ export function createFrameGovernor({
   if (typeof onFrame !== 'function') {
     throw new TypeError('Frame governor requires an onFrame callback');
   }
+
+  const ownsRegistry = !resourceRegistry;
+  const registry = resourceRegistry || createResourceRegistry({ platform: window });
+  const lifecycle = registry.createScope('frame-governor', {
+    ownership: RESOURCE_OWNERSHIP.GENERATION_SCOPED,
+  });
 
   const safeMaxPixelRatio = finitePositive(maxPixelRatio, FRAME_GOVERNOR_POLICY.maxPixelRatio);
   const safeMaxFramesPerSecond = finitePositive(maxFramesPerSecond, FRAME_GOVERNOR_POLICY.maxFramesPerSecond);
@@ -138,12 +147,11 @@ export function createFrameGovernor({
   let layoutReady = true;
   let renderRequested = true;
   let resumed = false;
-  let frameId = 0;
-  let resizeTimer = 0;
-  let resizeObserver = null;
+  let frameToken = null;
+  let resizeToken = null;
+  let dprToken = null;
   let dprMedia = null;
   let safeAreaProbe = null;
-  let unsubscribeContextState = null;
   let safeArea = Object.freeze({ top: 0, right: 0, bottom: 0, left: 0 });
   let viewport = null;
   let lastPresentedAt = Number.NEGATIVE_INFINITY;
@@ -155,20 +163,21 @@ export function createFrameGovernor({
   }
 
   function cancelScheduledFrame() {
-    if (!frameId) return;
-    cancelAnimationFrame(frameId);
-    frameId = 0;
+    frameToken?.cancel('presentation-frame-cancelled');
+    frameToken = null;
   }
 
   function cancelResizeDebounce() {
-    if (!resizeTimer) return;
-    clearTimeout(resizeTimer);
-    resizeTimer = 0;
+    resizeToken?.cancel('resize-debounce-cancelled');
+    resizeToken = null;
   }
 
   function schedule() {
-    if (!started || disposed || !visible || !graphicsAvailable || frameId) return;
-    frameId = requestAnimationFrame(tick);
+    if (!started || disposed || !visible || !graphicsAvailable || frameToken?.active) return;
+    frameToken = lifecycle.requestFrame(tick, {
+      label: 'presentation-frame',
+      replacementKey: 'presentation-frame',
+    });
   }
 
   function requestRender() {
@@ -195,19 +204,28 @@ export function createFrameGovernor({
     }
 
     layoutReady = false;
-    resizeTimer = window.setTimeout(() => {
-      resizeTimer = 0;
+    resizeToken = lifecycle.setTimeout(() => {
+      resizeToken = null;
       if (disposed || !visible || !graphicsAvailable) return;
       layoutReady = true;
       schedule();
-    }, safeResizeDebounceMs);
+    }, safeResizeDebounceMs, {
+      label: 'resize-debounce',
+      replacementKey: 'resize-debounce',
+    });
   }
 
   function bindDprWatcher() {
-    if (dprMedia?.removeEventListener) dprMedia.removeEventListener('change', onDprChange);
+    dprToken?.release('dpr-watcher-rebound');
+    dprToken = null;
     const rawPixelRatio = readRawDevicePixelRatio();
     dprMedia = window.matchMedia?.(`(resolution: ${rawPixelRatio}dppx)`) || null;
-    dprMedia?.addEventListener?.('change', onDprChange);
+    if (dprMedia?.addEventListener) {
+      dprToken = lifecycle.listen(dprMedia, 'change', onDprChange, undefined, {
+        label: 'dpr-change',
+        replacementKey: 'dpr-change',
+      });
+    }
   }
 
   function onDprChange() {
@@ -325,7 +343,7 @@ export function createFrameGovernor({
   }
 
   function tick(now) {
-    frameId = 0;
+    frameToken = null;
     if (!started || disposed || !visible || !graphicsAvailable) return;
 
     const layout = layoutDirty && layoutReady ? applyLayout() : null;
@@ -369,8 +387,8 @@ export function createFrameGovernor({
       graphicsAvailable,
       continuous,
       layoutDirty,
-      framePending: Boolean(frameId),
-      resizeDebouncePending: Boolean(resizeTimer),
+      framePending: Boolean(frameToken?.active),
+      resizeDebouncePending: Boolean(resizeToken?.active),
       frameCount,
       layoutCommitCount,
       lastPresentedAt: Number.isFinite(lastPresentedAt) ? lastPresentedAt : null,
@@ -385,47 +403,50 @@ export function createFrameGovernor({
     started = true;
     visible = document.visibilityState !== 'hidden';
     safeAreaProbe = createSafeAreaProbe();
-    unsubscribeContextState = rendererOwner.subscribeContextState(onContextStateChange);
+    lifecycle.register(safeAreaProbe, {
+      kind: RESOURCE_KINDS.DOM_NODE,
+      label: 'safe-area-probe',
+    });
 
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    window.addEventListener('pageshow', onPageShow);
-    window.addEventListener('pagehide', onPageHide);
-    window.addEventListener('resize', invalidateLayout, { passive: true });
-    window.addEventListener('orientationchange', invalidateLayout, { passive: true });
-    window.visualViewport?.addEventListener('resize', invalidateLayout, { passive: true });
-    screen.orientation?.addEventListener?.('change', invalidateLayout);
+    lifecycle.subscribe(
+      (listener) => rendererOwner.subscribeContextState(listener),
+      onContextStateChange,
+      { label: 'renderer-context-state' },
+    );
 
-    if (typeof ResizeObserver === 'function') {
-      resizeObserver = new ResizeObserver(invalidateLayout);
-      if (rendererOwner.canvas.parentElement) resizeObserver.observe(rendererOwner.canvas.parentElement);
+    lifecycle.listen(document, 'visibilitychange', onVisibilityChange, undefined, { label: 'visibilitychange' });
+    lifecycle.listen(window, 'pageshow', onPageShow, undefined, { label: 'pageshow' });
+    lifecycle.listen(window, 'pagehide', onPageHide, undefined, { label: 'pagehide' });
+    lifecycle.listen(window, 'resize', invalidateLayout, { passive: true }, { label: 'window-resize' });
+    lifecycle.listen(window, 'orientationchange', invalidateLayout, { passive: true }, { label: 'orientationchange' });
+    if (window.visualViewport?.addEventListener) {
+      lifecycle.listen(window.visualViewport, 'resize', invalidateLayout, { passive: true }, { label: 'visual-viewport-resize' });
+    }
+    if (screen.orientation?.addEventListener) {
+      lifecycle.listen(screen.orientation, 'change', invalidateLayout, undefined, { label: 'screen-orientation-change' });
+    }
+
+    if (typeof ResizeObserver === 'function' && rendererOwner.canvas.parentElement) {
+      lifecycle.observe(new ResizeObserver(invalidateLayout), rendererOwner.canvas.parentElement, undefined, {
+        label: 'renderer-parent-resize',
+      });
     }
 
     bindDprWatcher();
     invalidateLayout({ immediate: true });
   }
 
-  function dispose() {
+  function release() {
     if (disposed) return;
     disposed = true;
     started = false;
     cancelScheduledFrame();
     cancelResizeDebounce();
-    unsubscribeContextState?.();
-    unsubscribeContextState = null;
-    resizeObserver?.disconnect();
-    resizeObserver = null;
-
-    document.removeEventListener('visibilitychange', onVisibilityChange);
-    window.removeEventListener('pageshow', onPageShow);
-    window.removeEventListener('pagehide', onPageHide);
-    window.removeEventListener('resize', invalidateLayout);
-    window.removeEventListener('orientationchange', invalidateLayout);
-    window.visualViewport?.removeEventListener('resize', invalidateLayout);
-    screen.orientation?.removeEventListener?.('change', invalidateLayout);
-    dprMedia?.removeEventListener?.('change', onDprChange);
+    dprToken = null;
     dprMedia = null;
-    safeAreaProbe?.remove();
     safeAreaProbe = null;
+    lifecycle.release('frame-governor-released');
+    if (ownsRegistry) registry.dispose('frame-governor-owned-registry-released');
   }
 
   return Object.freeze({
@@ -434,7 +455,8 @@ export function createFrameGovernor({
     invalidateLayout,
     setContinuous,
     snapshot,
-    dispose,
+    release,
+    dispose: release,
     get visible() {
       return visible;
     },

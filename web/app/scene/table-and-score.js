@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RESOURCE_KINDS, RESOURCE_OWNERSHIP } from '../core/resource-registry.js';
 import {
   deriveAuthoritativeScoreLayout,
   deriveScoreMarkerContactPivot,
@@ -11,14 +12,26 @@ function requireMaterial(material, label) {
   return material;
 }
 
-function colorMaterial(approvedContract, colorId) {
-  const color = approvedContract?.materials?.palette?.[colorId];
-  if (typeof color !== 'string' || !color) throw new Error(`Missing approved material color for ${colorId}`);
-  return new THREE.MeshStandardMaterial({ color });
+function requireRegistry(resourceRegistry, label) {
+  if (!resourceRegistry?.register || !resourceRegistry?.createScope) {
+    throw new TypeError(`${label} requires the THREEJS-027 resource registry`);
+  }
+  return resourceRegistry;
 }
 
-export function createTableMaterial({ approvedContract, optionalMaps = {} } = {}) {
-  const material = colorMaterial(approvedContract, 'table');
+function colorMaterial(approvedContract, colorId, resourceRegistry, scope = 'table-and-score') {
+  const color = approvedContract?.materials?.palette?.[colorId];
+  if (typeof color !== 'string' || !color) throw new Error(`Missing approved material color for ${colorId}`);
+  return resourceRegistry.getOrCreateShared(`table-score-material:${colorId}`, () => new THREE.MeshStandardMaterial({ color }), {
+    kind: RESOURCE_KINDS.MATERIAL,
+    scope,
+    label: `table-score:${colorId}`,
+  });
+}
+
+export function createTableMaterial({ approvedContract, optionalMaps = {}, resourceRegistry } = {}) {
+  const registry = requireRegistry(resourceRegistry, 'Table material');
+  const material = colorMaterial(approvedContract, 'table', registry);
   const assignments = [
     ['map', optionalMaps.albedo],
     ['normalMap', optionalMaps.normal],
@@ -27,13 +40,18 @@ export function createTableMaterial({ approvedContract, optionalMaps = {} } = {}
   for (const [property, texture] of assignments) {
     if (texture == null) continue;
     if (!texture.isTexture) throw new TypeError(`Optional table ${property} must be a Three.js Texture when supplied`);
+    // Textures are asset-registry owned and shared; this material borrows them.
     material[property] = texture;
   }
   material.needsUpdate = true;
   return material;
 }
 
-export function createTableSurface({ footprintSvg, worldLayout, material } = {}) {
+export function createTableSurface({ footprintSvg, worldLayout, material, resourceRegistry } = {}) {
+  const registry = requireRegistry(resourceRegistry, 'Table surface');
+  const lifecycle = registry.createScope('table-surface', {
+    ownership: RESOURCE_OWNERSHIP.GENERATION_SCOPED,
+  });
   const tableMaterial = requireMaterial(material, 'Table material');
   const footprint = parseAuthoritativeTableFootprint(footprintSvg);
   const points = footprint.centeredPoints;
@@ -45,6 +63,10 @@ export function createTableSurface({ footprintSvg, worldLayout, material } = {})
   // The portable kit defines an exact top/contact height but no authoritative tabletop thickness.
   // Keep the runtime asset as the exact top surface instead of inventing a hidden vertical dimension.
   const geometry = new THREE.ShapeGeometry(shape);
+  lifecycle.register(geometry, {
+    kind: RESOURCE_KINDS.GEOMETRY,
+    label: 'authoritative-table-shape',
+  });
   geometry.rotateX(-Math.PI / 2);
   geometry.computeBoundingBox();
   const mesh = new THREE.Mesh(geometry, tableMaterial);
@@ -55,24 +77,28 @@ export function createTableSurface({ footprintSvg, worldLayout, material } = {})
   mesh.userData.tableTopY = Number(worldLayout?.room?.tableTopY);
   mesh.userData.optionalMapsAffectGeometry = false;
 
+  lifecycle.registerCleanup(() => mesh.removeFromParent(), {
+    label: 'table-surface-detach',
+  });
+
+  const release = () => lifecycle.release('table-surface-released');
   return Object.freeze({
     mesh,
     geometry,
     footprint,
     tableTopY: mesh.position.y,
-    dispose() {
-      mesh.removeFromParent();
-      geometry.dispose();
-    },
+    release,
+    dispose: release,
   });
 }
 
-export function createScoreMaterials(approvedContract) {
+export function createScoreMaterials(approvedContract, { resourceRegistry } = {}) {
+  const registry = requireRegistry(resourceRegistry, 'Score materials');
   const colorIds = approvedContract?.rules?.colors;
   if (!Array.isArray(colorIds) || colorIds.length !== 4 || new Set(colorIds).size !== 4) {
     throw new Error('Approved contract must provide four unique playable color IDs');
   }
-  return Object.freeze(Object.fromEntries(colorIds.map((colorId) => [colorId, colorMaterial(approvedContract, colorId)])));
+  return Object.freeze(Object.fromEntries(colorIds.map((colorId) => [colorId, colorMaterial(approvedContract, colorId, registry)])));
 }
 
 function materialFor(materialsByColor, colorId) {
@@ -102,7 +128,11 @@ function markerMatrix(position, pivot) {
   return matrix.multiply(new THREE.Matrix4().makeTranslation(-pivot[0], -pivot[1], -pivot[2]));
 }
 
-export function createScoreMarkerInstances({ runtimeAsset, worldLayout, materialsByColor } = {}) {
+export function createScoreMarkerInstances({ runtimeAsset, worldLayout, materialsByColor, resourceRegistry } = {}) {
+  const registry = requireRegistry(resourceRegistry, 'Score marker instances');
+  const lifecycle = registry.createScope('score-marker-instances', {
+    ownership: RESOURCE_OWNERSHIP.GENERATION_SCOPED,
+  });
   const { geometry, sourceBounds, pivot } = scoreMarkerGeometry(runtimeAsset);
   const layout = deriveAuthoritativeScoreLayout(worldLayout);
   const group = new THREE.Group();
@@ -113,6 +143,10 @@ export function createScoreMarkerInstances({ runtimeAsset, worldLayout, material
   for (const seat of layout.seats) {
     const material = materialFor(materialsByColor, seat.colorId);
     const mesh = new THREE.InstancedMesh(geometry, material, seat.slots.length);
+    lifecycle.register(mesh, {
+      kind: RESOURCE_KINDS.INSTANCED_MESH,
+      label: `score-marker-instanced-mesh:${seat.seatId}`,
+    });
     mesh.name = `YakolakScore:${seat.seatId}:${seat.colorId}`;
     mesh.count = 0;
     mesh.userData.seatId = seat.seatId;
@@ -159,6 +193,13 @@ export function createScoreMarkerInstances({ runtimeAsset, worldLayout, material
     });
   }
 
+  lifecycle.registerCleanup(() => {
+    group.removeFromParent();
+    group.clear();
+    // Geometry is owned by the decoded asset cache; materials are owned by the caller.
+  }, { label: 'score-marker-detach' });
+
+  const release = () => lifecycle.release('score-marker-instances-released');
   return Object.freeze({
     group,
     layout,
@@ -169,11 +210,8 @@ export function createScoreMarkerInstances({ runtimeAsset, worldLayout, material
     setScore,
     setScores,
     snapshot,
-    dispose() {
-      group.removeFromParent();
-      group.clear();
-      // Geometry is owned by the decoded asset cache; materials are owned by the caller.
-    },
+    release,
+    dispose: release,
   });
 }
 

@@ -116,7 +116,8 @@ export function decodeGlbComponents(input) {
   }
   const semanticGroups = Object.freeze([...(geometryProvenance.semanticGroups || geometryProvenance.semanticRoots || [])]);
 
-  let disposed = false;
+  // THREEJS-027: the decoder creates geometry, but ownership is adopted immediately
+  // by the asset manager's root resource registry. This aggregate has no disposer.
   return Object.freeze({
     format: 'yakolak-glb-components-v1',
     components: Object.freeze(components),
@@ -126,10 +127,5 @@ export function decodeGlbComponents(input) {
     semanticRoots: semanticGroups,
     sourcePivot: geometryProvenance.sourcePivot ? Object.freeze([...geometryProvenance.sourcePivot]) : null,
     getComponent: (index) => components[index] || null,
-    dispose() {
-      if (disposed) return;
-      disposed = true;
-      for (const component of components) component.geometry.dispose();
-    },
   });
 }

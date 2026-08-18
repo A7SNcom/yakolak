@@ -130,7 +130,7 @@ export function createMinimalLightingRig({ runtimeData } = {}) {
 
   root.add(hemisphere, key, key.target, rim, rim.target);
   const lights = Object.freeze({ hemisphere, key, rim });
-  let disposed = false;
+  let released = false;
 
   function snapshot() {
     return Object.freeze({
@@ -147,11 +147,11 @@ export function createMinimalLightingRig({ runtimeData } = {}) {
     });
   }
 
-  function dispose() {
-    if (disposed) return;
-    disposed = true;
+  function release() {
+    if (released) return;
+    released = true;
     root.remove(hemisphere, key, key.target, rim, rim.target);
   }
 
-  return Object.freeze({ root, lights, profile, snapshot, dispose });
+  return Object.freeze({ root, lights, profile, snapshot, release, dispose: release });
 }

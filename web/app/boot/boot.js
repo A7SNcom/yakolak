@@ -1,5 +1,6 @@
 import { hydrateBuildMarker } from './build-marker.js';
 import { installFatalErrorHandlers } from './fatal-error.js';
+import { createResourceRegistry, RESOURCE_OWNERSHIP } from '../core/resource-registry.js';
 import { createRendererOwner, WebGLNotSupportedError } from '../scene/renderer.js';
 import { createPreviewScene } from '../scene/preview-scene.js';
 import { createCanonicalRuntimeData } from '../data/runtime-data.js';
@@ -21,9 +22,6 @@ const recoveryReloadButton = document.querySelector('#graphics-recovery-reload')
 const assetErrorElement = document.querySelector('#asset-load-error');
 const assetErrorMessageElement = document.querySelector('#asset-load-error-message');
 const assetRetryButton = document.querySelector('#asset-load-retry');
-
-const fatal = installFatalErrorHandlers({ statusElement, unsupportedElement });
-recoveryReloadButton?.addEventListener('click', () => window.location.reload());
 
 function presentGraphicsState(contextState) {
   document.documentElement.dataset.graphicsState = contextState.state;
@@ -55,6 +53,22 @@ function formatProgress(group) {
 }
 
 async function boot() {
+  const resourceRegistry = createResourceRegistry({ platform: window });
+  resourceRegistry.beginGeneration('shell-boot-1');
+  const bootLifecycle = resourceRegistry.createScope('boot', {
+    ownership: RESOURCE_OWNERSHIP.GENERATION_SCOPED,
+  });
+  const fatal = installFatalErrorHandlers({
+    statusElement,
+    unsupportedElement,
+    resourceRegistry,
+  });
+  if (recoveryReloadButton) {
+    bootLifecycle.listen(recoveryReloadButton, 'click', () => window.location.reload(), undefined, {
+      label: 'graphics-recovery-reload',
+    });
+  }
+
   markOnce(STARTUP_MARKS.bootStart);
   document.documentElement.dataset.runtime = 'threejs-static-esm';
   document.documentElement.dataset.bootState = 'booting';
@@ -63,6 +77,7 @@ async function boot() {
 
   const markerPromise = hydrateBuildMarker(buildMarkerElement);
   const assetManager = createAssetManager({
+    resourceRegistry,
     onProgress: ({ group }) => {
       if (!group) return;
       if (group.group === 'boot-critical') document.documentElement.dataset.assetBootCritical = group.status || 'idle';
@@ -79,7 +94,7 @@ async function boot() {
   let previewScene = null;
   let canonicalRuntimeData = null;
   let materialSystem = null;
-  let unsubscribeContextState = null;
+  let contextSubscriptionToken = null;
   let shell = null;
   let requiredOperation = null;
   let disposed = false;
@@ -88,16 +103,19 @@ async function boot() {
     if (disposed) return;
     disposed = true;
     assetManager.cancelAll('disposed');
-    unsubscribeContextState?.();
-    unsubscribeContextState = null;
-    previewScene?.dispose();
+    contextSubscriptionToken?.release('boot-context-subscription-released');
+    contextSubscriptionToken = null;
+    previewScene?.release();
     previewScene = null;
-    materialSystem?.dispose();
+    materialSystem?.release();
     materialSystem = null;
     canonicalRuntimeData = null;
-    rendererOwner?.dispose();
+    rendererOwner?.release();
     rendererOwner = null;
-    assetManager.dispose();
+    assetManager.release();
+    fatal.release();
+    bootLifecycle.release('boot-released');
+    resourceRegistry.dispose('shell-disposed');
     if (window.__YAKOLAK_THREEJS_SHELL__ === shell) delete window.__YAKOLAK_THREEJS_SHELL__;
     delete window.__YAKOLAK_ASSET_LOADING__;
   };
@@ -111,6 +129,7 @@ async function boot() {
       getLightingSnapshot: () => previewScene?.getLightingSnapshot() || null,
       setPreviewTurnEmphasis: (playerId = null) => previewScene?.setTurnEmphasis(playerId) || null,
       getGraphicsContextSnapshot: () => rendererOwner?.getContextSnapshot() || null,
+      getResourceRegistrySnapshot: () => resourceRegistry.snapshot(),
       getAssetState: (id) => assetManager.getState(id),
       getAssetProgress: (group = null) => assetManager.snapshot(group),
       getAsset: (id) => assetManager.get(id),
@@ -155,8 +174,12 @@ async function boot() {
       document.documentElement.dataset.assetState = 'boot-critical-ready';
 
       if (!rendererOwner) {
-        rendererOwner = createRendererOwner({ mount: appElement });
-        unsubscribeContextState = rendererOwner.subscribeContextState(presentGraphicsState);
+        rendererOwner = createRendererOwner({ mount: appElement, resourceRegistry });
+        contextSubscriptionToken = bootLifecycle.subscribe(
+          (listener) => rendererOwner.subscribeContextState(listener),
+          presentGraphicsState,
+          { label: 'boot-graphics-context-state' },
+        );
       }
 
       const sceneRetry = retry && ['failed', 'cancelled'].includes(assetManager.snapshot('scene-critical').status);
@@ -166,8 +189,13 @@ async function boot() {
         introScatterText: assetManager.get('data.intro-scatter'),
         approvedContract: assetManager.get('data.approved-contract'),
       });
-      materialSystem?.dispose();
-      materialSystem = createCanonicalMaterialSystem({ runtimeData: canonicalRuntimeData });
+      materialSystem?.release();
+      // THREEJS-024 historical call shape: createCanonicalMaterialSystem({ runtimeData: canonicalRuntimeData })
+      // THREEJS-027 adds the same root resourceRegistry without changing canonical runtime-data authority.
+      materialSystem = createCanonicalMaterialSystem({
+        runtimeData: canonicalRuntimeData,
+        resourceRegistry,
+      });
       markOnce(STARTUP_MARKS.criticalAssetsReady);
       document.documentElement.dataset.requiredAssets = 'ready';
       document.documentElement.dataset.canonicalRuntimeData = 'validated';
@@ -177,6 +205,7 @@ async function boot() {
         previewScene = createPreviewScene(rendererOwner, {
           runtimeData: canonicalRuntimeData,
           materialSystem,
+          resourceRegistry,
         });
         previewScene.start();
       }
@@ -222,7 +251,11 @@ async function boot() {
     retry: () => loadRequiredAndStart({ retry: true }),
   });
 
-  assetRetryButton?.addEventListener('click', () => loadRequiredAndStart({ retry: true }));
+  if (assetRetryButton) {
+    bootLifecycle.listen(assetRetryButton, 'click', () => loadRequiredAndStart({ retry: true }), undefined, {
+      label: 'asset-load-retry',
+    });
+  }
 
   try {
     await loadRequiredAndStart();

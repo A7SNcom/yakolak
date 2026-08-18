@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createResourceRegistry, RESOURCE_KINDS, RESOURCE_OWNERSHIP } from '../core/resource-registry.js';
 import { deriveNeutralRoomLayout } from './room-layout.js';
 
 function createOwnedMaterial(color) {
@@ -28,19 +29,29 @@ export function createNeutralRoom({
   roomSpecText,
   wallMaterial = null,
   floorMaterial = null,
+  resourceRegistry = null,
 } = {}) {
   const layout = deriveNeutralRoomLayout({ worldLayout, approvedContract, roomSpecText });
+  const ownsRegistry = !resourceRegistry;
+  const registry = resourceRegistry || createResourceRegistry();
+  const lifecycle = registry.createScope('neutral-room', {
+    ownership: RESOURCE_OWNERSHIP.GENERATION_SCOPED,
+  });
   const { bounds, dimensions } = layout;
   const root = new THREE.Group();
   root.name = 'neutral-room-runtime';
 
-  // Two geometries cover all six exact room planes. No historical room mesh is imported.
   const horizontalGeometry = new THREE.PlaneGeometry(dimensions.width, dimensions.depth, 1, 1);
   const verticalGeometry = new THREE.PlaneGeometry(dimensions.width, dimensions.height, 1, 1);
+  lifecycle.register(horizontalGeometry, { kind: RESOURCE_KINDS.GEOMETRY, label: 'room-horizontal-planes' });
+  lifecycle.register(verticalGeometry, { kind: RESOURCE_KINDS.GEOMETRY, label: 'room-vertical-planes' });
+
   const ownsWallMaterial = !wallMaterial;
   const ownsFloorMaterial = !floorMaterial;
   const resolvedWallMaterial = wallMaterial || createOwnedMaterial(layout.palette.wall);
   const resolvedFloorMaterial = floorMaterial || createOwnedMaterial(layout.palette.floor);
+  if (ownsWallMaterial) lifecycle.register(resolvedWallMaterial, { kind: RESOURCE_KINDS.MATERIAL, label: 'room-wall-material' });
+  if (ownsFloorMaterial) lifecycle.register(resolvedFloorMaterial, { kind: RESOURCE_KINDS.MATERIAL, label: 'room-floor-material' });
 
   const centerX = layout.center[0];
   const centerY = layout.center[1];
@@ -63,8 +74,6 @@ export function createNeutralRoom({
   });
   surfaces.front.visible = layout.frontWallVisibleDefault;
 
-  // Content anchors are inset by the definitive ROOM.md amount, preventing z-fighting.
-  // Consumers attach logos/setup panels to these groups instead of moving the room walls.
   const backContentAnchor = new THREE.Group();
   backContentAnchor.name = 'room-content-back';
   backContentAnchor.position.fromArray(layout.wallContent.back.position);
@@ -78,6 +87,10 @@ export function createNeutralRoom({
 
   const contentAnchors = Object.freeze({ back: backContentAnchor, right: rightContentAnchor });
   let disposed = false;
+
+  lifecycle.registerCleanup(() => root.remove(...Object.values(surfaces), ...Object.values(contentAnchors)), {
+    label: 'neutral-room-detach',
+  });
 
   function setFrontWallVisibility(visible) {
     if (disposed) return false;
@@ -106,14 +119,11 @@ export function createNeutralRoom({
     });
   }
 
-  function dispose() {
+  function release() {
     if (disposed) return;
     disposed = true;
-    root.remove(...Object.values(surfaces), ...Object.values(contentAnchors));
-    horizontalGeometry.dispose();
-    verticalGeometry.dispose();
-    if (ownsWallMaterial) resolvedWallMaterial.dispose();
-    if (ownsFloorMaterial) resolvedFloorMaterial.dispose();
+    lifecycle.release('neutral-room-released');
+    if (ownsRegistry) registry.dispose('neutral-room-owned-registry-released');
   }
 
   return Object.freeze({
@@ -125,6 +135,7 @@ export function createNeutralRoom({
     geometries: Object.freeze({ horizontal: horizontalGeometry, vertical: verticalGeometry }),
     setFrontWallVisibility,
     getRuntimeSnapshot,
-    dispose,
+    release,
+    dispose: release,
   });
 }

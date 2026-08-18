@@ -1,7 +1,9 @@
 import * as THREE from 'three';
+import { createResourceRegistry, RESOURCE_KINDS, RESOURCE_OWNERSHIP } from '../core/resource-registry.js';
 import { createContextRecoveryController } from './context-recovery.js';
 
-// THREEJS-012/014: this module is the only renderer/canvas owner and owns WebGL context lifecycle.
+// THREEJS-012/014/027: this module is the only renderer/canvas owner.
+// Destructive GPU cleanup is delegated to the shared resource registry.
 const DIAGNOSTICS_KEY = '__YAKOLAK_RENDERER_INFO__';
 
 export const RENDERER_BASELINE = Object.freeze({
@@ -64,17 +66,28 @@ function positiveDimension(value, fallback) {
   return Math.max(1, Math.round(fallback || 1));
 }
 
-export function createRendererOwner({ mount }) {
+export function createRendererOwner({ mount, resourceRegistry = null }) {
   if (activeOwner && !activeOwner.disposed) {
     throw new RendererOwnershipError();
   }
 
   requireMount(mount);
-  const canvas = createOwnedCanvas(mount);
-  const context = canvas.getContext('webgl2', WEBGL2_CONTEXT_ATTRIBUTES);
+  const ownsRegistry = !resourceRegistry;
+  const registry = resourceRegistry || createResourceRegistry();
+  const lifecycle = registry.createScope('renderer-owner', {
+    ownership: RESOURCE_OWNERSHIP.GENERATION_SCOPED,
+  });
 
+  const canvas = createOwnedCanvas(mount);
+  lifecycle.register(canvas, {
+    kind: RESOURCE_KINDS.DOM_NODE,
+    label: 'primary-webgl2-canvas',
+  });
+
+  const context = canvas.getContext('webgl2', WEBGL2_CONTEXT_ATTRIBUTES);
   if (!context) {
-    canvas.remove();
+    lifecycle.release('webgl2-unavailable');
+    if (ownsRegistry) registry.dispose('renderer-bootstrap-failed');
     throw new WebGLNotSupportedError();
   }
 
@@ -82,9 +95,15 @@ export function createRendererOwner({ mount }) {
   try {
     renderer = new THREE.WebGLRenderer({ canvas, context });
   } catch (error) {
-    canvas.remove();
+    lifecycle.release('renderer-construction-failed');
+    if (ownsRegistry) registry.dispose('renderer-bootstrap-failed');
     throw error;
   }
+
+  lifecycle.register(renderer, {
+    kind: RESOURCE_KINDS.RENDERER,
+    label: 'primary-webgl2-renderer',
+  });
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -100,12 +119,16 @@ export function createRendererOwner({ mount }) {
 
   const contextRecovery = createContextRecoveryController({
     canvas,
+    resourceRegistry: registry,
     async restoreResources({ generation }) {
       displayState = Object.freeze({ width: 0, height: 0, pixelRatio: 0 });
       for (const restorer of [...resourceRestorers]) {
         await restorer(Object.freeze({ generation }));
       }
     },
+  });
+  lifecycle.registerCleanup(() => contextRecovery.release(), {
+    label: 'context-recovery-controller',
   });
 
   function assertLive() {
@@ -165,7 +188,11 @@ export function createRendererOwner({ mount }) {
     assertLive();
     if (typeof restorer !== 'function') throw new TypeError('Resource restorer must be a function');
     resourceRestorers.add(restorer);
-    return () => resourceRestorers.delete(restorer);
+    const token = lifecycle.registerCleanup(() => resourceRestorers.delete(restorer), {
+      kind: RESOURCE_KINDS.SUBSCRIPTION,
+      label: 'resource-restorer',
+    });
+    return () => token.release('resource-restorer-unregistered');
   }
 
   function subscribeContextState(subscriber, options) {
@@ -175,6 +202,10 @@ export function createRendererOwner({ mount }) {
 
   function getContextSnapshot() {
     return contextRecovery.snapshot();
+  }
+
+  function getResourceSnapshot() {
+    return registry.snapshot();
   }
 
   function exposeDevelopmentDiagnostics(target = window) {
@@ -202,17 +233,14 @@ export function createRendererOwner({ mount }) {
   }
 
   let owner;
-  function dispose() {
+  function release() {
     if (disposed) return;
     disposed = true;
     revokeDevelopmentDiagnostics();
-    contextRecovery.dispose();
     resourceRestorers.clear();
-    renderer.setAnimationLoop(null);
-    renderer.dispose();
-    renderer.forceContextLoss();
-    canvas.remove();
+    lifecycle.release('renderer-owner-released');
     if (activeOwner === owner) activeOwner = null;
+    if (ownsRegistry) registry.dispose('renderer-owned-registry-released');
   }
 
   owner = Object.freeze({
@@ -225,8 +253,10 @@ export function createRendererOwner({ mount }) {
     registerResourceRestorer,
     subscribeContextState,
     getContextSnapshot,
+    getResourceSnapshot,
     exposeDevelopmentDiagnostics,
-    dispose,
+    release,
+    dispose: release,
   });
 
   activeOwner = owner;

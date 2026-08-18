@@ -1,37 +1,68 @@
 import * as THREE from 'three';
+import { createResourceRegistry, RESOURCE_KINDS, RESOURCE_OWNERSHIP } from '../core/resource-registry.js';
 import { createFrameGovernor, FRAME_GOVERNOR_POLICY } from '../camera/frame-governor.js';
 import { markOnce, STARTUP_MARKS } from '../perf/startup-marks.js';
 import { createMinimalLightingRig, createTurnEmphasisPresentation } from './lighting-rig.js';
 
-function createGpuFacingPreviewResources(group, materialSystem) {
-  const geometry = new THREE.TorusKnotGeometry(1.05, 0.28, 128, 20);
-  const hero = new THREE.Mesh(geometry, materialSystem.getSurfaceMaterial('board'));
-  hero.name = 'preview:canonical-board-material';
-  group.add(hero);
+function createGpuFacingPreviewResources(group, materialSystem, registry, generation) {
+  const lifecycle = registry.createScope(`preview-gpu:${generation}`, {
+    ownership: RESOURCE_OWNERSHIP.TRANSIENT,
+  });
+  let hero = null;
+  let ring = null;
 
-  const ringGeometry = new THREE.TorusGeometry(1.85, 0.025, 12, 128);
-  const ring = new THREE.Mesh(ringGeometry, materialSystem.getPlayerMaterial('marble'));
-  ring.name = 'preview:canonical-marble-material';
-  ring.rotation.x = Math.PI * 0.54;
-  ring.rotation.z = Math.PI * 0.18;
-  group.add(ring);
+  lifecycle.registerCleanup(() => {
+    if (hero) group.remove(hero);
+    if (ring) group.remove(ring);
+  }, { label: 'preview-mesh-detach' });
 
-  function dispose() {
-    group.remove(hero, ring);
-    geometry.dispose();
-    ringGeometry.dispose();
-    // Canonical materials are owned by the boot-level material system.
+  try {
+    const geometry = new THREE.TorusKnotGeometry(1.05, 0.28, 128, 20);
+    lifecycle.register(geometry, {
+      kind: RESOURCE_KINDS.GEOMETRY,
+      label: 'preview-hero-geometry',
+    });
+    hero = new THREE.Mesh(geometry, materialSystem.getSurfaceMaterial('board'));
+    hero.name = 'preview:canonical-board-material';
+    group.add(hero);
+
+    const ringGeometry = new THREE.TorusGeometry(1.85, 0.025, 12, 128);
+    lifecycle.register(ringGeometry, {
+      kind: RESOURCE_KINDS.GEOMETRY,
+      label: 'preview-ring-geometry',
+    });
+    ring = new THREE.Mesh(ringGeometry, materialSystem.getPlayerMaterial('marble'));
+    ring.name = 'preview:canonical-marble-material';
+    ring.rotation.x = Math.PI * 0.54;
+    ring.rotation.z = Math.PI * 0.18;
+    group.add(ring);
+
+    return Object.freeze({
+      ring,
+      release: () => lifecycle.release('preview-gpu-generation-replaced'),
+    });
+  } catch (error) {
+    lifecycle.release('preview-gpu-construction-failed');
+    throw error;
   }
-
-  return Object.freeze({ ring, dispose });
 }
 
-export function createPreviewScene(rendererOwner, { runtimeData, materialSystem } = {}) {
+export function createPreviewScene(rendererOwner, {
+  runtimeData,
+  materialSystem,
+  resourceRegistry = null,
+} = {}) {
   if (!rendererOwner) throw new TypeError('Preview scene requires the renderer owner');
   if (!runtimeData?.materials?.palette?.wall) throw new TypeError('Preview scene requires validated canonical runtime data');
   if (!materialSystem?.getSurfaceMaterial || !materialSystem?.getPlayerMaterial) {
     throw new TypeError('Preview scene requires the canonical material system');
   }
+
+  const ownsRegistry = !resourceRegistry;
+  const registry = resourceRegistry || createResourceRegistry({ platform: window });
+  const lifecycle = registry.createScope('preview-scene', {
+    ownership: RESOURCE_OWNERSHIP.GENERATION_SCOPED,
+  });
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(runtimeData.materials.palette.wall);
@@ -42,7 +73,7 @@ export function createPreviewScene(rendererOwner, { runtimeData, materialSystem 
 
   const group = new THREE.Group();
   scene.add(group);
-  let resources = createGpuFacingPreviewResources(group, materialSystem);
+  let resources = createGpuFacingPreviewResources(group, materialSystem, registry, 0);
   let restoredResourceGeneration = 0;
 
   const lightingRig = createMinimalLightingRig({ runtimeData });
@@ -58,15 +89,20 @@ export function createPreviewScene(rendererOwner, { runtimeData, materialSystem 
 
   const unregisterResourceRestorer = rendererOwner.registerResourceRestorer(({ generation }) => {
     if (disposed || generation <= restoredResourceGeneration) return;
-    resources.dispose();
-    resources = createGpuFacingPreviewResources(group, materialSystem);
+    resources.release();
+    resources = createGpuFacingPreviewResources(group, materialSystem, registry, generation);
     restoredResourceGeneration = generation;
     lastFrameNow = null;
+  });
+  lifecycle.registerCleanup(unregisterResourceRestorer, {
+    kind: RESOURCE_KINDS.SUBSCRIPTION,
+    label: 'preview-resource-restorer',
   });
 
   const frameGovernor = createFrameGovernor({
     rendererOwner,
     camera,
+    resourceRegistry: registry,
     onFrame({ now, resumed }) {
       if (!running || disposed) return;
 
@@ -87,6 +123,9 @@ export function createPreviewScene(rendererOwner, { runtimeData, materialSystem 
       if (rendererOwner.render(scene, camera)) markOnce(STARTUP_MARKS.firstVisibleFrame);
     },
   });
+  lifecycle.registerCleanup(() => frameGovernor.release(), {
+    label: 'preview-frame-governor',
+  });
 
   function onReducedMotionChange(event) {
     reducedMotion = event.matches;
@@ -95,7 +134,11 @@ export function createPreviewScene(rendererOwner, { runtimeData, materialSystem 
     frameGovernor.requestRender();
   }
 
-  reducedMotionQuery.addEventListener?.('change', onReducedMotionChange);
+  if (reducedMotionQuery?.addEventListener) {
+    lifecycle.listen(reducedMotionQuery, 'change', onReducedMotionChange, undefined, {
+      label: 'prefers-reduced-motion',
+    });
+  }
 
   function start() {
     if (running || disposed) return;
@@ -122,19 +165,19 @@ export function createPreviewScene(rendererOwner, { runtimeData, materialSystem 
       cameraAspect: camera.aspect,
       cameraFov: camera.fov,
       lighting: getLightingSnapshot(),
+      resources: registry.snapshot(),
     });
   }
 
-  function dispose() {
+  function release() {
     if (disposed) return;
     disposed = true;
     running = false;
-    reducedMotionQuery.removeEventListener?.('change', onReducedMotionChange);
-    unregisterResourceRestorer();
-    frameGovernor.dispose();
-    resources.dispose();
-    lightingRig.dispose();
+    resources.release();
+    lightingRig.release();
     scene.clear();
+    lifecycle.release('preview-scene-released');
+    if (ownsRegistry) registry.dispose('preview-owned-registry-released');
   }
 
   return Object.freeze({
@@ -145,6 +188,7 @@ export function createPreviewScene(rendererOwner, { runtimeData, materialSystem 
     setTurnEmphasis: turnEmphasis.setActivePlayer,
     getLightingSnapshot,
     getPresentationSnapshot,
-    dispose,
+    release,
+    dispose: release,
   });
 }

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createResourceRegistry, RESOURCE_KINDS } from '../core/resource-registry.js';
 
 export const CANONICAL_PLAYER_IDS = Object.freeze(['marble', 'blue', 'gold', 'green']);
 export const CANONICAL_SURFACE_KEYS = Object.freeze(['wall', 'floor', 'table', 'board', 'ink']);
@@ -128,15 +129,17 @@ function createStandardMaterial({ key, colorHex, roughness, metalness, gameplayI
   return material;
 }
 
-export function createCanonicalMaterialSystem({ runtimeData, optionalTableMaps = {} } = {}) {
+export function createCanonicalMaterialSystem({ runtimeData, optionalTableMaps = {}, resourceRegistry = null } = {}) {
   const { palette } = requireRuntimeData(runtimeData);
   const playerPresentation = derivePlayerPresentationMap(runtimeData);
+  const ownsRegistry = !resourceRegistry;
+  const registry = resourceRegistry || createResourceRegistry();
   const players = {};
   const surfaces = {};
 
   for (const colorId of CANONICAL_PLAYER_IDS) {
     const profile = playerPresentation[colorId];
-    players[colorId] = createStandardMaterial({
+    players[colorId] = registry.getOrCreateShared(`canonical-material:player:${colorId}`, () => createStandardMaterial({
       key: profile.materialKey,
       colorHex: profile.colorHex,
       roughness: profile.roughness,
@@ -144,22 +147,33 @@ export function createCanonicalMaterialSystem({ runtimeData, optionalTableMaps =
       gameplayId: profile.gameplayId,
       displayName: profile.displayName,
       identityCue: profile.nonColorIdentityCue,
+    }), {
+      kind: RESOURCE_KINDS.MATERIAL,
+      scope: 'canonical-materials',
+      label: `player:${colorId}`,
     });
   }
 
   for (const key of CANONICAL_SURFACE_KEYS) {
     const finish = SURFACE_FINISHES[key];
-    surfaces[key] = createStandardMaterial({
-      key,
-      colorHex: palette[key],
-      roughness: finish.roughness,
-      metalness: finish.metalness,
+    surfaces[key] = registry.getOrCreateShared(`canonical-material:surface:${key}`, () => {
+      const material = createStandardMaterial({
+        key,
+        colorHex: palette[key],
+        roughness: finish.roughness,
+        metalness: finish.metalness,
+      });
+      if (key === 'table') applyOptionalTableMaps(material, optionalTableMaps);
+      return material;
+    }, {
+      kind: RESOURCE_KINDS.MATERIAL,
+      scope: 'canonical-materials',
+      label: `surface:${key}`,
     });
   }
-  applyOptionalTableMaps(surfaces.table, optionalTableMaps);
 
   const materialByKey = Object.freeze({ ...surfaces, ...players });
-  let disposed = false;
+  let released = false;
 
   function getPlayerMaterial(gameplayId) {
     const material = players[gameplayId];
@@ -196,10 +210,12 @@ export function createCanonicalMaterialSystem({ runtimeData, optionalTableMaps =
     });
   }
 
-  function dispose() {
-    if (disposed) return;
-    disposed = true;
-    for (const material of Object.values(materialByKey)) material.dispose();
+  function release() {
+    if (released) return;
+    released = true;
+    // Shared immutable materials intentionally survive this facade. The root registry
+    // owns their final destruction and reuses them across rematch/setup generations.
+    if (ownsRegistry) registry.dispose('canonical-material-system-released');
   }
 
   return Object.freeze({
@@ -212,6 +228,7 @@ export function createCanonicalMaterialSystem({ runtimeData, optionalTableMaps =
     getPlayerPresentation,
     getSurfaceMaterial,
     snapshot,
-    dispose,
+    release,
+    dispose: release,
   });
 }

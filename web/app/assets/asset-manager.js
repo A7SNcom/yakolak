@@ -1,9 +1,10 @@
 import { ASSET_LIST, ASSET_GROUPS, runtimePayloadBytes, runtimePayloadGitBlobSha } from './asset-manifest.js';
+import { createResourceRegistry, RESOURCE_KINDS, RESOURCE_OWNERSHIP } from '../core/resource-registry.js';
 
 const textDecoder = new TextDecoder();
 const textEncoder = new TextEncoder();
-let stlLoaderPromise = null;
-let glbDecoderPromise = null;
+const stlLoaderByRegistry = new WeakMap();
+const glbDecoderByRegistry = new WeakMap();
 
 export class AssetUnavailableError extends Error {
   constructor(asset) {
@@ -71,20 +72,6 @@ function initialState(asset) {
   };
 }
 
-function disposeResource(resource) {
-  if (resource == null) return;
-  if (Array.isArray(resource)) {
-    for (const item of resource) disposeResource(item);
-    return;
-  }
-  if (resource instanceof Map) {
-    for (const item of resource.values()) disposeResource(item);
-    return;
-  }
-  if (typeof resource.dispose === 'function') resource.dispose();
-  else if (typeof resource.close === 'function') resource.close();
-}
-
 function abortReason(signal) {
   return typeof signal?.reason === 'string' && signal.reason ? signal.reason : 'cancelled';
 }
@@ -108,29 +95,41 @@ async function verifyGitBlobSha(asset, bytes) {
   if (actualHash !== runtimePayloadGitBlobSha(asset)) throw new AssetIntegrityError(asset, actualHash);
 }
 
-async function getStlLoader() {
-  if (!stlLoaderPromise) {
-    stlLoaderPromise = import('three/addons/loaders/STLLoader.js').then(({ STLLoader }) => new STLLoader());
+async function getStlLoader(registry) {
+  if (!stlLoaderByRegistry.has(registry)) {
+    stlLoaderByRegistry.set(registry, import('three/addons/loaders/STLLoader.js').then(({ STLLoader }) => (
+      registry.getOrCreateShared('loader:stl', () => new STLLoader(), {
+        kind: RESOURCE_KINDS.LOADER,
+        scope: 'asset-loaders',
+        label: 'STLLoader',
+      })
+    )));
   }
-  return stlLoaderPromise;
+  return stlLoaderByRegistry.get(registry);
 }
 
-async function getGlbDecoder() {
-  if (!glbDecoderPromise) {
-    glbDecoderPromise = import('./glb-components.js').then(({ decodeGlbComponents }) => decodeGlbComponents);
+async function getGlbDecoder(registry) {
+  if (!glbDecoderByRegistry.has(registry)) {
+    glbDecoderByRegistry.set(registry, import('./glb-components.js').then(({ decodeGlbComponents }) => (
+      registry.getOrCreateShared('decoder:glb-components', () => decodeGlbComponents, {
+        kind: RESOURCE_KINDS.DECODER,
+        scope: 'asset-decoders',
+        label: 'decodeGlbComponents',
+      })
+    )));
   }
-  return glbDecoderPromise;
+  return glbDecoderByRegistry.get(registry);
 }
 
-async function defaultDecode(asset, bytes) {
+async function defaultDecode(asset, bytes, registry) {
   if (asset.runtime.type === 'json') return JSON.parse(textDecoder.decode(bytes));
   if (asset.runtime.type === 'text') return textDecoder.decode(bytes);
   if (asset.runtime.type === 'stl') {
-    const loader = await getStlLoader();
+    const loader = await getStlLoader(registry);
     return loader.parse(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
   }
   if (asset.runtime.type === 'glb-components') {
-    const decode = await getGlbDecoder();
+    const decode = await getGlbDecoder(registry);
     return decode(bytes);
   }
   if (asset.runtime.type === 'png') {
@@ -151,10 +150,17 @@ export function createAssetManager({
   integrityImpl = verifyGitBlobSha,
   onProgress = null,
   concurrency = 3,
+  resourceRegistry = null,
 } = {}) {
   if (typeof fetchImpl !== 'function') throw new TypeError('Asset manager requires fetch');
   if (typeof decodeImpl !== 'function') throw new TypeError('Asset manager requires a decoder');
   if (typeof integrityImpl !== 'function') throw new TypeError('Asset manager requires an integrity verifier');
+
+  const ownsRegistry = !resourceRegistry;
+  const registry = resourceRegistry || createResourceRegistry();
+  const lifecycle = registry.createScope('asset-manager', {
+    ownership: RESOURCE_OWNERSHIP.GENERATION_SCOPED,
+  });
 
   const localManifest = Object.freeze([...manifest]);
   const byId = new Map(localManifest.map((asset) => [asset.logicalId, asset]));
@@ -177,7 +183,14 @@ export function createAssetManager({
   const groupRuns = new Map();
   const listeners = new Set();
   let disposed = false;
-  if (typeof onProgress === 'function') listeners.add(onProgress);
+
+  if (typeof onProgress === 'function') {
+    listeners.add(onProgress);
+    lifecycle.registerCleanup(() => listeners.delete(onProgress), {
+      kind: RESOURCE_KINDS.SUBSCRIPTION,
+      label: 'asset-progress-initial-listener',
+    });
+  }
 
   function groupEntries(group) {
     return localManifest.filter((asset) => asset.group === group);
@@ -263,6 +276,28 @@ export function createAssetManager({
     return bytes;
   }
 
+  function stageDecodedResource(asset, value) {
+    registry.adoptDeep(value, {
+      ownership: RESOURCE_OWNERSHIP.TRANSIENT,
+      scope: lifecycle.id,
+      label: `asset-staging:${asset.logicalId}`,
+      reclassify: true,
+    });
+  }
+
+  function commitDecodedResource(asset, value) {
+    registry.adoptDeep(value, {
+      ownership: RESOURCE_OWNERSHIP.SHARED_IMMUTABLE,
+      scope: 'asset-cache',
+      label: `asset-cache:${asset.logicalId}`,
+      reclassify: true,
+    });
+  }
+
+  function releaseDecodedResource(value, reason) {
+    registry.releaseDeep(value, reason);
+  }
+
   function startAssetFetch(asset, { signal = null, retry = false } = {}) {
     if (disposed) return Promise.reject(new Error('Asset manager is disposed'));
     if (!asset.runtime.ready || !asset.runtime.url) {
@@ -284,6 +319,7 @@ export function createAssetManager({
         totalBytes: expectedBytes,
         error: null,
       });
+      let value = null;
       try {
         if (signal?.aborted) throw new DOMException('cancelled', 'AbortError');
         const response = await fetchImpl(asset.runtime.url, { signal, credentials: 'same-origin', cache: 'default' });
@@ -295,18 +331,21 @@ export function createAssetManager({
         await integrityImpl(asset, bytes);
         if (signal?.aborted) throw new DOMException('cancelled', 'AbortError');
         setAssetState(asset, { status: 'decoding' });
-        const value = await decodeImpl(asset, bytes);
+        value = await decodeImpl(asset, bytes, registry);
+        stageDecodedResource(asset, value);
         if (signal?.aborted) {
-          disposeResource(value);
+          releaseDecodedResource(value, 'asset-decode-cancelled');
           throw new DOMException('cancelled', 'AbortError');
         }
         setAssetState(asset, { status: 'loaded', error: null });
         return value;
       } catch (error) {
         if (isAbortError(error) || signal?.aborted) {
+          if (value !== null) releaseDecodedResource(value, 'asset-load-cancelled');
           setAssetState(asset, { status: 'cancelled', error });
           throw error;
         }
+        if (value !== null) releaseDecodedResource(value, 'asset-load-failed');
         const wrapped = error instanceof AssetLoadError ? error : new AssetLoadError(asset, error);
         setAssetState(asset, { status: 'failed', error: wrapped });
         throw wrapped;
@@ -325,8 +364,9 @@ export function createAssetManager({
     return startAssetFetch(asset, { signal, retry }).then((value) => {
       if (value !== null) {
         const prior = cache.get(id);
+        if (prior !== undefined && prior !== value) releaseDecodedResource(prior, 'asset-cache-replaced');
         cache.set(id, value);
-        if (prior !== undefined && prior !== value) disposeResource(prior);
+        commitDecodedResource(asset, value);
         setAssetState(asset, { status: 'ready' });
       }
       return value;
@@ -369,7 +409,7 @@ export function createAssetManager({
     await Promise.all(Array.from({ length: workerCount }, () => worker()));
 
     if (controller.signal.aborted) {
-      for (const value of staged.values()) disposeResource(value);
+      for (const value of staged.values()) releaseDecodedResource(value, 'asset-group-cancelled');
       for (const asset of entries) {
         const state = states.get(asset.logicalId);
         if (state.status === 'loaded') states.set(asset.logicalId, { ...state, status: 'rolled-back' });
@@ -380,7 +420,7 @@ export function createAssetManager({
     }
 
     if (ASSET_GROUPS[group].blocking && failures.length) {
-      for (const value of staged.values()) disposeResource(value);
+      for (const value of staged.values()) releaseDecodedResource(value, 'asset-group-required-rollback');
       for (const [id] of staged) states.set(id, { ...states.get(id), status: 'rolled-back' });
       setGroupState(group, { status: 'failed', failures });
       throw new AssetGroupLoadError(group, failures);
@@ -388,8 +428,9 @@ export function createAssetManager({
 
     for (const [id, value] of staged) {
       const prior = cache.get(id);
+      if (prior !== undefined && prior !== value) releaseDecodedResource(prior, 'asset-cache-replaced');
       cache.set(id, value);
-      if (prior !== undefined && prior !== value) disposeResource(prior);
+      commitDecodedResource(byId.get(id), value);
       states.set(id, { ...states.get(id), status: 'ready' });
     }
     setGroupState(group, { status: failures.length ? 'degraded' : 'ready', failures });
@@ -416,18 +457,30 @@ export function createAssetManager({
 
     const state = groupStates.get(group);
     if (!retry && (state.status === 'ready' || state.status === 'degraded')) {
-      return Promise.resolve(Object.freeze({ group, values: new Map(groupEntries(group).map((asset) => [asset.logicalId, cache.get(asset.logicalId) ?? null])), degraded: Object.freeze([...state.failures]), progress: groupSnapshot(group) }));
+      return Promise.resolve(Object.freeze({
+        group,
+        values: new Map(groupEntries(group).map((asset) => [asset.logicalId, cache.get(asset.logicalId) ?? null])),
+        degraded: Object.freeze([...state.failures]),
+        progress: groupSnapshot(group),
+      }));
     }
 
     const controller = new AbortController();
+    const runScope = registry.createScope(`asset-group:${group}`, {
+      ownership: RESOURCE_OWNERSHIP.TRANSIENT,
+    });
     const forwardAbort = () => controller.abort(abortReason(signal));
-    signal?.addEventListener?.('abort', forwardAbort, { once: true });
+    if (signal?.addEventListener) {
+      runScope.listen(signal, 'abort', forwardAbort, { once: true }, {
+        label: `asset-group:${group}:external-abort`,
+      });
+    }
     if (signal?.aborted) forwardAbort();
 
     const run = { controller, promise: null, restartPromise: null, isRetry: retry };
     run.promise = executeGroup(group, controller, { retry })
       .finally(() => {
-        signal?.removeEventListener?.('abort', forwardAbort);
+        runScope.release('asset-group-run-finished');
         if (groupRuns.get(group) === run) groupRuns.delete(group);
       });
     groupRuns.set(group, run);
@@ -451,7 +504,11 @@ export function createAssetManager({
     if (typeof listener !== 'function') throw new TypeError('Progress listener must be a function');
     listeners.add(listener);
     listener(Object.freeze({ asset: null, group: null, overall: groupSnapshot(null) }));
-    return () => listeners.delete(listener);
+    const token = lifecycle.registerCleanup(() => listeners.delete(listener), {
+      kind: RESOURCE_KINDS.SUBSCRIPTION,
+      label: 'asset-progress-listener',
+    });
+    return () => token.release('asset-progress-unsubscribed');
   }
 
   function get(id) {
@@ -466,24 +523,26 @@ export function createAssetManager({
   function clear(id = null) {
     if (id) {
       const prior = cache.get(id);
-      if (prior !== undefined) disposeResource(prior);
+      if (prior !== undefined) releaseDecodedResource(prior, 'asset-cache-cleared');
       cache.delete(id);
       const asset = byId.get(id);
       if (asset && !assetRuns.has(id)) states.set(id, initialState(asset));
       return;
     }
-    for (const resource of cache.values()) disposeResource(resource);
+    for (const resource of cache.values()) releaseDecodedResource(resource, 'asset-cache-cleared');
     cache.clear();
     for (const asset of localManifest) if (!assetRuns.has(asset.logicalId)) states.set(asset.logicalId, initialState(asset));
     for (const group of Object.keys(ASSET_GROUPS)) groupStates.set(group, { status: 'idle', attempt: 0, failures: [] });
   }
 
-  function dispose() {
+  function release() {
     if (disposed) return;
     disposed = true;
     cancelAll('disposed');
-    listeners.clear();
     clear();
+    listeners.clear();
+    lifecycle.release('asset-manager-released');
+    if (ownsRegistry) registry.dispose('asset-manager-owned-registry-released');
   }
 
   return Object.freeze({
@@ -497,6 +556,7 @@ export function createAssetManager({
     getState,
     snapshot: groupSnapshot,
     clear,
-    dispose,
+    release,
+    dispose: release,
   });
 }

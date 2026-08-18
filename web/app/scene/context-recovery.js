@@ -1,111 +1,156 @@
-export const GRAPHICS_CONTEXT_STATES = Object.freeze({
+import { createResourceRegistry, RESOURCE_OWNERSHIP } from '../core/resource-registry.js';
+
+export const CONTEXT_STATES = Object.freeze({
   READY: 'ready',
   LOST: 'lost',
   RESTORING: 'restoring',
   FAILED: 'failed',
 });
 
-function normalizeError(error) {
-  if (error instanceof Error) return error;
-  return new Error(String(error || 'Unknown graphics recovery failure'));
+function immutableFailure(error) {
+  if (!error) return null;
+  return Object.freeze({
+    name: error?.name || 'Error',
+    message: error?.message || String(error),
+  });
 }
 
-export function createContextRecoveryController({ canvas, restoreResources = () => {} }) {
-  if (!canvas || typeof canvas.addEventListener !== 'function') {
-    throw new TypeError('Context recovery requires the owned WebGL canvas');
+export function createContextRecoveryController({
+  canvas,
+  restoreResources = async () => {},
+  onStateChange = null,
+  resourceRegistry = null,
+} = {}) {
+  if (!canvas?.addEventListener || !canvas?.removeEventListener) {
+    throw new TypeError('Context recovery requires an EventTarget canvas');
   }
   if (typeof restoreResources !== 'function') {
     throw new TypeError('Context recovery requires a restoreResources callback');
   }
+  if (onStateChange != null && typeof onStateChange !== 'function') {
+    throw new TypeError('onStateChange must be a function');
+  }
 
-  const subscribers = new Set();
+  const ownsRegistry = !resourceRegistry;
+  const registry = resourceRegistry || createResourceRegistry();
+  const lifecycle = registry.createScope('webgl-context-recovery', {
+    ownership: RESOURCE_OWNERSHIP.GENERATION_SCOPED,
+  });
+
   let disposed = false;
-  let state = GRAPHICS_CONTEXT_STATES.READY;
+  let state = CONTEXT_STATES.READY;
   let generation = 0;
   let restoreCount = 0;
   let failure = null;
-  let restorationPromise = null;
+  let restorePromise = Promise.resolve();
+  const subscribers = new Set();
+  const subscriptionTokens = new Map();
 
   function snapshot() {
     return Object.freeze({
       state,
       generation,
       restoreCount,
-      canUseGpu: !disposed && state === GRAPHICS_CONTEXT_STATES.READY,
-      failure: failure ? Object.freeze({ name: failure.name, message: failure.message }) : null,
+      canUseGpu: !disposed && state === CONTEXT_STATES.READY,
+      failure,
     });
   }
 
   function emit() {
-    const next = snapshot();
-    for (const subscriber of subscribers) subscriber(next);
-    return next;
-  }
-
-  function transition(nextState, error = null) {
-    state = nextState;
-    failure = error ? normalizeError(error) : null;
-    return emit();
+    const value = snapshot();
+    onStateChange?.(value);
+    for (const subscriber of [...subscribers]) subscriber(value);
   }
 
   function onContextLost(event) {
-    if (disposed) return;
-    event?.preventDefault?.();
-    if (state === GRAPHICS_CONTEXT_STATES.LOST || state === GRAPHICS_CONTEXT_STATES.RESTORING) return;
-
+    event.preventDefault?.();
+    if (disposed || state === CONTEXT_STATES.LOST) return;
     generation += 1;
-    restorationPromise = null;
-    transition(GRAPHICS_CONTEXT_STATES.LOST);
+    state = CONTEXT_STATES.LOST;
+    failure = null;
+    registry.markContextLost();
+    emit();
   }
 
   function onContextRestored() {
-    if (disposed || state !== GRAPHICS_CONTEXT_STATES.LOST || restorationPromise) return;
-
+    if (disposed || state !== CONTEXT_STATES.LOST) return;
+    state = CONTEXT_STATES.RESTORING;
     const restoringGeneration = generation;
-    transition(GRAPHICS_CONTEXT_STATES.RESTORING);
-    restorationPromise = Promise.resolve()
+    emit();
+
+    restorePromise = Promise.resolve()
       .then(() => restoreResources(Object.freeze({ generation: restoringGeneration })))
       .then(() => {
-        if (disposed || generation !== restoringGeneration) return snapshot();
+        if (disposed || generation !== restoringGeneration || state !== CONTEXT_STATES.RESTORING) return;
         restoreCount += 1;
-        return transition(GRAPHICS_CONTEXT_STATES.READY);
+        state = CONTEXT_STATES.READY;
+        failure = null;
+        registry.markContextRestored();
+        emit();
       })
       .catch((error) => {
-        if (disposed || generation !== restoringGeneration) return snapshot();
-        return transition(GRAPHICS_CONTEXT_STATES.FAILED, error);
+        if (disposed || generation !== restoringGeneration) return;
+        state = CONTEXT_STATES.FAILED;
+        failure = immutableFailure(error);
+        emit();
       });
   }
 
-  function subscribe(subscriber, { emitCurrent = true } = {}) {
-    if (typeof subscriber !== 'function') throw new TypeError('Context subscriber must be a function');
-    if (disposed) throw new Error('Context recovery has been disposed');
+  lifecycle.listen(canvas, 'webglcontextlost', onContextLost, false, {
+    label: 'webglcontextlost',
+    replacementKey: 'lost',
+  });
+  lifecycle.listen(canvas, 'webglcontextrestored', onContextRestored, false, {
+    label: 'webglcontextrestored',
+    replacementKey: 'restored',
+  });
+
+  function subscribe(subscriber) {
+    if (typeof subscriber !== 'function') throw new TypeError('Context-state subscriber must be a function');
+    if (disposed) throw new Error('Context recovery controller is disposed');
     subscribers.add(subscriber);
-    if (emitCurrent) subscriber(snapshot());
-    return () => subscribers.delete(subscriber);
+    subscriber(snapshot());
+
+    const token = lifecycle.registerCleanup(() => subscribers.delete(subscriber), {
+      kind: 'subscription',
+      label: 'context-state-subscriber',
+    });
+    subscriptionTokens.set(subscriber, token);
+
+    return () => {
+      subscriptionTokens.delete(subscriber);
+      token.release('context-subscription-removed');
+    };
   }
 
   function whenSettled() {
-    return restorationPromise || Promise.resolve(snapshot());
+    return restorePromise;
   }
 
-  function dispose() {
+  function release() {
     if (disposed) return;
     disposed = true;
-    canvas.removeEventListener('webglcontextlost', onContextLost);
-    canvas.removeEventListener('webglcontextrestored', onContextRestored);
     subscribers.clear();
+    subscriptionTokens.clear();
+    lifecycle.release('context-recovery-released');
+    if (ownsRegistry) registry.dispose('context-recovery-owned-registry-released');
   }
-
-  canvas.addEventListener('webglcontextlost', onContextLost, false);
-  canvas.addEventListener('webglcontextrestored', onContextRestored, false);
 
   return Object.freeze({
     subscribe,
     snapshot,
+    getSnapshot: snapshot,
     whenSettled,
-    dispose,
+    release,
+    dispose: release,
+    get state() {
+      return state;
+    },
     get canUseGpu() {
-      return !disposed && state === GRAPHICS_CONTEXT_STATES.READY;
+      return !disposed && state === CONTEXT_STATES.READY;
+    },
+    get disposed() {
+      return disposed;
     },
   });
 }
