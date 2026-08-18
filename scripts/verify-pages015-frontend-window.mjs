@@ -4,6 +4,13 @@ import fs from 'node:fs';
 
 const [activeDescriptorPath, previousDescriptorPath] = process.argv.slice(2);
 const evidencePath = String(process.env.PAGES015_EVIDENCE_PATH || 'pages015-live-evidence.json');
+const workerLockPath = new URL('../backend/cloudflare/WORKER_ROLLBACK_WINDOW.json', import.meta.url);
+const apiOriginPath = new URL('../backend/cloudflare/API_ORIGIN.txt', import.meta.url);
+const expectedCapabilities = [
+  'health.compatibility.v1',
+  'room-probe.read.v1',
+  'room-probe.write.v1',
+];
 const frontends = [
   {
     role: 'active',
@@ -21,8 +28,68 @@ const frontends = [
 
 const evidenceBytes = fs.readFileSync(evidencePath);
 const evidence = JSON.parse(evidenceBytes.toString('utf8'));
-if (evidence?.gate !== 'PAGES-015' || evidence?.verified !== true || evidence?.workerWindow?.length !== 2) {
-  throw new Error('live Worker evidence must exist before frontend-window verification');
+if (
+  evidence?.gate !== 'PAGES-015' ||
+  evidence?.verified !== true ||
+  evidence?.liveHealthVerified !== true ||
+  evidence?.corsHeadersVerified !== true ||
+  evidence?.liveTursoRoundTripVerified !== true ||
+  evidence?.protocolIdentity !== 'yakolak-online-room@1' ||
+  evidence?.protocolVersion !== '1' ||
+  evidence?.capabilityIdentity !== 'yakolak-online-room-capabilities-v1' ||
+  !Array.isArray(evidence?.capabilities) ||
+  evidence.capabilities.length !== expectedCapabilities.length ||
+  expectedCapabilities.some((name) => !evidence.capabilities.includes(name)) ||
+  evidence?.tursoSchemaId !== 'yakolak-pages005-room-probe' ||
+  evidence?.tursoSchemaVersion !== 1 ||
+  evidence?.migrationPolicy !== 'expand-contract-forward-only' ||
+  evidence?.tursoDataRollbackRequired !== false ||
+  !Array.isArray(evidence?.workerWindow) ||
+  evidence.workerWindow.length !== 2
+) {
+  throw new Error('live Worker evidence must be complete before frontend-window verification');
+}
+
+const apiOrigin = fs.readFileSync(apiOriginPath, 'utf8').trim();
+const workerLock = JSON.parse(fs.readFileSync(workerLockPath, 'utf8'));
+const lockCapabilities = Array.isArray(workerLock?.capabilities) ? [...workerLock.capabilities].sort() : [];
+const evidenceCapabilities = [...evidence.capabilities].sort();
+const workerByRole = new Map(evidence.workerWindow.map((item) => [item?.role, item]));
+const activeWorker = workerByRole.get('active');
+const previousWorker = workerByRole.get('previous');
+if (
+  !/^https:\/\/[^/]+$/.test(apiOrigin) ||
+  workerLock?.schemaVersion !== 1 ||
+  workerLock?.gate !== 'PAGES-005' ||
+  workerLock?.provider !== 'cloudflare-workers' ||
+  workerLock?.workerName !== 'yakolak-room-api' ||
+  workerLock?.apiOrigin !== apiOrigin ||
+  evidence?.apiOrigin !== apiOrigin ||
+  workerLock?.protocolIdentity !== evidence.protocolIdentity ||
+  workerLock?.capabilityIdentity !== evidence.capabilityIdentity ||
+  JSON.stringify(lockCapabilities) !== JSON.stringify(evidenceCapabilities) ||
+  workerLock?.tursoSchemaId !== evidence.tursoSchemaId ||
+  workerLock?.tursoSchemaVersion !== evidence.tursoSchemaVersion ||
+  workerLock?.migrationPolicy !== 'expand-contract-forward-only' ||
+  workerLock?.tursoDataRollbackRequired !== false ||
+  workerLock?.traffic?.activePercent !== 100 ||
+  workerLock?.traffic?.previousPercent !== 0 ||
+  workerLock?.versionOverrideProof !== true ||
+  workerLock?.browserCorsVerified !== true ||
+  workerLock?.liveTursoRoundTripVerified !== true ||
+  !/^[a-f0-9]{64}$/.test(String(workerLock?.finalEvidenceSha256 || '')) ||
+  workerByRole.size !== 2 ||
+  !activeWorker?.workerVersionId ||
+  !previousWorker?.workerVersionId ||
+  activeWorker.workerVersionId === previousWorker.workerVersionId ||
+  activeWorker.workerVersionId !== workerLock?.activeWorkerVersionId ||
+  previousWorker.workerVersionId !== workerLock?.previousWorkerVersionId ||
+  activeWorker.healthVerified !== true ||
+  previousWorker.healthVerified !== true ||
+  activeWorker.tursoRoundTripVerified !== true ||
+  previousWorker.tursoRoundTripVerified !== true
+) {
+  throw new Error('live Worker evidence does not match the locked PAGES-005 rollback identity');
 }
 
 function descriptorSha(bytes) {
@@ -81,6 +148,7 @@ evidence.frontendWindow = frontendWindow;
 evidence.compatiblePairings = pairings;
 evidence.frontendArchiveReverified = true;
 evidence.rollbackWindowVerified = true;
+evidence.workerLockIdentityVerified = true;
 evidence.frontendWindowVerifiedAt = new Date().toISOString();
 fs.writeFileSync(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
 console.log(JSON.stringify({ ok: true, frontendWindow, pairings }, null, 2));
