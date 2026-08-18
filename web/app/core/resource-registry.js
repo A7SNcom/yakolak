@@ -550,8 +550,11 @@ export function createResourceRegistry({
     const holder = { handle: null };
     let token = null;
     let firedBeforeRegistration = false;
+    let earlyCallbackFailed = false;
+    let earlyCallbackError = null;
     const wrapped = (...args) => {
-      if (!token) firedBeforeRegistration = true;
+      const firedEarly = !token;
+      if (firedEarly) firedBeforeRegistration = true;
       if (token?.active) {
         const entry = entries.get(token.id);
         if (entry) {
@@ -560,12 +563,22 @@ export function createResourceRegistry({
           entries.delete(entry.id);
         }
       }
+      if (firedEarly) {
+        try {
+          callback(...args);
+        } catch (error) {
+          earlyCallbackFailed = true;
+          earlyCallbackError = error;
+        }
+        return;
+      }
       callback(...args);
     };
     holder.handle = delay == null ? scheduleFn(wrapped) : scheduleFn(wrapped, delay);
     const rollback = () => cancelFn(holder.handle);
     if (firedBeforeRegistration) {
       rollbackExternalSetup(rollback);
+      if (earlyCallbackFailed) throw earlyCallbackError;
       return createNoopToken();
     }
     token = registerAfterExternalSetup(holder, {
