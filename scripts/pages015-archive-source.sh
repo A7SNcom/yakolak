@@ -6,6 +6,8 @@ for name in "${required[@]}"; do
   test -n "${!name:-}" || { echo "missing ${name}" >&2; exit 2; }
 done
 : "${GH_TOKEN:?GH_TOKEN is required}"
+LEDGER_TOKEN="${GH_TOKEN}"
+RELEASE_TOKEN="${PAGES_RELEASE_ADMIN_TOKEN:-${GH_TOKEN}}"
 
 work="${RUNNER_TEMP:-/tmp}/pages015-archive-${SOURCE_PAGES_RUN_ID}"
 rm -rf "${work}"
@@ -17,7 +19,7 @@ append_ledger_event() {
   local message="$3"
   for attempt in 1 2 3 4 5; do
     rm -rf "${work}/ledger-repo"
-    git clone --quiet --branch threejs-rebuild "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${work}/ledger-repo"
+    git clone --quiet --branch threejs-rebuild "https://x-access-token:${LEDGER_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${work}/ledger-repo"
     git -C "${work}/ledger-repo" config user.name 'github-actions[bot]'
     git -C "${work}/ledger-repo" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
     ledger="${work}/ledger-repo/RELEASE_QUALIFICATION/ledger.jsonl"
@@ -182,6 +184,11 @@ EOF
 find "${work}/release-assets" -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort > "${work}/actual-assets.txt"
 diff -u "${work}/expected-assets.txt" "${work}/actual-assets.txt"
 
+# Artifact recovery above uses the Actions token. Release API and immutable-release
+# administration use the stronger token when configured; immutable release bytes
+# are still never changed after publication.
+export GH_TOKEN="${RELEASE_TOKEN}"
+
 # Create/complete a mutable draft. Never mutate a published release.
 gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > "${work}/releases.json"
 release_id="$(jq -r --arg tag "${RELEASE_TAG}" '.[] | select(.tag_name == $tag) | .id' "${work}/releases.json" | head -n1)"
@@ -217,7 +224,7 @@ if [ "${immutable}" != true ]; then
 
   # Publication is fail-closed on the repository immutable-release setting.
   api="https://api.github.com/repos/${GITHUB_REPOSITORY}/immutable-releases"
-  token="${PAGES_RELEASE_ADMIN_TOKEN:-${GH_TOKEN}}"
+  token="${RELEASE_TOKEN}"
   code="$(curl --silent --show-error --output "${work}/immutable-setting.json" --write-out '%{http_code}' \
     --header 'Accept: application/vnd.github+json' --header "Authorization: Bearer ${token}" \
     --header 'X-GitHub-Api-Version: 2026-03-10' "${api}")"
