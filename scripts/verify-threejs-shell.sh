@@ -62,6 +62,7 @@ required=(
   tests/threejs_resource_registry_cross_scope_ownership.test.mjs
   tests/threejs_resource_registry_reentrant_rollback.test.mjs
   tests/threejs_resource_registry_synchronous_one_shot.test.mjs
+  tests/threejs_resource_registry_shared_factory_rollback.test.mjs
   tests/threejs_asset_loading_contract.test.mjs
   tests/threejs_asset_runtime_copies_contract.test.mjs
   tests/threejs_asset_conversion_pipeline.test.mjs
@@ -115,6 +116,7 @@ node tests/threejs_resource_registry_atomic_listener_replacement.test.mjs
 node tests/threejs_resource_registry_cross_scope_ownership.test.mjs
 node tests/threejs_resource_registry_reentrant_rollback.test.mjs
 node tests/threejs_resource_registry_synchronous_one_shot.test.mjs
+node tests/threejs_resource_registry_shared_factory_rollback.test.mjs
 node tests/threejs_asset_loading_contract.test.mjs
 node tests/threejs_asset_runtime_copies_contract.test.mjs
 node tests/threejs_asset_conversion_pipeline.test.mjs
