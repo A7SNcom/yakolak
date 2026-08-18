@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "event": "pages014_live_generation_verified",
   "verified": true,
-  "godotRootSha": "98770b0b4b68ead393c660662a41bd2293e0e124",
-  "threejsCandidateSha": "20b962d67aaf0595269fe9e979755b064a83dd7e",
-  "deploymentGeneration": "sha256:2f433ecf481dd600412b238ccec86a4aa00c70238e6f0b95eb516580adab2730",
-  "publicRuntimeProtocolSha256": "270f4f245fd653222afece3dc051dd874a3ba6e6109865c0b5c148989b962389",
-  "contentIdentitySha256": "9117dbc9f2fd5140c4376af83f4632e6d376111bacfe3ec78997fe801efd2017",
-  "liveManifestSha256": "654ef236da4b1af6efdaaf2085a2535aea6d21aa26d954be2b71fb2218dba518",
+  "godotRootSha": "bf3c2d4b10d9b4030d2edbb5819bba6a5c6d2be5",
+  "threejsCandidateSha": "c0f3a27304ac9bc18a652cba133b72a626b9bed8",
+  "deploymentGeneration": "sha256:9a933443a999e73306e4c98d50334b43f0cbce3d5b31f3f15448a7b63d57b935",
+  "publicRuntimeProtocolSha256": "d870efea7e85a48c9746d59d9cf01e875076432d8762d6deb54ed013f3a4b95c",
+  "contentIdentitySha256": "79b9f1bae5fda88f1f24819fb5c27be352c7df962bbbc77cc9816a16f16c0822",
+  "liveManifestSha256": "b07ccd7e6ac5c64af27d2ec2c5da9b6c337ba4c6e2df2776505e186afedf2792",
   "pageUrl": "https://a7sncom.github.io/yakolak/",
-  "sourceCompositeRunId": 32134126950,
-  "verifierWorkflowRunId": 32134215923,
-  "verifiedAt": "2026-08-18T11:56:35Z"
+  "sourceCompositeRunId": 32151536313,
+  "verifierWorkflowRunId": 32152134801,
+  "verifiedAt": "2026-08-18T15:05:03Z"
 }
