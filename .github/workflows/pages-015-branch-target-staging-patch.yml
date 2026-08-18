@@ -1,0 +1,201 @@
+name: PAGES-015 Install Branch-Target Draft Staging
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/pages-015-branch-target-staging-patch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: threejs-rebuild
+          fetch-depth: 0
+
+      - name: Patch exact archive helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/pages015-archive-window-entry-v2.sh')
+          s = path.read_text()
+
+          anchor = '''[[ "$PAGES014_LIVE_MANIFEST_SHA256" =~ $HEX64 ]]
+          [[ "$DEPLOYMENT_GENERATION" =~ $GENERATION ]]
+          '''
+          insert = anchor + '''
+          # GitHub Actions github.token cannot create a release directly against a candidate
+          # commit whose reachable history includes workflow changes. For the locked previous
+          # candidate only, a pre-created branch may be used as the mutable draft target, but
+          # only after resolving that branch back to the exact locked candidate SHA.
+          release_target_ref="${RELEASE_TARGET_REF:-}"
+          if [ -z "$release_target_ref" ] && [ "${ROLE:-}" = previous ]; then
+            candidate_branch="pages015-release-target-previous-${THREEJS_CANDIDATE_SHA:0:8}"
+            if gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${candidate_branch}" >/dev/null 2>&1; then
+              release_target_ref="$candidate_branch"
+            fi
+          fi
+          release_target="$THREEJS_CANDIDATE_SHA"
+          if [ -n "$release_target_ref" ]; then
+            test "${ROLE:-}" = previous || { echo 'branch release target is allowed only for previous frontend staging' >&2; exit 1; }
+            [[ "$release_target_ref" =~ ^pages015-release-target-previous-[a-f0-9]{8}$ ]] || {
+              echo 'invalid PAGES-015 release target branch name' >&2
+              exit 1
+            }
+            target_ref_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${release_target_ref}" --jq '.object.sha')"
+            test "$target_ref_sha" = "$THREEJS_CANDIDATE_SHA" || {
+              echo 'release target branch does not resolve to the locked candidate SHA' >&2
+              exit 1
+            }
+            release_target="$release_target_ref"
+          fi
+          '''
+          if anchor not in s:
+              raise SystemExit('validation anchor not found')
+          s = s.replace(anchor, insert, 1)
+
+          old = '''    --target "$THREEJS_CANDIDATE_SHA" \\
+          '''
+          new = '''    --target "$release_target" \\
+          '''
+          if old not in s:
+              raise SystemExit('release create target anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''test "$(jq -r '.tag_name' "$work/release.json")" = "$RELEASE_TAG"
+          test "$(jq -r '.target_commitish' "$work/release.json")" = "$THREEJS_CANDIDATE_SHA"
+          release_immutable="$(jq -r '.immutable // false' "$work/release.json")"
+          '''
+          new = '''test "$(jq -r '.tag_name' "$work/release.json")" = "$RELEASE_TAG"
+          release_target_commitish="$(jq -r '.target_commitish' "$work/release.json")"
+          test "$release_target_commitish" = "$release_target" || {
+            echo "release target mismatch: expected ${release_target}, got ${release_target_commitish}" >&2
+            exit 1
+          }
+          if [ -n "$release_target_ref" ]; then
+            target_ref_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${release_target_ref}" --jq '.object.sha')"
+            test "$target_ref_sha" = "$THREEJS_CANDIDATE_SHA" || {
+              echo 'release target branch moved after draft creation' >&2
+              exit 1
+            }
+          fi
+          release_immutable="$(jq -r '.immutable // false' "$work/release.json")"
+          '''
+          if old not in s:
+              raise SystemExit('release target validation anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''  test -n "${ADMIN_TOKEN:-}" || {
+            echo 'PAGES_RELEASE_ADMIN_TOKEN is required before publishing the exact draft.' >&2
+            exit 1
+          }
+          immutable_api="https://api.github.com/repos/${GITHUB_REPOSITORY}/immutable-releases"
+          '''
+          new = '''  test -n "${ADMIN_TOKEN:-}" || {
+            echo 'PAGES_RELEASE_ADMIN_TOKEN is required before publishing the exact draft.' >&2
+            exit 1
+          }
+          if [ -n "$release_target_ref" ]; then
+            target_ref_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${release_target_ref}" --jq '.object.sha')"
+            test "$target_ref_sha" = "$THREEJS_CANDIDATE_SHA" || {
+              echo 'release target branch moved before immutable publication' >&2
+              exit 1
+            }
+          fi
+          immutable_api="https://api.github.com/repos/${GITHUB_REPOSITORY}/immutable-releases"
+          '''
+          if old not in s:
+              raise SystemExit('publication preflight anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''test "$ok" = true || { echo 'published release did not verify as immutable/attested' >&2; exit 1; }
+
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$work/immutable-download"
+          '''
+          new = '''test "$ok" = true || { echo 'published release did not verify as immutable/attested' >&2; exit 1; }
+
+          # Prove the published release tag resolves to the exact locked candidate commit,
+          # regardless of whether the mutable draft used a raw SHA or a staging branch.
+          tag_ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}")"
+          tag_object_type="$(jq -r '.object.type' <<<"$tag_ref_json")"
+          tag_object_sha="$(jq -r '.object.sha' <<<"$tag_ref_json")"
+          case "$tag_object_type" in
+            commit)
+              published_tag_commit_sha="$tag_object_sha"
+              ;;
+            tag)
+              annotated_tag_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object_sha}")"
+              test "$(jq -r '.object.type' <<<"$annotated_tag_json")" = commit
+              published_tag_commit_sha="$(jq -r '.object.sha' <<<"$annotated_tag_json")"
+              ;;
+            *)
+              echo "unsupported release tag object type: ${tag_object_type}" >&2
+              exit 1
+              ;;
+          esac
+          test "$published_tag_commit_sha" = "$THREEJS_CANDIDATE_SHA" || {
+            echo 'published immutable release tag does not resolve to locked candidate SHA' >&2
+            exit 1
+          }
+
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$work/immutable-download"
+          '''
+          if old not in s:
+              raise SystemExit('immutable tag proof anchor not found')
+          s = s.replace(old, new, 1)
+
+          path.write_text(s)
+
+          test_path = Path('tests/pages015_release_target_staging_contract.test.mjs')
+          test_path.write_text(r'''import test from 'node:test';
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+
+          const helper = readFileSync(new URL('../scripts/pages015-archive-window-entry-v2.sh', import.meta.url), 'utf8');
+
+          test('PAGES-015 previous draft branch target is exact-SHA bound and publication rechecks it', () => {
+            assert.match(helper, /pages015-release-target-previous-\$\{THREEJS_CANDIDATE_SHA:0:8\}/);
+            assert.match(helper, /branch release target is allowed only for previous frontend staging/);
+            assert.match(helper, /release target branch does not resolve to the locked candidate SHA/);
+            assert.match(helper, /release target branch moved before immutable publication/);
+          });
+
+          test('PAGES-015 immutable publication proves the final release tag commit', () => {
+            assert.match(helper, /git\/ref\/tags\/\$\{RELEASE_TAG\}/);
+            assert.match(helper, /published immutable release tag does not resolve to locked candidate SHA/);
+          });
+
+          test('PAGES-015 still requires admin proof before publishing mutable drafts', () => {
+            assert.match(helper, /PAGES_RELEASE_ADMIN_TOKEN is required before publishing the exact draft/);
+            const adminGate = helper.indexOf('PAGES_RELEASE_ADMIN_TOKEN is required before publishing the exact draft');
+            const publish = helper.indexOf('gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false');
+            assert.ok(adminGate >= 0 && publish > adminGate);
+          });
+          ''')
+          PY
+
+          bash -n scripts/pages015-archive-window-entry-v2.sh
+          node --test tests/pages015_release_target_staging_contract.test.mjs
+
+      - name: Commit safe staging support
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/pages015-archive-window-entry-v2.sh tests/pages015_release_target_staging_contract.test.mjs
+          git diff --cached --name-only | grep -qx 'scripts/pages015-archive-window-entry-v2.sh'
+          git diff --cached --name-only | grep -qx 'tests/pages015_release_target_staging_contract.test.mjs'
+          test "$(git diff --cached --name-only | wc -l)" -eq 2
+          git commit -m 'PAGES-015 stage previous draft through exact-SHA branch target'
+          git push origin HEAD:threejs-rebuild
