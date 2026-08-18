@@ -19,3 +19,10 @@ test("admin gate remains before publication", () => {
   const publish = helper.indexOf("gh release edit \"$RELEASE_TAG\" --repo \"$GITHUB_REPOSITORY\" --draft=false");
   assert.ok(gate >= 0 && publish > gate);
 });
+
+
+test("draft creation and upload tolerate GitHub read-after-write delay", () => {
+  assert.match(helper, /for attempt in \$\(seq 1 12\); do/);
+  assert.match(helper, /new draft release did not become readable/);
+  assert.match(helper, /uploaded release asset did not become readable/);
+});

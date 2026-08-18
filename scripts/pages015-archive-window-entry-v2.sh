@@ -237,10 +237,15 @@ if [ -z "$release_id" ]; then
     --title "YAKOLAK exact-byte Pages archive ${RELEASE_TAG}" \
     --notes "Exact deployed Pages bytes from run ${SOURCE_PAGES_RUN_ID}. Qualification remains external in RELEASE_QUALIFICATION/ledger.jsonl." \
     --latest=false --draft
-  gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > "$work/releases.json"
-  release_id="$(jq -r --arg tag "$RELEASE_TAG" '.[] | select(.tag_name == $tag) | .id' "$work/releases.json" | head -n1)"
+  release_id=""
+  for attempt in $(seq 1 12); do
+    gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > "$work/releases.json"
+    release_id="$(jq -r --arg tag "$RELEASE_TAG" '.[] | select(.tag_name == $tag) | .id' "$work/releases.json" | head -n1)"
+    [ -n "$release_id" ] && break
+    sleep 1
+  done
 fi
-test -n "$release_id"
+test -n "$release_id" || { echo "new draft release did not become readable for ${RELEASE_TAG}" >&2; exit 1; }
 gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}" > "$work/release.json"
 test "$(jq -r '.tag_name' "$work/release.json")" = "$RELEASE_TAG"
 release_target_commitish="$(jq -r '.target_commitish' "$work/release.json")"
@@ -258,7 +263,16 @@ if [ "$release_immutable" != true ]; then
   while IFS= read -r name; do
     if ! jq -e --arg name "$name" 'any(.[]; .name == $name)' "$work/assets.json" >/dev/null; then
       gh release upload "$RELEASE_TAG" "$assets/$name" --repo "$GITHUB_REPOSITORY"
-      gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?per_page=100" > "$work/assets.json"
+      asset_visible=false
+      for attempt in $(seq 1 12); do
+        gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?per_page=100" > "$work/assets.json"
+        if jq -e --arg name "$name" 'any(.[]; .name == $name)' "$work/assets.json" >/dev/null; then
+          asset_visible=true
+          break
+        fi
+        sleep 1
+      done
+      test "$asset_visible" = true || { echo "uploaded release asset did not become readable: ${name}" >&2; exit 1; }
     fi
   done < "$expected"
   jq -r '.[].name' "$work/assets.json" | LC_ALL=C sort > "$work/remote-assets.txt"

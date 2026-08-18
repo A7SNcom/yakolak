@@ -65,7 +65,7 @@ The Worker exposes the same compatibility identity on `/health`, probe writes an
 - revalidates the recorded PAGES-014 run and job against their logs;
 - reproduces the original `IMMUTABLE_FACTS.json` byte contract used by the first staged archive, including `liveManifestSha256` and `pages014VerifierRunId` in their historical order;
 - never silently replaces an existing draft asset: every existing asset is re-downloaded and byte-compared;
-- uses `PAGES_RELEASE_ADMIN_TOKEN` for release creation/promotion when available;
+- can stage the locked previous mutable draft through a dedicated branch that is re-resolved to the exact candidate SHA before use; `PAGES_RELEASE_ADMIN_TOKEN` remains mandatory for immutable publication/promotion;
 - proves/enables repository immutable releases **before publication**;
 - after publication, requires `isImmutable=true`, release/asset verification, exact SHA equality and a non-production restore;
 - only then appends `archive_verified` and matching strong `deployment_generation_verified` to the additive ledger.
@@ -79,10 +79,12 @@ The original Pages source artifacts expired, but this is no longer a blocker. On
 
 The temporary recovery workflow was retired after proving those exact SHA matches. Durable recovery now lives in the resolver + locked Git SHAs + `PAGES015_TAR_LAYOUT/*.json`; recovered-source metadata is explicitly `qualificationEvidence=false`.
 
-`RELEASE_QUALIFICATION/PAGES015_ARCHIVE_STATUS/*.json` is diagnostics only (`qualificationEvidence=false`). Archive run `32136510727` proved the retention-independent flow end-to-end after the originals had expired:
+`RELEASE_QUALIFICATION/PAGES015_ARCHIVE_STATUS/*.json` is diagnostics only (`qualificationEvidence=false`). The retention-independent flow now has exact mutable drafts for **both** locked frontend keys. Run `32164753404` revalidated them after the original Actions artifacts had expired:
 
-- **active** `pages-archive-2026-08-18-geeb3b8e1-t4e4e5dec` / `3bb476e2…`: `stageState=exact-draft-verified`; the exact source resolved from the preserved recovered artifact, all release-asset bytes re-verified, and publication stopped only at the missing Admin credential.
-- **previous** `pages-archive-2026-08-18-geeb3b8e1-t5cc89e05` / `6769843e…`: `stageState=waiting-admin-to-create-draft`; the exact source likewise resolved and verified, but there is no reusable draft and the ordinary Actions integration cannot create the release.
+- **active** `pages-archive-2026-08-18-geeb3b8e1-t4e4e5dec` / `3bb476e2…`: `stageState=exact-draft-verified`; release ID `372154227`.
+- **previous** `pages-archive-2026-08-18-geeb3b8e1-t5cc89e05` / `6769843e…`: `stageState=exact-draft-verified`; release ID `372518304`. Its mutable draft targets `pages015-release-target-previous-5cc89e05`, and that branch is re-resolved to exact candidate SHA `5cc89e05653b6461ed6a41332f374eaadb360945` before staging and again before any immutable publication.
+
+All eight expected release assets are byte-checked before a `draft_staged` receipt is accepted. Neither draft is immutable or eligible yet; publication remains blocked on the Admin credential.
 
 Neither state is an `archive_verified` event. The strict verifier ignores `draft_staged`, recovery metadata and diagnostics.
 
@@ -92,9 +94,11 @@ A dedicated one-time permission probe was run and then retired. Run `32150862909
 
 The locked previous candidate `5cc89e05653b6461ed6a41332f374eaadb360945` itself directly changed `.github/workflows/threejs-optional-checks.yml`; the active candidate `4e4e5dec72ee71a06940c6db561dde8d24abd2d0` changed only `web/online-compatibility.json`. The release target/candidate SHA will **not** be retargeted merely to bypass this permission requirement.
 
+The branch-target proof subsequently showed that ordinary `github.token` can safely stage the **mutable previous draft** when the target branch is pre-created and independently locked to the exact candidate SHA. This does not weaken the historical raw-ref permission finding and does not remove the Admin publication gate.
+
 Therefore `PAGES_RELEASE_ADMIN_TOKEN` must be capable of:
 
-- creating/reading the draft and release assets;
+- reading the staged drafts and release assets and promoting them only after immutable-release proof;
 - creating/publishing the locked release tag/ref for candidate commits whose trees/history contain workflow files;
 - carrying the GitHub **workflows write permission/scope** required for that ref operation;
 - reading/enabling the repository immutable-release setting;
@@ -130,7 +134,7 @@ The earlier nested credential-probe/supervisor experiments were retired after Gi
 
 ## Verified current blocker evidence
 
-Fresh explicit orchestrator run `32150414990` completed successfully at `2026-08-18T14:47:00Z`. Its non-secret receipt proves the current credential state without relying on an older unchanged semantic-status timestamp:
+Fresh explicit orchestrator run `32156873552` completed successfully at `2026-08-18T15:50:53Z`. Its non-secret receipt proves the current credential state without relying on an older unchanged semantic-status timestamp:
 
 - `PAGES_RELEASE_ADMIN_TOKEN`: absent
 - `CLOUDFLARE_API_TOKEN`: absent
@@ -140,9 +144,9 @@ Fresh explicit orchestrator run `32150414990` completed successfully at `2026-08
 - backend credentials ready: false
 - Worker lock files present: false
 
-The same run completed the full orchestrator job successfully and remained fail-closed. The additive ledger still contains only initialization plus the active exact `draft_staged` event; there are no strong archive, deployment-generation, or backend-compatibility qualification rows.
+The same run completed the full orchestrator job successfully and remained fail-closed. The additive ledger now contains initialization plus exact `draft_staged` events for both active and previous archives; there are still no strong archive, deployment-generation, or backend-compatibility qualification rows.
 
-`backend/cloudflare/API_ORIGIN.txt` and `backend/cloudflare/WORKER_ROLLBACK_WINDOW.json` remain absent. Therefore no authenticated Cloudflare/Turso bootstrap or live four-pair compatibility proof can occur, the previous immutable release cannot yet be created/published with the required release/workflows/Admin authority, and no `backend_compatibility_verified` event may be written.
+`backend/cloudflare/API_ORIGIN.txt` and `backend/cloudflare/WORKER_ROLLBACK_WINDOW.json` remain absent. Therefore no authenticated Cloudflare/Turso bootstrap or live four-pair compatibility proof can occur, both mutable release drafts are staged but neither can yet be published/verified immutable without the required release/workflows/Admin authority, and no `backend_compatibility_verified` event may be written.
 
 The four backend credentials must be valid for the selected Cloudflare account and live Turso datastore. Do not weaken the exact source, release-target, immutable-release, browser-CORS, live-Turso or four-pair checks merely to make the task appear complete.
 
