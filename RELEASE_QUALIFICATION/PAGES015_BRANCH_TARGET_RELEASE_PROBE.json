@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "gate": "PAGES-015",
+  "event": "draft_release_branch_target_probe",
+  "workflowRunId": 32163638806,
+  "targetBranch": "pages015-probe-target-5cc89e05",
+  "targetSha": "5cc89e05653b6461ed6a41332f374eaadb360945",
+  "draftCreated": true,
+  "cleanup": {
+    "releaseDeleted": false,
+    "tagDeleted": true,
+    "branchDeleted": true
+  },
+  "errorClass": "none",
+  "containsSecretValues": false,
+  "qualificationEvidence": false,
+  "recordedAt": "2026-08-18T17:04:25Z"
+}
