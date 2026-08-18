@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "gate": "PAGES-015",
+  "event": "locked_archive_tag_proof_started",
+  "workflowRunId": 32150862909,
+  "eventName": "push",
+  "triggerHeadSha": "408d83c9483a8815ab2b8ea99d3493f0f2692679",
+  "recordedAt": "2026-08-18T14:51:24Z",
+  "qualificationEvidence": false
+}
