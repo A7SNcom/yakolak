@@ -11,6 +11,7 @@ on:
       - 'scripts/probe-pages015-live-compatibility.mjs'
       - 'tests/pages_backend_runtime_contract.test.mjs'
       - 'tests/pages_online_compatibility_contract.test.mjs'
+      - 'tests/pages005_worker_lock_identity_contract.test.mjs'
       - 'tests/pages015-browser-cors.spec.js'
       - '.github/workflows/pages-005-cloudflare-backend.yml'
   workflow_dispatch:
@@ -38,7 +39,7 @@ jobs:
       - name: Install runtime dependency
         run: npm install --ignore-scripts
       - name: Worker and online compatibility contract tests
-        run: node --test tests/pages_backend_runtime_contract.test.mjs tests/pages_online_compatibility_contract.test.mjs
+        run: node --test tests/pages_backend_runtime_contract.test.mjs tests/pages_online_compatibility_contract.test.mjs tests/pages005_worker_lock_identity_contract.test.mjs
       - name: Wrangler dry-run bundle
         run: npx --yes wrangler@4 deploy --dry-run --config backend/cloudflare/wrangler.jsonc --outdir .tmp/pages005-worker
 
