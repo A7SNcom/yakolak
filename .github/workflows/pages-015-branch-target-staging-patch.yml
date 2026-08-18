@@ -199,3 +199,5 @@ jobs:
           test "$(git diff --cached --name-only | wc -l)" -eq 2
           git commit -m 'PAGES-015 stage previous draft through exact-SHA branch target'
           git push origin HEAD:threejs-rebuild
+
+# retrigger-after-install: 2026-08-18T17:09Z
