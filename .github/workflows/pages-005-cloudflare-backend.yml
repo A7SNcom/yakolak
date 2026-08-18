@@ -10,6 +10,7 @@ on:
       - 'scripts/pages015-finalize-live-window.sh'
       - 'scripts/probe-pages005-cloudflare-roundtrip.mjs'
       - 'scripts/probe-pages015-live-compatibility.mjs'
+      - 'scripts/verify-pages015-frontend-window.mjs'
       - 'tests/pages_backend_runtime_contract.test.mjs'
       - 'tests/pages_online_compatibility_contract.test.mjs'
       - 'tests/pages005_worker_lock_identity_contract.test.mjs'
@@ -39,6 +40,7 @@ jobs:
         run: |
           bash -n scripts/pages005-bootstrap-live.sh
           bash -n scripts/pages015-finalize-live-window.sh
+          node --check scripts/verify-pages015-frontend-window.mjs
       - name: Install runtime dependency
         run: npm install --ignore-scripts
       - name: Worker and online compatibility contract tests
@@ -75,5 +77,6 @@ jobs:
         run: |
           bash -n scripts/pages005-bootstrap-live.sh
           bash -n scripts/pages015-finalize-live-window.sh
+          node --check scripts/verify-pages015-frontend-window.mjs
       - name: Deploy and prove exact Cloudflare/Turso rollback window
         run: bash scripts/pages005-bootstrap-live.sh
