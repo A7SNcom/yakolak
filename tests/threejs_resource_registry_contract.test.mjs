@@ -117,6 +117,61 @@ test('re-registering the same resource under a new replacement key removes the s
   assert.equal(oldKeyReplacement.disposeCalls, 1);
 });
 
+test('released scopes reject every lifecycle-producing operation before side effects can leak', () => {
+  const platform = fakePlatform();
+  const registry = createResourceRegistry({ platform });
+  const scope = registry.createScope('released-scope');
+  const first = disposable('isMaterial');
+  scope.register(first, { kind: RESOURCE_KINDS.MATERIAL });
+  assert.equal(scope.release('scope-complete'), 1);
+  assert.equal(scope.release('duplicate-scope-release'), 0);
+  assert.equal(first.disposeCalls, 1);
+
+  const lateResource = disposable('isMaterial');
+  const target = new EventTarget();
+  let subscribed = 0;
+  let observed = 0;
+  let sharedFactories = 0;
+  const observer = {
+    observe() { observed += 1; },
+    disconnect() { observed -= 1; },
+  };
+  const expectReleased = (operation) => assert.throws(
+    operation,
+    /Resource scope is released: released-scope#\d+/,
+  );
+
+  expectReleased(() => scope.register(lateResource, { kind: RESOURCE_KINDS.MATERIAL }));
+  expectReleased(() => scope.replace('late-material', lateResource, { kind: RESOURCE_KINDS.MATERIAL }));
+  expectReleased(() => scope.adoptDeep({
+    format: 'yakolak-glb-components-v1',
+    components: [{ geometry: disposable('isBufferGeometry') }],
+  }));
+  expectReleased(() => scope.listen(target, 'late-event', () => {}));
+  expectReleased(() => scope.subscribe(() => {
+    subscribed += 1;
+    return () => { subscribed -= 1; };
+  }, () => {}));
+  expectReleased(() => scope.observe(observer, target));
+  expectReleased(() => scope.requestFrame(() => {}));
+  expectReleased(() => scope.setTimeout(() => {}, 1));
+  expectReleased(() => scope.setInterval(() => {}, 1));
+  expectReleased(() => scope.registerCleanup(() => {}));
+  expectReleased(() => scope.getOrCreateShared('late-shared', () => {
+    sharedFactories += 1;
+    return disposable('isBufferGeometry');
+  }));
+
+  assert.equal(lateResource.disposeCalls, 0, 'late resource must never become registry-owned');
+  assert.equal(subscribed, 0, 'late subscription function must not run');
+  assert.equal(observed, 0, 'late observer must not start observing');
+  assert.equal(sharedFactories, 0, 'late shared factory must not run');
+  assert.equal(platform.frames.size, 0, 'late frame must not be scheduled');
+  assert.equal(platform.timeouts.size, 0, 'late timeout must not be scheduled');
+  assert.equal(platform.intervals.size, 0, 'late interval must not be scheduled');
+  assert.equal(registry.snapshot().total, 0, 'released scope must remain empty after rejected late work');
+});
+
 test('context-loss cleanup remains idempotent even when a driver-facing disposer throws', () => {
   const registry = createResourceRegistry();
   const texture = disposable('isTexture', { throws: true });

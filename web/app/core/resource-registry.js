@@ -524,7 +524,13 @@ export function createResourceRegistry({
     const scope = `${name}#${++scopeSequence}`;
     let released = false;
 
+    function assertScopeLive() {
+      assertLive();
+      if (released) throw new Error(`Resource scope is released: ${scope}`);
+    }
+
     function scopedMetadata(metadata = {}) {
+      assertScopeLive();
       return {
         ...metadata,
         scope,
@@ -546,7 +552,10 @@ export function createResourceRegistry({
       setTimeout: (callback, delay, metadata) => setTimeoutHandle(callback, delay, scopedMetadata(metadata)),
       setInterval: (callback, delay, metadata) => setIntervalHandle(callback, delay, scopedMetadata(metadata)),
       registerCleanup: (cleanup, metadata) => registerCleanup(cleanup, scopedMetadata(metadata)),
-      getOrCreateShared: (key, factory, metadata) => getOrCreateShared(key, factory, { ...metadata, scope }),
+      getOrCreateShared(key, factory, metadata) {
+        assertScopeLive();
+        return getOrCreateShared(key, factory, { ...metadata, scope });
+      },
       release(reason = 'scope-released') {
         if (released) return 0;
         released = true;
