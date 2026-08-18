@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "gate": "PAGES-015",
+  "event": "previous_draft_metadata_inspected",
+  "workflowRunId": 32164403323,
+  "releaseId": 372518304,
+  "tagName": "pages-archive-2026-08-18-geeb3b8e1-t5cc89e05",
+  "targetCommitish": "pages015-release-target-previous-5cc89e05",
+  "draft": true,
+  "immutable": false,
+  "assetCount": 0,
+  "assetNames": [],
+  "containsSecretValues": false,
+  "qualificationEvidence": false,
+  "recordedAt": "2026-08-18T17:13:01Z"
+}
