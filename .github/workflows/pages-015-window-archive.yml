@@ -23,7 +23,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: pages-015-window-archive
+  group: pages-release-qualification-ledger
   cancel-in-progress: false
 
 jobs:
