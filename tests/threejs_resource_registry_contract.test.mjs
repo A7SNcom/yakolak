@@ -101,6 +101,22 @@ test('replacement disposes the replaced transient exactly once', () => {
   assert.equal(second.disposeCalls, 1);
 });
 
+test('re-registering the same resource under a new replacement key removes the stale old-key mapping', () => {
+  const registry = createResourceRegistry();
+  const resource = disposable('isMaterial');
+  const oldKeyReplacement = disposable('isMaterial');
+
+  registry.replace('slot-a', resource, { kind: RESOURCE_KINDS.MATERIAL });
+  registry.replace('slot-b', resource, { kind: RESOURCE_KINDS.MATERIAL });
+  registry.replace('slot-a', oldKeyReplacement, { kind: RESOURCE_KINDS.MATERIAL });
+
+  assert.equal(resource.disposeCalls, 0, 're-keyed resource must not remain addressable by its old replacement key');
+  assert.equal(oldKeyReplacement.disposeCalls, 0);
+  registry.dispose();
+  assert.equal(resource.disposeCalls, 1);
+  assert.equal(oldKeyReplacement.disposeCalls, 1);
+});
+
 test('context-loss cleanup remains idempotent even when a driver-facing disposer throws', () => {
   const registry = createResourceRegistry();
   const texture = disposable('isTexture', { throws: true });
