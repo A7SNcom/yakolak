@@ -5,6 +5,8 @@ import { readFileSync } from 'node:fs';
 const bootstrap = readFileSync(new URL('../scripts/pages005-bootstrap-live.sh', import.meta.url), 'utf8');
 const orchestrator = readFileSync(new URL('../scripts/pages015-orchestrate-qualification.sh', import.meta.url), 'utf8');
 const finalizer = readFileSync(new URL('../scripts/pages015-finalize-live-window.sh', import.meta.url), 'utf8');
+const frontendVerifier = readFileSync(new URL('../scripts/verify-pages015-frontend-window.mjs', import.meta.url), 'utf8');
+const legacy = readFileSync(new URL('../.github/workflows/pages-015-online-compatibility.yml', import.meta.url), 'utf8');
 
 const expectedCapabilities = [
   'health.compatibility.v1',
@@ -56,6 +58,26 @@ test('PAGES-015 finalizer binds the live Worker proof to the locked identity', (
   assert.match(finalizer, /\.tursoSchemaVersion == \$tursoVersion/);
   assert.match(finalizer, /\.workerVersionId == \$active/);
   assert.match(finalizer, /\.workerVersionId == \$previous/);
+});
+
+test('shared frontend verifier binds live evidence to the exact Worker lock before pairings', () => {
+  assert.match(frontendVerifier, /WORKER_ROLLBACK_WINDOW\.json/);
+  assert.match(frontendVerifier, /API_ORIGIN\.txt/);
+  assert.match(frontendVerifier, /workerLock\?\.protocolIdentity !== evidence\.protocolIdentity/);
+  assert.match(frontendVerifier, /workerLock\?\.capabilityIdentity !== evidence\.capabilityIdentity/);
+  assert.match(frontendVerifier, /workerLock\?\.tursoSchemaId !== evidence\.tursoSchemaId/);
+  assert.match(frontendVerifier, /workerLock\?\.tursoSchemaVersion !== evidence\.tursoSchemaVersion/);
+  assert.match(frontendVerifier, /activeWorker\.workerVersionId !== workerLock\?\.activeWorkerVersionId/);
+  assert.match(frontendVerifier, /previousWorker\.workerVersionId !== workerLock\?\.previousWorkerVersionId/);
+  assert.match(frontendVerifier, /evidence\.workerLockIdentityVerified = true/);
+
+  const finalizerVerify = finalizer.indexOf('verify-pages015-frontend-window.mjs');
+  const finalizerAppend = finalizer.indexOf('append-pages015-qualification.mjs');
+  assert.ok(finalizerVerify >= 0 && finalizerAppend > finalizerVerify, 'finalizer must bind Worker lock before ledger append');
+
+  const legacyVerify = legacy.indexOf('verify-pages015-frontend-window.mjs');
+  const legacyAppend = legacy.indexOf('append-pages015-qualification.mjs');
+  assert.ok(legacyVerify >= 0 && legacyAppend > legacyVerify, 'manual fallback must bind Worker lock before ledger append');
 });
 
 test('PAGES-015 status receipt uses the bound jq readiness variables', () => {
