@@ -25,6 +25,37 @@ jobs:
           ref: threejs-rebuild
           fetch-depth: 0
 
+      - name: Record tag-proof start receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin threejs-rebuild
+          git reset --hard origin/threejs-rebuild
+          mkdir -p RELEASE_QUALIFICATION
+          jq -n \
+            --arg runId "$GITHUB_RUN_ID" \
+            --arg eventName "$GITHUB_EVENT_NAME" \
+            --arg triggerHeadSha "$GITHUB_SHA" \
+            --arg recordedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
+            {
+              schemaVersion: 1,
+              gate: "PAGES-015",
+              event: "locked_archive_tag_proof_started",
+              workflowRunId: ($runId|tonumber),
+              eventName: $eventName,
+              triggerHeadSha: $triggerHeadSha,
+              recordedAt: $recordedAt,
+              qualificationEvidence: false
+            }
+          ' > RELEASE_QUALIFICATION/PAGES015_ARCHIVE_TAG_RUN.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add RELEASE_QUALIFICATION/PAGES015_ARCHIVE_TAG_RUN.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'PAGES-015 record archive tag proof run'
+            git push origin HEAD:threejs-rebuild
+          fi
+
       - name: Ensure exact locked archive tags
         id: tags
         shell: bash
