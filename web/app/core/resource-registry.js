@@ -291,6 +291,11 @@ export function createResourceRegistry({
     assertLive();
     if (!sharedKey) throw new TypeError('Shared resource requires a stable key');
     if (typeof factory !== 'function') throw new TypeError('Shared resource factory must be a function');
+    normaliseMetadata({
+      ...metadata,
+      ownership: RESOURCE_OWNERSHIP.SHARED_IMMUTABLE,
+      replacementKey: `shared:${sharedKey}`,
+    });
     const activeId = sharedEntries.get(sharedKey);
     const active = activeId ? entries.get(activeId) : null;
     if (active && !active.released) return active.resource;
@@ -419,7 +424,8 @@ export function createResourceRegistry({
       throw new TypeError('Registry listener target must implement addEventListener/removeEventListener');
     }
     if (typeof listener !== 'function') throw new TypeError('Registry listener must be a function');
-    const key = metadata.replacementKey;
+    const prepared = normaliseMetadata({ ...metadata, kind: RESOURCE_KINDS.LISTENER });
+    const key = prepared.replacementKey;
     if (key) {
       const priorId = replacementEntries.get(key);
       if (priorId) releaseId(priorId, 'replaced');
@@ -427,8 +433,7 @@ export function createResourceRegistry({
     target.addEventListener(type, listener, options);
     const holder = { target, type, listener };
     return register(holder, {
-      ...metadata,
-      kind: RESOURCE_KINDS.LISTENER,
+      ...prepared,
       cleanup: () => target.removeEventListener(type, listener, options),
     });
   }
@@ -436,12 +441,12 @@ export function createResourceRegistry({
   function subscribe(subscribeFn, listener, metadata = {}) {
     assertLive();
     if (typeof subscribeFn !== 'function') throw new TypeError('Registry subscription requires a subscribe function');
+    const prepared = normaliseMetadata({ ...metadata, kind: RESOURCE_KINDS.SUBSCRIPTION });
     const unsubscribe = subscribeFn(listener);
     if (typeof unsubscribe !== 'function') throw new TypeError('Subscription must return an unsubscribe function');
     const holder = { unsubscribe };
     return register(holder, {
-      ...metadata,
-      kind: RESOURCE_KINDS.SUBSCRIPTION,
+      ...prepared,
       cleanup: unsubscribe,
     });
   }
@@ -449,11 +454,9 @@ export function createResourceRegistry({
   function observe(observer, target, options, metadata = {}) {
     assertLive();
     if (!observer?.observe || !observer?.disconnect) throw new TypeError('Registry observer must implement observe/disconnect');
+    const prepared = normaliseMetadata({ ...metadata, kind: RESOURCE_KINDS.OBSERVER });
     observer.observe(target, options);
-    return register(observer, {
-      ...metadata,
-      kind: RESOURCE_KINDS.OBSERVER,
-    });
+    return register(observer, prepared);
   }
 
   function platformFunction(name) {
@@ -466,6 +469,7 @@ export function createResourceRegistry({
   function oneShot(kind, scheduleName, cancelName, callback, delay, metadata) {
     assertLive();
     if (typeof callback !== 'function') throw new TypeError(`${kind} callback must be a function`);
+    const prepared = normaliseMetadata({ ...metadata, kind });
     const scheduleFn = platformFunction(scheduleName);
     const cancelFn = platformFunction(cancelName);
     const holder = { handle: null };
@@ -483,8 +487,7 @@ export function createResourceRegistry({
     };
     holder.handle = delay == null ? scheduleFn(wrapped) : scheduleFn(wrapped, delay);
     token = register(holder, {
-      ...metadata,
-      kind,
+      ...prepared,
       cleanup: () => cancelFn(holder.handle),
     });
     return token;
@@ -515,22 +518,25 @@ export function createResourceRegistry({
   function setIntervalHandle(callback, delay, metadata = {}) {
     assertLive();
     if (typeof callback !== 'function') throw new TypeError('interval callback must be a function');
+    const prepared = normaliseMetadata({ ...metadata, kind: RESOURCE_KINDS.INTERVAL });
     const setIntervalFn = platformFunction('setInterval');
     const clearIntervalFn = platformFunction('clearInterval');
     const holder = { handle: setIntervalFn(callback, Math.max(0, Number(delay) || 0)) };
     return register(holder, {
-      ...metadata,
-      kind: RESOURCE_KINDS.INTERVAL,
+      ...prepared,
       cleanup: () => clearIntervalFn(holder.handle),
     });
   }
 
   function registerCleanup(cleanup, metadata = {}) {
     if (typeof cleanup !== 'function') throw new TypeError('Cleanup must be a function');
-    const holder = { cleanup };
-    return register(holder, {
+    const prepared = normaliseMetadata({
       ...metadata,
       kind: metadata.kind || RESOURCE_KINDS.CLEANUP,
+    });
+    const holder = { cleanup };
+    return register(holder, {
+      ...prepared,
       cleanup,
     });
   }
