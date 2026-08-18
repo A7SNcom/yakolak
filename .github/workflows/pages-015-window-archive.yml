@@ -6,7 +6,7 @@ on:
       - threejs-rebuild
     paths:
       - '.github/workflows/pages-015-window-archive.yml'
-      - 'scripts/pages015-archive-window-entry.sh'
+      - 'scripts/pages015-archive-window-entry-v2.sh'
       - 'RELEASE_QUALIFICATION/ONLINE_FRONTEND_WINDOW.json'
   workflow_dispatch:
 
@@ -90,6 +90,6 @@ jobs:
           ref: threejs-rebuild
           fetch-depth: 0
       - name: Validate archive helper syntax
-        run: bash -n scripts/pages015-archive-window-entry.sh
+        run: bash -n scripts/pages015-archive-window-entry-v2.sh
       - name: Qualify immutable frontend archive serially
-        run: bash scripts/pages015-archive-window-entry.sh
+        run: bash scripts/pages015-archive-window-entry-v2.sh
