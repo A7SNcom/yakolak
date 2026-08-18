@@ -1,0 +1,189 @@
+name: PAGES-005 Backend Bootstrap
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-005-cloudflare-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy-and-prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: cloudflare-backend
+    steps:
+      - name: Checkout authoritative Three.js backend source
+        uses: actions/checkout@v6
+        with:
+          ref: threejs-rebuild
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Require deployment credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo 'missing CLOUDFLARE_API_TOKEN'; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo 'missing CLOUDFLARE_ACCOUNT_ID'; exit 1; }
+          test -n "$TURSO_DATABASE_URL" || { echo 'missing TURSO_DATABASE_URL'; exit 1; }
+          test -n "$TURSO_AUTH_TOKEN" || { echo 'missing TURSO_AUTH_TOKEN'; exit 1; }
+
+      - name: Install and verify Worker contracts
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts
+          node --test tests/pages_backend_runtime_contract.test.mjs tests/pages_online_compatibility_contract.test.mjs
+          npx --yes wrangler@4 deploy --dry-run --config backend/cloudflare/wrangler.jsonc --outdir .tmp/pages005-worker
+
+      - name: Deploy bootstrap Worker version with required secrets
+        id: deploy
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: backend/cloudflare
+          wranglerVersion: '4'
+          command: deploy --message "PAGES-005 bootstrap live version"
+          secrets: |
+            TURSO_DATABASE_URL
+            TURSO_AUTH_TOKEN
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+
+      - name: Prove bootstrap live round trip and capture exact Worker version
+        id: bootstrap
+        env:
+          API_ORIGIN: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          set -euo pipefail
+          test -n "$API_ORIGIN" || { echo 'Wrangler did not return deployment-url'; exit 1; }
+          case "$API_ORIGIN" in
+            https://*.vercel.app*) echo 'refusing Vercel API_ORIGIN'; exit 1 ;;
+            https://*) ;;
+            *) echo "invalid API_ORIGIN: $API_ORIGIN"; exit 1 ;;
+          esac
+          api_origin="${API_ORIGIN%/}"
+          if [[ "${api_origin#https://}" == */* ]]; then
+            echo "API_ORIGIN must be a bare HTTPS origin: ${api_origin}" >&2
+            exit 1
+          fi
+          node scripts/probe-pages005-cloudflare-roundtrip.mjs "$api_origin"
+          curl --fail --silent --show-error \
+            --header 'Origin: https://a7sncom.github.io' \
+            --header 'Cache-Control: no-cache' \
+            "${api_origin}/health?pages005-bootstrap=${GITHUB_RUN_ID}" > "$RUNNER_TEMP/pages005-bootstrap-health.json"
+          jq -e '.ok == true and .compatibility.worker.versionId != null and .compatibility.worker.versionId != ""' \
+            "$RUNNER_TEMP/pages005-bootstrap-health.json" >/dev/null
+          bootstrap_version="$(jq -r '.compatibility.worker.versionId' "$RUNNER_TEMP/pages005-bootstrap-health.json")"
+          echo "api_origin=$api_origin" >> "$GITHUB_OUTPUT"
+          echo "bootstrap_version=$bootstrap_version" >> "$GITHUB_OUTPUT"
+
+      - name: Upload distinct rollback-window twin Worker version
+        id: twin
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          secrets_file="$RUNNER_TEMP/pages005-secrets.json"
+          output_file="$RUNNER_TEMP/pages005-version-upload.ndjson"
+          SECRETS_FILE="$secrets_file" node <<'NODE'
+          const fs = require('node:fs');
+          fs.writeFileSync(process.env.SECRETS_FILE, JSON.stringify({
+            TURSO_DATABASE_URL: process.env.TURSO_DATABASE_URL,
+            TURSO_AUTH_TOKEN: process.env.TURSO_AUTH_TOKEN,
+          }));
+          NODE
+          chmod 600 "$secrets_file"
+          rm -f "$output_file"
+          WRANGLER_OUTPUT_FILE_PATH="$output_file" \
+            npx --yes wrangler@4 versions upload \
+              --config backend/cloudflare/wrangler.jsonc \
+              --secrets-file "$secrets_file" \
+              --message "PAGES-005 rollback-window active twin"
+          rm -f "$secrets_file"
+          twin_version="$(jq -r 'select(.type == "version-upload") | .version_id // empty' "$output_file" | tail -n1)"
+          test -n "$twin_version"
+          test "$twin_version" != "${{ steps.bootstrap.outputs.bootstrap_version }}"
+          echo "twin_version=$twin_version" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy active plus previous Worker rollback window
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ACTIVE_VERSION: ${{ steps.twin.outputs.twin_version }}
+          PREVIOUS_VERSION: ${{ steps.bootstrap.outputs.bootstrap_version }}
+        run: |
+          set -euo pipefail
+          test -n "$ACTIVE_VERSION" && test -n "$PREVIOUS_VERSION"
+          test "$ACTIVE_VERSION" != "$PREVIOUS_VERSION"
+          npx --yes wrangler@4 versions deploy \
+            "${ACTIVE_VERSION}@100%" \
+            "${PREVIOUS_VERSION}@0%" \
+            --config backend/cloudflare/wrangler.jsonc \
+            --message "PAGES-005 active+previous rollback window" \
+            -y
+
+      - name: Prove both exact Worker versions against live Turso
+        env:
+          API_ORIGIN: ${{ steps.bootstrap.outputs.api_origin }}
+          ACTIVE_WORKER_VERSION: ${{ steps.twin.outputs.twin_version }}
+          PREVIOUS_WORKER_VERSION: ${{ steps.bootstrap.outputs.bootstrap_version }}
+          PAGES015_EVIDENCE_PATH: "$RUNNER_TEMP/pages005-worker-window-evidence.json"
+        run: node scripts/probe-pages015-live-compatibility.mjs
+
+      - name: Prove browser CORS from real GitHub Pages origin
+        env:
+          PAGES015_API_ORIGIN: ${{ steps.bootstrap.outputs.api_origin }}
+        run: |
+          set -euo pipefail
+          npm install --no-save --ignore-scripts @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+          npx playwright test tests/pages015-browser-cors.spec.js --workers=1
+
+      - name: Lock proven API_ORIGIN and Worker rollback window
+        env:
+          API_ORIGIN: ${{ steps.bootstrap.outputs.api_origin }}
+          ACTIVE_WORKER_VERSION: ${{ steps.twin.outputs.twin_version }}
+          PREVIOUS_WORKER_VERSION: ${{ steps.bootstrap.outputs.bootstrap_version }}
+        run: |
+          set -euo pipefail
+          test -n "$API_ORIGIN" && test -n "$ACTIVE_WORKER_VERSION" && test -n "$PREVIOUS_WORKER_VERSION"
+          test "$ACTIVE_WORKER_VERSION" != "$PREVIOUS_WORKER_VERSION"
+          git fetch --quiet origin threejs-rebuild
+          git checkout -B threejs-rebuild origin/threejs-rebuild
+          mkdir -p backend/cloudflare
+          printf '%s\n' "$API_ORIGIN" > backend/cloudflare/API_ORIGIN.txt
+          jq -n \
+            --arg apiOrigin "$API_ORIGIN" \
+            --arg activeWorkerVersionId "$ACTIVE_WORKER_VERSION" \
+            --arg previousWorkerVersionId "$PREVIOUS_WORKER_VERSION" \
+            --arg workflowRunId "$GITHUB_RUN_ID" \
+            --arg recordedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{schemaVersion:1,gate:"PAGES-005",provider:"cloudflare-workers",workerName:"yakolak-room-api",apiOrigin:$apiOrigin,activeWorkerVersionId:$activeWorkerVersionId,previousWorkerVersionId:$previousWorkerVersionId,traffic:{activePercent:100,previousPercent:0},versionOverrideProof:true,browserCorsVerified:true,liveTursoRoundTripVerified:true,migrationPolicy:"expand-contract-forward-only",tursoDataRollbackRequired:false,workflowRunId:$workflowRunId,recordedAt:$recordedAt}' \
+            > backend/cloudflare/WORKER_ROLLBACK_WINDOW.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/cloudflare/API_ORIGIN.txt backend/cloudflare/WORKER_ROLLBACK_WINDOW.json
+          if git diff --cached --quiet; then
+            echo 'Proven live origin and Worker rollback window already locked.'
+            exit 0
+          fi
+          test "$(git diff --cached --name-only | wc -l)" -eq 2
+          git commit -m 'PAGES-005 lock proven Cloudflare rollback window'
+          git push origin HEAD:threejs-rebuild
