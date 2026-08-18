@@ -9,6 +9,7 @@ on:
       - 'scripts/pages015-archive-window-entry-v2.sh'
       - 'scripts/pages015-record-exact-draft-stage.sh'
       - 'RELEASE_QUALIFICATION/ONLINE_FRONTEND_WINDOW.json'
+      - 'RELEASE_QUALIFICATION/PAGES015_ARCHIVE_TRIGGER'
       - 'backend/cloudflare/CREDENTIAL_STATUS.json'
   workflow_dispatch:
 
