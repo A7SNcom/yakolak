@@ -118,7 +118,7 @@ jobs:
       PAGES014_VERIFIER_JOB_ID: ${{ matrix.frontend.pages014LiveEvidence.verifierJobId }}
       PAGES014_LIVE_MANIFEST_SHA256: ${{ matrix.frontend.pages014LiveEvidence.liveManifestSha256 }}
       PAGES014_PAGE_URL: ${{ matrix.frontend.pages014LiveEvidence.pageUrl }}
-      GH_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ secrets.PAGES_RELEASE_ADMIN_TOKEN || github.token }}
       ADMIN_TOKEN: ${{ secrets.PAGES_RELEASE_ADMIN_TOKEN }}
     steps:
       - uses: actions/checkout@v6
@@ -140,10 +140,10 @@ jobs:
             echo 'ready=true' >> "$GITHUB_OUTPUT"
           else
             echo 'ready=false' >> "$GITHUB_OUTPUT"
-            echo '::notice title=PAGES-015 waiting for immutable-release admin credential::Exact mutable drafts will still be staged and byte-verified, but no release is published and no eligibility event is written.'
+            echo '::notice title=PAGES-015 waiting for immutable-release admin credential::Existing exact drafts are byte-verified; missing drafts cannot be created or published until the admin credential exists. No eligibility event is written.'
           fi
 
-      - name: Stage and record exact mutable draft while admin credential is absent
+      - name: Stage or verify exact mutable draft while admin credential is absent
         id: stage
         if: steps.admin.outputs.ready != 'true'
         shell: bash
@@ -161,13 +161,19 @@ jobs:
             exit 0
           fi
 
-          grep -Fq 'PAGES_RELEASE_ADMIN_TOKEN is required before publishing the exact draft.' "$log" || {
-            echo "archive helper failed before the expected immutable-admin gate" >&2
-            exit "$rc"
-          }
+          if grep -Fq 'PAGES_RELEASE_ADMIN_TOKEN is required before publishing the exact draft.' "$log"; then
+            bash scripts/pages015-record-exact-draft-stage.sh
+            echo "${ROLE} exact draft verified; publication remains WAITING for immutable-release admin proof."
+            exit 0
+          fi
 
-          bash scripts/pages015-record-exact-draft-stage.sh
-          echo "${ROLE} exact draft staged; publication remains WAITING for immutable-release admin proof."
+          if grep -Fq 'HTTP 403: Resource not accessible by integration' "$log" && grep -Fq '/releases' "$log"; then
+            echo "::notice title=PAGES-015 draft creation waiting for admin credential::${ROLE} has no reusable draft and github.token cannot create it. It will be created with PAGES_RELEASE_ADMIN_TOKEN once that credential exists."
+            exit 0
+          fi
+
+          echo "archive helper failed before an expected external credential gate" >&2
+          exit "$rc"
 
       - name: Publish and fully qualify immutable frontend archive serially
         id: publish
