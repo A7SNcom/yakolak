@@ -25,8 +25,15 @@ concurrency:
   group: yakolak-pages-composite
   cancel-in-progress: false
 
+env:
+  PAGES_PROTOCOL_VERSION: "1"
+
 jobs:
   compose:
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     if: >-
       ${{ github.event_name == 'workflow_dispatch' ||
           (github.event_name == 'push' && startsWith(github.event.head_commit.message, '[flash-ready]')) ||
@@ -40,6 +47,10 @@ jobs:
       root_ready: ${{ steps.root.outputs.ready }}
       root_sha: ${{ steps.root.outputs.sha }}
       candidate_sha: ${{ steps.candidate.outputs.sha }}
+      deployment_generation: ${{ steps.generation.outputs.deployment_generation }}
+      public_runtime_protocol_sha256: ${{ steps.generation.outputs.public_runtime_protocol_sha256 }}
+      content_identity_sha256: ${{ steps.generation.outputs.content_identity_sha256 }}
+      protocol_version: ${{ steps.generation.outputs.protocol_version }}
     steps:
       - name: Checkout main history only
         uses: actions/checkout@v4
@@ -202,7 +213,7 @@ jobs:
 
           const config = {
             frontendSha: process.env.FRONTEND_SHA,
-            protocolVersion: '1',
+            protocolVersion: process.env.PAGES_PROTOCOL_VERSION,
             apiOrigin,
             environment: 'production',
             branch: 'threejs-rebuild',
@@ -213,6 +224,84 @@ jobs:
 
           cat pages-site/threejs/runtime-config.json
 
+      - name: Define generation and publish deployment manifest
+        if: steps.root.outputs.ready == 'true'
+        id: generation
+        shell: bash
+        env:
+          GODOT_ROOT_SHA: ${{ steps.root.outputs.sha }}
+          THREEJS_CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          set -euo pipefail
+
+          runtime_hash="$(sha256sum pages-site/threejs/runtime-config.json | awk '{print $1}')"
+          protocol_version="$(jq -r '.protocolVersion' pages-site/threejs/runtime-config.json)"
+          test "${protocol_version}" = "${PAGES_PROTOCOL_VERSION}"
+
+          manifest_tmp="$(mktemp)"
+          (
+            cd pages-site
+            find . -type f ! -name 'deployment-manifest.json' -printf '%P\n' \
+              | LC_ALL=C sort \
+              | while IFS= read -r rel; do
+                  digest="$(sha256sum "${rel}" | awk '{print $1}')"
+                  printf '%s  %s\n' "${digest}" "${rel}"
+                done
+          ) > "${manifest_tmp}"
+          content_identity="$(sha256sum "${manifest_tmp}" | awk '{print $1}')"
+
+          generation_digest="$(
+            printf 'pages-deployment-generation-v1\n%s\n%s\n%s\n' \
+              "${GODOT_ROOT_SHA}" "${THREEJS_CANDIDATE_SHA}" "${runtime_hash}" \
+              | sha256sum | awk '{print $1}'
+          )"
+          deployment_generation="sha256:${generation_digest}"
+
+          jq -n \
+            --arg generation "${deployment_generation}" \
+            --arg godotRootSha "${GODOT_ROOT_SHA}" \
+            --arg threejsCandidateSha "${THREEJS_CANDIDATE_SHA}" \
+            --arg runtimeHash "${runtime_hash}" \
+            --arg protocolVersion "${protocol_version}" \
+            --arg contentIdentity "${content_identity}" \
+            '{
+              schemaVersion: 1,
+              generationSchema: "pages-deployment-generation-v1",
+              deploymentGeneration: $generation,
+              godotRootSha: $godotRootSha,
+              threejsCandidateSha: $threejsCandidateSha,
+              publicRuntimeProtocol: {
+                sha256: $runtimeHash,
+                protocolVersion: $protocolVersion
+              },
+              contentIdentity: {
+                algorithm: "sha256-canonical-file-manifest-v1",
+                sha256: $contentIdentity,
+                excludes: ["deployment-manifest.json"]
+              }
+            }' > pages-site/deployment-manifest.json
+
+          jq -e \
+            --arg generation "${deployment_generation}" \
+            --arg root "${GODOT_ROOT_SHA}" \
+            --arg candidate "${THREEJS_CANDIDATE_SHA}" \
+            --arg runtime "${runtime_hash}" \
+            --arg content "${content_identity}" \
+            '.schemaVersion == 1 and
+             .generationSchema == "pages-deployment-generation-v1" and
+             .deploymentGeneration == $generation and
+             .godotRootSha == $root and
+             .threejsCandidateSha == $candidate and
+             .publicRuntimeProtocol.sha256 == $runtime and
+             .contentIdentity.sha256 == $content' \
+            pages-site/deployment-manifest.json >/dev/null
+
+          echo "deployment_generation=${deployment_generation}" >> "$GITHUB_OUTPUT"
+          echo "public_runtime_protocol_sha256=${runtime_hash}" >> "$GITHUB_OUTPUT"
+          echo "content_identity_sha256=${content_identity}" >> "$GITHUB_OUTPUT"
+          echo "protocol_version=${protocol_version}" >> "$GITHUB_OUTPUT"
+          cat pages-site/deployment-manifest.json
+
       - name: Verify artifact structure and secrecy
         if: steps.root.outputs.ready == 'true'
         shell: bash
@@ -221,6 +310,7 @@ jobs:
           test -s pages-site/index.html
           test -s pages-site/threejs/index.html
           test -s pages-site/threejs/runtime-config.json
+          test -s pages-site/deployment-manifest.json
           test ! -e pages-site/.git
           test ! -e pages-site/.github
 
@@ -272,39 +362,411 @@ jobs:
           path: pages-site
 
   deploy:
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
     if: needs.compose.outputs.root_ready == 'true'
     needs: compose
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Checkout repository for immediate supersession guard
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: supersession-repo
+          fetch-depth: 0
+
+      - name: Re-resolve desired generation immediately before deploy
+        id: desired
+        shell: bash
+        env:
+          EXPECTED_GENERATION: ${{ needs.compose.outputs.deployment_generation }}
+        run: |
+          set -euo pipefail
+
+          git -C supersession-repo fetch --quiet --force origin \
+            '+refs/heads/main:refs/remotes/origin/main' \
+            '+refs/heads/threejs-rebuild:refs/remotes/origin/threejs-rebuild'
+
+          desired_root="$(
+            git -C supersession-repo log refs/remotes/origin/main \
+              --grep='^\[flash-ready\]' --format='%H' -n 1
+          )"
+          desired_candidate="$(git -C supersession-repo rev-parse refs/remotes/origin/threejs-rebuild)"
+          test -n "${desired_root}"
+          test -n "${desired_candidate}"
+
+          raw_origin=''
+          origin_state='absent'
+          if git -C supersession-repo cat-file -e "${desired_candidate}:backend/cloudflare/API_ORIGIN.txt" 2>/dev/null; then
+            raw_origin="$(git -C supersession-repo show "${desired_candidate}:backend/cloudflare/API_ORIGIN.txt" | tr -d '\r\n')"
+            if [ -n "${raw_origin}" ]; then
+              origin_state='configured'
+            fi
+          fi
+
+          FRONTEND_SHA="${desired_candidate}" RAW_API_ORIGIN="${raw_origin}" API_ORIGIN_STATE="${origin_state}" \
+            node <<'NODE'
+          const fs = require('node:fs');
+
+          const raw = String(process.env.RAW_API_ORIGIN || '').trim();
+          let apiOrigin = null;
+          let apiOriginState = process.env.API_ORIGIN_STATE === 'configured' ? 'configured' : 'absent';
+
+          if (raw) {
+            let url = null;
+            try { url = new URL(raw); } catch {}
+            const valid = url
+              && url.protocol === 'https:'
+              && !url.username
+              && !url.password
+              && url.pathname === '/'
+              && !url.search
+              && !url.hash
+              && !/(^|\.)vercel\.app$/i.test(url.hostname);
+            if (valid) apiOrigin = url.origin;
+            else apiOriginState = 'invalid';
+          }
+
+          const config = {
+            frontendSha: process.env.FRONTEND_SHA,
+            protocolVersion: process.env.PAGES_PROTOCOL_VERSION,
+            apiOrigin,
+            environment: 'production',
+            branch: 'threejs-rebuild',
+            apiOriginState,
+          };
+          fs.writeFileSync('/tmp/desired-runtime-config.json', `${JSON.stringify(config, null, 2)}\n`);
+          NODE
+
+          runtime_hash="$(sha256sum /tmp/desired-runtime-config.json | awk '{print $1}')"
+          desired_digest="$(
+            printf 'pages-deployment-generation-v1\n%s\n%s\n%s\n' \
+              "${desired_root}" "${desired_candidate}" "${runtime_hash}" \
+              | sha256sum | awk '{print $1}'
+          )"
+          desired_generation="sha256:${desired_digest}"
+
+          echo "desired_root_sha=${desired_root}" >> "$GITHUB_OUTPUT"
+          echo "desired_candidate_sha=${desired_candidate}" >> "$GITHUB_OUTPUT"
+          echo "desired_runtime_hash=${runtime_hash}" >> "$GITHUB_OUTPUT"
+          echo "desired_generation=${desired_generation}" >> "$GITHUB_OUTPUT"
+
+          if [ "${desired_generation}" != "${EXPECTED_GENERATION}" ]; then
+            echo 'deploy=false' >> "$GITHUB_OUTPUT"
+            echo "::notice title=PAGES-014 SUPERSEDED::Composed ${EXPECTED_GENERATION}; desired is now ${desired_generation}. Stale artifact will not be deployed."
+            exit 0
+          fi
+
+          echo 'deploy=true' >> "$GITHUB_OUTPUT"
+          echo "Generation is still desired immediately before deploy: ${desired_generation}"
+
+      - name: Finish superseded run without deployment
+        if: steps.desired.outputs.deploy != 'true'
+        shell: bash
+        run: |
+          echo "PAGES-014 result: SUPERSEDED"
+          echo "No deploy-pages call was made; a newer desired input exists."
+
       - name: Deploy composite artifact
+        if: steps.desired.outputs.deploy == 'true'
         id: deployment
         uses: actions/deploy-pages@v4
 
-      - name: HTTP smoke root, Three.js, and public runtime config
+      - name: Poll successful GitHub Pages deployment status
+        if: steps.desired.outputs.deploy == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGES_BUILD_VERSION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          for attempt in $(seq 1 24); do
+            status="$(
+              gh api \
+                -H 'Accept: application/vnd.github+json' \
+                -H 'X-GitHub-Api-Version: 2026-03-10' \
+                "repos/${GITHUB_REPOSITORY}/pages/deployments/${PAGES_BUILD_VERSION}" \
+                --jq '.status' 2>/dev/null || true
+            )"
+
+            case "${status}" in
+              succeed)
+                echo "Pages deployment reports succeed for build version ${PAGES_BUILD_VERSION}."
+                exit 0
+                ;;
+              deployment_failed|deployment_perms_error|deployment_content_failed|deployment_cancelled|deployment_lost)
+                echo "Pages deployment reached terminal failure status: ${status}" >&2
+                exit 1
+                ;;
+              *)
+                echo "Pages deployment not ready yet (attempt ${attempt}, status=${status:-not-found}); waiting."
+                sleep 5
+                ;;
+            esac
+          done
+
+          echo 'Pages deployment never reached succeed state within the readiness window.' >&2
+          exit 1
+
+      - name: Poll live manifest with cache revalidation and prove generation
+        if: steps.desired.outputs.deploy == 'true'
+        id: live
+        shell: bash
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          EXPECTED_GENERATION: ${{ needs.compose.outputs.deployment_generation }}
+          EXPECTED_ROOT_SHA: ${{ needs.compose.outputs.root_sha }}
+          EXPECTED_CANDIDATE_SHA: ${{ needs.compose.outputs.candidate_sha }}
+          EXPECTED_RUNTIME_HASH: ${{ needs.compose.outputs.public_runtime_protocol_sha256 }}
+          EXPECTED_CONTENT_IDENTITY: ${{ needs.compose.outputs.content_identity_sha256 }}
+        run: |
+          set -euo pipefail
+          base="${PAGE_URL%/}/"
+          final_observation=''
+
+          for attempt in $(seq 1 36); do
+            url="${base}deployment-manifest.json?generation=${EXPECTED_GENERATION#sha256:}&run=${GITHUB_RUN_ID}&attempt=${attempt}"
+            code="$(
+              curl --silent --show-error --location \
+                --header 'Cache-Control: no-cache, max-age=0' \
+                --header 'Pragma: no-cache' \
+                --output live-deployment-manifest.json \
+                --write-out '%{http_code}' \
+                "${url}" || true
+            )"
+
+            if [ "${code}" = '200' ] && jq -e . live-deployment-manifest.json >/dev/null 2>&1; then
+              observed="$(jq -r '.deploymentGeneration // ""' live-deployment-manifest.json)"
+              final_observation="${observed}"
+              if jq -e \
+                --arg generation "${EXPECTED_GENERATION}" \
+                --arg root "${EXPECTED_ROOT_SHA}" \
+                --arg candidate "${EXPECTED_CANDIDATE_SHA}" \
+                --arg runtime "${EXPECTED_RUNTIME_HASH}" \
+                --arg content "${EXPECTED_CONTENT_IDENTITY}" \
+                '.schemaVersion == 1 and
+                 .generationSchema == "pages-deployment-generation-v1" and
+                 .deploymentGeneration == $generation and
+                 .godotRootSha == $root and
+                 .threejsCandidateSha == $candidate and
+                 .publicRuntimeProtocol.sha256 == $runtime and
+                 .contentIdentity.sha256 == $content' \
+                live-deployment-manifest.json >/dev/null; then
+                live_manifest_sha="$(sha256sum live-deployment-manifest.json | awk '{print $1}')"
+                echo "live_manifest_sha256=${live_manifest_sha}" >> "$GITHUB_OUTPUT"
+                echo "Live generation verified: ${EXPECTED_GENERATION}"
+                exit 0
+              fi
+              echo "Public site is reachable but still serves generation ${observed:-unknown}; waiting for requested generation."
+            else
+              echo "Public manifest not ready yet (attempt ${attempt}, HTTP ${code:-000}); waiting."
+            fi
+            sleep 5
+          done
+
+          echo "Final live manifest mismatch after readiness window; expected ${EXPECTED_GENERATION}, observed ${final_observation:-unavailable}." >&2
+          if [ -s live-deployment-manifest.json ]; then
+            cat live-deployment-manifest.json >&2 || true
+          fi
+          exit 1
+
+      - name: HTTP smoke root, Three.js, and exact public runtime config
+        if: steps.desired.outputs.deploy == 'true'
         shell: bash
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
           FRONTEND_SHA: ${{ needs.compose.outputs.candidate_sha }}
+          EXPECTED_RUNTIME_HASH: ${{ needs.compose.outputs.public_runtime_protocol_sha256 }}
         run: |
           set -euo pipefail
           base="${PAGE_URL%/}/"
-          for attempt in $(seq 1 12); do
-            root="$(curl --fail --silent --show-error --location "${base}" || true)"
-            three="$(curl --fail --silent --show-error --location "${base}threejs/" || true)"
-            config="$(curl --fail --silent --show-error --location "${base}threejs/runtime-config.json" || true)"
-            if [ -n "${root}" ] && [ -n "${three}" ] && [ -n "${config}" ] \
-               && ! grep -Fq 'THREEJS REBUILD' <<<"${root}" \
-               && grep -Fq 'THREEJS REBUILD' <<<"${three}" \
-               && FRONTEND_SHA="${FRONTEND_SHA}" CONFIG_JSON="${config}" node -e \
-                  'const c=JSON.parse(process.env.CONFIG_JSON); if(c.frontendSha!==process.env.FRONTEND_SHA||c.protocolVersion!=="1"||!["configured","absent","invalid"].includes(c.apiOriginState)) process.exit(1)'; then
-              echo "HTTP smoke passed: ${base}, ${base}threejs/, and runtime-config.json"
+          cache_bust="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          curl --fail --silent --show-error --location \
+            --header 'Cache-Control: no-cache, max-age=0' \
+            --header 'Pragma: no-cache' \
+            "${base}?verify=${cache_bust}" > root.html
+          curl --fail --silent --show-error --location \
+            --header 'Cache-Control: no-cache, max-age=0' \
+            --header 'Pragma: no-cache' \
+            "${base}threejs/?verify=${cache_bust}" > three.html
+          curl --fail --silent --show-error --location \
+            --header 'Cache-Control: no-cache, max-age=0' \
+            --header 'Pragma: no-cache' \
+            "${base}threejs/runtime-config.json?verify=${cache_bust}" > runtime-config.json
+
+          test -s root.html
+          test -s three.html
+          test -s runtime-config.json
+          ! grep -Fq 'THREEJS REBUILD' root.html
+          grep -Fq 'THREEJS REBUILD' three.html
+
+          actual_runtime_hash="$(sha256sum runtime-config.json | awk '{print $1}')"
+          test "${actual_runtime_hash}" = "${EXPECTED_RUNTIME_HASH}"
+
+          FRONTEND_SHA="${FRONTEND_SHA}" CONFIG_JSON="$(cat runtime-config.json)" node -e \
+            'const c=JSON.parse(process.env.CONFIG_JSON); if(c.frontendSha!==process.env.FRONTEND_SHA||c.protocolVersion!==process.env.PAGES_PROTOCOL_VERSION||!["configured","absent","invalid"].includes(c.apiOriginState)) process.exit(1)'
+
+          echo "HTTP smoke passed with exact runtime hash ${EXPECTED_RUNTIME_HASH}."
+
+      - name: Qualify matching immutable archive in additive ledger
+        if: steps.desired.outputs.deploy == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ROOT_SHA: ${{ needs.compose.outputs.root_sha }}
+          RELEASE_CANDIDATE_SHA: ${{ needs.compose.outputs.candidate_sha }}
+          DEPLOYMENT_GENERATION: ${{ needs.compose.outputs.deployment_generation }}
+          PUBLIC_RUNTIME_PROTOCOL_SHA256: ${{ needs.compose.outputs.public_runtime_protocol_sha256 }}
+          CONTENT_IDENTITY_SHA256: ${{ needs.compose.outputs.content_identity_sha256 }}
+          PROTOCOL_VERSION: ${{ needs.compose.outputs.protocol_version }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          LIVE_MANIFEST_SHA256: ${{ steps.live.outputs.live_manifest_sha256 }}
+        run: |
+          set -euo pipefail
+          rm -rf ledger-repo release-match
+          git clone --quiet --branch threejs-rebuild \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ledger-repo
+
+          match="$(
+            jq -cs \
+              --arg root "${RELEASE_ROOT_SHA}" \
+              --arg candidate "${RELEASE_CANDIDATE_SHA}" \
+              --arg content "${CONTENT_IDENTITY_SHA256}" \
+              '[.[] | select(
+                .event == "archive_verified" and
+                .immutable == true and
+                .releaseAttestationVerified == true and
+                .archiveSha256Verified == true and
+                .nonProductionRestoreVerified == true and
+                .godotRootSha == $root and
+                .threejsCandidateSha == $candidate and
+                .contentManifestSha256 == $content
+              )] as $m |
+              if ($m|length) == 0 then
+                empty
+              elif ($m|length) == 1 then
+                $m[0]
+              else
+                error("multiple immutable archives match this exact deployment generation")
+              end' \
+              ledger-repo/RELEASE_QUALIFICATION/ledger.jsonl
+          )"
+
+          if [ -z "${match}" ]; then
+            echo "::notice title=PAGES-014 archive qualification pending::No PAGES-012 archive_verified row exactly matches root=${RELEASE_ROOT_SHA}, candidate=${RELEASE_CANDIDATE_SHA}, content=${CONTENT_IDENTITY_SHA256}. Deployment remains valid; no immutable release was mutated and no pending ledger placeholder was written."
+            exit 0
+          fi
+
+          release_tag="$(jq -r '.releaseTag' <<<"${match}")"
+          asset_sha="$(jq -r '.assetSha256' <<<"${match}")"
+          test -n "${release_tag}"
+          [[ "${asset_sha}" =~ ^[a-f0-9]{64}$ ]]
+
+          immutable="$(gh release view "${release_tag}" --repo "${GITHUB_REPOSITORY}" --json isImmutable --jq '.isImmutable')"
+          test "${immutable}" = 'true'
+          gh release verify "${release_tag}" --repo "${GITHUB_REPOSITORY}"
+
+          mkdir -p release-match
+          gh release download "${release_tag}" --repo "${GITHUB_REPOSITORY}" \
+            --pattern 'IMMUTABLE_FACTS.json' --dir release-match
+          gh release download "${release_tag}" --repo "${GITHUB_REPOSITORY}" \
+            --pattern 'pages-composite.tar' --dir release-match
+
+          gh release verify-asset "${release_tag}" release-match/pages-composite.tar --repo "${GITHUB_REPOSITORY}"
+          actual_asset_sha="$(sha256sum release-match/pages-composite.tar | awk '{print $1}')"
+          test "${actual_asset_sha}" = "${asset_sha}"
+
+          jq -e \
+            --arg root "${RELEASE_ROOT_SHA}" \
+            --arg candidate "${RELEASE_CANDIDATE_SHA}" \
+            --arg asset "${asset_sha}" \
+            --arg content "${CONTENT_IDENTITY_SHA256}" \
+            '.source.godotRootSha == $root and
+             .source.threejsCandidateSha == $candidate and
+             .archives["pages-composite.tar"].sha256 == $asset and
+             .archives["pages-composite.tar"].contentManifestSha256 == $content and
+             .mutationPolicy == "immutable-release-bytes-never-change"' \
+            release-match/IMMUTABLE_FACTS.json >/dev/null
+
+          record="$(
+            jq -cn \
+              --arg releaseTag "${release_tag}" \
+              --arg assetSha256 "${asset_sha}" \
+              --arg deploymentGeneration "${DEPLOYMENT_GENERATION}" \
+              --arg godotRootSha "${RELEASE_ROOT_SHA}" \
+              --arg threejsCandidateSha "${RELEASE_CANDIDATE_SHA}" \
+              --arg runtimeHash "${PUBLIC_RUNTIME_PROTOCOL_SHA256}" \
+              --arg protocolVersion "${PROTOCOL_VERSION}" \
+              --arg contentIdentity "${CONTENT_IDENTITY_SHA256}" \
+              --arg pagesBuildVersion "${GITHUB_SHA}" \
+              --arg pageUrl "${PAGE_URL}" \
+              --arg liveManifestSha256 "${LIVE_MANIFEST_SHA256}" \
+              --arg workflowRunId "${GITHUB_RUN_ID}" \
+              --arg recordedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              '{
+                schemaVersion: 1,
+                event: "deployment_generation_verified",
+                releaseTag: $releaseTag,
+                assetName: "pages-composite.tar",
+                assetSha256: $assetSha256,
+                deploymentGeneration: $deploymentGeneration,
+                godotRootSha: $godotRootSha,
+                threejsCandidateSha: $threejsCandidateSha,
+                publicRuntimeProtocolSha256: $runtimeHash,
+                protocolVersion: $protocolVersion,
+                contentIdentitySha256: $contentIdentity,
+                pagesBuildVersion: $pagesBuildVersion,
+                pagesDeploymentStatus: "succeed",
+                pageUrl: $pageUrl,
+                liveManifestSha256: $liveManifestSha256,
+                manifestVerified: true,
+                archiveMatchVerified: true,
+                verified: true,
+                workflowRunId: ($workflowRunId|tonumber),
+                recordedAt: $recordedAt
+              }'
+          )"
+
+          git -C ledger-repo config user.name "github-actions[bot]"
+          git -C ledger-repo config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          for attempt in 1 2 3 4; do
+            git -C ledger-repo fetch --quiet origin threejs-rebuild
+            git -C ledger-repo reset --hard origin/threejs-rebuild >/dev/null
+
+            if jq -s -e \
+              --arg tag "${release_tag}" \
+              --arg asset "${asset_sha}" \
+              --arg generation "${DEPLOYMENT_GENERATION}" \
+              'any(.[];
+                .event == "deployment_generation_verified" and
+                .releaseTag == $tag and
+                .assetSha256 == $asset and
+                .deploymentGeneration == $generation and
+                .verified == true
+              )' \
+              ledger-repo/RELEASE_QUALIFICATION/ledger.jsonl >/dev/null; then
+              echo "Deployment-generation qualification already recorded for ${release_tag} / ${asset_sha}."
               exit 0
             fi
-            sleep 5
+
+            printf '%s\n' "${record}" >> ledger-repo/RELEASE_QUALIFICATION/ledger.jsonl
+            git -C ledger-repo add RELEASE_QUALIFICATION/ledger.jsonl
+            git -C ledger-repo commit -m "PAGES-014 qualify deployment generation"
+            if git -C ledger-repo push --quiet origin HEAD:threejs-rebuild; then
+              echo "PAGES-014 qualification appended for ${release_tag} / ${asset_sha}."
+              exit 0
+            fi
+            echo "Qualification ledger push raced with another writer; retrying from latest branch."
           done
-          echo 'HTTP smoke failed after deployment.' >&2
+
+          echo 'Could not append deployment-generation qualification after retries.' >&2
           exit 1
