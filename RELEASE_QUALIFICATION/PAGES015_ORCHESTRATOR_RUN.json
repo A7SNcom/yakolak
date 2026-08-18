@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "gate": "PAGES-015",
+  "event": "explicit_orchestrator_credential_probe",
+  "workflowRunId": 32150414990,
+  "eventName": "push",
+  "triggerHeadSha": "425ff58ab6f1ede0fcc74e6968c9795d6b74e8b8",
+  "credentials": {
+    "pagesReleaseAdminTokenPresent": false,
+    "cloudflareApiTokenPresent": false,
+    "cloudflareAccountIdPresent": false,
+    "tursoDatabaseUrlPresent": false,
+    "tursoAuthTokenPresent": false,
+    "backendCredentialsReady": false
+  },
+  "workerLockFilesPresent": false,
+  "containsSecretValues": false,
+  "qualificationEvidence": false,
+  "recordedAt": "2026-08-18T14:47:00Z"
+}
