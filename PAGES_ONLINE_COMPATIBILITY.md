@@ -1,8 +1,8 @@
 # PAGES-015 — Online frontend / Cloudflare Worker / Turso compatibility window
 
-Status: **DESIGN + FAIL-CLOSED GATE LOCKED; LIVE QUALIFICATION BLOCKED BY PAGES-005 API_ORIGIN**
+Status: **DESIGN + FAIL-CLOSED GATES LOCKED; LIVE ELIGIBILITY AWAITS IMMUTABLE-RELEASE ADMIN PROOF AND PAGES-005 LIVE CREDENTIALS**
 
-This task is an **online/backend gate only**. It must never block loading the Three.js shell, presentation, asset loading, rendering, or local/offline gameplay. It gates only remote authoritative reads/mutations.
+This task is an **online/backend gate only**. It never blocks the Three.js shell, presentation, asset loading, rendering, or local/offline gameplay. It gates only remote authoritative reads/mutations.
 
 ## Compatibility identity
 
@@ -10,68 +10,81 @@ Every online tuple is identified by all of these values; none may be inferred fr
 
 | Dimension | Required identity |
 | --- | --- |
-| Frontend | immutable GitHub release tag + `pages-composite.tar` SHA-256 |
-| Frontend compatibility | `threejs/online-compatibility.json` read from the re-downloaded immutable archive bytes |
-| Frontend deployment | PAGES-014 deployment generation/content identity already qualified for that same immutable asset |
+| Frontend | immutable GitHub release tag + exact `pages-composite.tar` SHA-256 |
+| Frontend compatibility | `threejs/online-compatibility.json` read from re-downloaded immutable archive bytes |
+| Frontend deployment | exact PAGES-014 generation/runtime/content identity plus successful live-verifier evidence for the same source bytes |
 | Worker | Cloudflare Worker **version ID** exposed by the version-metadata binding |
 | Protocol | `yakolak-online-room@1` |
-| Capabilities | `yakolak-online-room-capabilities-v1` + the explicit capability-name set |
+| Capabilities | `yakolak-online-room-capabilities-v1` + explicit capability-name set |
 | Turso | `yakolak-pages005-room-probe@1` |
 | Migration policy | `expand-contract-forward-only`; Turso data is never rolled backward |
 
-`RELEASE_QUALIFICATION/ONLINE_COMPATIBILITY_MATRIX.json` defines the matrix columns and policy. Verified rows live only as additive `backend_compatibility_verified` events in `RELEASE_QUALIFICATION/ledger.jsonl`; an absent row means **unverified**, never pending/assumed.
+`RELEASE_QUALIFICATION/ONLINE_FRONTEND_WINDOW.json` locks the candidate active+previous frontend window but explicitly grants no eligibility. `RELEASE_QUALIFICATION/ONLINE_COMPATIBILITY_MATRIX.json` defines the matrix. Verified rows live only as additive `backend_compatibility_verified` events in `RELEASE_QUALIFICATION/ledger.jsonl`; absence means **unverified**, never pending/assumed.
 
 ## Active + previous rollback window
 
-Before an online frontend/Worker release is eligible, all four pairings must be safe against the same forward-only Turso schema:
+Before online eligibility, all four pairings must be proven safe against the same forward-only Turso schema:
 
 1. active frontend × active Worker
 2. active frontend × previous Worker
 3. previous frontend × active Worker
 4. previous frontend × previous Worker
 
-There is no cutover-task bootstrap exemption: THREEJS-078/080/098/099 require a complete qualification event proving the active+previous window. A version can leave the rollback window only after its successor pairings have been proven and the retention decision is explicit.
+THREEJS-078/080/098/099 have no bootstrap exemption: they require complete qualification for the exact immutable archive key. A version leaves the rollback window only after successor pairings are proven and retention is explicitly moved.
 
-Cloudflare rollback changes Worker executable/configuration only. Turso rows/schema are not rolled backward.
+Cloudflare rollback changes Worker code/configuration only. Turso rows/schema are never rolled backward.
 
 ## Expand / contract rule
 
-Schema/protocol evolution is ordered:
+1. **Expand** Turso additively; retained columns/tables/semantics stay usable by both Worker versions.
+2. Deploy a Worker version accepting old + expanded shapes.
+3. Keep active + previous Worker version IDs in the current deployment so exact Version Override probes can test both.
+4. Qualify active + previous frontend against active + previous Worker.
+5. Move the frontend/Worker window only after all four pairings pass.
+6. **Contract** only after the previous window has drained and a later qualification proves no retained version depends on the old shape.
 
-1. **Expand** Turso additively. Existing columns/tables/semantics remain readable/writable by both Worker versions.
-2. Deploy a Worker version that accepts both old and expanded shapes.
-3. Qualify active + previous frontend against active + previous Worker.
-4. Move the frontend window.
-5. Retire the oldest frontend/Worker only after no rollback path needs it.
-6. **Contract** only after the previous window has drained and a new qualification proves no retained version depends on the old shape.
-
-Destructive rename/drop/type reinterpretation cannot be part of an ordinary rollback-window migration.
+Destructive rename/drop/type reinterpretation is forbidden inside an ordinary rollback-window migration.
 
 ## Runtime fail-closed behavior
 
-`web/app/session/online-compatibility.js` starts `unverified`. It must successfully fetch `/health` and validate protocol, capability set, and Turso schema before `assertMutationAllowed()` can succeed.
+`web/app/session/online-compatibility.js` starts `unverified`. It must fetch `/health` and validate protocol, capability set, Turso schema and Worker identity before `assertMutationAllowed()` succeeds.
 
-`createCanonicalOnlineSession()` calls that assertion **before** reserving a move id and before invoking transport. Missing API origin, failed health, missing identity, protocol/capability/schema mismatch, or a changed snapshot identity blocks only the online mutation. It does not disable the shell/local game.
+`createCanonicalOnlineSession()` performs that assertion **before** reserving a move id and before transport. Missing API origin, failed health, missing identity, protocol/capability/schema mismatch, or changed snapshot identity blocks only the online mutation. Local gameplay/presentation remain available.
 
-The Worker returns the same `compatibility` object from `/health`, probe write responses, and probe snapshot reads. A response can therefore close the gate again if identity changes after the health check.
+The Worker exposes the same compatibility identity on `/health`, probe writes and probe snapshot reads, so a changed response closes the gate again.
 
-## Live qualification — mandatory evidence
+## Immutable frontend window proof
 
-Matrix design is valid while `backend/cloudflare/API_ORIGIN.txt` is absent, but **no** `backend_compatibility_verified` ledger event may be written until PAGES-005 has completed its real authenticated deploy and locked that file.
+`.github/workflows/pages-015-window-archive.yml` resolves both frontend entries from the locked window and processes them serially (`max-parallel: 1`). `scripts/pages015-archive-window-entry.sh`:
 
-The manual `PAGES-015 online compatibility qualification` workflow then requires, for both active and previous Worker version IDs:
+- recovers the exact successful Pages Actions artifact and verifies its SHA-256;
+- validates root SHA, candidate SHA, generation, runtime/protocol hash, content identity and archived online descriptor;
+- verifies the recorded PAGES-014 run **and job** succeeded and re-reads its job logs to match root/candidate/generation/runtime/content/live-manifest identities;
+- stages or reuses only an exact mutable draft and byte-compares every draft asset;
+- requires the repository immutable-release Admin API to prove/enable immutability **before publication**;
+- after publication, requires `isImmutable=true`, release/asset verification, exact SHA equality and a non-production restore;
+- only then appends `archive_verified` and matching `deployment_generation_verified` to the additive ledger.
 
-- the locked HTTPS `API_ORIGIN`;
-- re-download of each immutable `pages-composite.tar`, exact SHA-256 equality to the ledger key, and a compatible archived `threejs/online-compatibility.json`;
-- Cloudflare version metadata proving the exact invoked Worker version ID;
-- `/health` success with exact protocol/capability/Turso identity;
-- GitHub Pages browser-origin CORS fetch success;
-- live Turso write then independent read with matching payload/integrity;
-- the active and previous immutable frontend keys already have `archive_verified` and `deployment_generation_verified`;
-- all four active/previous frontend × Worker pairings are materialized from those archived descriptors and the exact Worker version IDs, and every pairing is compatible.
+Immutable release assets are never edited or re-uploaded after publication.
 
-Only then does the workflow append `backend_compatibility_verified` to the separate version-controlled ledger for **both** frontend archive keys. It never edits, re-uploads, or annotates an immutable release asset.
+## Worker/Turso live proof and automatic resume
 
-## Current blocker
+PAGES-005 must complete an authenticated Cloudflare deploy with Turso secrets, prove health/browser-CORS/live Turso round trips, retain distinct active+previous Worker versions in the current deployment, and commit only proven `backend/cloudflare/API_ORIGIN.txt` + `WORKER_ROLLBACK_WINDOW.json`.
 
-PAGES-005 currently records `PUBLIC API_ORIGIN NOT YET LOCKED`; therefore this commit intentionally appends **no** backend qualification event. Doing so before a real Cloudflare deploy + browser CORS + live Turso proof would be a false eligibility claim.
+`.github/workflows/pages-015-online-compatibility.yml` automatically re-evaluates when the frontend window, ledger, API origin or Worker window changes. It exits cleanly without qualification while prerequisites are incomplete. Once both exact frontend keys have `archive_verified` + matching `deployment_generation_verified` and PAGES-005 has a proven Worker window, it:
+
+- re-probes both Worker versions by exact Version Override;
+- re-downloads and verifies both immutable frontend archives and archived descriptors;
+- proves browser CORS from the real GitHub Pages origin;
+- proves live Turso write/read behavior;
+- materializes and validates all four frontend×Worker pairings;
+- appends `backend_compatibility_verified` for both exact immutable archive keys and verifies complete release qualification.
+
+## Current external blockers
+
+The implementation intentionally writes no backend eligibility event until both external boundaries are satisfied:
+
+- GitHub must provide `PAGES_RELEASE_ADMIN_TOKEN` (repository Administration read/write) so immutable-release status can be proved/enabled and the two exact drafts can be published immutably.
+- GitHub environment `cloudflare-backend` must provide `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `TURSO_DATABASE_URL`, and `TURSO_AUTH_TOKEN` so PAGES-005 can create and prove the real Worker/Turso rollback window.
+
+Missing credentials are treated as **not qualified**, never as a product/local-play failure and never as a guessed/pending qualification.
