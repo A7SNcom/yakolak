@@ -350,6 +350,25 @@ export function createResourceRegistry({
     return releasedCount;
   }
 
+  function releaseDeepInScope(value, scope, reason = 'released') {
+    let releasedCount = 0;
+    walkKnownResources(value, (resource) => {
+      const id = objectEntries.get(resource);
+      if (!id) return;
+      const entry = entries.get(id);
+      if (
+        entry
+        && !entry.released
+        && entry.scope === scope
+        && entry.ownership !== RESOURCE_OWNERSHIP.SHARED_IMMUTABLE
+        && releaseId(id, reason)
+      ) {
+        releasedCount += 1;
+      }
+    });
+    return releasedCount;
+  }
+
   function releaseScope(scope, reason = 'scope-released', { includeShared = false } = {}) {
     const ids = [...(scopeEntries.get(scope) || [])];
     let releasedCount = 0;
@@ -544,7 +563,10 @@ export function createResourceRegistry({
       register: (resource, metadata) => register(resource, scopedMetadata(metadata)),
       replace: (key, resource, metadata) => replace(`${scope}:${key}`, resource, scopedMetadata(metadata)),
       adoptDeep: (value, metadata) => adoptDeep(value, scopedMetadata(metadata)),
-      releaseDeep,
+      releaseDeep(value, reason = 'released') {
+        assertScopeLive();
+        return releaseDeepInScope(value, scope, reason);
+      },
       listen: (target, type, listener, options, metadata) => listen(target, type, listener, options, scopedMetadata(metadata)),
       subscribe: (subscribeFn, listener, metadata) => subscribe(subscribeFn, listener, scopedMetadata(metadata)),
       observe: (observer, target, options, metadata) => observe(observer, target, options, scopedMetadata(metadata)),
