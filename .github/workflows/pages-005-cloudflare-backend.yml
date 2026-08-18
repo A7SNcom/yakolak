@@ -7,6 +7,7 @@ on:
     paths:
       - 'backend/cloudflare/**'
       - 'scripts/pages005-bootstrap-live.sh'
+      - 'scripts/pages015-finalize-live-window.sh'
       - 'scripts/probe-pages005-cloudflare-roundtrip.mjs'
       - 'scripts/probe-pages015-live-compatibility.mjs'
       - 'tests/pages_backend_runtime_contract.test.mjs'
@@ -34,8 +35,10 @@ jobs:
         with:
           node-version: '22'
           package-manager-cache: false
-      - name: Validate centralized bootstrap helper syntax
-        run: bash -n scripts/pages005-bootstrap-live.sh
+      - name: Validate backend/finalizer helper syntax
+        run: |
+          bash -n scripts/pages005-bootstrap-live.sh
+          bash -n scripts/pages015-finalize-live-window.sh
       - name: Install runtime dependency
         run: npm install --ignore-scripts
       - name: Worker and online compatibility contract tests
@@ -65,7 +68,9 @@ jobs:
         with:
           node-version: '22'
           package-manager-cache: false
-      - name: Validate centralized bootstrap helper syntax
-        run: bash -n scripts/pages005-bootstrap-live.sh
+      - name: Validate backend/finalizer helper syntax
+        run: |
+          bash -n scripts/pages005-bootstrap-live.sh
+          bash -n scripts/pages015-finalize-live-window.sh
       - name: Deploy and prove exact Cloudflare/Turso rollback window
         run: bash scripts/pages005-bootstrap-live.sh
