@@ -310,7 +310,7 @@ export function createResourceRegistry({
     assertLive();
     if (!sharedKey) throw new TypeError('Shared resource requires a stable key');
     if (typeof factory !== 'function') throw new TypeError('Shared resource factory must be a function');
-    normaliseMetadata({
+    const preflight = normaliseMetadata({
       ...metadata,
       ownership: RESOURCE_OWNERSHIP.SHARED_IMMUTABLE,
       replacementKey: `shared:${sharedKey}`,
@@ -320,12 +320,34 @@ export function createResourceRegistry({
     if (active && !active.released) return active.resource;
 
     const resource = factory();
-    register(resource, {
-      ...metadata,
-      ownership: RESOURCE_OWNERSHIP.SHARED_IMMUTABLE,
+    if (resource == null) throw new TypeError('Shared resource factory must return a resource');
+    const prepared = {
+      ...preflight,
+      kind: metadata.kind || inferKind(resource),
       sharedKey,
-      replacementKey: `shared:${sharedKey}`,
-    });
+    };
+    const existingBeforeRegistration = activeObjectEntry(resource);
+    try {
+      register(resource, prepared);
+    } catch (error) {
+      if (!existingBeforeRegistration && !activeObjectEntry(resource)) {
+        const rollbackEntry = {
+          id: 'shared-factory-rollback',
+          resource,
+          kind: prepared.kind,
+          ownership: prepared.ownership,
+          scope: prepared.scope,
+          label: prepared.label,
+        };
+        try {
+          if (typeof prepared.cleanup === 'function') prepared.cleanup('shared-registration-rollback');
+          else runDefaultCleanup(rollbackEntry);
+        } catch (cleanupError) {
+          recordError(cleanupError, rollbackEntry, 'shared-registration-rollback');
+        }
+      }
+      throw error;
+    }
     return resource;
   }
 
