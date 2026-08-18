@@ -654,9 +654,12 @@ export function createResourceRegistry({
       setTimeout: (callback, delay, metadata) => setTimeoutHandle(callback, delay, scopedMetadata(metadata)),
       setInterval: (callback, delay, metadata) => setIntervalHandle(callback, delay, scopedMetadata(metadata)),
       registerCleanup: (cleanup, metadata) => registerCleanup(cleanup, scopedMetadata(metadata)),
-      getOrCreateShared(key, factory, metadata) {
+      getOrCreateShared(key, factory, metadata = {}) {
         assertScopeLive();
-        return getOrCreateShared(key, factory, { ...metadata, scope });
+        return getOrCreateShared(key, factory, {
+          ...metadata,
+          scope: metadata.scope || 'shared',
+        });
       },
       release(reason = 'scope-released') {
         if (released) return 0;
