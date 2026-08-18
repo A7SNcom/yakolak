@@ -20,6 +20,20 @@ jobs:
         with:
           ref: threejs-rebuild
           fetch-depth: 0
+      - name: Record hardening run before mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin threejs-rebuild
+          git reset --hard origin/threejs-rebuild
+          jq -n --arg runId "$GITHUB_RUN_ID" --arg headSha "$GITHUB_SHA" --arg recordedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '{schemaVersion:1,gate:"PAGES-015",event:"draft_readback_hardening_started",workflowRunId:($runId|tonumber),triggerHeadSha:$headSha,qualificationEvidence:false,recordedAt:$recordedAt}' > RELEASE_QUALIFICATION/PAGES015_DRAFT_HARDEN_RUN.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add RELEASE_QUALIFICATION/PAGES015_DRAFT_HARDEN_RUN.json
+          git commit -m 'PAGES-015 record draft hardening run'
+          git push origin HEAD:threejs-rebuild
+          git fetch --quiet origin threejs-rebuild
+          git reset --hard origin/threejs-rebuild
       - name: Apply and validate hardening
         shell: bash
         run: |
