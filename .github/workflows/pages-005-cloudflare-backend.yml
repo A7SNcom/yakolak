@@ -39,8 +39,13 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     environment: cloudflare-backend
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: threejs-rebuild
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -75,6 +80,7 @@ jobs:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
       - name: Prove live room write/read round trip
+        id: live
         env:
           API_ORIGIN: ${{ steps.deploy.outputs.deployment-url }}
         run: |
@@ -85,5 +91,32 @@ jobs:
             https://*) ;;
             *) echo "invalid API_ORIGIN: $API_ORIGIN"; exit 1 ;;
           esac
-          node scripts/probe-pages005-cloudflare-roundtrip.mjs "$API_ORIGIN"
-          echo "PAGES005_API_ORIGIN=$API_ORIGIN" >> "$GITHUB_STEP_SUMMARY"
+          api_origin="${API_ORIGIN%/}"
+          if [[ "${api_origin#https://}" == */* ]]; then
+            echo "API_ORIGIN must be a bare HTTPS origin: ${api_origin}" >&2
+            exit 1
+          fi
+          node scripts/probe-pages005-cloudflare-roundtrip.mjs "$api_origin"
+          echo "api_origin=$api_origin" >> "$GITHUB_OUTPUT"
+          echo "PAGES005_API_ORIGIN=$api_origin" >> "$GITHUB_STEP_SUMMARY"
+      - name: Lock proven public API_ORIGIN on threejs-rebuild
+        env:
+          API_ORIGIN: ${{ steps.live.outputs.api_origin }}
+        run: |
+          set -euo pipefail
+          test -n "$API_ORIGIN"
+          git fetch --quiet origin threejs-rebuild
+          git checkout -B threejs-rebuild origin/threejs-rebuild
+          mkdir -p backend/cloudflare
+          printf '%s\n' "$API_ORIGIN" > backend/cloudflare/API_ORIGIN.txt
+          if git diff --quiet -- backend/cloudflare/API_ORIGIN.txt && git ls-files --error-unmatch backend/cloudflare/API_ORIGIN.txt >/dev/null 2>&1; then
+            echo 'Locked API_ORIGIN already matches the proven live origin.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/cloudflare/API_ORIGIN.txt
+          git diff --cached --name-only | grep -qx 'backend/cloudflare/API_ORIGIN.txt'
+          test "$(git diff --cached --name-only | wc -l)" -eq 1
+          git commit -m 'PAGES-005 lock proven Cloudflare API_ORIGIN'
+          git push origin HEAD:threejs-rebuild
