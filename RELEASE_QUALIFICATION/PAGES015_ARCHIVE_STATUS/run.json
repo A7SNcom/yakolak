@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "workflow": "pages-015-window-archive.yml",
+  "workflowRunId": 32132943157,
+  "triggerHeadSha": "346c13606ffd1217f9c3a9e0fe26a9857b746864",
+  "eventName": "push",
+  "state": "started",
+  "recordedAt": "2026-08-18T11:41:16Z",
+  "qualificationEvidence": false
+}
