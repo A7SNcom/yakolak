@@ -47,6 +47,12 @@ test('scope releaseDeep cannot destroy shared or foreign-scope resources', () =>
   assert.equal(owner.releaseDeep(ownedMaterial, 'owned-deep-release'), 1);
   assert.equal(ownedMaterial.disposeCalls, 1);
   assert.equal(owner.releaseDeep(ownedMaterial, 'duplicate-owned-release'), 0);
+  assert.equal(owner.release('owner-complete'), 0);
+  assert.throws(
+    () => owner.releaseDeep(ownedMaterial, 'late-deep-release'),
+    /Resource scope is released: owner#\d+/,
+    'a released scope must not regain destruction authority',
+  );
 
   foreign.release();
   assert.equal(foreignMaterial.disposeCalls, 1);
