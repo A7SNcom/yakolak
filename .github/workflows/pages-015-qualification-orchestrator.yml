@@ -51,9 +51,15 @@ jobs:
           set -euo pipefail
           bash -n scripts/pages015-orchestrate-qualification.sh
           bash -n scripts/pages015-archive-window-entry-v2.sh
+          bash -n scripts/pages015-install-source-recovery-gh-shim.sh
+          bash -n scripts/pages015-resolve-exact-pages-source.sh
+          bash -n scripts/pages015-recover-expired-source.sh
           bash -n scripts/pages005-bootstrap-live.sh
           bash -n scripts/pages015-finalize-live-window.sh
           node --test tests/pages015_archive_facts_contract.test.mjs
+
+      - name: Install exact-source recovery bridge
+        run: bash scripts/pages015-install-source-recovery-gh-shim.sh
 
       - name: Qualify what external credentials currently permit
         shell: bash
