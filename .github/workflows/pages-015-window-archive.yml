@@ -8,6 +8,7 @@ on:
       - '.github/workflows/pages-015-window-archive.yml'
       - 'scripts/pages015-archive-window-entry-v2.sh'
       - 'RELEASE_QUALIFICATION/ONLINE_FRONTEND_WINDOW.json'
+      - 'backend/cloudflare/CREDENTIAL_STATUS.json'
   workflow_dispatch:
 
 permissions:
