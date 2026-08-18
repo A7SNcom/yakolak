@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "gate": "PAGES-015",
+  "phase": "readiness",
+  "credentials": {
+    "pagesReleaseAdminTokenPresent": false,
+    "cloudflareApiTokenPresent": false,
+    "cloudflareAccountIdPresent": false,
+    "tursoDatabaseUrlPresent": false,
+    "tursoAuthTokenPresent": false,
+    "backendCredentialsReady": false
+  },
+  "activeArchiveQualified": false,
+  "previousArchiveQualified": false,
+  "workerRollbackWindowLocked": false,
+  "completeQualification": false,
+  "containsSecretValues": false,
+  "qualificationEvidence": false,
+  "workflowRunId": 32134849795,
+  "recordedAt": "2026-08-18T12:03:49Z"
+}
