@@ -63,6 +63,7 @@ jobs:
     needs: resolve_window
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    environment: cloudflare-backend
     strategy:
       fail-fast: false
       max-parallel: 1
@@ -121,7 +122,6 @@ jobs:
           set -e
           cat "$log"
 
-          # If the release was already immutable, the helper may legitimately finish even without ADMIN_TOKEN.
           if [ "$rc" -eq 0 ]; then
             echo "${ROLE} archive was already immutable/qualified or otherwise completed safely."
             exit 0
@@ -132,7 +132,6 @@ jobs:
             exit "$rc"
           }
 
-          # Re-prove the staged draft key independently, then append only a non-eligibility draft_staged event.
           bash scripts/pages015-record-exact-draft-stage.sh
           echo "${ROLE} exact draft staged; publication remains WAITING for immutable-release admin proof."
 
