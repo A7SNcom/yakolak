@@ -86,6 +86,20 @@ The temporary recovery workflow was retired after proving those exact SHA matche
 
 Neither state is an `archive_verified` event. The strict verifier ignores `draft_staged`, recovery metadata and diagnostics.
 
+### Verified release/tag permission requirement
+
+A dedicated one-time permission probe was run and then retired. Run `32150862909`, job `95756098932`, had `contents:write` and attempted to create the locked archive tag without changing the locked target SHA. GitHub rejected the ref update because the GitHub App token lacked **workflows permission**, naming `.github/workflows/pages-005-cloudflare-backend.yml` in the rejection. This is recorded in `RELEASE_QUALIFICATION/PAGES015_RELEASE_PERMISSION_BLOCKER.json` and is not qualification evidence.
+
+The locked previous candidate `5cc89e05653b6461ed6a41332f374eaadb360945` itself directly changed `.github/workflows/threejs-optional-checks.yml`; the active candidate `4e4e5dec72ee71a06940c6db561dde8d24abd2d0` changed only `web/online-compatibility.json`. The release target/candidate SHA will **not** be retargeted merely to bypass this permission requirement.
+
+Therefore `PAGES_RELEASE_ADMIN_TOKEN` must be capable of:
+
+- creating/reading the draft and release assets;
+- creating/publishing the locked release tag/ref for candidate commits whose trees/history contain workflow files;
+- carrying the GitHub **workflows write permission/scope** required for that ref operation;
+- reading/enabling the repository immutable-release setting;
+- reading source Actions/PAGES-014 evidence used by the archive helper.
+
 ## Worker/Turso live proof
 
 PAGES-005 has one centralized implementation: `scripts/pages005-bootstrap-live.sh`. It:
@@ -103,31 +117,33 @@ PAGES-005 has one centralized implementation: `scripts/pages005-bootstrap-live.s
 
 The authoritative automatic-resume path is `.github/workflows/pages-015-qualification-orchestrator.yml` on `main`, invoking `scripts/pages015-orchestrate-qualification.sh`. It runs from the explicit credential trigger, manual dispatch, or one low-frequency daily schedule. It does **not** depend on nested workflow dispatch.
 
-Each run checks the five required credentials without storing values and writes only the non-qualification readiness receipt `RELEASE_QUALIFICATION/PAGES015_ORCHESTRATOR_STATUS.json` when semantic state changes. The same workflow installs the exact-source recovery bridge before any archive work. If credentials permit, the run proceeds directly and serially:
+Each run checks the five required credentials without storing values. Semantic changes are recorded in `RELEASE_QUALIFICATION/PAGES015_ORCHESTRATOR_STATUS.json`; explicit push/manual runs also write `RELEASE_QUALIFICATION/PAGES015_ORCHESTRATOR_RUN.json` so a fresh Run ID and credential-presence receipt exists even when the semantic state is unchanged. Both files are `qualificationEvidence=false` and never store secret values.
+
+The same workflow installs the exact-source recovery bridge before any archive work. If credentials permit, the run proceeds directly and serially:
 
 1. With `PAGES_RELEASE_ADMIN_TOKEN`, strongly qualify active then previous immutable frontend archives.
 2. With all four Cloudflare/Turso credentials, run `pages005-bootstrap-live.sh` if a proven Worker rollback window is not already locked.
 3. Once both strong frontend archive keys and the Worker window exist, run `scripts/pages015-finalize-live-window.sh`.
 4. The finalizer re-proves both Worker versions, live Turso, real browser CORS, both immutable archive downloads/attestations/descriptor digests, materializes all four frontend×Worker pairings, appends `backend_compatibility_verified` for both exact keys, and runs the strict release verifier.
 
-The earlier nested credential-probe/supervisor experiments were retired after GitHub returned `422` for nested workflow dispatch. They are not part of the production qualification path.
+The earlier nested credential-probe/supervisor experiments were retired after GitHub returned `422` for nested workflow dispatch. The one-time tag-permission probe was also removed after recording the exact blocker. None of those diagnostic workflows are part of the production qualification path.
 
 ## Verified current blocker evidence
 
-Direct orchestrator recheck run `32143755415` completed successfully at `2026-08-18T13:40:56Z` and recorded `phase=waiting-external-prerequisites` with no secret values and no qualification claim. Its current facts are:
+Fresh explicit orchestrator run `32150414990` completed successfully at `2026-08-18T14:47:00Z`. Its non-secret receipt proves the current credential state without relying on an older unchanged semantic-status timestamp:
 
 - `PAGES_RELEASE_ADMIN_TOKEN`: absent
 - `CLOUDFLARE_API_TOKEN`: absent
 - `CLOUDFLARE_ACCOUNT_ID`: absent
 - `TURSO_DATABASE_URL`: absent
 - `TURSO_AUTH_TOKEN`: absent
-- active strong archive qualification: false
-- previous strong archive qualification: false
-- Worker rollback window locked: false
-- complete PAGES-015 qualification: false
+- backend credentials ready: false
+- Worker lock files present: false
 
-`backend/cloudflare/API_ORIGIN.txt` and `backend/cloudflare/WORKER_ROLLBACK_WINDOW.json` are still absent. Therefore no authenticated Cloudflare/Turso bootstrap or live four-pair compatibility proof can occur, the previous immutable release cannot yet be created/published with the required Admin proof, and no `backend_compatibility_verified` event may be written.
+The same run completed the full orchestrator job successfully and remained fail-closed. The additive ledger still contains only initialization plus the active exact `draft_staged` event; there are no strong archive, deployment-generation, or backend-compatibility qualification rows.
 
-`PAGES_RELEASE_ADMIN_TOKEN` must be capable of reading the source Actions evidence, creating/reading release assets, and reading/enabling the immutable-release repository setting. The four backend credentials must be valid for the selected Cloudflare account and live Turso datastore. Do not weaken these checks merely to make the task appear complete.
+`backend/cloudflare/API_ORIGIN.txt` and `backend/cloudflare/WORKER_ROLLBACK_WINDOW.json` remain absent. Therefore no authenticated Cloudflare/Turso bootstrap or live four-pair compatibility proof can occur, the previous immutable release cannot yet be created/published with the required release/workflows/Admin authority, and no `backend_compatibility_verified` event may be written.
+
+The four backend credentials must be valid for the selected Cloudflare account and live Turso datastore. Do not weaken the exact source, release-target, immutable-release, browser-CORS, live-Turso or four-pair checks merely to make the task appear complete.
 
 Missing credentials are treated as **not qualified**, never as a product/local-play failure and never as a guessed/pending qualification.
