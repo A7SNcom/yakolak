@@ -37,12 +37,14 @@ jobs:
             .schemaVersion == 1 and
             .rules.thisFileDoesNotConferEligibility == true and
             .rules.bothRequireSuccessfulPages014LiveEvidence == true and
+            .rules.bothRequireExactArchivedCompatibilityDescriptorDigest == true and
             (.frontends | length) == 2 and
             ([.frontends[].role] | sort) == ["active", "previous"] and
             (.frontends[0].releaseTag != .frontends[1].releaseTag or .frontends[0].assetSha256 != .frontends[1].assetSha256) and
             all(.frontends[];
               .assetName == "pages-composite.tar" and
               (.assetSha256 | test("^[a-f0-9]{64}$")) and
+              (.onlineCompatibilityDescriptorSha256 | test("^[a-f0-9]{64}$")) and
               (.deploymentGeneration | test("^sha256:[a-f0-9]{64}$")) and
               (.publicRuntimeProtocolSha256 | test("^[a-f0-9]{64}$")) and
               (.contentIdentitySha256 | test("^[a-f0-9]{64}$")) and
@@ -72,6 +74,7 @@ jobs:
       SOURCE_PAGES_RUN_ID: ${{ matrix.frontend.sourcePagesRunId }}
       SOURCE_PAGES_ARTIFACT_ID: ${{ matrix.frontend.sourcePagesArtifactId }}
       SOURCE_ARTIFACT_TAR_SHA256: ${{ matrix.frontend.assetSha256 }}
+      EXPECTED_ONLINE_DESCRIPTOR_SHA256: ${{ matrix.frontend.onlineCompatibilityDescriptorSha256 }}
       DEPLOYMENT_GENERATION: ${{ matrix.frontend.deploymentGeneration }}
       PUBLIC_RUNTIME_PROTOCOL_SHA256: ${{ matrix.frontend.publicRuntimeProtocolSha256 }}
       CONTENT_IDENTITY_SHA256: ${{ matrix.frontend.contentIdentitySha256 }}
