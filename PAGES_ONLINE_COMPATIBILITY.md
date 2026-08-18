@@ -55,69 +55,69 @@ The Worker exposes the same compatibility identity on `/health`, probe writes an
 
 ## Immutable frontend window proof
 
-`.github/workflows/pages-015-window-archive.yml` resolves both frontend entries from the locked window and processes them serially (`max-parallel: 1`). `scripts/pages015-archive-window-entry-v2.sh`:
+`.github/workflows/pages-015-window-archive.yml` remains a targeted/manual archive diagnostic and fallback. `scripts/pages015-archive-window-entry-v2.sh`:
 
 - recovers the exact successful Pages Actions artifact and verifies its SHA-256;
-- validates root SHA, candidate SHA, generation, runtime/protocol hash, content identity and the exact archived online-descriptor SHA;
-- verifies the recorded PAGES-014 run **and job** succeeded and re-reads its job logs to match root/candidate/generation/runtime/content/live-manifest identities;
-- reproduces the original `IMMUTABLE_FACTS.json` byte contract used by the first staged archive, including immutable identities known at staging time (`liveManifestSha256` and `pages014VerifierRunId`), while all later qualification decisions remain external in the ledger;
-- never replaces an existing draft asset silently: every existing asset is re-downloaded and byte-compared;
-- uses `PAGES_RELEASE_ADMIN_TOKEN` for release creation/promotion when available, while existing readable drafts may still be re-verified with the ordinary workflow token;
-- requires the repository immutable-release Admin API to prove/enable immutability **before publication**;
+- validates root SHA, candidate SHA, generation, runtime/protocol hash, content identity and exact archived online-descriptor SHA;
+- revalidates the recorded PAGES-014 run and job against their logs;
+- reproduces the original `IMMUTABLE_FACTS.json` byte contract used by the first staged archive, including `liveManifestSha256` and `pages014VerifierRunId` in their historical order;
+- never silently replaces an existing draft asset: every existing asset is re-downloaded and byte-compared;
+- uses `PAGES_RELEASE_ADMIN_TOKEN` for release creation/promotion when available;
+- proves/enables repository immutable releases **before publication**;
 - after publication, requires `isImmutable=true`, release/asset verification, exact SHA equality and a non-production restore;
 - only then appends `archive_verified` and matching strong `deployment_generation_verified` to the additive ledger.
 
-`RELEASE_QUALIFICATION/PAGES015_ARCHIVE_STATUS/*.json` is diagnostics only (`qualificationEvidence=false`). It distinguishes `exact-draft-verified` from `waiting-admin-to-create-draft`; a successful diagnostic job never confers release eligibility.
+`tests/pages015_archive_facts_contract.test.mjs` locks the historical immutable-facts field order and forbids later qualification state from leaking into immutable release assets.
 
-Immutable release assets are never edited or re-uploaded after publication.
+`RELEASE_QUALIFICATION/PAGES015_ARCHIVE_STATUS/*.json` is diagnostics only (`qualificationEvidence=false`). Archive run `32133606554` established the current exact wait states:
 
-## Current frontend archive state
+- **active** `pages-archive-2026-08-18-geeb3b8e1-t4e4e5dec` / `3bb476e2…`: `stageState=exact-draft-verified`; the existing draft re-verifies byte-for-byte and is not published because the admin credential is absent.
+- **previous** `pages-archive-2026-08-18-geeb3b8e1-t5cc89e05` / `6769843e…`: `stageState=waiting-admin-to-create-draft`; there is no reusable draft and the ordinary Actions integration cannot create the release.
 
-Archive workflow run `32133400098` completed both active and previous jobs successfully in fail-closed waiting mode:
+Neither state is an `archive_verified` event. The strict verifier ignores `draft_staged` and diagnostics.
 
-- **active** `pages-archive-2026-08-18-geeb3b8e1-t4e4e5dec` / `3bb476e2…`: the historical immutable-facts schema was restored and the existing draft now re-verifies byte-for-byte. It is not published because the immutable-release admin credential is absent.
-- **previous** `pages-archive-2026-08-18-geeb3b8e1-t5cc89e05` / `6769843e…`: there is no reusable draft that the ordinary Actions token can create; release creation returned the expected integration-permission denial. The workflow records this as `waiting-admin-to-create-draft` rather than pretending a draft exists.
+## Worker/Turso live proof
 
-Neither diagnostic state is an `archive_verified` event. The strong release verifier ignores `draft_staged` and requires immutable publication + attestation + restore + matching PAGES-014 evidence.
+PAGES-005 has one centralized implementation: `scripts/pages005-bootstrap-live.sh`. It:
 
-## Worker/Turso live proof and automatic resume
-
-PAGES-005 has one centralized implementation: `scripts/pages005-bootstrap-live.sh`. Both the default-branch bootstrap workflow and the `threejs-rebuild` workflow invoke this exact helper. It:
-
-- validates local Worker/compatibility contracts and a Wrangler dry-run;
-- deploys with a protected secrets file and parses Wrangler structured NDJSON for the exact Worker version and HTTPS target;
-- waits for the bootstrap version identity to become live and proves a real Turso write/read round trip;
-- uploads a distinct twin Worker version and deploys active/previous at 100%/0%;
+- validates Worker/compatibility contracts and a Wrangler dry-run;
+- deploys with a protected secrets file and parses Wrangler structured NDJSON for exact Worker version and HTTPS target;
+- waits for exact version metadata and proves a live Turso write/read round trip;
+- uploads a distinct twin Worker and deploys active/previous at 100%/0%;
 - proves both exact versions by Cloudflare Version Override against live Turso;
 - proves browser CORS from `https://a7sncom.github.io`;
-- re-proves the exact version window immediately before publication and verifies the ordinary no-override health path resolves to the active version;
+- re-proves the exact window immediately before locking it and verifies the ordinary no-override path resolves to active;
 - only then commits `backend/cloudflare/API_ORIGIN.txt` and `WORKER_ROLLBACK_WINDOW.json`.
 
-The default-branch credential probe is self-resuming and runs on explicit trigger plus a low-frequency schedule. It commits `CREDENTIAL_STATUS.json` only when semantic credential/lock state changes, so it does not create daily repository churn. When all four Cloudflare/Turso credentials appear and no Worker window is already locked, it dispatches the hardened PAGES-005 bootstrap. Any `CREDENTIAL_STATUS.json` change also retriggers the PAGES-015 archive workflow, so an added release-admin credential is consumed automatically.
+## One direct automatic-resume path
 
-`.github/workflows/pages-015-online-compatibility.yml` automatically re-evaluates when the frontend window, ledger, API origin or Worker window changes. It exits cleanly without qualification while prerequisites are incomplete. Once both exact frontend keys have strong `archive_verified` + matching PAGES-014 `deployment_generation_verified` and PAGES-005 has a proven Worker window, it:
+The authoritative automatic-resume path is now `.github/workflows/pages-015-qualification-orchestrator.yml` on `main`, invoking `scripts/pages015-orchestrate-qualification.sh`. It runs from the explicit credential trigger, manual dispatch, or one low-frequency daily schedule. It does **not** depend on nested workflow dispatch.
 
-- re-probes both Worker versions by exact Version Override;
-- re-downloads and verifies both immutable frontend archives and exact archived descriptor digests;
-- proves browser CORS from the real GitHub Pages origin;
-- proves live Turso write/read behavior;
-- materializes and validates all four frontend×Worker pairings;
-- appends `backend_compatibility_verified` for both exact immutable archive keys and runs the hardened complete-release verifier.
+Each run checks the five required credentials without storing values and writes only the non-qualification readiness receipt `RELEASE_QUALIFICATION/PAGES015_ORCHESTRATOR_STATUS.json` when semantic state changes. If credentials permit, the same run proceeds directly and serially:
 
-## Verified external blocker evidence
+1. With `PAGES_RELEASE_ADMIN_TOKEN`, strongly qualify active then previous immutable frontend archives.
+2. With all four Cloudflare/Turso credentials, run `pages005-bootstrap-live.sh` if a proven Worker rollback window is not already locked.
+3. Once both strong frontend archive keys and the Worker window exist, run `scripts/pages015-finalize-live-window.sh`.
+4. The finalizer re-proves both Worker versions, live Turso, real browser CORS, both immutable archive downloads/attestations/descriptor digests, materializes all four frontend×Worker pairings, appends `backend_compatibility_verified` for both exact keys, and runs the strict release verifier.
 
-The latest default-branch credential probe wrote boolean-only evidence to `backend/cloudflare/CREDENTIAL_STATUS.json` from Actions run `32132444756`; it stores **no secret values** and is explicitly not qualification evidence.
+The earlier nested credential-probe/supervisor experiments were retired after GitHub returned `422` for nested workflow dispatch. They are not part of the production qualification path.
 
-All five required credentials are currently absent:
+## Verified current blocker evidence
 
+Direct orchestrator run `32134849795` completed successfully and recorded `phase=waiting-external-prerequisites` with no secret values and no qualification claim. Its current facts are:
+
+- `PAGES_RELEASE_ADMIN_TOKEN`: absent
 - `CLOUDFLARE_API_TOKEN`: absent
 - `CLOUDFLARE_ACCOUNT_ID`: absent
 - `TURSO_DATABASE_URL`: absent
 - `TURSO_AUTH_TOKEN`: absent
-- `PAGES_RELEASE_ADMIN_TOKEN`: absent
+- active strong archive qualification: false
+- previous strong archive qualification: false
+- Worker rollback window locked: false
+- complete PAGES-015 qualification: false
 
-Therefore `cloudflareBootstrapReady=false`, `workerRollbackWindowLocked=false`, no backend bootstrap is dispatched, no previous release draft can be created with sufficient release permissions, immutable publication cannot proceed, and no eligibility event may be written. `API_ORIGIN.txt` and `WORKER_ROLLBACK_WINDOW.json` do not exist.
+Therefore no live backend bootstrap can occur, the previous release cannot yet be created/published immutably, and no `backend_compatibility_verified` event may be written. `API_ORIGIN.txt` and `WORKER_ROLLBACK_WINDOW.json` remain absent.
 
-`PAGES_RELEASE_ADMIN_TOKEN` must be capable of the repository operations exercised by the archive helper: reading the source Actions evidence, creating/reading release assets, and reading/enabling the immutable-release repository setting. Do not weaken those checks merely to make the task appear complete.
+`PAGES_RELEASE_ADMIN_TOKEN` must be capable of reading the source Actions evidence, creating/reading release assets, and reading/enabling the immutable-release repository setting. The four backend credentials must be valid for the selected Cloudflare account and live Turso datastore. Do not weaken these checks merely to make the task appear complete.
 
 Missing credentials are treated as **not qualified**, never as a product/local-play failure and never as a guessed/pending qualification.
