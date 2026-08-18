@@ -17,6 +17,9 @@ if [ "$cf_token" = true ] && [ "$cf_account" = true ] && [ "$turso_url" = true ]
   backend_ready=true
 fi
 
+git fetch --quiet origin threejs-rebuild
+git reset --hard origin/threejs-rebuild
+
 worker_lock_present=false
 if [ -s backend/cloudflare/API_ORIGIN.txt ] && [ -s backend/cloudflare/WORKER_ROLLBACK_WINDOW.json ]; then
   worker_lock_present=true
@@ -24,43 +27,6 @@ fi
 
 receipt='RELEASE_QUALIFICATION/PAGES015_ORCHESTRATOR_RUN.json'
 mkdir -p "$(dirname "$receipt")"
-jq -n \
-  --arg runId "$GITHUB_RUN_ID" \
-  --arg eventName "$GITHUB_EVENT_NAME" \
-  --arg triggerHeadSha "$GITHUB_SHA" \
-  --argjson releaseAdmin "$release_admin" \
-  --argjson cfToken "$cf_token" \
-  --argjson cfAccount "$cf_account" \
-  --argjson tursoUrl "$turso_url" \
-  --argjson tursoToken "$turso_token" \
-  --argjson backendReady "$backend_ready" \
-  --argjson workerLockPresent "$worker_lock_present" \
-  --arg recordedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
-  {
-    schemaVersion: 1,
-    gate: "PAGES-015",
-    event: "explicit_orchestrator_credential_probe",
-    workflowRunId: ($runId|tonumber),
-    eventName: $eventName,
-    triggerHeadSha: $triggerHeadSha,
-    credentials: {
-      pagesReleaseAdminTokenPresent: $releaseAdmin,
-      cloudflareApiTokenPresent: $cfToken,
-      cloudflareAccountIdPresent: $cfAccount,
-      tursoDatabaseUrlPresent: $tursoUrl,
-      tursoAuthTokenPresent: $tursoToken,
-      backendCredentialsReady: $backendReady
-    },
-    workerLockFilesPresent: $workerLockPresent,
-    containsSecretValues: false,
-    qualificationEvidence: false,
-    recordedAt: $recordedAt
-  }
-' > "$receipt"
-
-git fetch --quiet origin threejs-rebuild
-git reset --hard origin/threejs-rebuild
-# Recreate after reset so the receipt is based on the latest branch and is the only staged path.
 jq -n \
   --arg runId "$GITHUB_RUN_ID" \
   --arg eventName "$GITHUB_EVENT_NAME" \
