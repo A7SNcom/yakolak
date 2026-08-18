@@ -1,0 +1,39 @@
+name: PAGES-015 Run Draft Hardening
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/PAGES015_DRAFT_HARDEN_TRIGGER'
+      - '.github/workflows/pages-015-run-draft-hardening.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: threejs-rebuild
+          fetch-depth: 0
+      - name: Apply and validate hardening
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/pages015-harden-draft-readback.py
+          bash -n scripts/pages015-archive-window-entry-v2.sh
+          node --test tests/pages015_release_target_staging_contract.test.mjs
+      - name: Commit hardening and facts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/pages015-archive-window-entry-v2.sh tests/pages015_release_target_staging_contract.test.mjs PAGES_ONLINE_COMPATIBILITY.md
+          test "$(git diff --cached --name-only | wc -l)" -eq 3
+          git commit -m 'PAGES-015 harden draft readback and record both exact drafts'
+          git push origin HEAD:threejs-rebuild
