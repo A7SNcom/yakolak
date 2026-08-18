@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const legacy = readFileSync(new URL('../.github/workflows/pages-015-online-compatibility.yml', import.meta.url), 'utf8');
 const archive = readFileSync(new URL('../.github/workflows/pages-015-window-archive.yml', import.meta.url), 'utf8');
 const pages005 = readFileSync(new URL('../.github/workflows/pages-005-cloudflare-backend.yml', import.meta.url), 'utf8');
+const pages012 = readFileSync(new URL('../.github/workflows/pages-012-immutable-release.yml', import.meta.url), 'utf8');
 
 function onBlock(yaml) {
   const start = yaml.indexOf('on:\n');
@@ -45,4 +46,15 @@ test('PAGES-005 may verify on push but live deploy stays manual-only and seriali
   assert.match(deployBlock, /if: github\.event_name == 'workflow_dispatch'/);
   assert.match(deployBlock, /bash scripts\/pages005-bootstrap-live\.sh/);
   sharedLedgerLock(deployBlock);
+});
+
+test('historical PAGES-012 ledger writer is serialized and does not self-trigger on workflow edits', () => {
+  assert.match(pages012, /^name: PAGES-012 Immutable Release Archive/m);
+  assert.match(pages012, /RELEASE_QUALIFICATION\/ledger\.jsonl/);
+  sharedLedgerLock(pages012);
+  const block = onBlock(pages012);
+  assert.match(block, /workflow_dispatch:/);
+  assert.match(block, /PAGES_RELEASE_ARCHIVES\.md/);
+  assert.match(block, /scripts\/verify-release-qualification\.mjs/);
+  assert.doesNotMatch(block, /\.github\/workflows\/pages-012-immutable-release\.yml/);
 });
