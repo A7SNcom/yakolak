@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "gate": "PAGES-015",
+  "event": "release_permission_blocker_verified",
+  "evidence": {
+    "workflowRunId": 32150862909,
+    "workflowJobId": 95756098932,
+    "tokenPermissionsObserved": {
+      "contents": "write",
+      "metadata": "read"
+    },
+    "tagCreationWorkflowsPermissionBlockVerified": true,
+    "rejectedTag": "pages-archive-2026-08-18-geeb3b8e1-t4e4e5dec",
+    "rejectedTargetSha": "4e4e5dec72ee71a06940c6db561dde8d24abd2d0",
+    "githubErrorClass": "refusing-to-allow-github-app-to-create-or-update-workflow-without-workflows-permission",
+    "workflowPathNamedByGitHub": ".github/workflows/pages-005-cloudflare-backend.yml",
+    "previousDraftReleaseCreation403PreviouslyObserved": true
+  },
+  "candidateFacts": {
+    "activeCandidateSha": "4e4e5dec72ee71a06940c6db561dde8d24abd2d0",
+    "activeCandidateDirectCommitWorkflowChange": false,
+    "previousCandidateSha": "5cc89e05653b6461ed6a41332f374eaadb360945",
+    "previousCandidateDirectCommitWorkflowChange": true,
+    "previousCandidateWorkflowPath": ".github/workflows/threejs-optional-checks.yml"
+  },
+  "requiredCredentialContract": {
+    "secretName": "PAGES_RELEASE_ADMIN_TOKEN",
+    "mustCreateAndReadReleases": true,
+    "mustCreateReleaseTagsForLockedCandidateCommits": true,
+    "mustHaveWorkflowsPermissionForRefsContainingWorkflowFiles": true,
+    "mustReadAndEnableImmutableReleaseRepositorySetting": true
+  },
+  "policy": {
+    "doNotRetargetImmutableReleaseToBypassPermission": true,
+    "doNotChangeLockedCandidateSha": true,
+    "doNotWriteQualificationWhilePermissionMissing": true
+  },
+  "containsSecretValues": false,
+  "qualificationEvidence": false,
+  "recordedAt": "2026-08-18T14:58:00Z"
+}
