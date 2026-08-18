@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/pages-015-window-archive.yml'
       - 'scripts/pages015-archive-window-entry-v2.sh'
+      - 'scripts/pages015-record-exact-draft-stage.sh'
       - 'RELEASE_QUALIFICATION/ONLINE_FRONTEND_WINDOW.json'
       - 'backend/cloudflare/CREDENTIAL_STATUS.json'
   workflow_dispatch:
@@ -91,6 +92,12 @@ jobs:
           ref: threejs-rebuild
           fetch-depth: 0
 
+      - name: Validate archive helper syntax
+        run: |
+          set -euo pipefail
+          bash -n scripts/pages015-archive-window-entry-v2.sh
+          bash -n scripts/pages015-record-exact-draft-stage.sh
+
       - name: Resolve immutable-release admin readiness
         id: admin
         shell: bash
@@ -99,17 +106,36 @@ jobs:
             echo 'ready=true' >> "$GITHUB_OUTPUT"
           else
             echo 'ready=false' >> "$GITHUB_OUTPUT"
-            echo '::notice title=PAGES-015 waiting for immutable-release admin credential::PAGES_RELEASE_ADMIN_TOKEN is absent; no release is published and no qualification row is written.'
+            echo '::notice title=PAGES-015 waiting for immutable-release admin credential::Exact mutable drafts will still be staged and byte-verified, but no release is published and no eligibility event is written.'
           fi
 
-      - name: Finish cleanly while immutable-release admin credential is absent
+      - name: Stage and record exact mutable draft while admin credential is absent
         if: steps.admin.outputs.ready != 'true'
-        run: echo 'PAGES-015 archive qualification remains intentionally WAITING.'
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/pages015-stage-${ROLE}.log"
+          set +e
+          bash scripts/pages015-archive-window-entry-v2.sh >"$log" 2>&1
+          rc=$?
+          set -e
+          cat "$log"
 
-      - name: Validate archive helper syntax
-        if: steps.admin.outputs.ready == 'true'
-        run: bash -n scripts/pages015-archive-window-entry-v2.sh
+          # If the release was already immutable, the helper may legitimately finish even without ADMIN_TOKEN.
+          if [ "$rc" -eq 0 ]; then
+            echo "${ROLE} archive was already immutable/qualified or otherwise completed safely."
+            exit 0
+          fi
 
-      - name: Qualify immutable frontend archive serially
+          grep -Fq 'PAGES_RELEASE_ADMIN_TOKEN is required before publishing the exact draft.' "$log" || {
+            echo "archive helper failed before the expected immutable-admin gate" >&2
+            exit "$rc"
+          }
+
+          # Re-prove the staged draft key independently, then append only a non-eligibility draft_staged event.
+          bash scripts/pages015-record-exact-draft-stage.sh
+          echo "${ROLE} exact draft staged; publication remains WAITING for immutable-release admin proof."
+
+      - name: Publish and fully qualify immutable frontend archive serially
         if: steps.admin.outputs.ready == 'true'
         run: bash scripts/pages015-archive-window-entry-v2.sh
