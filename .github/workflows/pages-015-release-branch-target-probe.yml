@@ -127,3 +127,5 @@ jobs:
           git add RELEASE_QUALIFICATION/PAGES015_BRANCH_TARGET_RELEASE_PROBE.json
           git commit -m 'PAGES-015 record branch-target draft release probe'
           git push origin HEAD:threejs-rebuild
+
+# retrigger-after-install: 2026-08-18T17:03Z
