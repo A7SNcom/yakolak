@@ -34,15 +34,17 @@ Do not write pending placeholders for deployment-generation or backend-compatibi
 
 PAGES-015 has one authoritative automatic-resume writer: `.github/workflows/pages-015-qualification-orchestrator.yml` on `main`, which serializes archive qualification, PAGES-005 bootstrap and final compatibility qualification through the version-controlled helpers.
 
-Every PAGES-015 workflow that can mutate qualification state uses the repository-wide `pages-release-qualification-ledger` concurrency group with `cancel-in-progress: false`. This includes the authoritative orchestrator, `.github/workflows/pages-015-window-archive.yml`, and the manual compatibility fallback. The shared lock prevents two qualification writers from mutating or appending to the ledger at the same time.
+Every workflow/job that can mutate the shared qualification ledger is serialized through the repository-wide `pages-release-qualification-ledger` concurrency group with `cancel-in-progress: false`. This includes the authoritative PAGES-015 orchestrator, `.github/workflows/pages-015-window-archive.yml`, the manual compatibility fallback, the manual PAGES-005 live deploy job, and the historical PAGES-012 immutable-release writer. The shared lock prevents independent qualification paths from appending to `ledger.jsonl` concurrently.
 
 `.github/workflows/pages-015-online-compatibility.yml` is a manual `workflow_dispatch` fallback only. It must not regain `push` or `schedule` triggers because a second automatic ledger writer can race the orchestrator when frontend archive rows or Worker lock files appear.
 
 `.github/workflows/pages-015-window-archive.yml` may still run as its targeted/manual archive fallback, but it shares the same ledger lock as the orchestrator. Its active/previous matrix remains serial and must stay fail-closed before recovery/publication while the release Administration credential is absent.
 
-`.github/workflows/pages-005-cloudflare-backend.yml` may verify backend contracts on pushes, but its live deploy job is manual-only. Automatic PAGES-015 qualification must continue through the orchestrator.
+`.github/workflows/pages-005-cloudflare-backend.yml` may verify backend contracts on pushes, but its live deploy job is manual-only and takes the same qualification-ledger lock before it can create/commit the proven API origin and Worker rollback window. Automatic PAGES-015 qualification must continue through the orchestrator.
 
-`tests/pages015_single_resume_path_contract.test.mjs` locks the manual-only legacy compatibility workflow, shared PAGES-015 ledger lock, and manual-only PAGES-005 deploy contracts and runs in the main PAGES-015 orchestrator validation step.
+`.github/workflows/pages-012-immutable-release.yml` is a historical release writer for a different archive key. It still supports explicit/manual execution and its historical source-change triggers, but workflow-file edits no longer self-trigger an immutable release run. When it writes `draft_staged` or `archive_verified`, it shares the same qualification-ledger lock as PAGES-015.
+
+`tests/pages015_single_resume_path_contract.test.mjs` locks the manual-only legacy compatibility workflow, repo-wide ledger serialization (including the historical PAGES-012 writer), and manual-only PAGES-005 deploy contract and runs in the main PAGES-015 orchestrator validation step.
 
 ## Complete qualification
 
