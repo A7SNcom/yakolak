@@ -50,6 +50,8 @@ jobs:
           jq -e '
             .schemaVersion == 1 and
             .rules.thisFileDoesNotConferEligibility == true and
+            .rules.bothRequireSuccessfulPages014LiveEvidence == true and
+            .rules.bothRequireExactArchivedCompatibilityDescriptorDigest == true and
             (.frontends | length) == 2 and
             ([.frontends[].role] | sort) == ["active", "previous"] and
             (.frontends[0].releaseTag != .frontends[1].releaseTag or .frontends[0].assetSha256 != .frontends[1].assetSha256) and
@@ -57,8 +59,12 @@ jobs:
               .assetName == "pages-composite.tar" and
               (.releaseTag | type == "string" and length > 0) and
               (.assetSha256 | test("^[a-f0-9]{64}$")) and
+              (.onlineCompatibilityDescriptorSha256 | test("^[a-f0-9]{64}$")) and
               (.deploymentGeneration | test("^sha256:[a-f0-9]{64}$")) and
-              (.contentIdentitySha256 | test("^[a-f0-9]{64}$"))
+              (.publicRuntimeProtocolSha256 | test("^[a-f0-9]{64}$")) and
+              (.contentIdentitySha256 | test("^[a-f0-9]{64}$")) and
+              .pages014LiveEvidence.verified == true and
+              (.pages014LiveEvidence.liveManifestSha256 | test("^[a-f0-9]{64}$"))
             )
           ' "$window" >/dev/null
 
@@ -66,19 +72,29 @@ jobs:
             local role="$1" field="$2"
             jq -r --arg role "$role" --arg field "$field" '.frontends[] | select(.role == $role) | .[$field]' "$window"
           }
+          read_live() {
+            local role="$1" field="$2"
+            jq -r --arg role "$role" --arg field "$field" '.frontends[] | select(.role == $role) | .pages014LiveEvidence[$field]' "$window"
+          }
 
           active_tag="$(read_window active releaseTag)"
           active_digest="$(read_window active assetSha256)"
+          active_descriptor="$(read_window active onlineCompatibilityDescriptorSha256)"
           active_generation="$(read_window active deploymentGeneration)"
+          active_live_manifest="$(read_live active liveManifestSha256)"
           previous_tag="$(read_window previous releaseTag)"
           previous_digest="$(read_window previous assetSha256)"
+          previous_descriptor="$(read_window previous onlineCompatibilityDescriptorSha256)"
           previous_generation="$(read_window previous deploymentGeneration)"
+          previous_live_manifest="$(read_live previous liveManifestSha256)"
 
           echo "active_tag=$active_tag" >> "$GITHUB_OUTPUT"
           echo "active_digest=$active_digest" >> "$GITHUB_OUTPUT"
+          echo "active_descriptor=$active_descriptor" >> "$GITHUB_OUTPUT"
           echo "active_generation=$active_generation" >> "$GITHUB_OUTPUT"
           echo "previous_tag=$previous_tag" >> "$GITHUB_OUTPUT"
           echo "previous_digest=$previous_digest" >> "$GITHUB_OUTPUT"
+          echo "previous_descriptor=$previous_descriptor" >> "$GITHUB_OUTPUT"
           echo "previous_generation=$previous_generation" >> "$GITHUB_OUTPUT"
 
           if node scripts/verify-release-qualification.mjs "$active_tag" "$active_digest" >/dev/null 2>&1 && \
@@ -91,8 +107,10 @@ jobs:
           echo 'already=false' >> "$GITHUB_OUTPUT"
 
           check_frontend_prerequisites() {
-            local tag="$1" digest="$2" generation="$3"
-            jq -s -e --arg tag "$tag" --arg digest "$digest" --arg generation "$generation" '
+            local tag="$1" digest="$2" descriptor="$3" generation="$4" live_manifest="$5"
+            jq -s -e \
+              --arg tag "$tag" --arg digest "$digest" --arg descriptor "$descriptor" \
+              --arg generation "$generation" --arg liveManifest "$live_manifest" '
               (any(.[];
                 .event == "archive_verified" and
                 .releaseTag == $tag and
@@ -100,24 +118,28 @@ jobs:
                 .immutable == true and
                 .releaseAttestationVerified == true and
                 .archiveSha256Verified == true and
-                .nonProductionRestoreVerified == true
+                .nonProductionRestoreVerified == true and
+                .onlineCompatibilityDescriptorSha256 == $descriptor
               )) and
               (any(.[];
                 .event == "deployment_generation_verified" and
                 .releaseTag == $tag and
                 .assetSha256 == $digest and
                 .deploymentGeneration == $generation and
+                .liveManifestSha256 == $liveManifest and
+                .pages014LiveEvidenceVerified == true and
+                .archiveMatchVerified == true and
                 .verified == true
               ))
             ' "$ledger" >/dev/null
           }
 
-          if check_frontend_prerequisites "$active_tag" "$active_digest" "$active_generation" && \
-             check_frontend_prerequisites "$previous_tag" "$previous_digest" "$previous_generation"; then
+          if check_frontend_prerequisites "$active_tag" "$active_digest" "$active_descriptor" "$active_generation" "$active_live_manifest" && \
+             check_frontend_prerequisites "$previous_tag" "$previous_digest" "$previous_descriptor" "$previous_generation" "$previous_live_manifest"; then
             echo 'ready=true' >> "$GITHUB_OUTPUT"
           else
             echo 'ready=false' >> "$GITHUB_OUTPUT"
-            echo '::notice title=PAGES-015 waiting for frontend archive qualification::Both exact immutable frontend keys must have archive_verified + matching deployment_generation_verified before online qualification.'
+            echo '::notice title=PAGES-015 waiting for frontend archive qualification::Both exact immutable frontend keys require exact descriptor-bound archive_verified plus matching PAGES-014 deployment_generation_verified.'
           fi
 
       - name: Require proven PAGES-005 live Worker rollback window
@@ -195,8 +217,10 @@ jobs:
           GH_TOKEN: ${{ secrets.PAGES_RELEASE_ADMIN_TOKEN || github.token }}
           ACTIVE_RELEASE_TAG: ${{ steps.frontend.outputs.active_tag }}
           ACTIVE_ASSET_SHA256: ${{ steps.frontend.outputs.active_digest }}
+          ACTIVE_DESCRIPTOR_SHA256: ${{ steps.frontend.outputs.active_descriptor }}
           PREVIOUS_RELEASE_TAG: ${{ steps.frontend.outputs.previous_tag }}
           PREVIOUS_ASSET_SHA256: ${{ steps.frontend.outputs.previous_digest }}
+          PREVIOUS_DESCRIPTOR_SHA256: ${{ steps.frontend.outputs.previous_descriptor }}
           PAGES015_EVIDENCE_PATH: pages015-live-evidence.json
         run: |
           set -euo pipefail
@@ -224,6 +248,8 @@ jobs:
           previous_descriptor="$(find .tmp/pages015-frontends/previous/extract -type f -path '*/threejs/online-compatibility.json' -print -quit)"
           test -n "$active_descriptor" && test -s "$active_descriptor"
           test -n "$previous_descriptor" && test -s "$previous_descriptor"
+          test "$(sha256sum "$active_descriptor" | awk '{print $1}')" = "$ACTIVE_DESCRIPTOR_SHA256"
+          test "$(sha256sum "$previous_descriptor" | awk '{print $1}')" = "$PREVIOUS_DESCRIPTOR_SHA256"
           node scripts/verify-pages015-frontend-window.mjs "$active_descriptor" "$previous_descriptor"
 
       - name: Prove browser CORS from the real GitHub Pages origin
