@@ -72,6 +72,7 @@ jobs:
         run: bash scripts/pages015-release-admin-preflight.sh
 
       - name: Install exact-source recovery bridge
+        if: env.PAGES_RELEASE_ADMIN_TOKEN != ''
         run: bash scripts/pages015-install-source-recovery-gh-shim.sh
 
       - name: Qualify what external credentials currently permit
