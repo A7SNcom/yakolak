@@ -210,6 +210,28 @@ export function createResourceRegistry({
     return Object.freeze(token);
   }
 
+  function activeObjectEntry(resource) {
+    if (resource == null) return null;
+    const objectLike = typeof resource === 'object' || typeof resource === 'function';
+    if (!objectLike) return null;
+    const id = objectEntries.get(resource);
+    const entry = id ? entries.get(id) : null;
+    return entry && !entry.released ? entry : null;
+  }
+
+  function assertObjectRegistrationAllowed(resource, normalised) {
+    const existing = activeObjectEntry(resource);
+    if (
+      existing
+      && existing.scope !== normalised.scope
+      && existing.ownership !== RESOURCE_OWNERSHIP.SHARED_IMMUTABLE
+      && !normalised.reclassify
+    ) {
+      throw new Error(`Resource already owned by another scope: ${existing.scope}`);
+    }
+    return existing;
+  }
+
   function register(resource, metadata = {}) {
     assertLive();
     if (resource == null) return createNoopToken();
@@ -219,6 +241,7 @@ export function createResourceRegistry({
       ...metadata,
       kind: metadata.kind || inferred,
     });
+    const existing = assertObjectRegistrationAllowed(resource, normalised);
 
     if (normalised.replacementKey) {
       const priorId = replacementEntries.get(normalised.replacementKey);
@@ -230,36 +253,32 @@ export function createResourceRegistry({
       }
     }
 
-    const objectLike = typeof resource === 'object' || typeof resource === 'function';
-    const existingId = objectLike ? objectEntries.get(resource) : null;
-    if (existingId) {
-      const existing = entries.get(existingId);
-      if (existing && !existing.released) {
-        if (normalised.reclassify) {
-          if (existing.scope !== normalised.scope) {
-            scopeEntries.get(existing.scope)?.delete(existing.id);
-            existing.scope = normalised.scope;
-            addToScope(existing);
-          }
-          existing.ownership = normalised.ownership;
-          existing.kind = normalised.kind;
-          existing.label = normalised.label || existing.label;
+    if (existing) {
+      if (normalised.reclassify) {
+        if (existing.scope !== normalised.scope) {
+          scopeEntries.get(existing.scope)?.delete(existing.id);
+          existing.scope = normalised.scope;
+          addToScope(existing);
         }
-        if (normalised.replacementKey) {
-          if (
-            existing.replacementKey
-            && existing.replacementKey !== normalised.replacementKey
-            && replacementEntries.get(existing.replacementKey) === existing.id
-          ) {
-            replacementEntries.delete(existing.replacementKey);
-          }
-          existing.replacementKey = normalised.replacementKey;
-          replacementEntries.set(normalised.replacementKey, existing.id);
-        }
-        return tokenFor(existing.id);
+        existing.ownership = normalised.ownership;
+        existing.kind = normalised.kind;
+        existing.label = normalised.label || existing.label;
       }
+      if (normalised.replacementKey) {
+        if (
+          existing.replacementKey
+          && existing.replacementKey !== normalised.replacementKey
+          && replacementEntries.get(existing.replacementKey) === existing.id
+        ) {
+          replacementEntries.delete(existing.replacementKey);
+        }
+        existing.replacementKey = normalised.replacementKey;
+        replacementEntries.set(normalised.replacementKey, existing.id);
+      }
+      return tokenFor(existing.id);
     }
 
+    const objectLike = typeof resource === 'object' || typeof resource === 'function';
     const id = `resource-${++sequence}`;
     const entry = {
       id,
@@ -450,6 +469,7 @@ export function createResourceRegistry({
     assertLive();
     if (!observer?.observe || !observer?.disconnect) throw new TypeError('Registry observer must implement observe/disconnect');
     const prepared = normaliseMetadata({ ...metadata, kind: RESOURCE_KINDS.OBSERVER });
+    assertObjectRegistrationAllowed(observer, prepared);
     observer.observe(target, options);
     return register(observer, prepared);
   }
