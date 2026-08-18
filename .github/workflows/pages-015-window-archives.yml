@@ -1,4 +1,5 @@
 name: PAGES-015 Frontend Rollback Archives
+# Launch marker: exact-byte active + previous qualification window.
 
 on:
   push:
