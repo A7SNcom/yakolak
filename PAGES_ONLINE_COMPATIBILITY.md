@@ -1,6 +1,6 @@
 # PAGES-015 — Online frontend / Cloudflare Worker / Turso compatibility window
 
-Status: **DESIGN + FAIL-CLOSED GATES LOCKED; LIVE ELIGIBILITY AWAITS IMMUTABLE-RELEASE ADMIN PROOF AND PAGES-005 LIVE CREDENTIALS**
+Status: **IMPLEMENTATION + FAIL-CLOSED GATES LOCKED; LIVE ELIGIBILITY BLOCKED ONLY BY VERIFIED-MISSING EXTERNAL CREDENTIALS**
 
 This task is an **online/backend gate only**. It never blocks the Three.js shell, presentation, asset loading, rendering, or local/offline gameplay. It gates only remote authoritative reads/mutations.
 
@@ -70,7 +70,16 @@ Immutable release assets are never edited or re-uploaded after publication.
 
 ## Worker/Turso live proof and automatic resume
 
-PAGES-005 must complete an authenticated Cloudflare deploy with Turso secrets. Its workflow uses Wrangler structured NDJSON output for the exact deployment URL/version IDs, then keeps distinct active+previous Worker versions in the current deployment (100%/0%), proves both by exact Version Override, proves browser CORS + live Turso, and commits only proven `backend/cloudflare/API_ORIGIN.txt` + `WORKER_ROLLBACK_WINDOW.json`.
+PAGES-005 now has one centralized implementation: `scripts/pages005-bootstrap-live.sh`. Both the default-branch bootstrap workflow and the `threejs-rebuild` workflow invoke this exact helper. It:
+
+- validates local Worker/compatibility contracts and a Wrangler dry-run;
+- deploys with a protected secrets file and parses Wrangler structured NDJSON for the exact Worker version and HTTPS target;
+- waits for the bootstrap version identity to become live and proves a real Turso write/read round trip;
+- uploads a distinct twin Worker version and deploys active/previous at 100%/0%;
+- proves both exact versions by Cloudflare Version Override against live Turso;
+- proves browser CORS from `https://a7sncom.github.io`;
+- re-proves the exact version window immediately before publication and verifies the ordinary no-override health path resolves to the active version;
+- only then commits `backend/cloudflare/API_ORIGIN.txt` and `WORKER_ROLLBACK_WINDOW.json`.
 
 `.github/workflows/pages-015-online-compatibility.yml` automatically re-evaluates when the frontend window, ledger, API origin or Worker window changes. It exits cleanly without qualification while prerequisites are incomplete. Once both exact frontend keys have strong `archive_verified` + matching PAGES-014 `deployment_generation_verified` and PAGES-005 has a proven Worker window, it:
 
@@ -81,11 +90,20 @@ PAGES-005 must complete an authenticated Cloudflare deploy with Turso secrets. I
 - materializes and validates all four frontend×Worker pairings;
 - appends `backend_compatibility_verified` for both exact immutable archive keys and runs the hardened complete-release verifier.
 
-## Current external blockers
+## Verified external blocker evidence
 
-The implementation intentionally writes no backend eligibility event until both external boundaries are satisfied:
+The default-branch credential probe (`.github/workflows/pages-005-credential-probe.yml`) ran as GitHub Actions run `32126519360` and wrote only boolean presence evidence to `backend/cloudflare/CREDENTIAL_STATUS.json`; it stores **no secret values** and is explicitly not qualification evidence.
 
-- GitHub must provide `PAGES_RELEASE_ADMIN_TOKEN` (repository Administration read/write) so immutable-release status can be proved/enabled and the two exact drafts can be published immutably.
-- GitHub environment `cloudflare-backend` must provide `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `TURSO_DATABASE_URL`, and `TURSO_AUTH_TOKEN` so PAGES-005 can create and prove the real Worker/Turso rollback window.
+At that run all five required credentials were absent:
+
+- `CLOUDFLARE_API_TOKEN`: absent
+- `CLOUDFLARE_ACCOUNT_ID`: absent
+- `TURSO_DATABASE_URL`: absent
+- `TURSO_AUTH_TOKEN`: absent
+- `PAGES_RELEASE_ADMIN_TOKEN`: absent
+
+Therefore `cloudflareBootstrapReady=false`, no backend bootstrap was dispatched, the immutable-release archive cannot be published, and no eligibility event may be written. The current ledger still contains only initialization plus the exact active `draft_staged` row; `API_ORIGIN.txt` and `WORKER_ROLLBACK_WINDOW.json` do not exist.
+
+When credentials are later configured, rerun **PAGES-005 credential probe and bootstrap dispatch** from `main` (or update `.github/PAGES005_CREDENTIAL_TRIGGER`). The probe will dispatch the hardened default-branch bootstrap only when all four Cloudflare/Turso values are present. Its `CREDENTIAL_STATUS.json` commit also retriggers the PAGES-015 archive workflow so `PAGES_RELEASE_ADMIN_TOKEN` is consumed automatically if present.
 
 Missing credentials are treated as **not qualified**, never as a product/local-play failure and never as a guessed/pending qualification.
