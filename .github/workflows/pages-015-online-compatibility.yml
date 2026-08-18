@@ -1,15 +1,6 @@
 name: PAGES-015 online compatibility qualification
 
 on:
-  push:
-    branches:
-      - threejs-rebuild
-    paths:
-      - '.github/workflows/pages-015-online-compatibility.yml'
-      - 'RELEASE_QUALIFICATION/ONLINE_FRONTEND_WINDOW.json'
-      - 'RELEASE_QUALIFICATION/ledger.jsonl'
-      - 'backend/cloudflare/API_ORIGIN.txt'
-      - 'backend/cloudflare/WORKER_ROLLBACK_WINDOW.json'
   workflow_dispatch:
 
 permissions:
