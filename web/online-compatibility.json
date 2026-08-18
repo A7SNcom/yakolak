@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "identity": "yakolak-online-frontend-compatibility-v1",
-  "qualificationEpoch": "pages015-window-2026-08-18",
+  "qualificationEpoch": "pages015-window-2026-08-18-final",
   "protocol": {
     "id": "yakolak-online-room",
     "version": "1"
