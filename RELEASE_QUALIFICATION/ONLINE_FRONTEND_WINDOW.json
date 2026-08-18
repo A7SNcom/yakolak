@@ -10,6 +10,7 @@
       "releaseTag": "pages-archive-2026-08-18-geeb3b8e1-t4e4e5dec",
       "assetName": "pages-composite.tar",
       "assetSha256": "3bb476e2ee76f372b9b945d160f6f1e9faad865eaacd9baef2b1384bd434fa5f",
+      "onlineCompatibilityDescriptorSha256": "d309ec7ec33a613f56b81d9fe2adcb32fd70fe61b47080fb88dbaa6dd2a725f3",
       "godotRootSha": "eeb3b8e15ded95c4343aed303f781b533c2e13a0",
       "threejsCandidateSha": "4e4e5dec72ee71a06940c6db561dde8d24abd2d0",
       "sourcePagesRunId": 32110008705,
@@ -30,6 +31,7 @@
       "releaseTag": "pages-archive-2026-08-18-geeb3b8e1-t5cc89e05",
       "assetName": "pages-composite.tar",
       "assetSha256": "6769843ee45a807cffe8af8c8450e0afd7d08c45270e66512f1ad52462dfb560",
+      "onlineCompatibilityDescriptorSha256": "5084bf821578011dfa98a4fec994c74f445888e59a2ecc7b3f8c69a96e84c32b",
       "godotRootSha": "eeb3b8e15ded95c4343aed303f781b533c2e13a0",
       "threejsCandidateSha": "5cc89e05653b6461ed6a41332f374eaadb360945",
       "sourcePagesRunId": 32108243496,
@@ -52,6 +54,7 @@
     "bothRequireArchiveVerified": true,
     "bothRequireDeploymentGenerationVerified": true,
     "bothRequireSuccessfulPages014LiveEvidence": true,
+    "bothRequireExactArchivedCompatibilityDescriptorDigest": true,
     "thisFileDoesNotConferEligibility": true
   }
 }
