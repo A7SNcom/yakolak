@@ -5,7 +5,6 @@ on:
     branches:
       - threejs-rebuild
     paths:
-      - ".github/workflows/pages-012-immutable-release.yml"
       - "PAGES_RELEASE_ARCHIVES.md"
       - "scripts/verify-release-qualification.mjs"
   workflow_dispatch:
@@ -15,7 +14,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: pages-012-immutable-release
+  group: pages-release-qualification-ledger
   cancel-in-progress: false
 
 env:
