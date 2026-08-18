@@ -49,6 +49,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          bash -n scripts/pages015-record-explicit-orchestrator-probe.sh
           bash -n scripts/pages015-orchestrate-qualification.sh
           bash -n scripts/pages015-archive-window-entry-v2.sh
           bash -n scripts/pages015-install-source-recovery-gh-shim.sh
@@ -57,6 +58,11 @@ jobs:
           bash -n scripts/pages005-bootstrap-live.sh
           bash -n scripts/pages015-finalize-live-window.sh
           node --test tests/pages015_archive_facts_contract.test.mjs
+
+      - name: Record fresh explicit credential probe receipt
+        if: github.event_name != 'schedule'
+        shell: bash
+        run: bash scripts/pages015-record-explicit-orchestrator-probe.sh
 
       - name: Install exact-source recovery bridge
         run: bash scripts/pages015-install-source-recovery-gh-shim.sh
