@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "gate": "PAGES-015",
   "event": "draft_release_branch_target_probe_cleanup",
-  "workflowRunId": 32163789978,
+  "workflowRunId": 32163833311,
   "releaseTag": "pages015-branch-target-probe-32163638806",
-  "existed": true,
+  "existed": false,
   "deleted": true,
   "qualificationEvidence": false,
-  "recordedAt": "2026-08-18T17:06:06Z"
+  "recordedAt": "2026-08-18T17:06:36Z"
 }
