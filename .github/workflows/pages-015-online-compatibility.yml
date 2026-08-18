@@ -1,26 +1,19 @@
 name: PAGES-015 online compatibility qualification
 
 on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - '.github/workflows/pages-015-online-compatibility.yml'
+      - 'RELEASE_QUALIFICATION/ONLINE_FRONTEND_WINDOW.json'
+      - 'RELEASE_QUALIFICATION/ledger.jsonl'
+      - 'backend/cloudflare/API_ORIGIN.txt'
+      - 'backend/cloudflare/WORKER_ROLLBACK_WINDOW.json'
   workflow_dispatch:
-    inputs:
-      active_release_tag:
-        description: Immutable active frontend release tag
-        required: true
-        type: string
-      active_asset_sha256:
-        description: SHA-256 of active pages-composite.tar
-        required: true
-        type: string
-      previous_release_tag:
-        description: Immutable previous frontend rollback release tag
-        required: true
-        type: string
-      previous_asset_sha256:
-        description: SHA-256 of previous pages-composite.tar
-        required: true
-        type: string
 
 permissions:
+  actions: read
   contents: write
 
 concurrency:
@@ -30,6 +23,7 @@ concurrency:
 jobs:
   qualify:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     environment: cloudflare-backend
     steps:
       - uses: actions/checkout@v6
@@ -42,65 +36,152 @@ jobs:
           node-version: '22'
           package-manager-cache: false
 
-      - name: Start from latest qualification ledger
+      - name: Refresh ledger and resolve the locked frontend window
+        id: frontend
+        shell: bash
         run: |
           set -euo pipefail
           git pull --ff-only origin threejs-rebuild
+          window='RELEASE_QUALIFICATION/ONLINE_FRONTEND_WINDOW.json'
+          ledger='RELEASE_QUALIFICATION/ledger.jsonl'
+          test -s "$window"
+          test -s "$ledger"
+
+          jq -e '
+            .schemaVersion == 1 and
+            .rules.thisFileDoesNotConferEligibility == true and
+            (.frontends | length) == 2 and
+            ([.frontends[].role] | sort) == ["active", "previous"] and
+            (.frontends[0].releaseTag != .frontends[1].releaseTag or .frontends[0].assetSha256 != .frontends[1].assetSha256) and
+            all(.frontends[];
+              .assetName == "pages-composite.tar" and
+              (.releaseTag | type == "string" and length > 0) and
+              (.assetSha256 | test("^[a-f0-9]{64}$")) and
+              (.deploymentGeneration | test("^sha256:[a-f0-9]{64}$")) and
+              (.contentIdentitySha256 | test("^[a-f0-9]{64}$"))
+            )
+          ' "$window" >/dev/null
+
+          read_window() {
+            local role="$1" field="$2"
+            jq -r --arg role "$role" --arg field "$field" '.frontends[] | select(.role == $role) | .[$field]' "$window"
+          }
+
+          active_tag="$(read_window active releaseTag)"
+          active_digest="$(read_window active assetSha256)"
+          active_generation="$(read_window active deploymentGeneration)"
+          previous_tag="$(read_window previous releaseTag)"
+          previous_digest="$(read_window previous assetSha256)"
+          previous_generation="$(read_window previous deploymentGeneration)"
+
+          echo "active_tag=$active_tag" >> "$GITHUB_OUTPUT"
+          echo "active_digest=$active_digest" >> "$GITHUB_OUTPUT"
+          echo "active_generation=$active_generation" >> "$GITHUB_OUTPUT"
+          echo "previous_tag=$previous_tag" >> "$GITHUB_OUTPUT"
+          echo "previous_digest=$previous_digest" >> "$GITHUB_OUTPUT"
+          echo "previous_generation=$previous_generation" >> "$GITHUB_OUTPUT"
+
+          if node scripts/verify-release-qualification.mjs "$active_tag" "$active_digest" >/dev/null 2>&1 && \
+             node scripts/verify-release-qualification.mjs "$previous_tag" "$previous_digest" >/dev/null 2>&1; then
+            echo 'already=true' >> "$GITHUB_OUTPUT"
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+            echo 'Both frontend keys already have complete PAGES-015 qualification.'
+            exit 0
+          fi
+          echo 'already=false' >> "$GITHUB_OUTPUT"
+
+          check_frontend_prerequisites() {
+            local tag="$1" digest="$2" generation="$3"
+            jq -s -e --arg tag "$tag" --arg digest "$digest" --arg generation "$generation" '
+              (any(.[];
+                .event == "archive_verified" and
+                .releaseTag == $tag and
+                .assetSha256 == $digest and
+                .immutable == true and
+                .releaseAttestationVerified == true and
+                .archiveSha256Verified == true and
+                .nonProductionRestoreVerified == true
+              )) and
+              (any(.[];
+                .event == "deployment_generation_verified" and
+                .releaseTag == $tag and
+                .assetSha256 == $digest and
+                .deploymentGeneration == $generation and
+                .verified == true
+              ))
+            ' "$ledger" >/dev/null
+          }
+
+          if check_frontend_prerequisites "$active_tag" "$active_digest" "$active_generation" && \
+             check_frontend_prerequisites "$previous_tag" "$previous_digest" "$previous_generation"; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo '::notice title=PAGES-015 waiting for frontend archive qualification::Both exact immutable frontend keys must have archive_verified + matching deployment_generation_verified before online qualification.'
+          fi
+
+      - name: Require proven PAGES-005 live Worker rollback window
+        id: pages005
+        if: steps.frontend.outputs.already != 'true' && steps.frontend.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -s backend/cloudflare/API_ORIGIN.txt ] || [ ! -s backend/cloudflare/WORKER_ROLLBACK_WINDOW.json ]; then
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo '::notice title=PAGES-015 waiting for PAGES-005::No proven API_ORIGIN + active/previous Worker window exists yet.'
+            exit 0
+          fi
+
+          api_origin="$(tr -d '\r\n' < backend/cloudflare/API_ORIGIN.txt)"
+          case "$api_origin" in
+            https://*.vercel.app*) echo 'Vercel API_ORIGIN is forbidden' >&2; exit 1 ;;
+            https://*) ;;
+            *) echo "invalid locked API_ORIGIN: $api_origin" >&2; exit 1 ;;
+          esac
+          [[ "${api_origin#https://}" != */* ]] || { echo 'API_ORIGIN must be a bare HTTPS origin' >&2; exit 1; }
+
+          jq -e --arg apiOrigin "$api_origin" '
+            .schemaVersion == 1 and
+            .gate == "PAGES-005" and
+            .provider == "cloudflare-workers" and
+            .workerName == "yakolak-room-api" and
+            .apiOrigin == $apiOrigin and
+            (.activeWorkerVersionId | type == "string" and length > 0) and
+            (.previousWorkerVersionId | type == "string" and length > 0) and
+            .activeWorkerVersionId != .previousWorkerVersionId and
+            .traffic.activePercent == 100 and
+            .traffic.previousPercent == 0 and
+            .versionOverrideProof == true and
+            .browserCorsVerified == true and
+            .liveTursoRoundTripVerified == true and
+            .migrationPolicy == "expand-contract-forward-only" and
+            .tursoDataRollbackRequired == false
+          ' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json >/dev/null
+
+          echo "api_origin=$api_origin" >> "$GITHUB_OUTPUT"
+          echo "active_worker_version=$(jq -r '.activeWorkerVersionId' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json)" >> "$GITHUB_OUTPUT"
+          echo "previous_worker_version=$(jq -r '.previousWorkerVersionId' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json)" >> "$GITHUB_OUTPUT"
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+
+      - name: Finish cleanly while prerequisites remain incomplete
+        if: steps.frontend.outputs.already == 'true' || steps.frontend.outputs.ready != 'true' || steps.pages005.outputs.ready != 'true'
+        run: |
+          if [ "${{ steps.frontend.outputs.already }}" = 'true' ]; then
+            echo 'PAGES-015 is already completely qualified for the locked frontend window.'
+          else
+            echo 'PAGES-015 remains intentionally unqualified; no backend_compatibility_verified event is written.'
+          fi
 
       - name: Verify local PAGES-015 contracts
+        if: steps.frontend.outputs.already != 'true' && steps.frontend.outputs.ready == 'true' && steps.pages005.outputs.ready == 'true'
         run: |
           set -euo pipefail
           npm install --ignore-scripts
           node --test tests/pages_backend_runtime_contract.test.mjs tests/pages_online_compatibility_contract.test.mjs
           npx --yes wrangler@4 deploy --dry-run --config backend/cloudflare/wrangler.jsonc --outdir .tmp/pages015-worker
 
-      - name: Require PAGES-005 locked live origin and Worker rollback window
-        id: pages005
-        run: |
-          set -euo pipefail
-          test -s backend/cloudflare/API_ORIGIN.txt || {
-            echo 'PAGES-005 has not locked backend/cloudflare/API_ORIGIN.txt; live PAGES-015 qualification is forbidden.' >&2
-            exit 1
-          }
-          test -s backend/cloudflare/WORKER_ROLLBACK_WINDOW.json || {
-            echo 'PAGES-005 has not locked WORKER_ROLLBACK_WINDOW.json; active+previous Worker qualification is forbidden.' >&2
-            exit 1
-          }
-          api_origin="$(tr -d '\r\n' < backend/cloudflare/API_ORIGIN.txt)"
-          case "${api_origin}" in
-            https://*.vercel.app*) echo 'Vercel API_ORIGIN is forbidden' >&2; exit 1 ;;
-            https://*) ;;
-            *) echo "invalid locked API_ORIGIN: ${api_origin}" >&2; exit 1 ;;
-          esac
-          if [[ "${api_origin#https://}" == */* ]]; then
-            echo 'API_ORIGIN must be an origin with no path' >&2
-            exit 1
-          fi
-          jq -e \
-            --arg apiOrigin "${api_origin}" \
-            '.schemaVersion == 1 and
-             .gate == "PAGES-005" and
-             .provider == "cloudflare-workers" and
-             .workerName == "yakolak-room-api" and
-             .apiOrigin == $apiOrigin and
-             (.activeWorkerVersionId | type == "string" and length > 0) and
-             (.previousWorkerVersionId | type == "string" and length > 0) and
-             .activeWorkerVersionId != .previousWorkerVersionId and
-             .traffic.activePercent == 100 and
-             .traffic.previousPercent == 0 and
-             .versionOverrideProof == true and
-             .browserCorsVerified == true and
-             .liveTursoRoundTripVerified == true and
-             .migrationPolicy == "expand-contract-forward-only" and
-             .tursoDataRollbackRequired == false' \
-            backend/cloudflare/WORKER_ROLLBACK_WINDOW.json >/dev/null
-          active_worker_version="$(jq -r '.activeWorkerVersionId' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json)"
-          previous_worker_version="$(jq -r '.previousWorkerVersionId' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json)"
-          echo "api_origin=${api_origin}" >> "$GITHUB_OUTPUT"
-          echo "active_worker_version=${active_worker_version}" >> "$GITHUB_OUTPUT"
-          echo "previous_worker_version=${previous_worker_version}" >> "$GITHUB_OUTPUT"
-
-      - name: Prove active + previous Worker health and live Turso round trips
+      - name: Re-prove active + previous Worker health and live Turso round trips
+        if: steps.frontend.outputs.already != 'true' && steps.frontend.outputs.ready == 'true' && steps.pages005.outputs.ready == 'true'
         env:
           API_ORIGIN: ${{ steps.pages005.outputs.api_origin }}
           ACTIVE_WORKER_VERSION: ${{ steps.pages005.outputs.active_worker_version }}
@@ -109,40 +190,44 @@ jobs:
         run: node scripts/probe-pages015-live-compatibility.mjs
 
       - name: Re-download and verify both immutable frontend archives
+        if: steps.frontend.outputs.already != 'true' && steps.frontend.outputs.ready == 'true' && steps.pages005.outputs.ready == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
-          ACTIVE_RELEASE_TAG: ${{ inputs.active_release_tag }}
-          ACTIVE_ASSET_SHA256: ${{ inputs.active_asset_sha256 }}
-          PREVIOUS_RELEASE_TAG: ${{ inputs.previous_release_tag }}
-          PREVIOUS_ASSET_SHA256: ${{ inputs.previous_asset_sha256 }}
+          GH_TOKEN: ${{ secrets.PAGES_RELEASE_ADMIN_TOKEN || github.token }}
+          ACTIVE_RELEASE_TAG: ${{ steps.frontend.outputs.active_tag }}
+          ACTIVE_ASSET_SHA256: ${{ steps.frontend.outputs.active_digest }}
+          PREVIOUS_RELEASE_TAG: ${{ steps.frontend.outputs.previous_tag }}
+          PREVIOUS_ASSET_SHA256: ${{ steps.frontend.outputs.previous_digest }}
           PAGES015_EVIDENCE_PATH: pages015-live-evidence.json
         run: |
           set -euo pipefail
-          test "${ACTIVE_RELEASE_TAG}" != "${PREVIOUS_RELEASE_TAG}" || test "${ACTIVE_ASSET_SHA256,,}" != "${PREVIOUS_ASSET_SHA256,,}"
           rm -rf .tmp/pages015-frontends
           mkdir -p .tmp/pages015-frontends/{active,previous}/{download,extract}
 
-          gh release download "${ACTIVE_RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
-            --pattern pages-composite.tar --dir .tmp/pages015-frontends/active/download
-          gh release download "${PREVIOUS_RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
-            --pattern pages-composite.tar --dir .tmp/pages015-frontends/previous/download
+          gh release view "$ACTIVE_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isImmutable --jq '.isImmutable' | grep -qx true
+          gh release view "$PREVIOUS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isImmutable --jq '.isImmutable' | grep -qx true
+          gh release verify "$ACTIVE_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+          gh release verify "$PREVIOUS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+
+          gh release download "$ACTIVE_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern pages-composite.tar --dir .tmp/pages015-frontends/active/download
+          gh release download "$PREVIOUS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern pages-composite.tar --dir .tmp/pages015-frontends/previous/download
 
           active_tar=.tmp/pages015-frontends/active/download/pages-composite.tar
           previous_tar=.tmp/pages015-frontends/previous/download/pages-composite.tar
-          test "$(sha256sum "${active_tar}" | awk '{print $1}')" = "${ACTIVE_ASSET_SHA256,,}"
-          test "$(sha256sum "${previous_tar}" | awk '{print $1}')" = "${PREVIOUS_ASSET_SHA256,,}"
+          test "$(sha256sum "$active_tar" | awk '{print $1}')" = "$ACTIVE_ASSET_SHA256"
+          test "$(sha256sum "$previous_tar" | awk '{print $1}')" = "$PREVIOUS_ASSET_SHA256"
+          gh release verify-asset "$ACTIVE_RELEASE_TAG" "$active_tar" --repo "$GITHUB_REPOSITORY" >/dev/null
+          gh release verify-asset "$PREVIOUS_RELEASE_TAG" "$previous_tar" --repo "$GITHUB_REPOSITORY" >/dev/null
 
-          tar -xf "${active_tar}" -C .tmp/pages015-frontends/active/extract
-          tar -xf "${previous_tar}" -C .tmp/pages015-frontends/previous/extract
-
+          tar -xf "$active_tar" -C .tmp/pages015-frontends/active/extract
+          tar -xf "$previous_tar" -C .tmp/pages015-frontends/previous/extract
           active_descriptor="$(find .tmp/pages015-frontends/active/extract -type f -path '*/threejs/online-compatibility.json' -print -quit)"
           previous_descriptor="$(find .tmp/pages015-frontends/previous/extract -type f -path '*/threejs/online-compatibility.json' -print -quit)"
-          test -n "${active_descriptor}" && test -s "${active_descriptor}"
-          test -n "${previous_descriptor}" && test -s "${previous_descriptor}"
-
-          node scripts/verify-pages015-frontend-window.mjs "${active_descriptor}" "${previous_descriptor}"
+          test -n "$active_descriptor" && test -s "$active_descriptor"
+          test -n "$previous_descriptor" && test -s "$previous_descriptor"
+          node scripts/verify-pages015-frontend-window.mjs "$active_descriptor" "$previous_descriptor"
 
       - name: Prove browser CORS from the real GitHub Pages origin
+        if: steps.frontend.outputs.already != 'true' && steps.frontend.outputs.ready == 'true' && steps.pages005.outputs.ready == 'true'
         env:
           PAGES015_API_ORIGIN: ${{ steps.pages005.outputs.api_origin }}
         run: |
@@ -152,29 +237,27 @@ jobs:
           npx playwright test tests/pages015-browser-cors.spec.js --workers=1
 
       - name: Append compatibility qualification for both frontend rollback keys
+        if: steps.frontend.outputs.already != 'true' && steps.frontend.outputs.ready == 'true' && steps.pages005.outputs.ready == 'true'
         env:
-          ACTIVE_RELEASE_TAG: ${{ inputs.active_release_tag }}
-          ACTIVE_ASSET_SHA256: ${{ inputs.active_asset_sha256 }}
-          PREVIOUS_RELEASE_TAG: ${{ inputs.previous_release_tag }}
-          PREVIOUS_ASSET_SHA256: ${{ inputs.previous_asset_sha256 }}
+          ACTIVE_RELEASE_TAG: ${{ steps.frontend.outputs.active_tag }}
+          ACTIVE_ASSET_SHA256: ${{ steps.frontend.outputs.active_digest }}
+          PREVIOUS_RELEASE_TAG: ${{ steps.frontend.outputs.previous_tag }}
+          PREVIOUS_ASSET_SHA256: ${{ steps.frontend.outputs.previous_digest }}
           PAGES015_EVIDENCE_PATH: pages015-live-evidence.json
           PAGES015_BROWSER_CORS_VERIFIED: 'true'
         run: |
           set -euo pipefail
           node scripts/append-pages015-qualification.mjs
-          node scripts/verify-release-qualification.mjs "${ACTIVE_RELEASE_TAG}" "${ACTIVE_ASSET_SHA256}"
-          node scripts/verify-release-qualification.mjs "${PREVIOUS_RELEASE_TAG}" "${PREVIOUS_ASSET_SHA256}"
+          node scripts/verify-release-qualification.mjs "$ACTIVE_RELEASE_TAG" "$ACTIVE_ASSET_SHA256"
+          node scripts/verify-release-qualification.mjs "$PREVIOUS_RELEASE_TAG" "$PREVIOUS_ASSET_SHA256"
 
       - name: Commit additive ledger events only
-        env:
-          ACTIVE_RELEASE_TAG: ${{ inputs.active_release_tag }}
-          PREVIOUS_RELEASE_TAG: ${{ inputs.previous_release_tag }}
+        if: steps.frontend.outputs.already != 'true' && steps.frontend.outputs.ready == 'true' && steps.pages005.outputs.ready == 'true'
         run: |
           set -euo pipefail
           rm -f pages015-live-evidence.json
-          git status --short
           if git diff --quiet -- RELEASE_QUALIFICATION/ledger.jsonl; then
-            echo 'Qualification events already exist; immutable releases remain untouched.'
+            echo 'Equivalent backend qualification already exists.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
@@ -182,5 +265,5 @@ jobs:
           git add RELEASE_QUALIFICATION/ledger.jsonl
           git diff --cached --name-only | grep -qx 'RELEASE_QUALIFICATION/ledger.jsonl'
           test "$(git diff --cached --name-only | wc -l)" -eq 1
-          git commit -m "PAGES-015 qualify online rollback window: ${ACTIVE_RELEASE_TAG} + ${PREVIOUS_RELEASE_TAG}"
+          git commit -m 'PAGES-015 qualify active+previous frontend/Worker window'
           git push origin HEAD:threejs-rebuild
