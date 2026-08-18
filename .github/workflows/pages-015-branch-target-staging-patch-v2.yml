@@ -88,7 +88,9 @@ jobs:
               raise SystemExit(f'expected one raw release target, found {s.count(old)}')
           s = s.replace(old, '--target "$release_target"', 1)
 
-          old = 'test "$(jq -r \'.target_commitish\' "$work/release.json")" = "$THREEJS_CANDIDATE_SHA"\n'
+          old = 'test "$(jq -r \' .target_commitish\' "$work/release.json")" = "$THREEJS_CANDIDATE_SHA"\n'
+          if old not in s:
+              old = 'test "$(jq -r \'.target_commitish\' "$work/release.json")" = "$THREEJS_CANDIDATE_SHA"\n'
           if old not in s:
               raise SystemExit('target_commitish anchor not found')
           s = s.replace(old, r'''release_target_commitish="$(jq -r '.target_commitish' "$work/release.json")"
@@ -146,3 +148,5 @@ jobs:
           test "$(git diff --cached --name-only | wc -l)" -eq 2
           git commit -m 'PAGES-015 stage previous draft through exact-SHA branch target'
           git push origin HEAD:threejs-rebuild
+
+# retrigger-after-install: 2026-08-18T17:13Z
