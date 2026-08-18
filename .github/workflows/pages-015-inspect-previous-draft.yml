@@ -69,3 +69,5 @@ jobs:
           git add RELEASE_QUALIFICATION/PAGES015_PREVIOUS_DRAFT_INSPECTION.json
           git commit -m 'PAGES-015 record previous draft metadata inspection'
           git push origin HEAD:threejs-rebuild
+
+# retrigger-after-install: 2026-08-18T17:16Z
