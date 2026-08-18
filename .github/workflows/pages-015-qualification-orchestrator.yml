@@ -1,0 +1,60 @@
+name: PAGES-015 qualification orchestrator
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/PAGES005_CREDENTIAL_TRIGGER'
+      - '.github/workflows/pages-015-qualification-orchestrator.yml'
+  schedule:
+    - cron: '47 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+env:
+  FORCE_COLOR: '0'
+
+concurrency:
+  group: pages-015-qualification-orchestrator
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: cloudflare-backend
+    env:
+      WORKFLOW_GH_TOKEN: ${{ github.token }}
+      PAGES_RELEASE_ADMIN_TOKEN: ${{ secrets.PAGES_RELEASE_ADMIN_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+      TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: threejs-rebuild
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Validate PAGES-015 orchestrator contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/pages015-orchestrate-qualification.sh
+          bash -n scripts/pages015-archive-window-entry-v2.sh
+          bash -n scripts/pages005-bootstrap-live.sh
+          bash -n scripts/pages015-finalize-live-window.sh
+          node --test tests/pages015_archive_facts_contract.test.mjs
+
+      - name: Qualify what external credentials currently permit
+        shell: bash
+        run: bash scripts/pages015-orchestrate-qualification.sh
