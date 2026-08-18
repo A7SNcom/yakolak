@@ -5,9 +5,9 @@
   "assetSha256": "3bb476e2ee76f372b9b945d160f6f1e9faad865eaacd9baef2b1384bd434fa5f",
   "immutableAdminReady": false,
   "stageOutcome": "success",
-  "stageState": "exact-draft-verified",
+  "stageState": "exact-draft-already-staged",
   "publishOutcome": "skipped",
-  "workflowRunId": 32164785888,
-  "recordedAt": "2026-08-18T17:18:42Z",
+  "workflowRunId": 32169299197,
+  "recordedAt": "2026-08-18T18:08:22Z",
   "qualificationEvidence": false
 }
