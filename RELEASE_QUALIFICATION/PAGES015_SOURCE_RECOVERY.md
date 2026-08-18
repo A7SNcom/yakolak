@@ -37,6 +37,8 @@ GitHub Actions run `32136096713` independently reconstructed both expired source
 
 `PAGES015_RECOVERED_SOURCES.json` records those artifact IDs, Actions ZIP digests, original run/artifact identities and layout digests. Its `qualificationEvidence` field is `false`.
 
+The temporary recovery workflow used to produce run `32136096713` was retired after this proof. It is not part of ordinary CI and is not needed for future recovery because the resolver can reconstruct the same bytes directly from immutable Git SHAs + the version-controlled layout oracle when the preserved 90-day artifacts eventually expire.
+
 ## Durable resolution order
 
 `scripts/pages015-resolve-exact-pages-source.sh` uses this fail-closed order:
