@@ -437,6 +437,23 @@ export function createResourceRegistry({
     contextLost = false;
   }
 
+  function rollbackExternalSetup(cleanup) {
+    try {
+      cleanup?.();
+    } catch {
+      // Rollback is best-effort and must never hide the original setup/registration error.
+    }
+  }
+
+  function registerAfterExternalSetup(resource, metadata, rollback) {
+    try {
+      return register(resource, metadata);
+    } catch (error) {
+      rollbackExternalSetup(rollback);
+      throw error;
+    }
+  }
+
   function listen(target, type, listener, options, metadata = {}) {
     assertLive();
     if (!target?.addEventListener || !target?.removeEventListener) {
@@ -444,12 +461,18 @@ export function createResourceRegistry({
     }
     if (typeof listener !== 'function') throw new TypeError('Registry listener must be a function');
     const prepared = normaliseMetadata({ ...metadata, kind: RESOURCE_KINDS.LISTENER });
-    target.addEventListener(type, listener, options);
+    const rollback = () => target.removeEventListener(type, listener, options);
+    try {
+      target.addEventListener(type, listener, options);
+    } catch (error) {
+      rollbackExternalSetup(rollback);
+      throw error;
+    }
     const holder = { target, type, listener };
-    return register(holder, {
+    return registerAfterExternalSetup(holder, {
       ...prepared,
-      cleanup: () => target.removeEventListener(type, listener, options),
-    });
+      cleanup: rollback,
+    }, rollback);
   }
 
   function subscribe(subscribeFn, listener, metadata = {}) {
@@ -459,10 +482,10 @@ export function createResourceRegistry({
     const unsubscribe = subscribeFn(listener);
     if (typeof unsubscribe !== 'function') throw new TypeError('Subscription must return an unsubscribe function');
     const holder = { unsubscribe };
-    return register(holder, {
+    return registerAfterExternalSetup(holder, {
       ...prepared,
       cleanup: unsubscribe,
-    });
+    }, unsubscribe);
   }
 
   function observe(observer, target, options, metadata = {}) {
@@ -470,8 +493,14 @@ export function createResourceRegistry({
     if (!observer?.observe || !observer?.disconnect) throw new TypeError('Registry observer must implement observe/disconnect');
     const prepared = normaliseMetadata({ ...metadata, kind: RESOURCE_KINDS.OBSERVER });
     assertObjectRegistrationAllowed(observer, prepared);
-    observer.observe(target, options);
-    return register(observer, prepared);
+    const rollback = () => observer.disconnect();
+    try {
+      observer.observe(target, options);
+    } catch (error) {
+      rollbackExternalSetup(rollback);
+      throw error;
+    }
+    return registerAfterExternalSetup(observer, prepared, rollback);
   }
 
   function platformFunction(name) {
@@ -501,10 +530,11 @@ export function createResourceRegistry({
       callback(...args);
     };
     holder.handle = delay == null ? scheduleFn(wrapped) : scheduleFn(wrapped, delay);
-    token = register(holder, {
+    const rollback = () => cancelFn(holder.handle);
+    token = registerAfterExternalSetup(holder, {
       ...prepared,
-      cleanup: () => cancelFn(holder.handle),
-    });
+      cleanup: rollback,
+    }, rollback);
     return token;
   }
 
@@ -537,10 +567,11 @@ export function createResourceRegistry({
     const setIntervalFn = platformFunction('setInterval');
     const clearIntervalFn = platformFunction('clearInterval');
     const holder = { handle: setIntervalFn(callback, Math.max(0, Number(delay) || 0)) };
-    return register(holder, {
+    const rollback = () => clearIntervalFn(holder.handle);
+    return registerAfterExternalSetup(holder, {
       ...prepared,
-      cleanup: () => clearIntervalFn(holder.handle),
-    });
+      cleanup: rollback,
+    }, rollback);
   }
 
   function registerCleanup(cleanup, metadata = {}) {
