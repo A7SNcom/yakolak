@@ -6,6 +6,8 @@ on:
       - threejs-rebuild
     paths:
       - '.github/workflows/pages-015-window-archive.yml'
+      - 'scripts/pages015-archive-window-entry.sh'
+      - 'RELEASE_QUALIFICATION/ONLINE_FRONTEND_WINDOW.json'
   workflow_dispatch:
 
 permissions:
@@ -16,322 +18,75 @@ concurrency:
   group: pages-015-window-archive
   cancel-in-progress: false
 
-env:
-  RELEASE_TAG: pages-archive-2026-08-18-geeb3b8e1-t5cc89e05
-  GODOT_ROOT_SHA: eeb3b8e15ded95c4343aed303f781b533c2e13a0
-  THREEJS_CANDIDATE_SHA: 5cc89e05653b6461ed6a41332f374eaadb360945
-  SOURCE_PAGES_RUN_ID: '32108243496'
-  SOURCE_PAGES_ARTIFACT_ID: '9313917543'
-  SOURCE_ARTIFACT_TAR_SHA256: 6769843ee45a807cffe8af8c8450e0afd7d08c45270e66512f1ad52462dfb560
-
 jobs:
+  resolve-window:
+    runs-on: ubuntu-latest
+    outputs:
+      frontends: ${{ steps.window.outputs.frontends }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: threejs-rebuild
+      - name: Validate locked active + previous frontend window
+        id: window
+        shell: bash
+        run: |
+          set -euo pipefail
+          window='RELEASE_QUALIFICATION/ONLINE_FRONTEND_WINDOW.json'
+          jq -e '
+            .schemaVersion == 1 and
+            .rules.thisFileDoesNotConferEligibility == true and
+            .rules.bothRequireSuccessfulPages014LiveEvidence == true and
+            (.frontends | length) == 2 and
+            ([.frontends[].role] | sort) == ["active", "previous"] and
+            (.frontends[0].releaseTag != .frontends[1].releaseTag or .frontends[0].assetSha256 != .frontends[1].assetSha256) and
+            all(.frontends[];
+              .assetName == "pages-composite.tar" and
+              (.assetSha256 | test("^[a-f0-9]{64}$")) and
+              (.deploymentGeneration | test("^sha256:[a-f0-9]{64}$")) and
+              (.publicRuntimeProtocolSha256 | test("^[a-f0-9]{64}$")) and
+              (.contentIdentitySha256 | test("^[a-f0-9]{64}$")) and
+              .pages014LiveEvidence.verified == true and
+              (.pages014LiveEvidence.verifierWorkflowRunId | type == "number") and
+              (.pages014LiveEvidence.verifierJobId | type == "number") and
+              (.pages014LiveEvidence.liveManifestSha256 | test("^[a-f0-9]{64}$")) and
+              .pages014LiveEvidence.pageUrl == "https://a7sncom.github.io/yakolak/"
+            )
+          ' "$window" >/dev/null
+          echo "frontends=$(jq -c '.frontends' "$window")" >> "$GITHUB_OUTPUT"
+
   archive:
+    needs: resolve-window
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        frontend: ${{ fromJSON(needs.resolve-window.outputs.frontends) }}
+    env:
+      ROLE: ${{ matrix.frontend.role }}
+      RELEASE_TAG: ${{ matrix.frontend.releaseTag }}
+      GODOT_ROOT_SHA: ${{ matrix.frontend.godotRootSha }}
+      THREEJS_CANDIDATE_SHA: ${{ matrix.frontend.threejsCandidateSha }}
+      SOURCE_PAGES_RUN_ID: ${{ matrix.frontend.sourcePagesRunId }}
+      SOURCE_PAGES_ARTIFACT_ID: ${{ matrix.frontend.sourcePagesArtifactId }}
+      SOURCE_ARTIFACT_TAR_SHA256: ${{ matrix.frontend.assetSha256 }}
+      DEPLOYMENT_GENERATION: ${{ matrix.frontend.deploymentGeneration }}
+      PUBLIC_RUNTIME_PROTOCOL_SHA256: ${{ matrix.frontend.publicRuntimeProtocolSha256 }}
+      CONTENT_IDENTITY_SHA256: ${{ matrix.frontend.contentIdentitySha256 }}
+      PAGES014_VERIFIER_RUN_ID: ${{ matrix.frontend.pages014LiveEvidence.verifierWorkflowRunId }}
+      PAGES014_VERIFIER_JOB_ID: ${{ matrix.frontend.pages014LiveEvidence.verifierJobId }}
+      PAGES014_LIVE_MANIFEST_SHA256: ${{ matrix.frontend.pages014LiveEvidence.liveManifestSha256 }}
+      PAGES014_PAGE_URL: ${{ matrix.frontend.pages014LiveEvidence.pageUrl }}
+      GH_TOKEN: ${{ github.token }}
+      ADMIN_TOKEN: ${{ secrets.PAGES_RELEASE_ADMIN_TOKEN }}
     steps:
       - uses: actions/checkout@v6
         with:
           ref: threejs-rebuild
           fetch-depth: 0
-
-      - name: Recover exact successful Pages artifact
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          run_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_PAGES_RUN_ID}")"
-          RUN_JSON="${run_json}" node <<'NODE'
-          const run = JSON.parse(process.env.RUN_JSON);
-          if (run.status !== 'completed' || run.conclusion !== 'success') {
-            throw new Error(`source Pages run is not successful: ${run.status}/${run.conclusion}`);
-          }
-          NODE
-
-          artifacts_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_PAGES_RUN_ID}/artifacts")"
-          ARTIFACTS_JSON="${artifacts_json}" EXPECTED_ID="${SOURCE_PAGES_ARTIFACT_ID}" node <<'NODE'
-          const payload = JSON.parse(process.env.ARTIFACTS_JSON);
-          const artifact = payload.artifacts.find((item) => item.id === Number(process.env.EXPECTED_ID));
-          if (!artifact) throw new Error('exact source Pages artifact not found');
-          if (artifact.name !== 'github-pages') throw new Error(`unexpected artifact name: ${artifact.name}`);
-          if (artifact.expired) throw new Error('source Pages artifact expired before archival');
-          NODE
-
-          rm -rf source site release-assets immutable-download restore-proof
-          mkdir -p source site release-assets immutable-download restore-proof
-          gh run download "${SOURCE_PAGES_RUN_ID}" --repo "${GITHUB_REPOSITORY}" --name github-pages --dir source
-          test -s source/artifact.tar
-          actual="$(sha256sum source/artifact.tar | awk '{print $1}')"
-          test "${actual}" = "${SOURCE_ARTIFACT_TAR_SHA256}"
-          cp --preserve=mode,timestamps source/artifact.tar release-assets/pages-composite.tar
-          cmp source/artifact.tar release-assets/pages-composite.tar
-          tar -xf source/artifact.tar -C site
-
-      - name: Verify source identities and online compatibility descriptor
-        run: |
-          set -euo pipefail
-          test -s site/index.html
-          test -s site/threejs/index.html
-          test -s site/threejs/runtime-config.json
-          test -s site/threejs/online-compatibility.json
-          test -s site/deployment-manifest.json
-          jq -e \
-            --arg root "${GODOT_ROOT_SHA}" \
-            --arg candidate "${THREEJS_CANDIDATE_SHA}" \
-            '.schemaVersion == 1 and
-             .generationSchema == "pages-deployment-generation-v1" and
-             .godotRootSha == $root and
-             .threejsCandidateSha == $candidate and
-             .publicRuntimeProtocol.protocolVersion == "1" and
-             (.deploymentGeneration | test("^sha256:[a-f0-9]{64}$")) and
-             (.contentIdentity.sha256 | test("^[a-f0-9]{64}$"))' \
-            site/deployment-manifest.json >/dev/null
-          jq -e \
-            '.schemaVersion == 1 and
-             .identity == "yakolak-online-frontend-compatibility-v1" and
-             .protocol.id == "yakolak-online-room" and
-             .protocol.version == "1" and
-             .capabilities.id == "yakolak-online-room-capabilities-v1" and
-             (.capabilities.required | sort) == (["health.compatibility.v1","room-probe.read.v1","room-probe.write.v1"] | sort) and
-             .turso.schemaId == "yakolak-pages005-room-probe" and
-             .turso.minVersion <= 1 and .turso.maxVersion >= 1 and
-             .migrationPolicy.mode == "expand-contract-forward-only" and
-             .migrationPolicy.tursoDataRollback == false and
-             .mutationRequiresHealthProof == true' \
-            site/threejs/online-compatibility.json >/dev/null
-          test "$(jq -r '.frontendSha' site/threejs/runtime-config.json)" = "${THREEJS_CANDIDATE_SHA}"
-
-      - name: Prepare deterministic component archives and manifests
-        run: |
-          set -euo pipefail
-          (
-            cd site
-            find . -type f -printf '%P\n' | LC_ALL=C sort | while IFS= read -r rel; do
-              printf '%s  %s\n' "$(sha256sum "${rel}" | awk '{print $1}')" "${rel}"
-            done
-          ) > release-assets/PAGES_COMPOSITE_FILES_SHA256
-          (
-            cd site
-            find . -type f ! -path './threejs/*' -printf '%P\n' | LC_ALL=C sort | while IFS= read -r rel; do
-              printf '%s  %s\n' "$(sha256sum "${rel}" | awk '{print $1}')" "${rel}"
-            done
-          ) > release-assets/GODOT_ROOT_FILES_SHA256
-          (
-            cd site/threejs
-            find . -type f -printf '%P\n' | LC_ALL=C sort | while IFS= read -r rel; do
-              printf '%s  %s\n' "$(sha256sum "${rel}" | awk '{print $1}')" "${rel}"
-            done
-          ) > release-assets/THREEJS_FILES_SHA256
-
-          rm -rf root-component threejs-component
-          mkdir root-component threejs-component
-          cp -a site/. root-component/
-          rm -rf root-component/threejs
-          cp -a site/threejs/. threejs-component/
-          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
-            --format=posix --pax-option=delete=atime,delete=ctime -cf release-assets/godot-root.tar -C root-component .
-          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
-            --format=posix --pax-option=delete=atime,delete=ctime -cf release-assets/threejs-candidate.tar -C threejs-component .
-
-          (
-            cd release-assets
-            sha256sum godot-root.tar pages-composite.tar threejs-candidate.tar > ARCHIVE_SHA256SUMS
-          )
-
-          pages_sha="$(sha256sum release-assets/pages-composite.tar | awk '{print $1}')"
-          root_sha="$(sha256sum release-assets/godot-root.tar | awk '{print $1}')"
-          three_sha="$(sha256sum release-assets/threejs-candidate.tar | awk '{print $1}')"
-          pages_manifest_sha="$(sha256sum release-assets/PAGES_COMPOSITE_FILES_SHA256 | awk '{print $1}')"
-          root_manifest_sha="$(sha256sum release-assets/GODOT_ROOT_FILES_SHA256 | awk '{print $1}')"
-          three_manifest_sha="$(sha256sum release-assets/THREEJS_FILES_SHA256 | awk '{print $1}')"
-          descriptor_sha="$(sha256sum site/threejs/online-compatibility.json | awk '{print $1}')"
-          generation="$(jq -r '.deploymentGeneration' site/deployment-manifest.json)"
-          content_identity="$(jq -r '.contentIdentity.sha256' site/deployment-manifest.json)"
-
-          jq -n \
-            --arg releaseTag "${RELEASE_TAG}" \
-            --arg releaseTargetSha "${THREEJS_CANDIDATE_SHA}" \
-            --arg godotRootSha "${GODOT_ROOT_SHA}" \
-            --arg threejsCandidateSha "${THREEJS_CANDIDATE_SHA}" \
-            --argjson pagesRunId "${SOURCE_PAGES_RUN_ID}" \
-            --argjson pagesArtifactId "${SOURCE_PAGES_ARTIFACT_ID}" \
-            --arg sourceArtifactTarSha256 "${SOURCE_ARTIFACT_TAR_SHA256}" \
-            --arg pagesSha "${pages_sha}" \
-            --arg rootSha "${root_sha}" \
-            --arg threeSha "${three_sha}" \
-            --arg pagesManifestSha "${pages_manifest_sha}" \
-            --arg rootManifestSha "${root_manifest_sha}" \
-            --arg threeManifestSha "${three_manifest_sha}" \
-            --arg descriptorSha "${descriptor_sha}" \
-            --arg generation "${generation}" \
-            --arg contentIdentity "${content_identity}" \
-            '{
-              schemaVersion: 1,
-              releaseTag: $releaseTag,
-              releaseTargetSha: $releaseTargetSha,
-              source: {
-                godotRootSha: $godotRootSha,
-                threejsCandidateSha: $threejsCandidateSha,
-                pagesRunId: $pagesRunId,
-                pagesArtifactId: $pagesArtifactId,
-                sourceArtifactTarSha256: $sourceArtifactTarSha256
-              },
-              deploymentGeneration: $generation,
-              contentIdentitySha256: $contentIdentity,
-              onlineCompatibilityDescriptorSha256: $descriptorSha,
-              archives: {
-                "pages-composite.tar": {sha256: $pagesSha, contentManifestSha256: $pagesManifestSha},
-                "godot-root.tar": {sha256: $rootSha, contentManifestSha256: $rootManifestSha},
-                "threejs-candidate.tar": {sha256: $threeSha, contentManifestSha256: $threeManifestSha}
-              },
-              mutationPolicy: "immutable-release-bytes-never-change"
-            }' > release-assets/IMMUTABLE_FACTS.json
-          sums_sha="$(sha256sum release-assets/ARCHIVE_SHA256SUMS | awk '{print $1}')"
-          jq --arg sumsSha "${sums_sha}" '. + {archiveSha256ManifestSha256:$sumsSha}' \
-            release-assets/IMMUTABLE_FACTS.json > release-assets/IMMUTABLE_FACTS.tmp
-          mv release-assets/IMMUTABLE_FACTS.tmp release-assets/IMMUTABLE_FACTS.json
-          (cd release-assets && sha256sum -c ARCHIVE_SHA256SUMS)
-
-      - name: Stage or verify exact release draft
-        id: release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          cat > /tmp/expected-assets.txt <<'EOF'
-          ARCHIVE_SHA256SUMS
-          GODOT_ROOT_FILES_SHA256
-          IMMUTABLE_FACTS.json
-          PAGES_COMPOSITE_FILES_SHA256
-          THREEJS_FILES_SHA256
-          godot-root.tar
-          pages-composite.tar
-          threejs-candidate.tar
-          EOF
-          find release-assets -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort > /tmp/local-assets.txt
-          diff -u /tmp/expected-assets.txt /tmp/local-assets.txt
-
-          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > /tmp/releases.json
-          release_id="$(jq -r --arg tag "${RELEASE_TAG}" '.[] | select(.tag_name == $tag) | .id' /tmp/releases.json | head -n1)"
-          if [ -z "${release_id}" ]; then
-            gh release create "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
-              --target "${THREEJS_CANDIDATE_SHA}" --title "YAKOLAK exact-byte Pages archive ${RELEASE_TAG}" \
-              --notes "Exact deployed Pages bytes from run ${SOURCE_PAGES_RUN_ID}; later qualification lives only in RELEASE_QUALIFICATION/ledger.jsonl." \
-              --latest=false --draft
-            gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > /tmp/releases.json
-            release_id="$(jq -r --arg tag "${RELEASE_TAG}" '.[] | select(.tag_name == $tag) | .id' /tmp/releases.json | head -n1)"
-          fi
-          test -n "${release_id}"
-          gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}" > /tmp/release.json
-          immutable="$(jq -r '.immutable // false' /tmp/release.json)"
-          draft="$(jq -r '.draft' /tmp/release.json)"
-          if [ "${immutable}" = true ]; then
-            echo 'immutable=true' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          test "${draft}" = true || { echo 'existing release is published but not immutable; refusing mutation' >&2; exit 1; }
-          test "$(jq -r '.target_commitish' /tmp/release.json)" = "${THREEJS_CANDIDATE_SHA}"
-          gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?per_page=100" > /tmp/assets.json
-          while IFS= read -r name; do
-            if ! jq -e --arg name "${name}" 'any(.[]; .name == $name)' /tmp/assets.json >/dev/null; then
-              gh release upload "${RELEASE_TAG}" "release-assets/${name}" --repo "${GITHUB_REPOSITORY}"
-              gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?per_page=100" > /tmp/assets.json
-            fi
-          done < /tmp/expected-assets.txt
-          jq -r '.[].name' /tmp/assets.json | LC_ALL=C sort > /tmp/remote-assets.txt
-          diff -u /tmp/expected-assets.txt /tmp/remote-assets.txt
-          echo 'immutable=false' >> "$GITHUB_OUTPUT"
-
-      - name: Verify release immutability setting before publication
-        if: steps.release.outputs.immutable != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ADMIN_TOKEN: ${{ secrets.PAGES_RELEASE_ADMIN_TOKEN }}
-        run: |
-          set -euo pipefail
-          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/immutable-releases"
-          token="${ADMIN_TOKEN:-${GH_TOKEN}}"
-          code="$(curl --silent --show-error --output /tmp/immutable-setting.json --write-out '%{http_code}' \
-            --header 'Accept: application/vnd.github+json' --header "Authorization: Bearer ${token}" \
-            --header 'X-GitHub-Api-Version: 2026-03-10' "${api}")"
-          if [ "${code}" = 404 ] && [ -n "${ADMIN_TOKEN}" ]; then
-            put_code="$(curl --silent --show-error --output /tmp/immutable-enable.json --write-out '%{http_code}' \
-              --request PUT --header 'Accept: application/vnd.github+json' --header "Authorization: Bearer ${ADMIN_TOKEN}" \
-              --header 'X-GitHub-Api-Version: 2026-03-10' "${api}")"
-            test "${put_code}" = 204
-            code="$(curl --silent --show-error --output /tmp/immutable-setting.json --write-out '%{http_code}' \
-              --header 'Accept: application/vnd.github+json' --header "Authorization: Bearer ${ADMIN_TOKEN}" \
-              --header 'X-GitHub-Api-Version: 2026-03-10' "${api}")"
-          fi
-          test "${code}" = 200 || { echo "cannot prove immutable releases enabled (HTTP ${code})" >&2; exit 1; }
-          jq -e '.enabled == true' /tmp/immutable-setting.json >/dev/null
-
-      - name: Publish verified draft
-        if: steps.release.outputs.immutable != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release edit "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --draft=false
-
-      - name: Verify immutable release, exact assets, and non-production restore
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          ok=false
-          for attempt in $(seq 1 12); do
-            immutable="$(gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --json isImmutable --jq '.isImmutable' 2>/dev/null || true)"
-            if [ "${immutable}" = true ] && gh release verify "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-              ok=true; break
-            fi
-            sleep 5
-          done
-          test "${ok}" = true
-          rm -rf immutable-download restore-proof
-          mkdir immutable-download restore-proof
-          gh release download "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --dir immutable-download
-          while IFS= read -r name; do
-            cmp "release-assets/${name}" "immutable-download/${name}"
-            gh release verify-asset "${RELEASE_TAG}" "immutable-download/${name}" --repo "${GITHUB_REPOSITORY}" >/dev/null
-          done < /tmp/expected-assets.txt
-          (cd immutable-download && sha256sum -c ARCHIVE_SHA256SUMS)
-          tar -xf immutable-download/pages-composite.tar -C restore-proof
-          test -s restore-proof/index.html
-          test -s restore-proof/threejs/index.html
-          test -s restore-proof/threejs/online-compatibility.json
-          python3 -m http.server 8765 --directory restore-proof >/tmp/pages015-restore.log 2>&1 &
-          server_pid=$!
-          trap 'kill ${server_pid} 2>/dev/null || true' EXIT
-          for attempt in $(seq 1 20); do
-            curl --fail --silent http://127.0.0.1:8765/ >/dev/null && break
-            sleep 0.25
-          done
-          curl --fail --silent http://127.0.0.1:8765/threejs/ >/dev/null
-          curl --fail --silent http://127.0.0.1:8765/threejs/online-compatibility.json | jq -e '.mutationRequiresHealthProof == true' >/dev/null
-
-      - name: Append archive_verified to additive qualification ledger
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          asset_sha="$(sha256sum immutable-download/pages-composite.tar | awk '{print $1}')"
-          descriptor_sha="$(sha256sum restore-proof/threejs/online-compatibility.json | awk '{print $1}')"
-          generation="$(jq -r '.deploymentGeneration' restore-proof/deployment-manifest.json)"
-          record="$(jq -cn \
-            --arg releaseTag "${RELEASE_TAG}" --arg assetSha256 "${asset_sha}" \
-            --arg godotRootSha "${GODOT_ROOT_SHA}" --arg threejsCandidateSha "${THREEJS_CANDIDATE_SHA}" \
-            --arg descriptorSha256 "${descriptor_sha}" --arg deploymentGeneration "${generation}" \
-            --arg workflowRunId "${GITHUB_RUN_ID}" --arg recordedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            '{schemaVersion:1,event:"archive_verified",releaseTag:$releaseTag,assetName:"pages-composite.tar",assetSha256:$assetSha256,immutable:true,releaseAttestationVerified:true,archiveSha256Verified:true,nonProductionRestoreVerified:true,godotRootSha:$godotRootSha,threejsCandidateSha:$threejsCandidateSha,onlineCompatibilityDescriptorSha256:$descriptorSha256,deploymentGenerationInArchive:$deploymentGeneration,workflowRunId:($workflowRunId|tonumber),recordedAt:$recordedAt}')"
-          rm -rf ledger-repo
-          git clone --quiet --branch threejs-rebuild "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ledger-repo
-          git -C ledger-repo config user.name 'github-actions[bot]'
-          git -C ledger-repo config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          if jq -e --arg tag "${RELEASE_TAG}" --arg digest "${asset_sha}" \
-            'select(.event == "archive_verified" and .releaseTag == $tag and .assetSha256 == $digest and .immutable == true)' \
-            ledger-repo/RELEASE_QUALIFICATION/ledger.jsonl >/dev/null; then
-            echo 'archive_verified already recorded'
-            exit 0
-          fi
-          printf '%s\n' "${record}" >> ledger-repo/RELEASE_QUALIFICATION/ledger.jsonl
-          git -C ledger-repo add RELEASE_QUALIFICATION/ledger.jsonl
-          git -C ledger-repo commit -m "PAGES-015 archive verified ${RELEASE_TAG}"
-          git -C ledger-repo push origin HEAD:threejs-rebuild
+      - name: Validate archive helper syntax
+        run: bash -n scripts/pages015-archive-window-entry.sh
+      - name: Qualify immutable frontend archive serially
+        run: bash scripts/pages015-archive-window-entry.sh
