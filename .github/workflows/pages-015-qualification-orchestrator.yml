@@ -50,6 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           bash -n scripts/pages015-record-explicit-orchestrator-probe.sh
+          bash -n scripts/pages015-release-admin-preflight.sh
           bash -n scripts/pages015-orchestrate-qualification.sh
           bash -n scripts/pages015-archive-window-entry-v2.sh
           bash -n scripts/pages015-install-source-recovery-gh-shim.sh
@@ -63,6 +64,11 @@ jobs:
         if: github.event_name != 'schedule'
         shell: bash
         run: bash scripts/pages015-record-explicit-orchestrator-probe.sh
+
+      - name: Preflight release-admin capability when configured
+        if: env.PAGES_RELEASE_ADMIN_TOKEN != ''
+        shell: bash
+        run: bash scripts/pages015-release-admin-preflight.sh
 
       - name: Install exact-source recovery bridge
         run: bash scripts/pages015-install-source-recovery-gh-shim.sh
