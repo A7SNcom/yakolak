@@ -40,7 +40,11 @@ if (
   evidence?.verified !== true ||
   evidence?.liveHealthVerified !== true ||
   evidence?.liveTursoRoundTripVerified !== true ||
-  evidence?.workerWindow?.length !== 2
+  evidence?.workerWindow?.length !== 2 ||
+  evidence?.frontendWindow?.length !== 2 ||
+  evidence?.compatiblePairings?.length !== 4 ||
+  evidence?.frontendArchiveReverified !== true ||
+  evidence?.rollbackWindowVerified !== true
 ) {
   throw new Error('live PAGES-015 evidence is incomplete');
 }
@@ -104,6 +108,12 @@ if (!activeWorkerVersion || !previousWorkerVersion || activeWorkerVersion === pr
 const compatibleFrontendWindow = frontendWindow.map(
   (item) => `${item.releaseTag}:${item.assetSha256}`,
 );
+for (const item of frontendWindow) {
+  const proven = evidence.frontendWindow.find((row) => row.role === item.role);
+  if (!proven || proven.releaseTag !== item.releaseTag || proven.assetSha256 !== item.assetSha256 || !/^[a-f0-9]{64}$/.test(String(proven.descriptorSha256 || ''))) {
+    throw new Error(`${item.role} frontend archive was not byte-bound to compatible descriptor evidence`);
+  }
+}
 const compatibleWorkerWindow = workerWindow.map(
   (item) => `${item.role}:${item.versionId}`,
 );
@@ -137,6 +147,8 @@ for (const item of frontendWindow) {
     assetSha256: item.assetSha256,
     frontendRole: item.role,
     frontendDigest: item.assetSha256,
+    frontendDescriptorSha256: evidence.frontendWindow.find((row) => row.role === item.role).descriptorSha256,
+    frontendArchiveReverified: true,
     deploymentGeneration: generation.deploymentGeneration,
     verified: true,
     safe: true,
@@ -158,6 +170,7 @@ for (const item of frontendWindow) {
     rollbackWindowVerified: true,
     compatibleFrontendWindow,
     compatibleWorkerWindow,
+    compatiblePairings: evidence.compatiblePairings,
     apiOrigin: evidence.apiOrigin,
     evidenceSha256,
     workflowRunId: String(process.env.GITHUB_RUN_ID || ''),

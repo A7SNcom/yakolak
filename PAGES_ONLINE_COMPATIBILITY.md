@@ -11,6 +11,7 @@ Every online tuple is identified by all of these values; none may be inferred fr
 | Dimension | Required identity |
 | --- | --- |
 | Frontend | immutable GitHub release tag + `pages-composite.tar` SHA-256 |
+| Frontend compatibility | `threejs/online-compatibility.json` read from the re-downloaded immutable archive bytes |
 | Frontend deployment | PAGES-014 deployment generation/content identity already qualified for that same immutable asset |
 | Worker | Cloudflare Worker **version ID** exposed by the version-metadata binding |
 | Protocol | `yakolak-online-room@1` |
@@ -61,12 +62,13 @@ Matrix design is valid while `backend/cloudflare/API_ORIGIN.txt` is absent, but 
 The manual `PAGES-015 online compatibility qualification` workflow then requires, for both active and previous Worker version IDs:
 
 - the locked HTTPS `API_ORIGIN`;
+- re-download of each immutable `pages-composite.tar`, exact SHA-256 equality to the ledger key, and a compatible archived `threejs/online-compatibility.json`;
 - Cloudflare version metadata proving the exact invoked Worker version ID;
 - `/health` success with exact protocol/capability/Turso identity;
 - GitHub Pages browser-origin CORS fetch success;
 - live Turso write then independent read with matching payload/integrity;
 - the active and previous immutable frontend keys already have `archive_verified` and `deployment_generation_verified`;
-- all four active/previous frontend × Worker pairings use the same compatible identity.
+- all four active/previous frontend × Worker pairings are materialized from those archived descriptors and the exact Worker version IDs, and every pairing is compatible.
 
 Only then does the workflow append `backend_compatibility_verified` to the separate version-controlled ledger for **both** frontend archive keys. It never edits, re-uploads, or annotates an immutable release asset.
 

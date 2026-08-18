@@ -7,6 +7,7 @@
     "releaseTag",
     "assetSha256",
     "deploymentGeneration",
+    "frontendCompatibilityDescriptorSha256",
     "workerVersionId",
     "protocolIdentity",
     "capabilityIdentity",
@@ -14,8 +15,14 @@
     "tursoSchemaVersion"
   ],
   "rollbackWindow": {
-    "frontends": ["active", "previous"],
-    "workers": ["active", "previous"],
+    "frontends": [
+      "active",
+      "previous"
+    ],
+    "workers": [
+      "active",
+      "previous"
+    ],
     "requiredPairings": [
       "active-frontend/active-worker",
       "active-frontend/previous-worker",
@@ -36,6 +43,8 @@
     "browserCorsFromGithubPagesOrigin",
     "liveTursoWriteReadRoundTrip",
     "cloudflareWorkerVersionMetadata",
+    "immutableFrontendArchiveRedownloadAndSha256",
+    "frontendCompatibilityDescriptorFromArchivedBytes",
     "archiveVerified",
     "deploymentGenerationVerified"
   ],

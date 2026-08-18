@@ -71,10 +71,18 @@ const backend = [...keyed].reverse().find(
     row.browserCorsVerified === true &&
     row.liveTursoRoundTripVerified === true &&
     row.rollbackWindowVerified === true &&
+    row.frontendArchiveReverified === true &&
+    /^[a-f0-9]{64}$/.test(String(row.frontendDescriptorSha256 || "")) &&
     Array.isArray(row.compatibleFrontendWindow) &&
     row.compatibleFrontendWindow.length === 2 &&
     Array.isArray(row.compatibleWorkerWindow) &&
     row.compatibleWorkerWindow.length === 2 &&
+    Array.isArray(row.compatiblePairings) &&
+    row.compatiblePairings.length === 4 &&
+    row.compatiblePairings.some((pair) => pair.frontendRole === "active" && pair.workerRole === "active" && pair.verified === true) &&
+    row.compatiblePairings.some((pair) => pair.frontendRole === "active" && pair.workerRole === "previous" && pair.verified === true) &&
+    row.compatiblePairings.some((pair) => pair.frontendRole === "previous" && pair.workerRole === "active" && pair.verified === true) &&
+    row.compatiblePairings.some((pair) => pair.frontendRole === "previous" && pair.workerRole === "previous" && pair.verified === true) &&
     typeof row.apiOrigin === "string" &&
     /^https:\/\/[^/]+$/.test(row.apiOrigin),
 );

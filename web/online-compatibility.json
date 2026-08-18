@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "identity": "yakolak-online-frontend-compatibility-v1",
+  "protocol": {
+    "id": "yakolak-online-room",
+    "version": "1"
+  },
+  "capabilities": {
+    "id": "yakolak-online-room-capabilities-v1",
+    "required": [
+      "health.compatibility.v1",
+      "room-probe.read.v1",
+      "room-probe.write.v1"
+    ]
+  },
+  "turso": {
+    "schemaId": "yakolak-pages005-room-probe",
+    "minVersion": 1,
+    "maxVersion": 1
+  },
+  "migrationPolicy": {
+    "mode": "expand-contract-forward-only",
+    "tursoDataRollback": false
+  },
+  "mutationRequiresHealthProof": true
+}

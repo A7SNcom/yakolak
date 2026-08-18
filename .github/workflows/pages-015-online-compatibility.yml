@@ -90,6 +90,39 @@ jobs:
           PAGES015_EVIDENCE_PATH: pages015-live-evidence.json
         run: node scripts/probe-pages015-live-compatibility.mjs
 
+      - name: Re-download and verify both immutable frontend archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTIVE_RELEASE_TAG: ${{ inputs.active_release_tag }}
+          ACTIVE_ASSET_SHA256: ${{ inputs.active_asset_sha256 }}
+          PREVIOUS_RELEASE_TAG: ${{ inputs.previous_release_tag }}
+          PREVIOUS_ASSET_SHA256: ${{ inputs.previous_asset_sha256 }}
+          PAGES015_EVIDENCE_PATH: pages015-live-evidence.json
+        run: |
+          set -euo pipefail
+          rm -rf .tmp/pages015-frontends
+          mkdir -p .tmp/pages015-frontends/{active,previous}/{download,extract}
+
+          gh release download "${ACTIVE_RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
+            --pattern pages-composite.tar --dir .tmp/pages015-frontends/active/download
+          gh release download "${PREVIOUS_RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
+            --pattern pages-composite.tar --dir .tmp/pages015-frontends/previous/download
+
+          active_tar=.tmp/pages015-frontends/active/download/pages-composite.tar
+          previous_tar=.tmp/pages015-frontends/previous/download/pages-composite.tar
+          test "$(sha256sum "${active_tar}" | awk '{print $1}')" = "${ACTIVE_ASSET_SHA256,,}"
+          test "$(sha256sum "${previous_tar}" | awk '{print $1}')" = "${PREVIOUS_ASSET_SHA256,,}"
+
+          tar -xf "${active_tar}" -C .tmp/pages015-frontends/active/extract
+          tar -xf "${previous_tar}" -C .tmp/pages015-frontends/previous/extract
+
+          active_descriptor="$(find .tmp/pages015-frontends/active/extract -type f -path '*/threejs/online-compatibility.json' -print -quit)"
+          previous_descriptor="$(find .tmp/pages015-frontends/previous/extract -type f -path '*/threejs/online-compatibility.json' -print -quit)"
+          test -n "${active_descriptor}" && test -s "${active_descriptor}"
+          test -n "${previous_descriptor}" && test -s "${previous_descriptor}"
+
+          node scripts/verify-pages015-frontend-window.mjs "${active_descriptor}" "${previous_descriptor}"
+
       - name: Prove browser CORS from the real GitHub Pages origin
         env:
           PAGES015_API_ORIGIN: ${{ steps.origin.outputs.api_origin }}

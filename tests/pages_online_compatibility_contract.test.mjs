@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import fs from 'node:fs';
 
 import {
   EXPECTED_ONLINE_PROTOCOL,
@@ -28,6 +29,20 @@ function liveIdentity({ protocolVersion = '1', workerVersionId = 'worker-active-
     },
   };
 }
+
+test('PAGES-015 published frontend descriptor matches the client/Worker contract', () => {
+  const descriptor = JSON.parse(fs.readFileSync(new URL('../web/online-compatibility.json', import.meta.url), 'utf8'));
+  assert.equal(descriptor.identity, 'yakolak-online-frontend-compatibility-v1');
+  assert.deepEqual(descriptor.protocol, EXPECTED_ONLINE_PROTOCOL);
+  assert.equal(descriptor.capabilities.id, REQUIRED_ONLINE_CAPABILITIES.id);
+  assert.deepEqual(descriptor.capabilities.required, [...REQUIRED_ONLINE_CAPABILITIES.names]);
+  assert.equal(descriptor.turso.schemaId, TURSO_SCHEMA.id);
+  assert.equal(descriptor.turso.minVersion, TURSO_SCHEMA.version);
+  assert.equal(descriptor.turso.maxVersion, TURSO_SCHEMA.version);
+  assert.equal(descriptor.migrationPolicy.mode, TURSO_SCHEMA.migrationPolicy);
+  assert.equal(descriptor.migrationPolicy.tursoDataRollback, false);
+  assert.equal(descriptor.mutationRequiresHealthProof, true);
+});
 
 test('PAGES-015 browser and Worker compatibility identities stay aligned', () => {
   assert.deepEqual(EXPECTED_ONLINE_PROTOCOL, ONLINE_PROTOCOL);
