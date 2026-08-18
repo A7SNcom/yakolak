@@ -100,3 +100,5 @@ if (missing.length) {
 }
 
 console.log(`release qualification complete for ${releaseTag} / ${assetSha256}`);
+
+// PAGES-015 dependency retrigger: intentionally no runtime behavior change.
