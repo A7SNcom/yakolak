@@ -79,15 +79,26 @@ worker_window_ready() {
     .schemaVersion == 1 and
     .gate == "PAGES-005" and
     .provider == "cloudflare-workers" and
+    .workerName == "yakolak-room-api" and
     .apiOrigin == $origin and
     (.activeWorkerVersionId | type == "string" and length > 0) and
     (.previousWorkerVersionId | type == "string" and length > 0) and
     .activeWorkerVersionId != .previousWorkerVersionId and
+    .protocolIdentity == "yakolak-online-room@1" and
+    .capabilityIdentity == "yakolak-online-room-capabilities-v1" and
+    (.capabilities | type == "array") and
+    (.capabilities | length) == 3 and
+    ((.capabilities | index("health.compatibility.v1")) != null) and
+    ((.capabilities | index("room-probe.read.v1")) != null) and
+    ((.capabilities | index("room-probe.write.v1")) != null) and
+    .tursoSchemaId == "yakolak-pages005-room-probe" and
+    .tursoSchemaVersion == 1 and
     .traffic.activePercent == 100 and
     .traffic.previousPercent == 0 and
     .versionOverrideProof == true and
     .browserCorsVerified == true and
     .liveTursoRoundTripVerified == true and
+    (.finalEvidenceSha256 | test("^[a-f0-9]{64}$")) and
     .migrationPolicy == "expand-contract-forward-only" and
     .tursoDataRollbackRequired == false
   ' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json >/dev/null
@@ -137,8 +148,8 @@ record_status() {
         backendCredentialsReady: $backendCredentialsReady
       },
       activeArchiveQualified: $activeArchiveReady,
-      previousArchiveQualified: $previousArchiveReady,
-      workerRollbackWindowLocked: $workerWindowReady,
+      previousArchiveQualified: $previous_archive,
+      workerRollbackWindowLocked: $worker,
       completeQualification: $complete,
       containsSecretValues: false,
       qualificationEvidence: false
@@ -220,7 +231,7 @@ git reset --hard origin/threejs-rebuild
 # Backend qualification is independent of release-admin credential.
 if [ "$backend_credentials_ready" = true ]; then
   if worker_window_ready; then
-    echo 'PAGES-005 Worker rollback window is already locked.'
+    echo 'PAGES-005 Worker rollback window is already locked with explicit compatibility identity.'
   else
     bash scripts/pages005-bootstrap-live.sh
   fi
