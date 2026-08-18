@@ -7,10 +7,14 @@ on:
     paths:
       - '.github/workflows/pages-015-window-archive.yml'
       - 'scripts/pages015-archive-window-entry-v2.sh'
+      - 'scripts/pages015-install-source-recovery-gh-shim.sh'
+      - 'scripts/pages015-resolve-exact-pages-source.sh'
+      - 'scripts/pages015-recover-expired-source.sh'
       - 'scripts/pages015-record-exact-draft-stage.sh'
       - 'RELEASE_QUALIFICATION/ONLINE_FRONTEND_WINDOW.json'
       - 'RELEASE_QUALIFICATION/PAGES015_ARCHIVE_TRIGGER'
-      - 'backend/cloudflare/CREDENTIAL_STATUS.json'
+      - 'RELEASE_QUALIFICATION/PAGES015_RECOVERED_SOURCES.json'
+      - 'RELEASE_QUALIFICATION/PAGES015_TAR_LAYOUT/**'
   workflow_dispatch:
 
 permissions:
@@ -127,11 +131,17 @@ jobs:
           ref: threejs-rebuild
           fetch-depth: 0
 
-      - name: Validate archive helper syntax
+      - name: Validate archive and source-recovery helper syntax
         run: |
           set -euo pipefail
           bash -n scripts/pages015-archive-window-entry-v2.sh
+          bash -n scripts/pages015-install-source-recovery-gh-shim.sh
+          bash -n scripts/pages015-resolve-exact-pages-source.sh
+          bash -n scripts/pages015-recover-expired-source.sh
           bash -n scripts/pages015-record-exact-draft-stage.sh
+
+      - name: Install exact-source recovery bridge
+        run: bash scripts/pages015-install-source-recovery-gh-shim.sh
 
       - name: Resolve immutable-release admin readiness
         id: admin
