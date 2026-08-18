@@ -92,3 +92,5 @@ jobs:
             git commit -m 'PAGES-015 record locked archive tag targets'
             git push origin HEAD:threejs-rebuild
           fi
+
+# retrigger-after-workflow-install: 2026-08-18T14:50Z
