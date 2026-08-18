@@ -57,7 +57,10 @@ The Worker exposes the same compatibility identity on `/health`, probe writes an
 
 `.github/workflows/pages-015-window-archive.yml` remains a targeted/manual archive diagnostic and fallback. `scripts/pages015-archive-window-entry-v2.sh`:
 
-- recovers the exact successful Pages Actions artifact and verifies its SHA-256;
+- resolves the exact historical Pages tar through `scripts/pages015-resolve-exact-pages-source.sh`;
+- prefers the original successful Pages Actions artifact when still retained;
+- otherwise accepts the preserved recovered Actions artifact only after artifact metadata, ZIP digest, recovery provenance and exact tar SHA all match;
+- if that preserved artifact later expires, reconstructs from the locked Godot/Three.js Git SHAs plus the version-controlled historical tar-layout oracle and accepts the result **only** when the final tar SHA-256 equals the original locked Pages digest;
 - validates root SHA, candidate SHA, generation, runtime/protocol hash, content identity and exact archived online-descriptor SHA;
 - revalidates the recorded PAGES-014 run and job against their logs;
 - reproduces the original `IMMUTABLE_FACTS.json` byte contract used by the first staged archive, including `liveManifestSha256` and `pages014VerifierRunId` in their historical order;
@@ -69,12 +72,19 @@ The Worker exposes the same compatibility identity on `/health`, probe writes an
 
 `tests/pages015_archive_facts_contract.test.mjs` locks the historical immutable-facts field order and forbids later qualification state from leaking into immutable release assets.
 
-`RELEASE_QUALIFICATION/PAGES015_ARCHIVE_STATUS/*.json` is diagnostics only (`qualificationEvidence=false`). Archive run `32133606554` established the current exact wait states:
+The original Pages source artifacts expired, but this is no longer a blocker. One-time recovery run `32136096713` independently reconstructed both exact historical tar streams and preserved them for 90 days:
 
-- **active** `pages-archive-2026-08-18-geeb3b8e1-t4e4e5dec` / `3bb476e2…`: `stageState=exact-draft-verified`; the existing draft re-verifies byte-for-byte and is not published because the admin credential is absent.
-- **previous** `pages-archive-2026-08-18-geeb3b8e1-t5cc89e05` / `6769843e…`: `stageState=waiting-admin-to-create-draft`; there is no reusable draft and the ordinary Actions integration cannot create the release.
+- active recovered artifact `9324028185` → `3bb476e2ee76f372b9b945d160f6f1e9faad865eaacd9baef2b1384bd434fa5f`
+- previous recovered artifact `9324029202` → `6769843ee45a807cffe8af8c8450e0afd7d08c45270e66512f1ad52462dfb560`
 
-Neither state is an `archive_verified` event. The strict verifier ignores `draft_staged` and diagnostics.
+The temporary recovery workflow was retired after proving those exact SHA matches. Durable recovery now lives in the resolver + locked Git SHAs + `PAGES015_TAR_LAYOUT/*.json`; recovered-source metadata is explicitly `qualificationEvidence=false`.
+
+`RELEASE_QUALIFICATION/PAGES015_ARCHIVE_STATUS/*.json` is diagnostics only (`qualificationEvidence=false`). Archive run `32136510727` proved the retention-independent flow end-to-end after the originals had expired:
+
+- **active** `pages-archive-2026-08-18-geeb3b8e1-t4e4e5dec` / `3bb476e2…`: `stageState=exact-draft-verified`; the exact source resolved from the preserved recovered artifact, all release-asset bytes re-verified, and publication stopped only at the missing Admin credential.
+- **previous** `pages-archive-2026-08-18-geeb3b8e1-t5cc89e05` / `6769843e…`: `stageState=waiting-admin-to-create-draft`; the exact source likewise resolved and verified, but there is no reusable draft and the ordinary Actions integration cannot create the release.
+
+Neither state is an `archive_verified` event. The strict verifier ignores `draft_staged`, recovery metadata and diagnostics.
 
 ## Worker/Turso live proof
 
@@ -91,9 +101,9 @@ PAGES-005 has one centralized implementation: `scripts/pages005-bootstrap-live.s
 
 ## One direct automatic-resume path
 
-The authoritative automatic-resume path is now `.github/workflows/pages-015-qualification-orchestrator.yml` on `main`, invoking `scripts/pages015-orchestrate-qualification.sh`. It runs from the explicit credential trigger, manual dispatch, or one low-frequency daily schedule. It does **not** depend on nested workflow dispatch.
+The authoritative automatic-resume path is `.github/workflows/pages-015-qualification-orchestrator.yml` on `main`, invoking `scripts/pages015-orchestrate-qualification.sh`. It runs from the explicit credential trigger, manual dispatch, or one low-frequency daily schedule. It does **not** depend on nested workflow dispatch.
 
-Each run checks the five required credentials without storing values and writes only the non-qualification readiness receipt `RELEASE_QUALIFICATION/PAGES015_ORCHESTRATOR_STATUS.json` when semantic state changes. If credentials permit, the same run proceeds directly and serially:
+Each run checks the five required credentials without storing values and writes only the non-qualification readiness receipt `RELEASE_QUALIFICATION/PAGES015_ORCHESTRATOR_STATUS.json` when semantic state changes. The same workflow installs the exact-source recovery bridge before any archive work. If credentials permit, the run proceeds directly and serially:
 
 1. With `PAGES_RELEASE_ADMIN_TOKEN`, strongly qualify active then previous immutable frontend archives.
 2. With all four Cloudflare/Turso credentials, run `pages005-bootstrap-live.sh` if a proven Worker rollback window is not already locked.
@@ -104,7 +114,7 @@ The earlier nested credential-probe/supervisor experiments were retired after Gi
 
 ## Verified current blocker evidence
 
-Direct orchestrator run `32134849795` completed successfully and recorded `phase=waiting-external-prerequisites` with no secret values and no qualification claim. Its current facts are:
+Direct orchestrator recheck run `32143755415` completed successfully at `2026-08-18T13:40:56Z` and recorded `phase=waiting-external-prerequisites` with no secret values and no qualification claim. Its current facts are:
 
 - `PAGES_RELEASE_ADMIN_TOKEN`: absent
 - `CLOUDFLARE_API_TOKEN`: absent
@@ -116,7 +126,7 @@ Direct orchestrator run `32134849795` completed successfully and recorded `phase
 - Worker rollback window locked: false
 - complete PAGES-015 qualification: false
 
-Therefore no live backend bootstrap can occur, the previous release cannot yet be created/published immutably, and no `backend_compatibility_verified` event may be written. `API_ORIGIN.txt` and `WORKER_ROLLBACK_WINDOW.json` remain absent.
+`backend/cloudflare/API_ORIGIN.txt` and `backend/cloudflare/WORKER_ROLLBACK_WINDOW.json` are still absent. Therefore no authenticated Cloudflare/Turso bootstrap or live four-pair compatibility proof can occur, the previous immutable release cannot yet be created/published with the required Admin proof, and no `backend_compatibility_verified` event may be written.
 
 `PAGES_RELEASE_ADMIN_TOKEN` must be capable of reading the source Actions evidence, creating/reading release assets, and reading/enabling the immutable-release repository setting. The four backend credentials must be valid for the selected Cloudflare account and live Turso datastore. Do not weaken these checks merely to make the task appear complete.
 
