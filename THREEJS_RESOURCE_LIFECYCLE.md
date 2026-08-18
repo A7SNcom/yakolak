@@ -43,6 +43,7 @@ Future THREEJS-026 shadow resources, THREEJS-096 motion resources, and every lat
 7. A consumer that borrows shared geometry/material/texture never releases it.
 8. `scope.releaseDeep(value)` is scope-local: it may release only active non-shared resources owned by that exact scope. It must never destroy `shared-immutable` resources or resources owned by another scope. Root `registry.releaseDeep(value)` remains the explicit global destruction primitive for authoritative cache/rollback owners.
 9. Once `scope.release()` succeeds, that scope is closed. All lifecycle-producing calls through it must fail before factories, subscriptions, observers, listeners, timers, animation handles or resources can create side effects.
+10. Lifecycle metadata is validated before external work begins. Invalid ownership/kind metadata must fail before adding listeners, subscribing, observing, scheduling RAF/timers, or invoking a shared-resource factory; a rejected registration must leave both the registry and the external platform unchanged.
 
 ## WebGL context loss
 
@@ -63,7 +64,7 @@ After any completed `setup → play → rematch → return` cycle, the registry 
 - DOM/window/media listeners;
 - subscriptions.
 
-The THREEJS-027 contract tests run consecutive lifecycle cycles and also verify context-loss/idempotent destruction, shared-resource reuse, post-release scope closure, replacement-key integrity and scope-local deep-release ownership.
+The THREEJS-027 contract tests run consecutive lifecycle cycles and also verify context-loss/idempotent destruction, shared-resource reuse, post-release scope closure, replacement-key integrity, scope-local deep-release ownership and metadata-preflight side-effect safety.
 
 ## Diagnostics
 
