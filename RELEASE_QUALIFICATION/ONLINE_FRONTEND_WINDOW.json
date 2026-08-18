@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "windowId": "pages015-frontend-window-2026-08-18-v1",
+  "purpose": "candidate-active-previous-window-only-not-qualification-evidence",
+  "qualificationSource": "RELEASE_QUALIFICATION/ledger.jsonl",
+  "frontends": [
+    {
+      "role": "active",
+      "releaseTag": "pages-archive-2026-08-18-geeb3b8e1-t4e4e5dec",
+      "assetName": "pages-composite.tar",
+      "assetSha256": "3bb476e2ee76f372b9b945d160f6f1e9faad865eaacd9baef2b1384bd434fa5f",
+      "godotRootSha": "eeb3b8e15ded95c4343aed303f781b533c2e13a0",
+      "threejsCandidateSha": "4e4e5dec72ee71a06940c6db561dde8d24abd2d0",
+      "sourcePagesRunId": 32110008705,
+      "sourcePagesArtifactId": 9314508471,
+      "deploymentGeneration": "sha256:984f30cf5df2117d86ae4c6fc304c0ad7b2efdf3dc4db3b3ab6557d16b7bba28",
+      "contentIdentitySha256": "0b425af69983b9aa5ceed2ec379259af9b9f5495d21bb89462a149d5740115c2"
+    },
+    {
+      "role": "previous",
+      "releaseTag": "pages-archive-2026-08-18-geeb3b8e1-t5cc89e05",
+      "assetName": "pages-composite.tar",
+      "assetSha256": "6769843ee45a807cffe8af8c8450e0afd7d08c45270e66512f1ad52462dfb560",
+      "godotRootSha": "eeb3b8e15ded95c4343aed303f781b533c2e13a0",
+      "threejsCandidateSha": "5cc89e05653b6461ed6a41332f374eaadb360945",
+      "sourcePagesRunId": 32108243496,
+      "sourcePagesArtifactId": 9313917543,
+      "deploymentGeneration": "sha256:e4e2eaa97bcced485e456dd5a3e7f9ef2c0fad6db2255f8ce1f0bfaa88530b51",
+      "contentIdentitySha256": "bfb80df2f416306af050f98ad161e7959e6795fbbbdf68b47ca4cb5036b9815c"
+    }
+  ],
+  "rules": {
+    "rolesMustBeDistinct": true,
+    "archiveKeysMustBeDistinct": true,
+    "bothRequireArchiveVerified": true,
+    "bothRequireDeploymentGenerationVerified": true,
+    "thisFileDoesNotConferEligibility": true
+  }
+}
