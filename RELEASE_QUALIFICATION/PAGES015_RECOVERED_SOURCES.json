@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "recovery": "exact-byte-git-sources-plus-historical-tar-layout-v1",
+  "workflowRunId": 32136096713,
+  "retentionDays": 90,
+  "artifacts": [
+    {
+      "role": "active",
+      "artifactName": "pages015-recovered-active-exact-source",
+      "artifactId": 9324028185,
+      "actionsArtifactDigest": "b4211643afb7cbcb9b7258a6175aced099e155ce5be800123426c617885847d2",
+      "pagesTarSha256": "3bb476e2ee76f372b9b945d160f6f1e9faad865eaacd9baef2b1384bd434fa5f",
+      "originalPagesRunId": 32110008705,
+      "originalPagesArtifactId": 9314508471,
+      "tarLayoutSha256": "c26d303d2cb507d8492d0c0f1310400558dd7b6fb11204c779f13a256372c330"
+    },
+    {
+      "role": "previous",
+      "artifactName": "pages015-recovered-previous-exact-source",
+      "artifactId": 9324029202,
+      "actionsArtifactDigest": "6b56c933f92a7246e08b7419d6ed3ddfed26b23f0b7232e39aca5b7b9f62d39f",
+      "pagesTarSha256": "6769843ee45a807cffe8af8c8450e0afd7d08c45270e66512f1ad52462dfb560",
+      "originalPagesRunId": 32108243496,
+      "originalPagesArtifactId": 9313917543,
+      "tarLayoutSha256": "a55ef30154b394aaa4fb90b9480a17b71d3c6adfce16f40080fcca2d1d0067f9"
+    }
+  ],
+  "exactSha256MatchRequired": true,
+  "qualificationEvidence": false,
+  "recordedAt": "2026-08-18T12:18:23Z"
+}
