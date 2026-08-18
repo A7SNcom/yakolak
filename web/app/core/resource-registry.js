@@ -246,6 +246,13 @@ export function createResourceRegistry({
           existing.label = normalised.label || existing.label;
         }
         if (normalised.replacementKey) {
+          if (
+            existing.replacementKey
+            && existing.replacementKey !== normalised.replacementKey
+            && replacementEntries.get(existing.replacementKey) === existing.id
+          ) {
+            replacementEntries.delete(existing.replacementKey);
+          }
           existing.replacementKey = normalised.replacementKey;
           replacementEntries.set(normalised.replacementKey, existing.id);
         }
