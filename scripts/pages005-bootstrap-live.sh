@@ -141,6 +141,13 @@ jq -e \
     .gate == "PAGES-015" and
     .verified == true and
     .apiOrigin == $apiOrigin and
+    .protocolIdentity == "yakolak-online-room@1" and
+    .capabilityIdentity == "yakolak-online-room-capabilities-v1" and
+    (.capabilities | sort) == ["health.compatibility.v1","room-probe.read.v1","room-probe.write.v1"] and
+    .tursoSchemaId == "yakolak-pages005-room-probe" and
+    .tursoSchemaVersion == 1 and
+    .migrationPolicy == "expand-contract-forward-only" and
+    .tursoDataRollbackRequired == false and
     .liveHealthVerified == true and
     .corsHeadersVerified == true and
     .liveTursoRoundTripVerified == true and
@@ -173,7 +180,8 @@ jq -n \
   --arg evidenceSha256 "$final_evidence_sha" \
   --arg workflowRunId "$GITHUB_RUN_ID" \
   --arg recordedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  '{
+  --slurpfile proof "$final_evidence" '
+  {
     schemaVersion: 1,
     gate: "PAGES-005",
     provider: "cloudflare-workers",
@@ -181,6 +189,11 @@ jq -n \
     apiOrigin: $apiOrigin,
     activeWorkerVersionId: $activeWorkerVersionId,
     previousWorkerVersionId: $previousWorkerVersionId,
+    protocolIdentity: $proof[0].protocolIdentity,
+    capabilityIdentity: $proof[0].capabilityIdentity,
+    capabilities: $proof[0].capabilities,
+    tursoSchemaId: $proof[0].tursoSchemaId,
+    tursoSchemaVersion: $proof[0].tursoSchemaVersion,
     traffic: {activePercent: 100, previousPercent: 0},
     versionOverrideProof: true,
     browserCorsVerified: true,
