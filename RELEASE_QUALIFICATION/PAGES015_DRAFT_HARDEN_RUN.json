@@ -1,9 +1,0 @@
-{
-  "schemaVersion": 1,
-  "gate": "PAGES-015",
-  "event": "draft_readback_hardening_started",
-  "workflowRunId": 32165349038,
-  "triggerHeadSha": "76ec9101fdb4cf936be52a368bccd807a3440980",
-  "qualificationEvidence": false,
-  "recordedAt": "2026-08-18T17:23:53Z"
-}
