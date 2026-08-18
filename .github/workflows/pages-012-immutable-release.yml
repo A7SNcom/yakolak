@@ -34,6 +34,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Require release Administration credential before archive recovery
+        shell: bash
+        env:
+          ADMIN_TOKEN: ${{ secrets.PAGES_RELEASE_ADMIN_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ADMIN_TOKEN}" ]; then
+            echo "PAGES_RELEASE_ADMIN_TOKEN is required before exact-byte archive recovery or release mutation." >&2
+            echo "Use a repository Actions secret backed by a token with Administration read/write for A7SNcom/yakolak." >&2
+            exit 1
+          fi
+          echo "Release Administration credential is present; continuing with exact-byte recovery."
+
       - name: Recover the preserved prepared release assets
         shell: bash
         env:
