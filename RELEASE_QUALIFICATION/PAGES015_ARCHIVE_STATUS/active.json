@@ -4,10 +4,10 @@
   "releaseTag": "pages-archive-2026-08-18-geeb3b8e1-t4e4e5dec",
   "assetSha256": "3bb476e2ee76f372b9b945d160f6f1e9faad865eaacd9baef2b1384bd434fa5f",
   "immutableAdminReady": false,
-  "stageOutcome": "success",
-  "stageState": "exact-draft-verified",
+  "stageOutcome": "failure",
+  "stageState": "unexpected-failure",
   "publishOutcome": "skipped",
-  "workflowRunId": 32133807861,
-  "recordedAt": "2026-08-18T11:57:15Z",
+  "workflowRunId": 32135102183,
+  "recordedAt": "2026-08-18T12:07:03Z",
   "qualificationEvidence": false
 }
