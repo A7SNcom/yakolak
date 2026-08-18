@@ -1,0 +1,46 @@
+name: PAGES-005 authenticated deploy dispatcher
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - 'backend/cloudflare/DEPLOY_REQUEST'
+      - '.github/workflows/pages-005-deploy-dispatcher.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: pages-005-deploy-dispatcher
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch the credential-gated PAGES-005 deployment workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          body='{"ref":"threejs-rebuild"}'
+          code="$(curl --silent --show-error \
+            --output /tmp/pages005-dispatch-response.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            --header 'Accept: application/vnd.github+json' \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header 'X-GitHub-Api-Version: 2026-03-10' \
+            --header 'Content-Type: application/json' \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/pages-005-cloudflare-backend.yml/dispatches" \
+            --data "$body")"
+          if [ "$code" != '204' ]; then
+            echo "PAGES-005 workflow dispatch failed (HTTP ${code})." >&2
+            cat /tmp/pages005-dispatch-response.json >&2 || true
+            exit 1
+          fi
+          echo 'PAGES-005 authenticated deployment workflow dispatched.'
