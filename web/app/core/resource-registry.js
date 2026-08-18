@@ -425,11 +425,6 @@ export function createResourceRegistry({
     }
     if (typeof listener !== 'function') throw new TypeError('Registry listener must be a function');
     const prepared = normaliseMetadata({ ...metadata, kind: RESOURCE_KINDS.LISTENER });
-    const key = prepared.replacementKey;
-    if (key) {
-      const priorId = replacementEntries.get(key);
-      if (priorId) releaseId(priorId, 'replaced');
-    }
     target.addEventListener(type, listener, options);
     const holder = { target, type, listener };
     return register(holder, {
@@ -488,6 +483,7 @@ export function createResourceRegistry({
     holder.handle = delay == null ? scheduleFn(wrapped) : scheduleFn(wrapped, delay);
     token = register(holder, {
       ...prepared,
+      kind,
       cleanup: () => cancelFn(holder.handle),
     });
     return token;
@@ -524,6 +520,7 @@ export function createResourceRegistry({
     const holder = { handle: setIntervalFn(callback, Math.max(0, Number(delay) || 0)) };
     return register(holder, {
       ...prepared,
+      kind: RESOURCE_KINDS.INTERVAL,
       cleanup: () => clearIntervalFn(holder.handle),
     });
   }
