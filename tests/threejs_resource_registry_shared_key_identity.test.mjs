@@ -80,3 +80,29 @@ test('shared key explicit scope collision fails without disturbing the cached re
   registry.dispose();
   assert.equal(shared.disposeCalls, 1);
 });
+
+test('consumer scope without an explicit shared scope reuses an explicitly scoped cache entry', () => {
+  const registry = createResourceRegistry();
+  const shared = registry.getOrCreateShared('consumer-reuse-shared', () => material(), {
+    kind: RESOURCE_KINDS.MATERIAL,
+    scope: 'asset-cache',
+  });
+  const consumer = registry.createScope('consumer');
+  let secondFactoryCalls = 0;
+
+  const reused = consumer.getOrCreateShared('consumer-reuse-shared', () => {
+    secondFactoryCalls += 1;
+    return material();
+  }, {
+    kind: RESOURCE_KINDS.MATERIAL,
+  });
+
+  assert.equal(reused, shared);
+  assert.equal(secondFactoryCalls, 0);
+  assert.equal(consumer.release('consumer-complete'), 0);
+  assert.equal(registry.snapshot().byScope['asset-cache'], 1);
+  assert.equal(shared.disposeCalls, 0);
+
+  registry.dispose();
+  assert.equal(shared.disposeCalls, 1);
+});
