@@ -43,23 +43,46 @@ const generation = keyed.find(
     row.deploymentGeneration.length > 0,
 );
 
-const backend = keyed.find(
+const backend = [...keyed].reverse().find(
   (row) =>
     row.event === "backend_compatibility_verified" &&
     row.verified === true &&
     row.safe === true &&
     typeof row.workerDeployment === "string" &&
     row.workerDeployment.length > 0 &&
-    typeof row.protocolVersion === "string" &&
-    row.protocolVersion.length > 0 &&
-    typeof row.tursoTuple === "string" &&
-    row.tursoTuple.length > 0,
+    typeof row.workerVersionId === "string" &&
+    row.workerVersionId.length > 0 &&
+    typeof row.previousWorkerVersionId === "string" &&
+    row.previousWorkerVersionId.length > 0 &&
+    row.workerVersionId !== row.previousWorkerVersionId &&
+    row.protocolIdentity === "yakolak-online-room@1" &&
+    row.protocolVersion === "1" &&
+    row.capabilityIdentity === "yakolak-online-room-capabilities-v1" &&
+    Array.isArray(row.capabilities) &&
+    row.capabilities.includes("health.compatibility.v1") &&
+    row.capabilities.includes("room-probe.read.v1") &&
+    row.capabilities.includes("room-probe.write.v1") &&
+    row.tursoTuple === "yakolak-pages005-room-probe@1" &&
+    row.tursoSchemaId === "yakolak-pages005-room-probe" &&
+    row.tursoSchemaVersion === 1 &&
+    row.migrationPolicy === "expand-contract-forward-only" &&
+    row.tursoDataRollbackRequired === false &&
+    row.liveHealthVerified === true &&
+    row.browserCorsVerified === true &&
+    row.liveTursoRoundTripVerified === true &&
+    row.rollbackWindowVerified === true &&
+    Array.isArray(row.compatibleFrontendWindow) &&
+    row.compatibleFrontendWindow.length === 2 &&
+    Array.isArray(row.compatibleWorkerWindow) &&
+    row.compatibleWorkerWindow.length === 2 &&
+    typeof row.apiOrigin === "string" &&
+    /^https:\/\/[^/]+$/.test(row.apiOrigin),
 );
 
 const missing = [];
 if (!archive) missing.push("archive_verified");
 if (!generation) missing.push("deployment_generation_verified");
-if (!backend) missing.push("backend_compatibility_verified");
+if (!backend) missing.push("complete_backend_compatibility_verified");
 
 if (missing.length) {
   console.error(

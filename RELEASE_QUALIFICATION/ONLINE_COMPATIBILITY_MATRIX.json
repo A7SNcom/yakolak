@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "matrixId": "pages015-online-compatibility-v1",
+  "verifiedRowsSource": "RELEASE_QUALIFICATION/ledger.jsonl#event=backend_compatibility_verified",
+  "noPendingRows": true,
+  "columns": [
+    "releaseTag",
+    "assetSha256",
+    "deploymentGeneration",
+    "workerVersionId",
+    "protocolIdentity",
+    "capabilityIdentity",
+    "tursoSchemaId",
+    "tursoSchemaVersion"
+  ],
+  "rollbackWindow": {
+    "frontends": ["active", "previous"],
+    "workers": ["active", "previous"],
+    "requiredPairings": [
+      "active-frontend/active-worker",
+      "active-frontend/previous-worker",
+      "previous-frontend/active-worker",
+      "previous-frontend/previous-worker"
+    ],
+    "allPairingsRequired": true
+  },
+  "migrationPolicy": {
+    "mode": "expand-contract-forward-only",
+    "tursoDataRollback": false,
+    "contractOnlyAfterPreviousWindowRetired": true
+  },
+  "liveEligibilityRequires": [
+    "pages005AuthenticatedDeploy",
+    "lockedApiOrigin",
+    "healthIdentity",
+    "browserCorsFromGithubPagesOrigin",
+    "liveTursoWriteReadRoundTrip",
+    "cloudflareWorkerVersionMetadata",
+    "archiveVerified",
+    "deploymentGenerationVerified"
+  ],
+  "verifiedRows": []
+}

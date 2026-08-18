@@ -1,5 +1,6 @@
 import { createClient } from '@tursodatabase/serverless/compat';
 import { COLORS, RULES, SIZES } from '../../../api/game-rules.js';
+import { withCompatibility } from './compatibility.js';
 
 const PROBE_TABLE = 'yakolak_pages005_room_probe_v1';
 const PAGES_ORIGIN = 'https://a7sncom.github.io';
@@ -173,7 +174,7 @@ export function createWorker({ createStore = createTursoStore } = {}) {
 
         if (request.method === 'GET' && url.pathname === '/health') {
           await store.ensureTable();
-          return responseJson(request, 200, {
+          return responseJson(request, 200, withCompatibility({
             ok: true,
             provider: 'cloudflare-workers',
             datastore: 'turso',
@@ -183,7 +184,7 @@ export function createWorker({ createStore = createTursoStore } = {}) {
               sizes: [...SIZES],
             },
             crypto: 'web-crypto',
-          });
+          }, env));
         }
 
         if (request.method === 'POST' && url.pathname === '/__pages005/rooms') {
@@ -205,7 +206,7 @@ export function createWorker({ createStore = createTursoStore } = {}) {
           await store.ensureTable();
           await store.writeRoom({ roomId, payload, integrity, now });
           const room = await store.readRoom(roomId);
-          return responseJson(request, 201, { ok: true, room });
+          return responseJson(request, 201, withCompatibility({ ok: true, room }, env));
         }
 
         const readMatch = url.pathname.match(/^\/__pages005\/rooms\/(p005-[a-f0-9]{32})$/);
@@ -213,7 +214,7 @@ export function createWorker({ createStore = createTursoStore } = {}) {
           await store.ensureTable();
           const room = await store.readRoom(readMatch[1]);
           if (!room) throw new Error('room_not_found');
-          return responseJson(request, 200, { ok: true, room });
+          return responseJson(request, 200, withCompatibility({ ok: true, room }, env));
         }
 
         return responseJson(request, 404, { ok: false, error: 'not_found' });
