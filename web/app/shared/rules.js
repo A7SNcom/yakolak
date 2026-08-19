@@ -1,6 +1,6 @@
-// THREEJS-044/046: one browser/backend-safe rules implementation.
+// THREEJS-044/046/047: one browser/backend-safe rules implementation.
 // `rules/yakolak-rules.json` remains the versioned data contract; contract tests
-// fail if this browser-safe data mirror or placement semantics drift.
+// fail if this browser-safe data mirror or gameplay semantics drift.
 
 const RULES_DATA = {
   version: 2,
@@ -46,6 +46,13 @@ function rulesError(code) {
   const error = new Error(code);
   error.code = code;
   return error;
+}
+
+function deepFreeze(value) {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  Object.freeze(value);
+  for (const child of Object.values(value)) deepFreeze(child);
+  return value;
 }
 
 function legacyNormalizePlacement(move) {
@@ -180,6 +187,41 @@ export function winningPatterns(board, color) {
   return patterns;
 }
 
+export function uniqueWinningSlots(patterns) {
+  const slots = new Map();
+  for (const pattern of patterns || []) {
+    for (const slot of pattern.slots || []) slots.set(`${slot.cell}:${slot.size}`, { cell: slot.cell, size: slot.size });
+  }
+  return [...slots.values()];
+}
+
+// Canonical win evaluation is bound to the placement that was just accepted.
+// The reducer passes the normalized committed placement only after placePiece has
+// succeeded. This prevents a pre-existing board pattern or rejected click from
+// becoming a second scoring trigger.
+export function winningOutcomeAfterAcceptedPlacement(board, color, move) {
+  const cell = move?.cell;
+  const size = move?.size;
+  if (
+    !Number.isInteger(cell) ||
+    cell < 0 ||
+    cell >= RULES.cellCount ||
+    typeof size !== 'string' ||
+    !SIZES.includes(size) ||
+    board?.[String(cell)]?.[size] !== color
+  ) throw rulesError('win_evaluation_requires_accepted_placement');
+
+  const patterns = winningPatterns(board, color);
+  const winningSlots = uniqueWinningSlots(patterns);
+  return deepFreeze({
+    won: patterns.length > 0,
+    patterns,
+    winningSlots,
+  });
+}
+
+// Historical/query helper retained for protocol-v5 compatibility. Canonical move
+// reducers use winningOutcomeAfterAcceptedPlacement instead.
 export function winner(board, color) {
   return winningPatterns(board, color).length > 0;
 }
@@ -191,12 +233,4 @@ export function hasLegalMove(board, color) {
     }
   }
   return false;
-}
-
-export function uniqueWinningSlots(patterns) {
-  const slots = new Map();
-  for (const pattern of patterns || []) {
-    for (const slot of pattern.slots || []) slots.set(`${slot.cell}:${slot.size}`, { cell: slot.cell, size: slot.size });
-  }
-  return [...slots.values()];
 }
