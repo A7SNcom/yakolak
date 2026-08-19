@@ -14,7 +14,6 @@ import {
 } from '../shared/rules.js';
 import { configuredSeatOrderFromState } from '../shared/seat-order.js';
 import {
-  assertCanonicalSessionState,
   runCanonicalSessionReducer,
 } from './canonical-session-state.js';
 import { assertLocalDeadlineAuthority } from './local-turn-deadline.js';
@@ -116,6 +115,8 @@ function assertRestartRequest(request) {
 
 function requestMatchesState(state, request) {
   return (
+    state.lifecycle.phase === SESSION_LIFECYCLE_PHASES.TURN_LOOP &&
+    state.lifecycle.interrupt === null &&
     request.intent.authority.revision === state.revision &&
     request.intent.authority.seat === hostSeatId(state) &&
     request.round === state.round &&
