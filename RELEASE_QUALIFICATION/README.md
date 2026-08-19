@@ -26,7 +26,7 @@ PAGES-012 appends `archive_verified` only after all of these are true:
 
 PAGES-014 appends `deployment_generation_verified` for the same `releaseTag` + `assetSha256`, with its verified generation evidence.
 
-PAGES-015 appends `backend_compatibility_verified` for the same key, with the verified safe Worker/protocol/Turso tuple.
+PAGES-015 appends `backend_compatibility_verified` for the same key, with the verified safe Worker/protocol/Turso tuple. Each backend row also records `workerLockEvidenceSha256`, the exact `finalEvidenceSha256` of the PAGES-005 Worker rollback lock that was proven before append.
 
 Do not write pending placeholders for deployment-generation or backend-compatibility state. Absence of a later evidence event means it has not yet been qualified.
 
@@ -52,4 +52,11 @@ The older `main` fallbacks `.github/workflows/pages-005-backend-bootstrap.yml`, 
 
 ## Complete qualification
 
-THREEJS-098/099 may consume an archive only when `node scripts/verify-release-qualification.mjs <releaseTag> <assetSha256>` exits successfully. The verifier requires the strong archive, deployment-generation and backend-compatibility events for the exact key **and** proves the sibling frontend key in the locked active+previous window has its own strong archive/generation/backend rows from the same Worker/Turso evidence. The two backend rows must carry the same exact capability set, API origin, active+previous Worker IDs and four unique frontend×Worker pairings; a lone frontend row, mismatched sibling evidence, capability superset or non-exact Worker deployment identity is not complete qualification.
+THREEJS-098/099 may consume an archive only when both of these commands exit successfully for the current repository state:
+
+- `node scripts/verify-release-qualification.mjs <releaseTag> <assetSha256>`
+- `node scripts/verify-pages015-current-lock-qualification.mjs`
+
+The strict release verifier requires the strong archive, deployment-generation and backend-compatibility events for the exact key **and** proves the sibling frontend key in the locked active+previous window has its own strong archive/generation/backend rows from the same Worker/Turso evidence. The two backend rows must carry the same exact capability set, API origin, active+previous Worker IDs and four unique frontend×Worker pairings; a lone frontend row, mismatched sibling evidence, capability superset or non-exact Worker deployment identity is not complete qualification.
+
+The current-lock verifier then binds those rows to the **current** PAGES-005 rollback lock, including its exact `finalEvidenceSha256`. A new Worker version, changed API/protocol/capability/Turso identity, or even a newly generated PAGES-005 evidence digest for the same nominal tuple invalidates the early-exit path until active+previous are freshly qualified against that current lock.
