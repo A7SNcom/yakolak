@@ -7,6 +7,11 @@ on:
     paths:
       - '.github/PAGES005_CREDENTIAL_TRIGGER'
       - '.github/workflows/pages-015-qualification-orchestrator.yml'
+  workflow_run:
+    workflows:
+      - PAGES-014 Post-Deploy Qualification
+    types:
+      - completed
   schedule:
     - cron: '47 3 * * *'
   workflow_dispatch:
@@ -24,6 +29,9 @@ concurrency:
 
 jobs:
   qualify:
+    if: >-
+      ${{ github.event_name != 'workflow_run' ||
+          github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: cloudflare-backend
@@ -44,6 +52,15 @@ jobs:
         with:
           node-version: '22'
           package-manager-cache: false
+
+      - name: Validate credential probe helper syntax
+        shell: bash
+        run: bash -n scripts/pages015-record-explicit-orchestrator-probe.sh
+
+      - name: Record fresh explicit credential probe receipt
+        if: github.event_name != 'schedule'
+        shell: bash
+        run: bash scripts/pages015-record-explicit-orchestrator-probe.sh
 
       - name: Validate PAGES-015 orchestrator contracts
         shell: bash
@@ -71,9 +88,17 @@ jobs:
           node --test tests/pages015_single_resume_path_contract.test.mjs
           node --test tests/pages005_worker_lock_identity_contract.test.mjs
           git fetch --quiet origin main
-          git show origin/main:.github/workflows/pages-015-qualification-orchestrator.yml \
+          orchestrator_main="$(git show origin/main:.github/workflows/pages-015-qualification-orchestrator.yml)"
+          printf '%s\n' "$orchestrator_main" \
             | grep -A2 '^concurrency:' \
             | grep -q 'group: pages-release-qualification-ledger'
+          orchestrator_on="$(printf '%s\n' "$orchestrator_main" | sed -n '/^on:/,/^permissions:/p')"
+          printf '%s\n' "$orchestrator_on" | grep -q 'workflow_run:'
+          printf '%s\n' "$orchestrator_on" | grep -q 'PAGES-014 Post-Deploy Qualification'
+          probe_line="$(printf '%s\n' "$orchestrator_main" | grep -n 'Record fresh explicit credential probe receipt' | head -1 | cut -d: -f1)"
+          validation_line="$(printf '%s\n' "$orchestrator_main" | grep -n 'Validate PAGES-015 orchestrator contracts' | head -1 | cut -d: -f1)"
+          test -n "$probe_line" && test -n "$validation_line"
+          test "$probe_line" -lt "$validation_line"
           git show origin/main:.github/workflows/pages-014-post-deploy-qualification.yml \
             | grep -A2 '^concurrency:' \
             | grep -q 'group: pages-release-qualification-ledger'
@@ -143,11 +168,6 @@ jobs:
             | grep -A2 '^[[:space:]]*concurrency:' \
             | grep -q 'group: yakolak-pages-composite'
           printf '%s\n' "$rollback_workflow" | grep -q "if: steps.mode.outputs.deploy != 'true'"
-
-      - name: Record fresh explicit credential probe receipt
-        if: github.event_name != 'schedule'
-        shell: bash
-        run: bash scripts/pages015-record-explicit-orchestrator-probe.sh
 
       - name: Preflight release-admin capability when configured
         if: env.PAGES_RELEASE_ADMIN_TOKEN != ''
