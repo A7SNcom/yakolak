@@ -1,6 +1,6 @@
 # THREEJS-045 — Canonical session state and reducer boundary
 
-Status: **LOCKED by THREEJS-045 (2026-08-19); lifecycle vocabulary/transition graph refined and locked by THREEJS-060 (2026-08-19)**
+Status: **LOCKED by THREEJS-045 (2026-08-19); lifecycle vocabulary/transition graph refined and locked by THREEJS-060 (2026-08-19); inventory/placement derivation centralized by THREEJS-046 (2026-08-19)**
 
 Canonical gameplay/session state is the JSON-only `yakolak.session-state/v1` object implemented by `web/app/session/canonical-session-state.js`.
 
@@ -29,9 +29,11 @@ Every object level uses a closed key set. Unknown fields are rejected rather tha
 
 ## Derived inventory
 
-`inventory` is serialized for snapshot convenience but is not a second mutable count. `deriveCanonicalInventory(board, seats)` computes it from placed board pieces and the locked `copiesPerSizePerColor` rule. Canonical validation rejects stale inventory or more placed pieces of a size/color than the rules allow.
+THREEJS-046 centralizes inventory math in `web/app/shared/rules.js`. `deriveCanonicalInventory(board, seats)` validates the canonical board/seat shape and delegates remaining-piece computation to the shared `deriveRemainingInventory` implementation.
 
-This is the boundary THREEJS-046 must consume when it centralizes placement/inventory legality.
+`inventory` is serialized for snapshot/hydration convenience only. It is not a mutable stock ledger and it is never consulted as the source of placement legality. Canonical validation recomputes the expected remaining counts from the board and rejects stale inventory or more placed pieces of a size/color than the rules allow.
+
+Consequently changing the serialized counter cannot allow an exhausted piece or make a legal remaining piece unavailable. Human, bot, local-authority and future backend-authority placement paths consume the same board-derived shared legality contract documented in `THREEJS_PLACEMENT_INVENTORY.md`.
 
 ## Pure reducer boundary
 
@@ -73,5 +75,6 @@ Run:
 
 - `node --test tests/threejs_canonical_session_state_contract.test.mjs`
 - `node --test tests/threejs_session_lifecycle_contract.test.mjs`
+- `node --test tests/threejs_placement_inventory_contract.test.mjs`
 
-Together these contracts cover JSON round-trip, seat/color normalization, seat-identity active turns without array-order authority, deadline consistency, derived inventory, board ownership, scores/votes, last move/skip/outcome fields, pure reducer behavior, lifecycle legality, presentation-generation staleness, JSON coercion protection and explicit rejection of rendering/DOM/service-worker/timer state.
+Together these contracts cover JSON round-trip, seat/color normalization, seat-identity active turns without array-order authority, deadline consistency, board-derived inventory, stable placement rejection codes, scores/votes, last move/skip/outcome fields, pure reducer behavior, lifecycle legality, presentation-generation staleness, JSON coercion protection and explicit rejection of rendering/DOM/service-worker/timer state.
