@@ -139,6 +139,50 @@ const staleRematch = applyAuthoritativeLocalRematch(staleMatchEnd, rematchReques
 assert.equal(staleRematch.status, 'stale');
 assert.equal(staleRematch.applied, false);
 
+// Persisted match-end cannot claim a score above the configured threshold: the
+// authoritative win reducer ends the match at the exact 3/5 boundary.
+const impossibleThreshold = JSON.parse(JSON.stringify(matchEnd));
+impossibleThreshold.scores.right = 4;
+impossibleThreshold.matchWinner.wins = 4;
+impossibleThreshold.matchWinners[0].wins = 4;
+assert.throws(() => createLocalRematchRequest(impossibleThreshold, { isOnlineSeatType }), /match_end_score_mismatch/);
+
+// Preferred-color rotation defines the first configured seat for a fresh rematch;
+// it must not accidentally hard-code the physical `right` seat.
+const goldConfigured = seats('gold', 2);
+const goldBoard = emptyBoard();
+goldBoard['0'].small = 'gold';
+goldBoard['1'].small = 'gold';
+goldBoard['2'].small = 'gold';
+const goldTurn = createCanonicalSessionState({
+  lobbyGeneration: 8,
+  preferredColor: 'gold',
+  targetPlayers: 2,
+  winsToMatch: 3,
+  seats: goldConfigured,
+  board: goldBoard,
+  activeSeatId: 'left',
+  deadlineAtMs: 1_787_170_100_000,
+  scores: { left: 2, front: 1 },
+  round: 3,
+  completedRounds: 2,
+  lastMove: { seatId: 'left', color: 'gold', cell: 2, size: 'small' },
+  revision: 121,
+  lifecycle: { phase: 'turn-loop', presentationGeneration: 30 },
+});
+const goldWon = commitAuthoritativeRoundWin(goldTurn, { expectedRevision: 121 }).state;
+const goldMatchEnd = commitCanonicalMatchEnd(goldWon, { expectedRevision: 121 }).state;
+const goldRequest = createLocalRematchRequest(goldMatchEnd, {
+  source: GAMEPLAY_PRESENTATION_SOURCES.TAP,
+  isOnlineSeatType,
+});
+assert.equal(goldRequest.intent.authority.seat, 'left');
+const goldRematch = applyAuthoritativeLocalRematch(goldMatchEnd, goldRequest, { isOnlineSeatType });
+assert.equal(goldRematch.nextState.activeSeatId, 'left');
+assert.equal(goldRematch.nextState.preferredColor, 'gold');
+assert.deepEqual(goldRematch.nextState.seats, goldConfigured);
+assert.deepEqual(goldRematch.nextState.scores, { left: 0, front: 0 });
+
 // Return to Setup explicitly abandons the completed session. Configuration/seats
 // are cleared, lobbyGeneration advances, and presentation generation changes so
 // callbacks from the abandoned session cannot commit into the clean setup state.
