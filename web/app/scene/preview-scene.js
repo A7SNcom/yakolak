@@ -71,6 +71,7 @@ function createGpuFacingPreviewResources(group, groundingRoot, materialSystem, r
     });
     groundingCue = new THREE.Mesh(groundingGeometry, groundingMaterial);
     groundingCue.name = 'preview:contact-grounding';
+    groundingCue.userData.groundingPolicy = CONTACT_GROUNDING_POLICY.mode;
     groundingCue.rotation.x = -Math.PI / 2;
     groundingCue.position.fromArray(CONTACT_GROUNDING_POLICY.position);
     groundingCue.scale.fromArray(CONTACT_GROUNDING_POLICY.scale);
