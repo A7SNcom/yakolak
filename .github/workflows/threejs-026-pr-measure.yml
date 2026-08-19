@@ -61,6 +61,100 @@ jobs:
       - name: Install Chromium
         run: npx playwright install chromium
 
+      - name: Patch lifecycle probe to direct dispose and cold recreate
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/measure-threejs-performance.mjs')
+          text = path.read_text()
+          start_marker = "  const lifecycleRecreate = await page.evaluate(async () => {"
+          end_marker = "  const png = await decodedPngBytes();"
+          start = text.index(start_marker)
+          end = text.index(end_marker, start)
+          replacement = r'''  const disposedLifecycle = await page.evaluate(() => {
+            const shell = window.__YAKOLAK_THREEJS_SHELL__;
+            if (!shell) throw new Error('Ready shell disappeared before dispose/recreate measurement');
+            const before = shell.getResourceRegistrySnapshot();
+            const graphicsBefore = shell.getGraphicsContextSnapshot();
+            shell.dispose();
+            const afterDispose = shell.getResourceRegistrySnapshot();
+            return { before, afterDispose, graphicsBefore };
+          });
+
+          await page.reload({ waitUntil: 'domcontentloaded', timeout: 120_000 });
+          await page.waitForFunction(() => {
+            const state = document.documentElement.dataset.bootState;
+            return ['ready', 'asset-load-failed', 'failed', 'unsupported-webgl'].includes(state);
+          }, null, { timeout: 120_000 });
+          const recreateBootState = await page.evaluate(() => document.documentElement.dataset.bootState);
+          if (recreateBootState !== 'ready') throw new Error(`Dispose/recreate cold reload did not reach ready: ${recreateBootState}`);
+          await page.waitForFunction(() => {
+            const shell = window.__YAKOLAK_THREEJS_SHELL__;
+            const marks = shell?.getStartupMarks?.();
+            return Boolean(marks?.firstVisibleFrame && marks?.firstInteractive);
+          }, null, { timeout: 30_000 });
+
+          const recreated = await page.evaluate(async () => {
+            const shell = window.__YAKOLAK_THREEJS_SHELL__;
+            const manifestUrl = new URL('../deployment-manifest.json', location.href);
+            manifestUrl.searchParams.set('threejs026_recreate', `${Date.now()}-${Math.random()}`);
+            const response = await fetch(manifestUrl, { cache: 'no-store', headers: { 'cache-control': 'no-cache' } });
+            const manifest = response.ok ? await response.json() : null;
+            return {
+              after: shell.getResourceRegistrySnapshot(),
+              graphicsAfter: shell.getGraphicsContextSnapshot(),
+              liveSha: manifest?.threejsCandidateSha || null,
+            };
+          });
+          if (expectedThreejsSha && recreated.liveSha !== expectedThreejsSha) {
+            throw new Error(`Pages generation changed during dispose/recreate: expected ${expectedThreejsSha}, got ${recreated.liveSha || 'none'}`);
+          }
+
+          const gpuFrameAfterRecreate = await rendererInfoSnapshot(cdp);
+          const recreateDelta = lifecycleDelta(disposedLifecycle.before, recreated.after);
+          const disposeResidual = Object.freeze({
+            total: Number(disposedLifecycle.afterDispose?.total || 0),
+            gpuObjects: Number(disposedLifecycle.afterDispose?.gpuObjects || 0),
+            geometries: resourceCount(disposedLifecycle.afterDispose, 'geometry'),
+            materials: resourceCount(disposedLifecycle.afterDispose, 'material'),
+            textures: resourceCount(disposedLifecycle.afterDispose, 'texture'),
+            renderTargets: resourceCount(disposedLifecycle.afterDispose, 'render-target'),
+            shadowMaps: resourceCount(disposedLifecycle.afterDispose, 'shadow-map'),
+            shaderVariants: Number(disposedLifecycle.afterDispose?.shaderVariants || 0),
+            materialVariants: Number(disposedLifecycle.afterDispose?.materialVariants || 0),
+          });
+          const lifecycleRecreate = Object.freeze({
+            supported: true,
+            before: disposedLifecycle.before,
+            afterDispose: disposedLifecycle.afterDispose,
+            after: recreated.after,
+            graphicsBefore: disposedLifecycle.graphicsBefore,
+            graphicsAfter: recreated.graphicsAfter,
+            disposeResidual,
+            reason: null,
+          });
+          const lifecycleOk = Object.values(disposeResidual).every((value) => value === 0)
+            && zeroLifecycleDelta(recreateDelta)
+            && JSON.stringify(lifecycleRecreate.before?.byKind || {}) === JSON.stringify(lifecycleRecreate.after?.byKind || {})
+            && JSON.stringify(lifecycleRecreate.before?.byOwnership || {}) === JSON.stringify(lifecycleRecreate.after?.byOwnership || {})
+            && (lifecycleRecreate.afterDispose?.disposalErrors?.length || 0) === (lifecycleRecreate.before?.disposalErrors?.length || 0)
+            && (lifecycleRecreate.after?.disposalErrors?.length || 0) === 0
+            && gpuFrameAfterRecreate.geometries === gpuFrame.geometries
+            && gpuFrameAfterRecreate.textures === gpuFrame.textures
+            && gpuFrameAfterRecreate.programs === gpuFrame.programs;
+
+          '''
+          text = text[:start] + replacement + text[end:]
+          text = text.replace(
+              "      before: lifecycleRecreate.before,\n      after: lifecycleRecreate.after,\n",
+              "      before: lifecycleRecreate.before,\n      afterDispose: lifecycleRecreate.afterDispose,\n      disposeResidual: lifecycleRecreate.disposeResidual,\n      after: lifecycleRecreate.after,\n",
+          )
+          path.write_text(text)
+          PY
+          node --check scripts/measure-threejs-performance.mjs
+
       - name: Measure exact live Pages generation
         shell: bash
         env:
