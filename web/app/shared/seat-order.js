@@ -13,7 +13,6 @@ export const CANONICAL_CONFIGURED_SEAT_RING = Object.freeze([
 
 export const NO_LEGAL_MOVE_SKIP_REASON = 'no_legal_move';
 
-const CONFIGURED_SEAT_IDS = new Set(CANONICAL_CONFIGURED_SEAT_RING.map(seat => seat.seatId));
 const SLOT_BY_ID = new Map(CANONICAL_CONFIGURED_SEAT_RING.map(seat => [seat.seatId, seat]));
 const SLOT_BY_COLOR = new Map(CANONICAL_CONFIGURED_SEAT_RING.map(seat => [seat.color, seat]));
 
@@ -90,25 +89,40 @@ export function assertConfiguredSeatsMatchOrder(seats, preferredColor, targetPla
   return seats;
 }
 
+// Authority consumers re-derive the configured order from the locked setup facts.
+// Incoming array order is deliberately ignored, but the set must be exact: no
+// missing, duplicate or extra seat may hide inside an adapter snapshot.
 export function configuredSeatOrderFromState(state) {
   if (!isPlainRecord(state)) fail('invalid_configured_state');
   const expected = configuredSeatOrder(state.preferredColor, state.targetPlayers);
   if (!Array.isArray(state.seats)) fail('invalid_configured_seats');
-  const bySeatId = new Map(state.seats.map(seat => [seat?.seatId, seat]));
+  if (state.seats.length !== expected.length) fail('configured_seat_set_mismatch');
+
+  const expectedIds = new Set(expected.map(slot => slot.seatId));
+  const bySeatId = new Map();
+  for (const seat of state.seats) {
+    if (!isPlainRecord(seat)) fail('invalid_configured_seat');
+    if (!expectedIds.has(seat.seatId)) fail('configured_seat_set_mismatch');
+    if (bySeatId.has(seat.seatId)) fail('duplicate_configured_seat_id');
+    const slot = canonicalConfiguredSlot(seat.seatId);
+    if (seat.color !== slot.color) fail('configured_seat_color_mismatch');
+    bySeatId.set(seat.seatId, seat);
+  }
+
   return deepFreeze(expected.map(slot => {
     const seat = bySeatId.get(slot.seatId);
-    if (!seat || seat.color !== slot.color) fail('configured_seat_missing');
+    if (!seat) fail('configured_seat_set_mismatch');
     return { ...seat };
   }));
 }
 
 // Bind only a stable opaque credential identity/fingerprint here, never a raw
-// bearer secret. Claim arrival order is ignored; output is sorted by configured
-// seat order so reconnect and backend execution resolve the same slot mapping.
-export function createCredentialSeatBindings(configuredSeats, claims) {
-  if (!Array.isArray(configuredSeats) || !Array.isArray(claims)) fail('invalid_credential_bindings');
-  const configuredIds = new Set(configuredSeats.map(seat => seat?.seatId));
-  for (const seatId of configuredIds) if (!CONFIGURED_SEAT_IDS.has(seatId)) fail('invalid_configured_seat_id');
+// bearer secret. Claim arrival order and adapter array order are ignored; both
+// binding and reconnect resolution derive from the canonical configured ring.
+export function createCredentialSeatBindings(state, claims) {
+  if (!Array.isArray(claims)) fail('invalid_credential_bindings');
+  const configuredSeats = configuredSeatOrderFromState(state);
+  const configuredIds = new Set(configuredSeats.map(seat => seat.seatId));
 
   const claimBySeat = new Map();
   const credentialIds = new Set();
@@ -127,12 +141,13 @@ export function createCredentialSeatBindings(configuredSeats, claims) {
     .map(seat => claimBySeat.get(seat.seatId)));
 }
 
-export function configuredSeatForCredential(configuredSeats, bindings, credentialId) {
+export function configuredSeatForCredential(state, bindings, credentialId) {
   requireOpaqueId(credentialId, 'invalid_credential_id');
-  if (!Array.isArray(configuredSeats) || !Array.isArray(bindings)) fail('invalid_credential_bindings');
+  if (!Array.isArray(bindings)) fail('invalid_credential_bindings');
+  const configuredSeats = configuredSeatOrderFromState(state);
   const binding = bindings.find(candidate => candidate?.credentialId === credentialId);
   if (!binding) return null;
-  return configuredSeats.find(seat => seat?.seatId === binding.seatId) || null;
+  return configuredSeats.find(seat => seat.seatId === binding.seatId) || null;
 }
 
 // Select from the resolved configured order, not from join arrival order. The
