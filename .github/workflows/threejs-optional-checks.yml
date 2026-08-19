@@ -36,24 +36,7 @@ jobs:
         run: |
           bash scripts/verify-threejs-shell.sh
           node --test tests/threejs_vendor_contract.test.mjs
-          node --test tests/threejs_gameplay_intent_contract.test.mjs
-          node --test tests/threejs_shared_rules_transitions_contract.test.mjs
-          node --test tests/threejs_canonical_session_state_contract.test.mjs
-          node --test tests/threejs_session_lifecycle_contract.test.mjs
-          node --test tests/threejs_placement_inventory_contract.test.mjs
-          node --test tests/threejs_winning_patterns_contract.test.mjs
-          node --test tests/threejs_turn_ring_contract.test.mjs
-          node --test tests/threejs_local_deadline_contract.test.mjs
-          node --test tests/threejs_local_timeout_contract.test.mjs
-          node --test tests/threejs_true_draw_contract.test.mjs
-          node --test tests/threejs_win_scoring_contract.test.mjs
-          node --test tests/threejs_persistent_score_markers_contract.test.mjs
-          node --test tests/threejs_round_advance_contract.test.mjs
-          node --test tests/threejs_local_restart_contract.test.mjs
-          node --test tests/threejs_match_end_lifecycle_contract.test.mjs
-          node --test tests/threejs_local_authority_adapter_contract.test.mjs
-          node --test tests/threejs_local_authority_queue_contract.test.mjs
-          node --test tests/threejs_computer_turn_contract.test.mjs
+          npm run test:threejs:gameplay
           node --test tests/pages_origin_storage_security.test.mjs
           node --test tests/pages_public_runtime_config.test.mjs
           node --test tests/pages_service_worker_decision.test.mjs
