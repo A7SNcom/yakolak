@@ -261,6 +261,7 @@ export function createAcceptedPieceTravelController({
     recordCanonical(state);
     syncMotionAuthority(state);
     if (activeTravel) fail('accepted_travel_already_active');
+    if (pendingLock) fail('accepted_travel_pending_already_active');
     const lock = lockModel({ phase: 'pending', state, pendingId: normalizedPendingId });
     pendingLock = lock;
     applyLock(lock, 'move-pending');
@@ -270,23 +271,22 @@ export function createAcceptedPieceTravelController({
   function cancelPending(reason = 'move-pending-cancelled') {
     assertLive();
     if (!pendingLock || activeTravel) return false;
-    const lock = pendingLock;
     pendingLock = null;
     applyLock(null, reason);
-    return Boolean(lock);
+    return true;
   }
 
   function startAcceptedTravel({ state, pieceId, pendingId = null } = {}) {
     assertLive();
     assertCanonicalSessionState(state);
+    if (state.lastMove === null) fail('accepted_travel_requires_last_move');
     const logicalPieceId = requireString(pieceId, 'accepted_travel_piece_id_required');
     const normalizedPendingId = pendingId == null
       ? `accepted:${state.lifecycle.presentationGeneration}:${state.revision}:${++sequence}`
       : requireString(pendingId, 'accepted_travel_pending_id_required');
 
     if (pendingLock && pendingLock.pendingId !== normalizedPendingId) fail('accepted_travel_pending_id_mismatch');
-    const comparison = recordCanonical(state);
-    if (comparison < 0) fail('stale_accepted_travel_snapshot');
+    recordCanonical(state);
     if (activeTravel) fail('accepted_travel_already_active');
 
     const live = view.isPieceLive(logicalPieceId);
@@ -295,7 +295,7 @@ export function createAcceptedPieceTravelController({
     const runtimePiece = runtimePieceFor({
       presentation: view,
       pieceId: logicalPieceId,
-      cellId: state.lastMove?.cell,
+      cellId: state.lastMove.cell,
     });
     const plan = deriveAcceptedPieceTravelPlan({ state, pieceId: logicalPieceId, runtimePiece });
     syncMotionAuthority(state);
@@ -308,6 +308,15 @@ export function createAcceptedPieceTravelController({
     });
     pendingLock = null;
     applyLock(lock, 'move-accepted-travel');
+
+    const travelRecord = {
+      id: lock.id,
+      lock,
+      plan,
+      handle: null,
+      witness: witnessFromState(state),
+    };
+    activeTravel = travelRecord;
 
     let handle;
     try {
@@ -342,18 +351,12 @@ export function createAcceptedPieceTravelController({
           }));
         },
       });
+      travelRecord.handle = handle;
     } catch (error) {
+      if (activeTravel?.id === lock.id) activeTravel = null;
       applyLock(null, 'accepted-travel-start-failed');
       throw error;
     }
-
-    activeTravel = {
-      id: lock.id,
-      lock,
-      plan,
-      handle,
-      witness: witnessFromState(state),
-    };
 
     handle.finished.then(result => {
       if (!activeTravel || activeTravel.id !== lock.id) return;
@@ -379,10 +382,8 @@ export function createAcceptedPieceTravelController({
       if (motionStillActive) motion.cancelScope(previousTravel.plan.scope, 'newer-canonical-snapshot');
       clearLockIfId(previousTravel.id, reason);
     } else if (pendingLock) {
-      const pending = pendingLock;
       pendingLock = null;
       applyLock(null, reason);
-      void pending;
     }
 
     return deepFreeze({
