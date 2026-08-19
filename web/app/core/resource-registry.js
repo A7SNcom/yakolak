@@ -255,17 +255,16 @@ export function createResourceRegistry({
 
     if (existing) {
       if (normalised.reclassify) {
-        if (existing.scope !== normalised.scope) {
+        const hasOwnMetadata = (key) => Object.prototype.hasOwnProperty.call(metadata, key);
+        if (hasOwnMetadata('scope') && existing.scope !== normalised.scope) {
           scopeEntries.get(existing.scope)?.delete(existing.id);
           existing.scope = normalised.scope;
           addToScope(existing);
         }
-        existing.ownership = normalised.ownership;
-        existing.kind = normalised.kind;
-        existing.label = normalised.label || existing.label;
-        if (Object.prototype.hasOwnProperty.call(metadata, 'cleanup')) {
-          existing.cleanup = normalised.cleanup || null;
-        }
+        if (hasOwnMetadata('ownership')) existing.ownership = normalised.ownership;
+        if (hasOwnMetadata('kind')) existing.kind = normalised.kind;
+        if (hasOwnMetadata('label')) existing.label = normalised.label;
+        if (hasOwnMetadata('cleanup')) existing.cleanup = normalised.cleanup || null;
       }
       if (normalised.replacementKey) {
         if (
