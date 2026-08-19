@@ -86,6 +86,23 @@ const sameOriginalAgain = commitAuthoritativeRoundWin(candidate, { expectedRevis
 assert.equal(sameOriginalAgain.state.scores.right, 2);
 assert.equal(candidate.scores.right, 1, 'input canonical state remains unchanged');
 
+// Score follows the actual stable winning seat, not host position/preferred color.
+const blueBoard = emptyBoard();
+blueBoard['0'].small = 'blue';
+blueBoard['1'].small = 'blue';
+blueBoard['2'].small = 'blue';
+const blueWin = commitAuthoritativeRoundWin(winCandidate({
+  board: blueBoard,
+  activeSeatId: 'back',
+  lastMove: { seatId: 'back', color: 'blue', cell: 2, size: 'small' },
+  rightScore: 2,
+  backScore: 1,
+  revision: 46,
+}), { expectedRevision: 46 }).state;
+assert.deepEqual(blueWin.winner, { seatId: 'back', color: 'blue' });
+assert.deepEqual(blueWin.scores, { right: 2, back: 2 });
+assert.equal(blueWin.matchComplete, false);
+
 // Match completion is score-threshold-only for both locked options.
 const reachThree = commitAuthoritativeRoundWin(winCandidate({
   winsToMatch: 3,
