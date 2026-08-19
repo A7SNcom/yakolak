@@ -110,8 +110,6 @@ export function deriveSelectedPieceEligibility(state, pieceId) {
   if (!seat) fail('selected_piece_active_seat_missing');
   if (seat.color !== parsed.colorId) fail('selected_piece_not_owned_by_active_seat');
 
-  // THREEJS-045 owns canonical inventory. Re-derive it with the THREEJS-046 shared
-  // rules helper so presentation cannot trust a second mutable piece count.
   const derivedInventory = deriveRemainingInventoryFromState(state);
   const canonicalRemaining = state.inventory?.[seat.seatId]?.[parsed.size];
   const derivedRemaining = derivedInventory?.[seat.seatId]?.[parsed.size];
@@ -120,8 +118,6 @@ export function deriveSelectedPieceEligibility(state, pieceId) {
   }
   if (parsed.copyIndex >= canonicalRemaining) fail('selected_piece_copy_not_remaining');
 
-  // Availability is confirmed only by the shared THREEJS-046 validator. If the selected
-  // size cannot produce any legal placement, presentation must not create a selectable cue.
   const legalCells = [];
   for (let cell = 0; cell < RULES.cellCount; cell += 1) {
     const validation = validatePlacementForSeat(state, seat.seatId, {
@@ -190,7 +186,11 @@ function requireDescriptor(descriptor, eligibility) {
   }
   if (!descriptor.geometry?.isBufferGeometry) fail('selected_piece_geometry_required');
   if (!Array.isArray(descriptor.matrixElements) || descriptor.matrixElements.length !== 16) fail('selected_piece_matrix_required');
-  if (!Array.isArray(descriptor.destination?.center) || descriptor.destination.center.length !== 3) fail('selected_piece_destination_required');
+  if (
+    !Array.isArray(descriptor.presentationCenter)
+    || descriptor.presentationCenter.length !== 3
+    || descriptor.presentationCenter.some(value => !Number.isFinite(value))
+  ) fail('selected_piece_presentation_center_required');
   if (!Number.isFinite(descriptor.boundingRadius) || descriptor.boundingRadius <= 0) fail('selected_piece_bounding_radius_required');
   if (!descriptor.baseMaterial?.isMaterial) fail('selected_piece_base_material_required');
   return descriptor;
@@ -306,9 +306,9 @@ export function createSelectedPiecePresentation({
       radius * SELECTED_PIECE_VISUAL_POLICY.haloLiftRatio,
     );
     haloInner.position.set(
-      descriptor.destination.center[0],
-      descriptor.destination.center[1] + lift,
-      descriptor.destination.center[2],
+      descriptor.presentationCenter[0],
+      descriptor.presentationCenter[1] + lift,
+      descriptor.presentationCenter[2],
     );
     haloOuter.position.copy(haloInner.position);
     haloInner.scale.setScalar(radius * SELECTED_PIECE_VISUAL_POLICY.haloRadiusScaleInner);
@@ -327,7 +327,6 @@ export function createSelectedPiecePresentation({
       eligibility,
     );
 
-    // Complete authority/availability/descriptor validation before exposing any cue.
     applyDescriptor(descriptor);
     current = deepFreeze({
       pieceId: eligibility.pieceId,
@@ -372,8 +371,6 @@ export function createSelectedPiecePresentation({
     latestWitness = nextWitness;
     if (!current) return false;
 
-    // One synchronous replacement owns all selected-looking primitives: no observer can
-    // see a cleared logical selection while an old outline/halo remains visible.
     root.visible = false;
     root.userData.selectedPieceId = null;
     current = null;
