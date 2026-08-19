@@ -1,0 +1,98 @@
+name: PAGES-015 Retire Inline Ledger Writer
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/pages-015-retire-inline-ledger-writer.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-015-topology-fix
+  cancel-in-progress: false
+
+jobs:
+  retire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Retire duplicate inline qualification writer
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='.github/workflows/pages-single-site.yml'
+
+          for attempt in 1 2 3 4; do
+            git fetch --quiet origin main
+            git reset --hard origin/main >/dev/null
+
+            python <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/pages-single-site.yml')
+          text = path.read_text()
+
+          permission_old = "  deploy:\n    permissions:\n      contents: write\n      pages: write\n      id-token: write\n"
+          permission_new = "  deploy:\n    permissions:\n      contents: read\n      pages: write\n      id-token: write\n"
+          marker = "\n      - name: Qualify matching immutable archive in additive ledger\n"
+
+          if text.count(permission_old) != 1:
+              raise SystemExit('expected exactly one deploy contents:write permission block')
+          if text.count(marker) != 1:
+              raise SystemExit('expected exactly one inline qualification step')
+
+          text = text.replace(permission_old, permission_new, 1)
+          text = text.split(marker, 1)[0].rstrip() + "\n"
+
+          forbidden = [
+              'Qualify matching immutable archive in additive ledger',
+              'deployment_generation_verified',
+              'RELEASE_QUALIFICATION/ledger.jsonl',
+              'ledger-repo',
+          ]
+          for needle in forbidden:
+              if needle in text:
+                  raise SystemExit(f'inline writer residue remains: {needle}')
+
+          deploy = text.split('\n  deploy:\n', 1)[1]
+          if '    permissions:\n      contents: read\n      pages: write\n      id-token: write\n' not in deploy:
+              raise SystemExit('deploy permissions were not reduced to contents:read')
+          if 'uses: actions/deploy-pages@v4' not in deploy:
+              raise SystemExit('Pages deployment step was accidentally removed')
+          if 'Poll live manifest with cache revalidation and prove generation' not in deploy:
+              raise SystemExit('live generation acceptance was accidentally removed')
+          if 'HTTP smoke root, Three.js, and exact public runtime config' not in deploy:
+              raise SystemExit('HTTP smoke was accidentally removed')
+
+          path.write_text(text)
+          PY
+
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add "$target"
+
+            if git diff --cached --quiet; then
+              echo 'Duplicate inline qualification writer is already retired.'
+              exit 0
+            fi
+
+            git diff --cached --check
+            git commit -m 'PAGES-015 retire duplicate inline ledger writer'
+            if git push --quiet origin HEAD:main; then
+              echo 'Duplicate inline ledger writer retired; PAGES-014 remains the sole deployment-generation qualification writer.'
+              exit 0
+            fi
+
+            echo "main advanced during topology fix (attempt ${attempt}); retrying from latest head."
+          done
+
+          echo 'Could not retire duplicate inline ledger writer after retries.' >&2
+          exit 1
