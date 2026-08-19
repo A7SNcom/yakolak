@@ -34,9 +34,14 @@ test('legacy fallback keeps a distinct manual-only identity and shared ledger lo
   sharedLedgerLock(legacy);
 });
 
-test('PAGES-015 archive fallback shares the qualification-ledger lock', () => {
+test('PAGES-015 archive fallback is manual-only and shares the qualification-ledger lock', () => {
   assert.match(archive, /^name: PAGES-015 Frontend Window Archive/m);
   assert.match(archive, /archive_verified|pages015-archive-window-entry-v2\.sh/);
+  const block = onBlock(archive);
+  assert.match(block, /workflow_dispatch:/);
+  assert.doesNotMatch(block, /\bpush:/);
+  assert.doesNotMatch(block, /\bschedule:/);
+  assert.doesNotMatch(block, /\bworkflow_run:/);
   sharedLedgerLock(archive);
 });
 
