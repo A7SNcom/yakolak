@@ -40,6 +40,7 @@ jobs:
           node --test tests/threejs_shared_rules_transitions_contract.test.mjs
           node --test tests/threejs_canonical_session_state_contract.test.mjs
           node --test tests/threejs_session_lifecycle_contract.test.mjs
+          node --test tests/threejs_placement_inventory_contract.test.mjs
           node --test tests/pages_origin_storage_security.test.mjs
           node --test tests/pages_public_runtime_config.test.mjs
           node --test tests/pages_service_worker_decision.test.mjs
