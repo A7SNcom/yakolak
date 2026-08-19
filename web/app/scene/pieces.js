@@ -138,6 +138,46 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
     return syncPresentation(pieceId, catalog.getBoardDestination(cellId));
   }
 
+  // Presentation-only read surface for state cues such as THREEJS-039. It exposes only
+  // the exact live instance matrix/bounds plus immutable identity metadata. Canonical
+  // materials and destination state are not exposed through this bridge.
+  function getSelectionPresentationDescriptor(pieceId) {
+    const piece = catalog.getPiece(pieceId);
+    const slot = renderSlotByPieceId.get(pieceId);
+    if (!piece || !slot) throw new TypeError(`Unknown logical piece ${pieceId}`);
+    const matrix = new Matrix4();
+    slot.mesh.getMatrixAt(slot.instanceIndex, matrix);
+    const geometryResource = resourceBySize.get(piece.size);
+    const geometry = geometryResource.geometry;
+    if (!geometry.boundingSphere) geometry.computeBoundingSphere();
+    const presentationBounds = geometry.boundingSphere?.clone().applyMatrix4(matrix);
+    const boundingRadius = Number(presentationBounds?.radius);
+    // The source pivot is the exact anchor used by matrixAt(...). Transforming it through
+    // the live instance matrix recovers the actual presentation anchor even after stack/
+    // drag motion; bounding-sphere center is deliberately not used as a placement anchor.
+    const presentationCenter = geometryResource.sourcePivot.clone().applyMatrix4(matrix).toArray();
+    if (
+      !Number.isFinite(boundingRadius)
+      || boundingRadius <= 0
+      || !Array.isArray(presentationCenter)
+      || presentationCenter.length !== 3
+      || presentationCenter.some(value => !Number.isFinite(value))
+    ) {
+      throw new Error(`Selected-piece geometry for ${piece.size} is missing finite live presentation bounds`);
+    }
+    return Object.freeze({
+      pieceId: piece.id,
+      colorId: piece.colorId,
+      size: piece.size,
+      copyIndex: piece.copyIndex,
+      matrixElements: Object.freeze([...matrix.elements]),
+      presentationCenter: Object.freeze(presentationCenter),
+      boundingRadius,
+      geometry,
+      baseMaterialUuid: String(slot.mesh.material?.uuid || ''),
+    });
+  }
+
   function getInstanceCounts() {
     const bySize = Object.fromEntries(PIECE_SIZES.map((size) => [size, 0]));
     for (const piece of catalog.pieces) bySize[piece.size] += 1;
@@ -169,6 +209,7 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
     pieceIds: catalog.pieceIds,
     logicalPieces: catalog.pieces,
     getLogicalPiece: (pieceId) => catalog.getPiece(pieceId),
+    getSelectionPresentationDescriptor,
     syncPieceHome,
     syncPieceToBoard,
     getInstanceCounts,
