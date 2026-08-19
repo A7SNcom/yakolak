@@ -12,6 +12,12 @@ on:
           - fast
           - browser
           - full
+          - live-local
+      expected_candidate_sha:
+        description: Exact 40-hex Three.js candidate SHA already proven live by PAGES-014; required only for live-local
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -41,6 +47,7 @@ jobs:
           node --test tests/pages_public_runtime_config.test.mjs
           node --test tests/pages_service_worker_decision.test.mjs
           node --test tests/pages_deployment_generation.test.mjs
+          node --test tests/threejs061_live_acceptance_contract.test.mjs
 
   browser:
     if: inputs.suite == 'browser' || inputs.suite == 'full'
@@ -86,3 +93,45 @@ jobs:
           node scripts/verify-threejs-lighting-browser.mjs
           node scripts/verify-threejs-tap-feedback-browser.mjs
           node scripts/verify-threejs-selected-piece-matrix-browser.mjs
+
+  live-local:
+    if: inputs.suite == 'live-local'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout acceptance harness
+        uses: actions/checkout@v4
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate explicit live candidate input
+        shell: bash
+        env:
+          EXPECTED_CANDIDATE_SHA: ${{ inputs.expected_candidate_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_CANDIDATE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "live-local requires expected_candidate_sha as one exact 40-hex Three.js candidate SHA" >&2
+            exit 1
+          fi
+      - name: Run source contract before live acceptance
+        run: node --test tests/threejs061_live_acceptance_contract.test.mjs
+      - name: Install live browser verifier only
+        run: npm install --no-save --package-lock=false playwright@1.55.0
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run exact-generation GitHub Pages local slice acceptance
+        env:
+          THREEJS061_EXPECTED_CANDIDATE_SHA: ${{ inputs.expected_candidate_sha }}
+          THREEJS061_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+          THREEJS061_EVIDENCE_PATH: threejs061-live-local-evidence.json
+        run: node scripts/verify-threejs061-live-local.mjs
+      - name: Upload THREEJS-061 live acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: threejs061-live-local-evidence
+          path: threejs061-live-local-evidence.json
+          if-no-files-found: error
+          retention-days: 30
