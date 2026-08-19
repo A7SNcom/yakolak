@@ -4,6 +4,11 @@ import fs from 'node:fs';
 
 const HEX64 = /^[a-f0-9]{64}$/;
 const GENERATION = /^sha256:[a-f0-9]{64}$/;
+const REQUIRED_CAPABILITIES = [
+  'health.compatibility.v1',
+  'room-probe.read.v1',
+  'room-probe.write.v1',
+];
 const ledgerPath = new URL('../RELEASE_QUALIFICATION/ledger.jsonl', import.meta.url);
 const windowPath = new URL('../RELEASE_QUALIFICATION/ONLINE_FRONTEND_WINDOW.json', import.meta.url);
 const evidencePath = String(process.env.PAGES015_EVIDENCE_PATH || 'pages015-live-evidence.json');
@@ -20,6 +25,15 @@ if (
   lockedWindow.frontends.length !== 2
 ) {
   throw new Error('locked PAGES-015 frontend window is invalid');
+}
+
+function exactStringSet(actual, expected) {
+  return (
+    Array.isArray(actual) &&
+    actual.length === expected.length &&
+    new Set(actual).size === actual.length &&
+    JSON.stringify([...actual].sort()) === JSON.stringify([...expected].sort())
+  );
 }
 
 function lockedRole(role) {
@@ -75,13 +89,12 @@ if (
   evidence?.corsHeadersVerified !== true ||
   evidence?.frontendArchiveReverified !== true ||
   evidence?.rollbackWindowVerified !== true ||
+  evidence?.workerLockIdentityVerified !== true ||
+  !HEX64.test(String(evidence?.workerLockEvidenceSha256 || '')) ||
   evidence?.protocolIdentity !== 'yakolak-online-room@1' ||
   evidence?.protocolVersion !== '1' ||
   evidence?.capabilityIdentity !== 'yakolak-online-room-capabilities-v1' ||
-  !Array.isArray(evidence?.capabilities) ||
-  !evidence.capabilities.includes('health.compatibility.v1') ||
-  !evidence.capabilities.includes('room-probe.read.v1') ||
-  !evidence.capabilities.includes('room-probe.write.v1') ||
+  !exactStringSet(evidence?.capabilities, REQUIRED_CAPABILITIES) ||
   evidence?.tursoSchemaId !== 'yakolak-pages005-room-probe' ||
   evidence?.tursoSchemaVersion !== 1 ||
   evidence?.migrationPolicy !== 'expand-contract-forward-only' ||
@@ -208,6 +221,7 @@ function prerequisites(item) {
 }
 
 const evidenceSha256 = crypto.createHash('sha256').update(evidenceBytes).digest('hex');
+const workerLockEvidenceSha256 = evidence.workerLockEvidenceSha256;
 const activeWorkerVersion = activeWorker.workerVersionId;
 const previousWorkerVersion = previousWorker.workerVersionId;
 const compatibleFrontendWindow = frontendWindow.map(
@@ -233,6 +247,7 @@ for (const item of frontendWindow) {
     capabilityIdentity: evidence.capabilityIdentity,
     tursoSchemaId: evidence.tursoSchemaId,
     tursoSchemaVersion: evidence.tursoSchemaVersion,
+    workerLockEvidenceSha256,
   })).digest('hex');
 
   if (rows.some((row) => row.qualificationId === qualificationId && row.verified === true)) {
@@ -260,6 +275,7 @@ for (const item of frontendWindow) {
     workerDeployment: `cloudflare:${activeWorkerVersion}`,
     workerVersionId: activeWorkerVersion,
     previousWorkerVersionId: previousWorkerVersion,
+    workerLockEvidenceSha256,
     protocolIdentity: evidence.protocolIdentity,
     protocolVersion: evidence.protocolVersion,
     capabilityIdentity: evidence.capabilityIdentity,
