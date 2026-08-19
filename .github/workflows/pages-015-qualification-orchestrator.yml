@@ -110,6 +110,20 @@ jobs:
           test "$last_current_lock_line" -gt "$append_line"
           test "$commit_line" -gt "$last_current_lock_line"
 
+          retired_archive_workflow="$(git show origin/main:.github/workflows/pages-015-window-archives.yml)"
+          printf '%s\n' "$retired_archive_workflow" | grep -q 'legacy archive fallback retired'
+          if printf '%s\n' "$retired_archive_workflow" | grep -Eq 'contents:[[:space:]]*write|PAGES_RELEASE_ADMIN_TOKEN|pages015-archive-source\.sh|gh release|git push'; then
+            echo '.github/workflows/pages-015-window-archives.yml must remain a read-only retired placeholder' >&2
+            exit 1
+          fi
+          retired_archive_helper="$(git show origin/main:scripts/pages015-archive-source.sh)"
+          printf '%s\n' "$retired_archive_helper" | grep -q 'legacy main archive helper is retired'
+          printf '%s\n' "$retired_archive_helper" | grep -q '^exit 64$'
+          if printf '%s\n' "$retired_archive_helper" | grep -Eq 'gh release|append_ledger_event|git push|curl .*immutable-releases'; then
+            echo 'scripts/pages015-archive-source.sh must remain non-mutating and retired' >&2
+            exit 1
+          fi
+
       - name: Record fresh explicit credential probe receipt
         if: github.event_name != 'schedule'
         shell: bash
