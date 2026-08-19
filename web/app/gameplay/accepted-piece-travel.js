@@ -175,7 +175,10 @@ export function deriveAcceptedPieceTravelPlan({
 
 function arcAdjustedTransform(value, easedProgress, arcHeight) {
   const position = [...value.position];
-  position[1] += Math.sin(Math.PI * easedProgress) * arcHeight;
+  const arc = easedProgress <= 0 || easedProgress >= 1
+    ? 0
+    : Math.sin(Math.PI * easedProgress) * arcHeight;
+  position[1] += arc;
   return deepFreeze({
     ...value,
     position: Object.freeze(position),
