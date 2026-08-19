@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "gate": "PAGES-015",
   "event": "explicit_orchestrator_credential_probe",
-  "workflowRunId": 32226180148,
-  "eventName": "push",
-  "triggerHeadSha": "f55c3451a341298ccc30851d21d6c6d136ee7b96",
+  "workflowRunId": 32226394371,
+  "eventName": "workflow_run",
+  "triggerHeadSha": "6e59d6776fcaa30aaa5631f7646d86325118785f",
   "credentials": {
     "pagesReleaseAdminTokenPresent": false,
     "cloudflareApiTokenPresent": false,
@@ -16,5 +16,5 @@
   "workerLockFilesPresent": false,
   "containsSecretValues": false,
   "qualificationEvidence": false,
-  "recordedAt": "2026-08-19T07:05:07Z"
+  "recordedAt": "2026-08-19T07:07:57Z"
 }
