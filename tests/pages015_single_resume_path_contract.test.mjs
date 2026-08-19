@@ -7,6 +7,8 @@ const archive = readFileSync(new URL('../.github/workflows/pages-015-window-arch
 const pages005 = readFileSync(new URL('../.github/workflows/pages-005-cloudflare-backend.yml', import.meta.url), 'utf8');
 const pages012 = readFileSync(new URL('../.github/workflows/pages-012-immutable-release.yml', import.meta.url), 'utf8');
 const rollback = readFileSync(new URL('../.github/workflows/pages-012-rollback.yml', import.meta.url), 'utf8');
+const qualificationReadme = readFileSync(new URL('../RELEASE_QUALIFICATION/README.md', import.meta.url), 'utf8');
+const releaseArchivesDoc = readFileSync(new URL('../PAGES_RELEASE_ARCHIVES.md', import.meta.url), 'utf8');
 const orchestrator = readFileSync(new URL('../scripts/pages015-orchestrate-qualification.sh', import.meta.url), 'utf8');
 
 function onBlock(yaml) {
@@ -76,6 +78,23 @@ test('historical PAGES-012 release workflow is retired, manual-only, and read-on
     'draft_staged',
   ]) {
     assert.ok(!pages012.includes(forbidden), `retired PAGES-012 workflow must not contain ${forbidden}`);
+  }
+});
+
+test('documentation cannot advertise the retired PAGES-012 writer as an operational retry path', () => {
+  assert.match(qualificationReadme, /historical read-only placeholder/);
+  assert.match(qualificationReadme, /Use `\.github\/workflows\/pages-015-window-archive\.yml`/);
+  assert.match(releaseArchivesDoc, /Retired execution path/);
+  assert.match(releaseArchivesDoc, /Do not re-run the retired PAGES-012 publication workflow/);
+  assert.match(releaseArchivesDoc, /PAGES-015 active\+previous archive window/);
+
+  for (const stale of [
+    'It still supports explicit/manual execution and its historical source-change triggers',
+    'Re-running PAGES-012 is expected',
+    'A retry against the current workflow definition is intentionally fail-fast',
+  ]) {
+    assert.ok(!qualificationReadme.includes(stale), `qualification README must not contain stale guidance: ${stale}`);
+    assert.ok(!releaseArchivesDoc.includes(stale), `release archive doc must not contain stale guidance: ${stale}`);
   }
 });
 
