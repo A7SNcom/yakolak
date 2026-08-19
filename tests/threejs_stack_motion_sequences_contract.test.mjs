@@ -111,7 +111,7 @@ assert(openPlan.pieces.every(piece => (
   && JSON.stringify(piece.targetTransform.scale) === JSON.stringify([1, 1, 1])
 )));
 
-// Used sizes are excluded before motion derivation; stack 1 has only large+medium.
+// Used copies are absent before sequence construction; another seat cannot open.
 const secondStack = deriveStackMotionPlan({
   state,
   stackTargetId: 'stack:right:1',
@@ -141,32 +141,54 @@ const controller = createMotionController({
   revision: 17,
 });
 const transforms = new Map();
+const canonicalTransforms = new Map();
 const livePieces = new Set();
 const applyLog = [];
 const snapLog = [];
 for (const piece of openPlan.pieces) {
   transforms.set(piece.pieceId, clone(piece.homeTransform));
+  canonicalTransforms.set(piece.pieceId, clone(piece.homeTransform));
   livePieces.add(piece.pieceId);
 }
 const presentation = {
   readPieceTransform(pieceId) {
-    return clone(transforms.get(pieceId));
+    const value = transforms.get(pieceId);
+    return value ? clone(value) : null;
   },
   applyPieceTransform(pieceId, transform, meta) {
     transforms.set(pieceId, clone(transform));
     applyLog.push({ pieceId, transform: clone(transform), progress: meta.progress });
   },
-  snapPieceHome(pieceId, homeTransform, meta) {
-    transforms.set(pieceId, clone(homeTransform));
-    snapLog.push({ pieceId, reason: meta.reason });
+  snapPieceCanonical(pieceId, meta) {
+    const canonical = canonicalTransforms.get(pieceId);
+    if (!canonical) throw new Error('missing-canonical-transform');
+    transforms.set(pieceId, clone(canonical));
+    snapLog.push({ pieceId, reason: meta.reason, revision: meta.controllerRevision });
   },
   isPieceLive(pieceId) {
     return livePieces.has(pieceId);
   },
 };
 
-// Open: all three remaining logical pieces submit independently to the one 096
-// controller, with no local scheduler or completion queue.
+// Submission is all-or-nothing at the sequence boundary: all current transforms are
+// preflighted before authority sync or the first 096 tween is allocated.
+const brokenPresentation = {
+  ...presentation,
+  readPieceTransform(pieceId) {
+    if (pieceId === 'piece:marble:medium:1') return null;
+    return presentation.readPieceTransform(pieceId);
+  },
+};
+assert.throws(() => submitStackMotionPlan({
+  plan: openPlan,
+  motionController: controller,
+  presentation: brokenPresentation,
+}), /stack_motion_piece_transform_missing/);
+assert.equal(controller.snapshot().activeCount, 0);
+assert.equal(controller.snapshot().revision, 17);
+assert.equal(registry.snapshot().animationHandles, 0);
+
+// Open: every remaining piece runs through the one THREEJS-096 controller.
 const opened = submitStackMotionPlan({ plan: openPlan, motionController: controller, presentation });
 assert.equal(opened.handles.length, 3);
 assert.equal(registry.snapshot().animationHandles, 3);
@@ -176,8 +198,7 @@ for (const handle of opened.handles) assert.equal((await handle.finished).status
 assert.deepEqual(openPlan.pieces.map(piece => transforms.get(piece.pieceId).position[1]), [2, 21, 40]);
 assert.equal(snapLog.length, 0);
 
-// Close: anchor large stays at Y=2 without a pointless arc. Pieces that actually
-// separated return with the approved arc height 10 and finish exactly home.
+// Close: the stationary anchor has no arc; only separated pieces use approved arc 10.
 const closePlan = deriveStackMotionPlan({
   state,
   stackTargetId: 'stack:right:0',
@@ -204,8 +225,7 @@ assert.deepEqual(closePlan.pieces.map(piece => transforms.get(piece.pieceId).pos
   [135, 2, -48],
 ]);
 
-// Explicit cancel delegates to 096 cancelScope and canonical-snaps each live piece
-// exactly once. Late platform callbacks cannot reopen the stack.
+// Explicit cancel delegates to 096 and snaps to the current canonical presentation.
 nowMs = 800;
 const cancelling = submitStackMotionPlan({ plan: openPlan, motionController: controller, presentation });
 const cancelledFrames = platform.pendingIds();
@@ -223,11 +243,17 @@ assert.equal(snapLog.filter(entry => entry.reason === 'selection-cancelled').len
 for (const id of cancelledFrames) platform.fireCancelled(id);
 assert.deepEqual(openPlan.pieces.map(piece => transforms.get(piece.pieceId).position[1]), [2, 2, 2]);
 
-// Timeout/reconnect/newer snapshot is represented by authority revision/generation;
-// 096 cancels the old sequence and the old plan cannot move authority backwards.
+// A newer revision can mean one formerly-home piece was committed to the board.
+// Canonical snap must therefore consult the latest snapshot adapter, never force home.
 nowMs = 900;
 const staleRun = submitStackMotionPlan({ plan: openPlan, motionController: controller, presentation });
 const staleFrames = platform.pendingIds();
+const acceptedSmallBoardTransform = {
+  position: [48, 2, 0],
+  rotationDegrees: [-90, 0, 0],
+  scale: [1, 1, 1],
+};
+canonicalTransforms.set('piece:marble:small:1', clone(acceptedSmallBoardTransform));
 controller.setRevision(18);
 for (const handle of staleRun.handles) {
   const result = await handle.finished;
@@ -235,15 +261,21 @@ for (const handle of staleRun.handles) {
   assert.equal(result.snappedCanonical, true);
 }
 for (const id of staleFrames) platform.fireCancelled(id);
-assert.deepEqual(openPlan.pieces.map(piece => transforms.get(piece.pieceId).position[1]), [2, 2, 2]);
+assert.deepEqual(transforms.get('piece:marble:large:1').position, [135, 2, -48]);
+assert.deepEqual(transforms.get('piece:marble:medium:1').position, [135, 2, -48]);
+assert.deepEqual(transforms.get('piece:marble:small:1').position, [48, 2, 0]);
 assert.throws(() => submitStackMotionPlan({
   plan: openPlan,
   motionController: controller,
   presentation,
 }), /stale_stack_motion_revision/);
 
-// A newer canonical lifecycle/revision may advance the controller and Reduced Motion
-// still uses the same plan/submit path with exact final transforms.
+// Reset this presentation fixture to a later canonical snapshot where the three
+// remaining pieces are home again, then prove Reduced Motion uses the identical path.
+for (const piece of openPlan.pieces) {
+  transforms.set(piece.pieceId, clone(piece.homeTransform));
+  canonicalTransforms.set(piece.pieceId, clone(piece.homeTransform));
+}
 const newerState = createCanonicalSessionState({
   preferredColor: 'marble',
   targetPlayers: 2,
@@ -268,12 +300,13 @@ for (const handle of instant.handles) assert.equal((await handle.finished).statu
 assert.deepEqual(newerPlan.pieces.map(piece => transforms.get(piece.pieceId).position[1]), [2, 21, 40]);
 assert.equal(registry.snapshot().animationHandles, 0);
 
-// Source ownership: 032 may define paths/targets but never schedules its own motion.
+// Source ownership: 032 defines paths/targets only; it never schedules its own motion.
 const source = readFileSync(path.join(root, 'web/app/gameplay/stack-motion-sequences.js'), 'utf8');
 assert.doesNotMatch(source, /requestAnimationFrame|cancelAnimationFrame|setTimeout|setInterval|Promise\.all|\.then\s*\(/);
 assert.match(source, /controller\.animate\s*\(/);
 assert.match(source, /controller\.syncSessionAuthority\s*\(/);
 assert.match(source, /cancelScope\s*\(/);
+assert.match(source, /snapPieceCanonical\s*\(/);
 
 controller.release();
 registry.dispose('stack-motion-sequence-test-complete');
