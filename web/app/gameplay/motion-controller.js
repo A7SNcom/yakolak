@@ -68,6 +68,11 @@ function requireBoolean(value, code) {
   return value;
 }
 
+function requireFunction(value, code) {
+  if (typeof value !== 'function') fail(code);
+  return value;
+}
+
 function normalizeNumericTree(value, path = 'value') {
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) fail(`invalid_motion_numeric_tree:${path}`);
@@ -119,11 +124,6 @@ function resolveEasing(easing) {
   fail('motion_easing_required');
 }
 
-function requireFunction(value, code) {
-  if (typeof value !== 'function') fail(code);
-  return value;
-}
-
 function motionId(scope, key) {
   return `${scope}::${key}`;
 }
@@ -137,7 +137,8 @@ function resultFor(entry, status, reason = null) {
     sequence: entry.sequence,
     status,
     reason,
-    snappedCanonical: entry.snapDone,
+    snapAttempted: entry.snapAttempted,
+    snappedCanonical: entry.snappedCanonical,
   });
 }
 
@@ -150,6 +151,7 @@ function settledHandle({ scope, key, generation, revision, sequence, status, rea
     sequence,
     status,
     reason,
+    snapAttempted: false,
     snappedCanonical: false,
   });
   return Object.freeze({
@@ -222,8 +224,8 @@ export function createMotionController({
   }
 
   function snapCanonical(entry, reason) {
-    if (entry.snapDone || entry.settled) return false;
-    entry.snapDone = true;
+    if (entry.snapAttempted || entry.settled) return false;
+    entry.snapAttempted = true;
     if (!targetIsLive(entry)) return false;
     entry.snapToCanonical(deepFreeze({
       scope: entry.scope,
@@ -235,13 +237,21 @@ export function createMotionController({
       sequence: entry.sequence,
       reason,
     }));
+    entry.snappedCanonical = true;
     return true;
   }
 
   function cancelEntry(entry, reason = 'cancelled', { snap = true } = {}) {
     if (!entry || entry.settled) return false;
     cancelFrame(entry, reason);
-    if (snap) snapCanonical(entry, reason);
+    if (snap) {
+      try {
+        snapCanonical(entry, reason);
+      } catch (error) {
+        settle(entry, 'error', error?.code || error?.message || 'motion-canonical-snap-error');
+        return true;
+      }
+    }
     return settle(entry, 'cancelled', reason);
   }
 
@@ -362,7 +372,8 @@ export function createMotionController({
       apply: applyFn,
       isTargetLive: targetLiveness,
       snapToCanonical: snapFn,
-      snapDone: false,
+      snapAttempted: false,
+      snappedCanonical: false,
       startedAtMs: clockNow(now),
       frameToken: null,
       settled: false,
@@ -504,7 +515,8 @@ export function createMotionController({
           durationMs: entry.durationMs,
           easing: entry.easing.name,
           frameActive: Boolean(entry.frameToken?.active),
-          snapDone: entry.snapDone,
+          snapAttempted: entry.snapAttempted,
+          snappedCanonical: entry.snappedCanonical,
         })),
     });
   }
