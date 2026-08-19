@@ -149,6 +149,7 @@ evidence.compatiblePairings = pairings;
 evidence.frontendArchiveReverified = true;
 evidence.rollbackWindowVerified = true;
 evidence.workerLockIdentityVerified = true;
+evidence.workerLockEvidenceSha256 = workerLock.finalEvidenceSha256;
 evidence.frontendWindowVerifiedAt = new Date().toISOString();
 fs.writeFileSync(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
 console.log(JSON.stringify({ ok: true, frontendWindow, pairings }, null, 2));
