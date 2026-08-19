@@ -110,8 +110,9 @@ export function applyAuthoritativeLocalTimeout(state, attempt, {
 } = {}) {
   assertLocalDeadlineAuthority(state, isOnlineSeatType);
   assertLocalTimeoutAttempt(attempt);
-  assertTurnCanTimeout(state);
 
+  // Old callbacks must fail closed as stale even if the authoritative state has
+  // already left turn-loop, cleared its deadline, or entered another round state.
   if (!attemptMatchesCurrentTurn(state, attempt)) {
     return deepFreeze({
       status: 'stale',
@@ -123,6 +124,7 @@ export function applyAuthoritativeLocalTimeout(state, attempt, {
     });
   }
 
+  assertTurnCanTimeout(state);
   const display = deriveTurnDeadlineDisplay(state, nowMs);
   if (!display.expired) {
     return deepFreeze({
