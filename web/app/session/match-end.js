@@ -69,6 +69,17 @@ function clearedVotes(seats) {
   return Object.fromEntries(seats.map(seat => [seat.seatId, false]));
 }
 
+function assertLocalMatchActionAuthority(state, isOnlineSeatType) {
+  assertCanonicalSessionState(state);
+  if (typeof isOnlineSeatType !== 'function') fail('online_seat_classifier_required');
+  for (const seat of state.seats) {
+    const online = isOnlineSeatType(seat.type);
+    if (typeof online !== 'boolean') fail('online_seat_classifier_must_return_boolean');
+    if (online) fail('online_session_not_local_match_action_authority');
+  }
+  return state;
+}
+
 function matchEndWitnessKey(kind, state, authoritySeatId) {
   return `${kind}:${state.revision}:${state.roundEndRevision}:${state.lifecycle.presentationGeneration}:${encodeURIComponent(authoritySeatId)}`;
 }
@@ -139,16 +150,18 @@ function createFreshMatchState(state, lifecycle) {
 
 function createSetupState(state, lifecycle) {
   const board = emptyBoard();
-  const inventory = deriveRemainingInventory(board, state.seats);
-  const scores = Object.fromEntries(state.seats.map(seat => [seat.seatId, 0]));
-  const votes = clearedVotes(state.seats);
   return {
     ...state,
+    lobbyGeneration: state.lobbyGeneration + 1,
+    preferredColor: null,
+    targetPlayers: null,
+    winsToMatch: null,
+    seats: [],
     board,
-    inventory,
+    inventory: deriveRemainingInventory(board, []),
     activeSeatId: null,
     deadlineAtMs: null,
-    scores,
+    scores: {},
     round: 0,
     completedRounds: 0,
     roundEndRevision: null,
@@ -159,8 +172,8 @@ function createSetupState(state, lifecycle) {
     matchComplete: false,
     matchWinner: null,
     matchWinners: [],
-    restart: { ...votes },
-    rematch: { ...votes },
+    restart: {},
+    rematch: {},
     lifecycle,
   };
 }
@@ -209,8 +222,9 @@ export function commitCanonicalMatchEnd(state, {
 
 export function createLocalRematchRequest(state, {
   source = GAMEPLAY_PRESENTATION_SOURCES.CLICK,
+  isOnlineSeatType,
 } = {}) {
-  assertCanonicalSessionState(state);
+  assertLocalMatchActionAuthority(state, isOnlineSeatType);
   assertMatchEndState(state);
   if (!ACTION_SOURCES.has(source)) fail('rematch_action_source_required');
   const seatId = hostSeatId(state);
@@ -259,8 +273,10 @@ function rematchMatchesState(state, request) {
   );
 }
 
-export function applyAuthoritativeLocalRematch(state, request) {
-  assertCanonicalSessionState(state);
+export function applyAuthoritativeLocalRematch(state, request, {
+  isOnlineSeatType,
+} = {}) {
+  assertLocalMatchActionAuthority(state, isOnlineSeatType);
   assertRematchRequest(request);
   if (!rematchMatchesState(state, request)) {
     return deepFreeze({ status: 'stale', applied: false, rematchKey: request.rematchKey, nextState: null });
@@ -294,8 +310,9 @@ export function applyAuthoritativeLocalRematch(state, request) {
 
 export function createReturnToSetupRequest(state, {
   source = GAMEPLAY_PRESENTATION_SOURCES.CLICK,
+  isOnlineSeatType,
 } = {}) {
-  assertCanonicalSessionState(state);
+  assertLocalMatchActionAuthority(state, isOnlineSeatType);
   assertMatchEndState(state);
   if (!ACTION_SOURCES.has(source)) fail('return_setup_action_source_required');
   const seatId = hostSeatId(state);
@@ -337,8 +354,10 @@ function returnSetupMatchesState(state, request) {
   );
 }
 
-export function applyAuthoritativeReturnToSetup(state, request) {
-  assertCanonicalSessionState(state);
+export function applyAuthoritativeReturnToSetup(state, request, {
+  isOnlineSeatType,
+} = {}) {
+  assertLocalMatchActionAuthority(state, isOnlineSeatType);
   assertReturnToSetupRequest(request);
   if (!returnSetupMatchesState(state, request)) {
     return deepFreeze({ status: 'stale', applied: false, actionKey: request.actionKey, nextState: null });
@@ -363,6 +382,7 @@ export function applyAuthoritativeReturnToSetup(state, request) {
     nextState,
     result: {
       lifecycle: nextState.lifecycle.phase,
+      lobbyGeneration: nextState.lobbyGeneration,
       revision: nextState.revision,
     },
   });
