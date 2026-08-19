@@ -34,7 +34,10 @@ assert.deepEqual(initial.scores, { right: 0, back: 0, left: 0 });
 assert.deepEqual(initial.restart, { right: false, back: false, left: false });
 assert.deepEqual(initial.rematch, { right: false, back: false, left: false });
 assert.deepEqual(initial.inventory.right, { small: 3, medium: 3, large: 3 });
+assert.deepEqual(initial.skips, []);
 assert.equal(Object.hasOwn(initial, 'turnIndex'), false, 'canonical active turn is stable seat identity, never array index');
+assert.equal(Object.hasOwn(initial, 'skippedSeat'), false, 'ordered skips replace the historical singular field');
+assert.equal(Object.hasOwn(initial, 'skipReason'), false, 'ordered skips replace the historical singular field');
 assert(Object.isFrozen(initial));
 assert(Object.isFrozen(initial.seats));
 
@@ -64,8 +67,10 @@ const playing = createCanonicalSessionState({
   round: 2,
   completedRounds: 1,
   lastMove: { seatId: 'right', color: 'marble', cell: 1, size: 'small' },
-  skippedSeat: 'left',
-  skipReason: 'authority-provided-reason',
+  skips: [
+    { seatId: 'left', reason: 'no_legal_move' },
+    { seatId: 'right', reason: 'authority-provided-reason' },
+  ],
   revision: 17,
   lifecycle: {
     phase: 'turn-loop',
@@ -77,7 +82,10 @@ const playing = createCanonicalSessionState({
 assert.equal(playing.inventory.right.small, 1);
 assert.equal(playing.activeSeatId, 'back');
 assert.equal(playing.deadlineAtMs, 1_787_161_000_000);
-assert.equal(playing.skipReason, 'authority-provided-reason');
+assert.deepEqual(playing.skips, [
+  { seatId: 'left', reason: 'no_legal_move' },
+  { seatId: 'right', reason: 'authority-provided-reason' },
+]);
 
 // THREEJS-048 resolves canonical stored seat order; shuffled array order is no longer legal.
 assert.throws(() => createCanonicalSessionState({
@@ -164,14 +172,25 @@ assert.throws(() => createCanonicalSessionState({
   preferredColor: 'marble',
   targetPlayers: 3,
   seats,
-  skippedSeat: 'right',
-  skipReason: null,
-}), /invalid_session_skip/);
+  skips: [{ seatId: 'front', reason: 'no_legal_move' }],
+}), /invalid_session_skipped_seat/);
+assert.throws(() => createCanonicalSessionState({
+  preferredColor: 'marble',
+  targetPlayers: 3,
+  seats,
+  skips: [
+    { seatId: 'back', reason: 'no_legal_move' },
+    { seatId: 'back', reason: 'timeout' },
+  ],
+}), /duplicate_session_skipped_seat/);
 assert.throws(() => createCanonicalSessionState({ targetPlayers: 2 }), /target_players_without_preferred_color/);
 
 const oldIndexLeak = JSON.parse(serializeCanonicalSessionState(playing));
 oldIndexLeak.turnIndex = 1;
 assert.throws(() => assertCanonicalSessionState(oldIndexLeak), /invalid_canonical_session_state_shape/, 'turnIndex stays adapter-only; configured order is stable seat identity');
+const oldSkipLeak = JSON.parse(serializeCanonicalSessionState(playing));
+oldSkipLeak.skippedSeat = 'left';
+assert.throws(() => assertCanonicalSessionState(oldSkipLeak), /invalid_canonical_session_state_shape/);
 
 for (const runtimeLeak of [
   ['mesh', { name: 'piece-mesh' }],
