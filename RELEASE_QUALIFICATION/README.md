@@ -34,17 +34,21 @@ Do not write pending placeholders for deployment-generation or backend-compatibi
 
 PAGES-015 has one authoritative automatic-resume writer: `.github/workflows/pages-015-qualification-orchestrator.yml` on `main`, which serializes archive qualification, PAGES-005 bootstrap and final compatibility qualification through the version-controlled helpers.
 
-Every workflow/job that can mutate the shared qualification ledger is serialized through the repository-wide `pages-release-qualification-ledger` concurrency group with `cancel-in-progress: false`. This includes the authoritative PAGES-015 orchestrator, `.github/workflows/pages-015-window-archive.yml`, the manual compatibility fallback, the manual PAGES-005 live deploy job, and the historical PAGES-012 immutable-release writer. The shared lock prevents independent qualification paths from appending to `ledger.jsonl` concurrently.
+Every workflow/job that can mutate the shared qualification ledger is serialized through the repository-wide `pages-release-qualification-ledger` concurrency group with `cancel-in-progress: false`. This includes the authoritative PAGES-015 orchestrator, the automatic PAGES-014 post-deploy generation writer, `.github/workflows/pages-015-window-archive.yml`, the manual compatibility fallback, both manual PAGES-005 live deploy fallbacks, and the historical PAGES-012 immutable-release writer. The shared lock prevents independent qualification paths from appending to `ledger.jsonl` concurrently.
 
-`.github/workflows/pages-015-online-compatibility.yml` is a manual `workflow_dispatch` fallback only. It must not regain `push` or `schedule` triggers because a second automatic ledger writer can race the orchestrator when frontend archive rows or Worker lock files appear.
+`.github/workflows/pages-014-post-deploy-qualification.yml` on `main` may run automatically after a successful composite Pages deployment because it is the generation-evidence writer, but it takes the same qualification-ledger lock before it can append `deployment_generation_verified`.
+
+`.github/workflows/pages-015-online-compatibility.yml` is a manual `workflow_dispatch` fallback only. It must not regain `push` or `schedule` triggers because a second automatic backend-compatibility writer would bypass the authoritative orchestrator path.
 
 `.github/workflows/pages-015-window-archive.yml` may still run as its targeted/manual archive fallback, but it shares the same ledger lock as the orchestrator. Its active/previous matrix remains serial and must stay fail-closed before recovery/publication while the release Administration credential is absent.
 
 `.github/workflows/pages-005-cloudflare-backend.yml` may verify backend contracts on pushes, but its live deploy job is manual-only and takes the same qualification-ledger lock before it can create/commit the proven API origin and Worker rollback window. Automatic PAGES-015 qualification must continue through the orchestrator.
 
+The older `main` fallbacks `.github/workflows/pages-005-backend-bootstrap.yml`, `.github/workflows/pages-015-window-archives.yml`, and `.github/workflows/pages-015-qualify-online-window.yml` are manual `workflow_dispatch` fallbacks only and all use `pages-release-qualification-ledger`. They must not regain `push`, `workflow_run`, or `schedule` triggers.
+
 `.github/workflows/pages-012-immutable-release.yml` is a historical release writer for a different archive key. It still supports explicit/manual execution and its historical source-change triggers, but workflow-file edits no longer self-trigger an immutable release run. When it writes `draft_staged` or `archive_verified`, it shares the same qualification-ledger lock as PAGES-015.
 
-`tests/pages015_single_resume_path_contract.test.mjs` locks the manual-only legacy compatibility workflow, repo-wide ledger serialization (including the historical PAGES-012 writer), and manual-only PAGES-005 deploy contract and runs in the main PAGES-015 orchestrator validation step.
+`tests/pages015_single_resume_path_contract.test.mjs` locks the feature-branch fallback contracts. The main PAGES-015 orchestrator additionally inspects the current `main` definitions directly and fails validation if PAGES-014 leaves the shared lock or any older main fallback regains an automatic trigger or leaves the shared lock.
 
 ## Complete qualification
 
