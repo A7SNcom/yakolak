@@ -2,7 +2,7 @@ import {
   COLORS,
   RULES,
   SIZES,
-  countPieces,
+  deriveRemainingInventory,
   emptyBoard,
 } from '../shared/rules.js';
 import {
@@ -128,15 +128,12 @@ function validateBoard(board, configuredColors) {
 export function deriveCanonicalInventory(board, seats) {
   const { colors } = validateSeats(seats);
   validateBoard(board, colors);
-  return Object.fromEntries(seats.map(seat => {
-    const remaining = {};
-    for (const size of SIZES) {
-      const used = countPieces(board, seat.color, size);
-      if (used > RULES.copiesPerSizePerColor) fail('invalid_session_piece_count');
-      remaining[size] = RULES.copiesPerSizePerColor - used;
-    }
-    return [seat.seatId, remaining];
-  }));
+  try {
+    return deriveRemainingInventory(board, seats);
+  } catch (error) {
+    if (error?.code === 'invalid_piece_count') fail('invalid_session_piece_count');
+    throw error;
+  }
 }
 
 function validateInventory(inventory, seats, board) {
