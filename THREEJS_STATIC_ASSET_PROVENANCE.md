@@ -47,7 +47,7 @@ No historical icon is copied into `web/` merely because it exists in the reposit
 
 - source identity is the canonical Git blob SHA plus byte length;
 - runtime identity is `git:<blob-sha>` / `git-blob-sha1:<blob-sha>`;
-- `runtimeAssetUrl()` resolves through PAGES-003 `toAppUrl()` and appends the immutable content identity;
+- `runtimeAssetUrl()` resolves through PAGES-003 `resolveAppUrl()` and appends the immutable content identity;
 - no runtime asset URL may be hard-coded to a repository-root path or mutable CDN.
 
 Derived runtime payloads (for example GLBs) keep their own exact runtime identity while preserving their canonical-source relationship.
