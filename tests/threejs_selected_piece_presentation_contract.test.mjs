@@ -64,32 +64,45 @@ function fakePieces() {
     color,
     new MeshStandardMaterial({ color: { marble: 0xf2f0ea, blue: 0x2d64a3, gold: 0xb89235, green: 0x2f7550 }[color] }),
   ]));
-  const centers = {
+  const canonicalCenters = {
     marble: [135, 2, 0],
     blue: [0, 2, -135],
     gold: [-135, 2, 0],
     green: [0, 2, 135],
   };
+  const presentationCenters = new Map();
+
+  function centerFor(pieceId, colorId, copyIndex) {
+    const override = presentationCenters.get(pieceId);
+    if (override) return [...override];
+    const center = [...canonicalCenters[colorId]];
+    center[0] += copyIndex * 28;
+    return center;
+  }
+
   return {
     root: rootGroup,
     geometries,
     materials,
+    presentationCenters,
     getSelectionPresentationDescriptor(pieceId) {
       const match = /^piece:([^:]+):([^:]+):(\d+)$/.exec(pieceId);
       if (!match) throw new TypeError('unknown-piece');
       const [, colorId, size, copyNumberRaw] = match;
       const copyIndex = Number(copyNumberRaw) - 1;
-      const center = [...centers[colorId]];
-      center[0] += copyIndex * 28;
-      const matrix = new Matrix4().makeTranslation(...center);
+      const canonicalCenter = [...canonicalCenters[colorId]];
+      canonicalCenter[0] += copyIndex * 28;
+      const presentationCenter = centerFor(pieceId, colorId, copyIndex);
+      const matrix = new Matrix4().makeTranslation(...presentationCenter);
       const geometry = geometries[size];
       return Object.freeze({
         pieceId,
         colorId,
         size,
         copyIndex,
-        destination: Object.freeze({ kind: 'home', seatId: seatByColor[colorId], stackIndex: copyIndex, center: Object.freeze(center) }),
+        destination: Object.freeze({ kind: 'home', seatId: seatByColor[colorId], stackIndex: copyIndex, center: Object.freeze(canonicalCenter) }),
         matrixElements: Object.freeze([...matrix.elements]),
+        presentationCenter: Object.freeze(presentationCenter),
         boundingRadius: geometry.boundingSphere.radius,
         geometry,
         baseMaterial: materials[colorId],
@@ -147,15 +160,12 @@ assert.deepEqual(eligibility.legalCells, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
 assert.deepEqual(eligibility.witness, { generation: 14, revision: 80, round: 1, activeSeatId: 'right' });
 assert.throws(() => deriveSelectedPieceEligibility(state80, 'piece:blue:medium:1'), /selected_piece_not_owned_by_active_seat/);
 
-// Canonical inventory + shared validation own availability. Once one medium marble is
-// committed, copy 3 is no longer a remaining physical source but copies 1/2 remain.
 const usedMediumBoard = emptyBoard();
 usedMediumBoard['0'].medium = 'marble';
 const usedMediumState = canonical({ revision: 81, board: usedMediumBoard });
 assert.equal(deriveSelectedPieceEligibility(usedMediumState, 'piece:marble:medium:2').remainingCount, 2);
 assert.throws(() => deriveSelectedPieceEligibility(usedMediumState, 'piece:marble:medium:3'), /selected_piece_copy_not_remaining/);
 
-// Even with inventory remaining, a size with every cell occupied is not selectable.
 const blockedBoard = emptyBoard();
 const blockers = ['blue', 'blue', 'blue', 'gold', 'gold', 'gold', 'green', 'green', 'green'];
 for (let cell = 0; cell < blockers.length; cell += 1) blockedBoard[String(cell)].large = blockers[cell];
@@ -172,8 +182,6 @@ const originalMaterialSnapshot = {
   metalness: marbleMaterial.metalness,
 };
 
-// Selection feedback is synchronous: exactly one logical object owns a line-only
-// outline + double halo, the base/shared material is untouched, and render is requested now.
 let snapshot = harness.presentation.select(state80, 'piece:marble:large:1');
 assert.equal(snapshot.selectedPieceId, 'piece:marble:large:1');
 assert.equal(snapshot.selectedLogicalObjectCount, 1);
@@ -194,8 +202,6 @@ assert.deepEqual({
   metalness: marbleMaterial.metalness,
 }, originalMaterialSnapshot, 'selection must not mutate the canonical piece material');
 
-// Selecting another valid size replaces the same logical cue root; it never accumulates
-// a second selected-looking object or duplicate outline primitive.
 snapshot = harness.presentation.select(state80, 'piece:marble:medium:1');
 assert.equal(snapshot.selectedPieceId, 'piece:marble:medium:1');
 assert.equal(snapshot.selectedLogicalObjectCount, 1);
@@ -203,14 +209,18 @@ assert.equal(snapshot.emphasisRenderPrimitiveCount, 3);
 assert.equal(harness.presentation.root.children.length, 3);
 assert.equal(snapshot.renderRequestCount, 2);
 
-// Presentation follows the selected piece's current render matrix on synchronous refresh
-// without a camera/tween dependency.
+// Destination remains canonical home while the live matrix moves to an opened/drag-like
+// presentation center. Refresh must move the halo with the matrix-derived live bounds.
 const beforeRefresh = snapshot.renderRequestCount;
+harness.pieces.presentationCenters.set('piece:marble:medium:1', [42, 21, -18]);
 harness.presentation.refresh(state80);
 assert.equal(harness.presentation.snapshot().renderRequestCount, beforeRefresh + 1);
+const [haloOuter, haloInner] = harness.presentation.root.children;
+assert.equal(haloInner.position.x, 42);
+assert.equal(haloInner.position.z, -18);
+assert(haloInner.position.y > 21);
+assert.deepEqual(haloOuter.position.toArray(), haloInner.position.toArray());
 
-// A new authoritative witness cannot slip underneath a live selection; a clear boundary
-// must happen first. Reconnect/turn clear records the new witness so old snapshots stay stale.
 const state82Back = canonical({ revision: 82, generation: 15, activeSeatId: 'back' });
 assert.throws(() => harness.presentation.select(state82Back, 'piece:blue:medium:1'), /selected_piece_requires_boundary_clear/);
 assert.equal(harness.presentation.reconcileCanonical({ state: state82Back, reason: 'seat-change' }), true);
@@ -220,7 +230,6 @@ assert.deepEqual(harness.presentation.snapshot().authorityWitness, { generation:
 assert.throws(() => harness.presentation.select(state80, 'piece:marble:medium:1'), /stale_selected_piece_snapshot/);
 harness.dispose();
 
-// Every UX-SELECT-44 acceptance boundary atomically removes all selected-looking cues.
 for (const reason of SELECTED_PIECE_CLEAR_REASONS) {
   const boundaryHarness = createHarness();
   const base = canonical({ revision: 90, generation: 20 });
@@ -248,8 +257,6 @@ for (const reason of SELECTED_PIECE_CLEAR_REASONS) {
   boundaryHarness.dispose();
 }
 
-// Source contract: presentation owns only line cues. Canonical 045 state + 046 shared
-// inventory/validator are the only availability sources; there is no camera/tween loop.
 const source = readFileSync(path.join(root, 'web/app/scene/selected-piece-presentation.js'), 'utf8');
 assert.match(source, /assertCanonicalSessionState/);
 assert.match(source, /deriveRemainingInventoryFromState/);
@@ -257,6 +264,7 @@ assert.match(source, /validatePlacementForSeat/);
 assert.match(source, /EdgesGeometry/);
 assert.match(source, /LineSegments/);
 assert.match(source, /LineLoop/);
+assert.match(source, /presentationCenter/);
 assert.doesNotMatch(source, /MeshBasicMaterial|MeshStandardMaterial|ShaderMaterial/);
 assert.doesNotMatch(source, /requestAnimationFrame|setTimeout|setInterval|Promise\./);
 assert.doesNotMatch(source, /camera|Camera/);
