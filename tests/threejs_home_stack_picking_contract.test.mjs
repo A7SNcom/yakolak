@@ -73,8 +73,6 @@ assert.deepEqual(targets.stacks.map(stack => ({
   },
 ]);
 
-// Used copies remain addressable as logical descriptors for deterministic nested
-// layout, but they are not selectable targets.
 const usedSmall = targets.stacks[1].pieces.find(piece => piece.size === 'small');
 assert.equal(usedSmall.available, false);
 assert.equal(usedSmall.unavailableReason, 'used-size-copy');
@@ -105,12 +103,12 @@ assert.throws(() => resolveHomePieceTarget(state, {
   size: 'giant',
 }), /invalid_home_piece_size/);
 
-// No remaining copies of a size means all three logical nested targets for that size
-// are rejected before selection.
+// Exhaust all large copies without constructing a winning line; this fixture is
+// strictly about inventory/remaining-target behavior.
 const noLargeBoard = emptyBoard();
 noLargeBoard['0'].large = 'marble';
-noLargeBoard['1'].large = 'marble';
-noLargeBoard['2'].large = 'marble';
+noLargeBoard['4'].large = 'marble';
+noLargeBoard['7'].large = 'marble';
 const noLargeState = createCanonicalSessionState({
   preferredColor: 'marble',
   targetPlayers: 2,
@@ -131,8 +129,6 @@ for (const stackIndex of [0, 1, 2]) {
   }), /home_piece_already_used/);
 }
 
-// Selection derivation is pure and hydration/re-evaluation returns the same logical
-// target identities from canonical board/inventory state.
 assert.deepEqual(deriveActiveHomeStackTargets(state), targets);
 assert.deepEqual(state.inventory.right, { small: 1, medium: 2, large: 3 });
 
