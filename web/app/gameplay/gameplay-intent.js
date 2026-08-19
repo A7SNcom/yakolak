@@ -137,16 +137,18 @@ export function createGameplayIntent({
     ? { adapter, seat, revision, mutationId }
     : { adapter, seat, revision };
 
-  const intent = cloneJson({
+  const intent = {
     schema: GAMEPLAY_INTENT_SCHEMA,
     kind,
     origin,
     authority,
     payload,
     presentation: { source },
-  });
+  };
   assertGameplayIntent(intent);
-  return deepFreeze(intent);
+  const serializedClone = cloneJson(intent);
+  assertGameplayIntent(serializedClone);
+  return deepFreeze(serializedClone);
 }
 
 export function serializeGameplayIntent(intent) {
