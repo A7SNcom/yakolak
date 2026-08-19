@@ -1,5 +1,6 @@
 name: PAGES-015 Retire Inline Ledger Writer
 
+# one-shot trigger v2
 on:
   push:
     branches:
