@@ -34,15 +34,26 @@ read_live() {
 }
 
 archive_key_ready() {
-  local role="$1" tag digest descriptor generation live_manifest
+  local role="$1" tag digest descriptor generation live_manifest root candidate runtime content page_url source_run verifier_run verifier_job
   tag="$(read_window "$role" releaseTag)"
   digest="$(read_window "$role" assetSha256)"
   descriptor="$(read_window "$role" onlineCompatibilityDescriptorSha256)"
   generation="$(read_window "$role" deploymentGeneration)"
+  root="$(read_window "$role" godotRootSha)"
+  candidate="$(read_window "$role" threejsCandidateSha)"
+  runtime="$(read_window "$role" publicRuntimeProtocolSha256)"
+  content="$(read_window "$role" contentIdentitySha256)"
+  source_run="$(read_window "$role" sourcePagesRunId)"
   live_manifest="$(read_live "$role" liveManifestSha256)"
+  page_url="$(read_live "$role" pageUrl)"
+  verifier_run="$(read_live "$role" verifierWorkflowRunId)"
+  verifier_job="$(read_live "$role" verifierJobId)"
   jq -s -e \
     --arg tag "$tag" --arg digest "$digest" --arg descriptor "$descriptor" \
-    --arg generation "$generation" --arg liveManifest "$live_manifest" '
+    --arg generation "$generation" --arg root "$root" --arg candidate "$candidate" \
+    --arg runtime "$runtime" --arg content "$content" --arg liveManifest "$live_manifest" \
+    --arg pageUrl "$page_url" --argjson sourceRun "$source_run" \
+    --argjson verifierRun "$verifier_run" --argjson verifierJob "$verifier_job" '
     (any(.[];
       .event == "archive_verified" and
       .releaseTag == $tag and
@@ -52,7 +63,10 @@ archive_key_ready() {
       .releaseAttestationVerified == true and
       .archiveSha256Verified == true and
       .nonProductionRestoreVerified == true and
-      .onlineCompatibilityDescriptorSha256 == $descriptor
+      .godotRootSha == $root and
+      .threejsCandidateSha == $candidate and
+      .onlineCompatibilityDescriptorSha256 == $descriptor and
+      .deploymentGenerationInArchive == $generation
     )) and
     (any(.[];
       .event == "deployment_generation_verified" and
@@ -60,8 +74,18 @@ archive_key_ready() {
       .assetName == "pages-composite.tar" and
       .assetSha256 == $digest and
       .deploymentGeneration == $generation and
+      .godotRootSha == $root and
+      .threejsCandidateSha == $candidate and
+      .publicRuntimeProtocolSha256 == $runtime and
+      .protocolVersion == "1" and
+      .contentIdentitySha256 == $content and
+      .pagesDeploymentStatus == "succeed" and
+      .pageUrl == $pageUrl and
       .liveManifestSha256 == $liveManifest and
       .pages014LiveEvidenceVerified == true and
+      .pages014VerifierWorkflowRunId == $verifierRun and
+      .pages014VerifierJobId == $verifierJob and
+      .sourceCompositeRunId == $sourceRun and
       .manifestVerified == true and
       .archiveMatchVerified == true and
       .verified == true
