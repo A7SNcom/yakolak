@@ -48,11 +48,19 @@ function rulesError(code) {
   return error;
 }
 
-function normalizePlacement(move) {
+function legacyNormalizePlacement(move) {
   return {
     cell: Number(move?.cell),
     size: String(move?.size || ''),
   };
+}
+
+function normalizedPlacementRejection(board, color, cell, size) {
+  if (board?.[String(cell)]?.[size]) return PLACEMENT_REJECTION_CODES.OCCUPIED_SLOT;
+  if (countPieces(board, color, size) >= RULES.copiesPerSizePerColor) {
+    return PLACEMENT_REJECTION_CODES.NO_PIECE_REMAINING;
+  }
+  return null;
 }
 
 export function isValidPlayerCount(value) {
@@ -93,17 +101,19 @@ export function deriveRemainingInventoryFromState(state) {
   return deriveRemainingInventory(state?.board, state?.seats);
 }
 
+// Canonical placement validation is strict: callers must already carry the
+// normalized integer/string intent schema. Device or transport coercion is not
+// part of gameplay legality.
 export function placementRejectionCode(board, color, move) {
-  const { cell, size } = normalizePlacement(move);
+  const cell = move?.cell;
+  const size = move?.size;
   if (!Number.isInteger(cell) || cell < 0 || cell >= RULES.cellCount) {
     return PLACEMENT_REJECTION_CODES.INVALID_CELL;
   }
-  if (!SIZES.includes(size)) return PLACEMENT_REJECTION_CODES.INVALID_SIZE;
-  if (board?.[String(cell)]?.[size]) return PLACEMENT_REJECTION_CODES.OCCUPIED_SLOT;
-  if (countPieces(board, color, size) >= RULES.copiesPerSizePerColor) {
-    return PLACEMENT_REJECTION_CODES.NO_PIECE_REMAINING;
+  if (typeof size !== 'string' || !SIZES.includes(size)) {
+    return PLACEMENT_REJECTION_CODES.INVALID_SIZE;
   }
-  return null;
+  return normalizedPlacementRejection(board, color, cell, size);
 }
 
 export function validatePlacementForSeat(state, seatId, move) {
@@ -115,31 +125,33 @@ export function validatePlacementForSeat(state, seatId, move) {
   const code = placementRejectionCode(state?.board, seat.color, move);
   if (code) return Object.freeze({ ok: false, code });
 
-  const { cell, size } = normalizePlacement(move);
   return Object.freeze({
     ok: true,
     code: null,
-    placement: Object.freeze({ seatId, color: seat.color, cell, size }),
+    placement: Object.freeze({
+      seatId,
+      color: seat.color,
+      cell: move.cell,
+      size: move.size,
+    }),
   });
 }
 
-// Protocol-v5 compatibility wrapper: v5 historically grouped invalid cell/size
-// as `invalid_move`. New canonical callers use placementRejectionCode or
-// validatePlacementForSeat and receive the stable detailed codes above.
+// Protocol-v5 compatibility wrapper: v5 historically coerces cell/size and groups
+// invalid cell/size as `invalid_move`. It still calls the same normalized
+// occupancy/piece-availability core, so only the historical input envelope differs.
 export function validatePlacement(board, color, move) {
-  const code = placementRejectionCode(board, color, move);
-  if (
-    code === PLACEMENT_REJECTION_CODES.INVALID_CELL ||
-    code === PLACEMENT_REJECTION_CODES.INVALID_SIZE
-  ) return 'invalid_move';
-  return code;
+  const { cell, size } = legacyNormalizePlacement(move);
+  if (!Number.isInteger(cell) || cell < 0 || cell >= RULES.cellCount || !SIZES.includes(size)) {
+    return 'invalid_move';
+  }
+  return normalizedPlacementRejection(board, color, cell, size);
 }
 
 export function placePiece(board, color, move) {
   const error = validatePlacement(board, color, move);
   if (error) throw rulesError(error);
-  const cell = Number(move.cell);
-  const size = String(move.size);
+  const { cell, size } = legacyNormalizePlacement(move);
   const next = structuredClone(board);
   next[String(cell)] ||= {};
   next[String(cell)][size] = color;
