@@ -25,6 +25,15 @@ function finiteTriple(value, code) {
   return Object.freeze(triple);
 }
 
+function normalizeTransform(value, code = 'invalid_stack_motion_transform') {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) fail(code);
+  return deepFreeze({
+    position: finiteTriple(value.position, `${code}_position`),
+    rotationDegrees: finiteTriple(value.rotationDegrees, `${code}_rotation`),
+    scale: finiteTriple(value.scale, `${code}_scale`),
+  });
+}
+
 function requireWorldLayout(worldLayout) {
   if (!worldLayout?.homeStacks || !Array.isArray(worldLayout?.pieceRotationDegrees)) fail('stack_motion_world_layout_required');
   return worldLayout;
@@ -49,10 +58,10 @@ function pieceId(target) {
 }
 
 function transformAt(position, rotationDegrees) {
-  return deepFreeze({
-    position: finiteTriple(position, 'invalid_stack_motion_position'),
-    rotationDegrees: finiteTriple(rotationDegrees, 'invalid_stack_motion_rotation'),
-    scale: Object.freeze([1, 1, 1]),
+  return normalizeTransform({
+    position,
+    rotationDegrees,
+    scale: [1, 1, 1],
   });
 }
 
@@ -127,7 +136,7 @@ function requireMotionController(motionController) {
 }
 
 function requirePresentation(presentation) {
-  for (const method of ['readPieceTransform', 'applyPieceTransform', 'snapPieceHome', 'isPieceLive']) {
+  for (const method of ['readPieceTransform', 'applyPieceTransform', 'snapPieceCanonical', 'isPieceLive']) {
     if (typeof presentation?.[method] !== 'function') fail(`stack_motion_presentation_${method}_required`);
   }
   return presentation;
@@ -148,6 +157,17 @@ function arcAdjustedTransform(value, easedProgress, arcHeight) {
   });
 }
 
+function preflightPieces(plan, view) {
+  return Object.freeze(plan.pieces.map(piece => {
+    const live = view.isPieceLive(piece.pieceId);
+    if (typeof live !== 'boolean') fail('stack_motion_piece_liveness_invalid');
+    if (!live) fail('stack_motion_piece_not_live');
+    const from = view.readPieceTransform(piece.pieceId);
+    if (!from) fail('stack_motion_piece_transform_missing');
+    return Object.freeze({ piece, from: normalizeTransform(from, 'invalid_stack_motion_current_transform') });
+  }));
+}
+
 export function submitStackMotionPlan({
   plan,
   motionController,
@@ -158,33 +178,36 @@ export function submitStackMotionPlan({
   const view = requirePresentation(presentation);
   const before = controller.snapshot();
   assertForwardAuthority(before, plan);
+
+  // Preflight the entire stack before authority synchronization or the first tween,
+  // so a missing/rebuilt second piece cannot leave a half-started stack sequence.
+  const prepared = preflightPieces(plan, view);
   controller.syncSessionAuthority(plan.lifecycle, plan.revision);
 
-  const handles = plan.pieces.map(piece => {
-    const from = view.readPieceTransform(piece.pieceId);
-    if (!from) fail('stack_motion_piece_transform_missing');
-    return controller.animate({
-      scope: plan.stackTargetId,
-      key: `piece:${piece.pieceId}`,
-      generation: plan.generation,
-      revision: plan.revision,
-      durationMs: plan.durationMs,
-      from,
-      to: piece.targetTransform,
-      easing: plan.easing,
-      apply(value, meta) {
-        view.applyPieceTransform(
-          piece.pieceId,
-          arcAdjustedTransform(value, meta.easedProgress, piece.arcHeight),
-          meta,
-        );
-      },
-      isTargetLive: () => view.isPieceLive(piece.pieceId),
-      snapToCanonical(meta) {
-        view.snapPieceHome(piece.pieceId, piece.homeTransform, meta);
-      },
-    });
-  });
+  const handles = prepared.map(({ piece, from }) => controller.animate({
+    scope: plan.stackTargetId,
+    key: `piece:${piece.pieceId}`,
+    generation: plan.generation,
+    revision: plan.revision,
+    durationMs: plan.durationMs,
+    from,
+    to: piece.targetTransform,
+    easing: plan.easing,
+    apply(value, meta) {
+      view.applyPieceTransform(
+        piece.pieceId,
+        arcAdjustedTransform(value, meta.easedProgress, piece.arcHeight),
+        meta,
+      );
+    },
+    isTargetLive: () => view.isPieceLive(piece.pieceId),
+    snapToCanonical(meta) {
+      // Never assume a cancelled piece is still at home. A revision change may mean
+      // authority has already committed it to the board; the presentation adapter
+      // must reconcile from its latest authoritative snapshot.
+      view.snapPieceCanonical(piece.pieceId, meta);
+    },
+  }));
 
   return Object.freeze({
     plan,
