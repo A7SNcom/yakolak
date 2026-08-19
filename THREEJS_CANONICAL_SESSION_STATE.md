@@ -1,6 +1,6 @@
 # THREEJS-045 — Canonical session state and reducer boundary
 
-Status: **LOCKED by THREEJS-045 (2026-08-19); lifecycle locked by THREEJS-060; inventory/placement centralized by THREEJS-046; stable seat order/skips resolved by THREEJS-048; exact round-end revision added by THREEJS-051**
+Status: **LOCKED by THREEJS-045 (2026-08-19); lifecycle locked by THREEJS-060; inventory/placement centralized by THREEJS-046; stable seat order/skips resolved by THREEJS-048; exact round-end revision added by THREEJS-051; win scoring/wins-to-match locked by THREEJS-052**
 
 Canonical gameplay/session state is the JSON-only `yakolak.session-state/v1` object implemented by `web/app/session/canonical-session-state.js`.
 
@@ -45,15 +45,20 @@ The old singular `skippedSeat` / `skipReason` shape is not canonical. One handof
 
 THREEJS-046 centralizes inventory math in `web/app/shared/rules.js`. Canonical validation recomputes expected remaining counts from the board and rejects stale inventory. Placement legality never trusts the serialized inventory snapshot.
 
-## Round-end revision
+## Round-end revision and outcome
 
 THREEJS-051 adds `roundEndRevision` so a completed round preserves the exact revision at which its result became authoritative even if live `revision` later advances.
 
-Draw commit records:
+Both authoritative outcomes now record:
 
 `roundEndRevision = revision`
 
-without incrementing `revision`; THREEJS-072 still owns revision/mutation advancement semantics. THREEJS-052 should use the same field for winning round closure.
+without incrementing `revision`; THREEJS-072 still owns revision/mutation advancement semantics.
+
+- THREEJS-051 draw: `draw=true`, zero score delta, lifecycle `draw`.
+- THREEJS-052 win: exactly one winner score increments by one, lifecycle `win`, and `matchComplete` depends only on reaching configured `winsToMatch`.
+
+`completedRounds` is history only. It never triggers match completion. Match completion occurs only when a configured seat score reaches 3 or 5 wins as selected by `winsToMatch`.
 
 ## Pure reducer boundary
 
@@ -84,5 +89,6 @@ Run:
 - `node --test tests/threejs_placement_inventory_contract.test.mjs`
 - `node --test tests/threejs_turn_ring_contract.test.mjs`
 - `node --test tests/threejs_true_draw_contract.test.mjs`
+- `node --test tests/threejs_win_scoring_contract.test.mjs`
 
-Together these contracts cover JSON round-trip, stable configured seats, ordered skip evidence, board-derived inventory, lifecycle legality, pure reducer behavior, exact round-end revision and authoritative draw persistence.
+Together these contracts cover JSON round-trip, stable configured seats, ordered skip evidence, board-derived inventory, lifecycle legality, pure reducer behavior, exact round-end revision, true draws, one-point winning-round scoring and locked 3/5 wins-to-match semantics.
