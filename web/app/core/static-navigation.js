@@ -83,13 +83,8 @@ function normalizeRoute(route = {}) {
   });
 }
 
-function sameRoute(left, right) {
-  return left.invitation === right.invitation && left.setup === right.setup;
-}
-
 export function canonicalStaticRouteUrl(urlLike, baseUrl = APP_BASE_URL) {
-  const route = routeFromUrl(urlLike, baseUrl);
-  return buildAppStateUrl(route, baseUrl);
+  return buildAppStateUrl(routeFromUrl(urlLike, baseUrl), baseUrl);
 }
 
 export function createStaticNavigationState({
@@ -131,11 +126,13 @@ function clearSelectionEffectIfNeeded(state, reason) {
 function hydrateFromUrl(state, event, reason) {
   const route = routeFromUrl(event.url, event.baseUrl ?? APP_BASE_URL);
   const lifecycleKey = requireLifecycleKey(event.lifecycleKey);
-  const effects = [
-    ...clearSelectionEffectIfNeeded(state, reason),
-    effect(STATIC_NAVIGATION_EFFECTS.HYDRATE_ROUTE, { route, lifecycleKey, reason }),
-  ];
-  return result(replaceState(state, { route, lifecycleKey, selectedTargetId: null }), effects);
+  return result(
+    replaceState(state, { route, lifecycleKey, selectedTargetId: null }),
+    [
+      ...clearSelectionEffectIfNeeded(state, reason),
+      effect(STATIC_NAVIGATION_EFFECTS.HYDRATE_ROUTE, { route, lifecycleKey, reason }),
+    ],
+  );
 }
 
 export function reduceStaticNavigation(state, event) {
@@ -143,18 +140,17 @@ export function reduceStaticNavigation(state, event) {
   if (!event || typeof event !== 'object') fail('navigation_event_required');
 
   switch (event.type) {
-    case STATIC_NAVIGATION_EVENTS.RESELECT: {
-      const selectedTargetId = requireSelectionTarget(event.targetId);
-      return result(replaceState(state, { selectedTargetId }));
-    }
+    case STATIC_NAVIGATION_EVENTS.RESELECT:
+      return result(replaceState(state, {
+        selectedTargetId: requireSelectionTarget(event.targetId),
+      }));
 
-    case STATIC_NAVIGATION_EVENTS.TAP_EMPTY: {
+    case STATIC_NAVIGATION_EVENTS.TAP_EMPTY:
       if (state.selectedTargetId === null) return result(replaceState(state, {}));
       return result(
         replaceState(state, { selectedTargetId: null }),
         [effect(STATIC_NAVIGATION_EFFECTS.CLEAR_SELECTION, { reason: 'tap-empty' })],
       );
-    }
 
     case STATIC_NAVIGATION_EVENTS.CANCEL:
     case STATIC_NAVIGATION_EVENTS.ESCAPE: {
@@ -188,7 +184,7 @@ export function reduceStaticNavigation(state, event) {
       );
     }
 
-    case STATIC_NAVIGATION_EVENTS.SETUP_BACK: {
+    case STATIC_NAVIGATION_EVENTS.SETUP_BACK:
       return result(
         replaceState(state, { selectedTargetId: null }),
         [
@@ -196,14 +192,11 @@ export function reduceStaticNavigation(state, event) {
           effect(STATIC_NAVIGATION_EFFECTS.HISTORY_BACK_OR_BASE, { reason: 'setup-back' }),
         ],
       );
-    }
 
     case STATIC_NAVIGATION_EVENTS.HYDRATE:
       return hydrateFromUrl(state, event, 'hydrate');
-
     case STATIC_NAVIGATION_EVENTS.HISTORY_POP:
       return hydrateFromUrl(state, event, 'history-pop');
-
     case STATIC_NAVIGATION_EVENTS.PAGESHOW:
       return hydrateFromUrl(state, event, 'pageshow');
 
@@ -249,8 +242,6 @@ function requireCallback(callback, code) {
 
 function historyWrite(historyImpl, method, route, baseUrl) {
   const url = buildAppStateUrl(route, baseUrl);
-  // History state is deliberately null. No credential, seat identity, claim payload or
-  // server-routing requirement is allowed to hide in history.state.
   historyImpl[method](null, '', url.href);
   return url;
 }
@@ -262,6 +253,16 @@ function canonicalHrefMatches(locationHref, route, baseUrl) {
   } catch {
     return false;
   }
+}
+
+function withoutUrlWrite(navResult) {
+  return result(
+    navResult.state,
+    navResult.effects.filter(navEffect => (
+      navEffect.type !== STATIC_NAVIGATION_EFFECTS.PUSH_URL
+      && navEffect.type !== STATIC_NAVIGATION_EFFECTS.REPLACE_URL
+    )),
+  );
 }
 
 export function createStaticNavigationController({
@@ -307,30 +308,20 @@ export function createStaticNavigationController({
     for (const navEffect of navResult.effects) {
       if (navEffect.type === STATIC_NAVIGATION_EFFECTS.CLEAR_SELECTION) {
         clearSelection(navEffect.reason);
-        continue;
-      }
-      if (navEffect.type === STATIC_NAVIGATION_EFFECTS.PUSH_URL) {
+      } else if (navEffect.type === STATIC_NAVIGATION_EFFECTS.PUSH_URL) {
         historyWrite(history, 'pushState', navEffect.route, base);
-        continue;
-      }
-      if (navEffect.type === STATIC_NAVIGATION_EFFECTS.REPLACE_URL) {
+      } else if (navEffect.type === STATIC_NAVIGATION_EFFECTS.REPLACE_URL) {
         historyWrite(history, 'replaceState', navEffect.route, base);
-        continue;
-      }
-      if (navEffect.type === STATIC_NAVIGATION_EFFECTS.HISTORY_BACK_OR_BASE) {
+      } else if (navEffect.type === STATIC_NAVIGATION_EFFECTS.HISTORY_BACK_OR_BASE) {
         if (Number(history.length) > 1) history.back();
         else historyWrite(history, 'replaceState', { invitation: null, setup: null }, base);
-        continue;
-      }
-      if (navEffect.type === STATIC_NAVIGATION_EFFECTS.HYDRATE_ROUTE) {
+      } else if (navEffect.type === STATIC_NAVIGATION_EFFECTS.HYDRATE_ROUTE) {
         hydrateRoute(navEffect.route, navEffect.lifecycleKey, navEffect.reason);
-        continue;
-      }
-      if (navEffect.type === STATIC_NAVIGATION_EFFECTS.ENTER_INVITATION) {
+      } else if (navEffect.type === STATIC_NAVIGATION_EFFECTS.ENTER_INVITATION) {
         invitationEntry(navEffect.invitation, navEffect.lifecycleKey);
-        continue;
+      } else {
+        fail('unsupported_navigation_effect');
       }
-      fail('unsupported_navigation_effect');
     }
     return publish(navResult.state);
   }
@@ -340,21 +331,36 @@ export function createStaticNavigationController({
   }
 
   function sanitizeLocation(route = routeFromUrl(location.href, base)) {
-    if (!canonicalHrefMatches(location.href, route, base)) {
-      historyWrite(history, 'replaceState', route, base);
-      return true;
-    }
-    return false;
+    if (canonicalHrefMatches(location.href, route, base)) return false;
+    historyWrite(history, 'replaceState', route, base);
+    return true;
+  }
+
+  function hydrateRouteOnly(route, type, currentLifecycleKey) {
+    return dispatch({
+      type,
+      url: buildAppStateUrl(route, base).href,
+      lifecycleKey: currentLifecycleKey,
+    });
   }
 
   function hydrateCurrent(type) {
     const route = routeFromUrl(location.href, base);
     sanitizeLocation(route);
-    return dispatch({
-      type,
-      url: buildAppStateUrl(route, base).href,
-      lifecycleKey: requireLifecycleKey(lifecycleKey()),
+    return hydrateRouteOnly(route, type, requireLifecycleKey(lifecycleKey()));
+  }
+
+  function enterCurrentInvitation(route, currentLifecycleKey) {
+    seenInvitations.add(route.invitation);
+    const navResult = reduceStaticNavigation(state, {
+      type: STATIC_NAVIGATION_EVENTS.INVITATION_ENTRY,
+      invitation: route.invitation,
+      setup: route.setup,
+      replace: true,
+      lifecycleKey: currentLifecycleKey,
+      baseUrl: base,
     });
+    return execute(withoutUrlWrite(navResult));
   }
 
   function enterInvitation(invitation, { setup = null, replace = true } = {}) {
@@ -363,11 +369,7 @@ export function createStaticNavigationController({
     if (seenInvitations.has(publicId)) {
       const route = normalizeRoute({ invitation: publicId, setup });
       historyWrite(history, replace ? 'replaceState' : 'pushState', route, base);
-      return dispatch({
-        type: STATIC_NAVIGATION_EVENTS.HYDRATE,
-        url: buildAppStateUrl(route, base).href,
-        lifecycleKey: currentLifecycleKey,
-      });
+      return hydrateRouteOnly(route, STATIC_NAVIGATION_EVENTS.HYDRATE, currentLifecycleKey);
     }
     seenInvitations.add(publicId);
     return dispatch({
@@ -382,30 +384,28 @@ export function createStaticNavigationController({
   function start() {
     const route = routeFromUrl(location.href, base);
     sanitizeLocation(route);
+    const currentLifecycleKey = requireLifecycleKey(lifecycleKey());
     if (route.invitation !== null && !seenInvitations.has(route.invitation)) {
-      seenInvitations.add(route.invitation);
-      // Initial deep-link invitation entry does not push a duplicate history record.
-      const navResult = reduceStaticNavigation(state, {
-        type: STATIC_NAVIGATION_EVENTS.INVITATION_ENTRY,
-        invitation: route.invitation,
-        setup: route.setup,
-        replace: true,
-        lifecycleKey: requireLifecycleKey(lifecycleKey()),
-        baseUrl: base,
-      });
-      // URL was already canonicalized above; remove the reducer's redundant replace effect.
-      return execute(result(navResult.state, navResult.effects.filter(item => item.type !== STATIC_NAVIGATION_EFFECTS.REPLACE_URL)));
+      return enterCurrentInvitation(route, currentLifecycleKey);
     }
-    return hydrateCurrent(STATIC_NAVIGATION_EVENTS.HYDRATE);
+    return hydrateRouteOnly(route, STATIC_NAVIGATION_EVENTS.HYDRATE, currentLifecycleKey);
   }
 
   function onPopState() {
-    return hydrateCurrent(STATIC_NAVIGATION_EVENTS.HISTORY_POP);
+    const route = routeFromUrl(location.href, base);
+    sanitizeLocation(route);
+    const currentLifecycleKey = requireLifecycleKey(lifecycleKey());
+    if (route.invitation !== null && !seenInvitations.has(route.invitation)) {
+      // A genuine Back/Forward transition may reveal a public invitation that this
+      // controller instance has never entered. Enter it once without writing history.
+      return enterCurrentInvitation(route, currentLifecycleKey);
+    }
+    return hydrateRouteOnly(route, STATIC_NAVIGATION_EVENTS.HISTORY_POP, currentLifecycleKey);
   }
 
   function onPageShow() {
-    // BFCache/pageshow is hydration-only. It must never recreate a room, claim a seat or
-    // replay invitation entry even if the URL still contains the public invite id.
+    // BFCache/pageshow remains hydration-only even for an unseen invite. It can never
+    // duplicate room create/claim solely because an invite remains in the URL.
     return hydrateCurrent(STATIC_NAVIGATION_EVENTS.PAGESHOW);
   }
 
