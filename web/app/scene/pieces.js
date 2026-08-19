@@ -133,8 +133,8 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
   }
 
   // Presentation-only read surface for state cues such as THREEJS-039. It exposes the
-  // exact current instance matrix and shared geometry without granting mutation access to
-  // render-slot ordering or canonical gameplay state.
+  // exact live instance matrix and bounds without granting mutation access to render-slot
+  // ordering or canonical gameplay state.
   function getSelectionPresentationDescriptor(pieceId) {
     const piece = catalog.getPiece(pieceId);
     const slot = renderSlotByPieceId.get(pieceId);
@@ -144,9 +144,17 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
     slot.mesh.getMatrixAt(slot.instanceIndex, matrix);
     const geometry = resourceBySize.get(piece.size).geometry;
     if (!geometry.boundingSphere) geometry.computeBoundingSphere();
-    const boundingRadius = Number(geometry.boundingSphere?.radius);
-    if (!Number.isFinite(boundingRadius) || boundingRadius <= 0) {
-      throw new Error(`Selected-piece geometry for ${piece.size} is missing a finite bounding radius`);
+    const presentationBounds = geometry.boundingSphere?.clone().applyMatrix4(matrix);
+    const boundingRadius = Number(presentationBounds?.radius);
+    const presentationCenter = presentationBounds?.center?.toArray();
+    if (
+      !Number.isFinite(boundingRadius)
+      || boundingRadius <= 0
+      || !Array.isArray(presentationCenter)
+      || presentationCenter.length !== 3
+      || presentationCenter.some(value => !Number.isFinite(value))
+    ) {
+      throw new Error(`Selected-piece geometry for ${piece.size} is missing finite live presentation bounds`);
     }
     return Object.freeze({
       pieceId: piece.id,
@@ -155,6 +163,7 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
       copyIndex: piece.copyIndex,
       destination,
       matrixElements: Object.freeze([...matrix.elements]),
+      presentationCenter: Object.freeze(presentationCenter),
       boundingRadius,
       geometry,
       baseMaterial: slot.mesh.material,
