@@ -1,21 +1,6 @@
 name: PAGES-015 Frontend Window Archive
 
 on:
-  push:
-    branches:
-      - threejs-rebuild
-    paths:
-      - '.github/workflows/pages-015-window-archive.yml'
-      - 'scripts/pages015-archive-window-entry-v2.sh'
-      - 'scripts/pages015-install-source-recovery-gh-shim.sh'
-      - 'scripts/pages015-resolve-exact-pages-source.sh'
-      - 'scripts/pages015-recover-expired-source.sh'
-      - 'scripts/pages015-record-exact-draft-stage.sh'
-      - 'tests/pages015_archive_admin_preflight_contract.test.mjs'
-      - 'RELEASE_QUALIFICATION/ONLINE_FRONTEND_WINDOW.json'
-      - 'RELEASE_QUALIFICATION/PAGES015_ARCHIVE_TRIGGER'
-      - 'RELEASE_QUALIFICATION/PAGES015_RECOVERED_SOURCES.json'
-      - 'RELEASE_QUALIFICATION/PAGES015_TAR_LAYOUT/**'
   workflow_dispatch:
 
 permissions:
