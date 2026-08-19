@@ -278,50 +278,77 @@ try {
     }
   }
 
-  const lifecycleRecreate = await page.evaluate(async () => {
-    const shell = window.__YAKOLAK_THREEJS_SHELL__;
-    const before = shell.getResourceRegistrySnapshot();
-    const graphicsBefore = shell.getGraphicsContextSnapshot();
-    const gl = shell.canvas.getContext('webgl2');
-    const extension = gl?.getExtension('WEBGL_lose_context');
-    if (!extension) {
-      return { supported: false, before, after: before, graphicsBefore, graphicsAfter: graphicsBefore, reason: 'WEBGL_lose_context unavailable' };
-    }
+  const disposedLifecycle = await page.evaluate(() => {
+  const shell = window.__YAKOLAK_THREEJS_SHELL__;
+  if (!shell) throw new Error('Ready shell disappeared before dispose/recreate measurement');
+  const before = shell.getResourceRegistrySnapshot();
+  const graphicsBefore = shell.getGraphicsContextSnapshot();
+  shell.dispose();
+  const afterDispose = shell.getResourceRegistrySnapshot();
+  return { before, afterDispose, graphicsBefore };
+});
 
-    const waitFor = async (predicate, timeoutMs = 15_000) => {
-      const started = performance.now();
-      while (!predicate()) {
-        if (performance.now() - started > timeoutMs) throw new Error('Timed out waiting for WebGL dispose/recreate lifecycle');
-        await new Promise((resolve) => setTimeout(resolve, 25));
-      }
-    };
+await page.reload({ waitUntil: 'domcontentloaded', timeout: 120_000 });
+await page.waitForFunction(() => {
+  const state = document.documentElement.dataset.bootState;
+  return ['ready', 'asset-load-failed', 'failed', 'unsupported-webgl'].includes(state);
+}, null, { timeout: 120_000 });
+const recreateBootState = await page.evaluate(() => document.documentElement.dataset.bootState);
+if (recreateBootState !== 'ready') throw new Error(`Dispose/recreate cold reload did not reach ready: ${recreateBootState}`);
+await page.waitForFunction(() => {
+  const shell = window.__YAKOLAK_THREEJS_SHELL__;
+  const marks = shell?.getStartupMarks?.();
+  return Boolean(marks?.firstVisibleFrame && marks?.firstInteractive);
+}, null, { timeout: 30_000 });
 
-    extension.loseContext();
-    await waitFor(() => shell.getGraphicsContextSnapshot()?.state === 'lost');
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    extension.restoreContext();
-    await waitFor(() => {
-      const state = shell.getGraphicsContextSnapshot();
-      return state?.state === 'active' && state.restoreCount > Number(graphicsBefore?.restoreCount || 0);
-    });
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+const recreated = await page.evaluate(async () => {
+  const shell = window.__YAKOLAK_THREEJS_SHELL__;
+  const manifestUrl = new URL('../deployment-manifest.json', location.href);
+  manifestUrl.searchParams.set('threejs026_recreate', `${Date.now()}-${Math.random()}`);
+  const response = await fetch(manifestUrl, { cache: 'no-store', headers: { 'cache-control': 'no-cache' } });
+  const manifest = response.ok ? await response.json() : null;
+  return {
+    after: shell.getResourceRegistrySnapshot(),
+    graphicsAfter: shell.getGraphicsContextSnapshot(),
+    liveSha: manifest?.threejsCandidateSha || null,
+  };
+});
+if (expectedThreejsSha && recreated.liveSha !== expectedThreejsSha) {
+  throw new Error(`Pages generation changed during dispose/recreate: expected ${expectedThreejsSha}, got ${recreated.liveSha || 'none'}`);
+}
 
-    return {
-      supported: true,
-      before,
-      after: shell.getResourceRegistrySnapshot(),
-      graphicsBefore,
-      graphicsAfter: shell.getGraphicsContextSnapshot(),
-    };
-  });
-  const gpuFrameAfterRecreate = lifecycleRecreate.supported ? await rendererInfoSnapshot(cdp) : gpuFrame;
-  const recreateDelta = lifecycleDelta(lifecycleRecreate.before, lifecycleRecreate.after);
-  const lifecycleOk = lifecycleRecreate.supported
-    && zeroLifecycleDelta(recreateDelta)
-    && (lifecycleRecreate.after?.disposalErrors?.length || 0) === (lifecycleRecreate.before?.disposalErrors?.length || 0)
-    && gpuFrameAfterRecreate.geometries === gpuFrame.geometries
-    && gpuFrameAfterRecreate.textures === gpuFrame.textures
-    && gpuFrameAfterRecreate.programs === gpuFrame.programs;
+const gpuFrameAfterRecreate = await rendererInfoSnapshot(cdp);
+const recreateDelta = lifecycleDelta(disposedLifecycle.before, recreated.after);
+const disposeResidual = Object.freeze({
+  total: Number(disposedLifecycle.afterDispose?.total || 0),
+  gpuObjects: Number(disposedLifecycle.afterDispose?.gpuObjects || 0),
+  geometries: resourceCount(disposedLifecycle.afterDispose, 'geometry'),
+  materials: resourceCount(disposedLifecycle.afterDispose, 'material'),
+  textures: resourceCount(disposedLifecycle.afterDispose, 'texture'),
+  renderTargets: resourceCount(disposedLifecycle.afterDispose, 'render-target'),
+  shadowMaps: resourceCount(disposedLifecycle.afterDispose, 'shadow-map'),
+  shaderVariants: Number(disposedLifecycle.afterDispose?.shaderVariants || 0),
+  materialVariants: Number(disposedLifecycle.afterDispose?.materialVariants || 0),
+});
+const lifecycleRecreate = Object.freeze({
+  supported: true,
+  before: disposedLifecycle.before,
+  afterDispose: disposedLifecycle.afterDispose,
+  after: recreated.after,
+  graphicsBefore: disposedLifecycle.graphicsBefore,
+  graphicsAfter: recreated.graphicsAfter,
+  disposeResidual,
+  reason: null,
+});
+const lifecycleOk = Object.values(disposeResidual).every((value) => value === 0)
+  && zeroLifecycleDelta(recreateDelta)
+  && JSON.stringify(lifecycleRecreate.before?.byKind || {}) === JSON.stringify(lifecycleRecreate.after?.byKind || {})
+  && JSON.stringify(lifecycleRecreate.before?.byOwnership || {}) === JSON.stringify(lifecycleRecreate.after?.byOwnership || {})
+  && (lifecycleRecreate.afterDispose?.disposalErrors?.length || 0) === (lifecycleRecreate.before?.disposalErrors?.length || 0)
+  && (lifecycleRecreate.after?.disposalErrors?.length || 0) === 0
+  && gpuFrameAfterRecreate.geometries === gpuFrame.geometries
+  && gpuFrameAfterRecreate.textures === gpuFrame.textures
+  && gpuFrameAfterRecreate.programs === gpuFrame.programs;
 
   const png = await decodedPngBytes();
   const baseMetrics = {
@@ -345,6 +372,8 @@ try {
       ok: lifecycleOk,
       delta: recreateDelta,
       before: lifecycleRecreate.before,
+      afterDispose: lifecycleRecreate.afterDispose,
+      disposeResidual: lifecycleRecreate.disposeResidual,
       after: lifecycleRecreate.after,
       graphicsBefore: lifecycleRecreate.graphicsBefore,
       graphicsAfter: lifecycleRecreate.graphicsAfter,
