@@ -18,7 +18,7 @@ export const CANONICAL_SESSION_STATE_SCHEMA = 'yakolak.session-state/v1';
 
 const TOP_LEVEL_KEYS = [
   'schema', 'lobbyGeneration', 'preferredColor', 'targetPlayers', 'winsToMatch', 'seats', 'board',
-  'inventory', 'activeSeatId', 'deadlineAtMs', 'scores', 'round', 'completedRounds',
+  'inventory', 'activeSeatId', 'deadlineAtMs', 'scores', 'round', 'completedRounds', 'roundEndRevision',
   'lastMove', 'skips', 'winner', 'draw', 'matchComplete', 'matchWinner', 'matchWinners',
   'restart', 'rematch', 'revision', 'lifecycle',
 ];
@@ -237,6 +237,7 @@ export function assertCanonicalSessionState(state) {
 
   requireInteger(state.round, 'invalid_session_round', { min: 0 });
   requireInteger(state.completedRounds, 'invalid_session_completed_rounds', { min: 0 });
+  requireInteger(state.roundEndRevision, 'invalid_session_round_end_revision', { nullable: true, min: 0 });
   requireInteger(state.revision, 'invalid_session_revision', { min: 0 });
 
   if (state.activeSeatId !== null) {
@@ -280,6 +281,7 @@ export function createCanonicalSessionState({
   scores = null,
   round = 0,
   completedRounds = 0,
+  roundEndRevision = null,
   lastMove = null,
   skips = [],
   winner = null,
@@ -312,6 +314,7 @@ export function createCanonicalSessionState({
     scores: scores === null ? defaultScores : scores,
     round,
     completedRounds,
+    roundEndRevision,
     lastMove,
     skips,
     winner,
