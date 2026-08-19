@@ -41,6 +41,8 @@ function quaternionFor(rotationDegrees) {
 }
 
 function matrixAt(center, rotation, sourcePivot) {
+  // One asset-level pivot correction per canonical size: T(center) * R * T(-sourcePivot).
+  // It is derived from immutable GLB source bounds, never from a logical piece or destination.
   return new Matrix4()
     .compose(new Vector3().fromArray(center), rotation, ONE)
     .multiply(new Matrix4().makeTranslation(-sourcePivot.x, -sourcePivot.y, -sourcePivot.z));
@@ -63,6 +65,8 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
   root.name = 'pieces-runtime';
   root.userData.presentationOnly = true;
 
+  // Render slots are intentionally private. Logical piece identity lives in piece-layout.js
+  // and remains stable even if these meshes are rebuilt or their instance ordering changes.
   const renderSlotByPieceId = new Map();
   const meshByKey = new Map();
   const destinationByPieceId = new Map();
@@ -129,6 +133,8 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
   }
 
   function syncPieceToBoard(pieceId, cellId) {
+    // This is presentation reconciliation only. Rules/authority must decide whether
+    // a move is legal before calling it; rendering never claims or mutates a board slot.
     return syncPresentation(pieceId, catalog.getBoardDestination(cellId));
   }
 
