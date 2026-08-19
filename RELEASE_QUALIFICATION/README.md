@@ -50,7 +50,9 @@ The older `main` backend/qualification fallbacks `.github/workflows/pages-005-ba
 
 `.github/workflows/pages-012-immutable-release.yml` is now a historical read-only placeholder. It is `workflow_dispatch` only, has `contents: read`, and must never regain `PAGES_RELEASE_ADMIN_TOKEN`, `gh release`, `git push`, or qualification-ledger mutation. Its old publication implementation remains only in Git history as historical evidence. Use `.github/workflows/pages-015-window-archive.yml` for the locked active+previous archive window and `.github/workflows/pages-012-rollback.yml` only for verified restore/rollback operations.
 
-`tests/pages015_single_resume_path_contract.test.mjs` locks the feature-branch fallback contracts, including the retired PAGES-012 release writer. The main PAGES-015 orchestrator additionally inspects the current `main` definitions directly and fails validation if PAGES-014 leaves the shared lock, a retired main archive path regains mutation capability, or an older main fallback regains an automatic trigger or leaves the shared lock.
+`.github/workflows/pages-012-preserve-source.yml` is also retired. It is manual-only/read-only and must not recreate the old PAGES-012 Actions artifact. Current PAGES-015 exact-byte source resolution uses the locked `RELEASE_QUALIFICATION/PAGES015_RECOVERED_SOURCES.json` receipts when available and otherwise the deterministic Git/layout reconstruction path; both routes still require the exact historical Pages artifact SHA-256 before bytes are accepted.
+
+`tests/pages015_single_resume_path_contract.test.mjs` locks the feature-branch fallback contracts, including the retired PAGES-012 release writer. `tests/pages015_retired_pages012_preserve_contract.test.mjs` separately locks the retired source-preservation path so it cannot regain automatic triggers or artifact recreation. The main PAGES-015 orchestrator additionally inspects the current `main` definitions directly and fails validation if PAGES-014 leaves the shared lock, a retired main archive path regains mutation capability, or an older main fallback regains an automatic trigger or leaves the shared lock.
 
 ## Complete qualification
 
