@@ -147,12 +147,14 @@ export function assertSessionLifecycleState(lifecycle) {
   return lifecycle;
 }
 
-export function createSessionLifecycleState({
-  phase = SESSION_LIFECYCLE_PHASES.BOOT,
-  interrupt = null,
-  recoveryTarget = null,
-  presentationGeneration = 0,
-} = {}) {
+export function createSessionLifecycleState(input = {}) {
+  requireRecord(input, 'invalid_session_lifecycle');
+  const {
+    phase = SESSION_LIFECYCLE_PHASES.BOOT,
+    interrupt = null,
+    recoveryTarget = null,
+    presentationGeneration = 0,
+  } = input;
   const lifecycle = { phase, interrupt, recoveryTarget, presentationGeneration };
   assertSessionLifecycleState(lifecycle);
   return frozenLifecycle(lifecycle);
