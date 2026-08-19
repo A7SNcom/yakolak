@@ -97,7 +97,9 @@ export function deriveStackMotionPlan({
       copyIndex: target.copyIndex,
       rank,
       homeTransform,
+      openTransform,
       targetTransform: normalizedAction === 'open' ? openTransform : homeTransform,
+      arcHeight: normalizedAction === 'close' && rank > 0 ? STACK_CLOSE_ARC_HEIGHT : 0,
     });
   });
 
@@ -111,7 +113,7 @@ export function deriveStackMotionPlan({
     durationMs: normalizedAction === 'open' ? motion.stackOpenMs : motion.stackCloseMs,
     easing: STACK_MOTION_EASING,
     separationY: STACK_OPEN_SEPARATION_Y,
-    arcHeight: normalizedAction === 'close' ? STACK_CLOSE_ARC_HEIGHT : 0,
+    closeArcHeight: STACK_CLOSE_ARC_HEIGHT,
     pieces,
     lifecycle: state.lifecycle,
   });
@@ -173,7 +175,7 @@ export function submitStackMotionPlan({
       apply(value, meta) {
         view.applyPieceTransform(
           piece.pieceId,
-          arcAdjustedTransform(value, meta.easedProgress, plan.arcHeight),
+          arcAdjustedTransform(value, meta.easedProgress, piece.arcHeight),
           meta,
         );
       },
@@ -184,7 +186,7 @@ export function submitStackMotionPlan({
     });
   });
 
-  return deepFreeze({
+  return Object.freeze({
     plan,
     handles: Object.freeze(handles),
   });
