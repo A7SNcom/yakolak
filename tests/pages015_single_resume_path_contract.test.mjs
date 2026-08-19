@@ -92,6 +92,26 @@ test('public exact-byte rollback is current-window compatibility gated while non
 });
 
 test('authoritative orchestrator cannot report complete or early-exit on stale Worker qualification', () => {
+  const archiveStart = orchestrator.indexOf('archive_key_ready() {');
+  const archiveEnd = orchestrator.indexOf('\n}\n\nworker_window_ready()', archiveStart);
+  assert.ok(archiveStart >= 0 && archiveEnd > archiveStart, 'archive_key_ready helper must exist');
+  const archiveReady = orchestrator.slice(archiveStart, archiveEnd);
+  for (const marker of [
+    '.godotRootSha == $root',
+    '.threejsCandidateSha == $candidate',
+    '.deploymentGenerationInArchive == $generation',
+    '.publicRuntimeProtocolSha256 == $runtime',
+    '.protocolVersion == "1"',
+    '.contentIdentitySha256 == $content',
+    '.pagesDeploymentStatus == "succeed"',
+    '.liveManifestSha256 == $liveManifest',
+    '.pages014VerifierWorkflowRunId == $verifierRun',
+    '.pages014VerifierJobId == $verifierJob',
+    '.sourceCompositeRunId == $sourceRun',
+  ]) {
+    assert.ok(archiveReady.includes(marker), `archive readiness must bind ${marker}`);
+  }
+
   const functionStart = orchestrator.indexOf('full_qualification_ready() {');
   const functionEnd = orchestrator.indexOf('\n}\n\nrecord_status()', functionStart);
   assert.ok(functionStart >= 0 && functionEnd > functionStart, 'full_qualification_ready helper must exist');
