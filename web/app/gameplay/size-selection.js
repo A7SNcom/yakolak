@@ -46,6 +46,19 @@ function isOlderWitness(next, current) {
   return next.generation < current.generation || next.revision < current.revision;
 }
 
+function sameWitness(left, right) {
+  return Boolean(left && right)
+    && left.generation === right.generation
+    && left.revision === right.revision
+    && left.round === right.round
+    && left.activeSeatId === right.activeSeatId;
+}
+
+function assertWitnessNotOlder(next, current) {
+  if (isOlderWitness(next, current)) fail('stale_size_selection_snapshot');
+  return next;
+}
+
 function emptySelection({ witness = null, reason = 'initial' } = {}) {
   return deepFreeze({
     selectedSize: null,
@@ -93,9 +106,10 @@ export function deriveSizeSelection(state, {
     legalTargetIds,
     selectedCue: {
       targetId: pieceTarget.id,
+      size: selectedSize,
+      selected: true,
       marker: SIZE_SELECTION_VISUAL_CONTRACT.selectedPieceMarker,
       colorIndependent: true,
-      accessibleLabel: `${selectedSize} selected`,
     },
     legalCellCues: legalCells.map(cell => ({
       targetId: `board:${cell}`,
@@ -118,32 +132,32 @@ export function createSizeSelectionController() {
   let authorityWitness = null;
   let current = emptySelection();
 
-  function observeState(state) {
-    const next = witnessFromState(state);
-    if (isOlderWitness(next, authorityWitness)) fail('stale_size_selection_snapshot');
-    authorityWitness = next;
-    return next;
-  }
-
   function select(state, input) {
-    const witness = observeState(state);
+    const candidateWitness = assertWitnessNotOlder(witnessFromState(state), authorityWitness);
+    if (current.selectedSize !== null && authorityWitness && !sameWitness(candidateWitness, authorityWitness)) {
+      fail('size_selection_requires_boundary_clear');
+    }
+
+    // Derive the complete replacement before mutating either controller field. A
+    // failed/illegal selection therefore cannot pair old visuals with a new witness.
     const next = deriveSizeSelection(state, input);
-    if (
-      next.witness.generation !== witness.generation
-      || next.witness.revision !== witness.revision
-      || next.witness.round !== witness.round
-      || next.witness.activeSeatId !== witness.activeSeatId
-    ) fail('size_selection_witness_drift');
+    if (!sameWitness(next.witness, candidateWitness)) fail('size_selection_witness_drift');
+    authorityWitness = candidateWitness;
     current = next;
     return current;
   }
 
   function clear(reason, state = null) {
     const normalizedReason = requireClearReason(reason);
-    const witness = state === null ? authorityWitness : observeState(state);
-    // One frozen replacement owns both selected size and target visibility, so no
-    // observer can see a cleared size with stale legal targets (or the reverse).
-    current = emptySelection({ witness, reason: normalizedReason });
+    const candidateWitness = state === null
+      ? authorityWitness
+      : assertWitnessNotOlder(witnessFromState(state), authorityWitness);
+
+    // One frozen replacement owns witness + selected size + target visibility, so no
+    // observer can see a new authority witness with stale selection/targets.
+    const next = emptySelection({ witness: candidateWitness, reason: normalizedReason });
+    authorityWitness = candidateWitness;
+    current = next;
     return current;
   }
 
