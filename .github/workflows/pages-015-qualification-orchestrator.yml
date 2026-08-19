@@ -58,10 +58,12 @@ jobs:
           bash -n scripts/pages015-recover-expired-source.sh
           bash -n scripts/pages005-bootstrap-live.sh
           bash -n scripts/pages015-finalize-live-window.sh
+          node --check scripts/verify-release-qualification.mjs
           node --test tests/pages015_archive_facts_contract.test.mjs
           node --test tests/pages015_archive_admin_preflight_contract.test.mjs
           node --test tests/pages015_release_target_staging_contract.test.mjs
           node --test tests/pages015_release_admin_preflight_contract.test.mjs
+          node --test tests/pages015_release_verifier_window_contract.test.mjs
           node --test tests/pages015_single_resume_path_contract.test.mjs
           node --test tests/pages005_worker_lock_identity_contract.test.mjs
           git fetch --quiet origin main
