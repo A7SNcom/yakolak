@@ -111,7 +111,8 @@ full_qualification_ready() {
   previous_tag="$(read_window previous releaseTag)"
   previous_digest="$(read_window previous assetSha256)"
   node scripts/verify-release-qualification.mjs "$active_tag" "$active_digest" >/dev/null 2>&1 && \
-    node scripts/verify-release-qualification.mjs "$previous_tag" "$previous_digest" >/dev/null 2>&1
+    node scripts/verify-release-qualification.mjs "$previous_tag" "$previous_digest" >/dev/null 2>&1 && \
+    node scripts/verify-pages015-current-lock-qualification.mjs >/dev/null 2>&1
 }
 
 record_status() {
@@ -186,7 +187,7 @@ record_status() {
 record_status 'readiness'
 
 if full_qualification_ready; then
-  echo 'PAGES-015 already fully qualified for both immutable frontend keys.'
+  echo 'PAGES-015 already fully qualified for both immutable frontend keys and the current Worker rollback lock.'
   record_status 'complete'
   exit 0
 fi
@@ -248,7 +249,7 @@ if archive_key_ready active && archive_key_ready previous && worker_window_ready
   GH_TOKEN="$final_gh_token" bash scripts/pages015-finalize-live-window.sh
   git fetch --quiet origin threejs-rebuild
   git reset --hard origin/threejs-rebuild
-  full_qualification_ready || { echo 'finalizer returned without complete strict qualification' >&2; exit 1; }
+  full_qualification_ready || { echo 'finalizer returned without complete current-lock qualification' >&2; exit 1; }
   record_status 'complete'
 else
   record_status 'waiting-external-prerequisites'
