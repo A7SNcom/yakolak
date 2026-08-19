@@ -6,7 +6,6 @@ import {
   LineBasicMaterial,
   LineLoop,
   LineSegments,
-  Matrix4,
 } from 'three';
 import { RESOURCE_KINDS, RESOURCE_OWNERSHIP } from '../core/resource-registry.js';
 import { assertCanonicalSessionState } from '../session/canonical-session-state.js';
@@ -252,6 +251,7 @@ export function createSelectedPiecePresentation({
   const edgeGeometryBySource = new Map();
   let outline = null;
   let current = null;
+  let latestWitness = null;
   let renderRequestCount = 0;
   let released = false;
 
@@ -318,13 +318,16 @@ export function createSelectedPiecePresentation({
   function select(state, pieceId) {
     if (released) fail('selected_piece_presentation_released');
     const eligibility = deriveSelectedPieceEligibility(state, pieceId);
-    if (current && isOlderWitness(eligibility.witness, current.witness)) fail('stale_selected_piece_snapshot');
+    if (isOlderWitness(eligibility.witness, latestWitness)) fail('stale_selected_piece_snapshot');
+    if (current && !sameWitness(eligibility.witness, current.witness)) {
+      fail('selected_piece_requires_boundary_clear');
+    }
     const descriptor = requireDescriptor(
       pieces.getSelectionPresentationDescriptor(eligibility.pieceId),
       eligibility,
     );
 
-    // Complete validation/descriptor resolution before exposing any selected-looking cue.
+    // Complete authority/availability/descriptor validation before exposing any cue.
     applyDescriptor(descriptor);
     current = deepFreeze({
       pieceId: eligibility.pieceId,
@@ -336,6 +339,7 @@ export function createSelectedPiecePresentation({
       witness: eligibility.witness,
       baseMaterialUuid: descriptor.baseMaterial.uuid,
     });
+    latestWitness = eligibility.witness;
     root.userData.selectedPieceId = current.pieceId;
     root.visible = true;
     publishRender();
@@ -345,6 +349,7 @@ export function createSelectedPiecePresentation({
   function refresh(state) {
     if (!current) return snapshot();
     const eligibility = deriveSelectedPieceEligibility(state, current.pieceId);
+    if (isOlderWitness(eligibility.witness, latestWitness)) fail('stale_selected_piece_snapshot');
     if (!sameWitness(eligibility.witness, current.witness)) fail('selected_piece_refresh_requires_same_witness');
     const descriptor = requireDescriptor(
       pieces.getSelectionPresentationDescriptor(current.pieceId),
@@ -357,11 +362,16 @@ export function createSelectedPiecePresentation({
 
   function clear(reason, { state = null } = {}) {
     requireClearReason(reason);
-    if (!current) return false;
+    let nextWitness = latestWitness;
     if (state !== null) {
-      const nextWitness = witnessFromState(state);
-      if (isOlderWitness(nextWitness, current.witness)) fail('stale_selected_piece_clear');
+      const candidateWitness = witnessFromState(state);
+      if (isOlderWitness(candidateWitness, latestWitness)) fail('stale_selected_piece_clear');
+      nextWitness = candidateWitness;
     }
+
+    latestWitness = nextWitness;
+    if (!current) return false;
+
     // One synchronous replacement owns all selected-looking primitives: no observer can
     // see a cleared logical selection while an old outline/halo remains visible.
     root.visible = false;
@@ -382,6 +392,7 @@ export function createSelectedPiecePresentation({
       selectedColorId: current?.colorId || null,
       selectedSize: current?.size || null,
       witness: current?.witness || null,
+      authorityWitness: latestWitness,
       visible: root.visible,
       selectedLogicalObjectCount: root.visible && current ? 1 : 0,
       emphasisRenderPrimitiveCount: root.visible && current ? 3 : 0,
