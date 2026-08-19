@@ -15,7 +15,7 @@ The immutable release asset is never edited to carry later evidence.
 
 `ledger.jsonl` is append-only JSON Lines. Existing evidence lines must not be rewritten or deleted.
 
-PAGES-012 appends `archive_verified` only after all of these are true:
+`archive_verified` means all of these are true for the exact release key:
 
 - repository release immutability was verified before publication;
 - the release was published and GitHub reports `isImmutable=true`;
@@ -23,6 +23,8 @@ PAGES-012 appends `archive_verified` only after all of these are true:
 - the local and re-downloaded release asset passes GitHub asset verification;
 - the recorded SHA-256 matches;
 - a non-production restore from the immutable `pages-composite.tar` succeeds without rebuilding.
+
+Historical PAGES-012 archives may already carry that evidence in the ledger. New locked active+previous archive publication/verification for PAGES-015 must flow through the Admin-gated PAGES-015 archive path; the historical PAGES-012 release workflow is retired and cannot append new evidence.
 
 PAGES-014 appends `deployment_generation_verified` for the same `releaseTag` + `assetSha256`, with its verified generation evidence.
 
@@ -34,7 +36,7 @@ Do not write pending placeholders for deployment-generation or backend-compatibi
 
 PAGES-015 has one authoritative automatic-resume writer: `.github/workflows/pages-015-qualification-orchestrator.yml` on `main`, which serializes archive qualification, PAGES-005 bootstrap and final compatibility qualification through the version-controlled helpers.
 
-Every workflow/job that can mutate the shared qualification ledger is serialized through the repository-wide `pages-release-qualification-ledger` concurrency group with `cancel-in-progress: false`. This includes the authoritative PAGES-015 orchestrator, the automatic PAGES-014 post-deploy generation writer, `.github/workflows/pages-015-window-archive.yml`, the manual compatibility fallback, both manual PAGES-005 live deploy fallbacks, and the historical PAGES-012 immutable-release writer. The shared lock prevents independent qualification paths from appending to `ledger.jsonl` concurrently.
+Every workflow/job that can mutate the shared qualification ledger is serialized through the repository-wide `pages-release-qualification-ledger` concurrency group with `cancel-in-progress: false`. This includes the authoritative PAGES-015 orchestrator, the automatic PAGES-014 post-deploy generation writer, `.github/workflows/pages-015-window-archive.yml`, the manual compatibility fallback, and both manual PAGES-005 live deploy fallbacks. The shared lock prevents independent qualification paths from appending to `ledger.jsonl` concurrently.
 
 `.github/workflows/pages-014-post-deploy-qualification.yml` on `main` may run automatically after a successful composite Pages deployment because it is the generation-evidence writer, but it takes the same qualification-ledger lock before it can append `deployment_generation_verified`.
 
@@ -46,9 +48,9 @@ Every workflow/job that can mutate the shared qualification ledger is serialized
 
 The older `main` backend/qualification fallbacks `.github/workflows/pages-005-backend-bootstrap.yml` and `.github/workflows/pages-015-qualify-online-window.yml` remain manual `workflow_dispatch` fallbacks only and use `pages-release-qualification-ledger`. The old main archive fallback `.github/workflows/pages-015-window-archives.yml` is now a read-only retired placeholder, and `scripts/pages015-archive-source.sh` is a fail-closed retired helper. Neither may regain release mutation or qualification-ledger write capability; archive work must flow through the orchestrator/Admin-gated v2 path.
 
-`.github/workflows/pages-012-immutable-release.yml` is a historical release writer for a different archive key. It still supports explicit/manual execution and its historical source-change triggers, but workflow-file edits no longer self-trigger an immutable release run. When it writes `draft_staged` or `archive_verified`, it shares the same qualification-ledger lock as PAGES-015.
+`.github/workflows/pages-012-immutable-release.yml` is now a historical read-only placeholder. It is `workflow_dispatch` only, has `contents: read`, and must never regain `PAGES_RELEASE_ADMIN_TOKEN`, `gh release`, `git push`, or qualification-ledger mutation. Its old publication implementation remains only in Git history as historical evidence. Use `.github/workflows/pages-015-window-archive.yml` for the locked active+previous archive window and `.github/workflows/pages-012-rollback.yml` only for verified restore/rollback operations.
 
-`tests/pages015_single_resume_path_contract.test.mjs` locks the feature-branch fallback contracts. The main PAGES-015 orchestrator additionally inspects the current `main` definitions directly and fails validation if PAGES-014 leaves the shared lock, a retired main archive path regains mutation capability, or an older main fallback regains an automatic trigger or leaves the shared lock.
+`tests/pages015_single_resume_path_contract.test.mjs` locks the feature-branch fallback contracts, including the retired PAGES-012 release writer. The main PAGES-015 orchestrator additionally inspects the current `main` definitions directly and fails validation if PAGES-014 leaves the shared lock, a retired main archive path regains mutation capability, or an older main fallback regains an automatic trigger or leaves the shared lock.
 
 ## Complete qualification
 
