@@ -121,6 +121,29 @@ function frozenLifecycle({ phase, interrupt, recoveryTarget, presentationGenerat
   return Object.freeze({ phase, interrupt, recoveryTarget, presentationGeneration });
 }
 
+function assertRecoveryTargetCompatibility(phase, interrupt, recoveryTarget) {
+  if (interrupt === SESSION_LIFECYCLE_INTERRUPTS.CANCELLED) {
+    if (recoveryTarget !== null) fail('cancelled_lifecycle_has_recovery_target');
+    return;
+  }
+
+  requirePhase(recoveryTarget, 'invalid_lifecycle_recovery_target');
+  if (
+    interrupt === SESSION_LIFECYCLE_INTERRUPTS.OFFLINE ||
+    interrupt === SESSION_LIFECYCLE_INTERRUPTS.RECONNECT ||
+    interrupt === SESSION_LIFECYCLE_INTERRUPTS.CONTEXT_LOST
+  ) {
+    if (recoveryTarget !== phase) fail('invalid_lifecycle_recovery_target');
+    return;
+  }
+
+  if (interrupt === SESSION_LIFECYCLE_INTERRUPTS.ASSET_ERROR) {
+    if (recoveryTarget !== phase && recoveryTarget !== SESSION_LIFECYCLE_PHASES.LOADING) {
+      fail('invalid_lifecycle_recovery_target');
+    }
+  }
+}
+
 export function assertSessionLifecycleState(lifecycle) {
   requireRecord(lifecycle, 'invalid_session_lifecycle');
   requireExactKeys(
@@ -137,13 +160,11 @@ export function assertSessionLifecycleState(lifecycle) {
   }
 
   requireInterrupt(lifecycle.interrupt);
-  if (lifecycle.interrupt === SESSION_LIFECYCLE_INTERRUPTS.CANCELLED) {
-    if (lifecycle.recoveryTarget !== null) fail('cancelled_lifecycle_has_recovery_target');
-    return lifecycle;
-  }
-
-  if (!RECOVERABLE_INTERRUPTS.has(lifecycle.interrupt)) fail('nonrecoverable_lifecycle_interrupt');
-  requirePhase(lifecycle.recoveryTarget, 'invalid_lifecycle_recovery_target');
+  if (
+    lifecycle.interrupt !== SESSION_LIFECYCLE_INTERRUPTS.CANCELLED &&
+    !RECOVERABLE_INTERRUPTS.has(lifecycle.interrupt)
+  ) fail('nonrecoverable_lifecycle_interrupt');
+  assertRecoveryTargetCompatibility(lifecycle.phase, lifecycle.interrupt, lifecycle.recoveryTarget);
   return lifecycle;
 }
 
@@ -166,33 +187,14 @@ function assertExpectedGeneration(lifecycle, expected) {
 }
 
 function validateRecoveryTargetForInterrupt(lifecycle, interrupt, recoveryTarget) {
-  if (interrupt === SESSION_LIFECYCLE_INTERRUPTS.CANCELLED) {
-    if (recoveryTarget !== null) fail('cancelled_lifecycle_has_recovery_target');
-    return;
-  }
-
-  requirePhase(recoveryTarget, 'invalid_lifecycle_recovery_target');
-
   // Once an interruption has captured a recovery target, changing the visible
   // interruption (for example offline -> reconnect) cannot rewrite that target.
-  if (lifecycle.interrupt !== null && lifecycle.recoveryTarget !== recoveryTarget) {
-    fail('lifecycle_recovery_target_changed');
-  }
-
   if (
-    interrupt === SESSION_LIFECYCLE_INTERRUPTS.OFFLINE ||
-    interrupt === SESSION_LIFECYCLE_INTERRUPTS.RECONNECT ||
-    interrupt === SESSION_LIFECYCLE_INTERRUPTS.CONTEXT_LOST
-  ) {
-    if (recoveryTarget !== lifecycle.phase) fail('invalid_lifecycle_recovery_target');
-    return;
-  }
-
-  if (interrupt === SESSION_LIFECYCLE_INTERRUPTS.ASSET_ERROR) {
-    if (recoveryTarget !== lifecycle.phase && recoveryTarget !== SESSION_LIFECYCLE_PHASES.LOADING) {
-      fail('invalid_lifecycle_recovery_target');
-    }
-  }
+    lifecycle.interrupt !== null &&
+    interrupt !== SESSION_LIFECYCLE_INTERRUPTS.CANCELLED &&
+    lifecycle.recoveryTarget !== recoveryTarget
+  ) fail('lifecycle_recovery_target_changed');
+  assertRecoveryTargetCompatibility(lifecycle.phase, interrupt, recoveryTarget);
 }
 
 export function reduceSessionLifecycle(lifecycle, event) {
@@ -200,9 +202,7 @@ export function reduceSessionLifecycle(lifecycle, event) {
   requireRecord(event, 'invalid_lifecycle_event');
   if (!EVENT_TYPES.has(event.type)) fail('invalid_lifecycle_event_type');
 
-  if (lifecycle.interrupt === SESSION_LIFECYCLE_INTERRUPTS.CANCELLED) {
-    fail('lifecycle_cancelled');
-  }
+  if (lifecycle.interrupt === SESSION_LIFECYCLE_INTERRUPTS.CANCELLED) fail('lifecycle_cancelled');
 
   if (event.type === SESSION_LIFECYCLE_EVENT_TYPES.ADVANCE) {
     requireExactKeys(event, ['type', 'to', 'presentationGeneration'], 'invalid_lifecycle_advance_event_shape');
