@@ -91,6 +91,7 @@ function backendRow({ tag, asset, role, descriptor, generation }) {
     workerDeployment: 'cloudflare:worker-active',
     workerVersionId: 'worker-active',
     previousWorkerVersionId: 'worker-previous',
+    workerLockEvidenceSha256: hex('7'),
     protocolIdentity: 'yakolak-online-room@1',
     protocolVersion: '1',
     capabilityIdentity: 'yakolak-online-room-capabilities-v1',
@@ -167,6 +168,22 @@ test('strict release verifier rejects sibling backend evidence from a different 
   const result = runVerifier(rows);
   assert.equal(result.status, 1);
   assert.match(result.stderr, /complete_backend_window_sibling/);
+});
+
+test('strict release verifier rejects missing or mismatched PAGES-005 Worker lock evidence digests', () => {
+  for (const mutate of [
+    (row) => { delete row.workerLockEvidenceSha256; },
+    (row) => { row.workerLockEvidenceSha256 = hex('6'); },
+  ]) {
+    const rows = completeRows();
+    const sibling = rows.find(
+      (row) => row.event === 'backend_compatibility_verified' && row.frontendRole === 'previous',
+    );
+    mutate(sibling);
+    const result = runVerifier(rows);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /complete_backend_window_sibling/);
+  }
 });
 
 test('strict release verifier rejects capability supersets and non-exact Worker deployment identity', () => {
