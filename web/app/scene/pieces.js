@@ -41,8 +41,6 @@ function quaternionFor(rotationDegrees) {
 }
 
 function matrixAt(center, rotation, sourcePivot) {
-  // One asset-level pivot correction per canonical size: T(center) * R * T(-sourcePivot).
-  // It is derived from immutable GLB source bounds, never from a logical piece or destination.
   return new Matrix4()
     .compose(new Vector3().fromArray(center), rotation, ONE)
     .multiply(new Matrix4().makeTranslation(-sourcePivot.x, -sourcePivot.y, -sourcePivot.z));
@@ -65,8 +63,6 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
   root.name = 'pieces-runtime';
   root.userData.presentationOnly = true;
 
-  // Render slots are intentionally private. Logical piece identity lives in piece-layout.js
-  // and remains stable even if these meshes are rebuilt or their instance ordering changes.
   const renderSlotByPieceId = new Map();
   const meshByKey = new Map();
   const destinationByPieceId = new Map();
@@ -133,9 +129,36 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
   }
 
   function syncPieceToBoard(pieceId, cellId) {
-    // This is presentation reconciliation only. Rules/authority must decide whether
-    // a move is legal before calling it; rendering never claims or mutates a board slot.
     return syncPresentation(pieceId, catalog.getBoardDestination(cellId));
+  }
+
+  // Presentation-only read surface for state cues such as THREEJS-039. It exposes the
+  // exact current instance matrix and shared geometry without granting mutation access to
+  // render-slot ordering or canonical gameplay state.
+  function getSelectionPresentationDescriptor(pieceId) {
+    const piece = catalog.getPiece(pieceId);
+    const slot = renderSlotByPieceId.get(pieceId);
+    const destination = destinationByPieceId.get(pieceId);
+    if (!piece || !slot || !destination) throw new TypeError(`Unknown logical piece ${pieceId}`);
+    const matrix = new Matrix4();
+    slot.mesh.getMatrixAt(slot.instanceIndex, matrix);
+    const geometry = resourceBySize.get(piece.size).geometry;
+    if (!geometry.boundingSphere) geometry.computeBoundingSphere();
+    const boundingRadius = Number(geometry.boundingSphere?.radius);
+    if (!Number.isFinite(boundingRadius) || boundingRadius <= 0) {
+      throw new Error(`Selected-piece geometry for ${piece.size} is missing a finite bounding radius`);
+    }
+    return Object.freeze({
+      pieceId: piece.id,
+      colorId: piece.colorId,
+      size: piece.size,
+      copyIndex: piece.copyIndex,
+      destination,
+      matrixElements: Object.freeze([...matrix.elements]),
+      boundingRadius,
+      geometry,
+      baseMaterial: slot.mesh.material,
+    });
   }
 
   function getInstanceCounts() {
@@ -169,6 +192,7 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
     pieceIds: catalog.pieceIds,
     logicalPieces: catalog.pieces,
     getLogicalPiece: (pieceId) => catalog.getPiece(pieceId),
+    getSelectionPresentationDescriptor,
     syncPieceHome,
     syncPieceToBoard,
     getInstanceCounts,
