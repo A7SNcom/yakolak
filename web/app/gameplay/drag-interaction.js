@@ -368,11 +368,7 @@ export function createDragInteractionController({
     setCameraEnabled(true);
     const returnHandle = requestCanonicalReturn(drag, reason);
     current = null;
-    return Object.freeze({
-      status: 'returned',
-      reason,
-      returnHandle,
-    });
+    return Object.freeze({ status: 'returned', reason, returnHandle });
   }
 
   function release({ state, selection, pointerId, ray, pointerType = current?.pointerType } = {}) {
@@ -425,12 +421,7 @@ export function createDragInteractionController({
     drag.diagnostic = null;
     current = drag;
 
-    return Object.freeze({
-      status: 'pending',
-      intent,
-      submission,
-      travelRequest,
-    });
+    return Object.freeze({ status: 'pending', intent, submission, travelRequest });
   }
 
   function cancel({ state = null, reason = 'cancel' } = {}) {
@@ -463,6 +454,15 @@ export function createDragInteractionController({
     const normalizedClearReason = requireClearReason(clearReason);
     const before = motion.snapshot();
     if (isOlderAuthority(state, before)) fail('stale_drag_canonical_snapshot');
+
+    if (
+      current?.phase === DRAG_PHASES.PENDING
+      && sameWitness(witnessFromState(state), current.witness)
+      && normalizedClearReason !== 'rejected-resync'
+      && normalizedClearReason !== 'reconnect'
+    ) {
+      fail('pending_drag_requires_authority_resolution');
+    }
 
     motion.syncSessionAuthority(state.lifecycle, state.revision);
     if (!current) {
