@@ -9,6 +9,7 @@ export const GAMEPLAY_TEST_FILES = Object.freeze([
   'tests/threejs_gameplay_intent_contract.test.mjs',
   'tests/threejs_pointer_gesture_contract.test.mjs',
   'tests/threejs_pointer_css_contract.test.mjs',
+  'tests/threejs_interaction_targets_contract.test.mjs',
   'tests/threejs_shared_rules_transitions_contract.test.mjs',
   'tests/threejs_canonical_session_state_contract.test.mjs',
   'tests/threejs_session_lifecycle_contract.test.mjs',
