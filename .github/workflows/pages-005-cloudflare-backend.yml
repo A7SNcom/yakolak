@@ -26,6 +26,7 @@ on:
       - 'RELEASE_QUALIFICATION/README.md'
       - '.github/workflows/pages-005-cloudflare-backend.yml'
       - '.github/workflows/pages-012-immutable-release.yml'
+      - '.github/workflows/pages-012-preserve-source.yml'
       - '.github/workflows/pages-012-rollback.yml'
       - '.github/workflows/pages-015-online-compatibility.yml'
       - '.github/workflows/pages-015-window-archive.yml'
