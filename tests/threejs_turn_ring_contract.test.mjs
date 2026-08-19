@@ -131,7 +131,7 @@ board2 = exhaustColor(board2, 'blue', [0, 1, 2]);
 const select2 = selectNextLegalConfiguredSeat(turnState('marble', 2, board2), 'right');
 assert.deepEqual(select2, {
   nextSeatId: 'right',
-  skipped: [{ seatId: 'back', reason: NO_LEGAL_MOVE_SKIP_REASON }],
+  skips: [{ seatId: 'back', reason: NO_LEGAL_MOVE_SKIP_REASON }],
   allSeatsBlocked: false,
 });
 
@@ -142,7 +142,7 @@ board3 = exhaustColor(board3, 'gold', [3, 4, 5]);
 const select3 = selectNextLegalConfiguredSeat(turnState('marble', 3, board3), 'right');
 assert.deepEqual(select3, {
   nextSeatId: 'right',
-  skipped: [
+  skips: [
     { seatId: 'back', reason: NO_LEGAL_MOVE_SKIP_REASON },
     { seatId: 'left', reason: NO_LEGAL_MOVE_SKIP_REASON },
   ],
@@ -156,7 +156,7 @@ board4 = exhaustColor(board4, 'gold', [3, 4, 5]);
 const select4 = selectNextLegalConfiguredSeat(turnState('marble', 4, board4), 'right');
 assert.deepEqual(select4, {
   nextSeatId: 'front',
-  skipped: [
+  skips: [
     { seatId: 'back', reason: NO_LEGAL_MOVE_SKIP_REASON },
     { seatId: 'left', reason: NO_LEGAL_MOVE_SKIP_REASON },
   ],
@@ -171,7 +171,7 @@ blocked = exhaustColor(blocked, 'blue', [3, 4, 5]);
 const noMover = selectNextLegalConfiguredSeat(turnState('marble', 2, blocked), 'right');
 assert.deepEqual(noMover, {
   nextSeatId: null,
-  skipped: [
+  skips: [
     { seatId: 'back', reason: NO_LEGAL_MOVE_SKIP_REASON },
     { seatId: 'right', reason: NO_LEGAL_MOVE_SKIP_REASON },
   ],
@@ -185,7 +185,7 @@ rotatedBoard = exhaustColor(rotatedBoard, 'marble', [0, 1, 2]);
 const rotatedSkip = selectNextLegalConfiguredSeat(turnState('green', 3, rotatedBoard), 'front');
 assert.deepEqual(rotatedSkip, {
   nextSeatId: 'back',
-  skipped: [{ seatId: 'right', reason: NO_LEGAL_MOVE_SKIP_REASON }],
+  skips: [{ seatId: 'right', reason: NO_LEGAL_MOVE_SKIP_REASON }],
   allSeatsBlocked: false,
 });
 
