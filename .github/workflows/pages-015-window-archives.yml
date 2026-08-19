@@ -1,65 +1,24 @@
-name: PAGES-015 Frontend Rollback Archives
-# Manual fallback for the exact-byte active + previous qualification window.
+name: PAGES-015 Frontend Rollback Archives (retired)
+# Retired manual placeholder. The authoritative archive path is the main
+# PAGES-015 qualification orchestrator, which checks out threejs-rebuild and
+# uses the Admin-gated v2 archive helper under the shared ledger lock.
 
 on:
   workflow_dispatch:
 
 permissions:
-  actions: read
-  contents: write
+  contents: read
 
 concurrency:
   group: pages-release-qualification-ledger
   cancel-in-progress: false
 
 jobs:
-  archive-window:
+  retired:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
-    strategy:
-      fail-fast: false
-      max-parallel: 1
-      matrix:
-        include:
-          - role: previous
-            release_tag: pages-archive-2026-08-18-geeb3b8e1-t5cc89e05
-            godot_root_sha: eeb3b8e15ded95c4343aed303f781b533c2e13a0
-            threejs_candidate_sha: 5cc89e05653b6461ed6a41332f374eaadb360945
-            source_pages_run_id: '32108243496'
-            source_pages_artifact_id: '9313917543'
-            source_artifact_tar_sha256: 6769843ee45a807cffe8af8c8450e0afd7d08c45270e66512f1ad52462dfb560
-            deployment_generation: sha256:e4e2eaa97bcced485e456dd5a3e7f9ef2c0fad6db2255f8ce1f0bfaa88530b51
-            content_identity: bfb80df2f416306af050f98ad161e7959e6795fbbbdf68b47ca4cb5036b9815c
-            live_manifest_sha256: 7acbfb04d9228fa4a0caef6b0d31b67b5f71117d54842861e0c2caa8341a77fa
-            pages014_verifier_run_id: '32108312542'
-          - role: active
-            release_tag: pages-archive-2026-08-18-geeb3b8e1-t4e4e5dec
-            godot_root_sha: eeb3b8e15ded95c4343aed303f781b533c2e13a0
-            threejs_candidate_sha: 4e4e5dec72ee71a06940c6db561dde8d24abd2d0
-            source_pages_run_id: '32110008705'
-            source_pages_artifact_id: '9314508471'
-            source_artifact_tar_sha256: 3bb476e2ee76f372b9b945d160f6f1e9faad865eaacd9baef2b1384bd434fa5f
-            deployment_generation: sha256:984f30cf5df2117d86ae4c6fc304c0ad7b2efdf3dc4db3b3ab6557d16b7bba28
-            content_identity: 0b425af69983b9aa5ceed2ec379259af9b9f5495d21bb89462a149d5740115c2
-            live_manifest_sha256: ab6fed5a9d7b00e3f07da8ebd9e648525d62a86d19efebd116f2868eaa2f3b26
-            pages014_verifier_run_id: '32110138422'
     steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: main
-          fetch-depth: 1
-      - name: Archive exact ${{ matrix.role }} frontend bytes
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PAGES_RELEASE_ADMIN_TOKEN: ${{ secrets.PAGES_RELEASE_ADMIN_TOKEN }}
-          RELEASE_TAG: ${{ matrix.release_tag }}
-          GODOT_ROOT_SHA: ${{ matrix.godot_root_sha }}
-          THREEJS_CANDIDATE_SHA: ${{ matrix.threejs_candidate_sha }}
-          SOURCE_PAGES_RUN_ID: ${{ matrix.source_pages_run_id }}
-          SOURCE_PAGES_ARTIFACT_ID: ${{ matrix.source_pages_artifact_id }}
-          SOURCE_ARTIFACT_TAR_SHA256: ${{ matrix.source_artifact_tar_sha256 }}
-          EXPECTED_DEPLOYMENT_GENERATION: ${{ matrix.deployment_generation }}
-          EXPECTED_CONTENT_IDENTITY: ${{ matrix.content_identity }}
-          EXPECTED_LIVE_MANIFEST_SHA256: ${{ matrix.live_manifest_sha256 }}
-          PAGES014_VERIFIER_RUN_ID: ${{ matrix.pages014_verifier_run_id }}
-        run: bash scripts/pages015-archive-source.sh
+      - name: Refuse legacy archive mutation path
+        shell: bash
+        run: |
+          echo '::error title=PAGES-015 legacy archive fallback retired::Use the PAGES-015 qualification orchestrator on main. This workflow intentionally cannot publish releases or write qualification evidence.'
+          exit 64
