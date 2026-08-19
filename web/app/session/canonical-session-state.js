@@ -16,7 +16,6 @@ const TOP_LEVEL_KEYS = [
   'seats',
   'board',
   'inventory',
-  'turnIndex',
   'activeSeatId',
   'deadlineAtMs',
   'scores',
@@ -158,8 +157,7 @@ export function deriveCanonicalInventory(board, seats) {
 
 function validateInventory(inventory, seats, board) {
   requireRecord(inventory, 'invalid_session_inventory');
-  const expectedKeys = seats.map(seat => seat.seatId);
-  requireExactKeys(inventory, expectedKeys, 'invalid_session_inventory_shape');
+  requireExactKeys(inventory, seats.map(seat => seat.seatId), 'invalid_session_inventory_shape');
   for (const seat of seats) {
     const remaining = requireRecord(inventory[seat.seatId], 'invalid_session_inventory_seat');
     requireExactKeys(remaining, SIZES, 'invalid_session_inventory_seat_shape');
@@ -240,7 +238,6 @@ export function assertCanonicalSessionState(state) {
   if (state.targetPlayers !== null && state.seats.length > state.targetPlayers) fail('too_many_configured_session_seats');
   validateBoard(state.board, colors);
   validateInventory(state.inventory, state.seats, state.board);
-
   validateSeatNumberMap(state.scores, state.seats, 'invalid_session_scores');
   validateVoteMap(state.restart, state.seats, 'invalid_session_restart_votes');
   validateVoteMap(state.rematch, state.seats, 'invalid_session_rematch_votes');
@@ -249,15 +246,10 @@ export function assertCanonicalSessionState(state) {
   requireInteger(state.completedRounds, 'invalid_session_completed_rounds', { min: 0 });
   requireInteger(state.revision, 'invalid_session_revision', { min: 0 });
 
-  if (state.turnIndex === null || state.activeSeatId === null) {
-    if (state.turnIndex !== null || state.activeSeatId !== null) fail('invalid_session_active_turn');
-  } else {
-    requireInteger(state.turnIndex, 'invalid_session_turn_index', { min: 0 });
-    if (state.turnIndex >= state.seats.length) fail('invalid_session_turn_index');
-    requireOpaqueString(state.activeSeatId, 'invalid_session_active_seat');
-    if (state.seats[state.turnIndex]?.seatId !== state.activeSeatId) fail('invalid_session_active_turn');
+  if (state.activeSeatId !== null) {
+    const activeSeatId = requireOpaqueString(state.activeSeatId, 'invalid_session_active_seat');
+    if (!seatIds.has(activeSeatId)) fail('invalid_session_active_seat');
   }
-
   requireInteger(state.deadlineAtMs, 'invalid_session_deadline', { nullable: true, min: 0 });
   if (state.deadlineAtMs !== null && state.activeSeatId === null) fail('deadline_without_active_turn');
 
@@ -296,7 +288,6 @@ export function createCanonicalSessionState({
   winsToMatch = null,
   seats = [],
   board = emptyBoard(),
-  turnIndex = null,
   activeSeatId = null,
   deadlineAtMs = null,
   scores = null,
@@ -329,7 +320,6 @@ export function createCanonicalSessionState({
     seats,
     board,
     inventory: deriveCanonicalInventory(board, seats),
-    turnIndex,
     activeSeatId,
     deadlineAtMs,
     scores: scores === null ? defaultScores : scores,
