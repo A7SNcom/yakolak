@@ -1,5 +1,6 @@
 name: PAGES-015 Retire Historical PAGES-012 Auto Trigger
 
+# trigger v2
 on:
   push:
     branches:
