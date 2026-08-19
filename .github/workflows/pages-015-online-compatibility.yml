@@ -89,10 +89,11 @@ jobs:
           echo "previous_generation=$previous_generation" >> "$GITHUB_OUTPUT"
 
           if node scripts/verify-release-qualification.mjs "$active_tag" "$active_digest" >/dev/null 2>&1 && \
-             node scripts/verify-release-qualification.mjs "$previous_tag" "$previous_digest" >/dev/null 2>&1; then
+             node scripts/verify-release-qualification.mjs "$previous_tag" "$previous_digest" >/dev/null 2>&1 && \
+             node scripts/verify-pages015-current-lock-qualification.mjs >/dev/null 2>&1; then
             echo 'already=true' >> "$GITHUB_OUTPUT"
             echo 'ready=true' >> "$GITHUB_OUTPUT"
-            echo 'Both frontend keys already have complete PAGES-015 qualification.'
+            echo 'Both frontend keys already have complete PAGES-015 qualification for the current Worker rollback lock.'
             exit 0
           fi
           echo 'already=false' >> "$GITHUB_OUTPUT"
@@ -162,11 +163,17 @@ jobs:
             (.activeWorkerVersionId | type == "string" and length > 0) and
             (.previousWorkerVersionId | type == "string" and length > 0) and
             .activeWorkerVersionId != .previousWorkerVersionId and
+            .protocolIdentity == "yakolak-online-room@1" and
+            .capabilityIdentity == "yakolak-online-room-capabilities-v1" and
+            (.capabilities | sort) == ["health.compatibility.v1","room-probe.read.v1","room-probe.write.v1"] and
+            .tursoSchemaId == "yakolak-pages005-room-probe" and
+            .tursoSchemaVersion == 1 and
             .traffic.activePercent == 100 and
             .traffic.previousPercent == 0 and
             .versionOverrideProof == true and
             .browserCorsVerified == true and
             .liveTursoRoundTripVerified == true and
+            (.finalEvidenceSha256 | test("^[a-f0-9]{64}$")) and
             .migrationPolicy == "expand-contract-forward-only" and
             .tursoDataRollbackRequired == false
           ' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json >/dev/null
@@ -180,7 +187,7 @@ jobs:
         if: steps.frontend.outputs.already == 'true' || steps.frontend.outputs.ready != 'true' || steps.pages005.outputs.ready != 'true'
         run: |
           if [ "${{ steps.frontend.outputs.already }}" = 'true' ]; then
-            echo 'PAGES-015 is already completely qualified for the locked frontend window.'
+            echo 'PAGES-015 is already completely qualified for the current Worker rollback lock.'
           else
             echo 'PAGES-015 remains intentionally unqualified; no backend_compatibility_verified event is written.'
           fi
@@ -190,7 +197,11 @@ jobs:
         run: |
           set -euo pipefail
           npm install --ignore-scripts
-          node --test tests/pages_backend_runtime_contract.test.mjs tests/pages_online_compatibility_contract.test.mjs
+          node --check scripts/append-pages015-qualification.mjs
+          node --check scripts/verify-pages015-frontend-window.mjs
+          node --check scripts/verify-pages015-current-lock-qualification.mjs
+          node --check scripts/verify-release-qualification.mjs
+          node --test tests/pages_backend_runtime_contract.test.mjs tests/pages_online_compatibility_contract.test.mjs tests/pages015_current_lock_qualification_contract.test.mjs tests/pages015_release_verifier_window_contract.test.mjs
           npx --yes wrangler@4 deploy --dry-run --config backend/cloudflare/wrangler.jsonc --outdir .tmp/pages015-worker
 
       - name: Re-prove active + previous Worker health and live Turso round trips
@@ -267,6 +278,7 @@ jobs:
           node scripts/append-pages015-qualification.mjs
           node scripts/verify-release-qualification.mjs "$ACTIVE_RELEASE_TAG" "$ACTIVE_ASSET_SHA256"
           node scripts/verify-release-qualification.mjs "$PREVIOUS_RELEASE_TAG" "$PREVIOUS_ASSET_SHA256"
+          node scripts/verify-pages015-current-lock-qualification.mjs
 
       - name: Commit additive ledger events only
         if: steps.frontend.outputs.already != 'true' && steps.frontend.outputs.ready == 'true' && steps.pages005.outputs.ready == 'true'
@@ -274,7 +286,7 @@ jobs:
           set -euo pipefail
           rm -f pages015-live-evidence.json
           if git diff --quiet -- RELEASE_QUALIFICATION/ledger.jsonl; then
-            echo 'Equivalent backend qualification already exists.'
+            echo 'Equivalent backend qualification already exists for the current Worker rollback lock.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
