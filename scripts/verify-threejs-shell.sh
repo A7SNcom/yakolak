@@ -61,6 +61,7 @@ required=(
   tests/threejs_resource_registry_preflight_contract.test.mjs
   tests/threejs_resource_registry_atomic_listener_replacement.test.mjs
   tests/threejs_resource_registry_cross_scope_ownership.test.mjs
+  tests/threejs_resource_registry_reclassification_cleanup.test.mjs
   tests/threejs_resource_registry_reentrant_rollback.test.mjs
   tests/threejs_resource_registry_synchronous_one_shot.test.mjs
   tests/threejs_resource_registry_synchronous_one_shot_throw.test.mjs
@@ -119,6 +120,7 @@ node tests/threejs_resource_registry_scope_ownership.test.mjs
 node tests/threejs_resource_registry_preflight_contract.test.mjs
 node tests/threejs_resource_registry_atomic_listener_replacement.test.mjs
 node tests/threejs_resource_registry_cross_scope_ownership.test.mjs
+node tests/threejs_resource_registry_reclassification_cleanup.test.mjs
 node tests/threejs_resource_registry_reentrant_rollback.test.mjs
 node tests/threejs_resource_registry_synchronous_one_shot.test.mjs
 node tests/threejs_resource_registry_synchronous_one_shot_throw.test.mjs
