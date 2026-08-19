@@ -6,6 +6,7 @@ const legacy = readFileSync(new URL('../.github/workflows/pages-015-online-compa
 const archive = readFileSync(new URL('../.github/workflows/pages-015-window-archive.yml', import.meta.url), 'utf8');
 const pages005 = readFileSync(new URL('../.github/workflows/pages-005-cloudflare-backend.yml', import.meta.url), 'utf8');
 const pages012 = readFileSync(new URL('../.github/workflows/pages-012-immutable-release.yml', import.meta.url), 'utf8');
+const rollback = readFileSync(new URL('../.github/workflows/pages-012-rollback.yml', import.meta.url), 'utf8');
 
 function onBlock(yaml) {
   const start = yaml.indexOf('on:\n');
@@ -57,4 +58,26 @@ test('historical PAGES-012 ledger writer is serialized and does not self-trigger
   assert.match(block, /PAGES_RELEASE_ARCHIVES\.md/);
   assert.match(block, /scripts\/verify-release-qualification\.mjs/);
   assert.doesNotMatch(block, /\.github\/workflows\/pages-012-immutable-release\.yml/);
+});
+
+test('public exact-byte rollback is current-window compatibility gated while non-production restore stays available', () => {
+  assert.match(rollback, /^name: PAGES-012 Immutable Exact-Byte Rollback/m);
+  sharedLedgerLock(rollback);
+  assert.match(rollback, /deploy_pages:\n\s+description: Deploy to GitHub Pages after verification[\s\S]*?default: false/);
+  assert.match(rollback, /Non-production restore proof/);
+  assert.match(rollback, /if: steps\.mode\.outputs\.deploy != 'true'/);
+  assert.match(rollback, /ONLINE_FRONTEND_WINDOW\.json/);
+  assert.match(rollback, /verify-release-qualification\.mjs/);
+  const currentLockCalls = rollback.match(/verify-pages015-current-lock-qualification\.mjs/g) || [];
+  assert.ok(currentLockCalls.length >= 2, 'public rollback must validate the current Worker lock before upload and deploy');
+
+  const preUploadQualification = rollback.indexOf('Require current PAGES-015 compatibility before public rollback upload');
+  const upload = rollback.indexOf('uses: actions/upload-pages-artifact@v4');
+  const finalQualification = rollback.indexOf('Fail closed if the compatibility window changed before deploy');
+  const deploy = rollback.indexOf('uses: actions/deploy-pages@v4');
+  assert.ok(preUploadQualification >= 0 && upload > preUploadQualification);
+  assert.ok(finalQualification >= 0 && deploy > finalQualification);
+
+  const deployJob = rollback.slice(rollback.indexOf('\n  deploy:\n'));
+  assert.match(deployJob, /concurrency:\n\s+group: yakolak-pages-composite\n\s+cancel-in-progress: false/);
 });
