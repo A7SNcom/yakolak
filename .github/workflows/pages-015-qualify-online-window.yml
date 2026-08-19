@@ -1,12 +1,6 @@
 name: PAGES-015 Qualify Online Rollback Window
 
 on:
-  workflow_run:
-    workflows:
-      - PAGES-005 Backend Bootstrap
-      - PAGES-015 Frontend Rollback Archives
-    types:
-      - completed
   workflow_dispatch:
 
 permissions:
