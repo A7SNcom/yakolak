@@ -53,6 +53,7 @@ jobs:
           node --test tests/threejs_match_end_lifecycle_contract.test.mjs
           node --test tests/threejs_local_authority_adapter_contract.test.mjs
           node --test tests/threejs_local_authority_queue_contract.test.mjs
+          node --test tests/threejs_computer_turn_contract.test.mjs
           node --test tests/pages_origin_storage_security.test.mjs
           node --test tests/pages_public_runtime_config.test.mjs
           node --test tests/pages_service_worker_decision.test.mjs
