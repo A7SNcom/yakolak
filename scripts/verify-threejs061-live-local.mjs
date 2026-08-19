@@ -503,9 +503,14 @@ async function runDeployedGameplayProbe(page) {
       });
       const selectionController = sizeSelectionModule.createSizeSelectionController();
       const selection = selectionController.select(state, { stackTargetId: 'stack:right:0', size: 'medium' });
-      const pieceId = selection.selectedPieceTargetId;
+      const selectedSeat = state.seats.find(seat => seat.seatId === selection.seatId);
+      const stackIndex = Number(selection.stackTargetId.split(':').at(-1));
+      if (!selectedSeat || !Number.isInteger(stackIndex) || stackIndex < 0 || stackIndex > 2) {
+        throw new Error('THREEJS-061 drag selected piece identity could not be resolved');
+      }
+      const pieceId = `piece:${selectedSeat.color}:${selection.selectedSize}:${stackIndex + 1}`;
       const zone = worldLayout.zones.find(candidate => candidate.id === selection.legalCells[0]);
-      const homeCenter = worldLayout.homeStacks.right[0];
+      const homeCenter = worldLayout.homeStacks[selection.seatId][stackIndex];
       let currentTransform = { position: [...homeCenter], rotationDegrees: [...worldLayout.pieceRotationDegrees], scale: [1, 1, 1] };
       const canonicalTransform = clone(currentTransform);
       const presentation = {
