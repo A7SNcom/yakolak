@@ -95,7 +95,7 @@ function assertPersistedMatchWinner(state) {
     fail('match_end_match_winner_mismatch');
   }
   const winnerScore = state.scores[state.winner.seatId];
-  if (winnerScore < state.winsToMatch || state.matchWinner.wins !== winnerScore) fail('match_end_score_mismatch');
+  if (winnerScore !== state.winsToMatch || state.matchWinner.wins !== winnerScore) fail('match_end_score_mismatch');
   if (state.matchWinners.length !== 1) fail('match_end_match_winners_mismatch');
   const [listed] = state.matchWinners;
   if (
