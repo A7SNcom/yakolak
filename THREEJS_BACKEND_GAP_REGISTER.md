@@ -1,6 +1,6 @@
 # Three.js Backend Gap and Contradiction Register
 
-Status: **LOCKED by THREEJS-007 (2026-08-16); deployment/runtime ownership superseded by PAGES-004 (2026-08-17)**
+Status: **LOCKED by THREEJS-007 (2026-08-16); deployment/runtime ownership superseded by PAGES-004 (2026-08-17); GAP-001 resolved by THREEJS-048 (2026-08-19)**
 
 Scope: `threejs-rebuild` only until the named later task explicitly resolves a gap. This register is a mandatory companion to `THREEJS_SOURCE_OF_TRUTH.md`, `THREEJS_ENTRY_INVITATION_CONTRACT.md`, `THREEJS_MIGRATION.md`, and `PAGES_MIGRATION_CONTRACT.md`.
 
@@ -64,7 +64,7 @@ The earlier draft incorrectly assigned GAP-001…013 to THREEJS-008…020. Those
 
 | Gap | Status | Contract/resolution owner | Required implementation/closure tasks |
 |---|---|---|---|
-| GAP-001 Seat topology / turn ring / no-legal-move handoff | OPEN | **THREEJS-048** | THREEJS-054 for next-round starter/reset behavior; THREEJS-062/064/072 for online protocol implementation |
+| GAP-001 Seat topology / turn ring / no-legal-move handoff | **RESOLVED — THREEJS-048** | **THREEJS-048** | THREEJS-054 consumes the locked order for next-round starter/reset; THREEJS-062/064/072 persist/transport it for the migration protocol |
 | GAP-002 Mixed Computer/Online authority | OPEN | **THREEJS-062** | THREEJS-064 seat records, THREEJS-069 readiness, THREEJS-071 server-authoritative online Computer turns |
 | GAP-003 Invitation lifecycle / claim / invalidation | OPEN | **THREEJS-062** | THREEJS-063 schema, THREEJS-065 allocation, THREEJS-066 claim/session identity, THREEJS-068 invalidation |
 | GAP-004 Ready/start lifecycle | OPEN | **THREEJS-062** | **THREEJS-069** authoritative ready check and explicit start |
@@ -80,25 +80,33 @@ The earlier draft incorrectly assigned GAP-001…013 to THREEJS-008…020. Those
 
 The owner column is about who is allowed to choose the contract. The implementation column identifies tasks that must make the chosen contract real. No earlier renderer/UI task inherits authority from needing an answer.
 
-## 4. GAP-001 — Seat topology, turn order, round starter and skip evidence — OPEN
+## 4. GAP-001 — Seat topology, turn order, round starter and skip evidence — RESOLVED by THREEJS-048
 
-Current conflict:
+Historical conflict:
 
-- the Kit defines the canonical spatial/color ring `marble → blue → gold → green`, rotated from the host preference;
+- the Kit defines the canonical spatial/color ring `marble → blue → gold → green`, mapped `right → back → left → front`, and rotates setup from the host preferred color;
 - protocol 5 stores joined players in host/join array order and advances `turnIndex` through that array;
 - current next-round starter derives from array position;
-- legal-mover skipping can occur without a complete persisted skip sequence suitable for deterministic presentation.
+- legacy state does not persist a deterministic complete no-legal-move skip sequence.
 
-Unresolved decisions:
+**Resolution — THREEJS-048 (2026-08-19):**
 
-- stable configured seat IDs and mapping to right/back/left/front + canonical colors;
-- canonical turn order independent of connection/join order;
-- representation of skip reason/evidence when one or more seats have no legal move;
-- next-round starter rule after seat order is locked.
+1. Stable configured seat IDs are the physical slots `right`, `back`, `left`, `front`, permanently bound to canonical colors `marble`, `blue`, `gold`, `green` respectively.
+2. The one base seat ring is `right/marble → back/blue → left/gold → front/green`.
+3. The host's preferred color rotates that ring so the preferred-color slot is first. The configured seat/turn order is the first `targetPlayers` entries from the rotated ring for 2-, 3-, or 4-seat sessions. No connection, invitation, reconnect, credential-claim or camera order may change it.
+4. Every Online invitation/session credential binds to an already-configured stable `seatId`. Credential arrival does not allocate or renumber a seat. Recovered identity resolves the same configured slot.
+5. Legal-mover handoff scans the configured ring beginning immediately after the current seat and wraps once through all configured seats, including the current seat at the end of the scan. Each seat with no legal placement is recorded in scan order with authoritative reason `no_legal_move`. The first seat with a legal placement becomes the next active seat.
+6. If no configured seat has any legal placement, the selector returns no next seat plus the complete `no_legal_move` evidence. THREEJS-051 owns committing the authoritative draw result from that condition.
+7. `no_legal_move` is not a timeout reason. THREEJS-050/070 own timeout handoff and must preserve a distinct timeout reason/intent.
+8. THREEJS-054 owns next-round starter/reset behavior but must consume this same configured order; it may not create another ring.
 
-**Contract owner: THREEJS-048 — RESOLVE TURN-RING OWNERSHIP THEN IMPLEMENT LEGAL-MOVER SKIPPING.**
+Migration boundary:
 
-THREEJS-054 consumes that decision for round starter/reset. Online protocol tasks must carry the same seat order; until then live protocol-5 play follows authoritative `players`/`turnIndex` rather than frontend color-ring guesses.
+- active protocol-5 rooms may continue to expose historical `p1…p4`/`players[]` order through an explicit compatibility adapter until their migration/cutover owner changes that protocol;
+- new migration protocol/backend work in THREEJS-062/064/072 must persist and transport stable configured slots/order and credential bindings from this resolution;
+- frontend presentation never derives authority from camera position or join order.
+
+The shared THREEJS-048 contract/test is the executable evidence for all 2/3/4-seat host-preference rotations, credential-to-slot stability and no-legal-move scanning.
 
 ## 5. GAP-002 — Mixed Computer/Online seat authority — OPEN
 
@@ -369,7 +377,7 @@ Historical THREEJS-009 Vercel Preview and historical Vercel Production evidence 
 
 ## 17. Source-of-truth cross-reference
 
-- `SRC-003` seat order/color ownership → GAP-001 → THREEJS-048.
+- `SRC-003` seat order/color ownership → GAP-001 → **RESOLVED by THREEJS-048**; THREEJS-054/062/064/072 consume it.
 - `SRC-004` invitation semantics are product-resolved by THREEJS-006; backend protocol/lifecycle → GAP-003 → THREEJS-062/063/065/066/068.
 - `SRC-005` Computer/mixed authority → GAP-002 → THREEJS-062/064/071.
 - `SRC-006` turn deadline/timeouts → GAP-005/GAP-006 → THREEJS-062/070/071 + PAGES-005 runtime capabilities.
