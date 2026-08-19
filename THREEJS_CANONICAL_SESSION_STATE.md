@@ -14,7 +14,7 @@ The canonical object contains only normalized application data:
 - `seats[]`: exact `{ seatId, type, color, ready }` records;
 - `board`: the exact 9-cell/3-size shared-rules board;
 - `inventory`: remaining pieces by seat and size, derived from `board` and never independently authoritative;
-- `turnIndex` + `activeSeatId`: either both `null` or one internally consistent active turn;
+- `activeSeatId`: `null` or the exact configured seat identity whose turn is active;
 - `deadlineAtMs`: `null` or one absolute epoch-millisecond deadline;
 - `scores`, `round`, `completedRounds`;
 - `lastMove`, `skippedSeat`, `skipReason`;
@@ -24,6 +24,8 @@ The canonical object contains only normalized application data:
 - `lifecycle`: `{ phase, interrupt, recoveryTarget, presentationGeneration }`.
 
 Every object level uses a closed key set. Unknown fields are rejected rather than silently retained.
+
+`turnIndex` is intentionally **not** canonical state. The current protocol-v5 adapter may still expose an array index, but encoding that index into the new state would silently make `seats[]` order authoritative before THREEJS-048 resolves stable seat topology/turn order. Adapters must translate their current representation to `activeSeatId`; future canonical ordering must come from the THREEJS-048 contract rather than accidental array position.
 
 ## Derived inventory
 
@@ -54,7 +56,7 @@ This schema stores data needed by later authority tasks without deciding their u
 - `skipReason` is an opaque reason token. THREEJS-048/070 own legal-move and timeout skip semantics.
 - `restart`/`rematch` serialize per-seat approvals but do not define required voters or consensus. THREEJS-076 owns that contract.
 - lifecycle tokens are opaque strings in THREEJS-045. THREEJS-060 immediately owns the allowed lifecycle phases, interruptions, recovery targets and legal transition graph.
-- stable seat topology/turn-ring meaning is not inferred from array position; THREEJS-048 owns it.
+- stable seat topology/turn-ring meaning is not inferred from `seats[]` order; THREEJS-048 owns it.
 
 The schema therefore records future authority facts without granting authority to the browser.
 
@@ -70,4 +72,4 @@ Run:
 
 `node --test tests/threejs_canonical_session_state_contract.test.mjs`
 
-The contract covers JSON round-trip, seat/color normalization, exact active-turn/deadline consistency, derived inventory, board ownership, scores/votes, last move/skip/outcome fields, pure reducer behavior, JSON coercion protection and explicit rejection of rendering/DOM/service-worker/timer state.
+The contract covers JSON round-trip, seat/color normalization, seat-identity active turns without array-order authority, deadline consistency, derived inventory, board ownership, scores/votes, last move/skip/outcome fields, pure reducer behavior, JSON coercion protection and explicit rejection of rendering/DOM/service-worker/timer state.
