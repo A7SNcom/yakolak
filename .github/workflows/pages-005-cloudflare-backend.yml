@@ -8,6 +8,7 @@ on:
       - 'backend/cloudflare/**'
       - 'scripts/pages005-bootstrap-live.sh'
       - 'scripts/pages015-finalize-live-window.sh'
+      - 'scripts/pages015-orchestrate-qualification.sh'
       - 'scripts/append-pages015-qualification.mjs'
       - 'scripts/probe-pages005-cloudflare-roundtrip.mjs'
       - 'scripts/probe-pages015-live-compatibility.mjs'
@@ -19,8 +20,13 @@ on:
       - 'tests/pages005_worker_lock_identity_contract.test.mjs'
       - 'tests/pages015_current_lock_qualification_contract.test.mjs'
       - 'tests/pages015_release_verifier_window_contract.test.mjs'
+      - 'tests/pages015_single_resume_path_contract.test.mjs'
       - 'tests/pages015-browser-cors.spec.js'
       - '.github/workflows/pages-005-cloudflare-backend.yml'
+      - '.github/workflows/pages-012-immutable-release.yml'
+      - '.github/workflows/pages-012-rollback.yml'
+      - '.github/workflows/pages-015-online-compatibility.yml'
+      - '.github/workflows/pages-015-window-archive.yml'
   workflow_dispatch:
 
 permissions:
@@ -52,7 +58,7 @@ jobs:
       - name: Install runtime dependency
         run: npm install --ignore-scripts
       - name: Worker and online compatibility contract tests
-        run: node --test tests/pages_backend_runtime_contract.test.mjs tests/pages_online_compatibility_contract.test.mjs tests/pages005_worker_lock_identity_contract.test.mjs tests/pages015_current_lock_qualification_contract.test.mjs tests/pages015_release_verifier_window_contract.test.mjs
+        run: node --test tests/pages_backend_runtime_contract.test.mjs tests/pages_online_compatibility_contract.test.mjs tests/pages005_worker_lock_identity_contract.test.mjs tests/pages015_current_lock_qualification_contract.test.mjs tests/pages015_release_verifier_window_contract.test.mjs tests/pages015_single_resume_path_contract.test.mjs
       - name: Wrangler dry-run bundle
         run: npx --yes wrangler@4 deploy --dry-run --config backend/cloudflare/wrangler.jsonc --outdir .tmp/pages005-worker
 
