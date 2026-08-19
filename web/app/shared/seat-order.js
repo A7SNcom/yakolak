@@ -144,22 +144,22 @@ export function selectNextLegalConfiguredSeat(state, currentSeatId) {
   const currentIndex = order.findIndex(seat => seat.seatId === currentSeatId);
   if (currentIndex < 0) fail('current_seat_not_configured');
 
-  const skipped = [];
+  const skips = [];
   for (let offset = 1; offset <= order.length; offset += 1) {
     const seat = order[(currentIndex + offset) % order.length];
     if (hasLegalMove(state.board, seat.color)) {
       return deepFreeze({
         nextSeatId: seat.seatId,
-        skipped,
+        skips,
         allSeatsBlocked: false,
       });
     }
-    skipped.push({ seatId: seat.seatId, reason: NO_LEGAL_MOVE_SKIP_REASON });
+    skips.push({ seatId: seat.seatId, reason: NO_LEGAL_MOVE_SKIP_REASON });
   }
 
   return deepFreeze({
     nextSeatId: null,
-    skipped,
+    skips,
     allSeatsBlocked: true,
   });
 }
