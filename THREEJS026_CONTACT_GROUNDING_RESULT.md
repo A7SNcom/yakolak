@@ -14,7 +14,7 @@ Pre-effect Pages identity:
 - deployment generation: `sha256:da19ae11e3df476c66e2ae7d23a74ecc78740acfef969c601021dea51ce8eada`
 - measurement run: `32231586141`
 
-Post-effect Pages identity:
+Measured post-effect Pages identity:
 
 - Three.js candidate: `b2ead11b752a55477ebfe11ce65e1b0d5e4bfc8e`
 - deployment generation: `sha256:c4ce95efbc0a85c9f5eeb4b75d01f0870eac74e4bd3412429ce055a8cf097bf4`
@@ -22,7 +22,9 @@ Post-effect Pages identity:
 - measurement run: `32233254521`
 - evidence artifact: `threejs026-final-post-grounding-32233254521` / artifact `9358024618`
 
-Between those candidate SHAs, repository history contains unrelated workflow/docs/tests/release-state commits from parallel Pages work, but GitHub's commit comparison shows the **only changed file under `web/` is `web/app/scene/preview-scene.js`**. Required/optional asset bodies and decoded six-GLB geometry remained byte-identical. This makes the runtime before/after comparison controlled to the grounding presentation change while keeping the same fixed profile.
+Between the pre/post candidate SHAs, repository history contains unrelated workflow/docs/tests/release-state commits from parallel Pages work, but GitHub's commit comparison shows the **only changed file under `web/` is `web/app/scene/preview-scene.js`**. Required/optional asset bodies and decoded six-GLB geometry remained byte-identical. This makes the runtime before/after comparison controlled to the grounding presentation change while keeping the same fixed profile.
+
+After the successful measurement, a final temporary Pages probe republished candidate `a9eb831999dbf8a60f846bc958d96fbb010bda63` as generation `sha256:43205bc9758fe3feadacd824e490256188665bf029cfb271439dfff9887adee8`. GitHub comparison from the measured `b2ead11b...` candidate to `a9eb831...` shows **no changes under `web/` at all**: only temporary workflows, Pages qualification state, and the measurement script changed. Therefore the live Three.js runtime being served after that publication is byte-equivalent to the measured grounding runtime for this presentation decision.
 
 ## Before / after
 
