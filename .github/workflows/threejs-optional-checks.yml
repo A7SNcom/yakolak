@@ -46,6 +46,7 @@ jobs:
           node --test tests/threejs_local_deadline_contract.test.mjs
           node --test tests/threejs_local_timeout_contract.test.mjs
           node --test tests/threejs_true_draw_contract.test.mjs
+          node --test tests/threejs_win_scoring_contract.test.mjs
           node --test tests/pages_origin_storage_security.test.mjs
           node --test tests/pages_public_runtime_config.test.mjs
           node --test tests/pages_service_worker_decision.test.mjs
