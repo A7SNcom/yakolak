@@ -240,9 +240,12 @@ export function createDragInteractionController({
     const live = view.isPieceLive(pieceId);
     if (typeof live !== 'boolean') fail('drag_piece_liveness_invalid');
     if (!live) fail('drag_piece_not_live');
+
+    // THREEJS-032 may already have separated the selected remaining piece visually.
+    // Drag begins from that current presentation transform; canonical is consulted only
+    // for invalid/cancel return or authoritative resync.
     const originTransform = normalizeTransform(view.readPieceTransform(pieceId), 'invalid_drag_origin_transform');
-    const canonicalTransform = normalizeTransform(view.readCanonicalPieceTransform(pieceId), 'invalid_drag_canonical_transform');
-    if (JSON.stringify(originTransform) !== JSON.stringify(canonicalTransform)) fail('drag_piece_not_at_canonical_start');
+    normalizeTransform(view.readCanonicalPieceTransform(pieceId), 'invalid_drag_canonical_transform');
 
     const witness = witnessFromState(state);
     const motionSnapshot = motion.snapshot();
@@ -310,9 +313,9 @@ export function createDragInteractionController({
     let directTransform = drag.lastTransform;
     if (pick.worldPoint) {
       directTransform = directTransformFromWorldPoint(drag.originTransform, pick.worldPoint, contract.dragHeight);
-      const live = view.isPieceLive(drag.pieceId);
-      if (typeof live !== 'boolean') fail('drag_piece_liveness_invalid');
-      if (!live) fail('drag_piece_not_live');
+      const liveNow = view.isPieceLive(drag.pieceId);
+      if (typeof liveNow !== 'boolean') fail('drag_piece_liveness_invalid');
+      if (!liveNow) fail('drag_piece_not_live');
       view.applyDragTransform(drag.pieceId, directTransform, deepFreeze({
         dragId: drag.dragId,
         phase: DRAG_PHASES.DRAGGING,
@@ -333,9 +336,9 @@ export function createDragInteractionController({
   }
 
   function requestCanonicalReturn(drag, reason) {
-    const live = view.isPieceLive(drag.pieceId);
-    if (typeof live !== 'boolean') fail('drag_piece_liveness_invalid');
-    if (!live) return null;
+    const liveNow = view.isPieceLive(drag.pieceId);
+    if (typeof liveNow !== 'boolean') fail('drag_piece_liveness_invalid');
+    if (!liveNow) return null;
     const from = normalizeTransform(view.readPieceTransform(drag.pieceId), 'invalid_drag_return_from');
     const to = normalizeTransform(view.readCanonicalPieceTransform(drag.pieceId), 'invalid_drag_return_to');
     return motion.animate({
@@ -447,9 +450,9 @@ export function createDragInteractionController({
     const drag = current;
     setCameraEnabled(true);
     motion.cancelScope(returnScope(drag.pieceId), reason);
-    const live = view.isPieceLive(drag.pieceId);
-    if (typeof live !== 'boolean') fail('drag_piece_liveness_invalid');
-    if (live) view.snapPieceCanonical(drag.pieceId, deepFreeze({ reason, immediate: true }));
+    const liveNow = view.isPieceLive(drag.pieceId);
+    if (typeof liveNow !== 'boolean') fail('drag_piece_liveness_invalid');
+    if (liveNow) view.snapPieceCanonical(drag.pieceId, deepFreeze({ reason, immediate: true }));
     current = null;
     clearSizeSelection('cancel', clearState);
     return true;
@@ -469,9 +472,9 @@ export function createDragInteractionController({
 
     const drag = current;
     setCameraEnabled(true);
-    const live = view.isPieceLive(drag.pieceId);
-    if (typeof live !== 'boolean') fail('drag_piece_liveness_invalid');
-    if (live) {
+    const liveNow = view.isPieceLive(drag.pieceId);
+    if (typeof liveNow !== 'boolean') fail('drag_piece_liveness_invalid');
+    if (liveNow) {
       view.snapPieceCanonical(drag.pieceId, deepFreeze({
         reason,
         immediate: true,
