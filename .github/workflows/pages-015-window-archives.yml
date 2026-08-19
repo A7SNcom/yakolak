@@ -1,13 +1,7 @@
 name: PAGES-015 Frontend Rollback Archives
-# Launch marker: exact-byte active + previous qualification window.
+# Manual fallback for the exact-byte active + previous qualification window.
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/pages-015-window-archives.yml'
-      - 'scripts/pages015-archive-source.sh'
   workflow_dispatch:
 
 permissions:
@@ -15,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: pages-015-frontend-rollback-archives
+  group: pages-release-qualification-ledger
   cancel-in-progress: false
 
 jobs:
