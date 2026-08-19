@@ -2,38 +2,37 @@
 // `rules/yakolak-rules.json` remains the versioned data contract; the parity
 // test must fail if this browser-safe data mirror drifts from that file.
 
-function freezeList(values) {
-  return Object.freeze([...values]);
-}
-
-export const RULES = Object.freeze({
+const RULES_DATA = {
   version: 2,
-  playerCounts: freezeList([2, 3, 4]),
-  colors: freezeList(['marble', 'blue', 'gold', 'green']),
-  sizes: freezeList(['small', 'medium', 'large']),
+  playerCounts: [2, 3, 4],
+  colors: ['marble', 'blue', 'gold', 'green'],
+  sizes: ['small', 'medium', 'large'],
   copiesPerSizePerColor: 3,
   totalPieces: 36,
-  winsToMatchOptions: freezeList([3, 5]),
+  winsToMatchOptions: [3, 5],
   cellCount: 9,
-  lines: Object.freeze([
-    freezeList([0, 1, 2]),
-    freezeList([3, 4, 5]),
-    freezeList([6, 7, 8]),
-    freezeList([0, 3, 6]),
-    freezeList([1, 4, 7]),
-    freezeList([2, 5, 8]),
-    freezeList([0, 4, 8]),
-    freezeList([2, 4, 6]),
-  ]),
-  gradedOrders: Object.freeze([
-    freezeList(['small', 'medium', 'large']),
-    freezeList(['large', 'medium', 'small']),
-  ]),
-});
+  lines: [
+    [0, 1, 2],
+    [3, 4, 5],
+    [6, 7, 8],
+    [0, 3, 6],
+    [1, 4, 7],
+    [2, 5, 8],
+    [0, 4, 8],
+    [2, 4, 6],
+  ],
+  gradedOrders: [
+    ['small', 'medium', 'large'],
+    ['large', 'medium', 'small'],
+  ],
+};
 
-export const COLORS = RULES.colors;
-export const SIZES = RULES.sizes;
-export const LINES = RULES.lines;
+// Preserve the public mutability/freeze shape of the pre-refactor v5 module:
+// RULES is top-level frozen, while exported convenience lists are frozen copies.
+export const RULES = Object.freeze(structuredClone(RULES_DATA));
+export const COLORS = Object.freeze([...RULES.colors]);
+export const SIZES = Object.freeze([...RULES.sizes]);
+export const LINES = Object.freeze(RULES.lines.map(line => Object.freeze([...line])));
 
 export function isValidPlayerCount(value) {
   return RULES.playerCounts.includes(Number(value));
