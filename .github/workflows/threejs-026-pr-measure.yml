@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 env:
-  THREEJS026_EXPECTED_CANDIDATE: 2803601aa6a79fea40b464c23867b82addaee776
+  THREEJS026_EXPECTED_CANDIDATE: 5ec4c77dba5da8ce8ed0406ac4ca6813e552998c
 
 jobs:
   measure:
