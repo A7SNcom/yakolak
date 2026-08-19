@@ -8,6 +8,7 @@ on:
       - 'backend/cloudflare/**'
       - 'scripts/pages005-bootstrap-live.sh'
       - 'scripts/pages015-finalize-live-window.sh'
+      - 'scripts/append-pages015-qualification.mjs'
       - 'scripts/probe-pages005-cloudflare-roundtrip.mjs'
       - 'scripts/probe-pages015-live-compatibility.mjs'
       - 'scripts/verify-pages015-frontend-window.mjs'
@@ -44,6 +45,7 @@ jobs:
         run: |
           bash -n scripts/pages005-bootstrap-live.sh
           bash -n scripts/pages015-finalize-live-window.sh
+          node --check scripts/append-pages015-qualification.mjs
           node --check scripts/verify-pages015-frontend-window.mjs
           node --check scripts/verify-pages015-current-lock-qualification.mjs
           node --check scripts/verify-release-qualification.mjs
@@ -83,6 +85,7 @@ jobs:
         run: |
           bash -n scripts/pages005-bootstrap-live.sh
           bash -n scripts/pages015-finalize-live-window.sh
+          node --check scripts/append-pages015-qualification.mjs
           node --check scripts/verify-pages015-frontend-window.mjs
           node --check scripts/verify-pages015-current-lock-qualification.mjs
           node --check scripts/verify-release-qualification.mjs
