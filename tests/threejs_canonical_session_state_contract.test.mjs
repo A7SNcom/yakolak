@@ -82,14 +82,14 @@ const reordered = createCanonicalSessionState({
 });
 assert.equal(reordered.activeSeatId, 'seat-guest', 'active turn is seat identity, not array index');
 
-// Seat type and lifecycle tokens are carried as normalized opaque strings here.
-// Their authoritative vocabulary/transition semantics belong to later owner tasks.
-const opaqueTokens = createCanonicalSessionState({
+// Seat type remains opaque until THREEJS-062; lifecycle vocabulary is now locked by THREEJS-060.
+const opaqueSeatType = createCanonicalSessionState({
   seats: [{ seatId: 'future-seat', type: 'future-authority-seat-type', color: 'green', ready: null }],
-  lifecycle: { phase: 'future-phase-token' },
+  lifecycle: { phase: 'setup' },
 });
-assert.equal(opaqueTokens.seats[0].type, 'future-authority-seat-type');
-assert.equal(opaqueTokens.lifecycle.phase, 'future-phase-token');
+assert.equal(opaqueSeatType.seats[0].type, 'future-authority-seat-type');
+assert.throws(() => createCanonicalSessionState({ lifecycle: { phase: 'future-phase-token' } }), /invalid_lifecycle_phase/);
+assert.throws(() => createCanonicalSessionState({ lifecycle: new Date('2026-08-19T00:00:00Z') }), /invalid_session_lifecycle/);
 
 assert.throws(() => createCanonicalSessionState({
   seats: [
@@ -119,14 +119,8 @@ const tooManyPieces = emptyBoard();
 for (const cell of [0, 1, 2, 3]) tooManyPieces[String(cell)].small = 'marble';
 assert.throws(() => createCanonicalSessionState({ seats, board: tooManyPieces }), /invalid_session_piece_count/);
 
-assert.throws(() => createCanonicalSessionState({
-  seats,
-  activeSeatId: 'missing-seat',
-}), /invalid_session_active_seat/);
-assert.throws(() => createCanonicalSessionState({
-  seats,
-  deadlineAtMs: 123,
-}), /deadline_without_active_turn/);
+assert.throws(() => createCanonicalSessionState({ seats, activeSeatId: 'missing-seat' }), /invalid_session_active_seat/);
+assert.throws(() => createCanonicalSessionState({ seats, deadlineAtMs: 123 }), /deadline_without_active_turn/);
 assert.throws(() => createCanonicalSessionState({
   seats,
   winner: { seatId: 'seat-host', color: 'marble' },
@@ -167,12 +161,12 @@ const reduced = runCanonicalSessionReducer(initial, { type: 'CONFIGURED' }, (sta
   revision: state.revision + 1,
   lifecycle: {
     ...state.lifecycle,
-    phase: event.type.toLowerCase(),
+    phase: event.type.toLowerCase() === 'configured' ? 'setup' : state.lifecycle.phase,
     presentationGeneration: state.lifecycle.presentationGeneration + 1,
   },
 }));
 assert.equal(reduced.revision, 1);
-assert.equal(reduced.lifecycle.phase, 'configured');
+assert.equal(reduced.lifecycle.phase, 'setup');
 assert.equal(reduced.lifecycle.presentationGeneration, 1);
 assert.equal(initial.revision, 0, 'reducer boundary must not mutate canonical input');
 
@@ -180,12 +174,7 @@ assert.throws(() => runCanonicalSessionReducer(initial, null, state => {
   state.revision += 1;
   return state;
 }), /read only|Cannot assign|canonical_session_reducer_mutated_input/);
-
-assert.throws(() => runCanonicalSessionReducer(initial, null, state => ({
-  ...state,
-  renderer: { mesh: true },
-})), /invalid_canonical_session_state_shape/);
-
+assert.throws(() => runCanonicalSessionReducer(initial, null, state => ({ ...state, renderer: { mesh: true } })), /invalid_canonical_session_state_shape/);
 assert.throws(() => runCanonicalSessionReducer(initial, { bad: 1n }, state => state), /canonical_reducer_event_not_json/);
 assert.throws(() => runCanonicalSessionReducer(initial, { when: new Date('2026-08-19T00:00:00Z') }, state => state), /canonical_reducer_event_not_json/);
 assert.throws(() => createCanonicalSessionState({
