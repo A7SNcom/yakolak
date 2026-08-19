@@ -33,12 +33,6 @@ previous_descriptor_sha="$(read_window previous onlineCompatibilityDescriptorSha
 previous_generation="$(read_window previous deploymentGeneration)"
 previous_live_manifest="$(read_live previous liveManifestSha256)"
 
-if node scripts/verify-release-qualification.mjs "$active_tag" "$active_digest" >/dev/null 2>&1 && \
-   node scripts/verify-release-qualification.mjs "$previous_tag" "$previous_digest" >/dev/null 2>&1; then
-  echo 'PAGES-015 locked window is already fully qualified.'
-  exit 0
-fi
-
 check_frontend_prerequisites() {
   local tag="$1" digest="$2" descriptor="$3" generation="$4" live_manifest="$5"
   jq -s -e \
@@ -109,6 +103,14 @@ locked_capability_identity="$(jq -r '.capabilityIdentity' backend/cloudflare/WOR
 locked_capabilities_json="$(jq -c '.capabilities | sort' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json)"
 locked_turso_schema_id="$(jq -r '.tursoSchemaId' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json)"
 locked_turso_schema_version="$(jq -r '.tursoSchemaVersion' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json)"
+
+if node scripts/verify-release-qualification.mjs "$active_tag" "$active_digest" >/dev/null 2>&1 && \
+   node scripts/verify-release-qualification.mjs "$previous_tag" "$previous_digest" >/dev/null 2>&1 && \
+   node scripts/verify-pages015-current-lock-qualification.mjs >/dev/null 2>&1; then
+  echo 'PAGES-015 locked window is already fully qualified for the current Worker rollback lock.'
+  exit 0
+fi
+
 evidence="$RUNNER_TEMP/pages015-live-evidence.json"
 frontends="$RUNNER_TEMP/pages015-frontends"
 rm -rf "$frontends" "$evidence"
@@ -208,11 +210,12 @@ node scripts/append-pages015-qualification.mjs
 
 node scripts/verify-release-qualification.mjs "$active_tag" "$active_digest"
 node scripts/verify-release-qualification.mjs "$previous_tag" "$previous_digest"
+node scripts/verify-pages015-current-lock-qualification.mjs
 
 rm -f "$evidence"
 git restore --worktree --staged package.json package-lock.json 2>/dev/null || true
 if git diff --quiet -- "$ledger"; then
-  echo 'Equivalent PAGES-015 backend qualification already exists.'
+  echo 'Equivalent PAGES-015 backend qualification already exists for the current Worker rollback lock.'
   exit 0
 fi
 
@@ -224,4 +227,4 @@ test "$(git diff --cached --name-only | wc -l)" -eq 1
 git commit -m 'PAGES-015 qualify active+previous frontend Worker window'
 git push origin HEAD:threejs-rebuild
 
-echo 'PAGES-015 live compatibility qualification complete for both immutable frontend keys.'
+echo 'PAGES-015 live compatibility qualification complete for both immutable frontend keys and the current Worker rollback lock.'
