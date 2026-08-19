@@ -11,11 +11,13 @@ import {
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const baseUrl = process.env.SHELL_URL || 'http://127.0.0.1:4173/';
+const expectedThreejsSha = String(process.env.EXPECTED_THREEJS_SHA || '').trim() || null;
 
 const PROFILE = Object.freeze({
   name: REPRESENTATIVE_MOBILE_PROFILE.name,
   viewport: Object.freeze({ width: REPRESENTATIVE_MOBILE_PROFILE.width, height: REPRESENTATIVE_MOBILE_PROFILE.height }),
   deviceScaleFactor: REPRESENTATIVE_MOBILE_PROFILE.deviceScaleFactor,
+  rendererDprCap: REPRESENTATIVE_MOBILE_PROFILE.rendererDprCap,
   cpuThrottleRate: REPRESENTATIVE_MOBILE_PROFILE.cpuThrottleRate,
   latencyMs: REPRESENTATIVE_MOBILE_PROFILE.latencyMs,
   downloadKbps: REPRESENTATIVE_MOBILE_PROFILE.downloadKbps,
@@ -72,6 +74,80 @@ function budgetStatus(metrics, limits) {
   });
 }
 
+async function rendererInfoSnapshot(cdp) {
+  await cdp.send('Runtime.enable');
+  const prototype = await cdp.send('Runtime.evaluate', {
+    expression: `(async () => {
+      const moduleUrl = new URL('vendor/three/r185/three.module.js', location.href).href;
+      const THREE = await import(moduleUrl);
+      return THREE.WebGLRenderer.prototype;
+    })()`,
+    awaitPromise: true,
+    returnByValue: false,
+  });
+  const prototypeObjectId = prototype?.result?.objectId;
+  if (!prototypeObjectId) throw new Error('Unable to resolve the live Three.js WebGLRenderer prototype');
+
+  const queried = await cdp.send('Runtime.queryObjects', { prototypeObjectId });
+  const objectsObjectId = queried?.objects?.objectId;
+  if (!objectsObjectId) throw new Error('Unable to query live Three.js WebGLRenderer instances');
+
+  try {
+    const snapshot = await cdp.send('Runtime.callFunctionOn', {
+      objectId: objectsObjectId,
+      functionDeclaration: `function () {
+        const candidates = Array.from(this).filter((renderer) =>
+          renderer?.isWebGLRenderer
+          && renderer?.domElement?.dataset?.rendererOwner === 'primary-webgl2'
+          && renderer.domElement.isConnected
+          && renderer.info
+        );
+        const renderer = candidates.at(-1);
+        if (!renderer) return null;
+        const info = renderer.info;
+        return {
+          drawCalls: info.render.calls,
+          triangles: info.render.triangles,
+          points: info.render.points,
+          lines: info.render.lines,
+          geometries: info.memory.geometries,
+          textures: info.memory.textures,
+          programs: info.programs?.length || 0,
+        };
+      }`,
+      returnByValue: true,
+    });
+    const value = snapshot?.result?.value;
+    if (!value) throw new Error('No connected primary WebGLRenderer instance was found');
+    return Object.freeze(value);
+  } finally {
+    await cdp.send('Runtime.releaseObject', { objectId: objectsObjectId }).catch(() => {});
+    await cdp.send('Runtime.releaseObject', { objectId: prototypeObjectId }).catch(() => {});
+  }
+}
+
+function resourceCount(snapshot, kind) {
+  return Number(snapshot?.byKind?.[kind] || 0);
+}
+
+function lifecycleDelta(before, after) {
+  return Object.freeze({
+    total: Number(after?.total || 0) - Number(before?.total || 0),
+    gpuObjects: Number(after?.gpuObjects || 0) - Number(before?.gpuObjects || 0),
+    geometries: resourceCount(after, 'geometry') - resourceCount(before, 'geometry'),
+    materials: resourceCount(after, 'material') - resourceCount(before, 'material'),
+    textures: resourceCount(after, 'texture') - resourceCount(before, 'texture'),
+    renderTargets: resourceCount(after, 'render-target') - resourceCount(before, 'render-target'),
+    shadowMaps: resourceCount(after, 'shadow-map') - resourceCount(before, 'shadow-map'),
+    shaderVariants: Number(after?.shaderVariants || 0) - Number(before?.shaderVariants || 0),
+    materialVariants: Number(after?.materialVariants || 0) - Number(before?.materialVariants || 0),
+  });
+}
+
+function zeroLifecycleDelta(delta) {
+  return Object.values(delta).every((value) => value === 0);
+}
+
 const browser = await chromium.launch({
   headless: true,
   args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
@@ -113,11 +189,14 @@ try {
   await page.waitForFunction(() => {
     const shell = window.__YAKOLAK_THREEJS_SHELL__;
     const marks = shell?.getStartupMarks?.();
-    return Boolean(marks?.firstVisibleFrame && marks?.firstInteractive && window.__YAKOLAK_RENDERER_INFO__);
+    return Boolean(marks?.firstVisibleFrame && marks?.firstInteractive);
   }, null, { timeout: 30_000 });
 
+  const gpuFrame = await rendererInfoSnapshot(cdp);
+
   const browserMetrics = await page.evaluate(async () => {
-    const { ASSET_LIST: manifest } = await import('/app/assets/asset-manifest.js');
+    const manifestUrl = new URL('app/assets/asset-manifest.js', location.href).href;
+    const { ASSET_LIST: manifest } = await import(manifestUrl);
     const shell = window.__YAKOLAK_THREEJS_SHELL__;
     const marks = shell.getStartupMarks();
 
@@ -164,23 +243,26 @@ try {
 
     const requiredPaths = new Set(manifest.filter((asset) => asset.runtimeRequired).map((asset) => new URL(asset.runtime.url, location.href).pathname));
     const requiredAssetEntries = resources.filter((entry) => requiredPaths.has(new URL(entry.name).pathname) && entry.responseEnd <= startupCutoff + 0.001);
-    const rendererInfo = window.__YAKOLAK_RENDERER_INFO__;
+
+    let deploymentManifest = null;
+    try {
+      const deploymentManifestUrl = new URL('../deployment-manifest.json', location.href);
+      deploymentManifestUrl.searchParams.set('threejs026_perf', `${Date.now()}-${Math.random()}`);
+      const response = await fetch(deploymentManifestUrl, { cache: 'no-store', headers: { 'cache-control': 'no-cache' } });
+      if (response.ok) deploymentManifest = await response.json();
+    } catch {
+      deploymentManifest = null;
+    }
 
     return {
       marks,
+      startupHitchMs: Math.max(0, Number(marks.firstVisibleFrame) - Number(marks.firstInteractive)),
       startupNetwork: allAtInteractive,
       requiredAssetNetwork: network(requiredAssetEntries),
       decodedRequiredGeometryBytes,
       decodedGeometry,
-      gpuFrame: {
-        drawCalls: rendererInfo.render.calls,
-        triangles: rendererInfo.render.triangles,
-        points: rendererInfo.render.points,
-        lines: rendererInfo.render.lines,
-        geometries: rendererInfo.memory.geometries,
-        textures: rendererInfo.memory.textures,
-        programs: rendererInfo.programs?.length || 0,
-      },
+      deploymentManifest,
+      resourceRegistryAtReady: shell.getResourceRegistrySnapshot?.() || null,
       dpr: window.devicePixelRatio,
       drawingBuffer: {
         width: shell.canvas.width,
@@ -189,10 +271,64 @@ try {
     };
   });
 
+  if (expectedThreejsSha) {
+    const liveSha = browserMetrics.deploymentManifest?.threejsCandidateSha || null;
+    if (liveSha !== expectedThreejsSha) {
+      throw new Error(`Exact Pages generation mismatch: expected Three.js ${expectedThreejsSha}, live manifest has ${liveSha || 'none'}`);
+    }
+  }
+
+  const lifecycleRecreate = await page.evaluate(async () => {
+    const shell = window.__YAKOLAK_THREEJS_SHELL__;
+    const before = shell.getResourceRegistrySnapshot();
+    const graphicsBefore = shell.getGraphicsContextSnapshot();
+    const gl = shell.canvas.getContext('webgl2');
+    const extension = gl?.getExtension('WEBGL_lose_context');
+    if (!extension) {
+      return { supported: false, before, after: before, graphicsBefore, graphicsAfter: graphicsBefore, reason: 'WEBGL_lose_context unavailable' };
+    }
+
+    const waitFor = async (predicate, timeoutMs = 15_000) => {
+      const started = performance.now();
+      while (!predicate()) {
+        if (performance.now() - started > timeoutMs) throw new Error('Timed out waiting for WebGL dispose/recreate lifecycle');
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+    };
+
+    extension.loseContext();
+    await waitFor(() => shell.getGraphicsContextSnapshot()?.state === 'lost');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    extension.restoreContext();
+    await waitFor(() => {
+      const state = shell.getGraphicsContextSnapshot();
+      return state?.state === 'active' && state.restoreCount > Number(graphicsBefore?.restoreCount || 0);
+    });
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+    return {
+      supported: true,
+      before,
+      after: shell.getResourceRegistrySnapshot(),
+      graphicsBefore,
+      graphicsAfter: shell.getGraphicsContextSnapshot(),
+    };
+  });
+  const gpuFrameAfterRecreate = lifecycleRecreate.supported ? await rendererInfoSnapshot(cdp) : gpuFrame;
+  const recreateDelta = lifecycleDelta(lifecycleRecreate.before, lifecycleRecreate.after);
+  const lifecycleOk = lifecycleRecreate.supported
+    && zeroLifecycleDelta(recreateDelta)
+    && (lifecycleRecreate.after?.disposalErrors?.length || 0) === (lifecycleRecreate.before?.disposalErrors?.length || 0)
+    && gpuFrameAfterRecreate.geometries === gpuFrame.geometries
+    && gpuFrameAfterRecreate.textures === gpuFrame.textures
+    && gpuFrameAfterRecreate.programs === gpuFrame.programs;
+
   const png = await decodedPngBytes();
   const baseMetrics = {
-    schema: 'THREEJS-017-PERF-V1',
+    schema: 'THREEJS-026-PERF-V1',
     profile: PROFILE,
+    target: baseUrl,
+    expectedThreejsSha,
     manifestBodyBytes: Object.freeze({
       bootCritical: sumRuntimeBytes('boot-critical'),
       sceneCritical: sumRuntimeBytes('scene-critical'),
@@ -203,15 +339,31 @@ try {
     decodedOptionalTextureRgba8Bytes: png.total,
     decodedOptionalTextures: png.entries,
     ...browserMetrics,
+    gpuFrame,
+    lifecycleRecreate: Object.freeze({
+      supported: lifecycleRecreate.supported,
+      ok: lifecycleOk,
+      delta: recreateDelta,
+      before: lifecycleRecreate.before,
+      after: lifecycleRecreate.after,
+      graphicsBefore: lifecycleRecreate.graphicsBefore,
+      graphicsAfter: lifecycleRecreate.graphicsAfter,
+      gpuBefore: gpuFrame,
+      gpuAfter: gpuFrameAfterRecreate,
+      reason: lifecycleRecreate.reason || null,
+    }),
     pageErrors,
   };
   const regression = budgetStatus(baseMetrics, PERFORMANCE_REGRESSION_CEILINGS);
   const cutover = budgetStatus(baseMetrics, PERFORMANCE_CUTOVER_TARGETS);
   const metrics = Object.freeze({ ...baseMetrics, regression, cutover });
 
-  console.log(`THREEJS-017_METRICS ${JSON.stringify(metrics)}`);
-  if (pageErrors.length || !regression.ok) {
-    if (!regression.ok) console.error(`THREEJS-017 budget regression: ${JSON.stringify(regression.failures)}`);
+  const serialized = JSON.stringify(metrics);
+  console.log(`THREEJS-017_METRICS ${serialized}`);
+  console.log(`THREEJS026_METRICS ${serialized}`);
+  if (pageErrors.length || !regression.ok || !lifecycleOk) {
+    if (!regression.ok) console.error(`THREEJS-026 budget regression: ${JSON.stringify(regression.failures)}`);
+    if (!lifecycleOk) console.error(`THREEJS-026 lifecycle recreate mismatch: ${JSON.stringify(metrics.lifecycleRecreate)}`);
     process.exitCode = 1;
   }
   await context.close();

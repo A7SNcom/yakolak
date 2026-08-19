@@ -1,0 +1,167 @@
+name: YAKOLAK THREEJS-026 Exact Pages Performance
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - '.github/workflows/threejs-026-measure.yml'
+      - 'scripts/measure-threejs-performance.mjs'
+      - 'web/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: yakolak-threejs-026-pages-performance
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact candidate SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Playwright measurement runtime
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Wait for this exact candidate to become the live Pages generation
+        id: live
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          MANIFEST_URL: https://a7sncom.github.io/yakolak/deployment-manifest.json
+        run: |
+          set -euo pipefail
+          rm -f /tmp/deployment-manifest.json
+          for attempt in $(seq 1 120); do
+            nonce="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${attempt}-$(date +%s)"
+            if curl --fail --silent --show-error \
+              -H 'Cache-Control: no-cache' \
+              -H 'Pragma: no-cache' \
+              "${MANIFEST_URL}?threejs026=${nonce}" \
+              -o /tmp/deployment-manifest.next.json; then
+              live_sha="$(jq -r '.threejsCandidateSha // empty' /tmp/deployment-manifest.next.json)"
+              if [ "${live_sha}" = "${EXPECTED_SHA}" ]; then
+                mv /tmp/deployment-manifest.next.json /tmp/deployment-manifest.json
+                break
+              fi
+            fi
+            sleep 5
+          done
+
+          if [ ! -s /tmp/deployment-manifest.json ]; then
+            echo "Exact candidate ${EXPECTED_SHA} never became the live Pages generation." >&2
+            exit 1
+          fi
+
+          generation="$(jq -r '.deploymentGeneration' /tmp/deployment-manifest.json)"
+          root_sha="$(jq -r '.godotRootSha' /tmp/deployment-manifest.json)"
+          runtime_sha="$(jq -r '.publicRuntimeProtocol.sha256' /tmp/deployment-manifest.json)"
+          echo "generation=${generation}" >> "$GITHUB_OUTPUT"
+          echo "root_sha=${root_sha}" >> "$GITHUB_OUTPUT"
+          echo "runtime_sha=${runtime_sha}" >> "$GITHUB_OUTPUT"
+          cat /tmp/deployment-manifest.json
+
+      - name: Measure exact live Pages generation with fixed cold mobile profile
+        id: perf
+        shell: bash
+        env:
+          SHELL_URL: https://a7sncom.github.io/yakolak/threejs/
+          EXPECTED_THREEJS_SHA: ${{ github.sha }}
+        run: |
+          set +e
+          node scripts/measure-threejs-performance.mjs 2>&1 | tee /tmp/threejs026-performance.log
+          status=${PIPESTATUS[0]}
+          set -e
+          metrics="$(grep '^THREEJS026_METRICS ' /tmp/threejs026-performance.log | tail -n 1 | sed 's/^THREEJS026_METRICS //')"
+          if [ -z "${metrics}" ]; then
+            echo 'Measurement did not emit THREEJS026_METRICS.' >&2
+            tail -n 120 /tmp/threejs026-performance.log >&2
+            exit 1
+          fi
+          printf '%s' "${metrics}" > /tmp/threejs026-metrics.json
+          jq -e . /tmp/threejs026-metrics.json >/dev/null
+          echo "measurement_status=${status}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish measurement evidence to relay issue
+        if: always() && steps.live.outcome == 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ github.sha }}
+          DEPLOYMENT_GENERATION: ${{ steps.live.outputs.generation }}
+          ROOT_SHA: ${{ steps.live.outputs.root_sha }}
+          RUNTIME_SHA: ${{ steps.live.outputs.runtime_sha }}
+          MEASUREMENT_STATUS: ${{ steps.perf.outputs.measurement_status }}
+        run: |
+          set -euo pipefail
+          if [ -s /tmp/threejs026-metrics.json ]; then
+            compact="$(jq -c . /tmp/threejs026-metrics.json)"
+            summary="$(jq -r '
+              "encoded=" + (.startupNetwork.encodedBytes|tostring) +
+              " decodedGeometry=" + (.decodedRequiredGeometryBytes|tostring) +
+              " critical=" + (.marks.criticalAssetsReady|tostring) +
+              " interactive=" + (.marks.firstInteractive|tostring) +
+              " visible=" + (.marks.firstVisibleFrame|tostring) +
+              " hitch=" + (.startupHitchMs|tostring) +
+              " draws=" + (.gpuFrame.drawCalls|tostring) +
+              " triangles=" + (.gpuFrame.triangles|tostring) +
+              " geometries=" + (.gpuFrame.geometries|tostring) +
+              " textures=" + (.gpuFrame.textures|tostring) +
+              " programs=" + (.gpuFrame.programs|tostring) +
+              " regression=" + (.regression.ok|tostring) +
+              " lifecycle=" + (.lifecycleRecreate.ok|tostring)
+            ' /tmp/threejs026-metrics.json)"
+            body=$(cat <<EOF
+THREEJS-026 exact Pages measurement
+
+candidate: ${CANDIDATE_SHA}
+generation: ${DEPLOYMENT_GENERATION}
+godotRootSha: ${ROOT_SHA}
+runtimeProtocolSha256: ${RUNTIME_SHA}
+measurementExit: ${MEASUREMENT_STATUS}
+summary: ${summary}
+
+\`\`\`json
+${compact}
+\`\`\`
+EOF
+)
+          else
+            tail_text="$(tail -n 80 /tmp/threejs026-performance.log 2>/dev/null || true)"
+            body=$(cat <<EOF
+THREEJS-026 measurement failed before JSON evidence.
+
+candidate: ${CANDIDATE_SHA}
+generation: ${DEPLOYMENT_GENERATION}
+
+\`\`\`
+${tail_text}
+\`\`\`
+EOF
+)
+          fi
+          gh api "repos/${GITHUB_REPOSITORY}/issues/69/comments" -f body="${body}" >/dev/null
+
+      - name: Enforce measurement result
+        if: steps.perf.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ steps.perf.outputs.measurement_status }}" = '0'
+          jq -e '.regression.ok == true and .lifecycleRecreate.ok == true' /tmp/threejs026-metrics.json >/dev/null
