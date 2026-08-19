@@ -38,17 +38,17 @@ Every workflow/job that can mutate the shared qualification ledger is serialized
 
 `.github/workflows/pages-014-post-deploy-qualification.yml` on `main` may run automatically after a successful composite Pages deployment because it is the generation-evidence writer, but it takes the same qualification-ledger lock before it can append `deployment_generation_verified`.
 
-`.github/workflows/pages-015-online-compatibility.yml` is a manual `workflow_dispatch` fallback only. It must not regain `push` or `schedule` triggers because a second automatic backend-compatibility writer would bypass the authoritative orchestrator path.
+`.github/workflows/pages-015-online-compatibility.yml` is a manual `workflow_dispatch` fallback only. It must not regain `push` or `schedule` triggers because a second automatic backend-compatibility writer would bypass the authoritative orchestrator path. It validates the exact current Worker lock before early completion and again after append before any ledger commit.
 
 `.github/workflows/pages-015-window-archive.yml` may still run as its targeted/manual archive fallback, but it shares the same ledger lock as the orchestrator. Its active/previous matrix remains serial and must stay fail-closed before recovery/publication while the release Administration credential is absent.
 
 `.github/workflows/pages-005-cloudflare-backend.yml` may verify backend contracts on pushes, but its live deploy job is manual-only and takes the same qualification-ledger lock before it can create/commit the proven API origin and Worker rollback window. Automatic PAGES-015 qualification must continue through the orchestrator.
 
-The older `main` fallbacks `.github/workflows/pages-005-backend-bootstrap.yml`, `.github/workflows/pages-015-window-archives.yml`, and `.github/workflows/pages-015-qualify-online-window.yml` are manual `workflow_dispatch` fallbacks only and all use `pages-release-qualification-ledger`. They must not regain `push`, `workflow_run`, or `schedule` triggers.
+The older `main` backend/qualification fallbacks `.github/workflows/pages-005-backend-bootstrap.yml` and `.github/workflows/pages-015-qualify-online-window.yml` remain manual `workflow_dispatch` fallbacks only and use `pages-release-qualification-ledger`. The old main archive fallback `.github/workflows/pages-015-window-archives.yml` is now a read-only retired placeholder, and `scripts/pages015-archive-source.sh` is a fail-closed retired helper. Neither may regain release mutation or qualification-ledger write capability; archive work must flow through the orchestrator/Admin-gated v2 path.
 
 `.github/workflows/pages-012-immutable-release.yml` is a historical release writer for a different archive key. It still supports explicit/manual execution and its historical source-change triggers, but workflow-file edits no longer self-trigger an immutable release run. When it writes `draft_staged` or `archive_verified`, it shares the same qualification-ledger lock as PAGES-015.
 
-`tests/pages015_single_resume_path_contract.test.mjs` locks the feature-branch fallback contracts. The main PAGES-015 orchestrator additionally inspects the current `main` definitions directly and fails validation if PAGES-014 leaves the shared lock or any older main fallback regains an automatic trigger or leaves the shared lock.
+`tests/pages015_single_resume_path_contract.test.mjs` locks the feature-branch fallback contracts. The main PAGES-015 orchestrator additionally inspects the current `main` definitions directly and fails validation if PAGES-014 leaves the shared lock, a retired main archive path regains mutation capability, or an older main fallback regains an automatic trigger or leaves the shared lock.
 
 ## Complete qualification
 
@@ -60,3 +60,13 @@ THREEJS-098/099 may consume an archive only when both of these commands exit suc
 The strict release verifier requires the strong archive, deployment-generation and backend-compatibility events for the exact key **and** proves the sibling frontend key in the locked active+previous window has its own strong archive/generation/backend rows from the same Worker/Turso evidence. The two backend rows must carry the same exact capability set, API origin, active+previous Worker IDs and four unique frontend×Worker pairings; a lone frontend row, mismatched sibling evidence, capability superset or non-exact Worker deployment identity is not complete qualification.
 
 The current-lock verifier then binds those rows to the **current** PAGES-005 rollback lock, including its exact `finalEvidenceSha256`. A new Worker version, changed API/protocol/capability/Turso identity, or even a newly generated PAGES-005 evidence digest for the same nominal tuple invalidates the early-exit path until active+previous are freshly qualified against that current lock.
+
+## Rollback eligibility
+
+`.github/workflows/pages-012-rollback.yml` preserves the online/backend gate boundary:
+
+- `deploy_pages=false` remains a non-production exact-byte restore proof and does not require live backend qualification.
+- `deploy_pages=true` is a public online mutation and therefore requires the requested immutable `releaseTag` + `assetSha256` to be one of the **current** active/previous frontend keys, requires the strict release verifier, and requires the current-lock verifier.
+- Public rollback re-runs those current-window/current-lock checks before artifact upload and again immediately before `deploy-pages`, while the workflow holds `pages-release-qualification-ledger`; the deploy job also takes `yakolak-pages-composite`.
+
+This means presentation/local restore remains usable without PAGES-005, while public online rollback cannot silently revive an archive qualified against an obsolete Worker/Turso window.
