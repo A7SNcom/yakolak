@@ -7,6 +7,7 @@ const archive = readFileSync(new URL('../.github/workflows/pages-015-window-arch
 const pages005 = readFileSync(new URL('../.github/workflows/pages-005-cloudflare-backend.yml', import.meta.url), 'utf8');
 const pages012 = readFileSync(new URL('../.github/workflows/pages-012-immutable-release.yml', import.meta.url), 'utf8');
 const rollback = readFileSync(new URL('../.github/workflows/pages-012-rollback.yml', import.meta.url), 'utf8');
+const orchestrator = readFileSync(new URL('../scripts/pages015-orchestrate-qualification.sh', import.meta.url), 'utf8');
 
 function onBlock(yaml) {
   const start = yaml.indexOf('on:\n');
@@ -80,4 +81,24 @@ test('public exact-byte rollback is current-window compatibility gated while non
 
   const deployJob = rollback.slice(rollback.indexOf('\n  deploy:\n'));
   assert.match(deployJob, /concurrency:\n\s+group: yakolak-pages-composite\n\s+cancel-in-progress: false/);
+});
+
+test('authoritative orchestrator cannot report complete or early-exit on stale Worker qualification', () => {
+  const functionStart = orchestrator.indexOf('full_qualification_ready() {');
+  const functionEnd = orchestrator.indexOf('\n}\n\nrecord_status()', functionStart);
+  assert.ok(functionStart >= 0 && functionEnd > functionStart, 'full_qualification_ready helper must exist');
+  const helper = orchestrator.slice(functionStart, functionEnd);
+  const activeStrict = helper.indexOf('verify-release-qualification.mjs "$active_tag" "$active_digest"');
+  const previousStrict = helper.indexOf('verify-release-qualification.mjs "$previous_tag" "$previous_digest"');
+  const currentLock = helper.indexOf('verify-pages015-current-lock-qualification.mjs');
+  assert.ok(activeStrict >= 0 && previousStrict > activeStrict && currentLock > previousStrict);
+
+  const statusComplete = orchestrator.indexOf('full_qualification_ready && complete=true');
+  const earlyExit = orchestrator.indexOf('if full_qualification_ready; then');
+  const finalizer = orchestrator.indexOf('bash scripts/pages015-finalize-live-window.sh');
+  const postFinalizer = orchestrator.indexOf("full_qualification_ready || { echo 'finalizer returned without complete current-lock qualification'");
+  assert.ok(statusComplete > functionEnd, 'status complete must use current-lock-bound helper');
+  assert.ok(earlyExit > statusComplete, 'early completion must use current-lock-bound helper');
+  assert.ok(finalizer > earlyExit && postFinalizer > finalizer, 'post-finalizer completion must re-use current-lock-bound helper');
+  assert.match(orchestrator, /already fully qualified for both immutable frontend keys and the current Worker rollback lock/);
 });
