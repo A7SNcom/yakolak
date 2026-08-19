@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: pages-014-post-deploy-qualification
+  group: pages-release-qualification-ledger
   cancel-in-progress: false
 
 env:
