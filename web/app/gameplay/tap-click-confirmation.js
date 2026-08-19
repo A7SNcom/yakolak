@@ -126,10 +126,9 @@ export function createTapClickConfirmationController({
     return visible;
   }
 
-  function observeState(state) {
+  function candidateWitness(state) {
     const witness = witnessFromState(state);
     if (isOlderWitness(witness, latestWitness)) fail('stale_tap_snapshot');
-    latestWitness = witness;
     return witness;
   }
 
@@ -139,8 +138,7 @@ export function createTapClickConfirmationController({
     inputSequence += 1;
     if (phase === TAP_CONFIRMATION_PHASES.PENDING) return emit('pending-duplicate-size-tap', { source: inputSource });
 
-    const witness = witnessFromState(state);
-    if (isOlderWitness(witness, latestWitness)) fail('stale_tap_snapshot');
+    const witness = candidateWitness(state);
     const selection = selectionController.select(state, { stackTargetId, size });
     latestWitness = witness;
     phase = TAP_CONFIRMATION_PHASES.SELECTED;
@@ -164,7 +162,7 @@ export function createTapClickConfirmationController({
     }
     if (phase !== TAP_CONFIRMATION_PHASES.SELECTED) fail('tap_requires_size_selection');
 
-    const witness = observeState(state);
+    const witness = candidateWitness(state);
     const selection = selectionController.snapshot();
     if (!sameWitness(selection.witness, witness)) fail('tap_selection_witness_mismatch');
 
@@ -203,6 +201,7 @@ export function createTapClickConfirmationController({
     phase = TAP_CONFIRMATION_PHASES.PENDING;
     diagnostic = null;
     pending = { intent, source: inputSource, submission: null };
+    latestWitness = witness;
     const pendingVisible = emit('authoritative-commit-pending', {
       source: inputSource,
       cell: pick.candidateCell,
@@ -240,8 +239,9 @@ export function createTapClickConfirmationController({
   function cancel({ state = null } = {}) {
     if (phase === TAP_CONFIRMATION_PHASES.PENDING) return false;
     inputSequence += 1;
+    const witness = state ? candidateWitness(state) : latestWitness;
     selectionController.clear('cancel', state);
-    if (state) latestWitness = witnessFromState(state);
+    latestWitness = witness;
     phase = TAP_CONFIRMATION_PHASES.IDLE;
     diagnostic = null;
     pending = null;
@@ -252,8 +252,7 @@ export function createTapClickConfirmationController({
   function reconcileCanonical({ state, clearReason } = {}) {
     assertCanonicalSessionState(state);
     const reason = requireClearReason(clearReason);
-    const witness = witnessFromState(state);
-    if (isOlderWitness(witness, latestWitness)) fail('stale_tap_snapshot');
+    const witness = candidateWitness(state);
 
     if (
       phase === TAP_CONFIRMATION_PHASES.PENDING
