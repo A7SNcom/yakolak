@@ -1,4 +1,5 @@
 import {
+  RULES,
   SIZES,
   deriveRemainingInventory,
   emptyBoard,
@@ -42,7 +43,9 @@ function boardIsEmpty(board) {
 }
 
 function inventoryIsHome(inventory, seats) {
-  return seats.every(seat => SIZES.every(size => inventory?.[seat.seatId]?.[size] === 3));
+  return seats.every(seat => SIZES.every(
+    size => inventory?.[seat.seatId]?.[size] === RULES.copiesPerSizePerColor,
+  ));
 }
 
 export function deriveNextRoundStarter(state) {
