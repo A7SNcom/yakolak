@@ -4,6 +4,8 @@ import {
   GAMEPLAY_INTENT_ORIGINS,
   GAMEPLAY_PRESENTATION_SOURCES,
   assertGameplayIntent,
+  parseGameplayIntent,
+  serializeGameplayIntent,
 } from '../gameplay/gameplay-intent.js';
 import {
   placePiece,
@@ -57,6 +59,11 @@ function deepFreeze(value) {
 
 function canonicalClone(state) {
   return parseCanonicalSessionState(serializeCanonicalSessionState(state));
+}
+
+function intentClone(intent) {
+  assertGameplayIntent(intent);
+  return parseGameplayIntent(serializeGameplayIntent(intent));
 }
 
 function requireNow(clock) {
@@ -341,7 +348,15 @@ export function createLocalAuthorityAdapter({
   }
 
   function submit(intent) {
-    const task = submitTail.then(() => executeSubmit(intent));
+    let capturedIntent;
+    try {
+      // Capture an immutable validated value at the call boundary. A caller cannot
+      // mutate a queued object after submit() and change what authority executes.
+      capturedIntent = intentClone(intent);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    const task = submitTail.then(() => executeSubmit(capturedIntent));
     submitTail = task.then(() => undefined, () => undefined);
     return task;
   }
