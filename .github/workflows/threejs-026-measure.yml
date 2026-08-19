@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   issues: write
 
 concurrency:
@@ -30,6 +30,7 @@ jobs:
           fetch-depth: 1
 
       - name: Mark measurement relay start
+        continue-on-error: true
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -108,6 +109,7 @@ jobs:
 
       - name: Publish measurement evidence to relay issue
         if: always() && steps.live.outcome == 'success'
+        continue-on-error: true
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -165,6 +167,35 @@ EOF
 )
           fi
           gh api "repos/${GITHUB_REPOSITORY}/issues/69/comments" -f body="${body}" >/dev/null
+
+      - name: Persist exact measurement evidence in repository
+        if: always() && steps.live.outcome == 'success' && steps.perf.outcome == 'success'
+        shell: bash
+        env:
+          CANDIDATE_SHA: ${{ github.sha }}
+          DEPLOYMENT_GENERATION: ${{ steps.live.outputs.generation }}
+          ROOT_SHA: ${{ steps.live.outputs.root_sha }}
+          RUNTIME_SHA: ${{ steps.live.outputs.runtime_sha }}
+          MEASUREMENT_STATUS: ${{ steps.perf.outputs.measurement_status }}
+        run: |
+          set -euo pipefail
+          test -s /tmp/threejs026-metrics.json
+          mkdir -p THREEJS026_MEASUREMENTS
+          evidence_path="THREEJS026_MEASUREMENTS/${CANDIDATE_SHA}.json"
+          jq -n \
+            --arg candidate "${CANDIDATE_SHA}" \
+            --arg generation "${DEPLOYMENT_GENERATION}" \
+            --arg root "${ROOT_SHA}" \
+            --arg runtime "${RUNTIME_SHA}" \
+            --argjson measurementExit "${MEASUREMENT_STATUS:-1}" \
+            --slurpfile metrics /tmp/threejs026-metrics.json \
+            '{schema:"THREEJS-026-PAGES-EVIDENCE-V1", candidateSha:$candidate, deploymentGeneration:$generation, godotRootSha:$root, runtimeProtocolSha256:$runtime, measurementExit:$measurementExit, metrics:$metrics[0]}' \
+            > "${evidence_path}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "${evidence_path}"
+          git commit -m "[threejs-026-evidence] record ${CANDIDATE_SHA:0:8} exact Pages metrics"
+          git push origin HEAD:threejs-rebuild
 
       - name: Enforce measurement result
         if: steps.perf.outcome == 'success'
