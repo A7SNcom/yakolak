@@ -25,22 +25,89 @@ try {
     const footprintSvg = shell.getAsset('scene.table-footprint');
     const worldLayout = shell.getAsset('data.world-layout');
     const approvedContract = shell.getAsset('data.approved-contract');
-    const [sceneModule, three, boardLayoutResponse] = await Promise.all([
+    const [sceneModule, scorePresentation, sessionModule, registryModule, three, boardLayoutResponse] = await Promise.all([
       import('/app/scene/table-and-score.js'),
+      import('/app/scene/score-marker-presentation.js'),
+      import('/app/session/canonical-session-state.js'),
+      import('/app/core/resource-registry.js'),
       import('three'),
       fetch('/assets/models/board-and-lid-layout.json', { cache: 'no-store' }),
     ]);
     if (!boardLayoutResponse.ok) throw new Error(`board layout HTTP ${boardLayoutResponse.status}`);
     const boardLayout = await boardLayoutResponse.json();
+    const resourceRegistry = registryModule.createResourceRegistry({ platform: window });
 
-    const tableMaterial = sceneModule.createTableMaterial({ approvedContract });
-    const table = sceneModule.createTableSurface({ footprintSvg, worldLayout, material: tableMaterial });
+    const tableMaterial = sceneModule.createTableMaterial({ approvedContract, resourceRegistry });
+    const table = sceneModule.createTableSurface({ footprintSvg, worldLayout, material: tableMaterial, resourceRegistry });
     table.mesh.updateMatrixWorld(true);
     const tableBounds = new three.Box3().setFromObject(table.mesh);
 
-    const scoreMaterials = sceneModule.createScoreMaterials(approvedContract);
-    const score = sceneModule.createScoreMarkerInstances({ runtimeAsset: runtimeScore, worldLayout, materialsByColor: scoreMaterials });
-    score.setScores({ marble: 7, blue: 3, gold: 1, green: 0 });
+    const scoreMaterials = sceneModule.createScoreMaterials(approvedContract, { resourceRegistry });
+    const createPhysicalScoreInstances = () => sceneModule.createScoreMarkerInstances({
+      runtimeAsset: runtimeScore,
+      worldLayout,
+      materialsByColor: scoreMaterials,
+      resourceRegistry,
+    });
+    const score = createPhysicalScoreInstances();
+
+    const seats = [
+      { seatId: 'right', type: 'host-human', color: 'marble', ready: true },
+      { seatId: 'back', type: 'computer', color: 'blue', ready: true },
+      { seatId: 'left', type: 'computer', color: 'gold', ready: true },
+      { seatId: 'front', type: 'computer', color: 'green', ready: true },
+    ];
+    const authoritative = sessionModule.createCanonicalSessionState({
+      preferredColor: 'marble',
+      targetPlayers: 4,
+      winsToMatch: 5,
+      seats,
+      scores: { right: 4, back: 3, left: 1, front: 0 },
+      round: 7,
+      completedRounds: 6,
+      revision: 80,
+      lifecycle: { phase: 'round-ready' },
+    });
+    const authoritativeSync = scorePresentation.syncPersistentScoreMarkerInstances(score, authoritative);
+    const authoritativeCounts = score.snapshot().seats.map((entry) => [entry.seatId, entry.colorId, entry.count]);
+
+    const hydrated = sessionModule.parseCanonicalSessionState(sessionModule.serializeCanonicalSessionState(authoritative));
+    const rebuiltScore = createPhysicalScoreInstances();
+    const hydrationSync = scorePresentation.rebuildPersistentScoreMarkerInstances(rebuiltScore, hydrated);
+    const hydratedCounts = rebuiltScore.snapshot().seats.map((entry) => [entry.seatId, entry.colorId, entry.count]);
+    const rebuildGeometryReused = rebuiltScore.records.every((record, index) => record.mesh.geometry === score.records[index].mesh.geometry);
+    const rebuildMaterialsReused = rebuiltScore.records.every((record, index) => record.mesh.material === score.records[index].mesh.material);
+
+    const nextRound = sessionModule.createCanonicalSessionState({
+      preferredColor: 'marble',
+      targetPlayers: 4,
+      winsToMatch: 5,
+      seats,
+      scores: { right: 4, back: 3, left: 1, front: 0 },
+      round: 8,
+      completedRounds: 7,
+      revision: 81,
+      lifecycle: { phase: 'round-ready' },
+    });
+    scorePresentation.syncPersistentScoreMarkerInstances(score, nextRound);
+    const roundResetCounts = score.snapshot().seats.map((entry) => [entry.seatId, entry.colorId, entry.count]);
+
+    const freshMatch = sessionModule.createCanonicalSessionState({
+      preferredColor: 'marble',
+      targetPlayers: 4,
+      winsToMatch: 5,
+      seats,
+      scores: { right: 0, back: 0, left: 0, front: 0 },
+      round: 1,
+      completedRounds: 0,
+      revision: 82,
+      lifecycle: { phase: 'round-ready' },
+    });
+    scorePresentation.syncPersistentScoreMarkerInstances(score, freshMatch);
+    const freshMatchCounts = score.snapshot().seats.map((entry) => [entry.seatId, entry.colorId, entry.count]);
+
+    // Restore the authoritative fixture for the physical snapshot below.
+    scorePresentation.syncPersistentScoreMarkerInstances(score, authoritative);
     const scoreSnapshot = score.snapshot();
     const contact = sceneModule.createTableAndScoreContactReport({ worldLayout, boardLayout });
     const geometryRefs = score.records.map((record) => record.mesh.geometry);
@@ -59,7 +126,21 @@ try {
       scoreGap: score.layout.gap,
       scoreOrder: score.layout.order,
       scorePlaneY: score.layout.scorePlaneY,
-      scoreCounts: scoreSnapshot.seats.map((entry) => [entry.colorId, entry.count]),
+      scoreSeatCenters: score.layout.seats.map((entry) => [entry.seatId, entry.colorId, entry.sideCenter]),
+      authoritativeCounts,
+      hydratedCounts,
+      roundResetCounts,
+      freshMatchCounts,
+      rebuildGeometryReused,
+      rebuildMaterialsReused,
+      authoritativeSync: {
+        countsBySeat: authoritativeSync.countsBySeat,
+        renderedCountsBySeat: authoritativeSync.renderedCountsBySeat,
+      },
+      hydrationSync: {
+        countsBySeat: hydrationSync.countsBySeat,
+        renderedCountsBySeat: hydrationSync.renderedCountsBySeat,
+      },
       scoreGeometryShared: geometryRefs.every((geometry) => geometry === geometryRefs[0]),
       scoreMaterialsPerSeatNotPerPoint: new Set(materialRefs).size === 4,
       scoreInstancedMeshes: score.records.length,
@@ -67,14 +148,36 @@ try {
       contact,
     };
 
+    rebuiltScore.dispose();
     score.dispose();
     table.dispose();
-    tableMaterial.dispose();
-    for (const material of Object.values(scoreMaterials)) material.dispose();
+    resourceRegistry.dispose('table-score-browser-verifier-complete');
     return snapshot;
   });
 
   const near = (actual, expected, epsilon = 0.001) => Math.abs(actual - expected) <= epsilon;
+  const expectedScores = [
+    ['right', 'marble', 4],
+    ['back', 'blue', 3],
+    ['left', 'gold', 1],
+    ['front', 'green', 0],
+  ];
+  const zeroScores = [
+    ['right', 'marble', 0],
+    ['back', 'blue', 0],
+    ['left', 'gold', 0],
+    ['front', 'green', 0],
+  ];
+  const expectedCenters = [
+    ['right', 'marble', [85, 2, 0]],
+    ['back', 'blue', [0, 2, -85]],
+    ['left', 'gold', [-85, 2, 0]],
+    ['front', 'green', [0, 2, 85]],
+  ];
+  const centersExact = result.scoreSeatCenters.length === expectedCenters.length
+    && result.scoreSeatCenters.every((entry, index) => entry[0] === expectedCenters[index][0]
+      && entry[1] === expectedCenters[index][1]
+      && entry[2].every((value, coordinate) => near(value, expectedCenters[index][2][coordinate])));
   const checks = {
     bootReady: result.bootState === 'ready',
     noPageErrors: pageErrors.length === 0,
@@ -90,10 +193,18 @@ try {
     scoreDataExact: result.scoreRadius === 85
       && result.scoreGap === 11
       && JSON.stringify(result.scoreOrder) === JSON.stringify([0, -1, 1, -2, 2, -3, 3])
-      && result.scorePlaneY === 2,
-    scoreCountsUseInstancedCapacity: JSON.stringify(result.scoreCounts) === JSON.stringify([
-      ['marble', 7], ['blue', 3], ['gold', 1], ['green', 0],
-    ]),
+      && result.scorePlaneY === 2
+      && centersExact,
+    scoreCountsFromAuthority: JSON.stringify(result.authoritativeCounts) === JSON.stringify(expectedScores)
+      && JSON.stringify(result.authoritativeSync.countsBySeat) === JSON.stringify({ right: 4, back: 3, left: 1, front: 0 })
+      && JSON.stringify(result.authoritativeSync.renderedCountsBySeat) === JSON.stringify({ right: 4, back: 3, left: 1, front: 0 }),
+    hydrationDeterministic: JSON.stringify(result.hydratedCounts) === JSON.stringify(expectedScores)
+      && JSON.stringify(result.hydrationSync.countsBySeat) === JSON.stringify(result.authoritativeSync.countsBySeat)
+      && JSON.stringify(result.hydrationSync.renderedCountsBySeat) === JSON.stringify(result.authoritativeSync.renderedCountsBySeat)
+      && result.rebuildGeometryReused === true
+      && result.rebuildMaterialsReused === true,
+    roundResetRetainsMarkers: JSON.stringify(result.roundResetCounts) === JSON.stringify(expectedScores),
+    freshMatchAuthorityClearsMarkers: JSON.stringify(result.freshMatchCounts) === JSON.stringify(zeroScores),
     scoreGeometryShared: result.scoreGeometryShared === true && result.scoreInstancedMeshes === 4,
     scoreMaterialsNotPerPoint: result.scoreMaterialsPerSeatNotPerPoint === true,
     scorePivotExact: Array.isArray(result.sourceContactPivot)
