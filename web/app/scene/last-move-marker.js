@@ -22,11 +22,7 @@ export const LAST_MOVE_MARKER_VISUAL_POLICY = Object.freeze({
   radius: 5,
   height: 8,
   radialSegments: 4,
-  sizeScale: Object.freeze({
-    small: 0.82,
-    medium: 1,
-    large: 1.18,
-  }),
+  sizeScale: Object.freeze({ small: 0.82, medium: 1, large: 1.18 }),
 });
 
 function fail(code) {
@@ -58,6 +54,13 @@ function isOlderWitness(next, current) {
     || next.round < current.round;
 }
 
+function sameWitness(left, right) {
+  return Boolean(left && right)
+    && left.generation === right.generation
+    && left.revision === right.revision
+    && left.round === right.round;
+}
+
 function requireWorldLayout(worldLayout) {
   if (!worldLayout || typeof worldLayout !== 'object') fail('last_move_world_layout_required');
   return worldLayout;
@@ -87,12 +90,11 @@ export function deriveLastMoveMarkerModel(state, { worldLayout } = {}) {
   assertCanonicalSessionState(state);
   const layout = deriveGameplayInteractionTargets(requireWorldLayout(worldLayout));
   const witness = witnessFromState(state);
-
   if (state.lastMove === null) return null;
+
   const move = state.lastMove;
   const boardCell = state.board?.[String(move.cell)];
   if (!boardCell || boardCell[move.size] !== move.color) fail('last_move_board_mismatch');
-
   const zone = layout.zones.find(candidate => candidate.cellId === move.cell);
   if (!zone) fail('last_move_target_missing');
   const scale = LAST_MOVE_MARKER_VISUAL_POLICY.sizeScale[move.size];
@@ -191,6 +193,8 @@ export function createLastMoveMarkerPresentation({
   markerParent.add(root);
 
   let latestWitness = null;
+  let latestMoveIdentity = null;
+  let hasLatestSnapshot = false;
   let current = null;
   let renderRequestCount = 0;
   let released = false;
@@ -210,7 +214,16 @@ export function createLastMoveMarkerPresentation({
     const witness = witnessFromState(state);
     if (isOlderWitness(witness, latestWitness)) fail('stale_last_move_snapshot');
     const model = deriveLastMoveMarkerModel(state, { worldLayout: canonicalWorldLayout });
+    const candidateIdentity = model?.moveIdentity || null;
+    if (
+      hasLatestSnapshot
+      && sameWitness(witness, latestWitness)
+      && candidateIdentity !== latestMoveIdentity
+    ) fail('last_move_revision_identity_conflict');
+
     latestWitness = witness;
+    latestMoveIdentity = candidateIdentity;
+    hasLatestSnapshot = true;
 
     if (model === null) {
       const wasVisible = root.visible || current !== null;
@@ -256,6 +269,8 @@ export function createLastMoveMarkerPresentation({
     released = true;
     current = null;
     latestWitness = null;
+    latestMoveIdentity = null;
+    hasLatestSnapshot = false;
     root.visible = false;
     root.userData.moveIdentity = null;
     lifecycle.release('last-move-marker-released');
