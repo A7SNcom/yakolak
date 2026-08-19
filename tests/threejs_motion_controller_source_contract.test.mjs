@@ -13,5 +13,9 @@ assert.doesNotMatch(source, /\bsetInterval\s*\(/, 'non-camera tweens must not us
 assert.doesNotMatch(source, /\.then\s*\(/, 'controller must not create free-running Promise chains');
 assert.match(source, /lifecycle\.requestFrame\s*\(/, 'all tween frames must use the THREEJS-027 resource scope');
 assert.match(source, /lifecycle\.listen\s*\(reducedMotionQuery/, 'Reduced Motion subscription must be resource-owned');
+assert.match(source, /assertSessionLifecycleState\s*\(sessionLifecycle\)/, 'THREEJS-060 lifecycle state must gate presentation generation sync');
+assert.match(source, /sessionLifecycle\.presentationGeneration/, 'THREEJS-060 presentationGeneration must feed motion authority');
+assert.match(source, /requestedRevision\s*!==\s*currentRevision/, 'authoritative revision must reject stale sequence submission');
+assert.match(source, /motion_snap_to_canonical_required/, 'every cancellable motion must supply a canonical final snap callback');
 
 console.log('THREEJS-096 motion scheduling ownership contract: PASS');
