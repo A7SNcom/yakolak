@@ -146,6 +146,7 @@ function completeCurrentLockRow(row, role) {
     row?.workerDeployment !== `cloudflare:${lock.activeWorkerVersionId}` ||
     row?.workerVersionId !== lock.activeWorkerVersionId ||
     row?.previousWorkerVersionId !== lock.previousWorkerVersionId ||
+    row?.workerLockEvidenceSha256 !== lock.finalEvidenceSha256 ||
     row?.protocolIdentity !== lock.protocolIdentity ||
     row?.protocolVersion !== '1' ||
     row?.capabilityIdentity !== lock.capabilityIdentity ||
