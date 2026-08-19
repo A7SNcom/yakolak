@@ -58,6 +58,8 @@ jobs:
           bash -n scripts/pages015-recover-expired-source.sh
           bash -n scripts/pages005-bootstrap-live.sh
           bash -n scripts/pages015-finalize-live-window.sh
+          node --check scripts/append-pages015-qualification.mjs
+          node --check scripts/verify-pages015-frontend-window.mjs
           node --check scripts/verify-pages015-current-lock-qualification.mjs
           node --check scripts/verify-release-qualification.mjs
           node --test tests/pages015_archive_facts_contract.test.mjs
