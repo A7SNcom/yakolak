@@ -1,4 +1,5 @@
 import { RESOURCE_OWNERSHIP } from '../core/resource-registry.js';
+import { assertSessionLifecycleState } from '../session/session-lifecycle.js';
 
 export const MOTION_EASINGS = Object.freeze({
   linear: t => t,
@@ -46,6 +47,11 @@ function requireGeneration(value) {
   return value;
 }
 
+function requireRevision(value) {
+  if (!Number.isInteger(value) || value < 0) fail('invalid_motion_revision');
+  return value;
+}
+
 function requireScopeOrKey(value, code) {
   if (typeof value !== 'string' || !value || value.length > 256) fail(code);
   return value;
@@ -72,9 +78,7 @@ function normalizeNumericTree(value, path = 'value') {
   }
   if (isPlainRecord(value)) {
     const normalized = {};
-    for (const key of Object.keys(value).sort()) {
-      normalized[key] = normalizeNumericTree(value[key], `${path}.${key}`);
-    }
+    for (const key of Object.keys(value).sort()) normalized[key] = normalizeNumericTree(value[key], `${path}.${key}`);
     return deepFreeze(normalized);
   }
   fail(`invalid_motion_numeric_tree:${path}`);
@@ -93,9 +97,7 @@ function assertMatchingShape(from, to, path = 'value') {
   if (!isPlainRecord(from) || !isPlainRecord(to)) fail(`motion_shape_mismatch:${path}`);
   const fromKeys = Object.keys(from).sort();
   const toKeys = Object.keys(to).sort();
-  if (fromKeys.length !== toKeys.length || fromKeys.some((key, index) => key !== toKeys[index])) {
-    fail(`motion_shape_mismatch:${path}`);
-  }
+  if (fromKeys.length !== toKeys.length || fromKeys.some((key, index) => key !== toKeys[index])) fail(`motion_shape_mismatch:${path}`);
   for (const key of fromKeys) assertMatchingShape(from[key], to[key], `${path}.${key}`);
 }
 
@@ -117,14 +119,9 @@ function resolveEasing(easing) {
   fail('motion_easing_required');
 }
 
-function requireApply(apply) {
-  if (typeof apply !== 'function') fail('motion_apply_required');
-  return apply;
-}
-
-function requireTargetLiveness(isTargetLive) {
-  if (typeof isTargetLive !== 'function') fail('motion_target_liveness_required');
-  return isTargetLive;
+function requireFunction(value, code) {
+  if (typeof value !== 'function') fail(code);
+  return value;
 }
 
 function motionId(scope, key) {
@@ -136,18 +133,30 @@ function resultFor(entry, status, reason = null) {
     scope: entry.scope,
     key: entry.key,
     generation: entry.generation,
+    revision: entry.revision,
     sequence: entry.sequence,
     status,
     reason,
+    snappedCanonical: entry.snapDone,
   });
 }
 
-function settledHandle({ scope, key, generation, sequence, status, reason = null }) {
-  const result = deepFreeze({ scope, key, generation, sequence, status, reason });
+function settledHandle({ scope, key, generation, revision, sequence, status, reason = null }) {
+  const result = deepFreeze({
+    scope,
+    key,
+    generation,
+    revision,
+    sequence,
+    status,
+    reason,
+    snappedCanonical: false,
+  });
   return Object.freeze({
     scope,
     key,
     generation,
+    revision,
     sequence,
     finished: Promise.resolve(result),
     cancel: () => false,
@@ -160,15 +169,15 @@ export function createMotionController({
   reducedMotion = false,
   reducedMotionQuery = null,
   generation = 0,
+  revision = 0,
 } = {}) {
   const registry = requireRegistry(resourceRegistry);
   const now = requireClock(clock);
   let currentGeneration = requireGeneration(generation);
+  let currentRevision = requireRevision(revision);
   let reduced = requireBoolean(reducedMotion, 'invalid_reduced_motion');
   if (reducedMotionQuery !== null) {
-    if (!reducedMotionQuery?.addEventListener || !reducedMotionQuery?.removeEventListener) {
-      fail('invalid_reduced_motion_query');
-    }
+    if (!reducedMotionQuery?.addEventListener || !reducedMotionQuery?.removeEventListener) fail('invalid_reduced_motion_query');
     reduced = Boolean(reducedMotionQuery.matches);
   }
 
@@ -183,10 +192,12 @@ export function createMotionController({
     if (disposed) fail('motion_controller_disposed');
   }
 
+  function authorityMatches(entry) {
+    return currentGeneration === entry.generation && currentRevision === entry.revision;
+  }
+
   function entryIsCurrent(entry) {
-    return !disposed
-      && currentGeneration === entry.generation
-      && active.get(entry.id) === entry;
+    return !disposed && authorityMatches(entry) && active.get(entry.id) === entry;
   }
 
   function targetIsLive(entry) {
@@ -206,9 +217,32 @@ export function createMotionController({
     cancelFrame(entry, reason || status);
     if (active.get(entry.id) === entry) active.delete(entry.id);
     entry.settled = true;
-    const result = resultFor(entry, status, reason);
-    entry.resolve(result);
+    entry.resolve(resultFor(entry, status, reason));
     return true;
+  }
+
+  function snapCanonical(entry, reason) {
+    if (entry.snapDone || entry.settled) return false;
+    entry.snapDone = true;
+    if (!targetIsLive(entry)) return false;
+    entry.snapToCanonical(deepFreeze({
+      scope: entry.scope,
+      key: entry.key,
+      generation: entry.generation,
+      revision: entry.revision,
+      controllerGeneration: currentGeneration,
+      controllerRevision: currentRevision,
+      sequence: entry.sequence,
+      reason,
+    }));
+    return true;
+  }
+
+  function cancelEntry(entry, reason = 'cancelled', { snap = true } = {}) {
+    if (!entry || entry.settled) return false;
+    cancelFrame(entry, reason);
+    if (snap) snapCanonical(entry, reason);
+    return settle(entry, 'cancelled', reason);
   }
 
   function applyEntry(entry, value, progress, easedProgress) {
@@ -221,6 +255,7 @@ export function createMotionController({
       scope: entry.scope,
       key: entry.key,
       generation: entry.generation,
+      revision: entry.revision,
       sequence: entry.sequence,
       progress,
       easedProgress,
@@ -228,8 +263,8 @@ export function createMotionController({
     return true;
   }
 
-  function failFrame(entry, error) {
-    settle(entry, 'error', error?.code || error?.message || 'motion-frame-error');
+  function failEntry(entry, error, stage) {
+    settle(entry, 'error', error?.code || error?.message || stage);
     throw error;
   }
 
@@ -247,46 +282,41 @@ export function createMotionController({
         const progress = Math.min(1, elapsedMs / entry.durationMs);
         const easedProgress = entry.easing.fn(progress);
         if (!Number.isFinite(easedProgress)) fail('invalid_motion_easing_result');
-        const value = interpolateTree(entry.from, entry.to, easedProgress);
-        if (!applyEntry(entry, value, progress, easedProgress)) return;
-        if (progress >= 1) {
-          settle(entry, 'completed');
-          return;
-        }
-        scheduleFrame(entry);
+        if (!applyEntry(entry, interpolateTree(entry.from, entry.to, easedProgress), progress, easedProgress)) return;
+        if (progress >= 1) settle(entry, 'completed');
+        else scheduleFrame(entry);
       } catch (error) {
-        failFrame(entry, error);
+        failEntry(entry, error, 'motion-frame-error');
       }
     }, { label: `motion-frame:${entry.scope}:${entry.key}` });
-  }
-
-  function cancelEntry(entry, reason = 'cancelled') {
-    if (!entry || entry.settled) return false;
-    return settle(entry, 'cancelled', reason);
   }
 
   function animate({
     scope,
     key,
     generation: motionGeneration,
+    revision: motionRevision,
     durationMs,
     from,
     to,
     easing = 'easeOutCubic',
     apply,
     isTargetLive,
+    snapToCanonical,
   } = {}) {
     assertLive();
     const normalizedScope = requireScopeOrKey(scope, 'motion_scope_required');
     const normalizedKey = requireScopeOrKey(key, 'motion_key_required');
     const requestedGeneration = requireGeneration(motionGeneration);
+    const requestedRevision = requireRevision(motionRevision);
     const duration = requireDuration(durationMs);
     const normalizedFrom = normalizeNumericTree(from, 'from');
     const normalizedTo = normalizeNumericTree(to, 'to');
     assertMatchingShape(normalizedFrom, normalizedTo);
     const resolvedEasing = resolveEasing(easing);
-    const applyFn = requireApply(apply);
-    const targetLiveness = requireTargetLiveness(isTargetLive);
+    const applyFn = requireFunction(apply, 'motion_apply_required');
+    const targetLiveness = requireFunction(isTargetLive, 'motion_target_liveness_required');
+    const snapFn = requireFunction(snapToCanonical, 'motion_snap_to_canonical_required');
     const id = motionId(normalizedScope, normalizedKey);
     const motionSequence = ++sequence;
 
@@ -295,9 +325,21 @@ export function createMotionController({
         scope: normalizedScope,
         key: normalizedKey,
         generation: requestedGeneration,
+        revision: requestedRevision,
         sequence: motionSequence,
         status: 'stale-generation',
         reason: `controller-generation-${currentGeneration}`,
+      });
+    }
+    if (requestedRevision !== currentRevision) {
+      return settledHandle({
+        scope: normalizedScope,
+        key: normalizedKey,
+        generation: requestedGeneration,
+        revision: requestedRevision,
+        sequence: motionSequence,
+        status: 'stale-revision',
+        reason: `controller-revision-${currentRevision}`,
       });
     }
 
@@ -311,6 +353,7 @@ export function createMotionController({
       scope: normalizedScope,
       key: normalizedKey,
       generation: requestedGeneration,
+      revision: requestedRevision,
       sequence: motionSequence,
       durationMs: duration,
       from: normalizedFrom,
@@ -318,6 +361,8 @@ export function createMotionController({
       easing: resolvedEasing,
       apply: applyFn,
       isTargetLive: targetLiveness,
+      snapToCanonical: snapFn,
+      snapDone: false,
       startedAtMs: clockNow(now),
       frameToken: null,
       settled: false,
@@ -329,6 +374,7 @@ export function createMotionController({
       scope: entry.scope,
       key: entry.key,
       generation: entry.generation,
+      revision: entry.revision,
       sequence: entry.sequence,
       finished,
       cancel: (reason = 'cancelled-by-consumer') => {
@@ -351,8 +397,7 @@ export function createMotionController({
       if (!entry.settled) scheduleFrame(entry);
       return handle;
     } catch (error) {
-      settle(entry, 'error', error?.code || error?.message || 'motion-start-error');
-      throw error;
+      failEntry(entry, error, 'motion-start-error');
     }
   }
 
@@ -375,13 +420,38 @@ export function createMotionController({
     return count;
   }
 
-  function setGeneration(nextGeneration) {
+  function setAuthority(nextGeneration, nextRevision) {
     assertLive();
-    const next = requireGeneration(nextGeneration);
-    if (next === currentGeneration) return currentGeneration;
-    for (const entry of [...active.values()]) cancelEntry(entry, 'generation-changed');
-    currentGeneration = next;
-    return currentGeneration;
+    const generationValue = requireGeneration(nextGeneration);
+    const revisionValue = requireRevision(nextRevision);
+    if (generationValue === currentGeneration && revisionValue === currentRevision) {
+      return deepFreeze({ generation: currentGeneration, revision: currentRevision });
+    }
+    const generationChanged = generationValue !== currentGeneration;
+    const revisionChanged = revisionValue !== currentRevision;
+    currentGeneration = generationValue;
+    currentRevision = revisionValue;
+    const reason = generationChanged && revisionChanged
+      ? 'generation-and-revision-changed'
+      : generationChanged
+        ? 'generation-changed'
+        : 'revision-changed';
+    for (const entry of [...active.values()]) cancelEntry(entry, reason);
+    return deepFreeze({ generation: currentGeneration, revision: currentRevision });
+  }
+
+  function setGeneration(nextGeneration) {
+    return setAuthority(nextGeneration, currentRevision).generation;
+  }
+
+  function setRevision(nextRevision) {
+    return setAuthority(currentGeneration, nextRevision).revision;
+  }
+
+  function syncSessionAuthority(sessionLifecycle, authoritativeRevision) {
+    assertLive();
+    assertSessionLifecycleState(sessionLifecycle);
+    return setAuthority(sessionLifecycle.presentationGeneration, requireRevision(authoritativeRevision));
   }
 
   function snapActiveToFinalForReducedMotion() {
@@ -393,12 +463,9 @@ export function createMotionController({
           settle(entry, 'stale-target', 'target-released-or-rebuilt');
           continue;
         }
-        if (applyEntry(entry, entry.to, 1, 1)) {
-          settle(entry, 'reduced-motion', 'reduced-motion-final-state');
-        }
+        if (applyEntry(entry, entry.to, 1, 1)) settle(entry, 'reduced-motion', 'reduced-motion-final-state');
       } catch (error) {
-        settle(entry, 'error', error?.code || error?.message || 'motion-reduced-motion-error');
-        throw error;
+        failEntry(entry, error, 'motion-reduced-motion-error');
       }
     }
   }
@@ -423,6 +490,7 @@ export function createMotionController({
     return deepFreeze({
       disposed,
       generation: currentGeneration,
+      revision: currentRevision,
       reducedMotion: reduced,
       activeCount: active.size,
       active: [...active.values()]
@@ -431,10 +499,12 @@ export function createMotionController({
           scope: entry.scope,
           key: entry.key,
           generation: entry.generation,
+          revision: entry.revision,
           sequence: entry.sequence,
           durationMs: entry.durationMs,
           easing: entry.easing.name,
           frameActive: Boolean(entry.frameToken?.active),
+          snapDone: entry.snapDone,
         })),
     });
   }
@@ -451,7 +521,10 @@ export function createMotionController({
     animate,
     cancel,
     cancelScope,
+    setAuthority,
     setGeneration,
+    setRevision,
+    syncSessionAuthority,
     setReducedMotion,
     snapshot,
     release,
