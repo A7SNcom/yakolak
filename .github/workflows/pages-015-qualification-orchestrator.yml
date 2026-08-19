@@ -68,6 +68,11 @@ jobs:
           git show origin/main:.github/workflows/pages-015-qualification-orchestrator.yml \
             | grep -A2 '^concurrency:' \
             | grep -q 'group: pages-release-qualification-ledger'
+          git show origin/main:.github/workflows/pages-014-post-deploy-qualification.yml \
+            | grep -A2 '^concurrency:' \
+            | grep -q 'group: pages-release-qualification-ledger'
+          git show origin/main:.github/workflows/pages-014-post-deploy-qualification.yml \
+            | grep -q 'deployment_generation_verified'
 
       - name: Record fresh explicit credential probe receipt
         if: github.event_name != 'schedule'
