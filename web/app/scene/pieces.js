@@ -141,11 +141,15 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
     if (!piece || !slot) throw new TypeError(`Unknown logical piece ${pieceId}`);
     const matrix = new Matrix4();
     slot.mesh.getMatrixAt(slot.instanceIndex, matrix);
-    const geometry = resourceBySize.get(piece.size).geometry;
+    const geometryResource = resourceBySize.get(piece.size);
+    const geometry = geometryResource.geometry;
     if (!geometry.boundingSphere) geometry.computeBoundingSphere();
     const presentationBounds = geometry.boundingSphere?.clone().applyMatrix4(matrix);
     const boundingRadius = Number(presentationBounds?.radius);
-    const presentationCenter = presentationBounds?.center?.toArray();
+    // The source pivot is the exact anchor used by matrixAt(...). Transforming it through
+    // the live instance matrix recovers the actual presentation anchor even after stack/
+    // drag motion; bounding-sphere center is deliberately not used as a placement anchor.
+    const presentationCenter = geometryResource.sourcePivot.clone().applyMatrix4(matrix).toArray();
     if (
       !Number.isFinite(boundingRadius)
       || boundingRadius <= 0
