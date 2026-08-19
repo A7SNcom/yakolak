@@ -106,6 +106,19 @@ assert.equal(
   'front',
   'reconnect must resolve the same stable seat even when adapter array order is reversed',
 );
+assert.throws(() => configuredSeatOrderFromState({
+  ...reversedAdapterState,
+  seats: reversedAdapterState.seats.slice(0, 3),
+}), /configured_seat_set_mismatch/, 'missing configured seats must fail closed');
+assert.throws(() => configuredSeatOrderFromState({
+  ...reversedAdapterState,
+  seats: [...reversedAdapterState.seats, { seatId: 'extra-seat', type: 'online-human', color: 'green', ready: true }],
+}), /configured_seat_set_mismatch/, 'extra adapter seats must fail closed');
+assert.throws(() => configuredSeatOrderFromState({
+  ...reversedAdapterState,
+  seats: [reversedAdapterState.seats[0], reversedAdapterState.seats[0], reversedAdapterState.seats[2], reversedAdapterState.seats[3]],
+}), /duplicate_configured_seat_id|configured_seat_set_mismatch/, 'duplicate adapter seats must fail closed');
+
 assert.equal(configuredSeatForCredential(canonical, bindings, 'credential-missing-000000000000000000'), null);
 assert.throws(() => createCredentialSeatBindings(canonical, [
   { credentialId: 'duplicate-credential-000000000000000001', seatId: 'left' },
