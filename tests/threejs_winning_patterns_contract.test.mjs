@@ -136,6 +136,17 @@ assert.throws(() => applyMoveTransition(rejectedState, 'p1', { cell: 0, size: 's
 assert.deepEqual(rejectedState.scores, { p1: 1, p2: 0 });
 assert.equal(rejectedState.status, 'playing');
 
+// A legal placement elsewhere must not resurrect a stale/pre-existing winning
+// pattern: only patterns containing the newly accepted slot may trigger the round.
+const staleButAccepted = applyMoveTransition(transitionState(preExistingWin, 1), 'p1', { cell: 8, size: 'medium' });
+assert.equal(staleButAccepted.status, 'playing');
+assert.deepEqual(staleButAccepted.scores, { p1: 1, p2: 0 });
+assert.equal(staleButAccepted.turnIndex, 1);
+const staleOutcome = winningOutcomeAfterAcceptedPlacement(staleButAccepted.board, COLOR, { cell: 8, size: 'medium' });
+assert.equal(staleOutcome.won, false);
+assert.deepEqual(staleOutcome.patterns, []);
+assert.deepEqual(staleOutcome.winningSlots, []);
+
 // One accepted placement completes two patterns simultaneously:
 // - small same-size line [0,1,2]
 // - complete cell 2
