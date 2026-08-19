@@ -76,7 +76,7 @@ Because the emphasis is line-only and has no filled mesh, it leaves the original
 
 THREEJS-039 imports no camera controller, creates no RAF/timer/Promise queue and owns no motion scheduler. A camera transition may still be running, but selection feedback does not wait for it.
 
-`refresh(...)` only re-reads the current presentation matrix for the already-selected logical piece on the same authority witness. This lets the outline follow stack/drag presentation without becoming a second motion owner.
+`refresh(...)` only re-reads the current presentation matrix/bounds for the already-selected logical piece on the same authority witness. This lets the outline and halo follow stack-open/drag presentation without becoming a second motion owner.
 
 ## Authority witness and stale-callback safety
 
@@ -108,16 +108,15 @@ Clear hides the entire emphasis root, drops the selected logical target and requ
 
 ## Instanced-piece presentation bridge
 
-`createPieceInstances(...)` exposes one read-only `getSelectionPresentationDescriptor(pieceId)` bridge for state cues. It returns:
+`createPieceInstances(...)` exposes one narrow `getSelectionPresentationDescriptor(pieceId)` bridge for state cues. It returns only:
 
 - stable logical identity;
-- current instance matrix;
-- current canonical/presentation destination;
-- shared source geometry;
-- finite bounding radius;
-- shared base material identity.
+- current live instance matrix;
+- current live transformed bounds center/radius;
+- shared source geometry needed to derive edge lines;
+- immutable base-material UUID identity.
 
-It does **not** expose render-slot mutation or gameplay authority. The selected overlay can therefore follow an `InstancedMesh` piece without de-instancing the 36-piece runtime or changing canonical material ownership.
+It deliberately does **not** expose canonical destination state, a mutable material object, render-slot mutation or gameplay authority. The selected overlay can therefore follow the actual `InstancedMesh` presentation—including stack-open/drag transforms—without de-instancing the 36-piece runtime or opening a material-mutation path.
 
 ## Rendered acceptance matrix
 
@@ -150,4 +149,4 @@ Run:
 - `npm run test:threejs:gameplay`
 - manual optional browser/full suite, which includes `node scripts/verify-threejs-selected-piece-matrix-browser.mjs`
 
-The Node contract proves canonical/shared-rule ownership, remaining-copy rejection, no-legal-destination rejection, one-object replacement, immutable canonical materials, synchronous rendering, stale-witness protection and all eight atomic clear reasons. The browser matrix proves the visible result across canonical colors, sizes, neutral lighting and play cameras.
+The Node contract proves canonical/shared-rule ownership, remaining-copy rejection, no-legal-destination rejection, one-object replacement, immutable canonical materials, live-matrix following, synchronous rendering, stale-witness protection and all eight atomic clear reasons. The browser matrix proves the visible result across canonical colors, sizes, neutral lighting and play cameras.
