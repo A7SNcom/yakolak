@@ -1,6 +1,6 @@
 # THREEJS-045 — Canonical session state and reducer boundary
 
-Status: **LOCKED by THREEJS-045 (2026-08-19)**
+Status: **LOCKED by THREEJS-045 (2026-08-19); lifecycle vocabulary/transition graph refined and locked by THREEJS-060 (2026-08-19)**
 
 Canonical gameplay/session state is the JSON-only `yakolak.session-state/v1` object implemented by `web/app/session/canonical-session-state.js`.
 
@@ -21,7 +21,7 @@ The canonical object contains only normalized application data:
 - `winner`, `draw`, `matchComplete`, `matchWinner`, `matchWinners`;
 - `restart` and `rematch`: per-seat boolean vote maps;
 - `revision`: non-negative canonical state revision value;
-- `lifecycle`: `{ phase, interrupt, recoveryTarget, presentationGeneration }`.
+- `lifecycle`: `{ phase, interrupt, recoveryTarget, presentationGeneration }`, validated by the THREEJS-060 lifecycle state machine.
 
 Every object level uses a closed key set. Unknown fields are rejected rather than silently retained.
 
@@ -44,21 +44,22 @@ This is the boundary THREEJS-046 must consume when it centralizes placement/inve
 5. rejects mutation of the input or any non-canonical output;
 6. returns a deep-frozen JSON clone.
 
-The boundary deliberately does **not** require a particular revision increment. Mutation/revision/exactly-once semantics remain owned by THREEJS-072/GAP-009.
+The boundary deliberately does **not** require a particular gameplay `revision` increment. Mutation/revision/exactly-once semantics remain owned by THREEJS-072/GAP-009.
+
+THREEJS-060 adds one separate `lifecycle.presentationGeneration` boundary for presentation callbacks. It invalidates stale animation/network completion events without pretending to be the authoritative gameplay revision.
 
 ## Explicit authority non-resolutions
 
 This schema stores data needed by later authority tasks without deciding their unresolved semantics:
 
 - `seat.type` is an opaque normalized token. THREEJS-062 owns the authoritative configured-seat/type vocabulary and Computer authority semantics.
-- `ready` is `null` or boolean. THREEJS-069 owns what makes a seat authoritative-ready and when start may commit.
+- `ready` is `null` or boolean. THREEJS-069 owns what makes a seat authoritative-ready and when Start may commit.
 - `deadlineAtMs` is an internal absolute representation only. THREEJS-062/070 own where the authoritative deadline comes from, clock semantics and timeout reconciliation.
 - `skipReason` is an opaque reason token. THREEJS-048/070 own legal-move and timeout skip semantics.
 - `restart`/`rematch` serialize per-seat approvals but do not define required voters or consensus. THREEJS-076 owns that contract.
-- lifecycle tokens are opaque strings in THREEJS-045. THREEJS-060 immediately owns the allowed lifecycle phases, interruptions, recovery targets and legal transition graph.
 - stable seat topology/turn-ring meaning is not inferred from `seats[]` order; THREEJS-048 owns it.
 
-The schema therefore records future authority facts without granting authority to the browser.
+Lifecycle **is no longer an open vocabulary** after THREEJS-060: normal phases, interrupt states, recovery rules and legal phase edges are locked in `web/app/session/session-lifecycle.js`. That lifecycle machine still does not grant browser-side gameplay authority; it only orders canonical application states and rejects stale presentation callbacks.
 
 ## Runtime objects are forbidden
 
@@ -70,6 +71,7 @@ Canonical state may never contain meshes, Three.js objects, DOM nodes, animation
 
 Run:
 
-`node --test tests/threejs_canonical_session_state_contract.test.mjs`
+- `node --test tests/threejs_canonical_session_state_contract.test.mjs`
+- `node --test tests/threejs_session_lifecycle_contract.test.mjs`
 
-The contract covers JSON round-trip, seat/color normalization, seat-identity active turns without array-order authority, deadline consistency, derived inventory, board ownership, scores/votes, last move/skip/outcome fields, pure reducer behavior, JSON coercion protection and explicit rejection of rendering/DOM/service-worker/timer state.
+Together these contracts cover JSON round-trip, seat/color normalization, seat-identity active turns without array-order authority, deadline consistency, derived inventory, board ownership, scores/votes, last move/skip/outcome fields, pure reducer behavior, lifecycle legality, presentation-generation staleness, JSON coercion protection and explicit rejection of rendering/DOM/service-worker/timer state.
