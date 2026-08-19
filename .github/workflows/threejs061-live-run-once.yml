@@ -1,0 +1,45 @@
+name: THREEJS-061 Live Acceptance Once
+
+on:
+  push:
+    branches:
+      - threejs-061-live-run-once
+
+permissions:
+  contents: read
+
+concurrency:
+  group: threejs-061-live-run-once
+  cancel-in-progress: true
+
+jobs:
+  live-local:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout isolated acceptance harness
+        uses: actions/checkout@v4
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run source contract
+        run: node --test tests/threejs061_live_acceptance_contract.test.mjs
+      - name: Install Playwright only
+        run: npm install --no-save --package-lock=false playwright@1.55.0
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run exact public Pages acceptance
+        env:
+          THREEJS061_EXPECTED_CANDIDATE_SHA: 6726651ef57e7a82f123982619ca3e12855d3c28
+          THREEJS061_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+          THREEJS061_EVIDENCE_PATH: threejs061-live-local-evidence.json
+        run: node scripts/verify-threejs061-live-local.mjs
+      - name: Upload acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: threejs061-live-local-evidence
+          path: threejs061-live-local-evidence.json
+          if-no-files-found: error
+          retention-days: 30
