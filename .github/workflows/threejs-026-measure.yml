@@ -29,15 +29,13 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 1
 
-      - name: Set up Node 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install Playwright measurement runtime
+      - name: Mark measurement relay start
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          npm install --no-save --package-lock=false playwright@1.55.0
-          npx playwright install --with-deps chromium
+          gh api "repos/${GITHUB_REPOSITORY}/issues/69/comments" \
+            -f body="THREEJS-026 measurement started for exact candidate ${GITHUB_SHA}." >/dev/null
 
       - name: Wait for this exact candidate to become the live Pages generation
         id: live
@@ -76,6 +74,16 @@ jobs:
           echo "root_sha=${root_sha}" >> "$GITHUB_OUTPUT"
           echo "runtime_sha=${runtime_sha}" >> "$GITHUB_OUTPUT"
           cat /tmp/deployment-manifest.json
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Playwright measurement runtime
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
 
       - name: Measure exact live Pages generation with fixed cold mobile profile
         id: perf
