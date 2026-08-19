@@ -76,35 +76,46 @@ assert.throws(() => createCanonicalSessionState({
   seats: [canonicalSeats[3], canonicalSeats[1], canonicalSeats[2], canonicalSeats[0]],
 }), /configured_seat_order_mismatch/);
 
-// Credential claim arrival order cannot redefine seat authority. The stable opaque
-// credential identity maps back to the exact configured seat on reconnect.
+// Credential claim arrival order cannot redefine seat authority. Binding order is
+// derived from canonical preferredColor + targetPlayers + configured seat identity.
 const claimsByArrival = [
   { credentialId: 'credential-back-00000000000000000001', seatId: 'back' },
   { credentialId: 'credential-right-0000000000000000001', seatId: 'right' },
   { credentialId: 'credential-front-0000000000000000001', seatId: 'front' },
   { credentialId: 'credential-left-00000000000000000001', seatId: 'left' },
 ];
-const bindings = createCredentialSeatBindings(canonicalSeats, claimsByArrival);
+const bindings = createCredentialSeatBindings(canonical, claimsByArrival);
 assert.deepEqual(bindings.map(binding => binding.seatId), ['left', 'front', 'right', 'back']);
 assert.equal(
-  configuredSeatForCredential(canonicalSeats, bindings, 'credential-front-0000000000000000001').seatId,
+  configuredSeatForCredential(canonical, bindings, 'credential-front-0000000000000000001').seatId,
   'front',
 );
+
+// Even if an adapter presents hydrated seats in reverse/join order, the helper
+// re-derives canonical order instead of trusting that array as authority.
+const reversedAdapterState = {
+  preferredColor: canonical.preferredColor,
+  targetPlayers: canonical.targetPlayers,
+  seats: [...canonical.seats].reverse(),
+  board: canonical.board,
+};
+const reversedBindings = createCredentialSeatBindings(reversedAdapterState, claimsByArrival);
+assert.deepEqual(reversedBindings.map(binding => binding.seatId), ['left', 'front', 'right', 'back']);
 assert.equal(
-  configuredSeatForCredential([...canonicalSeats].reverse(), bindings, 'credential-front-0000000000000000001').seatId,
+  configuredSeatForCredential(reversedAdapterState, reversedBindings, 'credential-front-0000000000000000001').seatId,
   'front',
-  'reconnect lookup must resolve the same stable seat even if an adapter presents seats in another arrival order',
+  'reconnect must resolve the same stable seat even when adapter array order is reversed',
 );
-assert.equal(configuredSeatForCredential(canonicalSeats, bindings, 'credential-missing-000000000000000000'), null);
-assert.throws(() => createCredentialSeatBindings(canonicalSeats, [
+assert.equal(configuredSeatForCredential(canonical, bindings, 'credential-missing-000000000000000000'), null);
+assert.throws(() => createCredentialSeatBindings(canonical, [
   { credentialId: 'duplicate-credential-000000000000000001', seatId: 'left' },
   { credentialId: 'duplicate-credential-000000000000000001', seatId: 'front' },
 ]), /duplicate_credential_id/);
-assert.throws(() => createCredentialSeatBindings(canonicalSeats, [
+assert.throws(() => createCredentialSeatBindings(canonical, [
   { credentialId: 'credential-one-000000000000000000001', seatId: 'left' },
   { credentialId: 'credential-two-000000000000000000001', seatId: 'left' },
 ]), /duplicate_credential_seat/);
-assert.throws(() => createCredentialSeatBindings(canonicalSeats, [
+assert.throws(() => createCredentialSeatBindings(canonical, [
   { credentialId: 'credential-invalid-00000000000000001', seatId: 'not-a-seat' },
 ]), /credential_seat_not_configured/);
 
