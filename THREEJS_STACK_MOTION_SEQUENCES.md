@@ -26,11 +26,11 @@ The definitive rebuild guide locks:
 - close return uses **arc 10**;
 - cancelled/skipped presentation snaps once to the exact canonical final state.
 
-Remaining nested targets arrive from THREEJS-031 in `large → medium → small` order. Their open positions are therefore:
+Remaining nested targets arrive from THREEJS-031 in `large → medium → small` order. Their open positions are:
 
 `homeY + 19 × remaining-rank`
 
-The first remaining piece is the stack anchor and stays at the home center. Only pieces whose rank is greater than zero were actually separated; only those pieces receive the 10-unit close arc. Every close finishes exactly at the canonical home transform.
+The first remaining piece is the stack anchor and stays at the home center. Only pieces whose rank is greater than zero were actually separated; only those pieces receive the 10-unit close arc. Every normal close finishes exactly at the canonical home transform.
 
 ## Authority witness
 
@@ -39,9 +39,19 @@ Every plan carries:
 - `generation = state.lifecycle.presentationGeneration` from THREEJS-060;
 - `revision = state.revision`.
 
-Before synchronizing THREEJS-096, `submitStackMotionPlan(...)` compares the plan with the controller snapshot. A plan older than the controller generation or revision is rejected locally as stale, so an old snapshot cannot move the motion controller authority backward.
+Before synchronizing THREEJS-096, `submitStackMotionPlan(...)` compares the plan with the controller snapshot. A plan older than the controller generation or revision is rejected locally as stale, so an old snapshot cannot move motion authority backward.
 
 The plan is then submitted with `motionController.syncSessionAuthority(plan.lifecycle, plan.revision)` and every piece motion carries the same generation/revision witness.
+
+## Atomic sequence preflight
+
+Before authority sync or the first tween, THREEJS-032 preflights **every** piece in the stack:
+
+- target is still live;
+- current transform exists;
+- current transform has the required finite numeric shape.
+
+If any piece fails preflight, no frame is allocated and no partial stack sequence begins.
 
 ## Execution ownership
 
@@ -61,15 +71,17 @@ A scene/presentation adapter supplies four hooks:
 - `readPieceTransform(pieceId)`;
 - `applyPieceTransform(pieceId, transform, meta)`;
 - `isPieceLive(pieceId)`;
-- `snapPieceHome(pieceId, canonicalHomeTransform, meta)`.
+- `snapPieceCanonical(pieceId, meta)`.
 
-This keeps THREEJS-032 free of mesh identity and renderer ownership. The stable logical piece IDs come from the THREEJS-031 target mapping and match the existing piece catalog IDs.
+The last hook must reconcile from the **latest authoritative snapshot**. It must not blindly return a cancelled piece to home: a newer revision may already have committed that formerly-home piece to a board cell.
+
+This keeps THREEJS-032 free of mesh identity and renderer ownership. Stable logical piece IDs come from THREEJS-031 and match the existing piece catalog IDs.
 
 ## Cancellation and resync
 
 Explicit stack cancellation delegates to `motionController.cancelScope(stackTargetId, reason)`.
 
-Turn/seat change, timeout, reconnect, lifecycle generation change or newer authoritative revision is represented by THREEJS-096 authority synchronization. Active stack motion is cancelled there and each still-live target canonical-snaps once. Released/rebuilt targets receive no stale writes.
+Turn/seat change, timeout, reconnect, lifecycle generation change or newer authoritative revision is represented by THREEJS-096 authority synchronization. Active stack motion is cancelled there and each still-live target canonical-snaps once from the latest snapshot. Released/rebuilt targets receive no stale writes.
 
 No stack completion callback commits gameplay state.
 
@@ -83,7 +95,7 @@ Gameplay authority and selection legality are decided independently of this anim
 
 Reduced Motion submits the exact same plan through THREEJS-096. The controller collapses timing and writes the same exact final transforms. It does not create a separate stack lifecycle or selection path.
 
-Because the close arc is derived from controller progress, final progress `1` always produces zero arc and the exact home transform.
+Because the close arc is derived from controller progress, final progress `1` always produces zero arc and the exact normal-close target.
 
 ## Verification
 
@@ -92,4 +104,4 @@ Run:
 - `node --test tests/threejs_stack_motion_sequences_contract.test.mjs`
 - `npm run test:threejs:gameplay`
 
-The focused contract covers canonical remaining-piece filtering, exact 19-Y separation, 360/360 timing, close arc 10, exact home completion, active-seat rejection, explicit cancellation, revision invalidation, stale-plan rejection, Reduced Motion and source-level prohibition of a second scheduler.
+The focused contract covers canonical remaining-piece filtering, exact 19-Y separation, 360/360 timing, close arc 10, exact normal-close home completion, active-seat rejection, atomic preflight, explicit cancellation, revision invalidation, canonical board resync after a newer revision, stale-plan rejection, Reduced Motion and source-level prohibition of a second scheduler.
