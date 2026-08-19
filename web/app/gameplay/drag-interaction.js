@@ -4,8 +4,9 @@ import {
   GAMEPLAY_PRESENTATION_SOURCES,
   assertGameplayIntent,
 } from './gameplay-intent.js';
-import { projectRayToBoardPlane, resolveBoardCellPick } from './board-cell-picking.js';
+import { resolveBoardCellPick } from './board-cell-picking.js';
 import { resolveHomePieceTarget } from './home-stack-picking.js';
+import { SIZE_SELECTION_CLEAR_REASONS } from './size-selection.js';
 import { assertCanonicalSessionState } from '../session/canonical-session-state.js';
 
 export const DRAG_PHASES = Object.freeze({
@@ -83,6 +84,11 @@ function requireCameraGestureToggle(setCameraGesturesEnabled) {
 function requireClearSelection(clearSelection) {
   if (typeof clearSelection !== 'function') fail('drag_clear_selection_required');
   return clearSelection;
+}
+
+function requireClearReason(reason) {
+  if (!SIZE_SELECTION_CLEAR_REASONS.includes(reason)) fail('invalid_drag_clear_reason');
+  return reason;
 }
 
 function requireContract(approvedContract) {
@@ -289,21 +295,9 @@ export function createDragInteractionController({
     const normalizedPointerType = requirePointerType(pointerType);
     if (normalizedPointerType !== drag.pointerType) fail('drag_pointer_type_changed');
 
-    const boardPlaneY = worldLayout.zones?.[0]?.position?.[1];
-    if (!Number.isFinite(Number(boardPlaneY))) fail('drag_board_plane_missing');
-    const projected = projectRayToBoardPlane(ray, Number(boardPlaneY));
-    let directTransform = drag.lastTransform;
-    if (projected) {
-      directTransform = directTransformFromWorldPoint(drag.originTransform, projected.point, contract.dragHeight);
-      if (!view.isPieceLive(drag.pieceId)) fail('drag_piece_not_live');
-      view.applyDragTransform(drag.pieceId, directTransform, deepFreeze({
-        dragId: drag.dragId,
-        phase: DRAG_PHASES.DRAGGING,
-        directPointerFollow: true,
-        dragHeight: contract.dragHeight,
-      }));
-    }
-
+    // THREEJS-034 validates selection/layout and projects the ray before any direct
+    // presentation write. Its worldPoint exists even when the point is outside all
+    // valid radii, which still allows pointer-follow while exposing no candidate.
     const pick = resolveBoardCellPick({
       state,
       selection,
@@ -312,6 +306,21 @@ export function createDragInteractionController({
       worldLayout,
       approvedContract,
     });
+
+    let directTransform = drag.lastTransform;
+    if (pick.worldPoint) {
+      directTransform = directTransformFromWorldPoint(drag.originTransform, pick.worldPoint, contract.dragHeight);
+      const live = view.isPieceLive(drag.pieceId);
+      if (typeof live !== 'boolean') fail('drag_piece_liveness_invalid');
+      if (!live) fail('drag_piece_not_live');
+      view.applyDragTransform(drag.pieceId, directTransform, deepFreeze({
+        dragId: drag.dragId,
+        phase: DRAG_PHASES.DRAGGING,
+        directPointerFollow: true,
+        dragHeight: contract.dragHeight,
+      }));
+    }
+
     drag.lastTransform = directTransform;
     drag.candidate = normalizeCandidate(pick);
     drag.diagnostic = drag.candidate ? null : deepFreeze({
@@ -356,7 +365,7 @@ export function createDragInteractionController({
     setCameraEnabled(true);
     const returnHandle = requestCanonicalReturn(drag, reason);
     current = null;
-    return deepFreeze({
+    return Object.freeze({
       status: 'returned',
       reason,
       returnHandle,
@@ -366,7 +375,7 @@ export function createDragInteractionController({
   function release({ state, selection, pointerId, ray, pointerType = current?.pointerType } = {}) {
     assertCanonicalSessionState(state);
     if (current?.phase === DRAG_PHASES.PENDING) {
-      return deepFreeze({ status: 'pending', intent: current.intent, submission: current.submission, travelRequest: current.travelRequest });
+      return Object.freeze({ status: 'pending', intent: current.intent, submission: current.submission, travelRequest: current.travelRequest });
     }
     const drag = assertActiveInput(state, selection, pointerId);
     update({ state, selection, pointerId, ray, pointerType });
@@ -382,7 +391,6 @@ export function createDragInteractionController({
     }));
     assertIntentMatchesDrag(intent, drag, drag.candidate);
 
-    setCameraEnabled(true);
     const travelRequest = deepFreeze({
       owner: 'THREEJS-042',
       pieceId: drag.pieceId,
@@ -392,8 +400,20 @@ export function createDragInteractionController({
       generation: drag.witness.generation,
       revision: drag.witness.revision,
     });
-    const submission = authorityAdapter.submit(intent);
-    if (!submission || typeof submission.then !== 'function') fail('drag_authority_submit_must_return_promise');
+
+    let submission;
+    try {
+      submission = authorityAdapter.submit(intent);
+    } catch (error) {
+      invalidRelease(drag, 'submission-start-failed');
+      throw error;
+    }
+    if (!submission || typeof submission.then !== 'function') {
+      invalidRelease(drag, 'submission-start-failed');
+      fail('drag_authority_submit_must_return_promise');
+    }
+
+    setCameraEnabled(true);
     drag.phase = DRAG_PHASES.PENDING;
     drag.intent = intent;
     drag.travelRequest = travelRequest;
@@ -402,7 +422,7 @@ export function createDragInteractionController({
     drag.diagnostic = null;
     current = drag;
 
-    return deepFreeze({
+    return Object.freeze({
       status: 'pending',
       intent,
       submission,
@@ -427,7 +447,9 @@ export function createDragInteractionController({
     const drag = current;
     setCameraEnabled(true);
     motion.cancelScope(returnScope(drag.pieceId), reason);
-    if (view.isPieceLive(drag.pieceId)) view.snapPieceCanonical(drag.pieceId, deepFreeze({ reason, immediate: true }));
+    const live = view.isPieceLive(drag.pieceId);
+    if (typeof live !== 'boolean') fail('drag_piece_liveness_invalid');
+    if (live) view.snapPieceCanonical(drag.pieceId, deepFreeze({ reason, immediate: true }));
     current = null;
     clearSizeSelection('cancel', clearState);
     return true;
@@ -435,20 +457,21 @@ export function createDragInteractionController({
 
   function reconcileCanonical({ state, clearReason, reason = 'canonical-resync' } = {}) {
     assertCanonicalSessionState(state);
+    const normalizedClearReason = requireClearReason(clearReason);
+    const before = motion.snapshot();
+    if (isOlderAuthority(state, before)) fail('stale_drag_canonical_snapshot');
+
+    motion.syncSessionAuthority(state.lifecycle, state.revision);
     if (!current) {
-      clearSizeSelection(clearReason, state);
-      const before = motion.snapshot();
-      if (isOlderAuthority(state, before)) fail('stale_drag_canonical_snapshot');
-      motion.syncSessionAuthority(state.lifecycle, state.revision);
+      clearSizeSelection(normalizedClearReason, state);
       return false;
     }
 
     const drag = current;
-    const before = motion.snapshot();
-    if (isOlderAuthority(state, before)) fail('stale_drag_canonical_snapshot');
-    motion.syncSessionAuthority(state.lifecycle, state.revision);
     setCameraEnabled(true);
-    if (view.isPieceLive(drag.pieceId)) {
+    const live = view.isPieceLive(drag.pieceId);
+    if (typeof live !== 'boolean') fail('drag_piece_liveness_invalid');
+    if (live) {
       view.snapPieceCanonical(drag.pieceId, deepFreeze({
         reason,
         immediate: true,
@@ -457,12 +480,8 @@ export function createDragInteractionController({
       }));
     }
     current = null;
-    clearSizeSelection(clearReason, state);
+    clearSizeSelection(normalizedClearReason, state);
     return true;
-  }
-
-  function snapshot() {
-    return publicSnapshot();
   }
 
   return Object.freeze({
@@ -472,6 +491,6 @@ export function createDragInteractionController({
     cancel,
     pointerCancel,
     reconcileCanonical,
-    snapshot,
+    snapshot: publicSnapshot,
   });
 }
