@@ -195,10 +195,9 @@ export function uniqueWinningSlots(patterns) {
   return [...slots.values()];
 }
 
-// Canonical win evaluation is bound to the placement that was just accepted.
-// The reducer passes the normalized committed placement only after placePiece has
-// succeeded. This prevents a pre-existing board pattern or rejected click from
-// becoming a second scoring trigger.
+// Canonical win evaluation is bound to the exact placement that was just
+// accepted. Only patterns containing that committed slot are new patterns caused
+// by this move; stale/pre-existing patterns cannot become a second scoring trigger.
 export function winningOutcomeAfterAcceptedPlacement(board, color, move) {
   const cell = move?.cell;
   const size = move?.size;
@@ -211,7 +210,9 @@ export function winningOutcomeAfterAcceptedPlacement(board, color, move) {
     board?.[String(cell)]?.[size] !== color
   ) throw rulesError('win_evaluation_requires_accepted_placement');
 
-  const patterns = winningPatterns(board, color);
+  const patterns = winningPatterns(board, color).filter(pattern =>
+    pattern.slots.some(slot => slot.cell === cell && slot.size === size),
+  );
   const winningSlots = uniqueWinningSlots(patterns);
   return deepFreeze({
     won: patterns.length > 0,
