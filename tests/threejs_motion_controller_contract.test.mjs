@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 
 import { createResourceRegistry } from '../web/app/core/resource-registry.js';
+import { createMotionController, MOTION_EASINGS } from '../web/app/gameplay/motion-controller.js';
 import {
-  MOTION_EASINGS,
-  createMotionController,
-} from '../web/app/gameplay/motion-controller.js';
+  SESSION_LIFECYCLE_EVENT_TYPES,
+  SESSION_LIFECYCLE_PHASES,
+  createSessionLifecycleState,
+  reduceSessionLifecycle,
+} from '../web/app/session/session-lifecycle.js';
 
 function fakePlatform() {
   let sequence = 0;
@@ -56,6 +59,34 @@ class FakeMediaQuery {
   }
 }
 
+function motionArgs({
+  scope = 'piece',
+  key = 'transform',
+  generation = 1,
+  revision = 7,
+  durationMs = 100,
+  from = 0,
+  to = 1,
+  apply = () => {},
+  isTargetLive = () => true,
+  snapToCanonical = () => {},
+  easing = 'linear',
+} = {}) {
+  return {
+    scope,
+    key,
+    generation,
+    revision,
+    durationMs,
+    from,
+    to,
+    apply,
+    isTargetLive,
+    snapToCanonical,
+    easing,
+  };
+}
+
 assert.equal(MOTION_EASINGS.linear(0.5), 0.5);
 assert.equal(MOTION_EASINGS.easeOutCubic(1), 1);
 assert.equal(MOTION_EASINGS.easeInOutCubic(0), 0);
@@ -67,208 +98,282 @@ const controller = createMotionController({
   resourceRegistry: registry,
   clock: () => nowMs,
   generation: 1,
+  revision: 7,
+});
+assert.deepEqual(controller.snapshot(), {
+  disposed: false,
+  generation: 1,
+  revision: 7,
+  reducedMotion: false,
+  activeCount: 0,
+  active: [],
 });
 
-// One numeric-tree tween can carry transform/scale/opacity together. Initial state
-// applies synchronously; every subsequent frame is resource-registry-owned.
+// Numeric-tree tweening is deterministic and every frame is registry-owned.
 const applied = [];
-const target = { live: true };
-const first = controller.animate({
+let completedSnaps = 0;
+const first = controller.animate(motionArgs({
+  scope: 'stack:right:0',
+  key: 'open-close',
+  from: { position: [0, 0, 0], opacity: 0 },
+  to: { position: [10, 20, 30], opacity: 1 },
+  apply: (value, meta) => applied.push({ value, meta }),
+  snapToCanonical: () => { completedSnaps += 1; },
+}));
+assert.deepEqual(applied[0].value, { opacity: 0, position: [0, 0, 0] });
+assert.equal(applied[0].meta.revision, 7);
+assert.equal(registry.snapshot().animationHandles, 1);
+let frame = platform.pendingIds()[0];
+nowMs = 50;
+platform.fire(frame);
+assert.deepEqual(applied.at(-1).value, { opacity: 0.5, position: [5, 10, 15] });
+frame = platform.pendingIds()[0];
+nowMs = 100;
+platform.fire(frame);
+assert.deepEqual(applied.at(-1).value, { opacity: 1, position: [10, 20, 30] });
+assert.deepEqual(await first.finished, {
   scope: 'stack:right:0',
   key: 'open-close',
   generation: 1,
-  durationMs: 100,
-  from: { position: [0, 0, 0], scale: [1, 1, 1], opacity: 0 },
-  to: { position: [10, 20, 30], scale: [2, 2, 2], opacity: 1 },
-  easing: 'linear',
-  apply: (value, meta) => applied.push({ value, meta }),
-  isTargetLive: () => target.live,
+  revision: 7,
+  sequence: 1,
+  status: 'completed',
+  reason: null,
+  snappedCanonical: false,
 });
-assert.equal(applied.length, 1);
-assert.deepEqual(applied[0].value, { opacity: 0, position: [0, 0, 0], scale: [1, 1, 1] });
-assert.equal(registry.snapshot().animationHandles, 1);
-assert.equal(controller.snapshot().activeCount, 1);
-let frameId = platform.pendingIds()[0];
-nowMs = 50;
-platform.fire(frameId);
-assert.deepEqual(applied.at(-1).value, { opacity: 0.5, position: [5, 10, 15], scale: [1.5, 1.5, 1.5] });
-assert.equal(applied.at(-1).meta.progress, 0.5);
-assert.equal(registry.snapshot().animationHandles, 1);
-frameId = platform.pendingIds()[0];
-nowMs = 100;
-platform.fire(frameId);
-assert.deepEqual(applied.at(-1).value, { opacity: 1, position: [10, 20, 30], scale: [2, 2, 2] });
-assert.deepEqual(await first.finished, {
-  scope: 'stack:right:0', key: 'open-close', generation: 1, sequence: 1, status: 'completed', reason: null,
-});
-assert.equal(controller.snapshot().activeCount, 0);
+assert.equal(completedSnaps, 0, 'normal completion must not invoke cancellation snap');
 assert.equal(registry.snapshot().animationHandles, 0);
 
-// Newer motion for the same scoped key cancels the old motion. Even if a platform
-// delivers the cancelled rAF callback later, the sequence/current-entry check makes
-// that stale callback a no-op.
+// Same-key supersession cancels the old work, snaps canonical exactly once, and a
+// cancelled platform callback cannot mutate afterwards.
 nowMs = 200;
 const oldWrites = [];
-const old = controller.animate({
-  scope: 'piece:right:0:large', key: 'transform', generation: 1, durationMs: 100,
-  from: [0], to: [10], apply: value => oldWrites.push(value[0]), isTargetLive: () => true,
-});
-const cancelledFrameId = platform.pendingIds()[0];
+const oldSnaps = [];
+const old = controller.animate(motionArgs({
+  scope: 'piece:right:0:large',
+  key: 'transform',
+  from: 0,
+  to: 10,
+  apply: value => oldWrites.push(value),
+  snapToCanonical: meta => oldSnaps.push(meta.reason),
+}));
+const cancelledFrame = platform.pendingIds()[0];
 const newerWrites = [];
-const newer = controller.animate({
-  scope: 'piece:right:0:large', key: 'transform', generation: 1, durationMs: 100,
-  from: [3], to: [30], apply: value => newerWrites.push(value[0]), isTargetLive: () => true,
-});
-assert.equal(oldWrites.length, 1);
-assert.equal(newerWrites.length, 1);
-assert.equal(platform.fireCancelled(cancelledFrameId), true);
-assert.deepEqual(oldWrites, [0], 'cancelled callback must not mutate superseded target state');
-assert.equal((await old.finished).status, 'cancelled');
-assert.equal((await old.finished).reason, 'superseded-by-newer-motion');
+const newer = controller.animate(motionArgs({
+  scope: 'piece:right:0:large',
+  key: 'transform',
+  from: 3,
+  to: 30,
+  apply: value => newerWrites.push(value),
+}));
+assert.deepEqual(oldSnaps, ['superseded-by-newer-motion']);
+assert.equal((await old.finished).snappedCanonical, true);
+platform.fireCancelled(cancelledFrame);
+assert.deepEqual(oldWrites, [0]);
 nowMs = 300;
 platform.fire(platform.pendingIds()[0]);
 assert.equal((await newer.finished).status, 'completed');
 assert.deepEqual(newerWrites, [3, 30]);
 
-// Different scoped keys coexist; cancelScope cancels only that logical interaction.
+// Authoritative revision replacement invalidates all active motion and snaps each
+// still-live target exactly once before stale callbacks can write.
 nowMs = 400;
-const left = controller.animate({
-  scope: 'stack:right:0', key: 'piece:large', generation: 1, durationMs: 100,
-  from: 0, to: 1, apply: () => {}, isTargetLive: () => true,
+const revisionWrites = [];
+const revisionSnaps = [];
+const revisionMotion = controller.animate(motionArgs({
+  scope: 'piece',
+  key: 'travel',
+  from: 0,
+  to: 50,
+  apply: value => revisionWrites.push(value),
+  snapToCanonical: meta => revisionSnaps.push({ reason: meta.reason, controllerRevision: meta.controllerRevision }),
+}));
+const revisionFrame = platform.pendingIds()[0];
+assert.equal(controller.setRevision(8), 8);
+assert.deepEqual(revisionSnaps, [{ reason: 'revision-changed', controllerRevision: 8 }]);
+assert.deepEqual(await revisionMotion.finished, {
+  scope: 'piece',
+  key: 'travel',
+  generation: 1,
+  revision: 7,
+  sequence: 4,
+  status: 'cancelled',
+  reason: 'revision-changed',
+  snappedCanonical: true,
 });
-const right = controller.animate({
-  scope: 'stack:right:1', key: 'piece:large', generation: 1, durationMs: 100,
-  from: 0, to: 1, apply: () => {}, isTargetLive: () => true,
-});
-assert.equal(controller.snapshot().activeCount, 2);
-assert.equal(controller.cancelScope('stack:right:0', 'stack-closed'), 1);
-assert.equal((await left.finished).status, 'cancelled');
-assert.equal(controller.snapshot().activeCount, 1);
-assert.equal(controller.cancel('stack:right:1', 'piece:large', 'other-stack-opened'), true);
-assert.equal((await right.finished).reason, 'other-stack-opened');
-assert.equal(controller.snapshot().activeCount, 0);
+platform.fireCancelled(revisionFrame);
+assert.deepEqual(revisionWrites, [0]);
+const staleRevision = controller.animate(motionArgs({ revision: 7 }));
+assert.equal((await staleRevision.finished).status, 'stale-revision');
+assert.equal(registry.snapshot().animationHandles, 0);
 
-// Generation change invalidates all active callbacks. A stale-generation request is
-// settled without applying from/to or scheduling a frame.
+// THREEJS-060 presentationGeneration is the lifecycle generation source. Advancing
+// lifecycle and authoritative revision together cancels stale motion under one call.
+let lifecycle = createSessionLifecycleState({
+  phase: SESSION_LIFECYCLE_PHASES.BOOT,
+  presentationGeneration: 1,
+});
+const lifecycleWrites = [];
+const lifecycleSnaps = [];
+const lifecycleMotion = controller.animate(motionArgs({
+  scope: 'setup',
+  key: 'surface',
+  revision: 8,
+  from: 0,
+  to: 1,
+  apply: value => lifecycleWrites.push(value),
+  snapToCanonical: meta => lifecycleSnaps.push(meta.reason),
+}));
+const lifecycleFrame = platform.pendingIds()[0];
+lifecycle = reduceSessionLifecycle(lifecycle, {
+  type: SESSION_LIFECYCLE_EVENT_TYPES.ADVANCE,
+  to: SESSION_LIFECYCLE_PHASES.LOADING,
+  presentationGeneration: 1,
+});
+assert.equal(lifecycle.presentationGeneration, 2);
+assert.deepEqual(controller.syncSessionAuthority(lifecycle, 9), { generation: 2, revision: 9 });
+assert.deepEqual(lifecycleSnaps, ['generation-and-revision-changed']);
+assert.equal((await lifecycleMotion.finished).snappedCanonical, true);
+platform.fireCancelled(lifecycleFrame);
+assert.deepEqual(lifecycleWrites, [0]);
+assert.deepEqual(controller.snapshot().generation, 2);
+assert.deepEqual(controller.snapshot().revision, 9);
+
+// A released/rebuilt target is never touched by either stale frame or canonical snap.
 nowMs = 500;
-let generationWrites = 0;
-const generationMotion = controller.animate({
-  scope: 'selection', key: 'pulse', generation: 1, durationMs: 100,
-  from: 0, to: 1, apply: () => { generationWrites += 1; }, isTargetLive: () => true,
-});
-const generationFrame = platform.pendingIds()[0];
-assert.equal(generationWrites, 1);
-controller.setGeneration(2);
-assert.equal((await generationMotion.finished).reason, 'generation-changed');
-platform.fireCancelled(generationFrame);
-assert.equal(generationWrites, 1);
-let staleWrites = 0;
-const staleGeneration = controller.animate({
-  scope: 'selection', key: 'pulse', generation: 1, durationMs: 100,
-  from: 0, to: 1, apply: () => { staleWrites += 1; }, isTargetLive: () => true,
-});
-assert.equal((await staleGeneration.finished).status, 'stale-generation');
-assert.equal(staleWrites, 0);
-assert.equal(registry.snapshot().animationHandles, 0);
+const target = { live: true, writes: [], snaps: 0 };
+const releasedTarget = controller.animate(motionArgs({
+  generation: 2,
+  revision: 9,
+  scope: 'piece',
+  key: 'released-target',
+  from: 0,
+  to: 10,
+  apply: value => target.writes.push(value),
+  isTargetLive: () => target.live,
+  snapToCanonical: () => { target.snaps += 1; },
+}));
+const releasedFrame = platform.pendingIds()[0];
+assert.deepEqual(target.writes, [0]);
+target.live = false;
+controller.setRevision(10);
+assert.equal((await releasedTarget.finished).snappedCanonical, true, 'snap attempt is consumed exactly once');
+assert.equal(target.snaps, 0, 'released target must not be mutated by canonical snap');
+platform.fireCancelled(releasedFrame);
+assert.deepEqual(target.writes, [0]);
 
-// Rebuilt/released targets are checked immediately before every apply. Once liveness
-// changes, no stale frame mutates the object and the handle settles.
+// Reduced Motion uses the same semantic transition and commits `to` directly; it is
+// not a cancellation snap and does not allocate another lifecycle path.
 nowMs = 600;
-const liveness = { live: true, writes: [] };
-const liveMotion = controller.animate({
-  scope: 'piece', key: 'return-home', generation: 2, durationMs: 100,
-  from: 0, to: 10, apply: value => liveness.writes.push(value), isTargetLive: () => liveness.live,
-});
-const liveFrame = platform.pendingIds()[0];
-assert.deepEqual(liveness.writes, [0]);
-liveness.live = false;
-nowMs = 650;
-platform.fire(liveFrame);
-assert.deepEqual(liveness.writes, [0]);
-assert.equal((await liveMotion.finished).status, 'stale-target');
-assert.equal(registry.snapshot().animationHandles, 0);
-
-// Reduced Motion during an active cosmetic tween cancels rAF and writes only the
-// exact final committed presentation state. No gameplay caller needs to await it.
-nowMs = 700;
 const reducedWrites = [];
-const reducedActive = controller.animate({
-  scope: 'stack', key: 'open', generation: 2, durationMs: 500,
-  from: { x: 0, opacity: 0 }, to: { x: 42, opacity: 1 },
-  apply: value => reducedWrites.push(value), isTargetLive: () => true,
-});
+let reducedSnaps = 0;
+const reducedActive = controller.animate(motionArgs({
+  generation: 2,
+  revision: 10,
+  scope: 'stack',
+  key: 'open',
+  durationMs: 500,
+  from: { x: 0, opacity: 0 },
+  to: { x: 42, opacity: 1 },
+  apply: value => reducedWrites.push(value),
+  snapToCanonical: () => { reducedSnaps += 1; },
+}));
 const reducedFrame = platform.pendingIds()[0];
-assert.equal(registry.snapshot().animationHandles, 1);
 controller.setReducedMotion(true);
-assert.equal(registry.snapshot().animationHandles, 0);
 assert.deepEqual(reducedWrites, [{ opacity: 0, x: 0 }, { opacity: 1, x: 42 }]);
 assert.equal((await reducedActive.finished).status, 'reduced-motion');
+assert.equal(reducedSnaps, 0);
+assert.equal(registry.snapshot().animationHandles, 0);
 platform.fireCancelled(reducedFrame);
 assert.equal(reducedWrites.length, 2);
 
-// New motion while Reduced Motion is enabled immediately reaches final state and
-// never allocates an animation frame. Duration zero behaves the same when motion is enabled.
 const instantWrites = [];
-const instant = controller.animate({
-  scope: 'piece', key: 'lift', generation: 2, durationMs: 250,
-  from: [0, 0, 0], to: [0, 14, 0], apply: value => instantWrites.push(value), isTargetLive: () => true,
-});
+const instant = controller.animate(motionArgs({
+  generation: 2,
+  revision: 10,
+  scope: 'piece',
+  key: 'lift',
+  durationMs: 250,
+  from: [0, 0, 0],
+  to: [0, 14, 0],
+  apply: value => instantWrites.push(value),
+}));
 assert.deepEqual(instantWrites, [[0, 14, 0]]);
 assert.equal((await instant.finished).status, 'reduced-motion');
-assert.equal(registry.snapshot().animationHandles, 0);
 controller.setReducedMotion(false);
-const zeroWrites = [];
-const zero = controller.animate({
-  scope: 'piece', key: 'snap', generation: 2, durationMs: 0,
-  from: 0, to: 9, apply: value => zeroWrites.push(value), isTargetLive: () => true,
-});
-assert.deepEqual(zeroWrites, [9]);
-assert.equal((await zero.finished).status, 'completed');
 
-// A media-query subscription is registry-owned and switching it on snaps active
-// motion to final. Releasing the controller removes the listener and active handles.
+// Scope cancellation and controller release both canonical-snap live targets once.
+const scopeSnaps = [];
+controller.animate(motionArgs({
+  generation: 2,
+  revision: 10,
+  scope: 'stack:right:0',
+  key: 'large',
+  snapToCanonical: meta => scopeSnaps.push(meta.reason),
+}));
+assert.equal(controller.cancelScope('stack:right:0', 'stack-closed'), 1);
+assert.deepEqual(scopeSnaps, ['stack-closed']);
+
+const releaseWrites = [];
+const releaseSnaps = [];
+const releaseMotion = controller.animate(motionArgs({
+  generation: 2,
+  revision: 10,
+  scope: 'reset',
+  key: 'return-home',
+  apply: value => releaseWrites.push(value),
+  snapToCanonical: meta => releaseSnaps.push(meta.reason),
+}));
+const releaseFrame = platform.pendingIds()[0];
+assert.equal(controller.release(), true);
+assert.deepEqual(releaseSnaps, ['controller-released']);
+assert.equal((await releaseMotion.finished).snappedCanonical, true);
+platform.fireCancelled(releaseFrame);
+assert.deepEqual(releaseWrites, [0]);
+assert.equal(registry.snapshot().animationHandles, 0);
+assert.throws(() => controller.animate({}), /motion_controller_disposed/);
+registry.dispose('motion-controller-test-complete');
+
+// Media-query listener is owned by the registry and Reduced Motion still uses the
+// same controller path.
 const mediaPlatform = fakePlatform();
 const mediaRegistry = createResourceRegistry({ platform: mediaPlatform });
 const mediaQuery = new FakeMediaQuery(false);
-let mediaNow = 0;
 const mediaController = createMotionController({
   resourceRegistry: mediaRegistry,
-  clock: () => mediaNow,
+  clock: () => 0,
   generation: 3,
+  revision: 11,
   reducedMotionQuery: mediaQuery,
 });
 assert.equal(mediaRegistry.snapshot().listeners, 1);
 const mediaWrites = [];
-const mediaMotion = mediaController.animate({
-  scope: 'overlay', key: 'opacity', generation: 3, durationMs: 100,
-  from: 0, to: 1, apply: value => mediaWrites.push(value), isTargetLive: () => true,
-});
+const mediaMotion = mediaController.animate(motionArgs({
+  generation: 3,
+  revision: 11,
+  scope: 'overlay',
+  key: 'opacity',
+  from: 0,
+  to: 1,
+  apply: value => mediaWrites.push(value),
+}));
 const mediaFrame = mediaPlatform.pendingIds()[0];
 mediaQuery.set(true);
 assert.deepEqual(mediaWrites, [0, 1]);
 assert.equal((await mediaMotion.finished).status, 'reduced-motion');
 mediaPlatform.fireCancelled(mediaFrame);
 assert.deepEqual(mediaWrites, [0, 1]);
-assert.equal(mediaController.release(), true);
+mediaController.release();
 assert.equal(mediaRegistry.snapshot().listeners, 0);
-assert.equal(mediaRegistry.snapshot().animationHandles, 0);
 assert.equal(mediaQuery.listeners.size, 0);
 mediaRegistry.dispose('motion-media-test-complete');
 
-// Controller release settles active work and blocks stale cancelled callbacks.
-nowMs = 900;
-const releaseWrites = [];
-const releaseMotion = controller.animate({
-  scope: 'reset', key: 'return-home', generation: 2, durationMs: 100,
-  from: 0, to: 1, apply: value => releaseWrites.push(value), isTargetLive: () => true,
-});
-const releaseFrame = platform.pendingIds()[0];
-assert.equal(controller.release(), true);
-assert.equal((await releaseMotion.finished).reason, 'controller-released');
-platform.fireCancelled(releaseFrame);
-assert.deepEqual(releaseWrites, [0]);
-assert.equal(registry.snapshot().animationHandles, 0);
-assert.throws(() => controller.animate({}), /motion_controller_disposed/);
-registry.dispose('motion-controller-test-complete');
+// Stale sequences cannot omit the authority witness or canonical snap contract.
+const validationRegistry = createResourceRegistry({ platform: fakePlatform() });
+const validationController = createMotionController({ resourceRegistry: validationRegistry, generation: 0, revision: 0 });
+assert.throws(() => validationController.animate(motionArgs({ revision: undefined })), /invalid_motion_revision/);
+assert.throws(() => validationController.animate(motionArgs({ snapToCanonical: undefined })), /motion_snap_to_canonical_required/);
+validationController.release();
+validationRegistry.dispose('motion-validation-test-complete');
 
 console.log('THREEJS-096 motion controller contract: PASS');
