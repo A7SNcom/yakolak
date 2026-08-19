@@ -71,12 +71,13 @@ test('shared frontend verifier binds live evidence to the exact Worker lock befo
   assert.match(frontendVerifier, /previousWorker\.workerVersionId !== workerLock\?\.previousWorkerVersionId/);
   assert.match(frontendVerifier, /evidence\.workerLockIdentityVerified = true/);
 
-  const finalizerVerify = finalizer.indexOf('verify-pages015-frontend-window.mjs');
-  const finalizerAppend = finalizer.indexOf('append-pages015-qualification.mjs');
+  const finalizerVerify = finalizer.indexOf('node scripts/verify-pages015-frontend-window.mjs');
+  const finalizerAppend = finalizer.indexOf('node scripts/append-pages015-qualification.mjs');
   assert.ok(finalizerVerify >= 0 && finalizerAppend > finalizerVerify, 'finalizer must bind Worker lock before ledger append');
 
-  const legacyVerify = legacy.indexOf('verify-pages015-frontend-window.mjs');
-  const legacyAppend = legacy.indexOf('append-pages015-qualification.mjs');
+  assert.match(legacy, /PAGES015_EVIDENCE_PATH: pages015-live-evidence\.json/);
+  const legacyVerify = legacy.indexOf('node scripts/verify-pages015-frontend-window.mjs');
+  const legacyAppend = legacy.indexOf('node scripts/append-pages015-qualification.mjs');
   assert.ok(legacyVerify >= 0 && legacyAppend > legacyVerify, 'manual fallback must bind Worker lock before ledger append');
 });
 
