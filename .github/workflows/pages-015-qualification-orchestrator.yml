@@ -73,6 +73,21 @@ jobs:
             | grep -q 'group: pages-release-qualification-ledger'
           git show origin/main:.github/workflows/pages-014-post-deploy-qualification.yml \
             | grep -q 'deployment_generation_verified'
+          for workflow in \
+            .github/workflows/pages-005-backend-bootstrap.yml \
+            .github/workflows/pages-015-window-archives.yml \
+            .github/workflows/pages-015-qualify-online-window.yml; do
+            workflow_text="$(git show "origin/main:${workflow}")"
+            on_block="$(printf '%s\n' "$workflow_text" | sed -n '/^on:/,/^permissions:/p')"
+            printf '%s\n' "$on_block" | grep -q 'workflow_dispatch:'
+            if printf '%s\n' "$on_block" | grep -Eq '^[[:space:]]+(push|workflow_run|schedule):'; then
+              echo "${workflow} must remain manual-only" >&2
+              exit 1
+            fi
+            printf '%s\n' "$workflow_text" \
+              | grep -A2 '^concurrency:' \
+              | grep -q 'group: pages-release-qualification-ledger'
+          done
 
       - name: Record fresh explicit credential probe receipt
         if: github.event_name != 'schedule'
