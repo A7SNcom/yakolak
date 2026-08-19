@@ -57,6 +57,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag }}
           ASSET_NAME: ${{ inputs.asset_name }}
+          DEPLOY_PAGES: ${{ inputs.deploy_pages }}
         run: |
           set -euo pipefail
           immutable="$(gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --json isImmutable --jq '.isImmutable')"
@@ -97,7 +98,9 @@ jobs:
 
           test -s restore-site/index.html
           test -s restore-site/threejs/index.html
-          test -s restore-site/deployment-manifest.json
+          if [ "${DEPLOY_PAGES}" = "true" ]; then
+            test -s restore-site/deployment-manifest.json
+          fi
           ! grep -Fq 'THREEJS REBUILD' restore-site/index.html
           grep -Fq 'THREEJS REBUILD' restore-site/threejs/index.html
           echo "Exact-byte restore verified; no source checkout or build occurred."
