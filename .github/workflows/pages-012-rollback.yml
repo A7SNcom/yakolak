@@ -24,8 +24,11 @@ permissions:
   pages: write
   id-token: write
 
+# Public rollback is an online compatibility mutation. Hold the same lock as
+# PAGES-005/PAGES-015 so the Worker/Turso window cannot change under validation.
+# The deploy job also takes the composite Pages lock before deploy-pages.
 concurrency:
-  group: yakolak-pages-composite
+  group: pages-release-qualification-ledger
   cancel-in-progress: false
 
 jobs:
@@ -34,6 +37,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       deploy: ${{ steps.mode.outputs.deploy }}
+      asset_sha256: ${{ steps.release.outputs.asset_sha256 }}
     steps:
       - name: Restrict rollback to the exact composite archive format
         shell: bash
@@ -47,6 +51,7 @@ jobs:
           fi
 
       - name: Verify immutable release, release attestation, asset attestation and recorded SHA-256
+        id: release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -82,6 +87,7 @@ jobs:
 
           facts_digest="$(jq -r --arg asset "${ASSET_NAME}" '.archives[$asset].sha256' restore-download/IMMUTABLE_FACTS.json)"
           test "${facts_digest}" = "${actual}"
+          echo "asset_sha256=${actual}" >> "$GITHUB_OUTPUT"
 
           tar -xf "restore-download/${ASSET_NAME}" -C restore-site
 
@@ -94,6 +100,44 @@ jobs:
           ! grep -Fq 'THREEJS REBUILD' restore-site/index.html
           grep -Fq 'THREEJS REBUILD' restore-site/threejs/index.html
           echo "Exact-byte restore verified; no source checkout or build occurred."
+
+      - name: Checkout current PAGES-015 qualification state for public rollback
+        if: ${{ inputs.deploy_pages }}
+        uses: actions/checkout@v6
+        with:
+          ref: threejs-rebuild
+          path: qualification-code
+          fetch-depth: 1
+
+      - name: Use Node 22 for public rollback qualification
+        if: ${{ inputs.deploy_pages }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Require current PAGES-015 compatibility before public rollback upload
+        if: ${{ inputs.deploy_pages }}
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          ASSET_SHA256: ${{ steps.release.outputs.asset_sha256 }}
+        run: |
+          set -euo pipefail
+          test -n "$ASSET_SHA256"
+          window='qualification-code/RELEASE_QUALIFICATION/ONLINE_FRONTEND_WINDOW.json'
+          test -s "$window"
+          jq -e --arg tag "$RELEASE_TAG" --arg digest "$ASSET_SHA256" '
+            .schemaVersion == 1 and
+            .rules.thisFileDoesNotConferEligibility == true and
+            (.frontends | length) == 2 and
+            any(.frontends[]; .releaseTag == $tag and .assetSha256 == $digest)
+          ' "$window" >/dev/null || {
+            echo 'Refusing public rollback: requested immutable archive is not in the current active+previous frontend window.' >&2
+            exit 1
+          }
+          node qualification-code/scripts/verify-release-qualification.mjs "$RELEASE_TAG" "$ASSET_SHA256"
+          node qualification-code/scripts/verify-pages015-current-lock-qualification.mjs
 
       - name: Record requested mode
         id: mode
@@ -136,10 +180,43 @@ jobs:
     needs: restore
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    concurrency:
+      group: yakolak-pages-composite
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Re-check current PAGES-015 state immediately before deploy
+        uses: actions/checkout@v6
+        with:
+          ref: threejs-rebuild
+          path: qualification-code-final
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Fail closed if the compatibility window changed before deploy
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          ASSET_SHA256: ${{ needs.restore.outputs.asset_sha256 }}
+        run: |
+          set -euo pipefail
+          test -n "$ASSET_SHA256"
+          window='qualification-code-final/RELEASE_QUALIFICATION/ONLINE_FRONTEND_WINDOW.json'
+          jq -e --arg tag "$RELEASE_TAG" --arg digest "$ASSET_SHA256" '
+            .schemaVersion == 1 and
+            .rules.thisFileDoesNotConferEligibility == true and
+            (.frontends | length) == 2 and
+            any(.frontends[]; .releaseTag == $tag and .assetSha256 == $digest)
+          ' "$window" >/dev/null
+          node qualification-code-final/scripts/verify-release-qualification.mjs "$RELEASE_TAG" "$ASSET_SHA256"
+          node qualification-code-final/scripts/verify-pages015-current-lock-qualification.mjs
+
       - name: Deploy exact verified release bytes
         id: deployment
         uses: actions/deploy-pages@v4
