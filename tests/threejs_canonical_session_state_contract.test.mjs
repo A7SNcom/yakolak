@@ -32,6 +32,7 @@ assert.deepEqual(initial.scores, { 'seat-host': 0, 'seat-guest': 0, 'seat-bot': 
 assert.deepEqual(initial.restart, { 'seat-host': false, 'seat-guest': false, 'seat-bot': false });
 assert.deepEqual(initial.rematch, { 'seat-host': false, 'seat-guest': false, 'seat-bot': false });
 assert.deepEqual(initial.inventory['seat-host'], { small: 3, medium: 3, large: 3 });
+assert.equal(Object.hasOwn(initial, 'turnIndex'), false, 'canonical active turn must not encode unresolved seat-array order');
 assert(Object.isFrozen(initial));
 assert(Object.isFrozen(initial.seats));
 
@@ -54,7 +55,6 @@ const playing = createCanonicalSessionState({
   winsToMatch: 3,
   seats,
   board,
-  turnIndex: 1,
   activeSeatId: 'seat-guest',
   deadlineAtMs: 1_787_161_000_000,
   scores: { 'seat-host': 1, 'seat-guest': 0, 'seat-bot': 0 },
@@ -75,6 +75,12 @@ assert.equal(playing.inventory['seat-host'].small, 1);
 assert.equal(playing.activeSeatId, 'seat-guest');
 assert.equal(playing.deadlineAtMs, 1_787_161_000_000);
 assert.equal(playing.skipReason, 'authority-provided-reason');
+
+const reordered = createCanonicalSessionState({
+  seats: [seats[2], seats[0], seats[1]],
+  activeSeatId: 'seat-guest',
+});
+assert.equal(reordered.activeSeatId, 'seat-guest', 'active turn is seat identity, not array index');
 
 // Seat type and lifecycle tokens are carried as normalized opaque strings here.
 // Their authoritative vocabulary/transition semantics belong to later owner tasks.
@@ -115,9 +121,8 @@ assert.throws(() => createCanonicalSessionState({ seats, board: tooManyPieces })
 
 assert.throws(() => createCanonicalSessionState({
   seats,
-  turnIndex: 1,
-  activeSeatId: 'seat-host',
-}), /invalid_session_active_turn/);
+  activeSeatId: 'missing-seat',
+}), /invalid_session_active_seat/);
 assert.throws(() => createCanonicalSessionState({
   seats,
   deadlineAtMs: 123,
@@ -132,6 +137,10 @@ assert.throws(() => createCanonicalSessionState({
   skippedSeat: 'seat-host',
   skipReason: null,
 }), /invalid_session_skip/);
+
+const oldIndexLeak = JSON.parse(serializeCanonicalSessionState(playing));
+oldIndexLeak.turnIndex = 1;
+assert.throws(() => assertCanonicalSessionState(oldIndexLeak), /invalid_canonical_session_state_shape/, 'turnIndex must stay adapter-owned until THREEJS-048');
 
 for (const runtimeLeak of [
   ['mesh', { name: 'piece-mesh' }],
