@@ -1,6 +1,6 @@
 # THREEJS-045 — Canonical session state and reducer boundary
 
-Status: **LOCKED by THREEJS-045 (2026-08-19); lifecycle vocabulary/transition graph refined and locked by THREEJS-060 (2026-08-19); inventory/placement derivation centralized by THREEJS-046 (2026-08-19)**
+Status: **LOCKED by THREEJS-045 (2026-08-19); lifecycle locked by THREEJS-060; inventory/placement centralized by THREEJS-046; stable seat order/skips resolved by THREEJS-048; exact round-end revision added by THREEJS-051**
 
 Canonical gameplay/session state is the JSON-only `yakolak.session-state/v1` object implemented by `web/app/session/canonical-session-state.js`.
 
@@ -9,65 +9,71 @@ Canonical gameplay/session state is the JSON-only `yakolak.session-state/v1` obj
 The canonical object contains only normalized application data:
 
 - `lobbyGeneration`: non-negative configuration generation;
+- `preferredColor`: `null` before setup, otherwise the host preference used to rotate the canonical configured-seat ring;
 - `targetPlayers`: `null` or 2/3/4;
 - `winsToMatch`: `null` or the locked 3/5 wins-to-match value;
-- `seats[]`: exact `{ seatId, type, color, ready }` records;
-- `board`: the exact 9-cell/3-size shared-rules board;
-- `inventory`: remaining pieces by seat and size, derived from `board` and never independently authoritative;
-- `activeSeatId`: `null` or the exact configured seat identity whose turn is active;
+- `seats[]`: exact `{ seatId, type, color, ready }` records in THREEJS-048 configured order;
+- `board`: exact shared-rules 9-cell/3-size board;
+- `inventory`: remaining pieces by seat/size, derived from `board` and never independently authoritative;
+- `activeSeatId`: `null` or one configured stable seat identity;
 - `deadlineAtMs`: `null` or one absolute epoch-millisecond deadline;
 - `scores`, `round`, `completedRounds`;
-- `lastMove`, `skippedSeat`, `skipReason`;
+- `roundEndRevision`: `null` during an unresolved round, otherwise the exact gameplay revision recorded when that round ended;
+- `lastMove`;
+- `skips[]`: ordered exact `{ seatId, reason }` handoff evidence;
 - `winner`, `draw`, `matchComplete`, `matchWinner`, `matchWinners`;
 - `restart` and `rematch`: per-seat boolean vote maps;
-- `revision`: non-negative canonical state revision value;
-- `lifecycle`: `{ phase, interrupt, recoveryTarget, presentationGeneration }`, validated by the THREEJS-060 lifecycle state machine.
+- `revision`: non-negative current canonical state revision;
+- `lifecycle`: `{ phase, interrupt, recoveryTarget, presentationGeneration }`, validated by THREEJS-060.
 
-Every object level uses a closed key set. Unknown fields are rejected rather than silently retained.
+Every object level uses a closed key set. Unknown fields are rejected.
 
-`turnIndex` is intentionally **not** canonical state. The current protocol-v5 adapter may still expose an array index, but encoding that index into the new state would silently make `seats[]` order authoritative before THREEJS-048 resolves stable seat topology/turn order. Adapters must translate their current representation to `activeSeatId`; future canonical ordering must come from the THREEJS-048 contract rather than accidental array position.
+## Stable configured seats
+
+THREEJS-048 locks stable physical seat/color identity:
+
+- `right = marble`
+- `back = blue`
+- `left = gold`
+- `front = green`
+
+The base ring is `right → back → left → front`. `preferredColor` rotates configured order only; physical slot/color identity never rotates. `turnIndex` is not canonical state.
+
+The old singular `skippedSeat` / `skipReason` shape is not canonical. One handoff can skip multiple seats, so authoritative evidence is the ordered `skips[]` array.
 
 ## Derived inventory
 
-THREEJS-046 centralizes inventory math in `web/app/shared/rules.js`. `deriveCanonicalInventory(board, seats)` validates the canonical board/seat shape and delegates remaining-piece computation to the shared `deriveRemainingInventory` implementation.
+THREEJS-046 centralizes inventory math in `web/app/shared/rules.js`. Canonical validation recomputes expected remaining counts from the board and rejects stale inventory. Placement legality never trusts the serialized inventory snapshot.
 
-`inventory` is serialized for snapshot/hydration convenience only. It is not a mutable stock ledger and it is never consulted as the source of placement legality. Canonical validation recomputes the expected remaining counts from the board and rejects stale inventory or more placed pieces of a size/color than the rules allow.
+## Round-end revision
 
-Consequently changing the serialized counter cannot allow an exhausted piece or make a legal remaining piece unavailable. Human, bot, local-authority and future backend-authority placement paths consume the same board-derived shared legality contract documented in `THREEJS_PLACEMENT_INVENTORY.md`.
+THREEJS-051 adds `roundEndRevision` so a completed round preserves the exact revision at which its result became authoritative even if live `revision` later advances.
+
+Draw commit records:
+
+`roundEndRevision = revision`
+
+without incrementing `revision`; THREEJS-072 still owns revision/mutation advancement semantics. THREEJS-052 should use the same field for winning round closure.
 
 ## Pure reducer boundary
 
-`runCanonicalSessionReducer(state, event, reducer)`:
+`runCanonicalSessionReducer(state, event, reducer)` validates canonical input, JSON-clones/deep-freezes state and event, runs one synchronous pure reducer, rejects input mutation/non-canonical output, and returns a deep-frozen canonical clone.
 
-1. validates canonical input;
-2. JSON-clones and deep-freezes state;
-3. accepts only plain JSON event data;
-4. calls a synchronous pure reducer;
-5. rejects mutation of the input or any non-canonical output;
-6. returns a deep-frozen JSON clone.
+The boundary deliberately does not define gameplay revision increments. `lifecycle.presentationGeneration` is a separate THREEJS-060 stale-presentation boundary, not gameplay revision.
 
-The boundary deliberately does **not** require a particular gameplay `revision` increment. Mutation/revision/exactly-once semantics remain owned by THREEJS-072/GAP-009.
+## Authority boundaries still open
 
-THREEJS-060 adds one separate `lifecycle.presentationGeneration` boundary for presentation callbacks. It invalidates stale animation/network completion events without pretending to be the authoritative gameplay revision.
+- `seat.type` vocabulary / Computer online authority: THREEJS-062/071.
+- authoritative readiness/start: THREEJS-069.
+- online absolute deadline/timeout reconciliation: THREEJS-062/070.
+- restart/rematch consensus: THREEJS-076.
+- mutation/revision/exactly-once envelope: THREEJS-072.
 
-## Explicit authority non-resolutions
-
-This schema stores data needed by later authority tasks without deciding their unresolved semantics:
-
-- `seat.type` is an opaque normalized token. THREEJS-062 owns the authoritative configured-seat/type vocabulary and Computer authority semantics.
-- `ready` is `null` or boolean. THREEJS-069 owns what makes a seat authoritative-ready and when Start may commit.
-- `deadlineAtMs` is an internal absolute representation only. THREEJS-062/070 own where the authoritative deadline comes from, clock semantics and timeout reconciliation.
-- `skipReason` is an opaque reason token. THREEJS-048/070 own legal-move and timeout skip semantics.
-- `restart`/`rematch` serialize per-seat approvals but do not define required voters or consensus. THREEJS-076 owns that contract.
-- stable seat topology/turn-ring meaning is not inferred from `seats[]` order; THREEJS-048 owns it.
-
-Lifecycle **is no longer an open vocabulary** after THREEJS-060: normal phases, interrupt states, recovery rules and legal phase edges are locked in `web/app/session/session-lifecycle.js`. That lifecycle machine still does not grant browser-side gameplay authority; it only orders canonical application states and rejects stale presentation callbacks.
+Local deadline/timeout behavior is separately locked by THREEJS-049/050 and must not be projected onto Online authority.
 
 ## Runtime objects are forbidden
 
-Canonical state may never contain meshes, Three.js objects, DOM nodes, animation handles/callbacks, service-worker state, request objects, local timer handles or other class instances. Exact-key validation plus plain-JSON validation keeps those concerns outside gameplay state.
-
-`web/app/session/canonical-online-session.js` remains a separate identity/transport helper; callbacks, credential/session transport state and compatibility gates are not embedded in canonical gameplay state.
+Canonical state may never contain meshes, Three.js objects, DOM nodes, animation callbacks/handles, service-worker state, request objects, timer handles or other class instances. Rendering/transport/session credentials remain outside gameplay state.
 
 ## Verification
 
@@ -76,5 +82,7 @@ Run:
 - `node --test tests/threejs_canonical_session_state_contract.test.mjs`
 - `node --test tests/threejs_session_lifecycle_contract.test.mjs`
 - `node --test tests/threejs_placement_inventory_contract.test.mjs`
+- `node --test tests/threejs_turn_ring_contract.test.mjs`
+- `node --test tests/threejs_true_draw_contract.test.mjs`
 
-Together these contracts cover JSON round-trip, seat/color normalization, seat-identity active turns without array-order authority, deadline consistency, board-derived inventory, stable placement rejection codes, scores/votes, last move/skip/outcome fields, pure reducer behavior, lifecycle legality, presentation-generation staleness, JSON coercion protection and explicit rejection of rendering/DOM/service-worker/timer state.
+Together these contracts cover JSON round-trip, stable configured seats, ordered skip evidence, board-derived inventory, lifecycle legality, pure reducer behavior, exact round-end revision and authoritative draw persistence.
