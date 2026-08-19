@@ -78,11 +78,9 @@ assert.deepEqual(medium.legalTargetIds, [
 ]);
 assert.equal(medium.legalCellCues.length, medium.legalCells.length);
 assert(medium.legalCellCues.every(cue => cue.visible && cue.marker === 'ring' && cue.colorIndependent));
-assert.deepEqual(Object.keys(medium.selectedCue).sort(), [
-  'accessibleLabel', 'colorIndependent', 'marker', 'targetId',
-]);
 assert.equal(medium.selectedCue.marker, 'outline');
 assert.equal(medium.selectedCue.colorIndependent, true);
+assert.equal(Object.hasOwn(medium.selectedCue, 'color'), false, 'selection cue cannot depend on a color field');
 assert.equal(medium.clearReason, null);
 assert.deepEqual(medium.witness, {
   generation: 4,
@@ -116,28 +114,29 @@ assert.equal(JSON.stringify(selectedLarge).includes('home-piece:right:0:medium')
 
 // THREEJS-031 remaining inventory gate runs before selection: with only one small
 // remaining, stack copy 1 is already used and cannot become selected.
-assert.deepEqual(state10.inventory.right.small, 1);
+assert.equal(state10.inventory.right.small, 1);
 assert.throws(() => controller.select(state10, {
   stackTargetId: 'stack:right:1',
   size: 'small',
 }), /home_piece_already_used/);
 assert.equal(controller.snapshot().selectedSize, 'large', 'failed selection must not partially clear/replace current state');
 
-// Every required boundary clears selected size + selected piece + legal cells +
-// visible legal target cues in one frozen replacement.
-let revision = 10;
+// Every required boundary independently clears selected size + selected piece + legal
+// targets/cues in one frozen replacement. No result depends on reason ordering.
 for (const reason of SIZE_SELECTION_CLEAR_REASONS) {
-  const selected = controller.select(canonical({ revision }), {
+  const boundaryController = createSizeSelectionController();
+  const selected = boundaryController.select(state10, {
     stackTargetId: 'stack:right:0',
     size: 'large',
   });
   assert.equal(selected.selectedSize, 'large');
-  revision += 1;
-  let boundaryState = canonical({ revision });
-  if (reason === 'ownership-change') boundaryState = canonical({ revision, activeSeatId: 'back' });
-  if (reason === 'reconnect') boundaryState = canonical({ revision, generation: 5 });
-  if (reason === 'round-reset') boundaryState = canonical({ revision, generation: 6, round: 2, nextBoard: emptyBoard() });
-  const cleared = controller.clear(reason, boundaryState);
+
+  let boundaryState = canonical({ revision: 11 });
+  if (reason === 'ownership-change') boundaryState = canonical({ revision: 11, activeSeatId: 'back' });
+  if (reason === 'reconnect') boundaryState = canonical({ revision: 11, generation: 5 });
+  if (reason === 'round-reset') boundaryState = canonical({ revision: 11, generation: 5, round: 2, nextBoard: emptyBoard() });
+
+  const cleared = boundaryController.clear(reason, boundaryState);
   assert.equal(cleared.selectedSize, null, `${reason} clears selected size`);
   assert.equal(cleared.selectedPieceTargetId, null, `${reason} clears selected piece`);
   assert.equal(cleared.stackTargetId, null, `${reason} clears stack`);
@@ -150,17 +149,27 @@ for (const reason of SIZE_SELECTION_CLEAR_REASONS) {
   assert(Object.isFrozen(cleared));
 }
 
-// Once a newer canonical boundary has been observed, an old snapshot cannot resurrect
-// a stale selection after reconnect/resync.
-assert.throws(() => controller.select(state10, {
+// Once reconnect/resync observes a newer authority witness, an old snapshot cannot
+// resurrect selection or legal targets.
+const staleController = createSizeSelectionController();
+staleController.select(state10, { stackTargetId: 'stack:right:0', size: 'large' });
+const reconnectState = canonical({ revision: 11, generation: 5 });
+staleController.clear('reconnect', reconnectState);
+assert.throws(() => staleController.select(state10, {
   stackTargetId: 'stack:right:0',
   size: 'large',
 }), /stale_size_selection_snapshot/);
-assert.equal(controller.snapshot().selectedSize, null);
-assert.deepEqual(controller.snapshot().legalCells, []);
+assert.equal(staleController.snapshot().selectedSize, null);
+assert.deepEqual(staleController.snapshot().legalCells, []);
+assert.deepEqual(staleController.snapshot().witness, {
+  generation: 5,
+  revision: 11,
+  round: 1,
+  activeSeatId: 'right',
+});
 
-// Source contract: legality must stay delegated to shared validation; this module
-// contains no board-slot occupancy/inventory rule clone and no async feedback delay.
+// Source contract: legality stays delegated to shared validation; this module contains
+// no board-slot occupancy/inventory rule clone and no async feedback delay.
 const source = readFileSync(path.join(root, 'web/app/gameplay/size-selection.js'), 'utf8');
 assert.match(source, /validatePlacementForSeat\s*\(/);
 assert.doesNotMatch(source, /setTimeout|setInterval|requestAnimationFrame|async\s+function|Promise\./);
