@@ -130,7 +130,6 @@ function returnedSnapshotFrom(rejection, explicitSnapshot) {
 function requireReturnMotion(returnMotion) {
   if (returnMotion == null) return null;
   if (!returnMotion || typeof returnMotion !== 'object' || Array.isArray(returnMotion)) fail('invalid_action_return_motion');
-  if (returnMotion.scope === ACTION_FEEDBACK_POLICY.semanticScope) fail('action_return_scope_conflicts_with_semantic_feedback');
   return returnMotion;
 }
 
@@ -275,13 +274,21 @@ export function createActionFeedbackController({
     syncMotionAuthority(state);
     const scope = String(descriptor.scope || '').trim();
     if (!scope) fail('action_return_motion_scope_required');
+    if (scope === ACTION_FEEDBACK_POLICY.semanticScope) fail('action_return_scope_conflicts_with_semantic_feedback');
     cancelPhysicalReturns('superseded-by-newer-invalid-return');
     activeReturnScopes.add(scope);
-    const handle = motion.animate({
-      ...descriptor,
-      generation: state.lifecycle.presentationGeneration,
-      revision: state.revision,
-    });
+    let handle;
+    try {
+      handle = motion.animate({
+        ...descriptor,
+        scope,
+        generation: state.lifecycle.presentationGeneration,
+        revision: state.revision,
+      });
+    } catch (error) {
+      activeReturnScopes.delete(scope);
+      throw error;
+    }
     handle.finished.then(() => activeReturnScopes.delete(scope));
     return handle;
   }
@@ -317,6 +324,12 @@ export function createActionFeedbackController({
   function newerHydratedThanAttempt(state, attemptedState) {
     if (!state) return false;
     return compareWitness(state, attemptedState) > 0;
+  }
+
+  function usablePostRejectionSnapshot(candidate, attemptedState) {
+    if (candidate == null) return null;
+    assertCanonicalSessionState(candidate);
+    return compareWitness(candidate, attemptedState) < 0 ? null : candidate;
   }
 
   function chooseNewestCanonical(candidates) {
@@ -362,8 +375,6 @@ export function createActionFeedbackController({
     const explicitReturned = returnedSnapshotFrom(rejection, returnedSnapshot);
     if (explicitReturned !== null) assertCanonicalSessionState(explicitReturned);
 
-    // Stop speculative/pending presentation immediately. Do not animate a guessed rollback
-    // while waiting for the authoritative/current canonical snapshot.
     cancelSpeculative('authority-rejected');
     cancelSemanticFeedback('authority-rejected');
     cancelPhysicalReturns('authority-rejected');
@@ -382,8 +393,8 @@ export function createActionFeedbackController({
       : null;
     const chosen = chooseNewestCanonical([
       newerHydration,
-      explicitReturned,
-      currentSnapshot,
+      usablePostRejectionSnapshot(explicitReturned, attemptedState),
+      usablePostRejectionSnapshot(currentSnapshot, attemptedState),
     ]);
     if (chosen === null) {
       if (snapshotError) {
