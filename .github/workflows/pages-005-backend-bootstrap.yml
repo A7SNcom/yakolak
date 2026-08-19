@@ -7,7 +7,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: pages-005-cloudflare-backend
+  group: pages-release-qualification-ledger
   cancel-in-progress: false
 
 jobs:
