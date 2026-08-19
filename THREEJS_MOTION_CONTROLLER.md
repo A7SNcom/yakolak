@@ -1,75 +1,81 @@
-# THREEJS-096 — One cancellable non-camera motion controller
+# THREEJS-096 — One stale-safe motion controller
 
 Status: **LOCKED by THREEJS-096 (2026-08-19)**
 
-THREEJS-096 is the single scheduling/ownership boundary for non-camera transform, opacity and scale tweening used by gameplay interactions. Camera motion remains separate under the camera/frame-governor work.
+THREEJS-096 is the single scheduling/ownership boundary for setup, stack, piece, travel, reveal, unboxing, win and reset motion. Camera motion may supply its own sequence data, but it must not introduce a second tween ownership model. Gameplay authority never waits for presentation motion.
 
 ## Required consumers
 
-THREEJS-032, THREEJS-033, THREEJS-034, THREEJS-035, THREEJS-036, THREEJS-038 and THREEJS-039 must use this controller for every non-camera tweened interaction they add.
+THREEJS-032/042/084/091/095 and later presentation tasks may define transforms, timings and sequences, but they must submit motion through this controller. They may not create independent RAF/tween schedulers, completion queues or stale-callback mechanisms.
 
-Those tasks must not create parallel raw `requestAnimationFrame`, `setTimeout`, `setInterval` or uncancelled Promise-based tween loops.
+The controller itself never calls raw `requestAnimationFrame`, `cancelAnimationFrame`, `setTimeout` or `setInterval`; every frame handle belongs to the THREEJS-027 resource registry.
 
-## Controller identity
+## Authority witness
 
-Every motion has:
+Every `animate(...)` request carries both:
 
-- `scope` — logical interaction/object group;
-- `key` — one motion channel inside that scope;
-- `generation` — the presentation generation that owns the target;
-- a monotonically increasing controller-local sequence.
+- `generation` — THREEJS-060 `sessionLifecycle.presentationGeneration`;
+- `revision` — the authoritative gameplay/session revision observed when the sequence was derived.
 
-The active identity is `scope + key`. Starting newer motion for the same identity cancels and settles the older handle before the new one can progress.
+A stale generation settles `stale-generation`; a stale revision settles `stale-revision`. Neither applies `from`, `to`, nor schedules a frame.
 
-Different scoped identities may animate independently.
+`syncSessionAuthority(sessionLifecycle, revision)` validates the THREEJS-060 lifecycle object and synchronizes both witnesses together. `setAuthority(generation, revision)`, `setGeneration(...)` and `setRevision(...)` are lower-level operations for the same boundary.
+
+Any generation/revision change cancels all active entries before stale callbacks can write.
+
+## Motion identity
+
+Each motion also carries `scope + key`. This is the active channel identity. Starting newer motion for the same channel supersedes the older motion before the newer one progresses.
+
+Different channels may run concurrently.
+
+## Canonical snap contract
+
+Every motion must supply:
+
+- `apply(value, meta)` for interpolated presentation writes;
+- `isTargetLive()` so rebuilt/released targets cannot be mutated;
+- `snapToCanonical(meta)` for cancellation/revision/generation/release reconciliation.
+
+On cancellation or supersession, canonical snap is attempted **once**. If the target is still live, `snapToCanonical(...)` runs exactly once. If the target has already been released/rebuilt, the attempt is consumed but no target write is allowed.
+
+Results expose both `snapAttempted` and `snappedCanonical` so tests can distinguish these cases.
+
+The canonical snap callback is intentionally consumer-provided because only the consumer/current authoritative snapshot knows the correct final transform after reconnect, timeout, revision advance or rebuild. The controller owns when it may execute, not the game-specific transform.
 
 ## Numeric state
 
-The controller is intentionally Three.js-independent. `from` and `to` are matching finite numeric trees made from numbers, arrays and plain objects.
+The controller is Three.js-independent. `from` and `to` are matching finite numeric trees made only from numbers, arrays and plain objects. One tween may therefore carry position/rotation-like numeric arrays, scale and opacity atomically.
 
-A consumer may therefore tween related cosmetic state atomically, for example:
-
-```text
-{
-  position: [x, y, z],
-  scale: [x, y, z],
-  opacity: n
-}
-```
-
-Built-in easing names are `linear`, `easeOutCubic` and `easeInOutCubic`; a validated custom easing callback is also supported.
-
-## Generation and target liveness
-
-Every `animate(...)` call supplies the generation it observed. If it does not equal the controller generation, the returned handle settles `stale-generation` without applying or scheduling anything.
-
-Before every cosmetic write the controller also calls the required `isTargetLive()` guard. A rebuilt/released target settles `stale-target` and receives no further writes.
-
-`setGeneration(next)` cancels all active motion before switching generations. Even if a platform later delivers a callback that was already cancelled, that callback cannot mutate because the active-entry/generation/sequence checks no longer match.
-
-## Resource ownership
-
-The controller owns one THREEJS-027 transient resource scope.
-
-All animation frames use `lifecycle.requestFrame(...)`. Frame cancellation uses the registry token returned by that call. Optional Reduced Motion media-query subscription uses `lifecycle.listen(...)`.
-
-No raw animation-frame/timer scheduling exists in the controller. Releasing the controller cancels every active handle and releases its resource scope.
+Built-in easing names are `linear`, `easeOutCubic` and `easeInOutCubic`.
 
 ## Reduced Motion
 
-Reduced Motion collapses cosmetic timing to the exact final state:
+Reduced Motion uses the same semantic transition and lock/authority path:
 
-- starting motion while Reduced Motion is enabled applies `to` immediately and allocates no frame;
-- enabling Reduced Motion during active motion cancels the pending frame, writes the exact `to` state once if the target is still live/current, and settles the handle as `reduced-motion`;
-- duration `0` also commits final presentation state immediately.
+- new motion while reduced motion is enabled applies exact `to` immediately;
+- enabling it mid-flight cancels the owned frame and applies exact `to` once;
+- duration `0` also commits exact `to` immediately.
 
-Reduced Motion changes timing only. It must never change the intended committed transform/state.
+Reduced Motion does **not** invoke cancellation snap and never creates a separate gameplay/lifecycle path.
+
+## Resource ownership and stale callbacks
+
+The controller owns one THREEJS-027 transient resource scope. Frames use `lifecycle.requestFrame(...)`; optional `prefers-reduced-motion` listening uses `lifecycle.listen(...)`.
+
+A cancelled platform callback that arrives late cannot mutate because the entry must still match all of:
+
+- controller not disposed;
+- active `scope + key` entry identity;
+- lifecycle generation;
+- authoritative revision;
+- live target.
+
+Controller release cancels active entries, canonical-snaps live targets once, and releases its resource scope.
 
 ## Gameplay must not wait
 
-Gameplay selection, picking, legality, intent creation and authority submission must never depend on `handle.finished` before committing their gameplay decision.
-
-Consumers may observe the `finished` Promise for cleanup/presentation sequencing, but the gameplay state transition must already be decided independently. Every controller-owned Promise settles on completion, cancellation, stale generation/target, Reduced Motion or controller release; there are no free-running Promise chains.
+Picking, selection, legality, intent creation and authority submission must never depend on `handle.finished`. Motion completion is presentation-only. A consumer may observe `finished` for presentation sequencing/cleanup after gameplay is already committed.
 
 ## Public operations
 
@@ -78,12 +84,13 @@ Consumers may observe the `finished` Promise for cleanup/presentation sequencing
 - `animate(...)`
 - `cancel(scope, key, reason?)`
 - `cancelScope(scope, reason?)`
+- `setAuthority(generation, revision)`
 - `setGeneration(nextGeneration)`
+- `setRevision(nextRevision)`
+- `syncSessionAuthority(sessionLifecycle, authoritativeRevision)`
 - `setReducedMotion(boolean)`
 - `snapshot()`
 - `release()` / `dispose()`
-
-`animate(...)` returns an immutable handle containing `finished` and `cancel(...)`.
 
 ## Verification
 
@@ -93,4 +100,4 @@ Run:
 - `node --test tests/threejs_motion_controller_source_contract.test.mjs`
 - `npm run test:threejs:gameplay`
 
-The behavioral contract covers interpolation, same-key supersession, independent scopes, stale cancelled callbacks, generation replacement, target release/rebuild, Reduced Motion start/mid-flight behavior, media-query listener ownership and controller release. The source contract forbids raw frame/timer scheduling and free-running `.then(...)` chains in this controller.
+The behavioral contract covers interpolation, same-key supersession, revision replacement, direct THREEJS-060 presentation-generation synchronization, late cancelled callbacks, target release/rebuild, exactly-once canonical snap, Reduced Motion, media-query listener ownership and controller release. The source contract forbids raw scheduler ownership and requires lifecycle-generation + revision enforcement.
