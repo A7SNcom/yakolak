@@ -132,14 +132,13 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
     return syncPresentation(pieceId, catalog.getBoardDestination(cellId));
   }
 
-  // Presentation-only read surface for state cues such as THREEJS-039. It exposes the
-  // exact live instance matrix and bounds without granting mutation access to render-slot
-  // ordering or canonical gameplay state.
+  // Presentation-only read surface for state cues such as THREEJS-039. It exposes only
+  // the exact live instance matrix/bounds plus immutable identity metadata. Canonical
+  // materials and destination state are not exposed through this bridge.
   function getSelectionPresentationDescriptor(pieceId) {
     const piece = catalog.getPiece(pieceId);
     const slot = renderSlotByPieceId.get(pieceId);
-    const destination = destinationByPieceId.get(pieceId);
-    if (!piece || !slot || !destination) throw new TypeError(`Unknown logical piece ${pieceId}`);
+    if (!piece || !slot) throw new TypeError(`Unknown logical piece ${pieceId}`);
     const matrix = new Matrix4();
     slot.mesh.getMatrixAt(slot.instanceIndex, matrix);
     const geometry = resourceBySize.get(piece.size).geometry;
@@ -161,12 +160,11 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
       colorId: piece.colorId,
       size: piece.size,
       copyIndex: piece.copyIndex,
-      destination,
       matrixElements: Object.freeze([...matrix.elements]),
       presentationCenter: Object.freeze(presentationCenter),
       boundingRadius,
       geometry,
-      baseMaterial: slot.mesh.material,
+      baseMaterialUuid: String(slot.mesh.material?.uuid || ''),
     });
   }
 
