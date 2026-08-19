@@ -119,8 +119,7 @@ function pointerIdOf(event) {
 }
 
 function pointerTypeOf(event) {
-  const pointerType = typeof event?.pointerType === 'string' && event.pointerType ? event.pointerType : 'unknown';
-  return pointerType;
+  return typeof event?.pointerType === 'string' && event.pointerType ? event.pointerType : 'unknown';
 }
 
 function primaryPointerAllowed(event) {
@@ -208,8 +207,7 @@ export function createPointerEventsAdapter({
 
   function rayFor(ndc) {
     if (!raycaster) return null;
-    const camera = getCamera();
-    return projectCanvasNdcToRay(ndc, { camera, raycaster });
+    return projectCanvasNdcToRay(ndc, { camera: getCamera(), raycaster });
   }
 
   function pointFromEvent(event) {
@@ -281,11 +279,10 @@ export function createPointerEventsAdapter({
 
     const pointerId = pointerIdOf(event);
     const point = pointFromEvent(event);
-    const startedAtMs = clockNow();
     active = {
       pointerId,
       pointerType: pointerTypeOf(event),
-      startedAtMs,
+      startedAtMs: clockNow(),
       startPoint: point,
       lastPoint: point,
       maxDistanceSq: 0,
@@ -296,10 +293,7 @@ export function createPointerEventsAdapter({
     emit(packet('start', event, point, { durationMs: 0 }));
   }
 
-  function onPointerMove(event) {
-    if (disposed || !active || pointerIdOf(event) !== active.pointerId) return;
-    callPreventDefault(event);
-    const point = pointFromEvent(event);
+  function updateMovement(point) {
     active.lastPoint = point;
     active.maxDistanceSq = Math.max(
       active.maxDistanceSq,
@@ -311,6 +305,13 @@ export function createPointerEventsAdapter({
       ),
     );
     if (active.maxDistanceSq > dragThresholdSq) active.dragged = true;
+  }
+
+  function onPointerMove(event) {
+    if (disposed || !active || pointerIdOf(event) !== active.pointerId) return;
+    callPreventDefault(event);
+    const point = pointFromEvent(event);
+    updateMovement(point);
     emit(packet('move', event, point, {
       gesture: active.dragged ? 'drag' : 'pending',
       durationMs: Math.max(0, clockNow() - active.startedAtMs),
@@ -321,17 +322,7 @@ export function createPointerEventsAdapter({
     if (disposed || !active || pointerIdOf(event) !== active.pointerId) return;
     callPreventDefault(event);
     const point = pointFromEvent(event);
-    active.lastPoint = point;
-    active.maxDistanceSq = Math.max(
-      active.maxDistanceSq,
-      distanceSquared(
-        active.startPoint.client.x,
-        active.startPoint.client.y,
-        point.client.x,
-        point.client.y,
-      ),
-    );
-    if (active.maxDistanceSq > dragThresholdSq) active.dragged = true;
+    updateMovement(point);
     const previous = active;
     const gesture = previous.dragged ? 'drag' : 'tap';
     const durationMs = Math.max(0, clockNow() - previous.startedAtMs);
@@ -369,7 +360,9 @@ export function createPointerEventsAdapter({
 
   function onLostPointerCapture(event) {
     if (disposed || !active || pointerIdOf(event) !== active.pointerId) return;
-    cancelActive('lostpointercapture', event);
+    // Capture-loss events may report meaningless client coordinates. The adapter
+    // already owns the last normalized pointer location, so cancellation must use it.
+    cancelActive('lostpointercapture');
   }
 
   function onClick(event) {
@@ -384,9 +377,6 @@ export function createPointerEventsAdapter({
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
     if (distanceSquared(x, y, compatClick.clientX, compatClick.clientY) > clickDistanceSq) return;
 
-    // This click is the compatibility/synthetic click following an already-owned
-    // Pointer Events gesture. Consume only this duplicate; unrelated canvas clicks
-    // and all controls outside the canvas remain untouched.
     callPreventDefault(event);
     callStopImmediate(event);
     compatClick = null;
