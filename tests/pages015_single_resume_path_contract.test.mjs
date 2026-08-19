@@ -55,15 +55,28 @@ test('PAGES-005 may verify on push but live deploy stays manual-only and seriali
   sharedLedgerLock(deployBlock);
 });
 
-test('historical PAGES-012 ledger writer is serialized and does not self-trigger on workflow edits', () => {
+test('historical PAGES-012 release workflow is retired, manual-only, and read-only', () => {
   assert.match(pages012, /^name: PAGES-012 Immutable Release Archive/m);
-  assert.match(pages012, /RELEASE_QUALIFICATION\/ledger\.jsonl/);
-  sharedLedgerLock(pages012);
   const block = onBlock(pages012);
   assert.match(block, /workflow_dispatch:/);
-  assert.match(block, /PAGES_RELEASE_ARCHIVES\.md/);
-  assert.match(block, /scripts\/verify-release-qualification\.mjs/);
-  assert.doesNotMatch(block, /\.github\/workflows\/pages-012-immutable-release\.yml/);
+  assert.doesNotMatch(block, /\bpush:/);
+  assert.doesNotMatch(block, /\bschedule:/);
+  assert.doesNotMatch(block, /\bworkflow_run:/);
+  sharedLedgerLock(pages012);
+  assert.match(pages012, /permissions:\n\s+contents: read/);
+  assert.match(pages012, /historical evidence only/);
+  assert.match(pages012, /PAGES-015 Frontend Window Archive/);
+  for (const forbidden of [
+    'contents: write',
+    'PAGES_RELEASE_ADMIN_TOKEN',
+    'RELEASE_QUALIFICATION/ledger.jsonl',
+    'gh release',
+    'git push',
+    'archive_verified',
+    'draft_staged',
+  ]) {
+    assert.ok(!pages012.includes(forbidden), `retired PAGES-012 workflow must not contain ${forbidden}`);
+  }
 });
 
 test('public exact-byte rollback is current-window compatibility gated while non-production restore stays available', () => {
