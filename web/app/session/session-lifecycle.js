@@ -56,6 +56,9 @@ export const SESSION_LIFECYCLE_TRANSITIONS = Object.freeze({
   [SESSION_LIFECYCLE_PHASES.TURN_LOOP]: Object.freeze([
     SESSION_LIFECYCLE_PHASES.WIN,
     SESSION_LIFECYCLE_PHASES.DRAW,
+    // THREEJS-055: only an authority-owned, confirmed pre-placement restart may
+    // consume this edge. Presentation callbacks cannot commit lifecycle directly.
+    SESSION_LIFECYCLE_PHASES.RESET,
   ]),
   [SESSION_LIFECYCLE_PHASES.WIN]: Object.freeze([SESSION_LIFECYCLE_PHASES.RESET]),
   [SESSION_LIFECYCLE_PHASES.DRAW]: Object.freeze([SESSION_LIFECYCLE_PHASES.RESET]),
