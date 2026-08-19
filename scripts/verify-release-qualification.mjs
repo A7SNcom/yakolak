@@ -126,6 +126,7 @@ function isCompleteBackendRow(row, currentFrontendKey) {
     row.previousWorkerVersionId.length === 0 ||
     row.workerVersionId === row.previousWorkerVersionId ||
     row.workerDeployment !== `cloudflare:${row.workerVersionId}` ||
+    !HEX64.test(String(row.workerLockEvidenceSha256 || "")) ||
     row.protocolIdentity !== "yakolak-online-room@1" ||
     row.protocolVersion !== "1" ||
     row.capabilityIdentity !== "yakolak-online-room-capabilities-v1" ||
@@ -207,6 +208,7 @@ function isCompleteBackendRow(row, currentFrontendKey) {
 function sameBackendWindow(left, right) {
   return (
     left.evidenceSha256 === right.evidenceSha256 &&
+    left.workerLockEvidenceSha256 === right.workerLockEvidenceSha256 &&
     left.workerVersionId === right.workerVersionId &&
     left.previousWorkerVersionId === right.previousWorkerVersionId &&
     left.workerDeployment === right.workerDeployment &&
