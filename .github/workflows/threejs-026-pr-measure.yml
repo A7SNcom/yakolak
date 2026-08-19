@@ -1,0 +1,78 @@
+name: YAKOLAK THREEJS-026 PR Measurement Relay
+
+on:
+  pull_request:
+    branches:
+      - threejs-rebuild
+    paths:
+      - 'THREEJS026_PR_TRIGGER'
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout measurement tooling
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Resolve current exact live Pages generation
+        id: live
+        shell: bash
+        env:
+          MANIFEST_URL: https://a7sncom.github.io/yakolak/deployment-manifest.json
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            nonce="${GITHUB_RUN_ID}-${attempt}-$(date +%s)"
+            if curl --fail --silent --show-error \
+              -H 'Cache-Control: no-cache' \
+              -H 'Pragma: no-cache' \
+              "${MANIFEST_URL}?threejs026pr=${nonce}" \
+              -o /tmp/deployment-manifest.json; then
+              candidate="$(jq -r '.threejsCandidateSha // empty' /tmp/deployment-manifest.json)"
+              generation="$(jq -r '.deploymentGeneration // empty' /tmp/deployment-manifest.json)"
+              if [ -n "${candidate}" ] && [ -n "${generation}" ]; then
+                echo "candidate_sha=${candidate}" >> "$GITHUB_OUTPUT"
+                echo "generation=${generation}" >> "$GITHUB_OUTPUT"
+                git fetch --quiet --depth=1 origin "${candidate}"
+                git checkout "${candidate}" -- web YAKOLAK_PORTABLE_KIT/assets
+                cat /tmp/deployment-manifest.json
+                exit 0
+              fi
+            fi
+            sleep 2
+          done
+          echo 'Unable to resolve current live Pages generation.' >&2
+          exit 1
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Playwright measurement runtime
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Measure exact live Pages generation
+        shell: bash
+        env:
+          SHELL_URL: https://a7sncom.github.io/yakolak/threejs/
+          EXPECTED_THREEJS_SHA: ${{ steps.live.outputs.candidate_sha }}
+        run: |
+          set -o pipefail
+          node scripts/measure-threejs-performance.mjs 2>&1 | tee /tmp/threejs026-performance.log
+
+      - name: Upload raw measurement log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: threejs026-pr-measurement-${{ github.run_id }}
+          path: /tmp/threejs026-performance.log
+          if-no-files-found: warn
