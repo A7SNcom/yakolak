@@ -1,4 +1,4 @@
-import { validatePlacementForSeat } from '../shared/rules.js';
+import { RULES, validatePlacementForSeat } from '../shared/rules.js';
 import { assertCanonicalSessionState } from '../session/canonical-session-state.js';
 import { deriveGameplayInteractionTargets } from './interaction-targets.js';
 
@@ -73,7 +73,7 @@ function requireCurrentSelection(selection, state) {
   if (selection.seatId !== state.activeSeatId) fail('board_pick_selection_seat_mismatch');
 
   const legalCells = [];
-  for (let cell = 0; cell < 9; cell += 1) {
+  for (let cell = 0; cell < RULES.cellCount; cell += 1) {
     const validation = validatePlacementForSeat(state, selection.seatId, {
       cell,
       size: selection.selectedSize,
@@ -106,7 +106,7 @@ export function deriveBoardCellHitSurfaces({
     normalRadius: radii.normal,
     touchRadius: radii.touch,
   }));
-  if (surfaces.length !== 9) fail('board_pick_requires_nine_surfaces');
+  if (surfaces.length !== RULES.cellCount || RULES.cellCount !== 9) fail('board_pick_requires_nine_surfaces');
 
   return deepFreeze({
     planeY,
