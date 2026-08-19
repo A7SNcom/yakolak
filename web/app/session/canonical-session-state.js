@@ -6,6 +6,10 @@ import {
   emptyBoard,
 } from '../shared/rules.js';
 import {
+  assertConfiguredSeatsMatchOrder,
+  canonicalConfiguredSlot,
+} from '../shared/seat-order.js';
+import {
   assertSessionLifecycleState,
   createSessionLifecycleState,
 } from './session-lifecycle.js';
@@ -13,10 +17,10 @@ import {
 export const CANONICAL_SESSION_STATE_SCHEMA = 'yakolak.session-state/v1';
 
 const TOP_LEVEL_KEYS = [
-  'schema', 'lobbyGeneration', 'targetPlayers', 'winsToMatch', 'seats', 'board',
+  'schema', 'lobbyGeneration', 'preferredColor', 'targetPlayers', 'winsToMatch', 'seats', 'board',
   'inventory', 'activeSeatId', 'deadlineAtMs', 'scores', 'round', 'completedRounds',
-  'lastMove', 'skippedSeat', 'skipReason', 'winner', 'draw', 'matchComplete',
-  'matchWinner', 'matchWinners', 'restart', 'rematch', 'revision', 'lifecycle',
+  'lastMove', 'skips', 'winner', 'draw', 'matchComplete', 'matchWinner', 'matchWinners',
+  'restart', 'rematch', 'revision', 'lifecycle',
 ];
 
 function fail(code) {
@@ -98,10 +102,12 @@ function validateSeats(seats) {
     requireRecord(seat, 'invalid_session_seat');
     requireExactKeys(seat, ['seatId', 'type', 'color', 'ready'], 'invalid_session_seat_shape');
     requireOpaqueString(seat.seatId, 'invalid_session_seat_id');
-    // THREEJS-062 owns the eventual authoritative seat-type vocabulary. THREEJS-045
-    // carries the normalized type token without deciding its authority semantics.
+    const slot = canonicalConfiguredSlot(seat.seatId);
+    // THREEJS-062 owns the eventual authoritative seat-type vocabulary. THREEJS-048
+    // owns stable seat IDs, color binding and configured order only.
     requireOpaqueString(seat.type, 'invalid_session_seat_type');
     if (!COLORS.includes(seat.color)) fail('invalid_session_seat_color');
+    if (seat.color !== slot.color) fail('invalid_session_seat_color_binding');
     if (seat.ready !== null && typeof seat.ready !== 'boolean') fail('invalid_session_seat_readiness');
     if (seatIds.has(seat.seatId)) fail('duplicate_session_seat_id');
     if (colors.has(seat.color)) fail('duplicate_session_seat_color');
@@ -175,6 +181,20 @@ function validateLastMove(value, seatById) {
   if (value.cell >= RULES.cellCount || !SIZES.includes(value.size)) fail('invalid_session_last_move_slot');
 }
 
+function validateSkips(value, seatIds) {
+  if (!Array.isArray(value)) fail('invalid_session_skips');
+  const seen = new Set();
+  for (const skip of value) {
+    requireRecord(skip, 'invalid_session_skip');
+    requireExactKeys(skip, ['seatId', 'reason'], 'invalid_session_skip_shape');
+    const seatId = requireOpaqueString(skip.seatId, 'invalid_session_skipped_seat');
+    if (!seatIds.has(seatId)) fail('invalid_session_skipped_seat');
+    if (seen.has(seatId)) fail('duplicate_session_skipped_seat');
+    seen.add(seatId);
+    requireOpaqueString(skip.reason, 'invalid_session_skip_reason');
+  }
+}
+
 function validateWinner(value, seatById, code) {
   if (value === null) return;
   requireRecord(value, code);
@@ -198,10 +218,16 @@ export function assertCanonicalSessionState(state) {
   if (state.schema !== CANONICAL_SESSION_STATE_SCHEMA) fail('unsupported_canonical_session_state_schema');
 
   requireInteger(state.lobbyGeneration, 'invalid_session_lobby_generation', { min: 0 });
+  if (state.preferredColor !== null && !COLORS.includes(state.preferredColor)) fail('invalid_session_preferred_color');
   if (state.targetPlayers !== null && !RULES.playerCounts.includes(state.targetPlayers)) fail('invalid_session_target_players');
+  if (state.targetPlayers !== null && state.preferredColor === null) fail('target_players_without_preferred_color');
   if (state.winsToMatch !== null && !RULES.winsToMatchOptions.includes(state.winsToMatch)) fail('invalid_session_wins_to_match');
 
   const { seatIds, colors } = validateSeats(state.seats);
+  if (state.seats.length > 0) {
+    if (state.preferredColor === null || state.targetPlayers === null) fail('configured_seats_without_setup_order');
+    assertConfiguredSeatsMatchOrder(state.seats, state.preferredColor, state.targetPlayers);
+  }
   if (state.targetPlayers !== null && state.seats.length > state.targetPlayers) fail('too_many_configured_session_seats');
   validateBoard(state.board, colors);
   validateInventory(state.inventory, state.seats, state.board);
@@ -222,14 +248,7 @@ export function assertCanonicalSessionState(state) {
 
   const seatById = new Map(state.seats.map(seat => [seat.seatId, seat]));
   validateLastMove(state.lastMove, seatById);
-
-  if (state.skippedSeat === null || state.skipReason === null) {
-    if (state.skippedSeat !== null || state.skipReason !== null) fail('invalid_session_skip');
-  } else {
-    const skipped = requireOpaqueString(state.skippedSeat, 'invalid_session_skipped_seat');
-    if (!seatIds.has(skipped)) fail('invalid_session_skipped_seat');
-    requireOpaqueString(state.skipReason, 'invalid_session_skip_reason');
-  }
+  validateSkips(state.skips, seatIds);
 
   validateWinner(state.winner, seatById, 'invalid_session_winner');
   if (typeof state.draw !== 'boolean') fail('invalid_session_draw');
@@ -251,6 +270,7 @@ export function assertCanonicalSessionState(state) {
 
 export function createCanonicalSessionState({
   lobbyGeneration = 0,
+  preferredColor = null,
   targetPlayers = null,
   winsToMatch = null,
   seats = [],
@@ -261,8 +281,7 @@ export function createCanonicalSessionState({
   round = 0,
   completedRounds = 0,
   lastMove = null,
-  skippedSeat = null,
-  skipReason = null,
+  skips = [],
   winner = null,
   draw = false,
   matchComplete = false,
@@ -282,6 +301,7 @@ export function createCanonicalSessionState({
   const state = {
     schema: CANONICAL_SESSION_STATE_SCHEMA,
     lobbyGeneration,
+    preferredColor,
     targetPlayers,
     winsToMatch,
     seats,
@@ -293,8 +313,7 @@ export function createCanonicalSessionState({
     round,
     completedRounds,
     lastMove,
-    skippedSeat,
-    skipReason,
+    skips,
     winner,
     draw,
     matchComplete,

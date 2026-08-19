@@ -75,13 +75,19 @@ Status values: `OPEN`, `ADAPTER`, or `RESOLVED`. No entry may disappear without 
 - Preserve the spatial/identity mapping exactly: `right = marble`, `back = blue`, `left = gold`, `front = green`. Preserve the fixed spatial turn ring exactly as `right → back → left → front`, equivalent to canonical color ring `marble → blue → gold → green`.
 - Any old prose or artwork using the word `white` is descriptive only. Code must resolve presentation from canonical `marble`; it must not branch on `white` as a separate playable color or maintain parallel `white` and `marble` inventories/material identities.
 
-### SRC-003 — Seat order and color ownership — OPEN
+### SRC-003 — Seat order and color ownership — RESOLVED
 
-- The Kit's fixed canonical color/spatial ring is `marble → blue → gold → green`, mapped `right → back → left → front`, rotated so the preferred color is first for Kit-defined setup behavior; each Kit invitation model reserves one exact seat/color.
-- `api/rooms.js` stores players in host/join order, assigns the next free `p2`/`p3`/`p4` seat when a join occurs, and accepts the joining player's requested available color.
-- Turn advancement and round starters in the backend use the `players` array order rather than the Kit's fixed color ring.
-- THREEJS-005 resolves only color identity: it does **not** silently resolve this live seat/turn-authority contradiction. The fixed right/back/left/front spatial mapping and color ring remain the Kit presentation contract, while actual online ownership/turn state must still follow authoritative backend state until a separate explicit resolution changes that backend contract.
-- Rule for rewrite: do not make the UI imply fixed-ring online ownership when the live backend state says otherwise unless an explicit backend migration resolves this contract.
+- The Kit's fixed canonical color/spatial ring is `marble → blue → gold → green`, mapped `right → back → left → front`, and setup explicitly says: rotate the ring so the host's preferred color is first, then keep the selected 2/3/4 seats.
+- Protocol 5 historically stores players in host/join arrival order, assigns free `p2`/`p3`/`p4` identifiers, and advances `turnIndex` through that array. That representation is now a **legacy compatibility contract only** and is not the target seat authority for the rebuild migration.
+- **Resolution — THREEJS-048 (2026-08-19): canonical configured seat IDs are the stable spatial slots `right`, `back`, `left`, `front`, permanently bound to `marble`, `blue`, `gold`, `green` respectively.**
+- The canonical base ring is therefore `right/marble → back/blue → left/gold → front/green`. The host's approved preferred color rotates this ring once; the configured seat/turn order is the first `targetPlayers` slots from that rotated ring. No other rotation rule exists.
+- The first configured slot is the host's preferred-color seat. Remaining Computer/Online seat types occupy the following configured slots in that same order; changing camera orientation, reconnect order, invitation claim order or network arrival order never changes the configured order.
+- Every invitation/online credential maps to one already-configured stable `seatId`. The credential proves ownership of that slot; it never creates, renumbers, swaps or reorders a seat. Reconnect with the same recovered identity resolves the same `seatId`.
+- Canonical turn handoff scans only this configured order. Starting immediately after the current seat, each configured seat with no legal placement is recorded with authoritative reason `no_legal_move` and skipped; scanning wraps through the ring and may return to the current seat if that is the only seat with a legal move. Only when **no configured seat** has a legal placement does the selector return no next seat; THREEJS-051 owns committing the resulting draw transition.
+- `no_legal_move` is distinct from timeout. THREEJS-050/070 may hand off after timeout, but they must not mislabel a timeout as no-legal-move evidence.
+- THREEJS-054 owns next-round starter/reset mechanics but must consume this exact configured order; it may not invent a second seat ring.
+- THREEJS-062/064/072 and any future Cloudflare room implementation must persist/transport these stable configured slots and credential bindings. They may adapt active legacy protocol-5 rooms during migration, but they may not resurrect join-order authority for the new protocol.
+- The fixed physical mapping remains fixed even when the host prefers another color: rotating turn/setup order does **not** rotate the actual right/back/left/front geometry or rename colors.
 
 ### SRC-004 — Entry and invitation model — RESOLVED
 
@@ -160,6 +166,8 @@ Every implementation decision must be traceable to one of these outcomes:
 For `SRC-001` specifically, all future Three.js code, copy, adapters, fixtures, and tests must treat 3/5 as **wins-to-match**. No code path may terminate a match merely because `completedRounds` reaches 3 or 5.
 
 For `SRC-002` specifically, every playable color value crossing rules, state, persistence, network, turn, board, inventory, scoring, or tests must use canonical `marble`, never playable `white`. Rendering and copy for that ID must use the single approved white-marble display/material mapping rather than creating a second color identity. The canonical spatial identity is `right=marble`, `back=blue`, `left=gold`, `front=green`, with fixed spatial ring `right → back → left → front`.
+
+For `SRC-003` specifically, configured seat identity and order are never array-arrival artifacts. Build the stable slot ring `right/marble → back/blue → left/gold → front/green`, rotate it so the host's preferred color is first, keep the configured 2/3/4-seat prefix, bind credentials/invitations to those stable slot IDs, and scan only that order for turn handoff/no-legal-move skips. Legacy `p1…p4`/join-order behavior may exist only inside an explicit compatibility adapter during migration.
 
 For `SRC-004` specifically, every Three.js entry/invitation implementation must follow `THREEJS_ENTRY_INVITATION_CONTRACT.md`: `قيم جديد` is the host path, `دخول بدعوة` is the invitee path, each online invitation owns one exact reserved seat/color, and manual 2-digit entry resolves that invitation rather than a generic room. Link and code entry must converge on the same authoritative invitation record and claim outcome.
 
