@@ -263,6 +263,9 @@ export function createResourceRegistry({
         existing.ownership = normalised.ownership;
         existing.kind = normalised.kind;
         existing.label = normalised.label || existing.label;
+        if (Object.prototype.hasOwnProperty.call(metadata, 'cleanup')) {
+          existing.cleanup = normalised.cleanup || null;
+        }
       }
       if (normalised.replacementKey) {
         if (
