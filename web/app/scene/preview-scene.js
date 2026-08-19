@@ -4,16 +4,32 @@ import { createFrameGovernor, FRAME_GOVERNOR_POLICY } from '../camera/frame-gove
 import { markOnce, STARTUP_MARKS } from '../perf/startup-marks.js';
 import { createMinimalLightingRig, createTurnEmphasisPresentation } from './lighting-rig.js';
 
-function createGpuFacingPreviewResources(group, materialSystem, registry, generation) {
+export const CONTACT_GROUNDING_POLICY = Object.freeze({
+  mode: 'single-transparent-ellipse',
+  segments: 24,
+  opacity: 0.14,
+  color: 0x2f343b,
+  position: Object.freeze([0, -1.34, 0.12]),
+  scale: Object.freeze([1.48, 0.62, 1]),
+  extraLightCount: 0,
+  shadowMap: false,
+  renderTarget: false,
+  texture: false,
+  ownership: RESOURCE_OWNERSHIP.TRANSIENT,
+});
+
+function createGpuFacingPreviewResources(group, groundingRoot, materialSystem, registry, generation) {
   const lifecycle = registry.createScope(`preview-gpu:${generation}`, {
     ownership: RESOURCE_OWNERSHIP.TRANSIENT,
   });
   let hero = null;
   let ring = null;
+  let groundingCue = null;
 
   lifecycle.registerCleanup(() => {
     if (hero) group.remove(hero);
     if (ring) group.remove(ring);
+    if (groundingCue) groundingRoot.remove(groundingCue);
   }, { label: 'preview-mesh-detach' });
 
   try {
@@ -37,8 +53,32 @@ function createGpuFacingPreviewResources(group, materialSystem, registry, genera
     ring.rotation.z = Math.PI * 0.18;
     group.add(ring);
 
+    const groundingGeometry = new THREE.CircleGeometry(1, CONTACT_GROUNDING_POLICY.segments);
+    lifecycle.register(groundingGeometry, {
+      kind: RESOURCE_KINDS.GEOMETRY,
+      label: 'preview-contact-grounding-geometry',
+    });
+    const groundingMaterial = new THREE.MeshBasicMaterial({
+      color: CONTACT_GROUNDING_POLICY.color,
+      transparent: true,
+      opacity: CONTACT_GROUNDING_POLICY.opacity,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    lifecycle.register(groundingMaterial, {
+      kind: RESOURCE_KINDS.MATERIAL_VARIANT,
+      label: 'preview-contact-grounding-material-variant',
+    });
+    groundingCue = new THREE.Mesh(groundingGeometry, groundingMaterial);
+    groundingCue.name = 'preview:contact-grounding';
+    groundingCue.rotation.x = -Math.PI / 2;
+    groundingCue.position.fromArray(CONTACT_GROUNDING_POLICY.position);
+    groundingCue.scale.fromArray(CONTACT_GROUNDING_POLICY.scale);
+    groundingRoot.add(groundingCue);
+
     return Object.freeze({
       ring,
+      groundingCue,
       release: () => lifecycle.release('preview-gpu-generation-replaced'),
     });
   } catch (error) {
@@ -71,9 +111,13 @@ export function createPreviewScene(rendererOwner, {
   camera.position.set(0, 1.6, 6.2);
   camera.lookAt(0, 0, 0);
 
+  const groundingRoot = new THREE.Group();
+  groundingRoot.name = 'preview:grounding-root';
+  scene.add(groundingRoot);
+
   const group = new THREE.Group();
   scene.add(group);
-  let resources = createGpuFacingPreviewResources(group, materialSystem, registry, 0);
+  let resources = createGpuFacingPreviewResources(group, groundingRoot, materialSystem, registry, 0);
   let restoredResourceGeneration = 0;
 
   const lightingRig = createMinimalLightingRig({ runtimeData });
@@ -90,7 +134,7 @@ export function createPreviewScene(rendererOwner, {
   const unregisterResourceRestorer = rendererOwner.registerResourceRestorer(({ generation }) => {
     if (disposed || generation <= restoredResourceGeneration) return;
     resources.release();
-    resources = createGpuFacingPreviewResources(group, materialSystem, registry, generation);
+    resources = createGpuFacingPreviewResources(group, groundingRoot, materialSystem, registry, generation);
     restoredResourceGeneration = generation;
     lastFrameNow = null;
   });
@@ -165,6 +209,10 @@ export function createPreviewScene(rendererOwner, {
       cameraAspect: camera.aspect,
       cameraFov: camera.fov,
       lighting: getLightingSnapshot(),
+      grounding: Object.freeze({
+        ...CONTACT_GROUNDING_POLICY,
+        visible: resources.groundingCue.visible,
+      }),
       resources: registry.snapshot(),
     });
   }
