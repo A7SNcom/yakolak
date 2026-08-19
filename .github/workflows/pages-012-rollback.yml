@@ -97,6 +97,7 @@ jobs:
 
           test -s restore-site/index.html
           test -s restore-site/threejs/index.html
+          test -s restore-site/deployment-manifest.json
           ! grep -Fq 'THREEJS REBUILD' restore-site/index.html
           grep -Fq 'THREEJS REBUILD' restore-site/threejs/index.html
           echo "Exact-byte restore verified; no source checkout or build occurred."
@@ -220,6 +221,44 @@ jobs:
       - name: Deploy exact verified release bytes
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Prove live rollback generation equals the locked immutable archive
+        shell: bash
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          ASSET_SHA256: ${{ needs.restore.outputs.asset_sha256 }}
+        run: |
+          set -euo pipefail
+          window='qualification-code-final/RELEASE_QUALIFICATION/ONLINE_FRONTEND_WINDOW.json'
+          expected_manifest_sha="$(jq -r --arg tag "$RELEASE_TAG" --arg digest "$ASSET_SHA256" '.frontends[] | select(.releaseTag == $tag and .assetSha256 == $digest) | .pages014LiveEvidence.liveManifestSha256' "$window")"
+          expected_generation="$(jq -r --arg tag "$RELEASE_TAG" --arg digest "$ASSET_SHA256" '.frontends[] | select(.releaseTag == $tag and .assetSha256 == $digest) | .deploymentGeneration' "$window")"
+          [[ "$expected_manifest_sha" =~ ^[a-f0-9]{64}$ ]]
+          [[ "$expected_generation" =~ ^sha256:[a-f0-9]{64}$ ]]
+
+          base="${PAGE_URL%/}/"
+          live_manifest=''
+          for attempt in $(seq 1 18); do
+            nonce="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${attempt}"
+            if curl --fail --silent --show-error --location \
+              --header 'Cache-Control: no-cache, no-store, must-revalidate' \
+              --header 'Pragma: no-cache' \
+              "${base}deployment-manifest.json?rollback-proof=${nonce}" \
+              --output /tmp/pages012-live-manifest.json; then
+              live_sha="$(sha256sum /tmp/pages012-live-manifest.json | awk '{print $1}')"
+              live_generation="$(jq -r '.deploymentGeneration // ""' /tmp/pages012-live-manifest.json 2>/dev/null || true)"
+              if [ "$live_sha" = "$expected_manifest_sha" ] && [ "$live_generation" = "$expected_generation" ]; then
+                live_manifest="$live_sha"
+                break
+              fi
+            fi
+            sleep 5
+          done
+          test "$live_manifest" = "$expected_manifest_sha" || {
+            echo 'Rollback deployment completed but the live deployment manifest did not converge to the locked immutable archive identity.' >&2
+            exit 1
+          }
+          echo "Rollback live generation verified: ${expected_generation}"
 
       - name: HTTP smoke restored root and Three.js
         shell: bash
