@@ -52,4 +52,4 @@ The older `main` fallbacks `.github/workflows/pages-005-backend-bootstrap.yml`, 
 
 ## Complete qualification
 
-THREEJS-098/099 may consume an archive only when `node scripts/verify-release-qualification.mjs <releaseTag> <assetSha256>` exits successfully. The verifier requires all three events for the exact same key and validates the PAGES-014 and PAGES-015 evidence shapes.
+THREEJS-098/099 may consume an archive only when `node scripts/verify-release-qualification.mjs <releaseTag> <assetSha256>` exits successfully. The verifier requires the strong archive, deployment-generation and backend-compatibility events for the exact key **and** proves the sibling frontend key in the locked active+previous window has its own strong archive/generation/backend rows from the same Worker/Turso evidence. The two backend rows must carry the same exact capability set, API origin, active+previous Worker IDs and four unique frontend×Worker pairings; a lone frontend row, mismatched sibling evidence, capability superset or non-exact Worker deployment identity is not complete qualification.
