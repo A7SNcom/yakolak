@@ -1,0 +1,93 @@
+name: PAGES-015 Retire Historical PAGES-012 Auto Trigger
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - .github/workflows/pages-015-retire-pages012-auto.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-release-qualification-ledger
+  cancel-in-progress: false
+
+jobs:
+  retire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: threejs-rebuild
+          fetch-depth: 0
+
+      - name: Make historical PAGES-012 release workflow manual-only
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for attempt in 1 2 3 4; do
+            git fetch --quiet origin threejs-rebuild
+            git reset --hard origin/threejs-rebuild >/dev/null
+
+            python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          workflow_path = Path('.github/workflows/pages-012-immutable-release.yml')
+          test_path = Path('tests/pages015_single_resume_path_contract.test.mjs')
+
+          workflow = workflow_path.read_text()
+          old_on = '''on:\n  push:\n    branches:\n      - threejs-rebuild\n    paths:\n      - "PAGES_RELEASE_ARCHIVES.md"\n      - "scripts/verify-release-qualification.mjs"\n  workflow_dispatch:\n'''
+          new_on = '''on:\n  workflow_dispatch:\n'''
+          if workflow.count(old_on) != 1:
+              raise SystemExit('expected exactly one historical PAGES-012 automatic trigger block')
+          workflow = workflow.replace(old_on, new_on, 1)
+          workflow_path.write_text(workflow)
+
+          tests = test_path.read_text()
+          pattern = re.compile(
+              r"test\('historical PAGES-012 ledger writer is serialized and does not self-trigger on workflow edits', \(\) => \{.*?\n\}\);",
+              re.S,
+          )
+          replacement = '''test('historical PAGES-012 release workflow is manual-only and shares the qualification-ledger lock', () => {
+            assert.match(pages012, /^name: PAGES-012 Immutable Release Archive/m);
+            assert.match(pages012, /RELEASE_QUALIFICATION\\/ledger\\.jsonl/);
+            sharedLedgerLock(pages012);
+            const block = onBlock(pages012);
+            assert.match(block, /workflow_dispatch:/);
+            assert.doesNotMatch(block, /\\bpush:/);
+            assert.doesNotMatch(block, /\\bschedule:/);
+            assert.doesNotMatch(block, /\\bworkflow_run:/);
+          });'''
+          tests, count = pattern.subn(replacement, tests, count=1)
+          if count != 1:
+              raise SystemExit('expected exactly one historical PAGES-012 topology contract test')
+          test_path.write_text(tests)
+          PY
+
+            node --test tests/pages015_single_resume_path_contract.test.mjs
+            git diff --check
+            git add .github/workflows/pages-012-immutable-release.yml tests/pages015_single_resume_path_contract.test.mjs
+
+            if git diff --cached --quiet; then
+              echo 'Historical PAGES-012 automatic trigger is already retired.'
+              exit 0
+            fi
+
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'PAGES-015 retire historical PAGES-012 auto trigger'
+            if git push --quiet origin HEAD:threejs-rebuild; then
+              echo 'Historical PAGES-012 release workflow is now manual-only.'
+              exit 0
+            fi
+
+            echo "threejs-rebuild advanced during topology fix (attempt ${attempt}); retrying."
+          done
+
+          echo 'Could not retire historical PAGES-012 automatic trigger after retries.' >&2
+          exit 1
