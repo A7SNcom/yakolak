@@ -21,6 +21,10 @@ const appendSource = fs.readFileSync(
   new URL('../scripts/append-pages015-qualification.mjs', import.meta.url),
   'utf8',
 );
+const legacyWorkflowSource = fs.readFileSync(
+  new URL('../.github/workflows/pages-015-online-compatibility.yml', import.meta.url),
+  'utf8',
+);
 
 const hex = (ch) => ch.repeat(64);
 const workerLockEvidenceSha256 = hex('7');
@@ -222,4 +226,20 @@ test('finalizer cannot early-exit on historical qualification before validating 
   assert.ok(liveProbe > currentLockVerification);
   assert.ok(append > liveProbe);
   assert.doesNotMatch(finalizerSource, /PAGES-015 locked window is already fully qualified\.'\n\s*exit 0/);
+});
+
+test('manual fallback cannot early-exit or commit without current Worker lock verification', () => {
+  const verifierCalls = legacyWorkflowSource.match(/node scripts\/verify-pages015-current-lock-qualification\.mjs/g) || [];
+  assert.ok(verifierCalls.length >= 2, 'manual fallback must verify current lock before early exit and after append');
+  assert.match(legacyWorkflowSource, /\.protocolIdentity == "yakolak-online-room@1"/);
+  assert.match(legacyWorkflowSource, /\.capabilityIdentity == "yakolak-online-room-capabilities-v1"/);
+  assert.match(legacyWorkflowSource, /\.finalEvidenceSha256 \| test\("\^\[a-f0-9\]\{64\}\$"\)/);
+  const earlyExit = legacyWorkflowSource.indexOf("echo 'already=true'");
+  const firstCurrentLock = legacyWorkflowSource.indexOf('node scripts/verify-pages015-current-lock-qualification.mjs');
+  const append = legacyWorkflowSource.indexOf('node scripts/append-pages015-qualification.mjs');
+  const lastCurrentLock = legacyWorkflowSource.lastIndexOf('node scripts/verify-pages015-current-lock-qualification.mjs');
+  const commit = legacyWorkflowSource.indexOf("git commit -m 'PAGES-015 qualify active+previous frontend/Worker window'");
+  assert.ok(firstCurrentLock >= 0 && firstCurrentLock < earlyExit);
+  assert.ok(append >= 0 && append < lastCurrentLock);
+  assert.ok(lastCurrentLock < commit);
 });
