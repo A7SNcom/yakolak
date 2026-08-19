@@ -27,7 +27,6 @@ const seats = configuredSeatOrder('marble', 4).map((slot, index) => ({
   color: slot.color,
   ready: true,
 }));
-const seatByColor = Object.fromEntries(seats.map(seat => [seat.color, seat.seatId]));
 
 function canonical({
   revision = 80,
@@ -90,8 +89,6 @@ function fakePieces() {
       if (!match) throw new TypeError('unknown-piece');
       const [, colorId, size, copyNumberRaw] = match;
       const copyIndex = Number(copyNumberRaw) - 1;
-      const canonicalCenter = [...canonicalCenters[colorId]];
-      canonicalCenter[0] += copyIndex * 28;
       const presentationCenter = centerFor(pieceId, colorId, copyIndex);
       const matrix = new Matrix4().makeTranslation(...presentationCenter);
       const geometry = geometries[size];
@@ -100,12 +97,11 @@ function fakePieces() {
         colorId,
         size,
         copyIndex,
-        destination: Object.freeze({ kind: 'home', seatId: seatByColor[colorId], stackIndex: copyIndex, center: Object.freeze(canonicalCenter) }),
         matrixElements: Object.freeze([...matrix.elements]),
         presentationCenter: Object.freeze(presentationCenter),
         boundingRadius: geometry.boundingSphere.radius,
         geometry,
-        baseMaterial: materials[colorId],
+        baseMaterialUuid: materials[colorId].uuid,
       });
     },
     dispose() {
@@ -209,8 +205,8 @@ assert.equal(snapshot.emphasisRenderPrimitiveCount, 3);
 assert.equal(harness.presentation.root.children.length, 3);
 assert.equal(snapshot.renderRequestCount, 2);
 
-// Destination remains canonical home while the live matrix moves to an opened/drag-like
-// presentation center. Refresh must move the halo with the matrix-derived live bounds.
+// The live presentation matrix moves independently of canonical authority state. Refresh
+// must move the halo with matrix-derived bounds and stay independent of camera/tweens.
 const beforeRefresh = snapshot.renderRequestCount;
 harness.pieces.presentationCenters.set('piece:marble:medium:1', [42, 21, -18]);
 harness.presentation.refresh(state80);
