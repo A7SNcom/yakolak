@@ -1,6 +1,6 @@
-// THREEJS-044: one browser/backend-safe rules implementation.
-// `rules/yakolak-rules.json` remains the versioned data contract; the parity
-// test must fail if this browser-safe data mirror drifts from that file.
+// THREEJS-044/046: one browser/backend-safe rules implementation.
+// `rules/yakolak-rules.json` remains the versioned data contract; contract tests
+// fail if this browser-safe data mirror or placement semantics drift.
 
 const RULES_DATA = {
   version: 2,
@@ -34,6 +34,27 @@ export const COLORS = Object.freeze([...RULES.colors]);
 export const SIZES = Object.freeze([...RULES.sizes]);
 export const LINES = Object.freeze(RULES.lines.map(line => Object.freeze([...line])));
 
+export const PLACEMENT_REJECTION_CODES = Object.freeze({
+  UNKNOWN_SEAT: 'unknown_seat',
+  INVALID_CELL: 'invalid_cell',
+  INVALID_SIZE: 'invalid_size',
+  OCCUPIED_SLOT: 'occupied_slot',
+  NO_PIECE_REMAINING: 'no_piece_remaining',
+});
+
+function rulesError(code) {
+  const error = new Error(code);
+  error.code = code;
+  return error;
+}
+
+function normalizePlacement(move) {
+  return {
+    cell: Number(move?.cell),
+    size: String(move?.size || ''),
+  };
+}
+
 export function isValidPlayerCount(value) {
   return RULES.playerCounts.includes(Number(value));
 }
@@ -50,18 +71,73 @@ export function countPieces(board, color, size) {
   return Object.values(board || {}).filter(cell => cell?.[size] === color).length;
 }
 
-export function validatePlacement(board, color, move) {
-  const cell = Number(move?.cell);
-  const size = String(move?.size || '');
-  if (!Number.isInteger(cell) || cell < 0 || cell >= RULES.cellCount || !SIZES.includes(size)) return 'invalid_move';
-  if (board?.[String(cell)]?.[size]) return 'occupied_slot';
-  if (countPieces(board, color, size) >= RULES.copiesPerSizePerColor) return 'no_piece_remaining';
+export function remainingInventoryForColor(board, color) {
+  const remaining = {};
+  for (const size of SIZES) {
+    const count = countPieces(board, color, size);
+    if (count > RULES.copiesPerSizePerColor) throw rulesError('invalid_piece_count');
+    remaining[size] = RULES.copiesPerSizePerColor - count;
+  }
+  return Object.freeze(remaining);
+}
+
+export function deriveRemainingInventory(board, seats) {
+  if (!Array.isArray(seats)) throw rulesError('invalid_inventory_state');
+  return Object.freeze(Object.fromEntries(seats.map(seat => [
+    seat.seatId,
+    remainingInventoryForColor(board, seat.color),
+  ])));
+}
+
+export function deriveRemainingInventoryFromState(state) {
+  return deriveRemainingInventory(state?.board, state?.seats);
+}
+
+export function placementRejectionCode(board, color, move) {
+  const { cell, size } = normalizePlacement(move);
+  if (!Number.isInteger(cell) || cell < 0 || cell >= RULES.cellCount) {
+    return PLACEMENT_REJECTION_CODES.INVALID_CELL;
+  }
+  if (!SIZES.includes(size)) return PLACEMENT_REJECTION_CODES.INVALID_SIZE;
+  if (board?.[String(cell)]?.[size]) return PLACEMENT_REJECTION_CODES.OCCUPIED_SLOT;
+  if (countPieces(board, color, size) >= RULES.copiesPerSizePerColor) {
+    return PLACEMENT_REJECTION_CODES.NO_PIECE_REMAINING;
+  }
   return null;
+}
+
+export function validatePlacementForSeat(state, seatId, move) {
+  const seat = Array.isArray(state?.seats)
+    ? state.seats.find(candidate => candidate?.seatId === seatId)
+    : null;
+  if (!seat) return Object.freeze({ ok: false, code: PLACEMENT_REJECTION_CODES.UNKNOWN_SEAT });
+
+  const code = placementRejectionCode(state?.board, seat.color, move);
+  if (code) return Object.freeze({ ok: false, code });
+
+  const { cell, size } = normalizePlacement(move);
+  return Object.freeze({
+    ok: true,
+    code: null,
+    placement: Object.freeze({ seatId, color: seat.color, cell, size }),
+  });
+}
+
+// Protocol-v5 compatibility wrapper: v5 historically grouped invalid cell/size
+// as `invalid_move`. New canonical callers use placementRejectionCode or
+// validatePlacementForSeat and receive the stable detailed codes above.
+export function validatePlacement(board, color, move) {
+  const code = placementRejectionCode(board, color, move);
+  if (
+    code === PLACEMENT_REJECTION_CODES.INVALID_CELL ||
+    code === PLACEMENT_REJECTION_CODES.INVALID_SIZE
+  ) return 'invalid_move';
+  return code;
 }
 
 export function placePiece(board, color, move) {
   const error = validatePlacement(board, color, move);
-  if (error) throw new Error(error);
+  if (error) throw rulesError(error);
   const cell = Number(move.cell);
   const size = String(move.size);
   const next = structuredClone(board);
@@ -98,9 +174,8 @@ export function winner(board, color) {
 
 export function hasLegalMove(board, color) {
   for (const size of SIZES) {
-    if (countPieces(board, color, size) >= RULES.copiesPerSizePerColor) continue;
     for (let cell = 0; cell < RULES.cellCount; cell += 1) {
-      if (!board?.[String(cell)]?.[size]) return true;
+      if (placementRejectionCode(board, color, { cell, size }) === null) return true;
     }
   }
   return false;
