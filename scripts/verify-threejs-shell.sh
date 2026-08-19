@@ -54,6 +54,7 @@ required=(
   scripts/measure-threejs-performance.mjs
   tests/threejs_renderer_owner_contract.test.mjs
   tests/threejs_context_recovery_contract.test.mjs
+  tests/threejs_context_recovery_subscription_atomicity.test.mjs
   tests/threejs_frame_governor_contract.test.mjs
   tests/threejs_resource_registry_contract.test.mjs
   tests/threejs_resource_registry_scope_ownership.test.mjs
@@ -111,6 +112,7 @@ fi
 
 node tests/threejs_renderer_owner_contract.test.mjs
 node tests/threejs_context_recovery_contract.test.mjs
+node tests/threejs_context_recovery_subscription_atomicity.test.mjs
 node tests/threejs_frame_governor_contract.test.mjs
 node tests/threejs_resource_registry_contract.test.mjs
 node tests/threejs_resource_registry_scope_ownership.test.mjs
