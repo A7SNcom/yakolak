@@ -336,10 +336,14 @@ export function createResourceRegistry({
       sharedKey,
     };
     const existingBeforeRegistration = activeObjectEntry(resource);
+    if (existingBeforeRegistration) {
+      assertObjectRegistrationAllowed(resource, prepared);
+      throw new Error('Shared resource factory must return a newly unregistered resource');
+    }
     try {
       register(resource, prepared);
     } catch (error) {
-      if (!existingBeforeRegistration && !activeObjectEntry(resource)) {
+      if (!activeObjectEntry(resource)) {
         const rollbackEntry = {
           id: 'shared-factory-rollback',
           resource,
