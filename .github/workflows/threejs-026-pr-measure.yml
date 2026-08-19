@@ -10,33 +10,36 @@ on:
 permissions:
   contents: read
 
+env:
+  THREEJS026_EXPECTED_CANDIDATE: 2803601aa6a79fea40b464c23867b82addaee776
+
 jobs:
   measure:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout measurement tooling
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: Resolve current exact live Pages generation
+      - name: Resolve exact grounding Pages generation
         id: live
         shell: bash
         env:
           MANIFEST_URL: https://a7sncom.github.io/yakolak/deployment-manifest.json
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 30); do
+          for attempt in $(seq 1 120); do
             nonce="${GITHUB_RUN_ID}-${attempt}-$(date +%s)"
             if curl --fail --silent --show-error \
               -H 'Cache-Control: no-cache' \
               -H 'Pragma: no-cache' \
-              "${MANIFEST_URL}?threejs026pr=${nonce}" \
+              "${MANIFEST_URL}?threejs026post=${nonce}" \
               -o /tmp/deployment-manifest.json; then
               candidate="$(jq -r '.threejsCandidateSha // empty' /tmp/deployment-manifest.json)"
               generation="$(jq -r '.deploymentGeneration // empty' /tmp/deployment-manifest.json)"
-              if [ -n "${candidate}" ] && [ -n "${generation}" ]; then
+              if [ "${candidate}" = "${THREEJS026_EXPECTED_CANDIDATE}" ] && [ -n "${generation}" ]; then
                 echo "candidate_sha=${candidate}" >> "$GITHUB_OUTPUT"
                 echo "generation=${generation}" >> "$GITHUB_OUTPUT"
                 git fetch --quiet --depth=1 origin "${candidate}"
@@ -45,15 +48,21 @@ jobs:
                 exit 0
               fi
             fi
-            sleep 2
+            sleep 5
           done
-          echo 'Unable to resolve current live Pages generation.' >&2
+          echo "Exact grounding candidate ${THREEJS026_EXPECTED_CANDIDATE} never became the live Pages generation." >&2
+          cat /tmp/deployment-manifest.json 2>/dev/null || true
           exit 1
 
       - name: Set up Node 22
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      - name: Run contact and THREEJS-025 lighting contracts
+        run: |
+          node --test tests/threejs_lighting_contract.test.mjs tests/threejs_contact_grounding_contract.test.mjs
+          node scripts/verify-threejs-lighting.mjs
 
       - name: Install browser verifier only
         run: npm install --no-save --package-lock=false playwright@1.55.0
@@ -155,7 +164,7 @@ jobs:
           PY
           node --check scripts/measure-threejs-performance.mjs
 
-      - name: Measure exact live Pages generation
+      - name: Measure exact live grounding candidate
         shell: bash
         env:
           SHELL_URL: https://a7sncom.github.io/yakolak/threejs/
@@ -164,10 +173,41 @@ jobs:
           set -o pipefail
           node scripts/measure-threejs-performance.mjs 2>&1 | tee /tmp/threejs026-performance.log
 
-      - name: Upload raw measurement log
+      - name: Capture mobile grounding visual and runtime contract
+        shell: bash
+        env:
+          SHELL_URL: https://a7sncom.github.io/yakolak/threejs/
+        run: |
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          import { writeFile } from 'node:fs/promises';
+          const browser = await chromium.launch({ headless: true, args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'] });
+          try {
+            const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, reducedMotion: 'reduce' });
+            const page = await context.newPage();
+            await page.goto(process.env.SHELL_URL, { waitUntil: 'domcontentloaded', timeout: 120000 });
+            await page.waitForFunction(() => document.documentElement.dataset.bootState === 'ready', null, { timeout: 120000 });
+            await page.waitForFunction(() => Boolean(window.__YAKOLAK_THREEJS_SHELL__?.getStartupMarks?.().firstVisibleFrame), null, { timeout: 30000 });
+            const snapshot = await page.evaluate(() => ({
+              presentation: window.__YAKOLAK_THREEJS_SHELL__.getPresentationSnapshot(),
+              lighting: window.__YAKOLAK_THREEJS_SHELL__.getLightingSnapshot(),
+            }));
+            await writeFile('/tmp/threejs026-grounding-snapshot.json', JSON.stringify(snapshot, null, 2));
+            await page.screenshot({ path: '/tmp/threejs026-grounding-390x844.png', fullPage: true });
+            console.log('THREEJS026_GROUNDING_VISUAL', JSON.stringify(snapshot));
+            await context.close();
+          } finally {
+            await browser.close();
+          }
+          NODE
+
+      - name: Upload measurement and visual evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: threejs026-pr-measurement-${{ github.run_id }}
-          path: /tmp/threejs026-performance.log
+          name: threejs026-post-grounding-${{ github.run_id }}
+          path: |
+            /tmp/threejs026-performance.log
+            /tmp/threejs026-grounding-snapshot.json
+            /tmp/threejs026-grounding-390x844.png
           if-no-files-found: warn
