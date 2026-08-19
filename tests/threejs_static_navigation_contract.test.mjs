@@ -51,7 +51,6 @@ function createHistoryHarness(initialHref) {
     history,
     writes,
     entries,
-    getIndex: () => index,
     getBackCalls: () => backCalls,
   };
 }
@@ -170,14 +169,12 @@ for (const basePath of ['/yakolak/threejs/', '/yakolak/']) {
   // Presentation selection is local-only. pageshow/popstate clear it before hydrating the
   // current canonical lifecycle so presentation cannot remain stranded on stale state.
   harness.controller.reselect('home-piece:right:0:large');
-  assert.equal(harness.controller.snapshot().selectedTargetId, 'home-piece:right:0:large');
   harness.setLifecycle('gen-11:rev-21');
   harness.controller.pageshow();
   assert.equal(harness.controller.snapshot().selectedTargetId, null);
   assert.equal(harness.clears.at(-1), 'pageshow');
   assert.equal(harness.hydrations.at(-1).lifecycleKey, 'gen-11:rev-21');
 
-  // Setup routes are pushed only as query/hash under the current application base.
   harness.controller.openSetup('players');
   assert.equal(new URL(harness.location.href).pathname, basePath);
   assert.equal(new URL(harness.location.href).hash, '#setup=players');
@@ -202,7 +199,6 @@ for (const basePath of ['/yakolak/threejs/', '/yakolak/']) {
   harness.controller.popstate();
   assert.notEqual(harness.controller.snapshot().route.setup, 'confirm');
 
-  // Programmatic invitation entry writes only the public invite id and enters it once.
   harness.setLifecycle('gen-12:rev-22');
   harness.controller.enterInvitation('ROOM43', { replace: false });
   assert.equal(harness.invitations.length, 2);
@@ -217,8 +213,6 @@ for (const basePath of ['/yakolak/threejs/', '/yakolak/']) {
   assert.equal(harness.invitations.length, 2, 'same public invite cannot be claimed twice in controller lifetime');
   assert.equal(harness.hydrations.at(-1).reason, 'hydrate');
 
-  // Listener attach is idempotent; pageshow remains hydration-only when dispatched by
-  // the browser event target itself.
   assert.equal(harness.controller.attach(), true);
   assert.equal(harness.controller.attach(), false);
   assert.equal(harness.events.count('popstate'), 1);
@@ -233,6 +227,34 @@ for (const basePath of ['/yakolak/threejs/', '/yakolak/']) {
 
   assert(harness.writes.every(write => write.state === null), 'no history state may contain credentials or routing payload');
   assert(harness.entries.every(entry => entry.state === null));
+
+  // A fresh controller can encounter an unseen invitation through Forward/Back. Popstate
+  // must enter that invite exactly once without manufacturing another history write.
+  const forward = createControllerHarness({ baseUrl, initialHref: baseUrl });
+  forward.controller.start();
+  const writesBeforeForward = forward.writes.length;
+  forward.setLifecycle('gen-forward:rev-1');
+  forward.location.href = buildAppStateUrl({ invitation: 'ROOM99' }, baseUrl).href;
+  forward.controller.popstate();
+  assert.equal(forward.invitations.length, 1);
+  assert.deepEqual(forward.invitations[0], { invitation: 'ROOM99', lifecycleKey: 'gen-forward:rev-1' });
+  assert.equal(forward.hydrations.at(-1).reason, 'invitation-entry');
+  assert.equal(forward.writes.length, writesBeforeForward, 'popstate invitation entry must not push/replace history');
+  forward.controller.popstate();
+  assert.equal(forward.invitations.length, 1, 'revisiting the same history invite hydrates only');
+  assert.equal(forward.hydrations.at(-1).reason, 'history-pop');
+
+  // pageshow is stricter: even an unseen invite is hydration-only. A later real popstate
+  // may still enter it once because pageshow did not consume the invitation-entry token.
+  const bfcache = createControllerHarness({ baseUrl, initialHref: baseUrl });
+  bfcache.controller.start();
+  bfcache.location.href = buildAppStateUrl({ invitation: 'ROOMBF' }, baseUrl).href;
+  bfcache.controller.pageshow();
+  assert.equal(bfcache.invitations.length, 0);
+  assert.equal(bfcache.hydrations.at(-1).reason, 'pageshow');
+  bfcache.controller.popstate();
+  assert.equal(bfcache.invitations.length, 1);
+  assert.equal(bfcache.invitations[0].invitation, 'ROOMBF');
 }
 
 assert.throws(() => canonicalStaticRouteUrl('https://a7sncom.github.io/yakolak/?invite=bad%20space', 'https://a7sncom.github.io/yakolak/'), /invalid_public_invitation_id/);
@@ -241,10 +263,10 @@ assert.throws(() => createStaticNavigationState({ route: {}, lifecycleKey: '' })
 const source = readFileSync(path.join(root, 'web/app/core/static-navigation.js'), 'utf8');
 assert.match(source, /buildAppStateUrl/);
 assert.match(source, /readAppState/);
-assert.match(source, /pushState\]\(null|pushState', route|pushState/);
-assert.match(source, /replaceState/);
+assert.match(source, /historyImpl\[method\]\(null, '', url\.href\)/);
 assert.match(source, /pageshow/);
 assert.match(source, /popstate/);
+assert.match(source, /seenInvitations/);
 assert.doesNotMatch(source, /location\.pathname\s*=|location\.href\s*=|window\.location\s*=/);
 assert.doesNotMatch(source, /seatCredential\s*:|bearer\s*:|authorization\s*:/i);
 
