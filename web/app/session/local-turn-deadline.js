@@ -16,22 +16,23 @@ function requireWallClockMs(value) {
   return value;
 }
 
-function assertZeroOnlineSeats(state, isOnlineSeatType) {
+export function assertLocalDeadlineAuthority(state, isOnlineSeatType) {
+  assertCanonicalSessionState(state);
   if (typeof isOnlineSeatType !== 'function') fail('online_seat_classifier_required');
   for (const seat of state.seats) {
     const result = isOnlineSeatType(seat.type);
     if (typeof result !== 'boolean') fail('online_seat_classifier_must_return_boolean');
     if (result) fail('online_session_not_local_deadline_authority');
   }
+  return state;
 }
 
 export function beginAuthoritativeLocalTurnDeadline(state, {
   nowMs,
   isOnlineSeatType,
 } = {}) {
-  assertCanonicalSessionState(state);
+  assertLocalDeadlineAuthority(state, isOnlineSeatType);
   const now = requireWallClockMs(nowMs);
-  assertZeroOnlineSeats(state, isOnlineSeatType);
 
   if (state.lifecycle.phase !== 'turn-loop') fail('local_deadline_requires_turn_loop');
   if (state.lifecycle.interrupt !== null) fail('local_deadline_requires_uninterrupted_turn');
