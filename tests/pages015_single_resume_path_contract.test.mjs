@@ -76,8 +76,16 @@ test('public exact-byte rollback is current-window compatibility gated while non
   const upload = rollback.indexOf('uses: actions/upload-pages-artifact@v4');
   const finalQualification = rollback.indexOf('Fail closed if the compatibility window changed before deploy');
   const deploy = rollback.indexOf('uses: actions/deploy-pages@v4');
+  const liveIdentity = rollback.indexOf('Prove live rollback generation equals the locked immutable archive');
+  const smoke = rollback.indexOf('HTTP smoke restored root and Three.js');
   assert.ok(preUploadQualification >= 0 && upload > preUploadQualification);
   assert.ok(finalQualification >= 0 && deploy > finalQualification);
+  assert.ok(liveIdentity > deploy && smoke > liveIdentity, 'live manifest identity proof must run after deploy and before smoke success');
+  assert.match(rollback, /pages014LiveEvidence\.liveManifestSha256/);
+  assert.match(rollback, /\.deploymentGeneration/);
+  assert.match(rollback, /Cache-Control: no-cache, no-store, must-revalidate/);
+  assert.match(rollback, /live_sha.*expected_manifest_sha/);
+  assert.match(rollback, /live_generation.*expected_generation/);
 
   const deployJob = rollback.slice(rollback.indexOf('\n  deploy:\n'));
   assert.match(deployJob, /concurrency:\n\s+group: yakolak-pages-composite\n\s+cancel-in-progress: false/);
