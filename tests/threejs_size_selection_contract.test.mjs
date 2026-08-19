@@ -121,6 +121,24 @@ assert.throws(() => controller.select(state10, {
 }), /home_piece_already_used/);
 assert.equal(controller.snapshot().selectedSize, 'large', 'failed selection must not partially clear/replace current state');
 
+// Authority cannot change underneath an active selection. Cancel may clear immediately
+// without a newer snapshot, after which a newer authority state can select normally.
+const state11 = canonical({ revision: 11 });
+assert.throws(() => controller.select(state11, {
+  stackTargetId: 'stack:right:0',
+  size: 'large',
+}), /size_selection_requires_boundary_clear/);
+assert.equal(controller.snapshot().witness.revision, 10);
+const cancelledImmediately = controller.clear('cancel');
+assert.equal(cancelledImmediately.selectedSize, null);
+assert.deepEqual(cancelledImmediately.legalCells, []);
+assert.equal(cancelledImmediately.witness.revision, 10);
+controller.select(state11, { stackTargetId: 'stack:right:0', size: 'large' });
+const timedOutImmediately = controller.clear('timeout');
+assert.equal(timedOutImmediately.selectedSize, null);
+assert.deepEqual(timedOutImmediately.legalTargetIds, []);
+assert.equal(timedOutImmediately.witness.revision, 11);
+
 // Every required boundary independently clears selected size + selected piece + legal
 // targets/cues in one frozen replacement. No result depends on reason ordering.
 for (const reason of SIZE_SELECTION_CLEAR_REASONS) {
