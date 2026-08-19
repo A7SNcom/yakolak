@@ -104,6 +104,24 @@ jobs:
             | grep -q 'group: pages-release-qualification-ledger'
           git show origin/main:.github/workflows/pages-014-post-deploy-qualification.yml \
             | grep -q 'deployment_generation_verified'
+
+          pages_workflow="$(git show origin/main:.github/workflows/pages-single-site.yml)"
+          pages_deploy_block="$(printf '%s\n' "$pages_workflow" | sed -n '/^  deploy:/,$p')"
+          printf '%s\n' "$pages_workflow" | grep -q 'uses: actions/deploy-pages@v4'
+          printf '%s\n' "$pages_workflow" | grep -q 'Poll live manifest with cache revalidation and prove generation'
+          printf '%s\n' "$pages_workflow" | grep -q 'HTTP smoke root, Three.js, and exact public runtime config'
+          printf '%s\n' "$pages_deploy_block" \
+            | grep -A4 '^[[:space:]]*permissions:' \
+            | grep -q 'contents: read'
+          if printf '%s\n' "$pages_deploy_block" | grep -Eq '^[[:space:]]+contents:[[:space:]]*write'; then
+            echo '.github/workflows/pages-single-site.yml deploy job must remain contents:read' >&2
+            exit 1
+          fi
+          if printf '%s\n' "$pages_workflow" | grep -Eq 'Qualify matching immutable archive in additive ledger|deployment_generation_verified|RELEASE_QUALIFICATION/ledger\.jsonl|ledger-repo'; then
+            echo '.github/workflows/pages-single-site.yml must never write the qualification ledger; PAGES-014 owns deployment-generation qualification' >&2
+            exit 1
+          fi
+
           for workflow in \
             .github/workflows/pages-005-backend-bootstrap.yml \
             .github/workflows/pages-015-window-archives.yml \
