@@ -64,3 +64,34 @@ test('failed shared claim never disposes a resource already owned by another sco
   assert.equal(owner.release('owner-complete'), 1);
   assert.equal(resource.disposeCalls, 1);
 });
+
+test('shared factory rejects a resource already registered in the requested scope', () => {
+  const registry = createResourceRegistry();
+  const resource = material();
+  registry.register(resource, {
+    kind: RESOURCE_KINDS.MATERIAL,
+    scope: 'asset-cache',
+  });
+  let factoryCalls = 0;
+
+  assert.throws(
+    () => registry.getOrCreateShared('same-scope-preowned', () => {
+      factoryCalls += 1;
+      return resource;
+    }, {
+      kind: RESOURCE_KINDS.MATERIAL,
+      scope: 'asset-cache',
+    }),
+    /Shared resource factory must return a newly unregistered resource/,
+  );
+
+  assert.equal(factoryCalls, 1);
+  assert.equal(resource.disposeCalls, 0, 'rejected pre-owned resource must remain owned by its original registration');
+  const snapshot = registry.snapshot();
+  assert.equal(snapshot.total, 1);
+  assert.equal(snapshot.byOwnership.transient, 1);
+  assert.equal(snapshot.byOwnership['shared-immutable'] || 0, 0);
+
+  assert.equal(registry.releaseScope('asset-cache', 'test-complete'), 1);
+  assert.equal(resource.disposeCalls, 1);
+});
