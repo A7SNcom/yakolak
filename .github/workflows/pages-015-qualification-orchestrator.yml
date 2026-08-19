@@ -124,6 +124,26 @@ jobs:
             exit 1
           fi
 
+          rollback_workflow="$(cat .github/workflows/pages-012-rollback.yml)"
+          printf '%s\n' "$rollback_workflow" \
+            | grep -A2 '^concurrency:' \
+            | grep -q 'group: pages-release-qualification-ledger'
+          printf '%s\n' "$rollback_workflow" | grep -q 'ONLINE_FRONTEND_WINDOW.json'
+          rollback_current_lock_calls="$(printf '%s\n' "$rollback_workflow" | grep -c 'verify-pages015-current-lock-qualification.mjs' || true)"
+          test "$rollback_current_lock_calls" -ge 2
+          pre_upload_gate_line="$(printf '%s\n' "$rollback_workflow" | grep -n 'Require current PAGES-015 compatibility before public rollback upload' | cut -d: -f1)"
+          upload_line="$(printf '%s\n' "$rollback_workflow" | grep -n 'uses: actions/upload-pages-artifact@v4' | cut -d: -f1)"
+          final_gate_line="$(printf '%s\n' "$rollback_workflow" | grep -n 'Fail closed if the compatibility window changed before deploy' | cut -d: -f1)"
+          deploy_line="$(printf '%s\n' "$rollback_workflow" | grep -n 'uses: actions/deploy-pages@v4' | cut -d: -f1)"
+          test -n "$pre_upload_gate_line" && test -n "$upload_line" && test -n "$final_gate_line" && test -n "$deploy_line"
+          test "$upload_line" -gt "$pre_upload_gate_line"
+          test "$deploy_line" -gt "$final_gate_line"
+          rollback_deploy_block="$(printf '%s\n' "$rollback_workflow" | sed -n '/^  deploy:/,$p')"
+          printf '%s\n' "$rollback_deploy_block" \
+            | grep -A2 '^[[:space:]]*concurrency:' \
+            | grep -q 'group: yakolak-pages-composite'
+          printf '%s\n' "$rollback_workflow" | grep -q "if: steps.mode.outputs.deploy != 'true'"
+
       - name: Record fresh explicit credential probe receipt
         if: github.event_name != 'schedule'
         shell: bash
