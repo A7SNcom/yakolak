@@ -115,6 +115,14 @@ function homeTransform() {
   };
 }
 
+function openMediumTransform() {
+  return {
+    position: [135, 21, -48],
+    rotationDegrees: [-90, 0, 0],
+    scale: [1, 1, 1],
+  };
+}
+
 function createHarness({ state, size = 'medium', stackTargetId = 'stack:right:0' } = {}) {
   let nowMs = 0;
   const platform = fakePlatform();
@@ -220,12 +228,14 @@ assert.equal(DRAG_RETURN_EASING, 'easeInOutCubic');
 assert.equal(approvedContract.rules.dragHeight, 14);
 assert.equal(approvedContract.motion.invalidReturnMs, 300);
 
-// Direct drag follows the pointer at boardY + 14 without creating a tween and exposes
-// at most one validated THREEJS-034 destination while camera gestures are disabled.
+// Direct drag may begin from THREEJS-032's opened-stack transform, follows the pointer
+// at boardY + 14 without a tween, and exposes at most one validated 034 destination.
 const mainBoard = emptyBoard();
 mainBoard['4'].medium = 'blue';
 const state30 = canonical({ board: mainBoard });
 const main = createHarness({ state: state30 });
+main.transforms.set(main.pieceId, openMediumTransform());
+assert.deepEqual(main.canonicalTransforms.get(main.pieceId), homeTransform());
 assert.deepEqual(main.drag.snapshot(), { phase: DRAG_PHASES.IDLE });
 const begun = main.drag.begin({
   state: state30,
@@ -272,8 +282,8 @@ assert.equal(illegalOverlap.diagnostic.ruleCode, 'occupied_slot');
 assert.equal(illegalOverlap.diagnostic.candidateCell, 4);
 assert.deepEqual(main.transforms.get(main.pieceId).position, [24, 16, 0]);
 
-// Valid release recomputes the release candidate, submits exactly once through the
-// generic authority adapter, becomes pending immediately and allocates NO travel tween.
+// Valid release recomputes the candidate, submits exactly once, becomes pending and
+// allocates NO accepted-travel tween in 035.
 const pendingRelease = main.drag.release({
   state: state30,
   selection: main.selection,
@@ -292,19 +302,24 @@ assert.equal(main.drag.snapshot().phase, DRAG_PHASES.PENDING);
 assert.deepEqual(main.cameraLog, [false, true]);
 assert.equal(main.registry.snapshot().animationHandles, 0, 'accepted travel belongs to THREEJS-042, not 035');
 
-// Pending cannot be locally undone or duplicated. Releasing/cancelling again returns
-// the same pending request and never calls authority a second time.
+// Pending cannot be locally undone, duplicated, or mislabeled as accepted on the same
+// authority witness. A trusted rejected-resync/reconnect may reconcile the same revision.
 assert.equal(main.drag.cancel({ state: state30 }), false);
 assert.equal(main.drag.pointerCancel({ clearState: state30 }), false);
 const repeatedRelease = main.drag.release({ state: state30 });
 assert.equal(repeatedRelease.status, 'pending');
 assert.equal(repeatedRelease.submission, pendingRelease.submission);
 assert.equal(main.submitLog.length, 1);
+assert.throws(() => main.drag.reconcileCanonical({
+  state: state30,
+  clearReason: 'accepted-resync',
+  reason: 'fake-local-accept',
+}), /pending_drag_requires_authority_resolution/);
+assert.equal(main.drag.snapshot().phase, DRAG_PHASES.PENDING);
 assert.deepEqual(main.transforms.get(main.pieceId).position, [48, 16, 0]);
 
-// Hydration/revision update owns pending resolution. It drops local drag presentation
-// immediately and snaps from the latest canonical snapshot; a late submit resolution
-// has no local presentation callback to replay.
+// A real newer authoritative snapshot owns accepted resolution. It drops local drag
+// presentation immediately; late submit resolution has no callback that can replay it.
 const acceptedBoard = emptyBoard();
 acceptedBoard['4'].medium = 'blue';
 acceptedBoard['5'].medium = 'marble';
@@ -328,8 +343,32 @@ await pendingRelease.submission;
 assert.deepEqual(main.transforms.get(main.pieceId).position, [48, 2, 0]);
 main.dispose();
 
-// Invalid/outside-radius release never submits. It requests the canonical return only
-// through THREEJS-096 using the approved 300ms duration and keeps size selection for correction.
+// Rejected authority may return the same revision. That is authoritative—not a local
+// cancel—so rejected-resync is allowed to drop pending and snap canonical.
+const rejected = createHarness({ state: state30 });
+rejected.drag.begin({ state: state30, selection: rejected.selection, pointerId: 70, pointerType: 'touch' });
+const rejectedRelease = rejected.drag.release({
+  state: state30,
+  selection: rejected.selection,
+  pointerId: 70,
+  pointerType: 'touch',
+  ray: rayAt(48, 0),
+});
+assert.equal(rejectedRelease.status, 'pending');
+assert.equal(rejected.drag.reconcileCanonical({
+  state: state30,
+  clearReason: 'rejected-resync',
+  reason: 'authority-rejected',
+}), true);
+assert.equal(rejected.drag.snapshot().phase, DRAG_PHASES.IDLE);
+assert.deepEqual(rejected.transforms.get(rejected.pieceId), homeTransform());
+assert.equal(rejected.selectionController.snapshot().clearReason, 'rejected-resync');
+rejected.pending.resolve({ accepted: false, snapshot: state30 });
+await rejectedRelease.submission;
+rejected.dispose();
+
+// Invalid/outside-radius release never submits. It requests canonical return only
+// through THREEJS-096 using approved 300ms and keeps selection for correction.
 const invalid = createHarness({ state: state30 });
 invalid.drag.begin({ state: state30, selection: invalid.selection, pointerId: 8, pointerType: 'mouse' });
 invalid.drag.update({
@@ -377,8 +416,8 @@ for (const id of cancelled.platform.pendingIds()) cancelled.platform.fire(id);
 assert.deepEqual(cancelled.transforms.get(cancelled.pieceId), homeTransform());
 cancelled.dispose();
 
-// Browser pointercancel is different from a deliberate invalid drop: local drag is
-// dropped immediately and rebuilt/snatched from canonical state, with no return tween.
+// Browser pointercancel drops local drag immediately and rebuilds from canonical with
+// no return tween.
 const pointerCancelled = createHarness({ state: state30 });
 pointerCancelled.drag.begin({ state: state30, selection: pointerCancelled.selection, pointerId: 10, pointerType: 'touch' });
 pointerCancelled.drag.update({ state: state30, selection: pointerCancelled.selection, pointerId: 10, pointerType: 'touch', ray: rayAt(48, 0) });
@@ -430,14 +469,15 @@ assert.throws(() => usedHarness.drag.begin({
 assert.deepEqual(usedHarness.cameraLog, []);
 usedHarness.dispose();
 
-// Source ownership: direct pointer follow is immediate; only the canonical-return path
-// calls THREEJS-096. No local RAF/timer/tween loop or accepted-travel animation exists.
+// Source ownership: direct pointer follow is immediate; only canonical return calls
+// THREEJS-096. No local RAF/timer/tween loop or accepted-travel animation exists.
 const source = readFileSync(path.join(root, 'web/app/gameplay/drag-interaction.js'), 'utf8');
 assert.doesNotMatch(source, /requestAnimationFrame|cancelAnimationFrame|setTimeout|setInterval/);
 assert.match(source, /motion\.animate\s*\(/);
 assert.match(source, /owner:\s*'THREEJS-042'/);
 assert.match(source, /directPointerFollow:\s*true/);
 assert.match(source, /drag_submission_pending/);
+assert.match(source, /pending_drag_requires_authority_resolution/);
 assert.match(source, /reconcileCanonical/);
 assert.equal((source.match(/motion\.animate\s*\(/g) || []).length, 1, '035 only animates canonical return; accepted travel is not animated here');
 
