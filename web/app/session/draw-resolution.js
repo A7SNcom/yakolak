@@ -60,10 +60,10 @@ export function commitAuthoritativeDraw(state, {
   assertCanonicalSessionState(state);
   const revision = requireRevision(expectedRevision);
   if (revision !== state.revision) fail('stale_draw_revision');
-  if (state.lifecycle.phase !== SESSION_LIFECYCLE_PHASES.TURN_LOOP) fail('draw_requires_turn_loop');
-  if (state.lifecycle.interrupt !== null) fail('draw_requires_uninterrupted_transition');
   if (state.draw || state.winner !== null || state.roundEndRevision !== null) fail('round_already_ended');
   if (state.matchComplete) fail('match_already_complete');
+  if (state.lifecycle.phase !== SESSION_LIFECYCLE_PHASES.TURN_LOOP) fail('draw_requires_turn_loop');
+  if (state.lifecycle.interrupt !== null) fail('draw_requires_uninterrupted_transition');
 
   const proof = proveCanonicalDraw(state);
   if (proof.hasWinningPattern) fail('draw_superseded_by_win');
