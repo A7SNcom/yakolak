@@ -2,11 +2,11 @@
 
 Status: **LOCKED by THREEJS-096 (2026-08-19)**
 
-THREEJS-096 is the single scheduling/ownership boundary for setup, stack, piece, travel, reveal, unboxing, win and reset motion. Camera motion may supply its own sequence data, but it must not introduce a second tween ownership model. Gameplay authority never waits for presentation motion.
+THREEJS-096 is the single scheduling/ownership boundary for **setup, camera transition, stack, piece, travel, reveal, unboxing, win and reset motion**. Camera tasks may define camera sequence data, but interpolation/cancellation belongs here. The existing camera frame governor remains render-loop governance only and is not a second tween scheduler. Gameplay authority never waits for presentation motion.
 
 ## Required consumers
 
-THREEJS-032/042/084/091/095 and later presentation tasks may define transforms, timings and sequences, but they must submit motion through this controller. They may not create independent RAF/tween schedulers, completion queues or stale-callback mechanisms.
+THREEJS-032/042/084/091/095 and later presentation/camera tasks may define transforms, timings and sequences, but they must submit motion through this controller. They may not create independent RAF/tween schedulers, completion queues or stale-callback mechanisms.
 
 The controller itself never calls raw `requestAnimationFrame`, `cancelAnimationFrame`, `setTimeout` or `setInterval`; every frame handle belongs to the THREEJS-027 resource registry.
 
@@ -27,7 +27,7 @@ Any generation/revision change cancels all active entries before stale callbacks
 
 Each motion also carries `scope + key`. This is the active channel identity. Starting newer motion for the same channel supersedes the older motion before the newer one progresses.
 
-Different channels may run concurrently.
+Different channels—including camera and object channels—may run concurrently.
 
 ## Canonical snap contract
 
@@ -45,7 +45,7 @@ The canonical snap callback is intentionally consumer-provided because only the 
 
 ## Numeric state
 
-The controller is Three.js-independent. `from` and `to` are matching finite numeric trees made only from numbers, arrays and plain objects. One tween may therefore carry position/rotation-like numeric arrays, scale and opacity atomically.
+The controller is Three.js-independent. `from` and `to` are matching finite numeric trees made only from numbers, arrays and plain objects. One tween may therefore carry camera position/target fields, object transforms, scale and opacity atomically.
 
 Built-in easing names are `linear`, `easeOutCubic` and `easeInOutCubic`.
 
