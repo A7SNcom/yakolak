@@ -22,6 +22,8 @@ on:
       - 'tests/pages015_release_verifier_window_contract.test.mjs'
       - 'tests/pages015_single_resume_path_contract.test.mjs'
       - 'tests/pages015-browser-cors.spec.js'
+      - 'PAGES_RELEASE_ARCHIVES.md'
+      - 'RELEASE_QUALIFICATION/README.md'
       - '.github/workflows/pages-005-cloudflare-backend.yml'
       - '.github/workflows/pages-012-immutable-release.yml'
       - '.github/workflows/pages-012-rollback.yml'
