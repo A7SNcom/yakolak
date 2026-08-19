@@ -109,7 +109,12 @@ export function createContextRecoveryController({
     if (typeof subscriber !== 'function') throw new TypeError('Context-state subscriber must be a function');
     if (disposed) throw new Error('Context recovery controller is disposed');
     subscribers.add(subscriber);
-    subscriber(snapshot());
+    try {
+      subscriber(snapshot());
+    } catch (error) {
+      subscribers.delete(subscriber);
+      throw error;
+    }
 
     const token = lifecycle.registerCleanup(() => subscribers.delete(subscriber), {
       kind: 'subscription',
