@@ -95,6 +95,21 @@ jobs:
               | grep -q 'group: pages-release-qualification-ledger'
           done
 
+          main_qualifier="$(git show origin/main:.github/workflows/pages-015-qualify-online-window.yml)"
+          printf '%s\n' "$main_qualifier" | grep -q '.protocolIdentity == "yakolak-online-room@1"'
+          printf '%s\n' "$main_qualifier" | grep -q '.capabilityIdentity == "yakolak-online-room-capabilities-v1"'
+          printf '%s\n' "$main_qualifier" | grep -q '.tursoSchemaId == "yakolak-pages005-room-probe"'
+          printf '%s\n' "$main_qualifier" | grep -q '.tursoSchemaVersion == 1'
+          printf '%s\n' "$main_qualifier" | grep -q 'finalEvidenceSha256'
+          current_lock_calls="$(printf '%s\n' "$main_qualifier" | grep -c 'node scripts/verify-pages015-current-lock-qualification.mjs' || true)"
+          test "$current_lock_calls" -ge 2
+          append_line="$(printf '%s\n' "$main_qualifier" | grep -n 'node scripts/append-pages015-qualification.mjs' | tail -1 | cut -d: -f1)"
+          last_current_lock_line="$(printf '%s\n' "$main_qualifier" | grep -n 'node scripts/verify-pages015-current-lock-qualification.mjs' | tail -1 | cut -d: -f1)"
+          commit_line="$(printf '%s\n' "$main_qualifier" | grep -n "git commit -m 'PAGES-015 qualify active+previous frontend/Worker window'" | tail -1 | cut -d: -f1)"
+          test -n "$append_line" && test -n "$last_current_lock_line" && test -n "$commit_line"
+          test "$last_current_lock_line" -gt "$append_line"
+          test "$commit_line" -gt "$last_current_lock_line"
+
       - name: Record fresh explicit credential probe receipt
         if: github.event_name != 'schedule'
         shell: bash
