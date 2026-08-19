@@ -224,6 +224,13 @@ assert.throws(() => createGameplayIntent({
   payload: { cell: 1, size: 'small', pointerX: 99 },
   source: GAMEPLAY_PRESENTATION_SOURCES.DRAG_RELEASE,
 }), /invalid_move_intent_payload/, 'device coordinates must not leak into rule payload');
+assert.throws(() => createGameplayIntent({
+  kind: GAMEPLAY_INTENT_KINDS.MOVE,
+  seat: 'p1',
+  revision: 1,
+  payload: { cell: 1, size: new Date('2026-08-19T00:00:00.000Z') },
+  source: GAMEPLAY_PRESENTATION_SOURCES.CLICK,
+}), /invalid_move_intent_size/, 'semantic values must be validated before JSON cloning can coerce them');
 
 const polluted = JSON.parse(serializeGameplayIntent(createLocalMove(GAMEPLAY_PRESENTATION_SOURCES.CLICK)));
 polluted.presentation.pointerType = 'mouse';
