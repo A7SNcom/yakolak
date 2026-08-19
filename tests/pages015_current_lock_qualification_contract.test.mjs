@@ -13,8 +13,17 @@ const finalizerSource = fs.readFileSync(
   new URL('../scripts/pages015-finalize-live-window.sh', import.meta.url),
   'utf8',
 );
+const frontendVerifierSource = fs.readFileSync(
+  new URL('../scripts/verify-pages015-frontend-window.mjs', import.meta.url),
+  'utf8',
+);
+const appendSource = fs.readFileSync(
+  new URL('../scripts/append-pages015-qualification.mjs', import.meta.url),
+  'utf8',
+);
 
 const hex = (ch) => ch.repeat(64);
+const workerLockEvidenceSha256 = hex('7');
 const active = {
   role: 'active',
   releaseTag: 'pages-active',
@@ -55,7 +64,7 @@ function workerLock() {
     versionOverrideProof: true,
     browserCorsVerified: true,
     liveTursoRoundTripVerified: true,
-    finalEvidenceSha256: hex('7'),
+    finalEvidenceSha256: workerLockEvidenceSha256,
     migrationPolicy: 'expand-contract-forward-only',
     tursoDataRollbackRequired: false,
   };
@@ -91,6 +100,7 @@ function backendRow(frontend) {
     workerDeployment: 'cloudflare:worker-active',
     workerVersionId: 'worker-active',
     previousWorkerVersionId: 'worker-previous',
+    workerLockEvidenceSha256,
     protocolIdentity: 'yakolak-online-room@1',
     protocolVersion: '1',
     capabilityIdentity: 'yakolak-online-room-capabilities-v1',
@@ -167,6 +177,16 @@ test('current-lock verifier rejects stale qualification after the Worker lock ve
   assert.match(result.stderr, /not qualified for the current Worker rollback lock/);
 });
 
+test('current-lock verifier rejects the same tuple when the PAGES-005 lock evidence digest changes', () => {
+  const result = fixture({
+    mutateLock: (lock) => {
+      lock.finalEvidenceSha256 = hex('6');
+    },
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /not qualified for the current Worker rollback lock/);
+});
+
 test('current-lock verifier rejects active and previous rows from different live evidence', () => {
   const result = fixture({
     mutateRows: (rows) => {
@@ -175,6 +195,16 @@ test('current-lock verifier rejects active and previous rows from different live
   });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /not qualified for the current Worker rollback lock/);
+});
+
+test('frontend verification carries the exact PAGES-005 evidence digest into append-only qualification rows', () => {
+  assert.match(
+    frontendVerifierSource,
+    /evidence\.workerLockEvidenceSha256 = workerLock\.finalEvidenceSha256/,
+  );
+  assert.match(appendSource, /evidence\?\.workerLockIdentityVerified !== true/);
+  assert.match(appendSource, /workerLockEvidenceSha256 = evidence\.workerLockEvidenceSha256/);
+  assert.match(appendSource, /workerLockEvidenceSha256,/);
 });
 
 test('finalizer cannot early-exit on historical qualification before validating the current Worker lock', () => {
