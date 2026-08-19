@@ -19,8 +19,8 @@ export const CANONICAL_SESSION_STATE_SCHEMA = 'yakolak.session-state/v1';
 const TOP_LEVEL_KEYS = [
   'schema', 'lobbyGeneration', 'preferredColor', 'targetPlayers', 'winsToMatch', 'seats', 'board',
   'inventory', 'activeSeatId', 'deadlineAtMs', 'scores', 'round', 'completedRounds',
-  'lastMove', 'skippedSeat', 'skipReason', 'winner', 'draw', 'matchComplete',
-  'matchWinner', 'matchWinners', 'restart', 'rematch', 'revision', 'lifecycle',
+  'lastMove', 'skips', 'winner', 'draw', 'matchComplete', 'matchWinner', 'matchWinners',
+  'restart', 'rematch', 'revision', 'lifecycle',
 ];
 
 function fail(code) {
@@ -104,7 +104,7 @@ function validateSeats(seats) {
     requireOpaqueString(seat.seatId, 'invalid_session_seat_id');
     const slot = canonicalConfiguredSlot(seat.seatId);
     // THREEJS-062 owns the eventual authoritative seat-type vocabulary. THREEJS-048
-    // now owns stable seat IDs/color/spatial order only.
+    // owns stable seat IDs, color binding and configured order only.
     requireOpaqueString(seat.type, 'invalid_session_seat_type');
     if (!COLORS.includes(seat.color)) fail('invalid_session_seat_color');
     if (seat.color !== slot.color) fail('invalid_session_seat_color_binding');
@@ -181,6 +181,20 @@ function validateLastMove(value, seatById) {
   if (value.cell >= RULES.cellCount || !SIZES.includes(value.size)) fail('invalid_session_last_move_slot');
 }
 
+function validateSkips(value, seatIds) {
+  if (!Array.isArray(value)) fail('invalid_session_skips');
+  const seen = new Set();
+  for (const skip of value) {
+    requireRecord(skip, 'invalid_session_skip');
+    requireExactKeys(skip, ['seatId', 'reason'], 'invalid_session_skip_shape');
+    const seatId = requireOpaqueString(skip.seatId, 'invalid_session_skipped_seat');
+    if (!seatIds.has(seatId)) fail('invalid_session_skipped_seat');
+    if (seen.has(seatId)) fail('duplicate_session_skipped_seat');
+    seen.add(seatId);
+    requireOpaqueString(skip.reason, 'invalid_session_skip_reason');
+  }
+}
+
 function validateWinner(value, seatById, code) {
   if (value === null) return;
   requireRecord(value, code);
@@ -234,14 +248,7 @@ export function assertCanonicalSessionState(state) {
 
   const seatById = new Map(state.seats.map(seat => [seat.seatId, seat]));
   validateLastMove(state.lastMove, seatById);
-
-  if (state.skippedSeat === null || state.skipReason === null) {
-    if (state.skippedSeat !== null || state.skipReason !== null) fail('invalid_session_skip');
-  } else {
-    const skipped = requireOpaqueString(state.skippedSeat, 'invalid_session_skipped_seat');
-    if (!seatIds.has(skipped)) fail('invalid_session_skipped_seat');
-    requireOpaqueString(state.skipReason, 'invalid_session_skip_reason');
-  }
+  validateSkips(state.skips, seatIds);
 
   validateWinner(state.winner, seatById, 'invalid_session_winner');
   if (typeof state.draw !== 'boolean') fail('invalid_session_draw');
@@ -274,8 +281,7 @@ export function createCanonicalSessionState({
   round = 0,
   completedRounds = 0,
   lastMove = null,
-  skippedSeat = null,
-  skipReason = null,
+  skips = [],
   winner = null,
   draw = false,
   matchComplete = false,
@@ -307,8 +313,7 @@ export function createCanonicalSessionState({
     round,
     completedRounds,
     lastMove,
-    skippedSeat,
-    skipReason,
+    skips,
     winner,
     draw,
     matchComplete,
