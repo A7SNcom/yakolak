@@ -1,4 +1,4 @@
-// THREEJS-044: pure gameplay/session transitions shared by local authority and
+// THREEJS-044/047: pure gameplay/session transitions shared by local authority and
 // the future online authority. This module intentionally does not decide stable
 // seat topology, timeout authority, bot authority, readiness, restart policy,
 // or rematch consensus; those contracts are owned by later explicit tasks.
@@ -7,7 +7,7 @@ import {
   emptyBoard,
   hasLegalMove,
   placePiece,
-  winner,
+  winningOutcomeAfterAcceptedPlacement,
 } from './rules.js';
 
 export function nextPlayablePlayerIndex(state, fromIndex, allowedSeats = null) {
@@ -55,10 +55,13 @@ export function applyMoveTransition(state, seat, move) {
   const current = state.players[state.turnIndex];
   if (!current || current.seat !== seat) throw new Error('not_your_turn');
 
+  // Placement legality commits first. Only the successfully committed normalized
+  // placement may trigger win evaluation; rejected placements never reach it.
   const board = placePiece(state.board, current.color, move);
   const cell = Number(move.cell);
   const size = String(move.size);
   const lastMove = { cell, size, color: current.color, seat };
+  const winOutcome = winningOutcomeAfterAcceptedPlacement(board, current.color, { cell, size });
   const next = {
     ...state,
     board,
@@ -69,7 +72,9 @@ export function applyMoveTransition(state, seat, move) {
     skippedSeat: null,
   };
 
-  if (winner(board, current.color)) return finishRoundTransition(next, { color: current.color, seat, lastMove });
+  // Any number of patterns from this single accepted placement resolves through
+  // one finishRoundTransition call, so the round score increases exactly once.
+  if (winOutcome.won) return finishRoundTransition(next, { color: current.color, seat, lastMove });
   const turnIndex = nextPlayablePlayerIndex(next, state.turnIndex);
   if (turnIndex < 0) return finishRoundTransition(next, { draw: true, lastMove });
   return { ...next, turnIndex };
