@@ -23,11 +23,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
-      - name: Checkout exact candidate SHA
+      - name: Checkout measurement tooling
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 1
+          fetch-depth: 2
 
       - name: Mark measurement relay start
         continue-on-error: true
@@ -36,16 +36,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh api "repos/${GITHUB_REPOSITORY}/issues/69/comments" \
-            -f body="THREEJS-026 measurement started for exact candidate ${GITHUB_SHA}." >/dev/null
+            -f body="THREEJS-026 measurement resolver started from tooling commit ${GITHUB_SHA}." >/dev/null
 
-      - name: Wait for this exact candidate to become the live Pages generation
+      - name: Resolve one exact live Pages candidate and generation
         id: live
         shell: bash
         env:
-          EXPECTED_SHA: ${{ github.sha }}
+          PUSH_SHA: ${{ github.sha }}
           MANIFEST_URL: https://a7sncom.github.io/yakolak/deployment-manifest.json
         run: |
           set -euo pipefail
+          web_changed=false
+          if git rev-parse HEAD^ >/dev/null 2>&1 && git diff --name-only HEAD^ HEAD -- web/ | grep -q .; then
+            web_changed=true
+          fi
+
           rm -f /tmp/deployment-manifest.json
           for attempt in $(seq 1 120); do
             nonce="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${attempt}-$(date +%s)"
@@ -55,7 +60,7 @@ jobs:
               "${MANIFEST_URL}?threejs026=${nonce}" \
               -o /tmp/deployment-manifest.next.json; then
               live_sha="$(jq -r '.threejsCandidateSha // empty' /tmp/deployment-manifest.next.json)"
-              if [ "${live_sha}" = "${EXPECTED_SHA}" ]; then
+              if [ -n "${live_sha}" ] && { [ "${web_changed}" = false ] || [ "${live_sha}" = "${PUSH_SHA}" ]; }; then
                 mv /tmp/deployment-manifest.next.json /tmp/deployment-manifest.json
                 break
               fi
@@ -64,13 +69,24 @@ jobs:
           done
 
           if [ ! -s /tmp/deployment-manifest.json ]; then
-            echo "Exact candidate ${EXPECTED_SHA} never became the live Pages generation." >&2
+            if [ "${web_changed}" = true ]; then
+              echo "Web-changing candidate ${PUSH_SHA} never became the live Pages generation." >&2
+            else
+              echo 'Unable to resolve a current live Pages generation.' >&2
+            fi
             exit 1
           fi
 
+          candidate_sha="$(jq -r '.threejsCandidateSha' /tmp/deployment-manifest.json)"
           generation="$(jq -r '.deploymentGeneration' /tmp/deployment-manifest.json)"
           root_sha="$(jq -r '.godotRootSha' /tmp/deployment-manifest.json)"
           runtime_sha="$(jq -r '.publicRuntimeProtocol.sha256' /tmp/deployment-manifest.json)"
+
+          git fetch --quiet --depth=1 origin "${candidate_sha}"
+          git checkout "${candidate_sha}" -- web YAKOLAK_PORTABLE_KIT/assets
+
+          echo "web_changed=${web_changed}" >> "$GITHUB_OUTPUT"
+          echo "candidate_sha=${candidate_sha}" >> "$GITHUB_OUTPUT"
           echo "generation=${generation}" >> "$GITHUB_OUTPUT"
           echo "root_sha=${root_sha}" >> "$GITHUB_OUTPUT"
           echo "runtime_sha=${runtime_sha}" >> "$GITHUB_OUTPUT"
@@ -91,7 +107,7 @@ jobs:
         shell: bash
         env:
           SHELL_URL: https://a7sncom.github.io/yakolak/threejs/
-          EXPECTED_THREEJS_SHA: ${{ github.sha }}
+          EXPECTED_THREEJS_SHA: ${{ steps.live.outputs.candidate_sha }}
         run: |
           set +e
           node scripts/measure-threejs-performance.mjs 2>&1 | tee /tmp/threejs026-performance.log
@@ -113,7 +129,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          CANDIDATE_SHA: ${{ github.sha }}
+          TOOLING_SHA: ${{ github.sha }}
+          CANDIDATE_SHA: ${{ steps.live.outputs.candidate_sha }}
           DEPLOYMENT_GENERATION: ${{ steps.live.outputs.generation }}
           ROOT_SHA: ${{ steps.live.outputs.root_sha }}
           RUNTIME_SHA: ${{ steps.live.outputs.runtime_sha }}
@@ -140,6 +157,7 @@ jobs:
             body=$(cat <<EOF
 THREEJS-026 exact Pages measurement
 
+tooling: ${TOOLING_SHA}
 candidate: ${CANDIDATE_SHA}
 generation: ${DEPLOYMENT_GENERATION}
 godotRootSha: ${ROOT_SHA}
@@ -157,6 +175,7 @@ EOF
             body=$(cat <<EOF
 THREEJS-026 measurement failed before JSON evidence.
 
+tooling: ${TOOLING_SHA}
 candidate: ${CANDIDATE_SHA}
 generation: ${DEPLOYMENT_GENERATION}
 
@@ -172,7 +191,8 @@ EOF
         if: always() && steps.live.outcome == 'success' && steps.perf.outcome == 'success'
         shell: bash
         env:
-          CANDIDATE_SHA: ${{ github.sha }}
+          TOOLING_SHA: ${{ github.sha }}
+          CANDIDATE_SHA: ${{ steps.live.outputs.candidate_sha }}
           DEPLOYMENT_GENERATION: ${{ steps.live.outputs.generation }}
           ROOT_SHA: ${{ steps.live.outputs.root_sha }}
           RUNTIME_SHA: ${{ steps.live.outputs.runtime_sha }}
@@ -180,16 +200,18 @@ EOF
         run: |
           set -euo pipefail
           test -s /tmp/threejs026-metrics.json
+          git restore --source=HEAD --staged --worktree web YAKOLAK_PORTABLE_KIT/assets
           mkdir -p THREEJS026_MEASUREMENTS
           evidence_path="THREEJS026_MEASUREMENTS/${CANDIDATE_SHA}.json"
           jq -n \
+            --arg tooling "${TOOLING_SHA}" \
             --arg candidate "${CANDIDATE_SHA}" \
             --arg generation "${DEPLOYMENT_GENERATION}" \
             --arg root "${ROOT_SHA}" \
             --arg runtime "${RUNTIME_SHA}" \
             --argjson measurementExit "${MEASUREMENT_STATUS:-1}" \
             --slurpfile metrics /tmp/threejs026-metrics.json \
-            '{schema:"THREEJS-026-PAGES-EVIDENCE-V1", candidateSha:$candidate, deploymentGeneration:$generation, godotRootSha:$root, runtimeProtocolSha256:$runtime, measurementExit:$measurementExit, metrics:$metrics[0]}' \
+            '{schema:"THREEJS-026-PAGES-EVIDENCE-V1", toolingSha:$tooling, candidateSha:$candidate, deploymentGeneration:$generation, godotRootSha:$root, runtimeProtocolSha256:$runtime, measurementExit:$measurementExit, metrics:$metrics[0]}' \
             > "${evidence_path}"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
