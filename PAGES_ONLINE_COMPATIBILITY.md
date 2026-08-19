@@ -121,9 +121,9 @@ PAGES-005 has one centralized implementation: `scripts/pages005-bootstrap-live.s
 
 ## One direct automatic-resume path
 
-The authoritative automatic-resume path is `.github/workflows/pages-015-qualification-orchestrator.yml` on `main`, invoking `scripts/pages015-orchestrate-qualification.sh`. It runs from the explicit credential trigger, manual dispatch, or one low-frequency daily schedule. It does **not** depend on nested workflow dispatch.
+The authoritative automatic-resume path is `.github/workflows/pages-015-qualification-orchestrator.yml` on `main`, invoking `scripts/pages015-orchestrate-qualification.sh`. It resumes automatically after a successful `PAGES-014 Post-Deploy Qualification` through `workflow_run`, and may also run from the explicit main credential trigger, manual dispatch, or the low-frequency daily schedule. It does **not** depend on nested workflow dispatch.
 
-Each run checks the five required credentials without storing values. Semantic changes are recorded in `RELEASE_QUALIFICATION/PAGES015_ORCHESTRATOR_STATUS.json`; explicit push/manual runs also write `RELEASE_QUALIFICATION/PAGES015_ORCHESTRATOR_RUN.json` so a fresh Run ID and credential-presence receipt exists even when the semantic state is unchanged. Both files are `qualificationEvidence=false` and never store secret values.
+Each run checks the five required credentials without storing values. Semantic changes are recorded in `RELEASE_QUALIFICATION/PAGES015_ORCHESTRATOR_STATUS.json`; every non-scheduled run also writes `RELEASE_QUALIFICATION/PAGES015_ORCHESTRATOR_RUN.json` so a fresh Run ID and credential-presence receipt exists even when the semantic state is unchanged. Both files are `qualificationEvidence=false` and never store secret values.
 
 When `PAGES_RELEASE_ADMIN_TOKEN` is present, the workflow runs the release-admin capability preflight and only then installs the exact-source recovery bridge before archive work. When the Admin credential is absent, both steps are skipped; Cloudflare/Turso readiness and all non-archive status checks continue independently. If credentials permit, the run proceeds directly and serially:
 
@@ -138,19 +138,15 @@ The earlier nested credential-probe/supervisor experiments were retired after Gi
 
 ## Verified current blocker evidence
 
-Fresh explicit orchestrator run `32175709664` completed successfully at `2026-08-18T19:16:58Z`. Its non-secret receipt proves the current credential state without relying on an older unchanged semantic-status timestamp:
+Current blocker claims must come from the canonical non-secret receipts, not from a hard-coded historical Run ID in this document:
 
-- `PAGES_RELEASE_ADMIN_TOKEN`: absent
-- `CLOUDFLARE_API_TOKEN`: absent
-- `CLOUDFLARE_ACCOUNT_ID`: absent
-- `TURSO_DATABASE_URL`: absent
-- `TURSO_AUTH_TOKEN`: absent
-- backend credentials ready: false
-- Worker lock files present: false
+- `RELEASE_QUALIFICATION/PAGES015_ORCHESTRATOR_RUN.json` records the freshest non-scheduled credential probe, trigger identity and whether Worker lock files were present.
+- `RELEASE_QUALIFICATION/PAGES015_ORCHESTRATOR_STATUS.json` records the semantic readiness phase, credential-presence booleans, active/previous archive readiness, Worker-window readiness and complete-qualification state.
+- `RELEASE_QUALIFICATION/ledger.jsonl` is the only source of qualification events; diagnostics and receipts remain `qualificationEvidence=false`.
 
-The same run completed the full orchestrator job successfully. Release-admin preflight and exact-source recovery bridge were both skipped because the Admin credential was absent, while the remaining contract validation and readiness logic succeeded. The additive ledger still contains initialization plus exact `draft_staged` events for both active and previous archives; there are no strong archive, deployment-generation, or backend-compatibility qualification rows.
+Before claiming that PAGES-015 is complete or blocked, read those receipts at the current `threejs-rebuild` head and inspect the referenced Actions run. Missing release-admin authority means immutable publication cannot proceed; missing Cloudflare/Turso credentials means the authenticated Worker bootstrap, browser-CORS proof, live Turso round trip and four frontend×Worker pairings cannot proceed. Neither absence may be converted into guessed qualification evidence.
 
-`backend/cloudflare/API_ORIGIN.txt` and `backend/cloudflare/WORKER_ROLLBACK_WINDOW.json` remain absent. Therefore no authenticated Cloudflare/Turso bootstrap or live four-pair compatibility proof can occur, both mutable release drafts are staged but neither can yet be published/verified immutable without the required release/workflows/Admin authority, and no `backend_compatibility_verified` event may be written.
+`backend/cloudflare/API_ORIGIN.txt` and `backend/cloudflare/WORKER_ROLLBACK_WINDOW.json` are created only after the live backend proof succeeds. Until the current receipts and ledger prove otherwise, no `archive_verified`, strong `deployment_generation_verified`, or `backend_compatibility_verified` row may be assumed.
 
 The four backend credentials must be valid for the selected Cloudflare account and live Turso datastore. Do not weaken the exact source, release-target, immutable-release, browser-CORS, live-Turso or four-pair checks merely to make the task appear complete.
 
