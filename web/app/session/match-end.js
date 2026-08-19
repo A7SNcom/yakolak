@@ -7,6 +7,7 @@ import {
   createGameplayIntent,
 } from '../gameplay/gameplay-intent.js';
 import {
+  RULES,
   deriveRemainingInventory,
   emptyBoard,
 } from '../shared/rules.js';
@@ -72,13 +73,39 @@ function matchEndWitnessKey(kind, state, authoritySeatId) {
   return `${kind}:${state.revision}:${state.roundEndRevision}:${state.lifecycle.presentationGeneration}:${encodeURIComponent(authoritySeatId)}`;
 }
 
+function assertPersistedMatchWinner(state) {
+  if (!RULES.winsToMatchOptions.includes(state.winsToMatch)) fail('match_end_wins_to_match_missing');
+  if (!state.matchComplete || !state.matchWinner || state.winner === null || state.draw) fail('match_end_result_missing');
+  if (state.roundEndRevision === null) fail('match_end_revision_missing');
+
+  const winnerSeat = state.seats.find(seat => seat.seatId === state.winner.seatId);
+  if (!winnerSeat || winnerSeat.color !== state.winner.color) fail('match_end_winner_identity_mismatch');
+  if (state.matchWinner.seatId !== state.winner.seatId || state.matchWinner.color !== state.winner.color) {
+    fail('match_end_match_winner_mismatch');
+  }
+  const winnerScore = state.scores[state.winner.seatId];
+  if (winnerScore < state.winsToMatch || state.matchWinner.wins !== winnerScore) fail('match_end_score_mismatch');
+  if (state.matchWinners.length !== 1) fail('match_end_match_winners_mismatch');
+  const [listed] = state.matchWinners;
+  if (
+    listed.seatId !== state.matchWinner.seatId ||
+    listed.color !== state.matchWinner.color ||
+    listed.wins !== state.matchWinner.wins
+  ) fail('match_end_match_winners_mismatch');
+
+  for (const seat of state.seats) {
+    if (seat.seatId !== state.winner.seatId && state.scores[seat.seatId] >= state.winsToMatch) {
+      fail('match_end_multiple_threshold_seats');
+    }
+  }
+  return state.matchWinner;
+}
+
 function assertMatchEndState(state) {
   if (state.lifecycle.phase !== SESSION_LIFECYCLE_PHASES.MATCH_END) fail('action_requires_match_end');
   if (state.lifecycle.interrupt !== null) fail('match_end_action_requires_uninterrupted_state');
-  if (!state.matchComplete || !state.matchWinner || state.winner === null || state.draw) fail('match_end_result_missing');
-  if (state.roundEndRevision === null) fail('match_end_revision_missing');
   if (state.activeSeatId !== null || state.deadlineAtMs !== null) fail('match_end_has_active_turn');
-  return canonicalWinResult(state);
+  return assertPersistedMatchWinner(state);
 }
 
 function createFreshMatchState(state, lifecycle) {
@@ -166,6 +193,7 @@ export function commitCanonicalMatchEnd(state, {
     { type: 'commit-match-end', expectedRevision: revision },
     canonical => ({ ...canonical, lifecycle: matchEndLifecycle }),
   );
+  assertPersistedMatchWinner(nextState);
 
   return deepFreeze({
     state: nextState,
@@ -216,6 +244,7 @@ function assertRematchRequest(request) {
   if (!ACTION_SOURCES.has(request.intent.presentation.source)) fail('invalid_local_rematch_source');
   requireRevision(request.roundEndRevision, 'invalid_local_rematch_end_revision');
   requireRevision(request.presentationGeneration, 'invalid_local_rematch_generation');
+  if (typeof request.rematchKey !== 'string' || !request.rematchKey) fail('invalid_local_rematch_key');
 }
 
 function rematchMatchesState(state, request) {
