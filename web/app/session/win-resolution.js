@@ -139,14 +139,33 @@ export function canonicalWinResult(state) {
   if (state.draw || state.winner === null) fail('canonical_state_is_not_win');
   if (state.lifecycle.phase !== SESSION_LIFECYCLE_PHASES.WIN) fail('canonical_win_lifecycle_mismatch');
   if (state.roundEndRevision === null) fail('canonical_win_missing_end_revision');
+
   const winsToMatch = requireWinsToMatch(state);
+  const thresholdSeats = state.seats.filter(seat => state.scores[seat.seatId] >= winsToMatch);
   const winnerScore = state.scores[state.winner.seatId];
-  if (state.matchComplete !== (winnerScore >= winsToMatch)) fail('canonical_match_completion_mismatch');
+
   if (state.matchComplete) {
-    if (!state.matchWinner || state.matchWinner.seatId !== state.winner.seatId) fail('canonical_match_winner_mismatch');
-    if (state.matchWinner.wins !== winnerScore) fail('canonical_match_winner_score_mismatch');
-  } else if (state.matchWinner !== null || state.matchWinners.length !== 0) {
-    fail('canonical_unfinished_match_has_winner');
+    if (thresholdSeats.length !== 1 || thresholdSeats[0].seatId !== state.winner.seatId) {
+      fail('canonical_match_threshold_mismatch');
+    }
+    if (!state.matchWinner || state.matchWinner.seatId !== state.winner.seatId) {
+      fail('canonical_match_winner_mismatch');
+    }
+    if (state.matchWinner.color !== state.winner.color || state.matchWinner.wins !== winnerScore) {
+      fail('canonical_match_winner_score_mismatch');
+    }
+    if (state.matchWinners.length !== 1) fail('canonical_match_winners_mismatch');
+    const [listedWinner] = state.matchWinners;
+    if (
+      listedWinner.seatId !== state.matchWinner.seatId ||
+      listedWinner.color !== state.matchWinner.color ||
+      listedWinner.wins !== state.matchWinner.wins
+    ) fail('canonical_match_winners_mismatch');
+  } else {
+    if (thresholdSeats.length !== 0) fail('canonical_unfinished_match_reached_threshold');
+    if (state.matchWinner !== null || state.matchWinners.length !== 0) {
+      fail('canonical_unfinished_match_has_winner');
+    }
   }
 
   return deepFreeze({
