@@ -79,6 +79,7 @@ jobs:
           node scripts/verify-threejs-browser.mjs
           node scripts/verify-threejs-context-recovery.mjs
           node scripts/verify-threejs-table-score-browser.mjs
+          node scripts/verify-threejs-interaction-layer-browser.mjs
           node scripts/verify-threejs-room-browser.mjs
           node scripts/verify-threejs-runtime-data-browser.mjs
           node scripts/verify-threejs-materials-browser.mjs
