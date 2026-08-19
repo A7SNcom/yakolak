@@ -42,8 +42,16 @@ textarea { font: inherit; }
   display: block;
   width: 100%;
   height: 100%;
-  touch-action: none;
+  touch-action: auto;
   outline: none;
+}
+
+/* THREEJS-030: browser scroll/zoom gestures are suppressed only while gameplay
+   explicitly owns canvas gestures. Normal canvas/browser accessibility behavior is
+   preserved before/after that ownership window and controls outside the canvas are
+   never covered by this rule. */
+.scene[data-gesture-owner="gameplay"] {
+  touch-action: none;
 }
 
 .overlay {
