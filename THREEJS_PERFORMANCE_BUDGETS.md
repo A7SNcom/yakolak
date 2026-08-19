@@ -127,3 +127,56 @@ The timing targets intentionally use the same slow mobile profile. They are not 
 - This documentation amendment changes no runtime asset, module, renderer or budget value; it changes only deployment/verification ownership semantics.
 
 See `PAGES_MIGRATION_CONTRACT.md` for deployment precedence.
+
+## CURRENT_POST_GLB_BASELINE — THREEJS-026 — 2026-08-19
+
+This is the authoritative cold comparator for THREEJS-026 contact-depth/shadow work. It rebases performance evidence onto the **current six-GLB startup request graph**; the THREEJS-017 STL numbers above remain historical evidence and must not be used as though the startup payload/decode graph were unchanged.
+
+The measurement used the fixed representative mobile cold profile above, Playwright `1.55.0` / Chromium `140.0.7339.16` (build `1187`), browser cache disabled, and exact live GitHub Pages identity:
+
+- Three.js candidate: `71f8398e735f6d2f3a40f70b28773ff19ca6d570`
+- deployment generation: `sha256:da19ae11e3df476c66e2ae7d23a74ecc78740acfef969c601021dea51ce8eada`
+- Godot root: `f6e94859095cec0a80e71321265e98a9ea68b347`
+- public runtime/protocol hash: `9e2da127e26b3bb337633ad7d6901bd74304c4d4f49086f07d34508e8d9fd84b`
+- Pages content identity: `c5a0a3ccef1639023fdf08fef6ef7a1d68cb8b5076085a8cec5e26da434747fe`
+- GitHub Actions measurement run: `32231586141`
+
+| Metric | CURRENT_POST_GLB_BASELINE |
+| --- | ---: |
+| Required manifest body | 4,607,929 B |
+| Startup encoded transfer through first interactive | **1,565,701 B** |
+| Required decoded GLB geometry | **4,542,792 B** |
+| Critical-assets-ready | **9,451.2 ms** |
+| First interactive | **9,500.9 ms** |
+| First visible frame | **9,613.4 ms** |
+| Startup hitch (`firstVisibleFrame - firstInteractive`) | **112.5 ms** |
+| Draw calls | **2** |
+| Triangles | **8,192** |
+| GPU geometries | **2** |
+| GPU textures | **1** |
+| GPU programs | **1** |
+
+The six required GLBs decoded to: board/lid `2,573,088 B`, player base `1,933,632 B`, small piece `5,016 B`, medium piece `10,080 B`, large piece `10,080 B`, score marker `10,896 B`.
+
+### Dispose/recreate resource proof
+
+The same measurement directly disposed the ready shell, then recreated it through a second cache-disabled cold reload while pinning the same Pages candidate identity.
+
+| Resource count | Before dispose | After dispose | After recreate |
+| --- | ---: | ---: | ---: |
+| Registry total | 86 | **0** | 86 |
+| Registry GPU objects | 57 | **0** | 57 |
+| Registry geometries | 47 | **0** | 47 |
+| Registry materials | 9 | **0** | 9 |
+| Registry textures | 0 | **0** | 0 |
+| Registry render targets | 0 | **0** | 0 |
+| Registry shadow maps | 0 | **0** | 0 |
+| Shader variants | 0 | **0** | 0 |
+| Material variants | 0 | **0** | 0 |
+| Renderer GPU geometries | 2 | n/a | 2 |
+| Renderer GPU textures | 1 | n/a | 1 |
+| Renderer GPU programs | 1 | n/a | 1 |
+
+Dispose residuals were all zero, recreate deltas were all zero, and no disposal/page errors were emitted. The current enforced regression ceilings passed without modification. The existing production cutover targets remain unchanged; the optional three-table-texture RGBA8 footprint is still `50,331,648 B`, so its stronger `16,777,216 B` cutover target remains an existing gap rather than being relaxed.
+
+PAGES-011 warm-cache evidence remains useful **cache evidence only**. It is not this cold baseline and must not replace it for THREEJS-026 before/after comparisons.
