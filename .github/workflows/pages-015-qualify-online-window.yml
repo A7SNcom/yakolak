@@ -18,9 +18,6 @@ env:
 
 jobs:
   qualify:
-    if: >-
-      ${{ github.event_name == 'workflow_dispatch' ||
-          github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: cloudflare-backend
@@ -84,11 +81,17 @@ jobs:
             (.activeWorkerVersionId | type == "string" and length > 0) and
             (.previousWorkerVersionId | type == "string" and length > 0) and
             .activeWorkerVersionId != .previousWorkerVersionId and
+            .protocolIdentity == "yakolak-online-room@1" and
+            .capabilityIdentity == "yakolak-online-room-capabilities-v1" and
+            (.capabilities | sort) == ["health.compatibility.v1","room-probe.read.v1","room-probe.write.v1"] and
+            .tursoSchemaId == "yakolak-pages005-room-probe" and
+            .tursoSchemaVersion == 1 and
             .traffic.activePercent == 100 and
             .traffic.previousPercent == 0 and
             .versionOverrideProof == true and
             .browserCorsVerified == true and
             .liveTursoRoundTripVerified == true and
+            (.finalEvidenceSha256 | test("^[a-f0-9]{64}$")) and
             .migrationPolicy == "expand-contract-forward-only" and
             .tursoDataRollbackRequired == false
           ' backend/cloudflare/WORKER_ROLLBACK_WINDOW.json >/dev/null
@@ -103,7 +106,14 @@ jobs:
 
       - name: Install PAGES-015 verification dependencies
         if: steps.frontend.outputs.ready == 'true' && steps.backend.outputs.ready == 'true'
-        run: npm install --ignore-scripts
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts
+          node --check scripts/append-pages015-qualification.mjs
+          node --check scripts/verify-pages015-frontend-window.mjs
+          node --check scripts/verify-pages015-current-lock-qualification.mjs
+          node --check scripts/verify-release-qualification.mjs
+          node --test tests/pages015_current_lock_qualification_contract.test.mjs tests/pages015_release_verifier_window_contract.test.mjs
 
       - name: Re-prove active plus previous Worker health and live Turso
         if: steps.frontend.outputs.ready == 'true' && steps.backend.outputs.ready == 'true'
@@ -164,14 +174,16 @@ jobs:
           node scripts/append-pages015-qualification.mjs
           node scripts/verify-release-qualification.mjs "$ACTIVE_RELEASE_TAG" "$ACTIVE_ASSET_SHA256"
           node scripts/verify-release-qualification.mjs "$PREVIOUS_RELEASE_TAG" "$PREVIOUS_ASSET_SHA256"
+          node scripts/verify-pages015-current-lock-qualification.mjs
 
       - name: Commit additive ledger events only
         if: steps.frontend.outputs.ready == 'true' && steps.backend.outputs.ready == 'true'
         run: |
           set -euo pipefail
+          node scripts/verify-pages015-current-lock-qualification.mjs
           rm -f pages015-live-evidence.json
           if git diff --quiet -- RELEASE_QUALIFICATION/ledger.jsonl; then
-            echo 'Equivalent backend qualification already exists.'
+            echo 'Equivalent backend qualification already exists for the current Worker rollback lock.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
