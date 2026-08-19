@@ -192,7 +192,7 @@ function requireDescriptor(descriptor, eligibility) {
     || descriptor.presentationCenter.some(value => !Number.isFinite(value))
   ) fail('selected_piece_presentation_center_required');
   if (!Number.isFinite(descriptor.boundingRadius) || descriptor.boundingRadius <= 0) fail('selected_piece_bounding_radius_required');
-  if (!descriptor.baseMaterial?.isMaterial) fail('selected_piece_base_material_required');
+  if (typeof descriptor.baseMaterialUuid !== 'string' || !descriptor.baseMaterialUuid) fail('selected_piece_base_material_identity_required');
   return descriptor;
 }
 
@@ -336,7 +336,7 @@ export function createSelectedPiecePresentation({
       seatId: eligibility.seatId,
       legalCells: eligibility.legalCells,
       witness: eligibility.witness,
-      baseMaterialUuid: descriptor.baseMaterial.uuid,
+      baseMaterialUuid: descriptor.baseMaterialUuid,
     });
     latestWitness = eligibility.witness;
     root.userData.selectedPieceId = current.pieceId;
