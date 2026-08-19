@@ -5,34 +5,18 @@ import {
   countPieces,
   emptyBoard,
 } from '../shared/rules.js';
+import {
+  assertSessionLifecycleState,
+  createSessionLifecycleState,
+} from './session-lifecycle.js';
 
 export const CANONICAL_SESSION_STATE_SCHEMA = 'yakolak.session-state/v1';
 
 const TOP_LEVEL_KEYS = [
-  'schema',
-  'lobbyGeneration',
-  'targetPlayers',
-  'winsToMatch',
-  'seats',
-  'board',
-  'inventory',
-  'activeSeatId',
-  'deadlineAtMs',
-  'scores',
-  'round',
-  'completedRounds',
-  'lastMove',
-  'skippedSeat',
-  'skipReason',
-  'winner',
-  'draw',
-  'matchComplete',
-  'matchWinner',
-  'matchWinners',
-  'restart',
-  'rematch',
-  'revision',
-  'lifecycle',
+  'schema', 'lobbyGeneration', 'targetPlayers', 'winsToMatch', 'seats', 'board',
+  'inventory', 'activeSeatId', 'deadlineAtMs', 'scores', 'round', 'completedRounds',
+  'lastMove', 'skippedSeat', 'skipReason', 'winner', 'draw', 'matchComplete',
+  'matchWinner', 'matchWinners', 'restart', 'rematch', 'revision', 'lifecycle',
 ];
 
 function fail(code) {
@@ -211,20 +195,6 @@ function validateMatchWinner(value, seatById) {
   requireInteger(value.wins, 'invalid_session_match_winner_wins', { min: 0 });
 }
 
-function validateLifecycle(value) {
-  requireRecord(value, 'invalid_session_lifecycle');
-  requireExactKeys(
-    value,
-    ['phase', 'interrupt', 'recoveryTarget', 'presentationGeneration'],
-    'invalid_session_lifecycle_shape',
-  );
-  // THREEJS-060 owns the allowed phase/interrupt vocabulary and transition graph.
-  requireOpaqueString(value.phase, 'invalid_session_lifecycle_phase');
-  requireOpaqueString(value.interrupt, 'invalid_session_lifecycle_interrupt', { nullable: true });
-  requireOpaqueString(value.recoveryTarget, 'invalid_session_lifecycle_recovery_target', { nullable: true });
-  requireInteger(value.presentationGeneration, 'invalid_session_presentation_generation', { min: 0 });
-}
-
 export function assertCanonicalSessionState(state) {
   requireRecord(state, 'invalid_canonical_session_state');
   requireExactKeys(state, TOP_LEVEL_KEYS, 'invalid_canonical_session_state_shape');
@@ -278,7 +248,7 @@ export function assertCanonicalSessionState(state) {
     matchWinnerSeats.add(winner.seatId);
   }
 
-  validateLifecycle(state.lifecycle);
+  assertSessionLifecycleState(state.lifecycle);
   return state;
 }
 
@@ -336,12 +306,7 @@ export function createCanonicalSessionState({
     restart: restart === null ? { ...defaultVotes } : restart,
     rematch: rematch === null ? { ...defaultVotes } : rematch,
     revision,
-    lifecycle: {
-      phase: lifecycle.phase ?? 'boot',
-      interrupt: lifecycle.interrupt ?? null,
-      recoveryTarget: lifecycle.recoveryTarget ?? null,
-      presentationGeneration: lifecycle.presentationGeneration ?? 0,
-    },
+    lifecycle: createSessionLifecycleState(lifecycle),
   };
   assertCanonicalSessionState(state);
   return deepFreeze(cloneJson(state));
