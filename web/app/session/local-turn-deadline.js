@@ -19,7 +19,7 @@ function requireWallClockMs(value) {
 function assertZeroOnlineSeats(state, isOnlineSeatType) {
   if (typeof isOnlineSeatType !== 'function') fail('online_seat_classifier_required');
   for (const seat of state.seats) {
-    const result = isOnlineSeatType(seat.type, seat);
+    const result = isOnlineSeatType(seat.type);
     if (typeof result !== 'boolean') fail('online_seat_classifier_must_return_boolean');
     if (result) fail('online_session_not_local_deadline_authority');
   }
