@@ -43,12 +43,13 @@ try {
     const tableBounds = new three.Box3().setFromObject(table.mesh);
 
     const scoreMaterials = sceneModule.createScoreMaterials(approvedContract, { resourceRegistry });
-    const score = sceneModule.createScoreMarkerInstances({
+    const createPhysicalScoreInstances = () => sceneModule.createScoreMarkerInstances({
       runtimeAsset: runtimeScore,
       worldLayout,
       materialsByColor: scoreMaterials,
       resourceRegistry,
     });
+    const score = createPhysicalScoreInstances();
 
     const seats = [
       { seatId: 'right', type: 'host-human', color: 'marble', ready: true },
@@ -71,8 +72,11 @@ try {
     const authoritativeCounts = score.snapshot().seats.map((entry) => [entry.seatId, entry.colorId, entry.count]);
 
     const hydrated = sessionModule.parseCanonicalSessionState(sessionModule.serializeCanonicalSessionState(authoritative));
-    const hydrationSync = scorePresentation.rebuildPersistentScoreMarkerInstances(score, hydrated);
-    const hydratedCounts = score.snapshot().seats.map((entry) => [entry.seatId, entry.colorId, entry.count]);
+    const rebuiltScore = createPhysicalScoreInstances();
+    const hydrationSync = scorePresentation.rebuildPersistentScoreMarkerInstances(rebuiltScore, hydrated);
+    const hydratedCounts = rebuiltScore.snapshot().seats.map((entry) => [entry.seatId, entry.colorId, entry.count]);
+    const rebuildGeometryReused = rebuiltScore.records.every((record, index) => record.mesh.geometry === score.records[index].mesh.geometry);
+    const rebuildMaterialsReused = rebuiltScore.records.every((record, index) => record.mesh.material === score.records[index].mesh.material);
 
     const nextRound = sessionModule.createCanonicalSessionState({
       preferredColor: 'marble',
@@ -122,10 +126,13 @@ try {
       scoreGap: score.layout.gap,
       scoreOrder: score.layout.order,
       scorePlaneY: score.layout.scorePlaneY,
+      scoreSeatCenters: score.layout.seats.map((entry) => [entry.seatId, entry.colorId, entry.sideCenter]),
       authoritativeCounts,
       hydratedCounts,
       roundResetCounts,
       freshMatchCounts,
+      rebuildGeometryReused,
+      rebuildMaterialsReused,
       authoritativeSync: {
         countsBySeat: authoritativeSync.countsBySeat,
         renderedCountsBySeat: authoritativeSync.renderedCountsBySeat,
@@ -141,6 +148,7 @@ try {
       contact,
     };
 
+    rebuiltScore.dispose();
     score.dispose();
     table.dispose();
     resourceRegistry.dispose('table-score-browser-verifier-complete');
@@ -160,6 +168,16 @@ try {
     ['left', 'gold', 0],
     ['front', 'green', 0],
   ];
+  const expectedCenters = [
+    ['right', 'marble', [85, 2, 0]],
+    ['back', 'blue', [0, 2, -85]],
+    ['left', 'gold', [-85, 2, 0]],
+    ['front', 'green', [0, 2, 85]],
+  ];
+  const centersExact = result.scoreSeatCenters.length === expectedCenters.length
+    && result.scoreSeatCenters.every((entry, index) => entry[0] === expectedCenters[index][0]
+      && entry[1] === expectedCenters[index][1]
+      && entry[2].every((value, coordinate) => near(value, expectedCenters[index][2][coordinate])));
   const checks = {
     bootReady: result.bootState === 'ready',
     noPageErrors: pageErrors.length === 0,
@@ -175,13 +193,16 @@ try {
     scoreDataExact: result.scoreRadius === 85
       && result.scoreGap === 11
       && JSON.stringify(result.scoreOrder) === JSON.stringify([0, -1, 1, -2, 2, -3, 3])
-      && result.scorePlaneY === 2,
+      && result.scorePlaneY === 2
+      && centersExact,
     scoreCountsFromAuthority: JSON.stringify(result.authoritativeCounts) === JSON.stringify(expectedScores)
       && JSON.stringify(result.authoritativeSync.countsBySeat) === JSON.stringify({ right: 4, back: 3, left: 1, front: 0 })
       && JSON.stringify(result.authoritativeSync.renderedCountsBySeat) === JSON.stringify({ right: 4, back: 3, left: 1, front: 0 }),
     hydrationDeterministic: JSON.stringify(result.hydratedCounts) === JSON.stringify(expectedScores)
       && JSON.stringify(result.hydrationSync.countsBySeat) === JSON.stringify(result.authoritativeSync.countsBySeat)
-      && JSON.stringify(result.hydrationSync.renderedCountsBySeat) === JSON.stringify(result.authoritativeSync.renderedCountsBySeat),
+      && JSON.stringify(result.hydrationSync.renderedCountsBySeat) === JSON.stringify(result.authoritativeSync.renderedCountsBySeat)
+      && result.rebuildGeometryReused === true
+      && result.rebuildMaterialsReused === true,
     roundResetRetainsMarkers: JSON.stringify(result.roundResetCounts) === JSON.stringify(expectedScores),
     freshMatchAuthorityClearsMarkers: JSON.stringify(result.freshMatchCounts) === JSON.stringify(zeroScores),
     scoreGeometryShared: result.scoreGeometryShared === true && result.scoreInstancedMeshes === 4,
