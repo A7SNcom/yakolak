@@ -85,3 +85,4 @@ jobs:
           node scripts/verify-threejs-materials-browser.mjs
           node scripts/verify-threejs-lighting-browser.mjs
           node scripts/verify-threejs-tap-feedback-browser.mjs
+          node scripts/verify-threejs-selected-piece-matrix-browser.mjs
