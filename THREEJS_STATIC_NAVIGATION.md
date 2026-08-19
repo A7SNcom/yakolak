@@ -70,22 +70,21 @@ Seat/bearer credentials remain governed by PAGES-006 memory-only policy and are 
 
 ## Browser Back / Forward
 
-`popstate` does not replay a local selection or mutation. It:
+`popstate` never trusts `history.state` and never recreates gameplay state from it. It reads and canonicalizes the current query/hash route, clears stale local presentation as part of hydration, and uses the current lifecycle key.
 
-1. reads the current static query/hash route;
-2. strips unknown URL state if necessary;
-3. clears local presentation selection;
-4. calls the hydration bridge with the current lifecycle key.
+If Back/Forward lands on a public invitation that this controller instance has **never entered**, that history transition is treated as the invitation entry exactly once. The controller invokes the invitation bridge without pushing or replacing another history record. Later visits to the same invitation route hydrate only.
 
-The canonical hydrated lifecycle—not history state—decides what presentation is valid after Back/Forward.
+This closes the case where Forward reveals an invitation that was not previously visited during the current controller lifetime while still preventing duplicate claim/create on ordinary Back/Forward revisits.
+
+The canonical hydrated lifecycle—not history state—decides what presentation is valid after navigation.
 
 ## `pageshow` / BFCache
 
-`pageshow` is hydration-only.
+`pageshow` is stricter than `popstate`: it is hydration-only, even when the current URL contains an invitation that is unseen by this controller.
 
-It may clear stale presentation and rehydrate the current route/lifecycle, but it **must never** recreate a room, claim a seat or replay invitation entry simply because `?invite=` is still present.
+It may clear stale presentation and rehydrate the current route/lifecycle, but it **must never** recreate a room, claim a seat or consume the invitation-entry token merely because `?invite=` remains present.
 
-This prevents BFCache restore from duplicating create/claim side effects.
+This prevents BFCache restore from duplicating create/claim side effects. A later genuine navigation/entry may still process that invitation once.
 
 ## Invitation entry
 
@@ -93,7 +92,7 @@ This prevents BFCache restore from duplicating create/claim side effects.
 
 Within one controller lifetime, each public invitation ID may invoke `onInvitationEntry(...)` only once. Re-entering the same invitation route later performs hydration only.
 
-Initial deep-link startup also enters the invitation once without pushing a duplicate history entry.
+Initial deep-link startup and a first unseen invitation reached through browser history both enter once without manufacturing a duplicate history entry.
 
 ## Setup Back
 
@@ -114,4 +113,4 @@ Run:
 - `node --test tests/threejs_static_navigation_contract.test.mjs`
 - `npm run test:threejs:gameplay`
 
-The focused contract covers pure reducer precedence, polluted credential-like URL stripping, `history.state=null`, both deployment prefixes, initial invitation entry, repeated `start/pageshow`, setup push/Back, Escape precedence, popstate hydration, programmatic invitation deduplication and listener attach/detach semantics.
+The focused contract covers pure reducer precedence, polluted credential-like URL stripping, `history.state=null`, both deployment prefixes, initial invitation entry, unseen invitation entry through Back/Forward without extra history writes, hydration-only `pageshow`, setup push/Back, Escape precedence, popstate hydration, programmatic invitation deduplication and listener attach/detach semantics.
