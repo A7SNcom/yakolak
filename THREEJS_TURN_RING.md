@@ -38,9 +38,9 @@ Examples:
 
 An invitation/session credential maps to an already configured stable `seatId`. Credential arrival does not allocate, renumber or reorder seats.
 
-`createCredentialSeatBindings(configuredSeats, claims)` accepts only stable opaque credential identities/fingerprints and exact configured seat IDs. It returns bindings in configured seat order even when claim arrival order is different.
+`createCredentialSeatBindings(state, claims)` and `configuredSeatForCredential(state, bindings, credentialId)` re-derive configured order from canonical `preferredColor + targetPlayers + seat identity`; they do not trust the incoming `seats[]` array order. Therefore even an adapter that presents hydrated seats in reversed join/reconnect order cannot redefine authority.
 
-`configuredSeatForCredential(...)` resolves the same stable seat on reconnect. Raw bearer secrets are not canonical gameplay state and are not stored by this module.
+Only stable opaque credential identities/fingerprints and exact configured seat IDs cross this helper. Raw bearer secrets are not canonical gameplay state and are not stored by this module.
 
 The future migration backend must persist the same binding. Protocol-v5 `p1…p4` identifiers remain compatibility-only during migration and cannot define new-protocol authority.
 
