@@ -6,6 +6,10 @@ import {
   authorityMigrationStatement,
 } from './authoritative-schema.js';
 import {
+  MANUAL_INVITATION_CODE_PATTERN,
+  secureRandomUint32,
+} from './authoritative-invitation-allocation.js';
+import {
   assertAuthoritativeStore,
   cloneAuthority,
   failAuthority,
@@ -15,6 +19,10 @@ import {
   validateNextInvitation,
 } from './authoritative-store-contract.js';
 import { materializeTursoLobbySeatBindings } from './authoritative-turso-seat-materialization.js';
+import {
+  allocateTursoInvitation,
+  expireTursoManualInvitationLocators,
+} from './authoritative-turso-invitation-allocation.js';
 
 const T = AUTHORITY_TABLES;
 const DEFAULT_BUSY_RETRIES = 4;
@@ -94,6 +102,7 @@ function rowToInvitation(row) {
     lobbyGeneration: Number(row.lobby_generation),
     state: String(row.state),
     data: row.data_json == null ? null : parseJson(row.data_json, 'authoritative_invitation_corrupt'),
+    ...(row.expires_at_ms == null ? {} : { expiresAtMs: Number(row.expires_at_ms) }),
   };
 }
 
@@ -139,6 +148,7 @@ export function createTursoAuthoritativeStoreFromConnection(db, {
   nowMs = () => Date.now(),
   busyRetries = DEFAULT_BUSY_RETRIES,
   sleepFn = sleep,
+  randomUint32 = secureRandomUint32,
 } = {}) {
   if (!db || typeof db !== 'object') failAuthority('datastore_unavailable');
 
@@ -199,7 +209,7 @@ export function createTursoAuthoritativeStoreFromConnection(db, {
       let currentInvitation = null;
       if (transaction.invitationId) {
         const invitationRow = await get(tx, `SELECT invitation_id, locator, room_id, seat_id,
-          lobby_generation, state, data_json
+          lobby_generation, state, data_json, expires_at_ms
           FROM ${T.invitations} WHERE invitation_id = ? LIMIT 1`, [transaction.invitationId]);
         currentInvitation = rowToInvitation(invitationRow);
         if (!currentInvitation) failAuthority('invitation_not_found');
@@ -237,6 +247,9 @@ export function createTursoAuthoritativeStoreFromConnection(db, {
           transaction.roomId,
         ]);
         if (changes(invitationUpdate) !== 1) failAuthority('invitation_not_found');
+        if (currentInvitation.state === 'open' && nextInvitation.state !== 'open') {
+          await run(tx, `DELETE FROM ${T.manualLocators} WHERE invitation_id = ?`, [transaction.invitationId]);
+        }
       }
 
       const nextRevision = room.revision + 1;
@@ -336,6 +349,12 @@ export function createTursoAuthoritativeStoreFromConnection(db, {
       const cutoffMs = Date.parse(String(beforeIso));
       if (!Number.isFinite(cutoffMs)) failAuthority('invalid_cleanup_cutoff');
       return withImmediate(async (tx) => {
+        await expireTursoManualInvitationLocators({
+          tx,
+          invitationsTable: T.invitations,
+          manualLocatorsTable: T.manualLocators,
+          nowMs: nowMs(),
+        });
         let deleted = 0;
         deleted += changes(await run(tx, `DELETE FROM ${PROBE_TABLE} WHERE updated_at < ?`, [beforeIso]));
         const tombstoned = `room_id IN (
@@ -347,6 +366,7 @@ export function createTursoAuthoritativeStoreFromConnection(db, {
           T.votes,
           T.readiness,
           T.deadlines,
+          T.manualLocators,
           T.invitations,
           T.seatConfigurations,
           T.seats,
@@ -379,12 +399,27 @@ export function createTursoAuthoritativeStoreFromConnection(db, {
     },
 
     async lookupInvitation({ locator }) {
-      const rows = await db.all(`SELECT invitation_id, locator, room_id, seat_id,
-        lobby_generation, state, data_json
-        FROM ${T.invitations} WHERE locator = ? ORDER BY created_at_ms DESC, invitation_id DESC LIMIT 2`,
-      String(locator || '').trim());
-      if (rows.length > 1) failAuthority('invitation_locator_ambiguous');
-      return rowToInvitation(rows[0]);
+      const normalized = String(locator || '').trim();
+      if (!MANUAL_INVITATION_CODE_PATTERN.test(normalized)) return null;
+      return withDeferred(async (tx) => {
+        const row = await get(tx, `SELECT i.invitation_id, m.locator, i.room_id, i.seat_id,
+          i.lobby_generation, i.state, i.data_json, m.expires_at_ms
+          FROM ${T.manualLocators} m
+          JOIN ${T.invitations} i ON i.invitation_id = m.invitation_id
+          WHERE m.locator = ? AND m.expires_at_ms > ? AND i.state = 'open' LIMIT 1`,
+        [normalized, nowMs()]);
+        return rowToInvitation(row);
+      });
+    },
+
+    async allocateInvitation(input) {
+      return withImmediate(async (tx) => allocateTursoInvitation({
+        tx,
+        tables: T,
+        input,
+        nowMs: nowMs(),
+        randomUint32,
+      }));
     },
 
     transactAuthority,
