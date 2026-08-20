@@ -1,3 +1,10 @@
+import {
+  GAMEPLAY_AUTHORITY_ADAPTERS,
+  GAMEPLAY_INTENT_KINDS,
+  assertGameplayIntent,
+  parseGameplayIntent,
+  serializeGameplayIntent,
+} from '../gameplay/gameplay-intent.js';
 import { OnlineCompatibilityError } from './online-compatibility.js';
 
 function requiredIdentity(value, name) {
@@ -6,10 +13,18 @@ function requiredIdentity(value, name) {
   return normalized;
 }
 
-function freezeMoveIntent(move) {
-  if (!move || typeof move !== 'object') throw new TypeError('move intent must be an object');
-  const moveId = requiredIdentity(move.moveId, 'moveId');
-  return Object.freeze({ ...move, moveId });
+function freezeMoveIntent(intent, seatId) {
+  assertGameplayIntent(intent);
+  if (intent.kind !== GAMEPLAY_INTENT_KINDS.MOVE) {
+    throw new TypeError('online session intent must be a gameplay move');
+  }
+  if (intent.authority.adapter !== GAMEPLAY_AUTHORITY_ADAPTERS.NETWORK) {
+    throw new TypeError('online session move requires network authority context');
+  }
+  if (intent.authority.seat !== seatId) {
+    throw new TypeError('online session move seat does not match canonical seat identity');
+  }
+  return parseGameplayIntent(serializeGameplayIntent(intent));
 }
 
 function compatibilityBoundary(gate) {
@@ -36,6 +51,8 @@ function compatibilityBoundary(gate) {
 
 // Canonical online/session identity is deliberately CPU/application state.
 // Graphics context loss/restoration must never recreate, clear, or replay this object.
+// Gameplay mutations use only the THREEJS-029 network intent envelope; graphics
+// recovery must not introduce or preserve a parallel moveId/cell/size contract.
 export function createCanonicalOnlineSession({
   roomId,
   seatId,
@@ -52,31 +69,32 @@ export function createCanonicalOnlineSession({
     playerId: requiredIdentity(playerId, 'playerId'),
   });
 
-  const submittedMoveIds = new Set();
+  const submittedMutationIds = new Set();
   let lastMoveIntent = null;
   let lastSubmissionError = null;
 
-  async function submitMoveIntent(move) {
+  async function submitMoveIntent(candidate) {
     // This check is deliberately before mutation-id reservation and before transport.
-    // Missing/failed compatibility proof cannot mutate online state or consume a move id.
+    // Missing/failed compatibility proof cannot mutate online state or consume a mutation id.
     compatibility.assertMutationAllowed();
 
-    const intent = freezeMoveIntent(move);
-    if (submittedMoveIds.has(intent.moveId)) {
-      return Object.freeze({ submitted: false, duplicate: true, moveId: intent.moveId });
+    const intent = freezeMoveIntent(candidate, seatIdentity.seatId);
+    const mutationId = intent.authority.mutationId;
+    if (submittedMutationIds.has(mutationId)) {
+      return Object.freeze({ submitted: false, duplicate: true, mutationId });
     }
 
-    submittedMoveIds.add(intent.moveId);
+    submittedMutationIds.add(mutationId);
     lastMoveIntent = intent;
     lastSubmissionError = null;
 
     try {
       const result = await submitMove(intent, seatIdentity);
       if (result?.compatibility) compatibility.observeSnapshot(result);
-      return Object.freeze({ submitted: true, duplicate: false, moveId: intent.moveId, result });
+      return Object.freeze({ submitted: true, duplicate: false, mutationId, result });
     } catch (error) {
-      // Keep the id reserved only after a transport attempt. A reconnect reconciles
-      // authoritative state rather than auto-resubmitting.
+      // Keep the mutation id reserved only after a transport attempt. A reconnect
+      // reconciles authoritative state rather than auto-resubmitting.
       lastSubmissionError = error instanceof Error ? error : new Error(String(error));
       throw lastSubmissionError;
     }
@@ -85,7 +103,7 @@ export function createCanonicalOnlineSession({
   function snapshot() {
     return Object.freeze({
       seatIdentity,
-      submittedMoveIds: Object.freeze([...submittedMoveIds]),
+      submittedMutationIds: Object.freeze([...submittedMutationIds]),
       lastMoveIntent,
       needsReconciliation: Boolean(lastSubmissionError),
       onlineCompatibility: compatibilityGate?.snapshot?.() || Object.freeze({
