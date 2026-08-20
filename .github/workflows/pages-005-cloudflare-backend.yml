@@ -6,6 +6,7 @@ on:
       - threejs-rebuild
     paths:
       - 'backend/cloudflare/**'
+      - 'package.json'
       - 'scripts/pages005-bootstrap-live.sh'
       - 'scripts/pages015-finalize-live-window.sh'
       - 'scripts/pages015-orchestrate-qualification.sh'
@@ -63,6 +64,8 @@ jobs:
           node --check scripts/verify-release-qualification.mjs
       - name: Install runtime dependency
         run: npm install --ignore-scripts
+      - name: Verify pinned Playwright test runtime
+        run: node --input-type=module -e "import { test, expect } from '@playwright/test'; if (!test || !expect) process.exit(1)"
       - name: Worker and online compatibility contract tests
         run: node --test tests/pages_backend_runtime_contract.test.mjs tests/pages_online_compatibility_contract.test.mjs tests/pages005_worker_lock_identity_contract.test.mjs tests/pages015_current_lock_qualification_contract.test.mjs tests/pages015_release_verifier_window_contract.test.mjs tests/pages015_single_resume_path_contract.test.mjs tests/pages015_retired_pages012_preserve_contract.test.mjs
       - name: Wrangler dry-run bundle
