@@ -1,6 +1,14 @@
 import { AUTHORITATIVE_ACTOR_KINDS, AUTHORITATIVE_OPERATION_NAMES } from './authoritative-api.js';
 import { validateMaterializedLobbySeatRecords } from './authoritative-lobby-config.js';
 import {
+  INVITE_CODE_CAPACITY,
+  MANUAL_INVITATION_CODE_PATTERN,
+  MANUAL_INVITATION_TTL_MS,
+  normalizeInvitationAllocation,
+  secureRandomUint32,
+  shuffledManualInvitationLocators,
+} from './authoritative-invitation-allocation.js';
+import {
   assertAuthoritativeStore,
   cloneAuthority,
   failAuthority,
@@ -25,7 +33,7 @@ function normalizeAuthoritativeSeed(seed) {
     const credentialGeneration = seat?.credentialGeneration;
     if (!/^[a-f0-9]{64}$/.test(credentialHash)) failAuthority('invalid_authoritative_seed');
     if (!Number.isSafeInteger(credentialGeneration) || credentialGeneration < 1) failAuthority('invalid_authoritative_seed');
-    return { seatId, credentialHash, credentialGeneration };
+    return { ...cloneAuthority(seat), seatId, credentialHash, credentialGeneration };
   });
   if (new Set(seats.map(seat => seat.seatId)).size !== seats.length) failAuthority('invalid_authoritative_seed');
   if (new Set(seats.map(seat => seat.credentialHash)).size !== seats.length) failAuthority('invalid_authoritative_seed');
@@ -47,6 +55,8 @@ function normalizeInvitationSeed(seed) {
   const seatId = opaqueAuthority(seed.seatId, 'invalid_invitation_seed');
   const lobbyGeneration = seed.lobbyGeneration;
   if (!Number.isSafeInteger(lobbyGeneration) || lobbyGeneration < 0) failAuthority('invalid_invitation_seed');
+  const expiresAtMs = seed.expiresAtMs ?? null;
+  if (expiresAtMs !== null && (!Number.isSafeInteger(expiresAtMs) || expiresAtMs < 0)) failAuthority('invalid_invitation_seed');
   return {
     invitationId,
     locator,
@@ -55,6 +65,7 @@ function normalizeInvitationSeed(seed) {
     lobbyGeneration,
     state: opaqueAuthority(seed.state, 'invalid_invitation_seed'),
     data: cloneAuthority(seed.data ?? null),
+    expiresAtMs,
   };
 }
 
@@ -87,14 +98,41 @@ function materializeSeatBindings(room, transaction, state, records) {
       });
 }
 
+function activeSeatKey(invitation) {
+  return `${invitation.roomId}:${invitation.lobbyGeneration}:${invitation.seatId}`;
+}
+
 export function createInMemoryAuthoritativeStore({
   authoritativeRooms = [],
   authoritativeInvitations = [],
+  nowMs = () => Date.now(),
+  randomUint32 = secureRandomUint32,
 } = {}) {
   const probeRooms = new Map();
   const rooms = new Map();
   const invitationsById = new Map();
-  const invitationIdByLocator = new Map();
+  const activeInvitationIdByLocator = new Map();
+  const activeInvitationIdBySeat = new Map();
+
+  function releaseManualLocator(invitation) {
+    if (!invitation) return;
+    if (activeInvitationIdByLocator.get(invitation.locator) === invitation.invitationId) {
+      activeInvitationIdByLocator.delete(invitation.locator);
+    }
+    const seatKey = activeSeatKey(invitation);
+    if (activeInvitationIdBySeat.get(seatKey) === invitation.invitationId) {
+      activeInvitationIdBySeat.delete(seatKey);
+    }
+  }
+
+  function expireInvitationIfNeeded(invitation, now) {
+    if (!invitation || invitation.state !== 'open') return invitation;
+    if (invitation.expiresAtMs !== null && invitation.expiresAtMs <= now) {
+      invitation.state = 'expired';
+      releaseManualLocator(invitation);
+    }
+    return invitation;
+  }
 
   for (const seed of authoritativeRooms) {
     const room = normalizeAuthoritativeSeed(seed);
@@ -103,11 +141,15 @@ export function createInMemoryAuthoritativeStore({
   }
   for (const seed of authoritativeInvitations) {
     const invitation = normalizeInvitationSeed(seed);
-    if (invitationsById.has(invitation.invitationId) || invitationIdByLocator.has(invitation.locator)) {
-      failAuthority('duplicate_invitation_seed');
-    }
+    if (invitationsById.has(invitation.invitationId)) failAuthority('duplicate_invitation_seed');
     invitationsById.set(invitation.invitationId, invitation);
-    invitationIdByLocator.set(invitation.locator, invitation.invitationId);
+    if (invitation.state === 'open' && MANUAL_INVITATION_CODE_PATTERN.test(invitation.locator)) {
+      if (activeInvitationIdByLocator.has(invitation.locator) || activeInvitationIdBySeat.has(activeSeatKey(invitation))) {
+        failAuthority('duplicate_invitation_seed');
+      }
+      activeInvitationIdByLocator.set(invitation.locator, invitation.invitationId);
+      activeInvitationIdBySeat.set(activeSeatKey(invitation), invitation.invitationId);
+    }
   }
 
   const capabilities = storeCapabilities('memory-contract', {
@@ -170,7 +212,9 @@ export function createInMemoryAuthoritativeStore({
 
     if (transaction.invitationId && Object.hasOwn(result, 'invitation')) {
       const nextInvitation = validateNextInvitation(currentInvitation, result.invitation, transaction.invitationId);
+      nextInvitation.expiresAtMs = currentInvitation.expiresAtMs ?? null;
       invitationsById.set(transaction.invitationId, nextInvitation);
+      if (currentInvitation.state === 'open' && nextInvitation.state !== 'open') releaseManualLocator(currentInvitation);
     }
 
     room.state = cloneAuthority(result.state);
@@ -240,8 +284,57 @@ export function createInMemoryAuthoritativeStore({
       };
     },
     async lookupInvitation({ locator }) {
-      const invitationId = invitationIdByLocator.get(String(locator || '').trim());
-      return invitationId ? cloneAuthority(invitationsById.get(invitationId)) : null;
+      const normalized = String(locator || '').trim();
+      if (!MANUAL_INVITATION_CODE_PATTERN.test(normalized)) return null;
+      const invitationId = activeInvitationIdByLocator.get(normalized);
+      const invitation = invitationId ? invitationsById.get(invitationId) : null;
+      expireInvitationIfNeeded(invitation, nowMs());
+      return invitation?.state === 'open' ? cloneAuthority(invitation) : null;
+    },
+    async allocateInvitation(input) {
+      const allocation = normalizeInvitationAllocation(input);
+      const room = rooms.get(allocation.roomId);
+      if (!room) failAuthority('room_not_found');
+      if (room.state?.status !== 'waiting') failAuthority('room_not_waiting');
+      if (Number(room.state?.lobbyGeneration ?? -1) !== allocation.lobbyGeneration) failAuthority('invalid_lobby_generation');
+      const seat = room.seats.find(candidate => candidate.seatId === allocation.seatId);
+      if (!seat || seat.type !== 'online' || seat.lobbyGeneration !== allocation.lobbyGeneration) {
+        failAuthority('invitation_seat_not_online');
+      }
+
+      const now = nowMs();
+      for (const invitation of invitationsById.values()) expireInvitationIfNeeded(invitation, now);
+
+      const seatKey = `${allocation.roomId}:${allocation.lobbyGeneration}:${allocation.seatId}`;
+      const existingId = activeInvitationIdBySeat.get(seatKey);
+      const existing = existingId ? invitationsById.get(existingId) : null;
+      if (existing?.state === 'open') return { status: 'existing', invitation: cloneAuthority(existing) };
+
+      const priorId = invitationsById.get(allocation.invitationId);
+      if (priorId) failAuthority('invitation_id_reused');
+
+      const locator = shuffledManualInvitationLocators(randomUint32)
+        .find(candidate => !activeInvitationIdByLocator.has(candidate));
+      if (!locator) failAuthority(INVITE_CODE_CAPACITY, { capacity: 100 });
+
+      const invitation = {
+        invitationId: allocation.invitationId,
+        locator,
+        roomId: allocation.roomId,
+        seatId: allocation.seatId,
+        lobbyGeneration: allocation.lobbyGeneration,
+        state: 'open',
+        data: {
+          color: seat.color,
+          spatialSlot: seat.spatialSlot,
+          configuredIndex: seat.configuredIndex,
+        },
+        expiresAtMs: now + MANUAL_INVITATION_TTL_MS,
+      };
+      invitationsById.set(invitation.invitationId, invitation);
+      activeInvitationIdByLocator.set(locator, invitation.invitationId);
+      activeInvitationIdBySeat.set(seatKey, invitation.invitationId);
+      return { status: 'allocated', invitation: cloneAuthority(invitation) };
     },
     transactAuthority,
     async commitMutation({
