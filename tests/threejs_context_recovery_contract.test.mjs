@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import {
+  GAMEPLAY_AUTHORITY_ADAPTERS,
+  GAMEPLAY_INTENT_KINDS,
+  GAMEPLAY_INTENT_ORIGINS,
+  GAMEPLAY_PRESENTATION_SOURCES,
+  createGameplayIntent,
+} from '../web/app/gameplay/gameplay-intent.js';
 import { createContextRecoveryController } from '../web/app/scene/context-recovery.js';
 import { createCanonicalOnlineSession } from '../web/app/session/canonical-online-session.js';
 
@@ -27,6 +34,7 @@ assert.match(bootSource, /window\.location\.reload\(\)/, 'failed recovery must e
 assert.equal((htmlSource.match(/id="graphics-recovery"/g) || []).length, 1, 'there must be exactly one graphics recovery failure state');
 assert.equal((htmlSource.match(/id="graphics-recovery-reload"/g) || []).length, 1, 'there must be exactly one graphics recovery action');
 assert.doesNotMatch(sessionSource, /\bTHREE\b|WebGLRenderer|canvas|getContext\(/, 'canonical online session state must not depend on GPU objects');
+assert.doesNotMatch(sessionSource, /\bmoveId\b/, 'context recovery session must not define a parallel legacy move-intent identity');
 
 let transportSubmissions = 0;
 const compatibilityGate = Object.freeze({
@@ -41,16 +49,35 @@ const session = createCanonicalOnlineSession({
   compatibilityGate,
   async submitMove(intent, seatIdentity) {
     transportSubmissions += 1;
-    return Object.freeze({ accepted: true, moveId: intent.moveId, seatId: seatIdentity.seatId });
+    return Object.freeze({ accepted: true, mutationId: intent.authority.mutationId, seatId: seatIdentity.seatId });
   },
 });
 
+await assert.rejects(
+  session.submitMoveIntent({ moveId: 'mutation-014-legacy', cell: 5, size: 'M' }),
+  /invalid_gameplay_intent_shape/,
+  'context recovery must not preserve a second legacy move-intent schema',
+);
+assert.equal(transportSubmissions, 0, 'rejected legacy intent must not reach transport');
+
 const seatIdentityBeforeRecovery = session.seatIdentity;
-const firstSubmission = await session.submitMoveIntent({ moveId: 'mutation-014-1', cell: 5, size: 'M' });
-const duplicateSubmission = await session.submitMoveIntent({ moveId: 'mutation-014-1', cell: 5, size: 'M' });
+const firstMoveIntent = createGameplayIntent({
+  kind: GAMEPLAY_INTENT_KINDS.MOVE,
+  origin: GAMEPLAY_INTENT_ORIGINS.HUMAN,
+  seat: 'seat-4',
+  revision: 17,
+  mutationId: 'threejs014_context_mutation_000000000001',
+  adapter: GAMEPLAY_AUTHORITY_ADAPTERS.NETWORK,
+  payload: { cell: 5, size: 'medium' },
+  source: GAMEPLAY_PRESENTATION_SOURCES.CLICK,
+});
+const firstSubmission = await session.submitMoveIntent(firstMoveIntent);
+const duplicateSubmission = await session.submitMoveIntent(firstMoveIntent);
 assert.equal(firstSubmission.submitted, true);
+assert.equal(firstSubmission.mutationId, firstMoveIntent.authority.mutationId);
 assert.equal(duplicateSubmission.duplicate, true);
-assert.equal(transportSubmissions, 1, 'same mutation id must never be submitted twice');
+assert.equal(duplicateSubmission.mutationId, firstMoveIntent.authority.mutationId);
+assert.equal(transportSubmissions, 1, 'same canonical mutation id must never be submitted twice');
 
 const canvas = new EventTarget();
 let restoreResourcesCalls = 0;
@@ -91,7 +118,8 @@ assert.equal(issueGuardedGpuWork(), true);
 const sessionAfterRecovery = session.snapshot();
 assert.equal(session.seatIdentity, seatIdentityBeforeRecovery, 'seat identity object must survive graphics recovery unchanged');
 assert.equal(sessionAfterRecovery.seatIdentity, seatIdentityBeforeRecovery);
-assert.deepEqual(sessionAfterRecovery.submittedMoveIds, ['mutation-014-1']);
+assert.deepEqual(sessionAfterRecovery.submittedMutationIds, [firstMoveIntent.authority.mutationId]);
+assert.equal(sessionAfterRecovery.lastMoveIntent, firstMoveIntent, 'canonical gameplay intent must survive graphics recovery unchanged');
 assert.equal(transportSubmissions, 1, 'graphics restoration must not replay an already-submitted move');
 
 const failedCanvas = new EventTarget();
@@ -111,4 +139,4 @@ assert.match(failedRecovery.snapshot().failure.message, /synthetic restore failu
 recovery.dispose();
 failedRecovery.dispose();
 
-console.log('Verified THREEJS-014 context loss/restore, exactly-once registry rebind, seat identity and move dedupe invariants');
+console.log('Verified THREEJS-014 context loss/restore, exactly-once registry rebind, seat identity and canonical mutation dedupe invariants');
