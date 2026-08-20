@@ -123,8 +123,8 @@ for attempt in $(seq 1 12); do
 done
 test "$proved" = true || { echo 'active+previous Worker override/Turso proof failed' >&2; exit 1; }
 
-PAGES015_API_ORIGIN="$api_origin" npx --yes playwright install chromium
-PAGES015_API_ORIGIN="$api_origin" npx --yes playwright test tests/pages015-browser-cors.spec.js --workers=1
+./node_modules/.bin/playwright install --with-deps chromium
+PAGES015_API_ORIGIN="$api_origin" ./node_modules/.bin/playwright test tests/pages015-browser-cors.spec.js --workers=1
 
 # Re-prove the exact version window immediately before committing the public lock files.
 API_ORIGIN="$api_origin" \
