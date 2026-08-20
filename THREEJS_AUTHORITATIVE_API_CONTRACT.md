@@ -1,8 +1,8 @@
 # THREEJS-062 — Authoritative API / store contract
 
-Status: **LOCKED by THREEJS-062 (2026-08-20); durable Turso store implemented by THREEJS-063 (2026-08-20); feature semantics remain downstream**
+Status: **LOCKED by THREEJS-062 (2026-08-20); durable Turso store by THREEJS-063; lobby config by 064; finite invitation namespace by 065; later feature semantics remain downstream**
 
-This contract extends the already-selected PAGES-005 Cloudflare Worker. It does not create another backend, does not change the PAGES-005 compatibility identity, and does not claim a live `API_ORIGIN`. THREEJS-063 implements the durable Turso schema/CAS/receipt side of this already-locked interface without taking HTTP/UI ownership.
+This contract extends the already-selected PAGES-005 Cloudflare Worker. It does not create another backend, does not change the PAGES-005 compatibility identity, and does not claim a live `API_ORIGIN`.
 
 ## 1. One Worker, one store interface
 
@@ -17,12 +17,14 @@ The exact store interface is:
 - `cleanup()`
 - `authorizeSeat()`
 - `lookupInvitation()`
+- `allocateInvitation()`
+- `revokeInvitation()`
 - `transactAuthority()`
 - `commitMutation()` — current move-route convenience wrapper over `transactAuthority()`
 
-`transactAuthority()` is the common CAS/idempotency boundary for later room-only and room+invitation transactions. Its contract carries authoritative room scope, actor framing, expected revision, idempotency identity, request fingerprint, operation name, optional invitation scope, and a pure transition callback. Duplicate identity is resolved before a transition callback is allowed to run.
+`transactAuthority()` remains the common CAS/idempotency boundary for room-only and room+invitation transactions. Duplicate identity is resolved before a transition callback is allowed to run. THREEJS-065 adds narrow store methods for finite-locator allocation/revocation because those operations need a namespace-wide free-set transaction rather than SQL in route handlers.
 
-THREEJS-063 now implements this interface transactionally in Turso behind `backend/cloudflare/src/authoritative-turso-store.js`; route handlers still contain no SQL. The durable adapter uses room-scoped receipts and one transaction boundary for receipt lookup, revision validation, optional invitation state, accepted state update and receipt persistence. Schema/migration details are locked in `THREEJS_TURSO_AUTHORITY_SCHEMA.md`.
+THREEJS-063 implements the durable Turso interface behind `backend/cloudflare/src/authoritative-turso-store.js`; route handlers contain no Turso SQL. THREEJS-065 keeps namespace SQL isolated in `backend/cloudflare/src/authoritative-turso-invitation-namespace.js` and composes it into that same store/transaction system.
 
 ## 2. Authoritative seat vocabulary
 
@@ -53,11 +55,18 @@ The backend invitation lifecycle vocabulary is:
 - `revoked`
 - `expired`
 
-Each persisted invitation belongs to one room/lobby generation and one already-reserved stable seat. Locator resolution is lookup only and never grants seat authority. Same-identity claim recovery is based on a separate high-entropy claim/seat credential, never possession of the short locator.
+Each persisted invitation belongs to one room/lobby generation and one already-reserved stable Online seat. Locator resolution is lookup only and never grants seat authority. Same-identity claim recovery is based on a separate high-entropy claim/seat credential, never possession of the short locator.
 
-THREEJS-065 still owns the finite manual-locator capacity decision and allocation policy, including whether the historical `00–99` contract remains or is explicitly superseded. THREEJS-063 deliberately leaves locator allocation/active uniqueness/reuse policy open: its schema indexes locator lookup but does not impose a global unique locator constraint, and ambiguous lookup fails closed until THREEJS-065 implements the chosen policy.
+THREEJS-065 locks the historical manual locator contract to **Option A**:
 
-THREEJS-066 implements atomic idempotent claim/recovery. THREEJS-068 implements lobby-generation invalidation and the safe unclaimed Online→Computer replacement rule. THREEJS-077 later owns enumeration/rate-limit/data-exposure hardening.
+- exact locator namespace `00`–`99`;
+- exactly 100 globally simultaneous open manual locators;
+- 10-minute open TTL;
+- DB-level unique open locator and unique open `(room,generation,seat)`;
+- explicit `INVITE_CODE_CAPACITY` when all 100 are occupied;
+- claim, revoke and expiry release the locator.
+
+`GET /v1/invitations/:twoDigitCode` resolves only a currently open, unexpired invitation preview. A claimed/revoked/expired short code does not recover authority. THREEJS-066 implements the high-entropy first claim, exact seat binding and same-credential recovery. THREEJS-068 implements lobby-generation invalidation and safe unclaimed Online→Computer replacement. THREEJS-077 later owns enumeration/rate-limit/data-exposure hardening.
 
 ## 5. Readiness / explicit start framing
 
@@ -67,7 +76,7 @@ Readiness is authoritative per configured seat and lobby generation:
 - Online seats become ready only after successful claim plus hydration of the current lobby generation.
 - the host controls the explicit Start action.
 
-Filling the configured seats, invitation claim, refresh or polling never auto-starts the match. `start-match` is a revision/idempotency transaction and succeeds only when the authoritative readiness gate passes.
+Filling configured seats, invitation claim, refresh or polling never auto-starts the match. `start-match` is a revision/idempotency transaction and succeeds only when the authoritative readiness gate passes.
 
 THREEJS-069 owns implementation of this rule and the exact start transition.
 
@@ -77,32 +86,34 @@ The authoritative online deadline field is `deadlineAtMs` and represents an abso
 
 The browser may render a countdown derived from this value and may issue a poll/wake request near expiry. It may not decide timeout, extend the deadline, or rely on an in-process 18-second timer surviving Worker lifecycle.
 
-Timeout reconciliation uses a `server` actor and reserved operation `reconcile-timeout`, with current revision plus idempotency identity through the common store transaction boundary. THREEJS-063 provides the transactional persistence/race boundary; THREEJS-070 implements the actual expiry reconciliation and transition semantics.
+Timeout reconciliation uses a `server` actor and reserved operation `reconcile-timeout`, with current revision plus idempotency identity through the common store transaction boundary. THREEJS-070 implements the actual expiry reconciliation and transition semantics.
 
 ## 7. Online Computer framing
 
 A configured `computer` seat has no browser authority. When it becomes active, request/wake/mutation traffic may trigger backend reconciliation, but the server verifies current revision/deadline, generates the legal bot intent through shared rules, and commits at most one result through the common transaction boundary.
 
-The reserved operation is `reconcile-computer`; THREEJS-063 provides the same transactional race boundary used by timeout/move/claim work, while THREEJS-071 implements strategy/reconciliation details. Concurrent browser triggers must converge on one accepted room revision/result.
+The reserved operation is `reconcile-computer`; THREEJS-071 implements strategy/reconciliation details. Concurrent browser triggers must converge on one accepted room revision/result.
 
 ## 8. Mutation / transition framing
 
-The currently exposed mutation route accepts only an exact move envelope:
+The existing host-authenticated room mutation endpoint is:
 
-```json
-{
-  "mutationId": "opaque-id",
-  "expectedRevision": 7,
-  "action": "move",
-  "payload": { "cell": 4, "size": "medium" }
-}
-```
+`POST /v1/rooms/:roomId/mutations`
 
-The authenticated store derives the seat. The move transition comes only from `web/app/shared/transitions.js`. Duplicate mutation replay returns the committed receipt/snapshot without running the transition a second time. Reusing one room-scoped mutation/idempotency id for different content, operation, or actor identity fails.
+It currently dispatches exact envelopes for:
 
-The generic transaction identity reserved by this contract supports later operations:
+- `configure-lobby` — THREEJS-064 initial configuration;
+- `allocate-invitation` — THREEJS-065 finite locator allocation for one exact Online seat;
+- `revoke-invitation` — THREEJS-065 host revocation of one open invitation;
+- `move` — shared authoritative move transition.
+
+All use the same authenticated room, expected revision, room-scoped mutation/idempotency ID and request fingerprint boundary. Allocation additionally uses the namespace-wide IMMEDIATE transaction to choose one free `00`–`99` locator without collision retry.
+
+The reserved operation vocabulary is:
 
 - `configure-lobby`
+- `allocate-invitation`
+- `revoke-invitation`
 - `claim-invitation`
 - `invalidate-lobby`
 - `set-ready`
@@ -111,7 +122,7 @@ The generic transaction identity reserved by this contract supports later operat
 - `reconcile-timeout`
 - `reconcile-computer`
 
-These names lock transport/transaction identity only. Their feature semantics remain owned by THREEJS-064/065/066/068/069/070/071, while THREEJS-072 unifies move/skip/timeout/draw/score/round and other state-changing transition semantics with the local pure transition package.
+Reserved names do not imply every downstream semantic is implemented. In particular `claim-invitation` remains THREEJS-066, invalidation 068, ready/start 069, timeout 070 and Computer execution 071.
 
 ## 9. Security / observability
 
@@ -124,10 +135,12 @@ PAGES-006 remains binding:
 - every response carries request/trace identity; raw backend exception messages are not public/logged as request error detail.
 - DB/admin secrets remain Worker environment secrets only.
 
+The public 2-digit resolver returns only invitation preview fields needed to show the reserved seat/color and expiry state. It does not return bearer/claim material.
+
 ## 10. Current implementation/readiness state
 
-`createInMemoryAuthoritativeStore()` remains deterministic contract evidence. It implements server-derived seat auth, invitation lookup over seeded records, room/invitation transaction scope, revision CAS, idempotent stable replay and request fingerprint/actor/operation reuse rejection.
+`createInMemoryAuthoritativeStore()` remains deterministic contract evidence for seat auth, lobby configuration, finite invitation allocation/revocation, invitation lookup, revision CAS and idempotent replay.
 
-`createTursoAuthoritativeStore()` now composes the THREEJS-063 durable adapter and advertises `turso-authoritative-v1` with authoritative read/mutation/invitation/transaction support and durable mutation receipts. The additive v1 schema persists lobby, seat, invitation, readiness, deadline, vote and mutation-receipt records while preserving the original PAGES-005 probe table. Migration is forward-only/expand-contract and Worker rollback never requires restoring Turso data.
+`createTursoAuthoritativeStore()` composes the THREEJS-063 durable adapter plus the THREEJS-065 finite invitation namespace adapter and advertises one `turso-authoritative-v1` store. The additive v1 schema persists lobby, explicit seat configuration, current credential binding, invitations, readiness, deadline, vote and mutation receipts while preserving the original PAGES-005 probe table.
 
-This implementation state is **not** a claim that production Turso has already been migrated or that `/v1` is live-client-ready. Before a dependent Worker generation is deployed, the THREEJS-063 schema migration must run with backend-only Turso credentials; PAGES-005 must still perform the authenticated deploy/probe for the selected `API_ORIGIN`; PAGES-015 must qualify the matching compatibility window. THREEJS-064+ still own the actual room/invitation/readiness/timeout/computer feature semantics.
+This implementation state is **not** a claim that production Turso has already been migrated or that `/v1` is live-client-ready. PAGES-005 still must perform authenticated deploy/probe for the selected `API_ORIGIN`, and PAGES-015 must qualify the matching compatibility window. THREEJS-066+ still own claim/recovery/readiness/timeout/Computer feature semantics.

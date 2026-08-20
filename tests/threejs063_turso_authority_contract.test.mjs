@@ -177,7 +177,7 @@ function transaction({
 
 test('THREEJS-063 additive schema creates every versioned authority record + migration ledger without replacing PAGES-005 probe table', async (t) => {
   const { primary, store } = await fixture(t);
-  await store.ensureTable(); // idempotent forward-only rerun
+  await store.ensureTable();
   const rows = await primary.all("SELECT name, type FROM sqlite_master WHERE type IN ('table','index')");
   const names = new Set(rows.map(row => String(row.name)));
   assert.equal(names.has(PROBE_TABLE), true);
@@ -186,6 +186,8 @@ test('THREEJS-063 additive schema creates every versioned authority record + mig
     'yakolak_authority_lobbies_expiry_v1',
     'yakolak_authority_seats_credential_v1',
     'yakolak_authority_invitations_locator_v1',
+    'yakolak_authority_invitations_open_locator_v1',
+    'yakolak_authority_invitations_open_seat_v1',
     'yakolak_authority_invitations_room_state_v1',
     'yakolak_authority_readiness_room_v1',
     'yakolak_authority_deadlines_due_v1',
@@ -198,13 +200,21 @@ test('THREEJS-063 additive schema creates every versioned authority record + mig
   assert.equal(migration.migration_name, 'threejs-063-authority-v1');
 });
 
-test('THREEJS-063 leaves 00–99 active-locator uniqueness to THREEJS-065 and fails ambiguous lookup closed', async (t) => {
+test('THREEJS-065 additive indexes enforce one active locator globally while allowing historical locator reuse', async (t) => {
   const { primary, store, now } = await fixture(t);
   await seedLobby(primary, { roomId: '54', now });
   await seedLobby(primary, { roomId: '55', now });
   await seedInvitation(primary, { invitationId: 'invite-a', locator: '42', roomId: '54', now });
-  await seedInvitation(primary, { invitationId: 'invite-b', locator: '42', roomId: '55', now });
-  await assert.rejects(store.lookupInvitation({ locator: '42' }), /invitation_locator_ambiguous/);
+  await assert.rejects(
+    seedInvitation(primary, { invitationId: 'invite-b-open', locator: '42', roomId: '55', now }),
+    /UNIQUE|constraint/i,
+  );
+  await seedInvitation(primary, {
+    invitationId: 'invite-b-history', locator: '42', roomId: '55', invitationState: 'claimed', now,
+  });
+  const resolved = await store.lookupInvitation({ locator: '42' });
+  assert.equal(resolved.invitationId, 'invite-a');
+  assert.equal(resolved.state, 'open');
 });
 
 test('Turso store capabilities are authoritative and seat auth derives server seat/generation from credential hash', async (t) => {
@@ -340,7 +350,9 @@ test('invitation-claim race and timeout-vs-computer race use the same room revis
   assert.equal(claims.filter(value => value.status === 'fulfilled').length, 1);
   assert.equal(claims.filter(value => value.status === 'rejected').length, 1);
   assert.match(String(claims.find(value => value.status === 'rejected').reason?.message), /revision_conflict/);
-  assert.equal((await s1.lookupInvitation({ locator: '42' })).state, 'claimed');
+  const claimedRow = await primary.get(`SELECT state FROM ${AUTHORITY_TABLES.invitations} WHERE invitation_id='invite-54-p2'`);
+  assert.equal(claimedRow.state, 'claimed');
+  assert.equal(await s1.lookupInvitation({ locator: '42' }), null, 'claimed short locator is released, not a recovery credential');
 
   const current = await primary.get(`SELECT revision FROM ${AUTHORITY_TABLES.lobbies} WHERE room_id = '54'`);
   const revision = Number(current.revision);

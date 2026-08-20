@@ -14,6 +14,7 @@ import {
   storeCapabilities,
   validateNextInvitation,
 } from './authoritative-store-contract.js';
+import { createTursoInvitationNamespace } from './authoritative-turso-invitation-namespace.js';
 import { materializeTursoLobbySeatBindings } from './authoritative-turso-seat-materialization.js';
 
 const T = AUTHORITY_TABLES;
@@ -93,6 +94,7 @@ function rowToInvitation(row) {
     seatId: String(row.seat_id),
     lobbyGeneration: Number(row.lobby_generation),
     state: String(row.state),
+    expiresAtMs: row.expires_at_ms == null ? null : Number(row.expires_at_ms),
     data: row.data_json == null ? null : parseJson(row.data_json, 'authoritative_invitation_corrupt'),
   };
 }
@@ -137,6 +139,7 @@ function validateNextState(result) {
 
 export function createTursoAuthoritativeStoreFromConnection(db, {
   nowMs = () => Date.now(),
+  randomUint32 = () => crypto.getRandomValues(new Uint32Array(1))[0],
   busyRetries = DEFAULT_BUSY_RETRIES,
   sleepFn = sleep,
 } = {}) {
@@ -152,6 +155,14 @@ export function createTursoAuthoritativeStoreFromConnection(db, {
 
   const withImmediate = (callback) => immediateTransaction(db, callback, { busyRetries, sleepFn });
   const withDeferred = (callback) => deferredTransaction(db, callback, { busyRetries, sleepFn });
+  const invitationNamespace = createTursoInvitationNamespace({
+    db,
+    tables: T,
+    withImmediate,
+    nowMs,
+    randomUint32,
+    receiptRetentionMs: RECEIPT_RETENTION_MS,
+  });
 
   async function transactAuthority(input) {
     const transaction = normalizeAuthorityTransaction(input);
@@ -198,8 +209,17 @@ export function createTursoAuthoritativeStoreFromConnection(db, {
 
       let currentInvitation = null;
       if (transaction.invitationId) {
+        const invitationNow = nowMs();
+        await run(tx, `UPDATE ${T.invitations}
+          SET state = 'expired', updated_at_ms = ?
+          WHERE invitation_id = ? AND state = 'open'
+            AND expires_at_ms IS NOT NULL AND expires_at_ms <= ?`, [
+          invitationNow,
+          transaction.invitationId,
+          invitationNow,
+        ]);
         const invitationRow = await get(tx, `SELECT invitation_id, locator, room_id, seat_id,
-          lobby_generation, state, data_json
+          lobby_generation, state, data_json, expires_at_ms
           FROM ${T.invitations} WHERE invitation_id = ? LIMIT 1`, [transaction.invitationId]);
         currentInvitation = rowToInvitation(invitationRow);
         if (!currentInvitation) failAuthority('invitation_not_found');
@@ -337,6 +357,11 @@ export function createTursoAuthoritativeStoreFromConnection(db, {
       if (!Number.isFinite(cutoffMs)) failAuthority('invalid_cleanup_cutoff');
       return withImmediate(async (tx) => {
         let deleted = 0;
+        const invitationNow = nowMs();
+        await run(tx, `UPDATE ${T.invitations}
+          SET state = 'expired', updated_at_ms = ?
+          WHERE state = 'open' AND expires_at_ms IS NOT NULL AND expires_at_ms <= ?`,
+        [invitationNow, invitationNow]);
         deleted += changes(await run(tx, `DELETE FROM ${PROBE_TABLE} WHERE updated_at < ?`, [beforeIso]));
         const tombstoned = `room_id IN (
           SELECT room_id FROM ${T.lobbies}
@@ -378,15 +403,9 @@ export function createTursoAuthoritativeStoreFromConnection(db, {
       });
     },
 
-    async lookupInvitation({ locator }) {
-      const rows = await db.all(`SELECT invitation_id, locator, room_id, seat_id,
-        lobby_generation, state, data_json
-        FROM ${T.invitations} WHERE locator = ? ORDER BY created_at_ms DESC, invitation_id DESC LIMIT 2`,
-      String(locator || '').trim());
-      if (rows.length > 1) failAuthority('invitation_locator_ambiguous');
-      return rowToInvitation(rows[0]);
-    },
-
+    lookupInvitation: invitationNamespace.lookupInvitation,
+    allocateInvitation: invitationNamespace.allocateInvitation,
+    revokeInvitation: invitationNamespace.revokeInvitation,
     transactAuthority,
 
     async commitMutation({

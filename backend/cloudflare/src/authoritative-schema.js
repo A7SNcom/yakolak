@@ -141,6 +141,10 @@ export const AUTHORITY_SCHEMA_STATEMENTS = Object.freeze([
     ON ${T.seatConfigurations} (room_id, lobby_generation)`,
   `CREATE INDEX IF NOT EXISTS yakolak_authority_invitations_locator_v1
     ON ${T.invitations} (locator, state, expires_at_ms)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS yakolak_authority_invitations_open_locator_v1
+    ON ${T.invitations} (locator) WHERE state = 'open'`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS yakolak_authority_invitations_open_seat_v1
+    ON ${T.invitations} (room_id, lobby_generation, seat_id) WHERE state = 'open'`,
   `CREATE INDEX IF NOT EXISTS yakolak_authority_invitations_room_state_v1
     ON ${T.invitations} (room_id, lobby_generation, state)`,
   `CREATE INDEX IF NOT EXISTS yakolak_authority_invitations_expiry_v1

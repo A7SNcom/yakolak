@@ -11,6 +11,11 @@ import {
   normalizeMutationEnvelope,
 } from './authoritative-api.js';
 import {
+  normalizeAllocateInvitationEnvelope,
+  normalizeRevokeInvitationEnvelope,
+  publicInvitationView,
+} from './authoritative-invitation-namespace.js';
+import {
   createConfigureLobbyTransaction,
   normalizeConfigureLobbyEnvelope,
 } from './authoritative-lobby-config.js';
@@ -154,6 +159,16 @@ function authorizeRoomRequest(request, store, roomId) {
   })();
 }
 
+function publicMutationReceipt(committed, actorSeatId) {
+  if (committed?.receipt?.mutationId) return committed.receipt;
+  return {
+    mutationId: committed.receipt.idempotencyKey,
+    action: committed.receipt.operation,
+    actorSeatId,
+    revision: committed.receipt.revision,
+  };
+}
+
 export function createWorker({
   createStore = createTursoAuthoritativeStore,
   randomUUID = () => crypto.randomUUID(),
@@ -222,6 +237,16 @@ export function createWorker({
           return responseJson(request, 200, shellPayload(store, env, { ok: true, room }), requestContext);
         }
 
+        const invitationMatch = url.pathname.match(/^\/v1\/invitations\/(\d{2})$/);
+        if (request.method === 'GET' && invitationMatch) {
+          const invitation = await store.lookupInvitation({ locator: invitationMatch[1] });
+          if (!invitation) throw codedError('invitation_not_found');
+          return responseJson(request, 200, shellPayload(store, env, {
+            ok: true,
+            invitation: publicInvitationView(invitation),
+          }), requestContext);
+        }
+
         const snapshotMatch = url.pathname.match(/^\/v1\/rooms\/(\d{2})\/snapshot$/);
         if (request.method === 'GET' && snapshotMatch) {
           const roomId = normalizeAuthoritativeRoomId(snapshotMatch[1]);
@@ -246,15 +271,21 @@ export function createWorker({
             throw codedError('invalid_payload');
           }
           const roomId = normalizeAuthoritativeRoomId(mutationMatch[1]);
-          const isConfigureLobby = body?.action === AUTHORITATIVE_OPERATION_NAMES.CONFIGURE_LOBBY;
+          const action = body?.action;
+          const isConfigureLobby = action === AUTHORITATIVE_OPERATION_NAMES.CONFIGURE_LOBBY;
+          const isAllocateInvitation = action === AUTHORITATIVE_OPERATION_NAMES.ALLOCATE_INVITATION;
+          const isRevokeInvitation = action === AUTHORITATIVE_OPERATION_NAMES.REVOKE_INVITATION;
           const envelope = isConfigureLobby
             ? normalizeConfigureLobbyEnvelope(body)
-            : normalizeMutationEnvelope(body);
+            : isAllocateInvitation
+              ? normalizeAllocateInvitationEnvelope(body)
+              : isRevokeInvitation
+                ? normalizeRevokeInvitationEnvelope(body)
+                : normalizeMutationEnvelope(body);
           const authorized = await authorizeRoomRequest(request, store, roomId);
           const fingerprint = await sha256Hex(mutationFingerprintSource(roomId, authorized.seatId, envelope));
 
           let committed;
-          let receipt;
           if (isConfigureLobby) {
             committed = await store.transactAuthority(createConfigureLobbyTransaction({
               roomId,
@@ -265,12 +296,27 @@ export function createWorker({
               fingerprint,
               configuration: envelope.payload,
             }));
-            receipt = {
-              mutationId: committed.receipt.idempotencyKey,
-              action: committed.receipt.operation,
+          } else if (isAllocateInvitation) {
+            committed = await store.allocateInvitation({
+              roomId,
               actorSeatId: authorized.seatId,
-              revision: committed.receipt.revision,
-            };
+              credentialGeneration: authorized.credentialGeneration,
+              expectedRevision: envelope.expectedRevision,
+              mutationId: envelope.mutationId,
+              fingerprint,
+              invitationId: randomUUID(),
+              seatId: envelope.payload.seatId,
+            });
+          } else if (isRevokeInvitation) {
+            committed = await store.revokeInvitation({
+              roomId,
+              actorSeatId: authorized.seatId,
+              credentialGeneration: authorized.credentialGeneration,
+              expectedRevision: envelope.expectedRevision,
+              mutationId: envelope.mutationId,
+              fingerprint,
+              invitationId: envelope.payload.invitationId,
+            });
           } else {
             committed = await store.commitMutation({
               roomId,
@@ -282,7 +328,6 @@ export function createWorker({
               action: envelope.action,
               transition: state => applyAuthoritativeMutation(state, authorized.seatId, envelope),
             });
-            receipt = committed.receipt;
           }
 
           return responseJson(request, 200, shellPayload(store, env, {
@@ -293,9 +338,10 @@ export function createWorker({
             },
             mutation: {
               status: committed.status,
-              receipt,
+              receipt: publicMutationReceipt(committed, authorized.seatId),
             },
             snapshot: committed.snapshot,
+            ...(committed.invitation ? { invitation: publicInvitationView(committed.invitation) } : {}),
           }), requestContext);
         }
 
