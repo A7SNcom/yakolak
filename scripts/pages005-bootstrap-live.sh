@@ -20,8 +20,12 @@ final_evidence="$RUNNER_TEMP/pages005-worker-window-final-evidence.json"
 trap 'rm -f "$secrets_file"' EXIT
 
 npm install --ignore-scripts
+test "$(node -p "require('./node_modules/wrangler/package.json').version")" = "4.123.0" || {
+  echo 'unexpected Wrangler version; refusing live deployment' >&2
+  exit 1
+}
 node --test tests/pages_backend_runtime_contract.test.mjs tests/pages_online_compatibility_contract.test.mjs
-npx --yes wrangler@4 deploy --dry-run --config backend/cloudflare/wrangler.jsonc --outdir .tmp/pages005-worker
+./node_modules/.bin/wrangler deploy --dry-run --config backend/cloudflare/wrangler.jsonc --outdir .tmp/pages005-worker
 
 SECRETS_FILE="$secrets_file" node <<'NODE'
 const fs = require('node:fs');
@@ -34,7 +38,7 @@ chmod 600 "$secrets_file"
 
 rm -f "$bootstrap_output"
 WRANGLER_OUTPUT_FILE_PATH="$bootstrap_output" \
-  npx --yes wrangler@4 deploy \
+  ./node_modules/.bin/wrangler deploy \
     --config backend/cloudflare/wrangler.jsonc \
     --secrets-file "$secrets_file" \
     --message 'PAGES-005 bootstrap live version'
@@ -82,7 +86,7 @@ node scripts/probe-pages005-cloudflare-roundtrip.mjs "$api_origin"
 
 rm -f "$twin_output"
 WRANGLER_OUTPUT_FILE_PATH="$twin_output" \
-  npx --yes wrangler@4 versions upload \
+  ./node_modules/.bin/wrangler versions upload \
     --config backend/cloudflare/wrangler.jsonc \
     --secrets-file "$secrets_file" \
     --message 'PAGES-005 rollback-window active twin'
@@ -94,7 +98,7 @@ test "$twin_version" != "$bootstrap_version"
 
 rm -f "$window_output"
 WRANGLER_OUTPUT_FILE_PATH="$window_output" \
-  npx --yes wrangler@4 versions deploy \
+  ./node_modules/.bin/wrangler versions deploy \
     "${twin_version}@100%" \
     "${bootstrap_version}@0%" \
     --config backend/cloudflare/wrangler.jsonc \
