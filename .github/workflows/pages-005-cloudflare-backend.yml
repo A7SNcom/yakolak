@@ -62,14 +62,16 @@ jobs:
           node --check scripts/verify-pages015-frontend-window.mjs
           node --check scripts/verify-pages015-current-lock-qualification.mjs
           node --check scripts/verify-release-qualification.mjs
-      - name: Install runtime dependency
+      - name: Install pinned toolchain
         run: npm install --ignore-scripts
-      - name: Verify pinned Playwright test runtime
-        run: node --input-type=module -e "import { test, expect } from '@playwright/test'; if (!test || !expect) process.exit(1)"
+      - name: Verify pinned deployment/test runtimes
+        run: |
+          node --input-type=module -e "import { test, expect } from '@playwright/test'; if (!test || !expect) process.exit(1)"
+          test "$(node -p "require('./node_modules/wrangler/package.json').version")" = "4.123.0"
       - name: Worker and online compatibility contract tests
         run: node --test tests/pages_backend_runtime_contract.test.mjs tests/pages_online_compatibility_contract.test.mjs tests/pages005_worker_lock_identity_contract.test.mjs tests/pages015_current_lock_qualification_contract.test.mjs tests/pages015_release_verifier_window_contract.test.mjs tests/pages015_single_resume_path_contract.test.mjs tests/pages015_retired_pages012_preserve_contract.test.mjs
       - name: Wrangler dry-run bundle
-        run: npx --yes wrangler@4 deploy --dry-run --config backend/cloudflare/wrangler.jsonc --outdir .tmp/pages005-worker
+        run: ./node_modules/.bin/wrangler deploy --dry-run --config backend/cloudflare/wrangler.jsonc --outdir .tmp/pages005-worker
 
   deploy:
     if: github.event_name == 'workflow_dispatch'
