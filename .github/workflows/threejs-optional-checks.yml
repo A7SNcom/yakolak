@@ -11,6 +11,7 @@ on:
         options:
           - fast
           - browser
+          - backend
           - full
           - live-local
       expected_candidate_sha:
@@ -48,6 +49,27 @@ jobs:
           node --test tests/pages_service_worker_decision.test.mjs
           node --test tests/pages_deployment_generation.test.mjs
           node --test tests/threejs061_live_acceptance_contract.test.mjs
+
+  backend:
+    if: inputs.suite == 'backend' || inputs.suite == 'full'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact migration SHA
+        uses: actions/checkout@v4
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install backend contract dependencies
+        run: npm install --ignore-scripts
+      - name: Run PAGES-005 and THREEJS-062 backend contracts
+        run: |
+          node --test tests/pages_backend_runtime_contract.test.mjs
+          node --test tests/threejs062_authoritative_api_shell.test.mjs
+          node --test tests/threejs062_authority_contract_extensions.test.mjs
+      - name: Compile Worker without deployment
+        run: npx --yes wrangler@4 deploy --dry-run --config backend/cloudflare/wrangler.jsonc
 
   browser:
     if: inputs.suite == 'browser' || inputs.suite == 'full'

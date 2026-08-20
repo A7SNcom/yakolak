@@ -1,36 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createInMemoryAuthoritativeStore } from '../backend/cloudflare/src/authoritative-store.js';
 import { createWorker, __testing } from '../backend/cloudflare/src/worker.js';
 
 function createMemoryStore() {
-  const rooms = new Map();
-  return {
-    async ensureTable() {},
-    async writeRoom({ roomId, payload, integrity, now }) {
-      const previous = rooms.get(roomId);
-      rooms.set(roomId, {
-        roomId,
-        payload: structuredClone(payload),
-        integrity,
-        createdAt: previous?.createdAt || now,
-        updatedAt: now,
-      });
-    },
-    async readRoom(roomId) {
-      const room = rooms.get(roomId);
-      return room ? structuredClone(room) : null;
-    },
-    async cleanup(beforeIso) {
-      let deleted = 0;
-      for (const [roomId, room] of rooms) {
-        if (room.updatedAt < beforeIso) {
-          rooms.delete(roomId);
-          deleted += 1;
-        }
-      }
-      return deleted;
-    },
-  };
+  return createInMemoryAuthoritativeStore();
 }
 
 function workerEnv() {
@@ -78,6 +52,7 @@ test('PAGES-015 health exposes protocol/capability/Turso/Worker identity with Pa
   const body = await response.json();
   assert.equal(body.ok, true);
   assertCompatibility(body);
+  assert.equal(body.authoritativeApi.store.mode, 'memory-contract');
 });
 
 test('PAGES-005 HTTP room write/read round trip preserves payload and snapshot identity', async () => {

@@ -1,74 +1,25 @@
-import { createClient } from '@tursodatabase/serverless/compat';
 import { COLORS, RULES, SIZES } from '../../../api/game-rules.js';
+import {
+  applyAuthoritativeMutation,
+  authoritativeApiIdentity,
+  createRequestContext,
+  extractSeatCredential,
+  mutationFingerprintSource,
+  normalizeApiError,
+  normalizeAuthoritativeRoomId,
+  normalizeMutationEnvelope,
+} from './authoritative-api.js';
+import {
+  PROBE_TABLE,
+  assertAuthoritativeStore,
+  createTursoAuthoritativeStore,
+} from './authoritative-store.js';
 import { withCompatibility } from './compatibility.js';
 
-const PROBE_TABLE = 'yakolak_pages005_room_probe_v1';
 const PAGES_ORIGIN = 'https://a7sncom.github.io';
 const PROBE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_BODY_BYTES = 8_000;
 const ROOM_ID_PATTERN = /^p005-[a-f0-9]{32}$/;
-
-function createTursoStore(env) {
-  if (!env?.TURSO_DATABASE_URL || !env?.TURSO_AUTH_TOKEN) {
-    throw new Error('datastore_unavailable');
-  }
-
-  const db = createClient({
-    url: env.TURSO_DATABASE_URL,
-    authToken: env.TURSO_AUTH_TOKEN,
-  });
-
-  return {
-    async ensureTable() {
-      await db.execute(`
-        CREATE TABLE IF NOT EXISTS ${PROBE_TABLE} (
-          room_id TEXT PRIMARY KEY,
-          payload_json TEXT NOT NULL,
-          integrity TEXT NOT NULL,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        )
-      `);
-    },
-
-    async writeRoom({ roomId, payload, integrity, now }) {
-      await db.execute({
-        sql: `INSERT INTO ${PROBE_TABLE} (room_id, payload_json, integrity, created_at, updated_at)
-              VALUES (?, ?, ?, ?, ?)
-              ON CONFLICT(room_id) DO UPDATE SET
-                payload_json = excluded.payload_json,
-                integrity = excluded.integrity,
-                updated_at = excluded.updated_at`,
-        args: [roomId, JSON.stringify(payload), integrity, now, now],
-      });
-    },
-
-    async readRoom(roomId) {
-      const result = await db.execute({
-        sql: `SELECT room_id, payload_json, integrity, created_at, updated_at
-              FROM ${PROBE_TABLE} WHERE room_id = ? LIMIT 1`,
-        args: [roomId],
-      });
-      const row = result.rows?.[0];
-      if (!row) return null;
-      return {
-        roomId: String(row.room_id),
-        payload: JSON.parse(String(row.payload_json)),
-        integrity: String(row.integrity),
-        createdAt: String(row.created_at),
-        updatedAt: String(row.updated_at),
-      };
-    },
-
-    async cleanup(beforeIso) {
-      const result = await db.execute({
-        sql: `DELETE FROM ${PROBE_TABLE} WHERE updated_at < ?`,
-        args: [beforeIso],
-      });
-      return Number(result.rowsAffected || 0);
-    },
-  };
-}
 
 function isAllowedOrigin(origin) {
   if (!origin) return true;
@@ -87,21 +38,33 @@ function corsHeaders(request) {
   if (origin && isAllowedOrigin(origin)) {
     headers.set('access-control-allow-origin', origin);
     headers.set('access-control-allow-methods', 'GET, POST, OPTIONS');
-    headers.set('access-control-allow-headers', 'authorization, content-type');
+    headers.set('access-control-allow-headers', 'authorization, content-type, x-request-id, x-trace-id, traceparent');
+    headers.set('access-control-expose-headers', 'x-request-id, x-trace-id');
     headers.set('access-control-max-age', '600');
   }
   return headers;
 }
 
-function responseJson(request, status, payload) {
+function responseJson(request, status, payload, requestContext = null) {
   const headers = corsHeaders(request);
   headers.set('content-type', 'application/json; charset=utf-8');
-  return new Response(JSON.stringify(payload), { status, headers });
+  if (requestContext) {
+    headers.set('x-request-id', requestContext.requestId);
+    headers.set('x-trace-id', requestContext.traceId);
+  }
+  const body = requestContext
+    ? { ...payload, request: { ...requestContext } }
+    : payload;
+  return new Response(JSON.stringify(body), { status, headers });
 }
 
 async function readLimitedJson(request) {
   const declared = Number(request.headers.get('content-length') || 0);
-  if (declared > MAX_BODY_BYTES) throw new Error('payload_too_large');
+  if (declared > MAX_BODY_BYTES) {
+    const error = new Error('payload_too_large');
+    error.code = 'payload_too_large';
+    throw error;
+  }
   if (!request.body) return {};
 
   const reader = request.body.getReader();
@@ -113,7 +76,9 @@ async function readLimitedJson(request) {
     total += value.byteLength;
     if (total > MAX_BODY_BYTES) {
       await reader.cancel('payload_too_large');
-      throw new Error('payload_too_large');
+      const error = new Error('payload_too_large');
+      error.code = 'payload_too_large';
+      throw error;
     }
     chunks.push(value);
   }
@@ -139,42 +104,77 @@ function createRoomId() {
   return `p005-${[...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('')}`;
 }
 
-function errorStatus(error) {
-  if (error?.message === 'payload_too_large') return 413;
-  if (error?.message === 'room_not_found') return 404;
-  if (error?.message === 'invalid_room_id' || error?.message === 'invalid_payload') return 400;
-  if (error?.message === 'origin_not_allowed') return 403;
-  if (error?.message === 'datastore_unavailable') return 503;
-  return 500;
+function codedError(code, safeDetails = null) {
+  const error = new Error(code);
+  error.code = code;
+  if (safeDetails !== null) error.safeDetails = safeDetails;
+  return error;
 }
 
-function logError(kind, error) {
+function logError(kind, publicErrorCode, requestContext = null) {
   console.error(JSON.stringify({
     service: 'yakolak-room-api',
     kind,
-    error: String(error?.message || error),
+    requestId: requestContext?.requestId || null,
+    traceId: requestContext?.traceId || null,
+    error: String(publicErrorCode || 'online_server_error'),
   }));
 }
 
-export function createWorker({ createStore = createTursoStore } = {}) {
+function shellPayload(store, env, payload) {
+  return withCompatibility({
+    ...payload,
+    authoritativeApi: authoritativeApiIdentity(store.getCapabilities()),
+  }, env);
+}
+
+function errorResponse(request, error, requestContext) {
+  const normalized = normalizeApiError(error);
+  if (normalized.status >= 500) logError('request_failed', normalized.code, requestContext);
+  return responseJson(request, normalized.status, {
+    ok: false,
+    error: normalized.code,
+    errorDetail: {
+      code: normalized.code,
+      retryable: normalized.retryable,
+      details: normalized.details,
+    },
+  }, requestContext);
+}
+
+function authorizeRoomRequest(request, store, roomId) {
+  return (async () => {
+    const credentialHash = await sha256Hex(extractSeatCredential(request));
+    return store.authorizeSeat({ roomId, credentialHash });
+  })();
+}
+
+export function createWorker({
+  createStore = createTursoAuthoritativeStore,
+  randomUUID = () => crypto.randomUUID(),
+} = {}) {
   return {
     async fetch(request, env) {
+      const requestContext = createRequestContext(request, { randomUUID });
       const origin = request.headers.get('origin') || '';
       if (!isAllowedOrigin(origin)) {
-        return responseJson(request, 403, { ok: false, error: 'origin_not_allowed' });
+        return errorResponse(request, codedError('origin_not_allowed'), requestContext);
       }
 
       if (request.method === 'OPTIONS') {
-        return new Response(null, { status: 204, headers: corsHeaders(request) });
+        const headers = corsHeaders(request);
+        headers.set('x-request-id', requestContext.requestId);
+        headers.set('x-trace-id', requestContext.traceId);
+        return new Response(null, { status: 204, headers });
       }
 
       const url = new URL(request.url);
       try {
-        const store = createStore(env);
+        const store = assertAuthoritativeStore(createStore(env));
 
-        if (request.method === 'GET' && url.pathname === '/health') {
+        if (request.method === 'GET' && (url.pathname === '/health' || url.pathname === '/v1/health')) {
           await store.ensureTable();
-          return responseJson(request, 200, withCompatibility({
+          return responseJson(request, 200, shellPayload(store, env, {
             ok: true,
             provider: 'cloudflare-workers',
             datastore: 'turso',
@@ -184,7 +184,7 @@ export function createWorker({ createStore = createTursoStore } = {}) {
               sizes: [...SIZES],
             },
             crypto: 'web-crypto',
-          }, env));
+          }), requestContext);
         }
 
         if (request.method === 'POST' && url.pathname === '/__pages005/rooms') {
@@ -192,13 +192,13 @@ export function createWorker({ createStore = createTursoStore } = {}) {
           try {
             body = await readLimitedJson(request);
           } catch (error) {
-            if (error?.message === 'payload_too_large') throw error;
-            throw new Error('invalid_payload');
+            if (error?.code === 'payload_too_large' || error?.message === 'payload_too_large') throw error;
+            throw codedError('invalid_payload');
           }
-          if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('invalid_payload');
+          if (!body || typeof body !== 'object' || Array.isArray(body)) throw codedError('invalid_payload');
 
           const roomId = body.roomId ? String(body.roomId) : createRoomId();
-          if (!ROOM_ID_PATTERN.test(roomId)) throw new Error('invalid_room_id');
+          if (!ROOM_ID_PATTERN.test(roomId)) throw codedError('invalid_room_id');
           const payload = Object.hasOwn(body, 'payload') ? body.payload : { probe: true };
           const integrity = await sha256Hex(JSON.stringify(payload));
           const now = new Date().toISOString();
@@ -206,37 +206,88 @@ export function createWorker({ createStore = createTursoStore } = {}) {
           await store.ensureTable();
           await store.writeRoom({ roomId, payload, integrity, now });
           const room = await store.readRoom(roomId);
-          return responseJson(request, 201, withCompatibility({ ok: true, room }, env));
+          return responseJson(request, 201, shellPayload(store, env, { ok: true, room }), requestContext);
         }
 
-        const readMatch = url.pathname.match(/^\/__pages005\/rooms\/(p005-[a-f0-9]{32})$/);
-        if (request.method === 'GET' && readMatch) {
+        const probeReadMatch = url.pathname.match(/^\/__pages005\/rooms\/(p005-[a-f0-9]{32})$/);
+        if (request.method === 'GET' && probeReadMatch) {
           await store.ensureTable();
-          const room = await store.readRoom(readMatch[1]);
-          if (!room) throw new Error('room_not_found');
-          return responseJson(request, 200, withCompatibility({ ok: true, room }, env));
+          const room = await store.readRoom(probeReadMatch[1]);
+          if (!room) throw codedError('room_not_found');
+          return responseJson(request, 200, shellPayload(store, env, { ok: true, room }), requestContext);
         }
 
-        return responseJson(request, 404, { ok: false, error: 'not_found' });
-      } catch (error) {
-        const status = errorStatus(error);
-        if (status >= 500) logError('request_failed', error);
-        return responseJson(request, status, {
+        const snapshotMatch = url.pathname.match(/^\/v1\/rooms\/(\d{2})\/snapshot$/);
+        if (request.method === 'GET' && snapshotMatch) {
+          const roomId = normalizeAuthoritativeRoomId(snapshotMatch[1]);
+          const authorized = await authorizeRoomRequest(request, store, roomId);
+          return responseJson(request, 200, shellPayload(store, env, {
+            ok: true,
+            actor: {
+              seatId: authorized.seatId,
+              credentialGeneration: authorized.credentialGeneration,
+            },
+            snapshot: authorized.snapshot,
+          }), requestContext);
+        }
+
+        const mutationMatch = url.pathname.match(/^\/v1\/rooms\/(\d{2})\/mutations$/);
+        if (request.method === 'POST' && mutationMatch) {
+          let body;
+          try {
+            body = await readLimitedJson(request);
+          } catch (error) {
+            if (error?.code === 'payload_too_large' || error?.message === 'payload_too_large') throw error;
+            throw codedError('invalid_payload');
+          }
+          const roomId = normalizeAuthoritativeRoomId(mutationMatch[1]);
+          const envelope = normalizeMutationEnvelope(body);
+          const authorized = await authorizeRoomRequest(request, store, roomId);
+          const fingerprint = await sha256Hex(mutationFingerprintSource(roomId, authorized.seatId, envelope));
+          const committed = await store.commitMutation({
+            roomId,
+            actorSeatId: authorized.seatId,
+            credentialGeneration: authorized.credentialGeneration,
+            expectedRevision: envelope.expectedRevision,
+            mutationId: envelope.mutationId,
+            fingerprint,
+            action: envelope.action,
+            transition: state => applyAuthoritativeMutation(state, authorized.seatId, envelope),
+          });
+          return responseJson(request, 200, shellPayload(store, env, {
+            ok: true,
+            actor: {
+              seatId: authorized.seatId,
+              credentialGeneration: authorized.credentialGeneration,
+            },
+            mutation: {
+              status: committed.status,
+              receipt: committed.receipt,
+            },
+            snapshot: committed.snapshot,
+          }), requestContext);
+        }
+
+        return responseJson(request, 404, {
           ok: false,
-          error: status >= 500 ? 'online_server_error' : String(error.message),
-        });
+          error: 'not_found',
+          errorDetail: { code: 'not_found', retryable: false, details: null },
+        }, requestContext);
+      } catch (error) {
+        return errorResponse(request, error, requestContext);
       }
     },
 
     async scheduled(controller, env) {
       try {
-        const store = createStore(env);
+        const store = assertAuthoritativeStore(createStore(env));
         await store.ensureTable();
         const beforeIso = new Date(Number(controller.scheduledTime || Date.now()) - PROBE_TTL_MS).toISOString();
         const deleted = await store.cleanup(beforeIso);
         console.log(JSON.stringify({ service: 'yakolak-room-api', kind: 'scheduled_cleanup', deleted }));
       } catch (error) {
-        logError('scheduled_cleanup_failed', error);
+        const normalized = normalizeApiError(error);
+        logError('scheduled_cleanup_failed', normalized.code);
         throw error;
       }
     },
