@@ -7,6 +7,7 @@ export const AUTHORITY_TABLES = Object.freeze({
   seats: 'yakolak_authority_seats_v1',
   seatConfigurations: 'yakolak_authority_seat_configurations_v1',
   invitations: 'yakolak_authority_invitations_v1',
+  manualLocators: 'yakolak_authority_manual_invitation_locators_v1',
   readiness: 'yakolak_authority_readiness_v1',
   deadlines: 'yakolak_authority_deadlines_v1',
   votes: 'yakolak_authority_votes_v1',
@@ -84,6 +85,17 @@ export const AUTHORITY_SCHEMA_STATEMENTS = Object.freeze([
     updated_at_ms INTEGER NOT NULL,
     expires_at_ms INTEGER
   )`,
+  `CREATE TABLE IF NOT EXISTS ${T.manualLocators} (
+    locator TEXT PRIMARY KEY CHECK (length(locator) = 2 AND locator GLOB '[0-9][0-9]'),
+    invitation_id TEXT NOT NULL UNIQUE,
+    room_id TEXT NOT NULL,
+    seat_id TEXT NOT NULL,
+    lobby_generation INTEGER NOT NULL CHECK (lobby_generation >= 0),
+    expires_at_ms INTEGER NOT NULL,
+    created_at_ms INTEGER NOT NULL,
+    updated_at_ms INTEGER NOT NULL,
+    UNIQUE (room_id, lobby_generation, seat_id)
+  )`,
   `CREATE TABLE IF NOT EXISTS ${T.readiness} (
     room_id TEXT NOT NULL,
     lobby_generation INTEGER NOT NULL CHECK (lobby_generation >= 0),
@@ -145,6 +157,8 @@ export const AUTHORITY_SCHEMA_STATEMENTS = Object.freeze([
     ON ${T.invitations} (room_id, lobby_generation, state)`,
   `CREATE INDEX IF NOT EXISTS yakolak_authority_invitations_expiry_v1
     ON ${T.invitations} (expires_at_ms, state)`,
+  `CREATE INDEX IF NOT EXISTS yakolak_authority_manual_locators_expiry_v1
+    ON ${T.manualLocators} (expires_at_ms)`,
   `CREATE INDEX IF NOT EXISTS yakolak_authority_readiness_room_v1
     ON ${T.readiness} (room_id, lobby_generation, ready)`,
   `CREATE INDEX IF NOT EXISTS yakolak_authority_deadlines_due_v1
