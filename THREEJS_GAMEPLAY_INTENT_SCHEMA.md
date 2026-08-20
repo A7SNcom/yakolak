@@ -53,6 +53,12 @@ A bot move is the same `move` kind and payload with `origin: "bot"`; it does not
 
 The engine-neutral core treats `seat` and `mutationId` as opaque identifiers. This is deliberate: THREEJS-029 must not pre-empt the still-open stable-seat and unified-mutation-envelope decisions. A concrete authority adapter may impose the constraints of the protocol it actually targets.
 
+## Graphics/context-recovery boundary
+
+`web/app/session/canonical-online-session.js` is application/session state used by the graphics recovery contract. It is not allowed to define its own gameplay mutation shape. Its `submitMoveIntent()` boundary accepts only a validated `yakolak.gameplay-intent/v1` network `move`, requires the intent seat to match the canonical session seat, and deduplicates/reconciles by `authority.mutationId`.
+
+The historical parallel `{ moveId, cell, size, ... }` shape is rejected. WebGL loss/restoration may preserve the canonical intent and its mutation identity, but it must never translate it into a graphics-specific or recovery-specific rules path.
+
 ## Current protocol-5 network submission adapter
 
 `toRoomsApiSubmission()` is explicitly an adapter for the currently deployed `/api/rooms` contract, not a second gameplay schema.
@@ -89,7 +95,9 @@ Only `presentation.source`/`origin` differs. `gameplayRuleSemantics()` removes b
 ## Files and verification
 
 - Runtime contract: `web/app/gameplay/gameplay-intent.js`
+- Graphics/session compatibility boundary: `web/app/session/canonical-online-session.js`
 - Contract test: `tests/threejs_gameplay_intent_contract.test.mjs`
-- Verification: `node --test tests/threejs_gameplay_intent_contract.test.mjs`
+- Graphics recovery regression: `tests/threejs_context_recovery_contract.test.mjs`
+- Verification: `node --test tests/threejs_gameplay_intent_contract.test.mjs tests/threejs_context_recovery_contract.test.mjs`
 
 No PAGES-012/PAGES-015 release, qualification, deployment or compatibility state is changed by THREEJS-029.
