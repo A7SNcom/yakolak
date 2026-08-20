@@ -32,6 +32,8 @@ export const AUTHORITATIVE_TURN_DURATION_MS = 18_000;
 // with the named downstream owners (064/065/066/068/069/070/071/072).
 export const AUTHORITATIVE_OPERATION_NAMES = Object.freeze({
   CONFIGURE_LOBBY: 'configure-lobby',
+  ALLOCATE_INVITATION: 'allocate-invitation',
+  REVOKE_INVITATION: 'revoke-invitation',
   CLAIM_INVITATION: 'claim-invitation',
   INVALIDATE_LOBBY: 'invalidate-lobby',
   SET_READY: 'set-ready',
@@ -55,6 +57,7 @@ export const AUTHORITATIVE_API = Object.freeze({
       'room-mutation-envelope.v1',
       'shared-transition.move.v1',
       'authoritative-lobby-configuration.v1',
+      'finite-invitation-namespace-00-99.v1',
       'authoritative-store-interface.v1',
     ]),
   }),
@@ -225,6 +228,11 @@ const ERROR_STATUS = Object.freeze({
   invalid_wins_to_match: 400,
   invalid_remaining_seat_types: 400,
   invalid_remaining_seat_type: 400,
+  invalid_invitation_locator: 400,
+  invalid_invitation_locator_index: 400,
+  invalid_invitation_namespace: 500,
+  invitation_random_source_invalid: 500,
+  invitation_random_source_unavailable: 503,
   invalid_lobby_generation: 409,
   invalid_lobby_state: 409,
   lobby_host_required: 409,
@@ -232,6 +240,12 @@ const ERROR_STATUS = Object.freeze({
   lobby_already_configured: 409,
   lobby_configuration_has_bound_seat: 409,
   host_only_lobby_configuration: 403,
+  host_only_invitation_allocation: 403,
+  invitation_online_seat_required: 409,
+  invitation_already_open: 409,
+  invitation_already_claimed: 409,
+  invitation_not_open: 409,
+  INVITE_CODE_CAPACITY: 409,
   origin_not_allowed: 403,
   room_not_found: 404,
   seat_credential_required: 401,
@@ -239,6 +253,7 @@ const ERROR_STATUS = Object.freeze({
   seat_credential_rejected: 401,
   seat_credential_generation_stale: 401,
   invitation_not_found: 404,
+  invitation_scope_mismatch: 409,
   revision_conflict: 409,
   mutation_id_reused: 409,
   idempotency_key_reused: 409,
@@ -262,7 +277,8 @@ export function normalizeApiError(error) {
     code,
     retryable: code === 'datastore_unavailable'
       || code === 'authoritative_store_unavailable'
-      || code === 'revision_conflict',
+      || code === 'revision_conflict'
+      || code === 'INVITE_CODE_CAPACITY',
     details: error?.safeDetails && typeof error.safeDetails === 'object'
       ? structuredClone(error.safeDetails)
       : null,

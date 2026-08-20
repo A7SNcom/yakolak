@@ -10,6 +10,8 @@ export const REQUIRED_STORE_METHODS = Object.freeze([
   'cleanup',
   'authorizeSeat',
   'lookupInvitation',
+  'allocateInvitation',
+  'revokeInvitation',
   'transactAuthority',
   'commitMutation',
 ]);
@@ -106,7 +108,7 @@ export function validateNextInvitation(currentInvitation, nextInvitation, invita
   if (!nextInvitation || typeof nextInvitation !== 'object' || Array.isArray(nextInvitation)) {
     failAuthority('invalid_next_invitation');
   }
-  for (const field of ['invitationId', 'locator', 'roomId', 'seatId', 'lobbyGeneration']) {
+  for (const field of ['invitationId', 'locator', 'roomId', 'seatId', 'lobbyGeneration', 'expiresAtMs']) {
     if (nextInvitation[field] !== currentInvitation[field]) failAuthority('invalid_next_invitation');
   }
   if (nextInvitation.invitationId !== invitationId) failAuthority('invalid_next_invitation');

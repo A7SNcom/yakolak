@@ -63,7 +63,7 @@ jobs:
           node-version: '22'
       - name: Install backend contract dependencies
         run: npm install --ignore-scripts
-      - name: Run PAGES-005 and THREEJS-062/063/064 backend contracts
+      - name: Run PAGES-005 and THREEJS-062/063/064/065 backend contracts
         run: |
           node --test tests/pages_backend_runtime_contract.test.mjs
           node --test tests/threejs062_authoritative_api_shell.test.mjs
@@ -71,6 +71,8 @@ jobs:
           node --test tests/threejs063_turso_authority_contract.test.mjs
           node --test tests/threejs064_authoritative_lobby_configuration.test.mjs
           node --test tests/threejs064_worker_route_contract.test.mjs
+          node --test tests/threejs065_invitation_namespace.test.mjs
+          node --test tests/threejs065_worker_invitation_route.test.mjs
       - name: Compile Worker without deployment
         run: npx --yes wrangler@4 deploy --dry-run --config backend/cloudflare/wrangler.jsonc
 

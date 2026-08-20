@@ -44,7 +44,7 @@ function state() {
   };
 }
 
-test('THREEJS-062 locks only the cross-task vocabulary and leaves feature semantics downstream', () => {
+test('THREEJS-062 locks cross-task vocabulary and THREEJS-065 adds only finite-namespace operation framing', () => {
   assert.deepEqual(AUTHORITATIVE_SEAT_TYPES, { HOST: 'host', ONLINE: 'online', COMPUTER: 'computer' });
   assert.deepEqual(AUTHORITATIVE_ACTOR_KINDS, { SEAT: 'seat', CLAIM: 'claim', SERVER: 'server' });
   assert.deepEqual(AUTHORITATIVE_INVITATION_STATES, {
@@ -57,6 +57,8 @@ test('THREEJS-062 locks only the cross-task vocabulary and leaves feature semant
   });
   assert.deepEqual(AUTHORITATIVE_API.contract.reservedOperations, [
     'configure-lobby',
+    'allocate-invitation',
+    'revoke-invitation',
     'claim-invitation',
     'invalidate-lobby',
     'set-ready',
@@ -65,12 +67,14 @@ test('THREEJS-062 locks only the cross-task vocabulary and leaves feature semant
     'reconcile-timeout',
     'reconcile-computer',
   ]);
+  assert.equal(AUTHORITATIVE_OPERATION_NAMES.ALLOCATE_INVITATION, 'allocate-invitation');
+  assert.equal(AUTHORITATIVE_OPERATION_NAMES.REVOKE_INVITATION, 'revoke-invitation');
   assert.equal(AUTHORITATIVE_OPERATION_NAMES.CLAIM_INVITATION, 'claim-invitation');
   assert.equal(AUTHORITATIVE_OPERATION_NAMES.RECONCILE_TIMEOUT, 'reconcile-timeout');
   assert.equal(AUTHORITATIVE_OPERATION_NAMES.RECONCILE_COMPUTER, 'reconcile-computer');
 });
 
-test('generic store transaction can atomically cover a seeded invitation scope without implementing allocation/claim policy', async () => {
+test('generic store transaction can atomically cover a seeded invitation scope without implementing claim credential policy', async () => {
   const credentialHash = await sha256Hex('host_authority_credential_0000000001');
   const store = createInMemoryAuthoritativeStore({
     authoritativeRooms: [{
@@ -89,15 +93,13 @@ test('generic store transaction can atomically cover a seeded invitation scope w
   });
 
   const invitation = await store.lookupInvitation({ locator: '42' });
-  assert.deepEqual(invitation, {
-    invitationId: 'invite-seeded-contract-001',
-    locator: '42',
-    roomId: '54',
-    seatId: 'p2',
-    lobbyGeneration: 9,
-    state: 'open',
-    data: { contractOnly: true },
-  });
+  assert.equal(invitation.invitationId, 'invite-seeded-contract-001');
+  assert.equal(invitation.locator, '42');
+  assert.equal(invitation.roomId, '54');
+  assert.equal(invitation.seatId, 'p2');
+  assert.equal(invitation.lobbyGeneration, 9);
+  assert.equal(invitation.state, 'open');
+  assert.deepEqual(invitation.data, { contractOnly: true });
   assert.equal(await store.lookupInvitation({ locator: '99' }), null);
 
   const transaction = {
@@ -128,6 +130,7 @@ test('generic store transaction can atomically cover a seeded invitation scope w
     operation: 'claim-invitation',
     revision: 12,
   });
+  assert.equal(await store.lookupInvitation({ locator: '42' }), null, 'claimed manual locator is released and cannot recover authority');
 
   const duplicate = await store.transactAuthority(transaction);
   assert.equal(duplicate.status, 'duplicate');
