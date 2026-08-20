@@ -113,6 +113,24 @@ export async function allocateTursoInvitation({
     allocation.seatId,
   );
   if (!seat || String(seat.seat_type) !== 'online') failAuthority('invitation_seat_not_online');
+  const targetBinding = await tx.get(
+    `SELECT credential_hash, credential_generation FROM ${tables.seats}
+      WHERE room_id = ? AND seat_id = ? LIMIT 1`,
+    allocation.roomId,
+    allocation.seatId,
+  );
+  if (!targetBinding) failAuthority('invitation_seat_not_online');
+  if (targetBinding.credential_hash != null || Number(targetBinding.credential_generation) > 0) {
+    failAuthority('invitation_seat_already_claimed');
+  }
+  const claimedInvitation = await tx.get(
+    `SELECT invitation_id FROM ${tables.invitations}
+      WHERE room_id = ? AND lobby_generation = ? AND seat_id = ? AND state = 'claimed' LIMIT 1`,
+    allocation.roomId,
+    allocation.lobbyGeneration,
+    allocation.seatId,
+  );
+  if (claimedInvitation) failAuthority('invitation_seat_already_claimed');
 
   const existingLocator = await tx.get(
     `SELECT locator, invitation_id, expires_at_ms FROM ${tables.manualLocators}
