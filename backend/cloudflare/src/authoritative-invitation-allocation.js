@@ -64,16 +64,24 @@ export function shuffledManualInvitationLocators(randomUint32 = secureRandomUint
 }
 
 export function normalizeInvitationAllocation(value) {
-  if (!exactKeys(value, ['roomId', 'seatId', 'lobbyGeneration', 'invitationId'])) {
+  if (!exactKeys(value, [
+    'roomId', 'seatId', 'lobbyGeneration', 'invitationId', 'actorSeatId', 'credentialGeneration',
+  ])) {
     fail('invalid_invitation_allocation');
   }
   const lobbyGeneration = value.lobbyGeneration;
   if (!Number.isSafeInteger(lobbyGeneration) || lobbyGeneration < 0) fail('invalid_lobby_generation');
+  const credentialGeneration = value.credentialGeneration;
+  if (!Number.isSafeInteger(credentialGeneration) || credentialGeneration < 1) {
+    fail('invalid_invitation_allocation');
+  }
   return Object.freeze({
     roomId: opaque(value.roomId, 'invalid_invitation_allocation'),
     seatId: opaque(value.seatId, 'invalid_invitation_allocation'),
     lobbyGeneration,
     invitationId: opaque(value.invitationId, 'invalid_invitation_allocation'),
+    actorSeatId: opaque(value.actorSeatId, 'invalid_invitation_allocation'),
+    credentialGeneration,
   });
 }
 
