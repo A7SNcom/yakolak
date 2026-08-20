@@ -52,7 +52,7 @@ function compatibilityBoundary(gate) {
 // Canonical online/session identity is deliberately CPU/application state.
 // Graphics context loss/restoration must never recreate, clear, or replay this object.
 // Gameplay mutations use only the THREEJS-029 network intent envelope; graphics
-// recovery must not introduce or preserve a parallel moveId/cell/size contract.
+// recovery must not introduce or preserve a parallel legacy move contract.
 export function createCanonicalOnlineSession({
   roomId,
   seatId,
