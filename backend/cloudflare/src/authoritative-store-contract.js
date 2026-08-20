@@ -10,6 +10,7 @@ export const REQUIRED_STORE_METHODS = Object.freeze([
   'cleanup',
   'authorizeSeat',
   'lookupInvitation',
+  'allocateInvitation',
   'transactAuthority',
   'commitMutation',
 ]);
