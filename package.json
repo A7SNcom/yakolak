@@ -11,6 +11,6 @@
     "test:threejs:gameplay": "node scripts/run-threejs-gameplay-tests.mjs"
   },
   "dependencies": {
-    "@tursodatabase/serverless": "^1.3.1"
+    "@tursodatabase/serverless": "1.4.0"
   }
 }
