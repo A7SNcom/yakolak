@@ -14,6 +14,7 @@ import {
   storeCapabilities,
   validateNextInvitation,
 } from './authoritative-store-contract.js';
+import { materializeTursoLobbySeatBindings } from './authoritative-turso-seat-materialization.js';
 
 const T = AUTHORITY_TABLES;
 const DEFAULT_BUSY_RETRIES = 4;
@@ -211,6 +212,18 @@ export function createTursoAuthoritativeStoreFromConnection(db, {
         revision: room.revision,
       })));
 
+      if (Object.hasOwn(result, 'seatRecords')) {
+        await materializeTursoLobbySeatBindings({
+          tx,
+          seatsTable: T.seats,
+          seatConfigurationsTable: T.seatConfigurations,
+          transaction,
+          state: result.state,
+          records: result.seatRecords,
+          nowMs: nowMs(),
+        });
+      }
+
       let nextInvitation = currentInvitation;
       if (transaction.invitationId && Object.hasOwn(result, 'invitation')) {
         nextInvitation = validateNextInvitation(currentInvitation, result.invitation, transaction.invitationId);
@@ -329,7 +342,15 @@ export function createTursoAuthoritativeStoreFromConnection(db, {
           SELECT room_id FROM ${T.lobbies}
           WHERE tombstoned_at_ms IS NOT NULL AND expires_at_ms IS NOT NULL AND expires_at_ms < ?
         )`;
-        for (const table of [T.receipts, T.votes, T.readiness, T.deadlines, T.invitations, T.seats]) {
+        for (const table of [
+          T.receipts,
+          T.votes,
+          T.readiness,
+          T.deadlines,
+          T.invitations,
+          T.seatConfigurations,
+          T.seats,
+        ]) {
           deleted += changes(await run(tx, `DELETE FROM ${table} WHERE ${tombstoned}`, [cutoffMs]));
         }
         deleted += changes(await run(tx, `DELETE FROM ${T.lobbies}
