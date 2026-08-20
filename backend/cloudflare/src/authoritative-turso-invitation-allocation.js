@@ -18,6 +18,14 @@ function parseState(value) {
 }
 
 function invitationFromRows(invitation, locatorRow) {
+  let data = null;
+  if (invitation.data_json != null) {
+    try {
+      data = JSON.parse(String(invitation.data_json));
+    } catch {
+      failAuthority('authoritative_invitation_corrupt');
+    }
+  }
   return {
     invitationId: String(invitation.invitation_id),
     locator: String(locatorRow.locator),
@@ -25,7 +33,7 @@ function invitationFromRows(invitation, locatorRow) {
     seatId: String(invitation.seat_id),
     lobbyGeneration: Number(invitation.lobby_generation),
     state: String(invitation.state),
-    data: invitation.data_json == null ? null : JSON.parse(String(invitation.data_json)),
+    data,
     expiresAtMs: Number(locatorRow.expires_at_ms),
   };
 }
@@ -74,6 +82,27 @@ export async function allocateTursoInvitation({
   const lobbyState = parseState(lobby.state_json);
   if (lobbyState.status !== 'waiting') failAuthority('room_not_waiting');
   if (Number(lobbyState.lobbyGeneration ?? -1) !== allocation.lobbyGeneration) failAuthority('invalid_lobby_generation');
+
+  const actorBinding = await tx.get(
+    `SELECT seat_id, credential_generation FROM ${tables.seats}
+      WHERE room_id = ? AND seat_id = ? LIMIT 1`,
+    allocation.roomId,
+    allocation.actorSeatId,
+  );
+  if (!actorBinding) failAuthority('seat_credential_rejected');
+  if (Number(actorBinding.credential_generation) !== allocation.credentialGeneration) {
+    failAuthority('seat_credential_generation_stale');
+  }
+  const actorConfig = await tx.get(
+    `SELECT seat_type, configured_index FROM ${tables.seatConfigurations}
+      WHERE room_id = ? AND lobby_generation = ? AND seat_id = ? LIMIT 1`,
+    allocation.roomId,
+    allocation.lobbyGeneration,
+    allocation.actorSeatId,
+  );
+  if (!actorConfig || String(actorConfig.seat_type) !== 'host' || Number(actorConfig.configured_index) !== 0) {
+    failAuthority('host_only_invitation_allocation');
+  }
 
   const seat = await tx.get(
     `SELECT seat_id, spatial_slot, color, seat_type, configured_index
