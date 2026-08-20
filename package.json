@@ -12,5 +12,8 @@
   },
   "dependencies": {
     "@tursodatabase/serverless": "1.4.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
   }
 }
