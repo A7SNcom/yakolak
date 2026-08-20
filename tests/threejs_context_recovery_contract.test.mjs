@@ -119,7 +119,7 @@ const sessionAfterRecovery = session.snapshot();
 assert.equal(session.seatIdentity, seatIdentityBeforeRecovery, 'seat identity object must survive graphics recovery unchanged');
 assert.equal(sessionAfterRecovery.seatIdentity, seatIdentityBeforeRecovery);
 assert.deepEqual(sessionAfterRecovery.submittedMutationIds, [firstMoveIntent.authority.mutationId]);
-assert.equal(sessionAfterRecovery.lastMoveIntent, firstMoveIntent, 'canonical gameplay intent must survive graphics recovery unchanged');
+assert.deepEqual(sessionAfterRecovery.lastMoveIntent, firstMoveIntent, 'canonical gameplay intent must survive graphics recovery unchanged');
 assert.equal(transportSubmissions, 1, 'graphics restoration must not replay an already-submitted move');
 
 const failedCanvas = new EventTarget();
