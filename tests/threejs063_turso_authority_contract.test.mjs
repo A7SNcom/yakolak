@@ -155,15 +155,22 @@ async function seedSeat(connection, {
 
 async function seedInvitation(connection, {
   invitationId = 'invite-54-p2', locator = '42', roomId = '54', seatId = 'p2',
-  lobbyGeneration = 3, invitationState = 'open', now = 2_000_000,
+  lobbyGeneration = 3, invitationState = 'open', now = 2_000_000, reserveLocator = true,
 } = {}) {
   const T = AUTHORITY_TABLES;
+  const expiresAt = now + 60_000;
   await connection.run(`INSERT INTO ${T.invitations}
     (invitation_id, schema_version, locator, room_id, seat_id, lobby_generation, state,
      claim_generation, data_json, created_at_ms, updated_at_ms, expires_at_ms)
     VALUES (?, 1, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
   invitationId, locator, roomId, seatId, lobbyGeneration, invitationState,
-  JSON.stringify({ seeded: true }), now, now, now + 60_000);
+  JSON.stringify({ seeded: true }), now, now, expiresAt);
+  if (reserveLocator && invitationState === 'open') {
+    await connection.run(`INSERT INTO ${T.manualLocators}
+      (locator, invitation_id, room_id, seat_id, lobby_generation, expires_at_ms, created_at_ms, updated_at_ms)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    locator, invitationId, roomId, seatId, lobbyGeneration, expiresAt, now, now);
+  }
 }
 
 function transaction({
@@ -177,7 +184,7 @@ function transaction({
 
 test('THREEJS-063 additive schema creates every versioned authority record + migration ledger without replacing PAGES-005 probe table', async (t) => {
   const { primary, store } = await fixture(t);
-  await store.ensureTable(); // idempotent forward-only rerun
+  await store.ensureTable();
   const rows = await primary.all("SELECT name, type FROM sqlite_master WHERE type IN ('table','index')");
   const names = new Set(rows.map(row => String(row.name)));
   assert.equal(names.has(PROBE_TABLE), true);
@@ -185,8 +192,10 @@ test('THREEJS-063 additive schema creates every versioned authority record + mig
   for (const index of [
     'yakolak_authority_lobbies_expiry_v1',
     'yakolak_authority_seats_credential_v1',
+    'yakolak_authority_seat_configurations_room_v1',
     'yakolak_authority_invitations_locator_v1',
     'yakolak_authority_invitations_room_state_v1',
+    'yakolak_authority_manual_locators_expiry_v1',
     'yakolak_authority_readiness_room_v1',
     'yakolak_authority_deadlines_due_v1',
     'yakolak_authority_votes_scope_v1',
@@ -198,13 +207,18 @@ test('THREEJS-063 additive schema creates every versioned authority record + mig
   assert.equal(migration.migration_name, 'threejs-063-authority-v1');
 });
 
-test('THREEJS-063 leaves 00–99 active-locator uniqueness to THREEJS-065 and fails ambiguous lookup closed', async (t) => {
+test('historical invitation rows may repeat a locator while active manual resolution follows the single reservation', async (t) => {
   const { primary, store, now } = await fixture(t);
   await seedLobby(primary, { roomId: '54', now });
   await seedLobby(primary, { roomId: '55', now });
-  await seedInvitation(primary, { invitationId: 'invite-a', locator: '42', roomId: '54', now });
-  await seedInvitation(primary, { invitationId: 'invite-b', locator: '42', roomId: '55', now });
-  await assert.rejects(store.lookupInvitation({ locator: '42' }), /invitation_locator_ambiguous/);
+  await seedInvitation(primary, { invitationId: 'invite-a', locator: '42', roomId: '54', now, reserveLocator: false });
+  await seedInvitation(primary, { invitationId: 'invite-b', locator: '42', roomId: '55', invitationState: 'expired', now, reserveLocator: false });
+  await primary.run(`INSERT INTO ${AUTHORITY_TABLES.manualLocators}
+    (locator, invitation_id, room_id, seat_id, lobby_generation, expires_at_ms, created_at_ms, updated_at_ms)
+    VALUES ('42','invite-a','54','p2',3,?,?,?)`, now + 60_000, now, now);
+  const resolved = await store.lookupInvitation({ locator: '42' });
+  assert.equal(resolved.invitationId, 'invite-a');
+  assert.equal(resolved.state, 'open');
 });
 
 test('Turso store capabilities are authoritative and seat auth derives server seat/generation from credential hash', async (t) => {
@@ -285,7 +299,7 @@ test('competing move transactions from separate connections converge to one revi
   assert.equal(rejected.length, 1);
   assert.match(String(rejected[0].reason?.message), /revision_conflict/);
   assert.equal(fulfilled[0].value.snapshot.revision, 8);
-  assert.equal(transitionRuns, 1, 'losing competing revision must not execute its transition after lock acquisition');
+  assert.equal(transitionRuns, 1);
 });
 
 test('duplicate mutation race converges to committed+duplicate while executing pure transition once', async (t) => {
@@ -340,7 +354,9 @@ test('invitation-claim race and timeout-vs-computer race use the same room revis
   assert.equal(claims.filter(value => value.status === 'fulfilled').length, 1);
   assert.equal(claims.filter(value => value.status === 'rejected').length, 1);
   assert.match(String(claims.find(value => value.status === 'rejected').reason?.message), /revision_conflict/);
-  assert.equal((await s1.lookupInvitation({ locator: '42' })).state, 'claimed');
+  assert.equal(await s1.lookupInvitation({ locator: '42' }), null, 'claimed invitation releases the short manual locator');
+  const claimedRow = await primary.get(`SELECT state FROM ${AUTHORITY_TABLES.invitations} WHERE invitation_id='invite-54-p2'`);
+  assert.equal(String(claimedRow.state), 'claimed');
 
   const current = await primary.get(`SELECT revision FROM ${AUTHORITY_TABLES.lobbies} WHERE room_id = '54'`);
   const revision = Number(current.revision);
