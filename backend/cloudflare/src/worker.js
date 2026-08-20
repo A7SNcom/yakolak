@@ -1,5 +1,6 @@
 import { COLORS, RULES, SIZES } from '../../../api/game-rules.js';
 import {
+  AUTHORITATIVE_OPERATION_NAMES,
   applyAuthoritativeMutation,
   authoritativeApiIdentity,
   createRequestContext,
@@ -9,6 +10,10 @@ import {
   normalizeAuthoritativeRoomId,
   normalizeMutationEnvelope,
 } from './authoritative-api.js';
+import {
+  createConfigureLobbyTransaction,
+  normalizeConfigureLobbyEnvelope,
+} from './authoritative-lobby-config.js';
 import {
   PROBE_TABLE,
   assertAuthoritativeStore,
@@ -241,19 +246,45 @@ export function createWorker({
             throw codedError('invalid_payload');
           }
           const roomId = normalizeAuthoritativeRoomId(mutationMatch[1]);
-          const envelope = normalizeMutationEnvelope(body);
+          const isConfigureLobby = body?.action === AUTHORITATIVE_OPERATION_NAMES.CONFIGURE_LOBBY;
+          const envelope = isConfigureLobby
+            ? normalizeConfigureLobbyEnvelope(body)
+            : normalizeMutationEnvelope(body);
           const authorized = await authorizeRoomRequest(request, store, roomId);
           const fingerprint = await sha256Hex(mutationFingerprintSource(roomId, authorized.seatId, envelope));
-          const committed = await store.commitMutation({
-            roomId,
-            actorSeatId: authorized.seatId,
-            credentialGeneration: authorized.credentialGeneration,
-            expectedRevision: envelope.expectedRevision,
-            mutationId: envelope.mutationId,
-            fingerprint,
-            action: envelope.action,
-            transition: state => applyAuthoritativeMutation(state, authorized.seatId, envelope),
-          });
+
+          let committed;
+          let receipt;
+          if (isConfigureLobby) {
+            committed = await store.transactAuthority(createConfigureLobbyTransaction({
+              roomId,
+              actorSeatId: authorized.seatId,
+              credentialGeneration: authorized.credentialGeneration,
+              expectedRevision: envelope.expectedRevision,
+              mutationId: envelope.mutationId,
+              fingerprint,
+              configuration: envelope.payload,
+            }));
+            receipt = {
+              mutationId: committed.receipt.idempotencyKey,
+              action: committed.receipt.operation,
+              actorSeatId: authorized.seatId,
+              revision: committed.receipt.revision,
+            };
+          } else {
+            committed = await store.commitMutation({
+              roomId,
+              actorSeatId: authorized.seatId,
+              credentialGeneration: authorized.credentialGeneration,
+              expectedRevision: envelope.expectedRevision,
+              mutationId: envelope.mutationId,
+              fingerprint,
+              action: envelope.action,
+              transition: state => applyAuthoritativeMutation(state, authorized.seatId, envelope),
+            });
+            receipt = committed.receipt;
+          }
+
           return responseJson(request, 200, shellPayload(store, env, {
             ok: true,
             actor: {
@@ -262,7 +293,7 @@ export function createWorker({
             },
             mutation: {
               status: committed.status,
-              receipt: committed.receipt,
+              receipt,
             },
             snapshot: committed.snapshot,
           }), requestContext);

@@ -1,4 +1,5 @@
-import { AUTHORITATIVE_ACTOR_KINDS } from './authoritative-api.js';
+import { AUTHORITATIVE_ACTOR_KINDS, AUTHORITATIVE_OPERATION_NAMES } from './authoritative-api.js';
+import { validateMaterializedLobbySeatRecords } from './authoritative-lobby-config.js';
 import {
   assertAuthoritativeStore,
   cloneAuthority,
@@ -55,6 +56,35 @@ function normalizeInvitationSeed(seed) {
     state: opaqueAuthority(seed.state, 'invalid_invitation_seed'),
     data: cloneAuthority(seed.data ?? null),
   };
+}
+
+function materializeSeatBindings(room, transaction, state, records) {
+  if (transaction.operation !== AUTHORITATIVE_OPERATION_NAMES.CONFIGURE_LOBBY) {
+    failAuthority('unexpected_seat_materialization');
+  }
+  if (transaction.actor.kind !== AUTHORITATIVE_ACTOR_KINDS.SEAT) failAuthority('host_only_lobby_configuration');
+  validateMaterializedLobbySeatRecords(records, state);
+  if (records[0].seatId !== transaction.actor.key) failAuthority('host_only_lobby_configuration');
+
+  const currentHost = room.seats.find(seat => seat.seatId === transaction.actor.key);
+  if (!currentHost?.credentialHash) failAuthority('seat_credential_rejected');
+  for (const seat of room.seats) {
+    if (seat.seatId !== transaction.actor.key && seat.credentialHash) {
+      failAuthority('lobby_configuration_has_bound_seat');
+    }
+  }
+
+  room.seats = records.map(record => record.type === 'host'
+    ? {
+        ...cloneAuthority(record),
+        credentialHash: currentHost.credentialHash,
+        credentialGeneration: currentHost.credentialGeneration,
+      }
+    : {
+        ...cloneAuthority(record),
+        credentialHash: null,
+        credentialGeneration: 0,
+      });
 }
 
 export function createInMemoryAuthoritativeStore({
@@ -133,6 +163,10 @@ export function createInMemoryAuthoritativeStore({
     }));
     if (!result || typeof result !== 'object' || Array.isArray(result)) failAuthority('invalid_next_state');
     if (!result.state || typeof result.state !== 'object' || Array.isArray(result.state)) failAuthority('invalid_next_state');
+
+    if (Object.hasOwn(result, 'seatRecords')) {
+      materializeSeatBindings(room, transaction, result.state, result.seatRecords);
+    }
 
     if (transaction.invitationId && Object.hasOwn(result, 'invitation')) {
       const nextInvitation = validateNextInvitation(currentInvitation, result.invitation, transaction.invitationId);

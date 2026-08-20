@@ -5,6 +5,7 @@ export const AUTHORITY_TABLES = Object.freeze({
   migrations: 'yakolak_authority_schema_migrations_v1',
   lobbies: 'yakolak_authority_lobbies_v1',
   seats: 'yakolak_authority_seats_v1',
+  seatConfigurations: 'yakolak_authority_seat_configurations_v1',
   invitations: 'yakolak_authority_invitations_v1',
   readiness: 'yakolak_authority_readiness_v1',
   deadlines: 'yakolak_authority_deadlines_v1',
@@ -51,6 +52,22 @@ export const AUTHORITY_SCHEMA_STATEMENTS = Object.freeze([
     PRIMARY KEY (room_id, seat_id),
     UNIQUE (room_id, credential_hash),
     CHECK ((seat_type = 'computer' AND credential_hash IS NULL) OR seat_type <> 'computer')
+  )`,
+  `CREATE TABLE IF NOT EXISTS ${T.seatConfigurations} (
+    room_id TEXT NOT NULL,
+    lobby_generation INTEGER NOT NULL CHECK (lobby_generation >= 0),
+    seat_id TEXT NOT NULL,
+    schema_version INTEGER NOT NULL DEFAULT 1,
+    configured_index INTEGER NOT NULL CHECK (configured_index >= 0 AND configured_index <= 3),
+    spatial_slot TEXT NOT NULL CHECK (spatial_slot IN ('right','back','left','front')),
+    color TEXT NOT NULL CHECK (color IN ('marble','blue','gold','green')),
+    seat_type TEXT NOT NULL CHECK (seat_type IN ('host','online','computer')),
+    created_at_ms INTEGER NOT NULL,
+    updated_at_ms INTEGER NOT NULL,
+    PRIMARY KEY (room_id, lobby_generation, seat_id),
+    UNIQUE (room_id, lobby_generation, configured_index),
+    UNIQUE (room_id, lobby_generation, spatial_slot),
+    UNIQUE (room_id, lobby_generation, color)
   )`,
   `CREATE TABLE IF NOT EXISTS ${T.invitations} (
     invitation_id TEXT PRIMARY KEY,
@@ -120,6 +137,8 @@ export const AUTHORITY_SCHEMA_STATEMENTS = Object.freeze([
     ON ${T.lobbies} (tombstoned_at_ms, expires_at_ms)`,
   `CREATE INDEX IF NOT EXISTS yakolak_authority_seats_credential_v1
     ON ${T.seats} (room_id, credential_hash)`,
+  `CREATE INDEX IF NOT EXISTS yakolak_authority_seat_configurations_room_v1
+    ON ${T.seatConfigurations} (room_id, lobby_generation)`,
   `CREATE INDEX IF NOT EXISTS yakolak_authority_invitations_locator_v1
     ON ${T.invitations} (locator, state, expires_at_ms)`,
   `CREATE INDEX IF NOT EXISTS yakolak_authority_invitations_room_state_v1
