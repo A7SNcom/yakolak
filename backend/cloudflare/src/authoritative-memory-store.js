@@ -29,14 +29,16 @@ function normalizeAuthoritativeSeed(seed) {
 
   const seats = seed.seats.map((seat) => {
     const seatId = opaqueAuthority(seat?.seatId, 'invalid_authoritative_seed');
-    const credentialHash = String(seat?.credentialHash || '').trim().toLowerCase();
+    const credentialHash = seat?.credentialHash == null ? null : String(seat.credentialHash).trim().toLowerCase();
     const credentialGeneration = seat?.credentialGeneration;
-    if (!/^[a-f0-9]{64}$/.test(credentialHash)) failAuthority('invalid_authoritative_seed');
-    if (!Number.isSafeInteger(credentialGeneration) || credentialGeneration < 1) failAuthority('invalid_authoritative_seed');
+    if (credentialHash !== null && !/^[a-f0-9]{64}$/.test(credentialHash)) failAuthority('invalid_authoritative_seed');
+    if (!Number.isSafeInteger(credentialGeneration) || credentialGeneration < 0) failAuthority('invalid_authoritative_seed');
+    if ((credentialHash === null) !== (credentialGeneration === 0)) failAuthority('invalid_authoritative_seed');
     return { ...cloneAuthority(seat), seatId, credentialHash, credentialGeneration };
   });
   if (new Set(seats.map(seat => seat.seatId)).size !== seats.length) failAuthority('invalid_authoritative_seed');
-  if (new Set(seats.map(seat => seat.credentialHash)).size !== seats.length) failAuthority('invalid_authoritative_seed');
+  const credentialHashes = seats.map(seat => seat.credentialHash).filter(Boolean);
+  if (new Set(credentialHashes).size !== credentialHashes.length) failAuthority('invalid_authoritative_seed');
 
   return {
     roomId,
@@ -297,9 +299,25 @@ export function createInMemoryAuthoritativeStore({
       if (!room) failAuthority('room_not_found');
       if (room.state?.status !== 'waiting') failAuthority('room_not_waiting');
       if (Number(room.state?.lobbyGeneration ?? -1) !== allocation.lobbyGeneration) failAuthority('invalid_lobby_generation');
+
+      const actor = room.seats.find(candidate => candidate.seatId === allocation.actorSeatId);
+      if (!actor?.credentialHash) failAuthority('seat_credential_rejected');
+      if (actor.credentialGeneration !== allocation.credentialGeneration) failAuthority('seat_credential_generation_stale');
+      if (actor.type !== 'host' || actor.configuredIndex !== 0 || actor.lobbyGeneration !== allocation.lobbyGeneration) {
+        failAuthority('host_only_invitation_allocation');
+      }
+
       const seat = room.seats.find(candidate => candidate.seatId === allocation.seatId);
       if (!seat || seat.type !== 'online' || seat.lobbyGeneration !== allocation.lobbyGeneration) {
         failAuthority('invitation_seat_not_online');
+      }
+      if (seat.credentialHash !== null || seat.credentialGeneration > 0) failAuthority('invitation_seat_already_claimed');
+      if ([...invitationsById.values()].some(invitation =>
+        invitation.roomId === allocation.roomId
+        && invitation.lobbyGeneration === allocation.lobbyGeneration
+        && invitation.seatId === allocation.seatId
+        && invitation.state === 'claimed')) {
+        failAuthority('invitation_seat_already_claimed');
       }
 
       const now = nowMs();
@@ -310,8 +328,7 @@ export function createInMemoryAuthoritativeStore({
       const existing = existingId ? invitationsById.get(existingId) : null;
       if (existing?.state === 'open') return { status: 'existing', invitation: cloneAuthority(existing) };
 
-      const priorId = invitationsById.get(allocation.invitationId);
-      if (priorId) failAuthority('invitation_id_reused');
+      if (invitationsById.has(allocation.invitationId)) failAuthority('invitation_id_reused');
 
       const locator = shuffledManualInvitationLocators(randomUint32)
         .find(candidate => !activeInvitationIdByLocator.has(candidate));
