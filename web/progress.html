@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0a">
+  <title>YAKOLAK — Three.js Progress Preview</title>
+  <style>
+    :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080a0d;color:#fff}
+    #stage{position:fixed;inset:0;touch-action:none}
+    canvas{display:block;width:100%;height:100%}
+    .hud{position:fixed;top:max(14px,env(safe-area-inset-top));right:14px;left:14px;display:flex;justify-content:space-between;gap:12px;pointer-events:none;z-index:2}
+    .card{background:rgba(8,10,13,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:12px 14px;box-shadow:0 12px 40px rgba(0,0,0,.28)}
+    .title{font-weight:700;font-size:15px}.sub{opacity:.66;font-size:12px;margin-top:4px;line-height:1.45}.status{font-size:12px;white-space:nowrap;align-self:flex-start}
+    .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#f0b34a;margin-left:7px}.ok .dot{background:#39d98a}.bad .dot{background:#ff5e66}
+    .hint{position:fixed;bottom:max(14px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);font-size:11px;opacity:.6;background:rgba(8,10,13,.6);padding:8px 12px;border-radius:999px;pointer-events:none;white-space:nowrap}
+    @media(max-width:600px){.hud{align-items:flex-start}.card:first-child{max-width:72%}.sub{font-size:11px}.status{padding:10px 12px}}
+  </style>
+  <script type="importmap">
+  {"imports":{"three":"./vendor/three/r185/three.module.js"}}
+  </script>
+</head>
+<body>
+  <div id="stage"></div>
+  <div class="hud">
+    <div class="card">
+      <div class="title">معاينة تقدم Three.js</div>
+      <div class="sub">مجسمات المشروع الحالية نفسها — ليست نسخة لعب نهائية.</div>
+    </div>
+    <div id="status" class="card status"><span class="dot"></span><span>تحميل المجسمات…</span></div>
+  </div>
+  <div class="hint">اسحب لتدوير المشهد</div>
+  <script type="module" src="./app/progress-preview.js"></script>
+</body>
+</html>
