@@ -97,3 +97,49 @@ test('PAGES-005 rejects foreign browser origins', async () => {
   assert.equal(response.status, 403);
   assert.equal((await response.json()).error, 'origin_not_allowed');
 });
+
+test('PAGES-005 normalizes public HTTP errors without leaking internal failures', async () => {
+  const worker = createWorker({ createStore: () => createMemoryStore() });
+  const env = workerEnv();
+  const origin = 'https://a7sncom.github.io';
+
+  const invalidPayload = await worker.fetch(new Request('https://worker.invalid/__pages005/rooms', {
+    method: 'POST',
+    headers: { origin, 'content-type': 'application/json' },
+    body: '{',
+  }), env);
+  assert.equal(invalidPayload.status, 400);
+  assert.equal((await invalidPayload.json()).error, 'invalid_payload');
+
+  const missingRoom = await worker.fetch(new Request(
+    'https://worker.invalid/__pages005/rooms/p005-ffffffffffffffffffffffffffffffff',
+    { headers: { origin } },
+  ), env);
+  assert.equal(missingRoom.status, 404);
+  assert.equal((await missingRoom.json()).error, 'room_not_found');
+
+  const oversizedPayload = await worker.fetch(new Request('https://worker.invalid/__pages005/rooms', {
+    method: 'POST',
+    headers: {
+      origin,
+      'content-type': 'application/json',
+      'content-length': String(__testing.MAX_BODY_BYTES + 1),
+    },
+    body: '{}',
+  }), env);
+  assert.equal(oversizedPayload.status, 413);
+  assert.equal((await oversizedPayload.json()).error, 'payload_too_large');
+
+  const failingWorker = createWorker({
+    createStore: () => {
+      throw new Error('sensitive_internal_failure');
+    },
+  });
+  const internalFailure = await failingWorker.fetch(new Request('https://worker.invalid/health', {
+    headers: { origin },
+  }), env);
+  assert.equal(internalFailure.status, 500);
+  const internalBody = await internalFailure.json();
+  assert.equal(internalBody.error, 'online_server_error');
+  assert.equal(JSON.stringify(internalBody).includes('sensitive_internal_failure'), false);
+});
