@@ -3,7 +3,9 @@ import { readFile } from 'node:fs/promises';
 
 import {
   createCanonicalSessionState,
+  parseCanonicalSessionState,
   runCanonicalSessionReducer,
+  serializeCanonicalSessionState,
 } from '../web/app/session/canonical-session-state.js';
 import {
   SESSION_LIFECYCLE_EVENT_TYPES,
@@ -198,6 +200,17 @@ assert.throws(() => createSessionLifecycleState({
 assert.throws(() => createCanonicalSessionState({
   lifecycle: { phase: P.SETUP, hiddenPhase: 'legacy-loading' },
 }), /invalid_session_lifecycle_shape/, 'canonical construction rejects hidden lifecycle phases/flags');
+
+const hydrationSource = createCanonicalSessionState({ lifecycle: { phase: P.SETUP } });
+const hydrated = parseCanonicalSessionState(serializeCanonicalSessionState(hydrationSource));
+assert.equal(hydrated.lifecycle.phase, P.SETUP, 'hydration consumes the canonical lifecycle model');
+const invalidHydration = JSON.parse(serializeCanonicalSessionState(hydrationSource));
+invalidHydration.lifecycle.isReconnecting = false;
+assert.throws(
+  () => parseCanonicalSessionState(JSON.stringify(invalidHydration)),
+  /invalid_session_lifecycle_shape/,
+  'hydration cannot introduce a parallel reconnect flag',
+);
 
 // Canonical state owns lifecycle truth; callbacks submit a generation-bound event.
 const canonical = createCanonicalSessionState();
