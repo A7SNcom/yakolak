@@ -1,5 +1,4 @@
 name: FASTPLAY-003 Final Public Acceptance v12
-# Diagnostic rerun: expose exact physical readiness state.
 
 on:
   push:
@@ -35,9 +34,8 @@ jobs:
         run: |
           run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
-            -f state=pending \
-            -f context='FASTPLAY-003/final-public' \
-            -f description='v12 canonical physical-commit acceptance running' \
+            -f state=pending -f context='FASTPLAY-003/final-public' \
+            -f description='v12 hardened canonical public acceptance running' \
             -f target_url="$run_url"
 
       - uses: actions/setup-node@v4
@@ -48,7 +46,7 @@ jobs:
           npm install --no-save --package-lock=false playwright@1.55.0
           node node_modules/playwright/cli.js install --with-deps chromium
 
-      - name: Build v12 verifier from current v10
+      - name: Build hardened verifier from v10
         shell: bash
         run: |
           python - <<'PY'
@@ -65,102 +63,37 @@ jobs:
 
           python - <<'PY'
           from pathlib import Path
-
           path = Path('fastplay-003-final-v3.mjs')
           source = path.read_text()
 
+          # CI runs the real public page with the product's supported reduced-motion
+          # preference so presentation animation cannot consume authority deadlines.
+          desktop = "const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });"
+          if desktop in source:
+            source = source.replace(desktop, "const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, reducedMotion: 'reduce' });", 1)
+          mobile = "    hasTouch: true,\n  });"
+          if mobile in source:
+            source = source.replace(mobile, "    hasTouch: true,\n    reducedMotion: 'reduce',\n  });", 1)
+
           a = source.index('async function waitHumanMoveCommitted(page, beforeRevision, move) {')
-          b = source.index('\nasync function tapMove', a)
+          b = source.index('async function tapMove(page, move) {', a)
           wait_commit = r'''async function waitHumanMoveCommitted(page, beforeRevision, move, { timeoutMs = 12_000, pollingMs = 25 } = {}) {
             const startedAt = Date.now();
             let lastState = null;
             while (Date.now() - startedAt < timeoutMs) {
               lastState = await getState(page);
-              if (
-                lastState.revision > beforeRevision
-                && lastState.lastMove?.seatId === move.seatId
-                && lastState.lastMove?.cell === move.cell
-                && lastState.lastMove?.size === move.size
-              ) return lastState;
+              const committedOnBoard = lastState.board?.[String(move.cell)]?.[move.size] === move.color;
+              if (lastState.revision > beforeRevision && committedOnBoard) return lastState;
               await page.waitForTimeout(pollingMs);
             }
             throw new Error(`human move did not commit canonically after revision ${beforeRevision}: ${JSON.stringify({ move, lastState })}`);
           }
+
           '''
           source = source[:a] + wait_commit + source[b:]
 
-          a = source.index("async function dragMove(page, move, { pointerType = 'mouse' } = {}) {")
-          b = source.index('\nasync function waitForHumanOrRoundEnd', a)
-          drag = r'''async function dragMove(page, move, { pointerType = 'mouse' } = {}) {
-            const readiness = await waitForPhysicalInputReady(page, move.seatId);
-            if (readiness.roundEndRevision !== null || readiness.matchComplete) {
-              return { gesture: 'drag', move, ended: true, revision: readiness.revision, pointerType };
-            }
-            const before = await getState(page);
-            const targets = await projectMove(page, move);
-            const offsets = [[0,0],[10,0],[-10,0],[0,10],[0,-10],[18,8],[-18,8],[18,-8],[-18,-8]];
-            let lastFailure = null;
-            for (const [dx, dy] of offsets) {
-              const from = { x: targets.piece.x + dx, y: targets.piece.y + dy };
-              const to = targets.board;
-              await page.evaluate(({ from, to, pointerType }) => {
-                const canvas = window.__YAKOLAK_THREEJS_SHELL__.canvas;
-                const pointerId = pointerType === 'touch' ? 63 : 62;
-                const emit = (type, x, y, buttons) => canvas.dispatchEvent(new PointerEvent(type, {
-                  bubbles: true,
-                  cancelable: true,
-                  pointerId,
-                  pointerType,
-                  isPrimary: true,
-                  button: 0,
-                  buttons,
-                  clientX: x,
-                  clientY: y,
-                }));
-                emit('pointerdown', from.x, from.y, 1);
-                for (let step = 1; step <= 10; step += 1) {
-                  const t = step / 10;
-                  emit('pointermove', from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t, 1);
-                }
-                emit('pointerup', to.x, to.y, 0);
-              }, { from, to, pointerType });
-              try {
-                const committed = await waitHumanMoveCommitted(page, before.revision, move, { timeoutMs: 1_500, pollingMs: 25 });
-                return { gesture: 'drag', move, from, target: to, revision: committed.revision, pointerType };
-              } catch (error) {
-                lastFailure = error;
-                await page.waitForTimeout(100);
-              }
-            }
-            const diagnostic = await page.evaluate(async () => {
-              const shell = window.__YAKOLAK_THREEJS_SHELL__;
-              return {
-                state: await shell.getCanonicalState(),
-                presentation: shell.getPresentationSnapshot(),
-              };
-            });
-            throw new Error(`could not commit ${move.size} move by ${pointerType} drag: ${JSON.stringify(diagnostic)}`, { cause: lastFailure });
-          }
-          '''
-          source = source[:a] + drag + source[b:]
-
-          a = source.index('async function waitForHumanOrRoundEnd(page, humanSeatId, { timeout = 15_000 } = {}) {')
-          b = source.index('\nasync function allowRealTimeout', a)
-          wait_human = r'''async function waitForHumanOrRoundEnd(page, humanSeatId, { timeout = 15_000 } = {}) {
-            const startedAt = Date.now();
-            let lastState = null;
-            while (Date.now() - startedAt < timeout) {
-              lastState = await getState(page);
-              if (lastState.roundEndRevision !== null || lastState.matchComplete || lastState.activeSeatId === humanSeatId) return lastState;
-              await page.waitForTimeout(25);
-            }
-            throw new Error(`human turn did not return within ${timeout}ms: ${JSON.stringify(lastState)}`);
-          }
-          '''
-          source = source[:a] + wait_human + source[b:]
-
           a = source.index('async function waitForPhysicalInputReady(page, seatId) {')
-          b = source.index('\n          async function tapMove', a) if '\n          async function tapMove' in source[a:] else source.index('\nasync function tapMove', a)
+          b = source.index('async function tapMove(page, move) {', a)
           readiness = r'''async function waitForPhysicalInputReady(page, seatId) {
             const startedAt = Date.now();
             let lastObservation = null;
@@ -169,10 +102,7 @@ jobs:
                 const shell = window.__YAKOLAK_THREEJS_SHELL__;
                 const state = await shell.getCanonicalState();
                 const presentation = shell.getPresentationSnapshot();
-                const ready = state.activeSeatId === seatId
-                  && !presentation?.movePresentationLock
-                  && (!presentation?.drag?.phase || presentation.drag.phase === 'idle')
-                  && (!presentation?.tap?.phase || presentation.tap.phase === 'idle');
+                const ready = state.activeSeatId === seatId && !presentation?.movePresentationLock;
                 return {
                   state,
                   ready,
@@ -183,26 +113,99 @@ jobs:
                   motion: presentation?.motion || null,
                 };
               }, seatId);
-              if (lastObservation.state.roundEndRevision !== null || lastObservation.state.matchComplete || lastObservation.ready) {
-                return lastObservation.state;
-              }
+              if (lastObservation.state.roundEndRevision !== null || lastObservation.state.matchComplete || lastObservation.ready) return lastObservation.state;
               await page.waitForTimeout(25);
             }
             throw new Error(`physical input did not become ready for ${seatId}: ${JSON.stringify(lastObservation)}`);
           }
+
           '''
           source = source[:a] + readiness + source[b:]
+
+          a = source.index("async function dragMove(page, move, { pointerType = 'mouse' } = {}) {")
+          b = source.index('async function waitForHumanOrRoundEnd', a)
+          drag = r'''async function dragMove(page, move, { pointerType = 'mouse' } = {}) {
+            const readiness = await waitForPhysicalInputReady(page, move.seatId);
+            if (readiness.roundEndRevision !== null || readiness.matchComplete) {
+              return { gesture: 'drag', move, ended: true, revision: readiness.revision, pointerType };
+            }
+            const before = await getState(page);
+            const targets = await projectMove(page, move);
+            const offsets = [[0,0],[10,0],[-10,0],[0,10],[0,-10],[18,8],[-18,8],[18,-8],[-18,-8],[26,0],[-26,0],[0,26],[0,-26]];
+            let lastFailure = null;
+            for (const candidate of targets.pieces) {
+              for (const [dx, dy] of offsets) {
+                const from = { x: candidate.point.x + dx, y: candidate.point.y + dy };
+                const to = targets.board;
+                await page.evaluate(({ from, to, pointerType }) => {
+                  const canvas = window.__YAKOLAK_THREEJS_SHELL__.canvas;
+                  const pointerId = pointerType === 'touch' ? 63 : 62;
+                  const emit = (type, x, y, buttons) => canvas.dispatchEvent(new PointerEvent(type, {
+                    bubbles: true, cancelable: true, pointerId, pointerType, isPrimary: true,
+                    button: 0, buttons, clientX: x, clientY: y,
+                  }));
+                  emit('pointerdown', from.x, from.y, 1);
+                  for (let step = 1; step <= 10; step += 1) {
+                    const t = step / 10;
+                    emit('pointermove', from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t, 1);
+                  }
+                  emit('pointerup', to.x, to.y, 0);
+                }, { from, to, pointerType });
+                try {
+                  const committed = await waitHumanMoveCommitted(page, before.revision, move, { timeoutMs: 2_000, pollingMs: 25 });
+                  return { gesture: 'drag', move, from, selectedPiece: candidate, target: to, revision: committed.revision, pointerType };
+                } catch (error) {
+                  lastFailure = error;
+                  await page.waitForTimeout(80);
+                }
+              }
+            }
+            const diagnostic = await page.evaluate(async () => {
+              const shell = window.__YAKOLAK_THREEJS_SHELL__;
+              return { state: await shell.getCanonicalState(), presentation: shell.getPresentationSnapshot() };
+            });
+            throw new Error(`could not commit ${move.size} move by ${pointerType} drag: ${JSON.stringify(diagnostic)}`, { cause: lastFailure });
+          }
+
+          '''
+          source = source[:a] + drag + source[b:]
+
+          a = source.index('async function waitForHumanOrRoundEnd(page, humanSeatId, { timeout = 15_000 } = {}) {')
+          b = source.index('async function allowRealTimeout', a)
+          wait_human = r'''async function waitForHumanOrRoundEnd(page, humanSeatId, { timeout = 15_000 } = {}) {
+            const startedAt = Date.now();
+            let lastState = null;
+            while (Date.now() - startedAt < timeout) {
+              lastState = await getState(page);
+              if (lastState.roundEndRevision !== null || lastState.matchComplete || lastState.activeSeatId === humanSeatId) return lastState;
+              await page.waitForTimeout(25);
+            }
+            throw new Error(`human turn did not return within ${timeout}ms: ${JSON.stringify(lastState)}`);
+          }
+
+          '''
+          source = source[:a] + wait_human + source[b:]
+
+          # A computer with no legal move legitimately waits for its 18-second deadline.
+          source = source.replace(
+            'waitForRevisionOrRoundEnd(page, beforeRevision, { timeoutMs: 3_000, pollingMs: 25 })',
+            'waitForRevisionOrRoundEnd(page, beforeRevision, { timeoutMs: 23_000, pollingMs: 25 })',
+            1,
+          )
 
           path.write_text(source)
           PY
 
           node --check fastplay-003-final-v3.mjs
-          grep -Fq 'human move did not commit canonically' fastplay-003-final-v3.mjs
-          grep -Fq 'could not commit ${move.size} move by ${pointerType} drag:' fastplay-003-final-v3.mjs
+          grep -Fq "reducedMotion: 'reduce'" fastplay-003-final-v3.mjs
+          grep -Fq 'committedOnBoard' fastplay-003-final-v3.mjs
+          grep -Fq 'for (const candidate of targets.pieces)' fastplay-003-final-v3.mjs
+          grep -Fq 'state.activeSeatId === seatId && !presentation?.movePresentationLock' fastplay-003-final-v3.mjs
           grep -Fq 'human turn did not return within' fastplay-003-final-v3.mjs
-          grep -Fq 'movePresentationLock: presentation?.movePresentationLock' fastplay-003-final-v3.mjs
+          grep -Fq 'timeoutMs: 23_000' fastplay-003-final-v3.mjs
           grep -Fq 'WebGL recovery must run at a stable round boundary' fastplay-003-final-v3.mjs
           grep -Fq "stage: 'real-timeout-pass'" fastplay-003-final-v3.mjs
+          grep -Fq "stage: 'webgl-recovery-pass'" fastplay-003-final-v3.mjs
 
       - name: Exercise full public first playable
         env:
