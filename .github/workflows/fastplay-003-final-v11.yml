@@ -77,8 +77,8 @@ jobs:
               raise SystemExit('mobile context signature changed')
           source = source.replace(mobile, mobile_reduced, 1)
 
-          old = '''                return { state, ready };'''
-          new = '''                return {
+          old = 'return { state, ready };'
+          new = '''return {
                   state,
                   ready,
                   movePresentationLock: presentation?.movePresentationLock || null,
