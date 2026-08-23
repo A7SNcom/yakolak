@@ -1,0 +1,140 @@
+name: FASTPLAY-003 Public First Playable Acceptance
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - 'web/**'
+      - 'scripts/verify-fastplay003-live.mjs'
+      - '.github/workflows/fastplay-003-first-playable.yml'
+      - '.github/workflows/pages-threejs-signal.yml'
+
+permissions:
+  contents: write
+  issues: write
+  statuses: write
+
+concurrency:
+  group: fastplay-003-first-playable
+  cancel-in-progress: true
+
+jobs:
+  public-first-playable:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Mark exact candidate pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=pending \
+            -f context='FASTPLAY-003/first-playable' \
+            -f description='Public first-playable acceptance running on exact candidate'
+
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Syntax-check acceptance probe
+        run: node --check scripts/verify-fastplay003-live.mjs
+
+      - name: Install browser verifier
+        run: npm install --no-save --package-lock=false playwright@1.55.0
+
+      - name: Install matching Chromium
+        run: node node_modules/playwright/cli.js install --with-deps chromium
+
+      - name: Exercise exact public first playable
+        env:
+          FASTPLAY003_EXPECTED_CANDIDATE_SHA: ${{ github.sha }}
+          FASTPLAY003_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+          FASTPLAY003_ARTIFACT_PATH: fastplay-003-acceptance.json
+        run: node scripts/verify-fastplay003-live.mjs
+
+      - name: Upload acceptance evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastplay-003-${{ github.sha }}
+          path: fastplay-003-acceptance.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Freeze first green candidate and record PASS
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$(jq -r '.candidateSha' fastplay-003-acceptance.json)"
+          generation="$(jq -r '.deploymentGeneration' fastplay-003-acceptance.json)"
+          public_url="$(jq -r '.publicUrl' fastplay-003-acceptance.json)"
+          result="$(jq -r '.FIRST_PLAYABLE_EXPERIMENTAL' fastplay-003-acceptance.json)"
+          test "${candidate}" = "${GITHUB_SHA}"
+          test "${result}" = 'PASS'
+          test -n "${generation}"
+          test "${public_url}" = 'https://a7sncom.github.io/yakolak/threejs/'
+
+          freeze_branch='first-playable-experimental'
+          existing="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${freeze_branch}" --jq '.object.sha' 2>/dev/null || true)"
+          if [ -z "${existing}" ]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/heads/${freeze_branch}" \
+              -f sha="${candidate}" >/dev/null
+            echo "Frozen ${candidate} at ${freeze_branch}."
+          elif [ "${existing}" != "${candidate}" ]; then
+            echo "Freeze branch already points to ${existing}; refusing to move it to ${candidate}." >&2
+            exit 1
+          fi
+
+          title='FIRST_PLAYABLE_EXPERIMENTAL=PASS'
+          existing_issue="$(gh api "repos/${GITHUB_REPOSITORY}/issues?state=all&per_page=100" \
+            --jq '.[] | select(.pull_request == null and .title == "FIRST_PLAYABLE_EXPERIMENTAL=PASS") | .number' \
+            | head -n 1)"
+          body_file="$(mktemp)"
+          cat > "${body_file}" <<BODY
+          FIRST_PLAYABLE_EXPERIMENTAL=PASS
+
+          candidate_sha: ${candidate}
+          deployment_generation: ${generation}
+          public_url: ${public_url}
+          freeze_branch: ${freeze_branch}
+          workflow_run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+
+          Acceptance covered the actual public human-facing page on desktop and mobile portrait, explicit 2-player Human+Computer setup, tap and drag moves, one real 18-second timeout, round completion and score, next-round reset, full match completion, rematch, return-to-setup, refresh recovery, WebGL context loss/restore, and no fatal/page errors.
+          BODY
+
+          if [ -z "${existing_issue}" ]; then
+            gh issue create --title "${title}" --body-file "${body_file}" >/dev/null
+          else
+            existing_body="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${existing_issue}" --jq '.body')"
+            if ! grep -Fq "candidate_sha: ${candidate}" <<<"${existing_body}" || ! grep -Fq "deployment_generation: ${generation}" <<<"${existing_body}"; then
+              echo "Existing PASS record #${existing_issue} does not match frozen candidate/generation." >&2
+              exit 1
+            fi
+          fi
+
+      - name: Mark first playable accepted
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=success \
+            -f context='FASTPLAY-003/first-playable' \
+            -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS; exact public candidate frozen'
+
+      - name: Mark first playable rejected
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=failure \
+            -f context='FASTPLAY-003/first-playable' \
+            -f description='Public first-playable acceptance failed; deferred work remains blocked'

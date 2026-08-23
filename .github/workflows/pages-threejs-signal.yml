@@ -8,8 +8,10 @@ on:
       - 'web/**'
       - 'scripts/pages-size-guard.sh'
       - 'scripts/pages-public-artifact-scan.sh'
+      - 'scripts/verify-fastplay003-live.mjs'
       - 'tests/pages_public_runtime_config.test.mjs'
       - 'PAGES_PUBLIC_ARTIFACT_CONTRACT.md'
+      - '.github/workflows/fastplay-003-first-playable.yml'
       - '.github/workflows/pages-threejs-signal.yml'
 
 permissions:
