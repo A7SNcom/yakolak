@@ -7,6 +7,7 @@ on:
     paths:
       - 'web/**'
       - 'scripts/verify-fastplay002-live.mjs'
+      - 'scripts/verify-fastplay002-stage.mjs'
       - 'tests/fastplay002_local_match_config.test.mjs'
       - '.github/workflows/fastplay-002-live-acceptance.yml'
 
@@ -85,6 +86,75 @@ jobs:
             -f state=success \
             -f context='FASTPLAY-002/browser-ready' \
             -f description='Playwright Chromium verifier ready'
+
+      - name: Diagnose setup to live scene
+        id: diag_setup
+        continue-on-error: true
+        env:
+          FASTPLAY002_DIAG_STAGE: setup-start
+          FASTPLAY002_EXPECTED_CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+          FASTPLAY002_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+        run: node scripts/verify-fastplay002-stage.mjs
+
+      - name: Record setup diagnostic
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+          OUTCOME: ${{ steps.diag_setup.outcome }}
+        run: |
+          state=failure
+          [ "$OUTCOME" = success ] && state=success
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
+            -f state="$state" \
+            -f context='FASTPLAY-002/diag-setup-start' \
+            -f description="Public setup/start diagnostic: ${OUTCOME}"
+
+      - name: Diagnose visible piece selection
+        id: diag_selection
+        continue-on-error: true
+        env:
+          FASTPLAY002_DIAG_STAGE: selection
+          FASTPLAY002_EXPECTED_CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+          FASTPLAY002_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+        run: node scripts/verify-fastplay002-stage.mjs
+
+      - name: Record selection diagnostic
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+          OUTCOME: ${{ steps.diag_selection.outcome }}
+        run: |
+          state=failure
+          [ "$OUTCOME" = success ] && state=success
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
+            -f state="$state" \
+            -f context='FASTPLAY-002/diag-selection' \
+            -f description="Public visible-piece selection diagnostic: ${OUTCOME}"
+
+      - name: Diagnose first authoritative move
+        id: diag_commit
+        continue-on-error: true
+        env:
+          FASTPLAY002_DIAG_STAGE: commit
+          FASTPLAY002_EXPECTED_CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+          FASTPLAY002_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+        run: node scripts/verify-fastplay002-stage.mjs
+
+      - name: Record first move diagnostic
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+          OUTCOME: ${{ steps.diag_commit.outcome }}
+        run: |
+          state=failure
+          [ "$OUTCOME" = success ] && state=success
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
+            -f state="$state" \
+            -f context='FASTPLAY-002/diag-first-move' \
+            -f description="Public first authoritative move diagnostic: ${OUTCOME}"
 
       - name: Finish a full human local match on exact public Pages candidate
         id: live
