@@ -52,15 +52,41 @@ jobs:
           node-version: '22'
 
       - name: Verify local setup contract
+        id: unit
         run: node --test tests/fastplay002_local_match_config.test.mjs
 
+      - name: Mark setup contract success
+        if: steps.unit.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
+            -f state=success \
+            -f context='FASTPLAY-002/unit-config' \
+            -f description='2/3/4 canonical local setup contract passed'
+
       - name: Install browser verifier
+        id: playwright
         run: npm install --no-save --package-lock=false playwright@1.55.0
 
       - name: Install matching Chromium
+        id: chromium
         run: node node_modules/playwright/cli.js install --with-deps chromium
 
+      - name: Mark browser ready
+        if: steps.playwright.outcome == 'success' && steps.chromium.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
+            -f state=success \
+            -f context='FASTPLAY-002/browser-ready' \
+            -f description='Playwright Chromium verifier ready'
+
       - name: Finish a full human local match on exact public Pages candidate
+        id: live
         env:
           FASTPLAY002_EXPECTED_CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
           FASTPLAY002_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
@@ -76,6 +102,39 @@ jobs:
             -f state=success \
             -f context='FASTPLAY-002/live-match' \
             -f description='Full human local match passed on exact public Pages candidate'
+
+      - name: Mark unit failure stage
+        if: failure() && steps.unit.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
+            -f state=failure \
+            -f context='FASTPLAY-002/failure-unit' \
+            -f description='Local setup contract failed'
+
+      - name: Mark browser install failure stage
+        if: failure() && (steps.playwright.outcome == 'failure' || steps.chromium.outcome == 'failure')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
+            -f state=failure \
+            -f context='FASTPLAY-002/failure-browser-install' \
+            -f description='Browser verifier installation failed'
+
+      - name: Mark public match failure stage
+        if: failure() && steps.live.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
+            -f state=failure \
+            -f context='FASTPLAY-002/failure-live-match' \
+            -f description='Public exact-candidate full match verifier failed'
 
       - name: Mark live acceptance failure
         if: failure()
