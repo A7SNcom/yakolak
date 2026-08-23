@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createFrameGovernor } from '../camera/frame-governor.js';
 import { RESOURCE_OWNERSHIP } from '../core/resource-registry.js';
+import { assertFastplayState, createFastplayInitialState } from '../fastplay/local-match-config.js';
 import { createAcceptedPieceTravelController } from '../gameplay/accepted-piece-travel.js';
 import { createComputerTurnProducer } from '../gameplay/computer-turn.js';
 import { createDragInteractionController, DRAG_PHASES } from '../gameplay/drag-interaction.js';
@@ -14,9 +15,8 @@ import { createPointerEventsAdapter } from '../gameplay/pointer-events-adapter.j
 import { createSizeSelectionController } from '../gameplay/size-selection.js';
 import { createTapClickConfirmationController, TAP_CONFIRMATION_PHASES } from '../gameplay/tap-click-confirmation.js';
 import { markOnce, STARTUP_MARKS } from '../perf/startup-marks.js';
-import { configuredSeatOrder } from '../shared/seat-order.js';
-import { createCanonicalSessionState } from '../session/canonical-session-state.js';
 import { createLocalAuthorityAdapter } from '../session/local-authority-adapter.js';
+import { commitCanonicalMatchEnd, createLocalRematchRequest } from '../session/match-end.js';
 import { createExpiredLocalTimeoutIntent } from '../session/local-timeout.js';
 import { createBoardAndLidObjects } from './board-and-lid.js';
 import { createGameplayInteractionLayer } from './gameplay-interaction-layer.js';
@@ -24,7 +24,8 @@ import { createMinimalLightingRig, createTurnEmphasisPresentation } from './ligh
 import { createNeutralRoom } from './neutral-room.js';
 import { createPieceInstances } from './pieces.js';
 import { createPlayerBaseInstances } from './player-bases.js';
-import { createTableSurface } from './table-and-score.js';
+import { syncPersistentScoreMarkerInstances } from './score-marker-presentation.js';
+import { createScoreMarkerInstances, createTableSurface } from './table-and-score.js';
 
 const LOCAL_GAME_SCHEMA = 'yakolak.fastplay-local-scene/v1';
 const isOnlineSeatType = type => type === 'online-human';
@@ -79,25 +80,6 @@ function applyCameraSpec(camera, spec) {
   camera.updateProjectionMatrix();
 }
 
-function createFastplayInitialState() {
-  const seats = configuredSeatOrder('marble', 2).map((slot, index) => ({
-    seatId: slot.seatId,
-    type: index === 0 ? 'human' : 'computer',
-    color: slot.color,
-    ready: true,
-  }));
-  return createCanonicalSessionState({
-    preferredColor: 'marble',
-    targetPlayers: 2,
-    winsToMatch: 3,
-    seats,
-    activeSeatId: seats[0].seatId,
-    round: 1,
-    revision: 0,
-    lifecycle: { phase: 'turn-loop', presentationGeneration: 0 },
-  });
-}
-
 function degreesToQuaternion(rotationDegrees) {
   return new THREE.Quaternion().setFromEuler(new THREE.Euler(
     THREE.MathUtils.degToRad(rotationDegrees[0]),
@@ -146,6 +128,8 @@ export async function createLocalGameScene(rendererOwnerInput, {
   assets,
   materialSystem,
   resourceRegistry,
+  gameConfig = null,
+  initialState: suppliedInitialState = null,
 } = {}) {
   const rendererOwner = requireRendererOwner(rendererOwnerInput);
   const registry = requireRegistry(resourceRegistry);
@@ -190,6 +174,14 @@ export async function createLocalGameScene(rendererOwnerInput, {
     resourceRegistry: registry,
   });
   scene.add(table.mesh);
+
+  const scoreMarkers = createScoreMarkerInstances({
+    runtimeAsset: requireAsset(assets?.scoreMarker, 'scoreMarker'),
+    worldLayout,
+    materialsByColor: materialSystem.players,
+    resourceRegistry: registry,
+  });
+  scene.add(scoreMarkers.group);
 
   const boardAndLid = createBoardAndLidObjects({
     runtimeAsset: requireAsset(assets?.boardAndLid, 'boardAndLid'),
@@ -314,13 +306,16 @@ export async function createLocalGameScene(rendererOwnerInput, {
     },
   });
 
-  const initialState = createFastplayInitialState();
+  const initialState = suppliedInitialState
+    ? assertFastplayState(suppliedInitialState)
+    : createFastplayInitialState(gameConfig || {});
   const authority = createLocalAuthorityAdapter({
     initialState,
     isOnlineSeatType,
     clock: () => Date.now(),
   });
   let canonicalState = await authority.snapshot();
+  syncPersistentScoreMarkerInstances(scoreMarkers, canonicalState);
 
   const reducedMotionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)') || null;
   const motionController = createMotionController({
@@ -405,6 +400,7 @@ export async function createLocalGameScene(rendererOwnerInput, {
 
   function updateCanonicalState(state) {
     canonicalState = state;
+    syncPersistentScoreMarkerInstances(scoreMarkers, state);
     setTurnPresentation(state);
     scheduleDeadline(state);
     frameGovernor.requestRender();
@@ -695,6 +691,7 @@ export async function createLocalGameScene(rendererOwnerInput, {
       acceptedTravel: acceptedTravel.snapshot(),
       pointer: pointerAdapter.snapshot(),
       frame: frameGovernor.snapshot(),
+      scoreMarkers: scoreMarkers.snapshot(),
       pieces: Object.freeze({ counts: pieces.getInstanceCounts(), placements: pieces.getPlacementSnapshot() }),
     });
   }
@@ -711,6 +708,18 @@ export async function createLocalGameScene(rendererOwnerInput, {
     return authority.snapshot();
   }
 
+  async function submitRematch(source = GAMEPLAY_PRESENTATION_SOURCES.CLICK) {
+    let state = await authority.snapshot();
+    if (state.matchComplete && state.lifecycle.phase === 'win') {
+      state = commitCanonicalMatchEnd(state, { expectedRevision: state.revision }).state;
+    }
+    const rematchAuthority = state === canonicalState
+      ? authority
+      : createLocalAuthorityAdapter({ initialState: state, isOnlineSeatType, clock: () => Date.now() });
+    const request = createLocalRematchRequest(state, { source, isOnlineSeatType });
+    return rematchAuthority.submit(request.intent);
+  }
+
   function release() {
     if (disposed) return false;
     disposed = true;
@@ -725,6 +734,7 @@ export async function createLocalGameScene(rendererOwnerInput, {
     pieces.release();
     playerBases.dispose();
     boardAndLid.dispose();
+    scoreMarkers.release();
     table.release();
     room.release();
     lighting.release();
@@ -740,6 +750,7 @@ export async function createLocalGameScene(rendererOwnerInput, {
     getPresentationSnapshot,
     getLightingSnapshot,
     getCanonicalState,
+    submitRematch,
     setTurnEmphasis,
     release,
     dispose: release,
