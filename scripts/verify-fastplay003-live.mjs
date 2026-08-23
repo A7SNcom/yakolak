@@ -1,3 +1,4 @@
+// FASTPLAY-003 registered-trigger marker: 2026-08-23
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { chromium } from 'playwright';
