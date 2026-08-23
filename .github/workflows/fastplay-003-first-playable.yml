@@ -64,11 +64,41 @@ jobs:
         run: node node_modules/playwright/cli.js install --with-deps chromium
 
       - name: Exercise exact public first playable
+        id: acceptance
         env:
           FASTPLAY003_EXPECTED_CANDIDATE_SHA: ${{ github.sha }}
           FASTPLAY003_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
           FASTPLAY003_ARTIFACT_PATH: fastplay-003-acceptance.json
-        run: node scripts/verify-fastplay003-live.mjs
+        shell: bash
+        run: |
+          set +e
+          node scripts/verify-fastplay003-live.mjs 2>&1 | tee fastplay-003-run.log
+          code=${PIPESTATUS[0]}
+          set -e
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish exact blocker diagnostic
+        if: steps.acceptance.outputs.exit_code != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title="FASTPLAY-003 blocker ${GITHUB_SHA}"
+          body_file="$(mktemp)"
+          {
+            echo "FASTPLAY-003 failed on the exact public candidate."
+            echo
+            echo "candidate_sha: ${GITHUB_SHA}"
+            echo "public_url: https://a7sncom.github.io/yakolak/threejs/"
+            echo "workflow_run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            echo '```text'
+            tail -n 80 fastplay-003-run.log
+            echo '```'
+          } > "${body_file}"
+          gh issue create --title "${title}" --body-file "${body_file}" >/dev/null
+          exit 1
 
       - name: Upload acceptance evidence
         uses: actions/upload-artifact@v4
