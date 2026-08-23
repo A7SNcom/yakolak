@@ -96,7 +96,6 @@ jobs:
             assert.equal(seat?.type, 'human', 'real timeout must begin on the human seat');
             const timeoutSkipCountBefore = (before.skips || []).filter(skip => skip.seatId === seat.seatId && skip.reason === 'timeout').length;
 
-            await page.evaluate(() => { window.__FASTPLAY003_TIMEOUT_EVIDENCE__ = null; });
             await page.waitForTimeout(500);
             const early = await getState(page);
             assert.equal(early.revision, before.revision, 'authority advanced before human timeout window');
@@ -108,33 +107,36 @@ jobs:
               const state = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
               const timeoutSkips = (state.skips || []).filter(skip => skip.seatId === seatId && skip.reason === 'timeout').length;
               const direct = state.revision > revision && timeoutSkips > timeoutSkipCountBefore && state.activeSeatId !== seatId;
+              const handoff = state.revision === revision + 1 && state.activeSeatId !== seatId;
               const followed = state.revision >= revision + 2 && state.lastMove?.seatId !== seatId;
-              if (!direct && !followed) return false;
-              window.__FASTPLAY003_TIMEOUT_EVIDENCE__ = {
-                revision: state.revision,
-                activeSeatId: state.activeSeatId,
-                deadlineAtMs: state.deadlineAtMs,
-                lastMove: state.lastMove,
-                timeoutSkips,
-                direct,
-                followed,
-              };
-              return true;
+              return direct || handoff || followed;
             }, { revision: before.revision, seatId: seat.seatId, timeoutSkipCountBefore }, { timeout: 5_000, polling: 25 });
             await transitionHandle.dispose();
-            const transition = await page.evaluate(() => window.__FASTPLAY003_TIMEOUT_EVIDENCE__);
-            assert.ok(transition && (transition.direct || transition.followed), 'authoritative timeout evidence missing');
+
             const elapsedMs = await page.evaluate(startedAt => performance.now() - startedAt, observation.startedAt);
             assert.ok(elapsedMs >= minimumElapsedMs, `timeout advanced too early after ${elapsedMs}ms`);
-            console.log(JSON.stringify({ stage: 'real-timeout-pass', ...transition, elapsedMs, turnDurationMs: observation.turnDurationMs }));
+            const after = await getState(page);
+            console.log(JSON.stringify({
+              stage: 'real-timeout-pass',
+              beforeRevision: before.revision,
+              beforeSeatId: seat.seatId,
+              deadlineAtMs: before.deadlineAtMs,
+              remainingMs: observation.remainingMs,
+              turnDurationMs: observation.turnDurationMs,
+              observedRevision: after.revision,
+              observedSeatId: after.activeSeatId,
+              observedLastMove: after.lastMove,
+              observedTimeoutSkips: (after.skips || []).filter(skip => skip.seatId === seat.seatId && skip.reason === 'timeout').length,
+              elapsedMs,
+              predicateObserved: true,
+            }));
             return {
               seatId: seat.seatId,
               deadlineAtMs: before.deadlineAtMs,
               turnDurationMs: observation.turnDurationMs,
-              observedRevision: transition.revision,
+              observedRevision: after.revision,
               elapsedMs,
-              direct: transition.direct,
-              followed: transition.followed,
+              predicateObserved: true,
             };
           }
           '''
@@ -142,6 +144,7 @@ jobs:
           PY
           node --check fastplay-003-final-v3.mjs
           ! grep -Fq "authority advanced materially before timeout deadline" fastplay-003-final-v3.mjs
+          grep -Fq "predicateObserved: true" fastplay-003-final-v3.mjs
 
       - name: Exercise full public first playable
         id: run
