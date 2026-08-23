@@ -1,0 +1,130 @@
+name: FASTPLAY-003 Final Public Acceptance v6
+on:
+  push:
+    branches: [threejs-rebuild]
+    paths: ['.github/workflows/fastplay-003-final-v6.yml']
+permissions:
+  contents: read
+  issues: write
+  statuses: write
+concurrency:
+  group: fastplay-003-final-v6
+  cancel-in-progress: true
+jobs:
+  acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - id: candidate
+        run: echo "sha=$(git log -1 --format='%H' -- web)" >> "$GITHUB_OUTPUT"
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" -f state=pending -f context='FASTPLAY-003/final-public' -f description='v6 revision-driven acceptance running' -f target_url="$run_url"
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          node node_modules/playwright/cli.js install --with-deps chromium
+      - name: Build verifier
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+          w=Path('.github/workflows/fastplay-003-final-v5.yml').read_text()
+          a=w.index('      - name: Build v5 verifier from proven v4\n')
+          b=w.index('      - name: Exercise full public first playable\n',a)
+          block=w[a:b]
+          r=block.index('        run: |\n')+len('        run: |\n')
+          Path('/tmp/build-v5.sh').write_text(textwrap.dedent(block[r:]))
+          PY
+          bash /tmp/build-v5.sh
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('fastplay-003-final-v3.mjs')
+          s=p.read_text()
+          a=s.index('async function finishRound(page, humanSeatId, gestureBook) {')
+          b=s.index('\nasync function finishMatch',a)
+          fn=r'''async function finishRound(page, humanSeatId, gestureBook) {
+            let lastDiagnostic = null;
+            for (let step = 0; step < 80; step += 1) {
+              const state = await getState(page);
+              if (state.roundEndRevision !== null || state.matchComplete) return state;
+              const seat = state.seats.find(candidate => candidate.seatId === state.activeSeatId);
+              lastDiagnostic = {
+                step,
+                revision: state.revision,
+                activeSeatId: state.activeSeatId,
+                activeSeatType: seat?.type || null,
+                deadlineAtMs: state.deadlineAtMs,
+                lastMove: state.lastMove,
+                skips: state.skips,
+                inventory: state.inventory,
+              };
+              if (state.activeSeatId === humanSeatId) {
+                const move = await chooseHumanMove(page);
+                if (!move) {
+                  const beforeRevision = state.revision;
+                  await page.waitForFunction(async revision => {
+                    const current = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
+                    return current.revision > revision || current.roundEndRevision !== null || current.matchComplete;
+                  }, beforeRevision, { timeout: 23_000, polling: 50 });
+                  continue;
+                }
+                const forceDrag = gestureBook.drag === 0;
+                const forceTap = gestureBook.tap === 0;
+                if (forceTap) {
+                  await tapMove(page, move);
+                  gestureBook.tap += 1;
+                } else if (forceDrag) {
+                  await dragMove(page, move, { pointerType: 'mouse' });
+                  gestureBook.drag += 1;
+                } else if ((gestureBook.tap + gestureBook.drag) % 2 === 0) {
+                  await tapMove(page, move);
+                  gestureBook.tap += 1;
+                } else {
+                  await dragMove(page, move, { pointerType: 'mouse' });
+                  gestureBook.drag += 1;
+                }
+              }
+              await waitForHumanOrRoundEnd(page, humanSeatId, { timeout: 20_000 });
+            }
+            throw new Error(`round did not finish within deterministic safety bound: ${JSON.stringify(lastDiagnostic)}`);
+          }
+          '''
+          p.write_text(s[:a]+fn+s[b:])
+          PY
+          node --check fastplay-003-final-v3.mjs
+      - name: Exercise full public first playable
+        env:
+          FASTPLAY003_EXPECTED_CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+          FASTPLAY003_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+          FASTPLAY003_ARTIFACT_PATH: fastplay-003-acceptance.json
+        run: timeout --signal=TERM 12m node fastplay-003-final-v3.mjs 2>&1 | tee fastplay-003-final-v6.log
+      - name: Mark accepted
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MILESTONE_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          candidate="$(jq -r '.candidateSha' fastplay-003-acceptance.json)"
+          generation="$(jq -r '.deploymentGeneration' fastplay-003-acceptance.json)"
+          test "$(jq -r '.FIRST_PLAYABLE_EXPERIMENTAL' fastplay-003-acceptance.json)" = PASS
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" -f state=success -f context='FASTPLAY-003/final-public' -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS' -f target_url="$run_url"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" -f state=success -f context='FASTPLAY-003/first-playable' -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS' -f target_url="$run_url"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${candidate}" -f state=success -f context='FASTPLAY-003/public-pass' -f description="PASS generation ${generation}" -f target_url="$run_url"
+      - name: Publish failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MILESTONE_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" -f state=failure -f context='FASTPLAY-003/final-public' -f description='v6 acceptance failed' -f target_url="$run_url"
+          { echo 'FASTPLAY-003 final-v6 failed.'; echo; echo "workflow_run: ${run_url}"; echo '```text'; tail -n 220 fastplay-003-final-v6.log; echo '```'; } > /tmp/body
+          gh issue create --title "FASTPLAY-003 final-v6 blocker ${MILESTONE_SHA}" --body-file /tmp/body >/dev/null
