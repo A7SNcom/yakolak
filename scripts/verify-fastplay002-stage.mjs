@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
 
 const stage = String(process.env.FASTPLAY002_DIAG_STAGE || 'setup-start').trim();
-const expectedCandidateSha = String(process.env.FASTPLAY002_EXPECTED_CANDIDATE_SHA || '').trim().toLowerCase();
+const milestoneSha = String(process.env.FASTPLAY002_EXPECTED_CANDIDATE_SHA || '').trim().toLowerCase();
 const baseUrl = new URL(process.env.FASTPLAY002_BASE_URL || 'https://a7sncom.github.io/yakolak/threejs/');
 const manifestUrl = new URL('../deployment-manifest.json', baseUrl);
 
-if (!/^[0-9a-f]{40}$/.test(expectedCandidateSha)) throw new Error('FASTPLAY002_EXPECTED_CANDIDATE_SHA must be one exact 40-hex SHA');
+if (!/^[0-9a-f]{40}$/.test(milestoneSha)) throw new Error('FASTPLAY002_EXPECTED_CANDIDATE_SHA must identify the milestone web commit');
 if (!['setup-start', 'selection', 'commit'].includes(stage)) throw new Error(`Unknown FASTPLAY002_DIAG_STAGE ${stage}`);
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -22,15 +23,26 @@ async function fetchJsonNoCache(url) {
   return response.json();
 }
 
-async function waitForExactCandidate() {
+function candidateContainsMilestone(candidateSha) {
+  if (!/^[0-9a-f]{40}$/.test(candidateSha)) return false;
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', milestoneSha, candidateSha], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForPlayableCandidate() {
   for (let attempt = 1; attempt <= 96; attempt += 1) {
     try {
       const manifest = await fetchJsonNoCache(manifestUrl);
-      if (String(manifest?.threejsCandidateSha || '').toLowerCase() === expectedCandidateSha) return manifest;
+      const liveSha = String(manifest?.threejsCandidateSha || '').trim().toLowerCase();
+      if (candidateContainsMilestone(liveSha)) return manifest;
     } catch {}
     await delay(5_000);
   }
-  throw new Error(`FASTPLAY-002 public candidate not live: expected ${expectedCandidateSha}`);
+  throw new Error(`FASTPLAY-002 public generation does not contain milestone ${milestoneSha}`);
 }
 
 async function setupTwoHumans(page) {
@@ -49,10 +61,12 @@ async function setupTwoHumans(page) {
     return {
       state,
       scene: document.documentElement.dataset.fastplayScene,
+      milestone: document.querySelector('#app')?.dataset.fastplayMilestone || null,
       setupHidden: document.querySelector('#local-setup')?.hidden,
       hudHidden: document.querySelector('#game-hud')?.hidden,
     };
   });
+  assert.equal(initial.milestone, 'FASTPLAY-002');
   assert.equal(initial.scene, 'real-local-game');
   assert.equal(initial.setupHidden, true);
   assert.equal(initial.hudHidden, false);
@@ -115,7 +129,8 @@ async function selectFirstPiece(page, target) {
   throw new Error('first visible home piece could not be selected');
 }
 
-await waitForExactCandidate();
+const live = await waitForPlayableCandidate();
+const liveSha = String(live.threejsCandidateSha || '').toLowerCase();
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
 const page = await context.newPage();
@@ -128,8 +143,7 @@ try {
   await setupTwoHumans(page);
   assert.equal(pageErrors.length, 0, `page errors: ${pageErrors.join(' | ')}`);
   if (stage === 'setup-start') {
-    console.log('FASTPLAY-002 staged diagnostic PASS setup-start');
-    process.exitCode = 0;
+    console.log(`FASTPLAY-002 staged diagnostic PASS setup-start on ${liveSha}`);
   } else {
     const target = await projectFirstMove(page);
     await selectFirstPiece(page, target);
@@ -137,8 +151,7 @@ try {
     assert.equal(selection?.selectedSize, 'small');
     assert.ok(Array.isArray(selection?.legalCells) && selection.legalCells.includes(0));
     if (stage === 'selection') {
-      console.log('FASTPLAY-002 staged diagnostic PASS selection');
-      process.exitCode = 0;
+      console.log(`FASTPLAY-002 staged diagnostic PASS selection on ${liveSha}`);
     } else {
       await page.mouse.click(target.board.x, target.board.y);
       await page.waitForFunction(async ({ revision, color }) => {
@@ -147,8 +160,7 @@ try {
       }, target, { timeout: 12_000 });
       await page.waitForFunction(() => !window.__YAKOLAK_THREEJS_SHELL__.canvas.dataset.movePresentationLock, null, { timeout: 12_000 });
       assert.equal(pageErrors.length, 0, `page errors: ${pageErrors.join(' | ')}`);
-      console.log('FASTPLAY-002 staged diagnostic PASS commit');
-      process.exitCode = 0;
+      console.log(`FASTPLAY-002 staged diagnostic PASS commit on ${liveSha}`);
     }
   }
 } finally {
