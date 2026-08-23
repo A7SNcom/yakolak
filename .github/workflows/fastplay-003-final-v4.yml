@@ -96,6 +96,7 @@ jobs:
             assert.equal(seat?.type, 'human', 'real timeout must begin on the human seat');
             const timeoutSkipCountBefore = (before.skips || []).filter(skip => skip.seatId === seat.seatId && skip.reason === 'timeout').length;
 
+            await page.evaluate(() => { window.__FASTPLAY003_TIMEOUT_EVIDENCE__ = null; });
             await page.waitForTimeout(500);
             const early = await getState(page);
             assert.equal(early.revision, before.revision, 'authority advanced before human timeout window');
@@ -109,7 +110,7 @@ jobs:
               const direct = state.revision > revision && timeoutSkips > timeoutSkipCountBefore && state.activeSeatId !== seatId;
               const followed = state.revision >= revision + 2 && state.lastMove?.seatId !== seatId;
               if (!direct && !followed) return false;
-              return {
+              window.__FASTPLAY003_TIMEOUT_EVIDENCE__ = {
                 revision: state.revision,
                 activeSeatId: state.activeSeatId,
                 deadlineAtMs: state.deadlineAtMs,
@@ -118,12 +119,14 @@ jobs:
                 direct,
                 followed,
               };
+              return true;
             }, { revision: before.revision, seatId: seat.seatId, timeoutSkipCountBefore }, { timeout: 5_000, polling: 25 });
-            const transition = await transitionHandle.jsonValue();
             await transitionHandle.dispose();
+            const transition = await page.evaluate(() => window.__FASTPLAY003_TIMEOUT_EVIDENCE__);
+            assert.ok(transition && (transition.direct || transition.followed), 'authoritative timeout evidence missing');
             const elapsedMs = await page.evaluate(startedAt => performance.now() - startedAt, observation.startedAt);
             assert.ok(elapsedMs >= minimumElapsedMs, `timeout advanced too early after ${elapsedMs}ms`);
-            assert.ok(transition.direct || transition.followed, 'authoritative timeout evidence missing');
+            console.log(JSON.stringify({ stage: 'real-timeout-pass', ...transition, elapsedMs, turnDurationMs: observation.turnDurationMs }));
             return {
               seatId: seat.seatId,
               deadlineAtMs: before.deadlineAtMs,
