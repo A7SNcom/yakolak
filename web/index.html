@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1018">
   <meta name="color-scheme" content="dark">
-  <title>YAKOLAK — Three.js Preview</title>
+  <title>YAKOLAK</title>
   <link rel="stylesheet" href="./styles/app.css">
   <script type="importmap">
   {
@@ -19,9 +19,9 @@
 <body>
   <main id="app" class="app-shell" aria-labelledby="app-title">
     <section class="overlay" aria-live="polite">
-      <div class="eyebrow">THREEJS REBUILD</div>
+      <div class="eyebrow">LOCAL GAME</div>
       <h1 id="app-title">YAKOLAK</h1>
-      <p id="boot-status" class="status">Booting static Three.js shell…</p>
+      <p id="boot-status" class="status">Loading game…</p>
     </section>
 
     <aside id="build-marker" class="build-marker" aria-label="Development build marker">
@@ -30,12 +30,12 @@
 
     <section id="unsupported-webgl" class="unsupported" hidden role="alert">
       <strong>WebGL 2 is unavailable.</strong>
-      <span>This preview needs a browser and device with WebGL 2 enabled. Update the browser, enable hardware acceleration, or try another supported device.</span>
+      <span>YAKOLAK needs a browser and device with WebGL 2 enabled. Update the browser, enable hardware acceleration, or try another supported device.</span>
     </section>
 
     <section id="graphics-recovery" class="unsupported recovery" hidden role="alert">
       <strong>Graphics recovery failed.</strong>
-      <span>Your game/session identity is preserved, but the GPU context could not be restored safely.</span>
+      <span>Your local game state is preserved, but the GPU context could not be restored safely.</span>
       <button id="graphics-recovery-reload" class="recovery-action" type="button">Reload and retry</button>
     </section>
 
@@ -47,9 +47,9 @@
   </main>
 
   <noscript>
-    <div class="noscript">JavaScript is required to run the Three.js preview.</div>
+    <div class="noscript">JavaScript is required to run YAKOLAK.</div>
   </noscript>
 
-  <script type="module" src="./app/boot/boot.js"></script>
+  <script type="module" src="./app/boot/local-game-boot.js"></script>
 </body>
 </html>
