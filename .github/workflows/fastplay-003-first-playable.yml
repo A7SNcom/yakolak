@@ -41,6 +41,19 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Enable WebGL on GPU-less CI Chromium
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/verify-fastplay003-live.mjs')
+          text = path.read_text()
+          old = "const browser = await chromium.launch({ headless: true });"
+          new = "const browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });"
+          if old not in text:
+              raise SystemExit('FASTPLAY-003 Chromium launch signature changed')
+          path.write_text(text.replace(old, new))
+          PY
+
       - name: Syntax-check acceptance probe
         run: node --check scripts/verify-fastplay003-live.mjs
 
