@@ -17,7 +17,7 @@
   </script>
 </head>
 <body>
-  <main id="app" class="app-shell" aria-labelledby="app-title" data-fastplay-milestone="FASTPLAY-001" data-fastplay-acceptance="desktop-click-mobile-drag" data-fastplay-local-flow="FASTPLAY-002" data-fastplay-001-live="rendered-camera-pages" data-fastplay-003-acceptance="persisted-authoritative-timeout-snapshot">
+  <main id="app" class="app-shell" aria-labelledby="app-title" data-fastplay-milestone="FASTPLAY-001" data-fastplay-acceptance="desktop-click-mobile-drag" data-fastplay-local-flow="FASTPLAY-002" data-fastplay-001-live="rendered-camera-pages" data-fastplay-003-acceptance="direct-authoritative-timeout-snapshot">
     <section class="overlay" aria-live="polite">
       <div class="eyebrow">THREEJS REBUILD · LOCAL GAME</div>
       <h1 id="app-title">YAKOLAK</h1>
@@ -39,17 +39,12 @@
       <button id="local-start" class="primary-action" type="button">Start match</button>
     </section>
 
-    <section id="game-hud" class="game-hud" hidden aria-live="polite">
-      <div class="hud-primary">
-        <strong id="hud-turn">Turn —</strong>
-        <span id="hud-timer" class="hud-timer">18s</span>
-      </div>
+    <section id="game-hud" class="local-panel hud-panel" hidden aria-label="Local match status">
+      <div class="hud-line"><strong>Turn</strong><span id="hud-turn">—</span></div>
+      <div class="hud-line"><strong>Timer</strong><span id="hud-timer">18s</span></div>
       <div id="hud-scores" class="hud-scores" aria-label="Scores"></div>
-      <div class="hud-detail">
-        <span id="hud-selection">Selected —</span>
-        <span id="hud-legal">Legal —</span>
-        <span id="hud-last-move">Last —</span>
-      </div>
+      <div class="hud-detail"><span id="hud-selection">Selected —</span><span id="hud-legal">Legal —</span></div>
+      <div id="hud-last-move" class="hud-detail">Last —</div>
     </section>
 
     <section id="round-result" class="local-panel result-panel" hidden aria-live="assertive">
@@ -58,35 +53,31 @@
       <div class="result-actions">
         <button id="next-round" class="primary-action" type="button">Next round</button>
         <button id="rematch" class="primary-action" type="button" hidden>Rematch</button>
-        <button id="return-setup" class="secondary-action" type="button">Return to setup</button>
+        <button id="return-setup" type="button">Return to setup</button>
       </div>
     </section>
 
-    <aside id="build-marker" class="build-marker" aria-label="Development build marker">
-      DEV / resolving SHA…
-    </aside>
-
-    <section id="unsupported-webgl" class="unsupported" hidden role="alert">
-      <strong>WebGL 2 is unavailable.</strong>
-      <span>YAKOLAK needs a browser and device with WebGL 2 enabled. Update the browser, enable hardware acceleration, or try another supported device.</span>
+    <section id="unsupported-webgl" class="fatal-panel" hidden aria-live="assertive">
+      <h2>WebGL 2 is required</h2>
+      <p>This device/browser cannot start the Three.js experience because WebGL 2 is unavailable.</p>
     </section>
 
-    <section id="graphics-recovery" class="unsupported recovery" hidden role="alert">
-      <strong>Graphics recovery failed.</strong>
-      <span>Your local game state is preserved, but the GPU context could not be restored safely.</span>
-      <button id="graphics-recovery-reload" class="recovery-action" type="button">Reload and retry</button>
+    <section id="graphics-recovery" class="fatal-panel" hidden aria-live="assertive">
+      <h2>Graphics recovery failed</h2>
+      <p>The browser could not restore the WebGL context safely.</p>
+      <button id="graphics-recovery-reload" type="button">Reload</button>
     </section>
 
-    <section id="asset-load-error" class="unsupported recovery" hidden role="alert">
-      <strong>Required assets unavailable.</strong>
-      <span id="asset-load-error-message">The game was not initialized because required assets failed to load.</span>
-      <button id="asset-load-retry" class="recovery-action" type="button">Retry required assets</button>
+    <section id="asset-load-error" class="fatal-panel" hidden aria-live="assertive">
+      <h2>Required assets unavailable</h2>
+      <p id="asset-load-error-message">The game was not initialized because required assets failed to load.</p>
+      <button id="asset-load-retry" type="button">Retry required assets</button>
     </section>
+
+    <footer class="build-marker" aria-label="build identity">
+      <span id="build-marker">build pending</span>
+    </footer>
   </main>
-
-  <noscript>
-    <div class="noscript">JavaScript is required to run YAKOLAK.</div>
-  </noscript>
 
   <script type="module" src="./app/boot/local-game-boot.js"></script>
 </body>
