@@ -1,4 +1,5 @@
 name: FASTPLAY-003 Fix Computer Deadline Retry Starvation
+# Rerun after acceptance exposed the stale retry loop on the public candidate.
 
 on:
   push:
