@@ -1,0 +1,71 @@
+name: FASTPLAY-003 Authority Presentation Decoupling
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - '.github/workflows/fastplay-003-authority-presentation-fix.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fastplay-003-authority-presentation-fix
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Rebase on current branch
+        run: git pull --rebase origin threejs-rebuild
+
+      - name: Decouple authority from accepted travel completion
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('web/app/scene/local-game-scene.js')
+          source = path.read_text()
+
+          old_human = '''      updateCanonicalState(result.snapshot);\n      await playAcceptedTravel(result.snapshot, pieceId, pendingId);\n      clearInputForCanonical(result.snapshot, 'accepted-resync', 'authority-accepted');\n      void runComputerTurns();\n      return result;'''
+          new_human = '''      updateCanonicalState(result.snapshot);\n      // Accepted travel is presentation-only. Authority handoff and bot production\n      // must never wait for a render-frame animation to finish or recover.\n      void playAcceptedTravel(result.snapshot, pieceId, pendingId).catch(error => {\n        console.warn('[fastplay] detached human accepted travel recovered', error);\n      });\n      clearInputForCanonical(result.snapshot, 'accepted-resync', 'authority-accepted');\n      void runComputerTurns();\n      return result;'''
+
+          old_bot = '''      updateCanonicalState(nextState);\n      if (pieceId) await playAcceptedTravel(nextState, pieceId, null, { observeFirst: true });\n      else acceptedTravel.observeSnapshot(nextState, { reason: 'computer-move-without-piece-presentation' });\n      clearInputForCanonical(nextState, 'ownership-change', 'computer-authority-advanced');\n      return result;'''
+          new_bot = '''      updateCanonicalState(nextState);\n      if (pieceId) {\n        // Do not keep computerInFlight occupied by presentation. A later canonical\n        // revision cancels/snaps this travel through the shared motion controller.\n        void playAcceptedTravel(nextState, pieceId, null, { observeFirst: true }).catch(error => {\n          console.warn('[fastplay] detached computer accepted travel recovered', error);\n        });\n      } else {\n        acceptedTravel.observeSnapshot(nextState, { reason: 'computer-move-without-piece-presentation' });\n      }\n      clearInputForCanonical(nextState, 'ownership-change', 'computer-authority-advanced');\n      return result;'''
+
+          if source.count(old_human) != 1:
+              raise SystemExit('human accepted-travel sequencing signature changed')
+          if source.count(old_bot) != 1:
+              raise SystemExit('computer accepted-travel sequencing signature changed')
+
+          source = source.replace(old_human, new_human, 1)
+          source = source.replace(old_bot, new_bot, 1)
+          path.write_text(source)
+          PY
+
+          node --check web/app/scene/local-game-scene.js
+          ! grep -Fq 'await playAcceptedTravel(result.snapshot, pieceId, pendingId);' web/app/scene/local-game-scene.js
+          ! grep -Fq 'if (pieceId) await playAcceptedTravel(nextState' web/app/scene/local-game-scene.js
+          grep -Fq 'detached human accepted travel recovered' web/app/scene/local-game-scene.js
+          grep -Fq 'detached computer accepted travel recovered' web/app/scene/local-game-scene.js
+
+      - name: Commit production fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- web/app/scene/local-game-scene.js; then
+            echo 'Production sequencing fix already present.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/app/scene/local-game-scene.js
+          git commit -m 'FASTPLAY-003 decouple turn authority from travel animation'
+          git push origin HEAD:threejs-rebuild
