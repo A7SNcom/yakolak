@@ -69,6 +69,7 @@ jobs:
           node --test tests/threejs062_authoritative_api_shell.test.mjs
           node --test tests/threejs062_authority_contract_extensions.test.mjs
           node --test tests/threejs063_turso_authority_contract.test.mjs
+          node --test tests/threejs063_expand_contract_rollback.test.mjs
           node --test tests/threejs064_authoritative_lobby_configuration.test.mjs
           node --test tests/threejs064_worker_route_contract.test.mjs
           node --test tests/threejs065_invitation_namespace.test.mjs
