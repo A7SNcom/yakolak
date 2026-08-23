@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
 
-const expectedCandidateSha = String(process.env.FASTPLAY002_EXPECTED_CANDIDATE_SHA || '').trim().toLowerCase();
+const milestoneSha = String(process.env.FASTPLAY002_EXPECTED_CANDIDATE_SHA || '').trim().toLowerCase();
 const baseUrl = new URL(process.env.FASTPLAY002_BASE_URL || 'https://a7sncom.github.io/yakolak/threejs/');
 const manifestUrl = new URL('../deployment-manifest.json', baseUrl);
 
-if (!/^[0-9a-f]{40}$/.test(expectedCandidateSha)) throw new Error('FASTPLAY002_EXPECTED_CANDIDATE_SHA must be one exact 40-hex SHA');
+if (!/^[0-9a-f]{40}$/.test(milestoneSha)) throw new Error('FASTPLAY002_EXPECTED_CANDIDATE_SHA must identify the milestone web commit');
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -17,19 +18,30 @@ async function fetchJsonNoCache(url) {
   return response.json();
 }
 
-async function waitForExactCandidate() {
+function candidateContainsMilestone(candidateSha) {
+  if (!/^[0-9a-f]{40}$/.test(candidateSha)) return false;
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', milestoneSha, candidateSha], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForPlayableCandidate() {
   let last = null;
   for (let attempt = 1; attempt <= 96; attempt += 1) {
     try {
       const manifest = await fetchJsonNoCache(manifestUrl);
       last = manifest;
-      if (String(manifest?.threejsCandidateSha || '').toLowerCase() === expectedCandidateSha) return { attempt, manifest };
+      const liveSha = String(manifest?.threejsCandidateSha || '').trim().toLowerCase();
+      if (candidateContainsMilestone(liveSha)) return { attempt, manifest, liveSha };
     } catch (error) {
       last = { error: error?.message || String(error) };
     }
     await delay(5_000);
   }
-  const error = new Error(`FASTPLAY-002 public candidate not live: expected ${expectedCandidateSha}`);
+  const error = new Error(`FASTPLAY-002 public generation does not contain milestone ${milestoneSha}`);
   error.lastObservation = last;
   throw error;
 }
@@ -128,8 +140,11 @@ async function verifyScorePresentation(page, expectedMarbleScore) {
   assert.match(scores || '', new RegExp(`Marble ${expectedMarbleScore}/3`));
 }
 
-const live = await waitForExactCandidate();
-const browser = await chromium.launch({ headless: true });
+const live = await waitForPlayableCandidate();
+const browser = await chromium.launch({
+  headless: true,
+  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+});
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
 const page = await context.newPage();
 const errors = [];
@@ -141,6 +156,7 @@ try {
   await page.waitForFunction(() => document.documentElement.dataset.bootState === 'setup-ready', null, { timeout: 60_000 });
 
   assert.equal(await page.locator('#local-setup').isVisible(), true);
+  assert.equal(await page.locator('#app').getAttribute('data-fastplay-milestone'), 'FASTPLAY-002');
   await page.locator('#local-seat-count').selectOption('4');
   const fourSeats = await page.evaluate(() => [...document.querySelectorAll('#local-seat-options .seat-option')].map(row => ({
     seatId: row.dataset.seatId,
@@ -207,6 +223,7 @@ try {
   assert.equal(match.scores.right, 3);
   assert.equal(await page.locator('#rematch').isVisible(), true);
   assert.equal(await page.locator('#next-round').isVisible(), false);
+  assert.equal(await page.locator('#return-setup').isVisible(), true);
   assert.match(await page.locator('#result-title').textContent(), /Marble wins the match/);
 
   await page.locator('#rematch').click();
@@ -220,7 +237,16 @@ try {
   await page.waitForFunction(() => document.documentElement.dataset.bootState === 'setup-ready' && !document.querySelector('#local-setup')?.hidden, null, { timeout: 10_000 });
 
   assert.equal(errors.length, 0, `page errors: ${errors.join(' | ')}`);
-  console.log(JSON.stringify({ fastplay002: 'PASS', candidateSha: expectedCandidateSha, deploymentGeneration: live.manifest.deploymentGeneration, manifestAttempt: live.attempt, finalScore: 3, rematchReset: true, returnedToSetup: true }, null, 2));
+  console.log(JSON.stringify({
+    fastplay002: 'PASS',
+    milestoneSha,
+    candidateSha: live.liveSha,
+    deploymentGeneration: live.manifest.deploymentGeneration,
+    manifestAttempt: live.attempt,
+    finalScore: 3,
+    rematchReset: true,
+    returnedToSetup: true,
+  }, null, 2));
 } finally {
   await context.close();
   await browser.close();
