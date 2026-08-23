@@ -24,6 +24,44 @@
       <p id="boot-status" class="status">Loading game…</p>
     </section>
 
+    <section id="local-setup" class="local-panel setup-panel" hidden aria-labelledby="local-setup-title">
+      <h2 id="local-setup-title">Local match</h2>
+      <label class="setup-field">
+        <span>Seats</span>
+        <select id="local-seat-count" aria-label="Number of local seats">
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        </select>
+      </label>
+      <div id="local-seat-options" class="seat-options" aria-label="Seat types"></div>
+      <p class="setup-note">First to 3 wins.</p>
+      <button id="local-start" class="primary-action" type="button">Start match</button>
+    </section>
+
+    <section id="game-hud" class="game-hud" hidden aria-live="polite">
+      <div class="hud-primary">
+        <strong id="hud-turn">Turn —</strong>
+        <span id="hud-timer" class="hud-timer">18s</span>
+      </div>
+      <div id="hud-scores" class="hud-scores" aria-label="Scores"></div>
+      <div class="hud-detail">
+        <span id="hud-selection">Selected —</span>
+        <span id="hud-legal">Legal —</span>
+        <span id="hud-last-move">Last —</span>
+      </div>
+    </section>
+
+    <section id="round-result" class="local-panel result-panel" hidden aria-live="assertive">
+      <h2 id="result-title">Round complete</h2>
+      <p id="result-detail"></p>
+      <div class="result-actions">
+        <button id="next-round" class="primary-action" type="button">Next round</button>
+        <button id="rematch" class="primary-action" type="button" hidden>Rematch</button>
+        <button id="return-setup" class="secondary-action" type="button">Return to setup</button>
+      </div>
+    </section>
+
     <aside id="build-marker" class="build-marker" aria-label="Development build marker">
       DEV / resolving SHA…
     </aside>
