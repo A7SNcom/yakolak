@@ -33,7 +33,7 @@ jobs:
         shell: bash
         run: |
           run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" -f state=pending -f context='FASTPLAY-003/final-public' -f description='v10 real-handoff public acceptance running' -f target_url="$run_url"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" -f state=pending -f context='FASTPLAY-003/final-public' -f description='v10 round-boundary WebGL acceptance running' -f target_url="$run_url"
 
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
@@ -187,6 +187,52 @@ jobs:
           }
           '''
           source = source[:a] + finish_round + source[b:]
+
+          a = source.index('async function verifyWebglRecovery(page) {')
+          b = source.index('\nasync function finishRound', a)
+          webgl = r'''async function verifyWebglRecovery(page) {
+            const before = await getState(page);
+            assert.ok(before.roundEndRevision !== null || before.matchComplete, 'WebGL recovery must run at a stable round boundary');
+            assert.equal(before.deadlineAtMs, null, 'round boundary must not retain an active deadline');
+            const initialGraphics = await page.evaluate(() => window.__YAKOLAK_THREEJS_SHELL__.getGraphicsContextSnapshot());
+            assert.equal(initialGraphics.state, 'ready');
+            const supported = await page.evaluate(() => {
+              const canvas = window.__YAKOLAK_THREEJS_SHELL__.canvas;
+              const gl = canvas.getContext('webgl2');
+              const ext = gl?.getExtension('WEBGL_lose_context');
+              if (!ext) return false;
+              window.__FASTPLAY003_WEBGL_LOSE_CONTEXT__ = ext;
+              ext.loseContext();
+              return true;
+            });
+            assert.equal(supported, true, 'WEBGL_lose_context is required to verify real WebGL recovery');
+            await page.waitForFunction(() => window.__YAKOLAK_THREEJS_SHELL__.getGraphicsContextSnapshot().state === 'lost', null, { timeout: 5_000 });
+            await page.evaluate(() => window.__FASTPLAY003_WEBGL_LOSE_CONTEXT__.restoreContext());
+            await page.waitForFunction(() => window.__YAKOLAK_THREEJS_SHELL__.getGraphicsContextSnapshot().state === 'ready', null, { timeout: 10_000 });
+            const after = await getState(page);
+            const graphics = await page.evaluate(() => window.__YAKOLAK_THREEJS_SHELL__.getGraphicsContextSnapshot());
+            assert.equal(after.revision, before.revision, 'WebGL recovery mutated canonical revision at round boundary');
+            assert.deepEqual(after.board, before.board, 'WebGL recovery mutated board at round boundary');
+            assert.deepEqual(after.scores, before.scores, 'WebGL recovery mutated scores at round boundary');
+            assert.equal(after.roundEndRevision, before.roundEndRevision, 'WebGL recovery changed round boundary');
+            assert.ok(graphics.restoreCount >= initialGraphics.restoreCount + 1);
+            console.log(JSON.stringify({
+              stage: 'webgl-recovery-pass',
+              revision: after.revision,
+              round: after.round,
+              roundEndRevision: after.roundEndRevision,
+              restoreCountBefore: initialGraphics.restoreCount,
+              restoreCountAfter: graphics.restoreCount,
+            }));
+            return { before: initialGraphics, after: graphics };
+          }
+          '''
+          source = source[:a] + webgl + source[b:]
+
+          run_desktop = source.index('async function runDesktop(browser) {')
+          webgl_call = source.index('    const webgl = await verifyWebglRecovery(page);', run_desktop)
+          source = source[:webgl_call] + "    const webglBoundary = await finishRound(page, humanSeatId, gestureBook);\n    assert.ok(webglBoundary.roundEndRevision !== null || webglBoundary.matchComplete, 'first round did not reach WebGL boundary');\n" + source[webgl_call:]
+
           path.write_text(source)
           PY
 
@@ -194,6 +240,8 @@ jobs:
           test "$(grep -Fc 'const readiness = await waitForPhysicalInputReady(page, move.seatId);' fastplay-003-final-v3.mjs)" -eq 2
           grep -Fq "waitForRevisionOrRoundEnd" fastplay-003-final-v3.mjs
           ! grep -Fq "page.waitForFunction(async revision" fastplay-003-final-v3.mjs
+          grep -Fq "WebGL recovery must run at a stable round boundary" fastplay-003-final-v3.mjs
+          grep -Fq "first round did not reach WebGL boundary" fastplay-003-final-v3.mjs
           grep -Fq "computer handoff stalled after revision" fastplay-003-final-v3.mjs
           grep -Fq "stage: 'real-timeout-pass'" fastplay-003-final-v3.mjs
           grep -Fq "stage: 'webgl-recovery-pass'" fastplay-003-final-v3.mjs
