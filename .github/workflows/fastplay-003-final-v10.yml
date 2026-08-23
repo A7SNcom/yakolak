@@ -33,7 +33,7 @@ jobs:
         shell: bash
         run: |
           run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" -f state=pending -f context='FASTPLAY-003/final-public' -f description='v10 round-aware input acceptance running' -f target_url="$run_url"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" -f state=pending -f context='FASTPLAY-003/final-public' -f description='v10 revision-gated public acceptance running' -f target_url="$run_url"
 
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
@@ -106,13 +106,79 @@ jobs:
             }'''
           source = source[:drag_insert] + drag_prefix + source[drag_insert:]
 
+          a = source.index('async function finishRound(page, humanSeatId, gestureBook) {')
+          b = source.index('\nasync function finishMatch', a)
+          finish_round = r'''async function finishRound(page, humanSeatId, gestureBook) {
+            for (let step = 0; step < 80; step += 1) {
+              const state = await getState(page);
+              if (state.roundEndRevision !== null || state.matchComplete) return state;
+              const seat = state.seats.find(candidate => candidate.seatId === state.activeSeatId);
+
+              if (state.activeSeatId === humanSeatId) {
+                const move = await chooseHumanMove(page);
+                if (!move) {
+                  const beforeRevision = state.revision;
+                  await page.waitForFunction(async revision => {
+                    const current = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
+                    return current.revision > revision || current.roundEndRevision !== null || current.matchComplete;
+                  }, beforeRevision, { timeout: 23_000, polling: 50 });
+                  continue;
+                }
+
+                const forceDrag = gestureBook.drag === 0;
+                const forceTap = gestureBook.tap === 0;
+                if (forceTap) {
+                  await tapMove(page, move);
+                  gestureBook.tap += 1;
+                } else if (forceDrag) {
+                  await dragMove(page, move, { pointerType: 'mouse' });
+                  gestureBook.drag += 1;
+                } else if ((gestureBook.tap + gestureBook.drag) % 2 === 0) {
+                  await tapMove(page, move);
+                  gestureBook.tap += 1;
+                } else {
+                  await dragMove(page, move, { pointerType: 'mouse' });
+                  gestureBook.drag += 1;
+                }
+                continue;
+              }
+
+              const beforeRevision = state.revision;
+              try {
+                const handle = await page.waitForFunction(async revision => {
+                  const current = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
+                  return current.revision > revision || current.roundEndRevision !== null || current.matchComplete;
+                }, beforeRevision, { timeout: 3_000, polling: 25 });
+                await handle.dispose();
+              } catch (error) {
+                const diagnostic = await page.evaluate(async () => {
+                  const shell = window.__YAKOLAK_THREEJS_SHELL__;
+                  const canonical = await shell.getCanonicalState();
+                  const presentation = shell.getPresentationSnapshot();
+                  return {
+                    canonical,
+                    computerSeat: canonical.seats.find(candidate => candidate.seatId === canonical.activeSeatId) || null,
+                    movePresentationLock: presentation?.movePresentationLock || null,
+                    motion: presentation?.motion || null,
+                    acceptedTravel: presentation?.acceptedTravel || null,
+                    graphics: shell.getGraphicsContextSnapshot(),
+                    resources: shell.getResourceRegistrySnapshot(),
+                  };
+                });
+                throw new Error(`computer handoff stalled after revision ${beforeRevision}: ${JSON.stringify(diagnostic)}`, { cause: error });
+              }
+            }
+            const finalState = await getState(page);
+            throw new Error(`round did not finish within deterministic safety bound: ${JSON.stringify(finalState)}`);
+          }
+          '''
+          source = source[:a] + finish_round + source[b:]
           path.write_text(source)
           PY
 
           node --check fastplay-003-final-v3.mjs
           test "$(grep -Fc 'const readiness = await waitForPhysicalInputReady(page, move.seatId);' fastplay-003-final-v3.mjs)" -eq 2
-          test "$(grep -Fc 'return getState(page);' fastplay-003-final-v3.mjs)" -ge 1
-          grep -Fq "ended: true" fastplay-003-final-v3.mjs
+          grep -Fq "computer handoff stalled after revision" fastplay-003-final-v3.mjs
           grep -Fq "stage: 'real-timeout-pass'" fastplay-003-final-v3.mjs
           grep -Fq "stage: 'webgl-recovery-pass'" fastplay-003-final-v3.mjs
 
@@ -170,4 +236,9 @@ jobs:
             tail -n 220 fastplay-003-final-v10.log 2>/dev/null || echo '(verifier log unavailable)'
             echo '```'
           } > "$body"
-          gh issue create --title "$title" --body-file "$body" >/dev/null
+          existing="$(gh api "repos/${GITHUB_REPOSITORY}/issues?state=open&per_page=100" --jq ".[] | select(.title == \"${title}\") | .number" | head -n 1)"
+          if [ -z "$existing" ]; then
+            gh issue create --title "$title" --body-file "$body" >/dev/null
+          else
+            gh issue edit "$existing" --body-file "$body" >/dev/null
+          fi
