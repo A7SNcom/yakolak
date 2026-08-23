@@ -4,7 +4,9 @@ name: FASTPLAY-003 Final Public Acceptance v13
 on:
   push:
     branches: [threejs-rebuild]
-    paths: ['.github/workflows/fastplay-003-final-v13.yml']
+    paths:
+      - 'web/**'
+      - '.github/workflows/fastplay-003-final-v13.yml'
 
 permissions:
   contents: write
