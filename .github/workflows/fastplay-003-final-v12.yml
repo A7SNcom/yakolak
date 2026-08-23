@@ -1,4 +1,5 @@
 name: FASTPLAY-003 Final Public Acceptance v12
+# Diagnostic rerun: expose exact physical readiness state.
 
 on:
   push:
@@ -159,8 +160,6 @@ jobs:
           source = source[:a] + wait_human + source[b:]
 
           a = source.index('async function waitForPhysicalInputReady(page, seatId) {')
-          b = source.index('\n\n', a)
-          # locate the end robustly by the following helper consumer, not the first blank line
           b = source.index('\n          async function tapMove', a) if '\n          async function tapMove' in source[a:] else source.index('\nasync function tapMove', a)
           readiness = r'''async function waitForPhysicalInputReady(page, seatId) {
             const startedAt = Date.now();
