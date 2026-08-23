@@ -1,0 +1,101 @@
+name: FASTPLAY-003 Fix Drag Tap Ownership
+
+on:
+  push:
+    branches: [threejs-rebuild]
+    paths: ['.github/workflows/fastplay-003-fix-drag-tap-ownership.yml']
+
+permissions:
+  contents: write
+  statuses: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Mark patch pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=pending \
+            -f context='FASTPLAY-003/drag-tap-ownership-patch' \
+            -f description='Applying exclusive drag gesture ownership' \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+      - name: Patch gesture ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('web/app/scene/local-game-scene.js')
+          s = p.read_text()
+          old = '''    if (packet.phase === 'move' && packet.gesture === 'drag' && pointerStartPieceId) {
+      try {
+        if (dragController.snapshot().phase === DRAG_PHASES.IDLE) {
+          dragController.begin({
+            state: canonicalState,
+            selection: dragSelection.snapshot(),
+            pointerId: packet.pointerId,
+            pointerType: packet.pointerType,
+          });
+        }
+'''
+          new = '''    if (packet.phase === 'move' && packet.gesture === 'drag' && pointerStartPieceId) {
+      try {
+        if (dragController.snapshot().phase === DRAG_PHASES.IDLE) {
+          // Pointer-down seeds both tap and drag selection so either gesture can win.
+          // Once the adapter resolves this gesture as a drag, retire the parallel tap
+          // controller before starting drag ownership. dragSelection is independent and
+          // remains intact for the drag controller.
+          if (tapController.snapshot().phase === TAP_CONFIRMATION_PHASES.SELECTED) {
+            tapController.cancel({ state: canonicalState });
+          }
+          dragController.begin({
+            state: canonicalState,
+            selection: dragSelection.snapshot(),
+            pointerId: packet.pointerId,
+            pointerType: packet.pointerType,
+          });
+        }
+'''
+          if old not in s:
+              raise SystemExit('drag ownership anchor changed')
+          p.write_text(s.replace(old, new, 1))
+          PY
+          node --check web/app/scene/local-game-scene.js
+          grep -Fq "tapController.cancel({ state: canonicalState });" web/app/scene/local-game-scene.js
+          git diff --check
+      - name: Commit production fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add web/app/scene/local-game-scene.js
+          git commit -m "FASTPLAY-003 retire tap selection when drag wins gesture"
+          git pull --rebase origin threejs-rebuild
+          git push origin HEAD:threejs-rebuild
+      - name: Mark patch success
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=success \
+            -f context='FASTPLAY-003/drag-tap-ownership-patch' \
+            -f description='Exclusive drag gesture ownership pushed' \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+      - name: Mark patch failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=failure \
+            -f context='FASTPLAY-003/drag-tap-ownership-patch' \
+            -f description='Exclusive drag gesture ownership failed' \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
