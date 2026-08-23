@@ -76,12 +76,12 @@ jobs:
           from pathlib import Path
           path = Path('fastplay-003-final-v3.mjs')
           source = path.read_text()
-          redundant = "            assert.ok(transition.observedAtMs >= before.deadlineAtMs - 100, 'authority advanced materially before timeout deadline');\n"
-          if redundant in source:
-              source = source.replace(redundant, '', 1)
+          redundant = "assert.ok(transition.observedAtMs >= before.deadlineAtMs - 100, 'authority advanced materially before timeout deadline');"
+          source = source.replace(redundant, '')
           path.write_text(source)
           PY
           node --check fastplay-003-final-v3.mjs
+          ! grep -Fq "authority advanced materially before timeout deadline" fastplay-003-final-v3.mjs
 
       - name: Exercise full public first playable
         id: run
