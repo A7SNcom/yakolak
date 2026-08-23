@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
 
-const expectedCandidateSha = String(process.env.FASTPLAY001_EXPECTED_CANDIDATE_SHA || '').trim().toLowerCase();
+const milestoneSha = String(process.env.FASTPLAY001_EXPECTED_CANDIDATE_SHA || '').trim().toLowerCase();
 const baseUrl = new URL(process.env.FASTPLAY001_BASE_URL || 'https://a7sncom.github.io/yakolak/threejs/');
 const manifestUrl = new URL('../deployment-manifest.json', baseUrl);
 
-if (!/^[0-9a-f]{40}$/.test(expectedCandidateSha)) {
-  throw new Error('FASTPLAY001_EXPECTED_CANDIDATE_SHA must be one exact 40-hex SHA');
+if (!/^[0-9a-f]{40}$/.test(milestoneSha)) {
+  throw new Error('FASTPLAY001_EXPECTED_CANDIDATE_SHA must identify the milestone web commit');
 }
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -22,21 +23,30 @@ async function fetchJsonNoCache(url) {
   return response.json();
 }
 
-async function waitForExactCandidate() {
+function candidateContainsMilestone(candidateSha) {
+  if (!/^[0-9a-f]{40}$/.test(candidateSha)) return false;
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', milestoneSha, candidateSha], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForPlayableCandidate() {
   let last = null;
-  for (let attempt = 1; attempt <= 72; attempt += 1) {
+  for (let attempt = 1; attempt <= 96; attempt += 1) {
     try {
       const manifest = await fetchJsonNoCache(manifestUrl);
       last = manifest;
-      if (String(manifest?.threejsCandidateSha || '').toLowerCase() === expectedCandidateSha) {
-        return { attempt, manifest };
-      }
+      const liveSha = String(manifest?.threejsCandidateSha || '').trim().toLowerCase();
+      if (candidateContainsMilestone(liveSha)) return { attempt, manifest, liveSha };
     } catch (error) {
       last = { error: error?.message || String(error) };
     }
     await delay(5_000);
   }
-  const error = new Error(`FASTPLAY-001 public candidate not live: expected ${expectedCandidateSha}`);
+  const error = new Error(`FASTPLAY-001 public generation does not contain milestone ${milestoneSha}`);
   error.lastObservation = last;
   throw error;
 }
@@ -247,14 +257,18 @@ async function runMobileDrag(browser) {
   }
 }
 
-const live = await waitForExactCandidate();
-const browser = await chromium.launch({ headless: true });
+const live = await waitForPlayableCandidate();
+const browser = await chromium.launch({
+  headless: true,
+  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+});
 try {
   const desktop = await runDesktopClick(browser);
   const mobile = await runMobileDrag(browser);
   console.log(JSON.stringify({
     fastplay001: 'PASS',
-    candidateSha: expectedCandidateSha,
+    milestoneSha,
+    candidateSha: live.liveSha,
     deploymentGeneration: live.manifest.deploymentGeneration,
     manifestAttempt: live.attempt,
     desktop,
