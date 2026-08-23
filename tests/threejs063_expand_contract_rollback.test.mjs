@@ -93,7 +93,7 @@ test('THREEJS-063 / PAGES-015 migration is additive, idempotent, and preserves t
 
     const preserved = db.prepare(`SELECT room_id, payload_json, integrity, created_at, updated_at
       FROM ${PROBE_TABLE} WHERE room_id = ?`).get(legacyRow.roomId);
-    assert.deepEqual(preserved, {
+    assert.deepEqual({ ...preserved }, {
       room_id: legacyRow.roomId,
       payload_json: legacyRow.payload,
       integrity: legacyRow.integrity,
@@ -108,7 +108,11 @@ test('THREEJS-063 / PAGES-015 migration is additive, idempotent, and preserves t
     }
 
     const migrations = db.prepare(`SELECT schema_version, migration_name, applied_at_ms
-      FROM ${AUTHORITY_TABLES.migrations}`).all();
+      FROM ${AUTHORITY_TABLES.migrations}`).all().map(row => ({
+      schema_version: Number(row.schema_version),
+      migration_name: String(row.migration_name),
+      applied_at_ms: Number(row.applied_at_ms),
+    }));
     assert.deepEqual(migrations, [{
       schema_version: AUTHORITY_SCHEMA_VERSION,
       migration_name: 'threejs-063-authority-v1',
