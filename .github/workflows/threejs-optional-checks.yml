@@ -89,8 +89,8 @@ jobs:
           node-version: '22'
       - name: Install browser verifier only
         run: npm install --no-save --package-lock=false playwright@1.55.0
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install matching Chromium
+        run: node node_modules/playwright/cli.js install --with-deps chromium
       - name: Prepare verified runtime assets
         run: node scripts/prepare-threejs-runtime-assets.mjs
       - name: Expose frozen baseline screenshots
@@ -146,8 +146,8 @@ jobs:
         run: node --test tests/threejs061_live_acceptance_contract.test.mjs
       - name: Install live browser verifier only
         run: npm install --no-save --package-lock=false playwright@1.55.0
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install matching Chromium
+        run: node node_modules/playwright/cli.js install --with-deps chromium
       - name: Run exact-generation GitHub Pages local slice acceptance
         env:
           THREEJS061_EXPECTED_CANDIDATE_SHA: ${{ inputs.expected_candidate_sha }}
