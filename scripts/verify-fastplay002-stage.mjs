@@ -131,7 +131,10 @@ async function selectFirstPiece(page, target) {
 
 const live = await waitForPlayableCandidate();
 const liveSha = String(live.threejsCandidateSha || '').toLowerCase();
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  headless: true,
+  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+});
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
 const page = await context.newPage();
 const pageErrors = [];
