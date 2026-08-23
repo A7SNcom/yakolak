@@ -84,32 +84,43 @@ jobs:
               remainingMs,
               timeoutSkipCountBefore,
             }));
-            await page.waitForFunction(async ({ revision, seatId, deadlineAtMs, timeoutSkipCountBefore }) => {
+            const transitionHandle = await page.waitForFunction(async ({ revision, seatId, deadlineAtMs, timeoutSkipCountBefore }) => {
               const state = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
               const timeoutSkipCount = (state.skips || [])
                 .filter(skip => skip.seatId === seatId && skip.reason === 'timeout').length;
-              return state.revision > revision
+              if (
+                state.revision > revision
                 && state.deadlineAtMs !== deadlineAtMs
-                && timeoutSkipCount > timeoutSkipCountBefore;
+                && timeoutSkipCount > timeoutSkipCountBefore
+              ) {
+                return {
+                  revision: state.revision,
+                  activeSeatId: state.activeSeatId,
+                  deadlineAtMs: state.deadlineAtMs,
+                  timeoutSkipCount,
+                };
+              }
+              return false;
             }, {
               revision: before.revision,
               seatId: seat.seatId,
               deadlineAtMs: before.deadlineAtMs,
               timeoutSkipCountBefore,
             }, { timeout: 23_000, polling: 25 });
-            const after = await getState(page);
-            const timeoutSkipCountAfter = (after.skips || [])
-              .filter(skip => skip.seatId === seat.seatId && skip.reason === 'timeout').length;
-            assert.ok(after.revision > before.revision, 'timeout did not advance authority revision');
-            assert.notEqual(after.deadlineAtMs, before.deadlineAtMs, 'timeout did not hand off to a new deadline');
-            assert.ok(timeoutSkipCountAfter > timeoutSkipCountBefore, 'new timeout skip was not observed');
+            const transition = await transitionHandle.jsonValue();
+            await transitionHandle.dispose();
+            assert.ok(transition.revision > before.revision, 'timeout did not advance authority revision');
+            assert.notEqual(transition.deadlineAtMs, before.deadlineAtMs, 'timeout did not hand off to a new deadline');
+            assert.ok(transition.timeoutSkipCount > timeoutSkipCountBefore, 'new timeout skip was not observed');
             return {
               seatId: seat.seatId,
               deadlineAtMs: before.deadlineAtMs,
               turnDurationMs: observation.turnDurationMs,
-              observedRevision: after.revision,
+              observedRevision: transition.revision,
+              observedActiveSeatId: transition.activeSeatId,
+              observedDeadlineAtMs: transition.deadlineAtMs,
               timeoutSkipCountBefore,
-              timeoutSkipCountAfter,
+              timeoutSkipCountAfter: transition.timeoutSkipCount,
             };
           }
           '''
