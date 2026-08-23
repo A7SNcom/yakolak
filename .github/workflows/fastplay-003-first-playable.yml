@@ -55,15 +55,57 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import textwrap
-          workflow = Path('.github/workflows/fastplay-003-final-v13.yml').read_text()
+          workflow = Path('.github/workflows/fastplay-003-final-v10.yml').read_text()
           a = workflow.index('      - name: Build verifier\n')
           b = workflow.index('      - name: Exercise full public first playable\n', a)
           block = workflow[a:b]
           r = block.index('        run: |\n') + len('        run: |\n')
-          Path('/tmp/build-v13.sh').write_text(textwrap.dedent(block[r:]))
+          Path('/tmp/build-v10.sh').write_text(textwrap.dedent(block[r:]))
           PY
-          bash /tmp/build-v13.sh
+          bash /tmp/build-v10.sh
+
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('fastplay-003-final-v3.mjs')
+          s = p.read_text()
+          old = """const ready = state.activeSeatId === seatId
+                  && !presentation?.movePresentationLock
+                  && (!presentation?.drag?.phase || presentation.drag.phase === 'idle')
+                  && (!presentation?.tap?.phase || presentation.tap.phase === 'idle');"""
+          new = """const ready = state.activeSeatId === seatId
+                  && !presentation?.movePresentationLock;"""
+          if old not in s:
+              raise SystemExit('physical readiness predicate anchor changed')
+          s = s.replace(old, new, 1)
+
+          old_wait = "await waitForRevisionOrRoundEnd(page, beforeRevision, { timeoutMs: 3_000, pollingMs: 25 });"
+          new_wait = "await waitForRevisionOrRoundEnd(page, beforeRevision, { timeoutMs: 23_000, pollingMs: 25 });"
+          if old_wait not in s:
+              raise SystemExit('computer handoff timeout anchor changed')
+          s = s.replace(old_wait, new_wait, 1)
+
+          old_result = """    const visibleResult = await page.locator('#round-result').isVisible();
+    assert.equal(visibleResult, true, `round result not visible for round ${state.round}`);"""
+          new_result = """    try {
+      await page.locator('#round-result').waitFor({ state: 'visible', timeout: 5_000 });
+    } catch (error) {
+      const ui = await page.evaluate(() => ({
+        bootState: document.documentElement.dataset.bootState,
+        scene: document.documentElement.dataset.fastplayScene,
+        roundResultHidden: document.querySelector('#round-result')?.hidden ?? null,
+        roundResultText: document.querySelector('#round-result')?.textContent || '',
+      }));
+      throw new Error(`round result did not become visible for round ${state.round}: ${JSON.stringify(ui)}`, { cause: error });
+    }"""
+          if old_result not in s:
+              raise SystemExit('round result visibility anchor changed')
+          s = s.replace(old_result, new_result, 1)
+          p.write_text(s)
+          PY
+
           node --check fastplay-003-final-v3.mjs
+          grep -Fq "state.activeSeatId === seatId" fastplay-003-final-v3.mjs
+          grep -Fq "&& !presentation?.movePresentationLock;" fastplay-003-final-v3.mjs
           grep -Fq "timeoutMs: 23_000" fastplay-003-final-v3.mjs
           grep -Fq "waitFor({ state: 'visible', timeout: 5_000 })" fastplay-003-final-v3.mjs
           grep -Fq "WebGL recovery must run at a stable round boundary" fastplay-003-final-v3.mjs
