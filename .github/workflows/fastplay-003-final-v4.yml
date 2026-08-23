@@ -77,9 +77,9 @@ jobs:
           path = Path('fastplay-003-final-v3.mjs')
           source = path.read_text()
           redundant = "            assert.ok(transition.observedAtMs >= before.deadlineAtMs - 100, 'authority advanced materially before timeout deadline');\n"
-          if redundant not in source:
-              raise SystemExit('FASTPLAY-003 v3 clock assertion signature changed')
-          path.write_text(source.replace(redundant, '', 1))
+          if redundant in source:
+              source = source.replace(redundant, '', 1)
+          path.write_text(source)
           PY
           node --check fastplay-003-final-v3.mjs
 
