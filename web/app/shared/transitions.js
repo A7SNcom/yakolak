@@ -6,6 +6,7 @@
 import {
   emptyBoard,
   hasLegalMove,
+  placeCanonicalPiece,
   placePiece,
   winningOutcomeAfterAcceptedPlacement,
 } from './rules.js';
@@ -50,14 +51,15 @@ export function finishRoundTransition(state, { color = null, seat = null, draw =
   };
 }
 
-export function applyMoveTransition(state, seat, move) {
+function applyMoveTransitionWithCommit(state, seat, move, commitPlacement) {
   if (state.status !== 'playing') throw new Error('room_not_playing');
   const current = state.players[state.turnIndex];
   if (!current || current.seat !== seat) throw new Error('not_your_turn');
 
-  // Placement legality commits first. Only the successfully committed normalized
-  // placement may trigger win evaluation; rejected placements never reach it.
-  const board = placePiece(state.board, current.color, move);
+  // Placement legality commits first. Canonical authorities use the strict shared
+  // commit; protocol-v5 keeps its historical coercing wrapper. Both live in the
+  // shared rules package and share occupancy/piece-availability semantics.
+  const board = commitPlacement(state.board, current.color, move);
   const cell = Number(move.cell);
   const size = String(move.size);
   const lastMove = { cell, size, color: current.color, seat };
@@ -78,6 +80,16 @@ export function applyMoveTransition(state, seat, move) {
   const turnIndex = nextPlayablePlayerIndex(next, state.turnIndex);
   if (turnIndex < 0) return finishRoundTransition(next, { draw: true, lastMove });
   return { ...next, turnIndex };
+}
+
+// Historical protocol-v5 transition keeps its coercing placement envelope.
+export function applyMoveTransition(state, seat, move) {
+  return applyMoveTransitionWithCommit(state, seat, move, placePiece);
+}
+
+// Canonical authority transition uses strict machine-readable placement codes.
+export function applyCanonicalMoveTransition(state, seat, move) {
+  return applyMoveTransitionWithCommit(state, seat, move, placeCanonicalPiece);
 }
 
 export function advanceRoundTransition(state, seat) {
