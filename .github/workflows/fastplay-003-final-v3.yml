@@ -1,0 +1,439 @@
+name: FASTPLAY-003 Final Public Acceptance v3
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - '.github/workflows/fastplay-003-final-v3.yml'
+
+permissions:
+  contents: write
+  issues: write
+  statuses: write
+
+concurrency:
+  group: fastplay-003-final-v3
+  cancel-in-progress: false
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve web milestone
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$(git log -1 --format='%H' -- web)"
+          test "${#candidate}" -eq 40
+          echo "sha=${candidate}" >> "$GITHUB_OUTPUT"
+
+      - name: Mark final acceptance pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
+            -f state=pending -f context='FASTPLAY-003/final-public' \
+            -f description='Physical-input public first-playable acceptance running'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          node node_modules/playwright/cli.js install --with-deps chromium
+
+      - name: Build resilient public verifier
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s = Path('scripts/verify-fastplay003-live.mjs').read_text()
+
+          anchor = "import fs from 'node:fs';"
+          if anchor not in s: raise SystemExit('missing fs import')
+          s = s.replace(anchor, anchor + "\nimport { execFileSync } from 'node:child_process';", 1)
+
+          a = s.index('async function waitForExactCandidate() {')
+          b = s.index('\nfunction attachPageErrorCapture', a)
+          wait = r'''function candidateContainsMilestone(candidateSha) {
+            if (!/^[0-9a-f]{40}$/.test(candidateSha)) return false;
+            try {
+              execFileSync('git', ['cat-file', '-e', `${candidateSha}^{commit}`], { stdio: 'ignore' });
+            } catch {
+              try { execFileSync('git', ['fetch', '--quiet', 'origin', candidateSha], { stdio: 'ignore' }); }
+              catch { return false; }
+            }
+            try {
+              execFileSync('git', ['merge-base', '--is-ancestor', expectedCandidateSha, candidateSha], { stdio: 'ignore' });
+              return true;
+            } catch { return false; }
+          }
+
+          async function waitForExactCandidate() {
+            let last = null;
+            for (let attempt = 1; attempt <= 120; attempt += 1) {
+              try {
+                const manifest = await fetchJsonNoCache(manifestUrl);
+                last = manifest;
+                const liveCandidateSha = String(manifest?.threejsCandidateSha || '').trim().toLowerCase();
+                if (candidateContainsMilestone(liveCandidateSha)) return { attempt, manifest, liveCandidateSha };
+              } catch (error) { last = { error: error?.message || String(error) }; }
+              await delay(5_000);
+            }
+            const error = new Error(`public generation does not contain milestone ${expectedCandidateSha}`);
+            error.lastObservation = last;
+            throw error;
+          }
+          '''
+          s = s[:a] + wait + s[b:]
+
+          old = "const browser = await chromium.launch({ headless: true });"
+          new = "const browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });"
+          if old not in s: raise SystemExit('missing chromium launch')
+          s = s.replace(old, new, 1)
+
+          a = s.index('async function projectMove(page, move) {')
+          b = s.index('\nasync function waitHumanMoveCommitted', a)
+          project = r'''async function projectMove(page, move) {
+            return page.evaluate(async move => {
+              const shell = window.__YAKOLAK_THREEJS_SHELL__;
+              const snapshot = shell.getPresentationSnapshot();
+              const state = await shell.getCanonicalState();
+              const worldLayout = shell.getAsset('data.world-layout');
+              const remaining = state.inventory?.[move.seatId]?.[move.size] ?? 0;
+              const candidates = snapshot.pieces.placements
+                .filter(candidate =>
+                  candidate.colorId === move.color
+                  && candidate.size === move.size
+                  && candidate.destination?.kind === 'home'
+                  && candidate.copyIndex < remaining)
+                .sort((left, right) => left.copyIndex - right.copyIndex);
+              if (!candidates.length) throw new Error(`FASTPLAY-003 visible home piece missing for ${move.color}/${move.size}`);
+              const zone = worldLayout.zones.find(candidate => candidate.id === move.cell);
+              if (!zone) throw new Error(`FASTPLAY-003 board cell missing: ${move.cell}`);
+              const THREE = await import(new URL('vendor/three/r185/three.module.js', location.href).href);
+              const frameModule = await import(new URL('app/camera/frame-governor.js', location.href).href);
+              const rect = shell.canvas.getBoundingClientRect();
+              const cameraSpec = worldLayout.cameras[snapshot.cameraId];
+              if (!cameraSpec) throw new Error(`FASTPLAY-003 camera spec missing: ${snapshot.cameraId}`);
+              const framePolicy = snapshot.frame?.policy || {};
+              const aspect = rect.width / rect.height;
+              const effectiveFov = frameModule.refitPerspectiveFov({
+                baseFov: framePolicy.baseFov ?? cameraSpec.fov,
+                aspect,
+                referenceAspect: framePolicy.referenceAspect ?? 1,
+                maxFov: framePolicy.maxFov ?? 72,
+              });
+              const camera = new THREE.PerspectiveCamera(effectiveFov, aspect, 0.1, 8000);
+              camera.position.fromArray(cameraSpec.position);
+              camera.lookAt(new THREE.Vector3(...cameraSpec.target));
+              camera.updateProjectionMatrix();
+              camera.updateMatrixWorld(true);
+              const project = position => {
+                const vector = new THREE.Vector3(...position).project(camera);
+                return {
+                  x: rect.left + ((vector.x + 1) / 2) * rect.width,
+                  y: rect.top + ((1 - vector.y) / 2) * rect.height,
+                };
+              };
+              return {
+                pieces: candidates.map(candidate => ({
+                  pieceId: candidate.pieceId,
+                  copyIndex: candidate.copyIndex,
+                  point: project(candidate.destination.center),
+                })),
+                board: project(zone.position),
+                cameraId: snapshot.cameraId,
+                effectiveFov,
+                canvas: { width: rect.width, height: rect.height },
+              };
+            }, move);
+          }
+          '''
+          s = s[:a] + project + s[b:]
+
+          a = s.index('async function tapMove(page, move) {')
+          b = s.index('\nasync function dragMove', a)
+          tap = r'''async function tapMove(page, move) {
+            const before = await getState(page);
+            const targets = await projectMove(page, move);
+            const offsets = [[0,0],[10,0],[-10,0],[0,10],[0,-10],[18,8],[-18,8],[18,-8],[-18,-8],[26,0],[-26,0],[0,26],[0,-26]];
+            let selectedAt = null;
+            let selectedPiece = null;
+            for (const candidate of targets.pieces) {
+              for (const [dx, dy] of offsets) {
+                await page.mouse.click(candidate.point.x + dx, candidate.point.y + dy);
+                const selected = await page.evaluate(size => {
+                  const tap = window.__YAKOLAK_THREEJS_SHELL__.getPresentationSnapshot()?.tap;
+                  return tap?.phase === 'selected' && tap?.selection?.selectedSize === size;
+                }, move.size);
+                if (selected) {
+                  selectedAt = { x: candidate.point.x + dx, y: candidate.point.y + dy };
+                  selectedPiece = candidate;
+                  break;
+                }
+                await page.waitForTimeout(50);
+              }
+              if (selectedAt) break;
+            }
+            assert.ok(selectedAt, `could not select ${move.size} piece by tap`);
+            await page.mouse.click(targets.board.x, targets.board.y);
+            const state = await waitHumanMoveCommitted(page, before.revision, move);
+            return { gesture: 'tap', move, selectedAt, selectedPiece, target: targets.board, revision: state.revision };
+          }
+          '''
+          s = s[:a] + tap + s[b:]
+
+          a = s.index('async function dragMove(page, move, { pointerType = \'mouse\' } = {}) {')
+          b = s.index('\nasync function waitForHumanOrRoundEnd', a)
+          drag = r'''async function dragMove(page, move, { pointerType = 'mouse' } = {}) {
+            const before = await getState(page);
+            const targets = await projectMove(page, move);
+            const offsets = [[0,0],[10,0],[-10,0],[0,10],[0,-10],[18,8],[-18,8],[18,-8],[-18,-8],[26,0],[-26,0],[0,26],[0,-26]];
+            for (const candidate of targets.pieces) {
+              for (const [dx, dy] of offsets) {
+                const from = { x: candidate.point.x + dx, y: candidate.point.y + dy };
+                const to = targets.board;
+                await page.evaluate(({ from, to, pointerType }) => {
+                  const canvas = window.__YAKOLAK_THREEJS_SHELL__.canvas;
+                  const pointerId = pointerType === 'touch' ? 63 : 62;
+                  const emit = (type, x, y, buttons) => canvas.dispatchEvent(new PointerEvent(type, {
+                    bubbles: true,
+                    cancelable: true,
+                    pointerId,
+                    pointerType,
+                    isPrimary: true,
+                    button: 0,
+                    buttons,
+                    clientX: x,
+                    clientY: y,
+                  }));
+                  emit('pointerdown', from.x, from.y, 1);
+                  for (let step = 1; step <= 10; step += 1) {
+                    const t = step / 10;
+                    emit('pointermove', from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t, 1);
+                  }
+                  emit('pointerup', to.x, to.y, 0);
+                }, { from, to, pointerType });
+                try {
+                  const handle = await page.waitForFunction(async ({ beforeRevision, move }) => {
+                    const state = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
+                    if (state.revision > beforeRevision && state.lastMove?.seatId === move.seatId && state.lastMove?.cell === move.cell && state.lastMove?.size === move.size) return state;
+                    return false;
+                  }, { beforeRevision: before.revision, move }, { timeout: 1_500 });
+                  await handle.dispose();
+                  const committed = await getState(page);
+                  return { gesture: 'drag', move, from, selectedPiece: candidate, target: to, revision: committed.revision, pointerType };
+                } catch {
+                  await page.waitForTimeout(80);
+                }
+              }
+            }
+            throw new Error(`could not commit ${move.size} move by ${pointerType} drag`);
+          }
+          '''
+          s = s[:a] + drag + s[b:]
+
+          a = s.index('async function allowRealTimeout(page) {')
+          b = s.index('\nasync function verifyWebglRecovery', a)
+          timeout = r'''async function allowRealTimeout(page) {
+            const startHandle = await page.waitForFunction(async () => {
+              const state = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
+              const seat = state.seats.find(candidate => candidate.seatId === state.activeSeatId);
+              const nowMs = Date.now();
+              const remainingMs = state.deadlineAtMs === null ? null : state.deadlineAtMs - nowMs;
+              if (seat?.type !== 'human' || !Number.isSafeInteger(state.deadlineAtMs) || remainingMs <= 0 || remainingMs > 18_000) return false;
+              return { state, nowMs, remainingMs, startedAt: performance.now() };
+            }, null, { timeout: 20_000, polling: 25 });
+            const observation = await startHandle.jsonValue();
+            await startHandle.dispose();
+            const before = observation.state;
+            const seat = before.seats.find(candidate => candidate.seatId === before.activeSeatId);
+            assert.equal(seat?.type, 'human');
+            const timeoutSkipCountBefore = (before.skips || []).filter(skip => skip.seatId === seat.seatId && skip.reason === 'timeout').length;
+
+            await page.waitForTimeout(500);
+            const early = await getState(page);
+            assert.equal(early.revision, before.revision, 'authority advanced before human timeout window');
+            assert.equal(early.activeSeatId, before.activeSeatId, 'active seat changed before human timeout window');
+
+            const minimumElapsedMs = Math.max(0, observation.remainingMs - 350);
+            await page.waitForTimeout(Math.max(0, minimumElapsedMs - 500));
+            const transitionHandle = await page.waitForFunction(async ({ revision, seatId }) => {
+              const state = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
+              if (state.revision <= revision) return false;
+              return {
+                revision: state.revision,
+                activeSeatId: state.activeSeatId,
+                deadlineAtMs: state.deadlineAtMs,
+                lastMove: state.lastMove,
+                timeoutSkips: (state.skips || []).filter(skip => skip.seatId === seatId && skip.reason === 'timeout').length,
+                observedAtMs: Date.now(),
+              };
+            }, { revision: before.revision, seatId: seat.seatId }, { timeout: 5_000, polling: 25 });
+            const transition = await transitionHandle.jsonValue();
+            await transitionHandle.dispose();
+            const elapsedMs = await page.evaluate(startedAt => performance.now() - startedAt, observation.startedAt);
+            assert.ok(elapsedMs >= minimumElapsedMs, `timeout advanced too early after ${elapsedMs}ms`);
+            assert.ok(transition.observedAtMs >= before.deadlineAtMs - 100, 'authority advanced materially before timeout deadline');
+            const direct = transition.timeoutSkips > timeoutSkipCountBefore;
+            const followed = transition.revision >= before.revision + 2 && transition.lastMove?.seatId !== seat.seatId;
+            assert.ok(direct || followed, 'authoritative timeout evidence missing');
+            return { seatId: seat.seatId, deadlineAtMs: before.deadlineAtMs, observedRevision: transition.revision, elapsedMs, direct, followed };
+          }
+          '''
+          s = s[:a] + timeout + s[b:]
+
+          old_flow = r'''    const timeout = await allowRealTimeout(page);
+              await waitForHumanOrRoundEnd(page, humanSeatId, { timeout: 15_000 });
+
+              const gestureBook = { tap: 0, drag: 0 };
+              const firstMove = await chooseHumanMove(page);
+              assert.ok(firstMove, 'no legal tap move after timeout');
+              const tap = await tapMove(page, firstMove);
+              gestureBook.tap += 1;
+              await waitForHumanOrRoundEnd(page, humanSeatId, { timeout: 15_000 });
+
+              const secondMove = await chooseHumanMove(page);
+              assert.ok(secondMove, 'no legal drag move after tap');
+              const drag = await dragMove(page, secondMove, { pointerType: 'mouse' });
+              gestureBook.drag += 1;
+              await waitForHumanOrRoundEnd(page, humanSeatId, { timeout: 15_000 });'''
+          new_flow = r'''    const gestureBook = { tap: 0, drag: 0 };
+              const firstMove = await chooseHumanMove(page);
+              assert.ok(firstMove, 'no legal opening tap move');
+              const tap = await tapMove(page, firstMove);
+              gestureBook.tap += 1;
+              await waitForHumanOrRoundEnd(page, humanSeatId, { timeout: 15_000 });
+
+              const timeout = await allowRealTimeout(page);
+              await waitForHumanOrRoundEnd(page, humanSeatId, { timeout: 15_000 });
+
+              const secondMove = await chooseHumanMove(page);
+              assert.ok(secondMove, 'no legal drag move after real timeout');
+              const drag = await dragMove(page, secondMove, { pointerType: 'mouse' });
+              gestureBook.drag += 1;
+              await waitForHumanOrRoundEnd(page, humanSeatId, { timeout: 15_000 });'''
+          if old_flow not in s: raise SystemExit('desktop flow changed')
+          s = s.replace(old_flow, new_flow, 1)
+
+          old_output = "    candidateSha: expectedCandidateSha,"
+          if old_output not in s: raise SystemExit('candidate output changed')
+          s = s.replace(old_output, "    candidateSha: live.liveCandidateSha,\n    milestoneSha: expectedCandidateSha,", 1)
+          Path('fastplay-003-final-v3.mjs').write_text(s)
+          PY
+          node --check fastplay-003-final-v3.mjs
+
+      - name: Exercise full public first playable
+        id: run
+        continue-on-error: true
+        env:
+          FASTPLAY003_EXPECTED_CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+          FASTPLAY003_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+          FASTPLAY003_ARTIFACT_PATH: fastplay-003-acceptance.json
+        shell: bash
+        run: node fastplay-003-final-v3.mjs 2>&1 | tee fastplay-003-final-v3.log
+
+      - name: Record blocker
+        if: steps.run.outcome != 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MILESTONE_SHA: ${{ steps.candidate.outputs.sha }}
+        shell: bash
+        run: |
+          body="$(mktemp)"
+          {
+            echo 'FASTPLAY-003 final-v3 public acceptance failed.'
+            echo
+            echo "milestone_sha: ${MILESTONE_SHA}"
+            echo "workflow_run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            echo '```text'
+            tail -n 200 fastplay-003-final-v3.log
+            echo '```'
+          } > "$body"
+          gh issue create --title "FASTPLAY-003 final-v3 blocker ${MILESTONE_SHA}" --body-file "$body" >/dev/null
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" \
+            -f state=failure -f context='FASTPLAY-003/final-public' \
+            -f description='Physical-input public first-playable acceptance failed'
+
+      - name: Freeze accepted generation
+        if: steps.run.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MILESTONE_SHA: ${{ steps.candidate.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$(jq -r '.candidateSha' fastplay-003-acceptance.json)"
+          generation="$(jq -r '.deploymentGeneration' fastplay-003-acceptance.json)"
+          result="$(jq -r '.FIRST_PLAYABLE_EXPERIMENTAL' fastplay-003-acceptance.json)"
+          git cat-file -e "${candidate}^{commit}" 2>/dev/null || git fetch --quiet origin "${candidate}"
+          git merge-base --is-ancestor "${MILESTONE_SHA}" "${candidate}"
+          test "$result" = PASS
+          test -n "$generation"
+
+          freeze_branch='first-playable-experimental'
+          existing="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${freeze_branch}" --jq '.object.sha' 2>/dev/null || true)"
+          if [ -z "$existing" ]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/heads/${freeze_branch}" -f sha="$candidate" >/dev/null
+          elif [ "$existing" != "$candidate" ]; then
+            echo "freeze branch already points to ${existing}" >&2
+            exit 1
+          fi
+
+          title='FIRST_PLAYABLE_EXPERIMENTAL=PASS'
+          existing_issue="$(gh api "repos/${GITHUB_REPOSITORY}/issues?state=all&per_page=100" --jq '.[] | select(.pull_request == null and .title == "FIRST_PLAYABLE_EXPERIMENTAL=PASS") | .number' | head -n 1)"
+          body="$(mktemp)"
+          cat > "$body" <<BODY
+          FIRST_PLAYABLE_EXPERIMENTAL=PASS
+
+          milestone_sha: ${MILESTONE_SHA}
+          candidate_sha: ${candidate}
+          deployment_generation: ${generation}
+          public_url: https://a7sncom.github.io/yakolak/threejs/
+          freeze_branch: ${freeze_branch}
+          workflow_run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+
+          Verified on the actual public page: desktop + mobile portrait Human/Computer setup, real pointer tap and drag across live remaining piece copies, authoritative 18-second human timeout, round scoring, next round, full match, rematch, return to setup, refresh recovery, WebGL loss/restore and no fatal/page errors.
+          BODY
+          if [ -z "$existing_issue" ]; then
+            gh issue create --title "$title" --body-file "$body" >/dev/null
+          else
+            gh issue edit "$existing_issue" --body-file "$body" --state open >/dev/null
+          fi
+
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" \
+            -f state=success -f context='FASTPLAY-003/final-public' \
+            -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS; public candidate frozen'
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" \
+            -f state=success -f context='FASTPLAY-003/first-playable' \
+            -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS'
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${candidate}" \
+            -f state=success -f context='FASTPLAY-003/public-pass' \
+            -f description='Public first-playable acceptance passed'
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastplay-003-final-v3-${{ steps.candidate.outputs.sha }}
+          path: |
+            fastplay-003-acceptance.json
+            fastplay-003-final-v3.log
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Fail after evidence
+        if: steps.run.outcome != 'success'
+        run: exit 1
