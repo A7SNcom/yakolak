@@ -14,12 +14,12 @@ permissions:
 
 concurrency:
   group: fastplay-003-final-v4
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   acceptance:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,10 +39,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
         run: |
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
             -f state=pending \
             -f context='FASTPLAY-003/final-public' \
-            -f description='v4 public first-playable acceptance running'
+            -f description='v4 bounded public first-playable acceptance running' \
+            -f target_url="$run_url"
 
       - uses: actions/setup-node@v4
         with:
@@ -53,7 +55,7 @@ jobs:
           npm install --no-save --package-lock=false playwright@1.55.0
           node node_modules/playwright/cli.js install --with-deps chromium
 
-      - name: Reuse v3 verifier and remove redundant clock assertion
+      - name: Build v4 verifier
         shell: bash
         run: |
           python - <<'PY'
@@ -77,47 +79,21 @@ jobs:
           redundant = "            assert.ok(transition.observedAtMs >= before.deadlineAtMs - 100, 'authority advanced materially before timeout deadline');\n"
           if redundant not in source:
               raise SystemExit('FASTPLAY-003 v3 clock assertion signature changed')
-          source = source.replace(redundant, '', 1)
-          path.write_text(source)
+          path.write_text(source.replace(redundant, '', 1))
           PY
           node --check fastplay-003-final-v3.mjs
 
       - name: Exercise full public first playable
         id: run
-        continue-on-error: true
         env:
           FASTPLAY003_EXPECTED_CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
           FASTPLAY003_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
           FASTPLAY003_ARTIFACT_PATH: fastplay-003-acceptance.json
         shell: bash
-        run: node fastplay-003-final-v3.mjs 2>&1 | tee fastplay-003-final-v4.log
-
-      - name: Record blocker
-        if: steps.run.outcome != 'success'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          MILESTONE_SHA: ${{ steps.candidate.outputs.sha }}
-        shell: bash
-        run: |
-          body="$(mktemp)"
-          {
-            echo 'FASTPLAY-003 final-v4 public acceptance failed.'
-            echo
-            echo "milestone_sha: ${MILESTONE_SHA}"
-            echo "workflow_run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            echo
-            echo '```text'
-            tail -n 220 fastplay-003-final-v4.log
-            echo '```'
-          } > "$body"
-          gh issue create --title "FASTPLAY-003 final-v4 blocker ${MILESTONE_SHA}" --body-file "$body" >/dev/null
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" \
-            -f state=failure \
-            -f context='FASTPLAY-003/final-public' \
-            -f description='v4 public first-playable acceptance failed'
+        run: timeout --signal=TERM 12m node fastplay-003-final-v3.mjs 2>&1 | tee fastplay-003-final-v4.log
 
       - name: Freeze accepted generation
-        if: steps.run.outcome == 'success'
+        if: success()
         env:
           GH_TOKEN: ${{ github.token }}
           MILESTONE_SHA: ${{ steps.candidate.outputs.sha }}
@@ -165,18 +141,22 @@ jobs:
             gh issue edit "$existing_issue" --body-file "$body" --state open >/dev/null
           fi
 
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" \
             -f state=success \
             -f context='FASTPLAY-003/final-public' \
-            -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS; public candidate frozen'
+            -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS; public candidate frozen' \
+            -f target_url="$run_url"
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" \
             -f state=success \
             -f context='FASTPLAY-003/first-playable' \
-            -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS'
+            -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS' \
+            -f target_url="$run_url"
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${candidate}" \
             -f state=success \
             -f context='FASTPLAY-003/public-pass' \
-            -f description='Public first-playable acceptance passed'
+            -f description='Public first-playable acceptance passed' \
+            -f target_url="$run_url"
 
       - name: Upload evidence
         if: always()
@@ -189,6 +169,37 @@ jobs:
           if-no-files-found: warn
           retention-days: 90
 
-      - name: Fail after evidence
-        if: steps.run.outcome != 'success'
-        run: exit 1
+      - name: Publish failure evidence
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MILESTONE_SHA: ${{ steps.candidate.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" \
+            -f state=failure \
+            -f context='FASTPLAY-003/final-public' \
+            -f description='v4 bounded public first-playable acceptance failed' \
+            -f target_url="$run_url"
+
+          title="FASTPLAY-003 final-v4 blocker ${MILESTONE_SHA}"
+          body="$(mktemp)"
+          {
+            echo 'FASTPLAY-003 final-v4 public acceptance failed.'
+            echo
+            echo "milestone_sha: ${MILESTONE_SHA}"
+            echo "workflow_run: ${run_url}"
+            echo
+            echo '```text'
+            tail -n 220 fastplay-003-final-v4.log 2>/dev/null || echo '(verifier log unavailable; failure occurred before verifier execution)'
+            echo '```'
+          } > "$body"
+          existing_issue="$(gh api "repos/${GITHUB_REPOSITORY}/issues?state=open&per_page=100" \
+            --jq ".[] | select(.title == \"${title}\") | .number" | head -n 1)"
+          if [ -z "$existing_issue" ]; then
+            gh issue create --title "$title" --body-file "$body" >/dev/null
+          else
+            gh issue edit "$existing_issue" --body-file "$body" >/dev/null
+          fi
