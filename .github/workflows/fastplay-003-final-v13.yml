@@ -1,5 +1,5 @@
 name: FASTPLAY-003 Final Public Acceptance v13
-# Authoritative rerun: preserve default motion and wait for round-result presentation before asserting it.
+# Authoritative rerun: preserve default motion, await round-result presentation, and verify the current branch head.
 
 on:
   push:
