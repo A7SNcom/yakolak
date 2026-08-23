@@ -1,5 +1,4 @@
-import { SIZES } from '../../../web/app/shared/rules.js';
-import { applyMoveTransition } from '../../../web/app/shared/transitions.js';
+import { applyCanonicalMoveTransition } from '../../../web/app/shared/transitions.js';
 import { ONLINE_PROTOCOL } from './compatibility.js';
 
 export const AUTHORITATIVE_SEAT_TYPES = Object.freeze({
@@ -183,9 +182,10 @@ export function normalizeMutationEnvelope(value) {
 
   if (value.action !== AUTHORITATIVE_OPERATION_NAMES.MOVE) fail('unsupported_mutation_action');
   if (!exactKeys(value.payload, ['cell', 'size'])) fail('invalid_mutation_payload');
-  if (!Number.isInteger(value.payload.cell)) fail('invalid_mutation_payload');
-  if (typeof value.payload.size !== 'string' || !SIZES.includes(value.payload.size)) fail('invalid_mutation_payload');
 
+  // Cell/size are gameplay legality, not transport-envelope legality. Keep their
+  // raw JSON values so the strict shared rules package is the only authority that
+  // can return invalid_cell / invalid_size.
   return Object.freeze({
     mutationId,
     expectedRevision,
@@ -210,7 +210,7 @@ export function mutationFingerprintSource(roomId, actorSeatId, envelope) {
 
 export function applyAuthoritativeMutation(state, actorSeatId, envelope) {
   if (envelope.action !== AUTHORITATIVE_OPERATION_NAMES.MOVE) fail('unsupported_mutation_action');
-  return applyMoveTransition(state, String(actorSeatId || ''), envelope.payload);
+  return applyCanonicalMoveTransition(state, String(actorSeatId || ''), envelope.payload);
 }
 
 const ERROR_STATUS = Object.freeze({
@@ -260,6 +260,8 @@ const ERROR_STATUS = Object.freeze({
   room_not_playing: 409,
   room_not_waiting: 409,
   not_your_turn: 409,
+  invalid_cell: 400,
+  invalid_size: 400,
   occupied_slot: 409,
   no_piece_remaining: 409,
   invalid_move: 400,
