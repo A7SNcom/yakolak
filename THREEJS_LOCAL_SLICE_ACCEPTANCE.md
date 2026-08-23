@@ -1,12 +1,26 @@
 # THREEJS-061 — Exact-generation local mixed playable-slice acceptance
 
-Status: **LIVE EVIDENCE PENDING (harness ready, 2026-08-20)**
+Status: **ACCEPTED — exact live evidence PASS (2026-08-23)**
 
 THREEJS-061 is accepted only by a real Chromium run against:
 
 `https://a7sncom.github.io/yakolak/threejs/`
 
 A branch SHA, localhost server, source-level contract, or stale/superseded Pages generation is not acceptance evidence.
+
+## Accepted live generation
+
+The passing public Pages run is pinned to:
+
+- Three.js candidate SHA: `50e8aad5640c9f262f679a1aa404c2eec3b18674`
+- deployment generation: `sha256:27a39804b0afe8b3c720d4523c8acfc01baef782303e0155c3888767392fced2`
+- Godot root SHA: `f6e94859095cec0a80e71321265e98a9ea68b347`
+- public runtime SHA-256: `213a0e202d23f176e961ef23a729924a1aaaebfbb1cf963123bf167e51d72fdd`
+- content identity SHA-256: `55cd4854d2f606ad54f2de9c6ebf604f8fd3c12436ed1273273a571f03518b4e`
+- passing GitHub Actions run: `32637508373`
+- committed evidence: `RELEASE_QUALIFICATION/THREEJS061_LIVE_LOCAL_EVIDENCE.json`
+
+The evidence reports `status = passed`, `pageErrors = []` and `failures = []`. The Pages root remained Godot and `/yakolak/threejs/` remained the Three.js candidate throughout the accepted run.
 
 ## Exact live identity gate
 
@@ -126,8 +140,12 @@ In **YAKOLAK Three.js Optional Checks**, manually choose:
 
 The workflow installs Playwright/Chromium, runs the source gate, executes the public Pages acceptance, and uploads evidence even on failure.
 
+The Playwright install is pinned to the same `playwright@1.55.0` package CLI used by the live verifier, avoiding a browser-revision mismatch when the repository also carries a newer `@playwright/test` development dependency.
+
 No push trigger or daily deployment gate is added. The existing `fast`, `browser` and `full` suites remain unchanged except that `fast/full` also validate the static THREEJS-061 acceptance contract.
 
 ## Current completion state
 
-The harness and exact-generation gate can be reviewed/merged independently, but **THREEJS-061 remains incomplete until a real `live-local` run produces a passing evidence artifact**. This environment cannot reach the public Pages host or dispatch the manual workflow, so source review must not be reported as live acceptance.
+**THREEJS-061 is complete.** GitHub Actions run `32637508373` executed the real public Pages acceptance against the exact PAGES-014 generation above and produced committed `status = passed` evidence. It completed all six 2/3/4-seat all-human and Human+Computer matches, all supported input paths, the 18-second timeout, skip/draw, restart/rematch, real page reload resume, nested base-path checks and WebGL loss/restore recovery with no page errors or acceptance failures.
+
+An earlier execution run `32637400709` failed before browser launch because `npx playwright install` selected the repository's newer Playwright CLI and downloaded the wrong browser revision for the verifier's pinned `playwright@1.55.0`. That was runner infrastructure failure, not candidate failure. The optional workflow was corrected, and the passing retry explicitly required the same candidate SHA, deployment generation and Godot root SHA before testing, so no stale or superseded generation was substituted.
