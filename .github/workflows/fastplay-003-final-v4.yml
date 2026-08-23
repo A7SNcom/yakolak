@@ -177,11 +177,45 @@ jobs:
             };
           }
           '''
-          path.write_text(source[:a] + timeout + source[b:])
+          source = source[:a] + timeout + source[b:]
+
+          run_desktop = source.index('async function runDesktop(browser) {')
+          flow_a = source.index('    const gestureBook = { tap: 0, drag: 0 };', run_desktop)
+          flow_b = source.index('\n    const webgl = await verifyWebglRecovery(page);', flow_a)
+          flow = r'''    const gestureBook = { tap: 0, drag: 0 };
+            const firstMove = await chooseHumanMove(page);
+            assert.ok(firstMove, 'no legal opening tap move');
+            const tap = await tapMove(page, firstMove);
+            gestureBook.tap += 1;
+            await waitForHumanOrRoundEnd(page, humanSeatId, { timeout: 15_000 });
+
+            const timeout = await allowRealTimeout(page);
+            await waitForHumanOrRoundEnd(page, humanSeatId, { timeout: 15_000 });
+          '''
+          source = source[:flow_a] + flow + source[flow_b:]
+
+          matched = '    const matched = await finishMatch(page, humanSeatId, gestureBook);'
+          if matched not in source:
+              raise SystemExit('finishMatch anchor changed')
+          source = source.replace(
+              matched,
+              matched + "\n    assert.ok(gestureBook.drag > 0, 'desktop match never exercised a real drag');",
+              1,
+          )
+          drag_return = '      drag,\n      webgl,'
+          if drag_return not in source:
+              raise SystemExit('desktop drag output anchor changed')
+          source = source.replace(
+              drag_return,
+              "      drag: { gesture: 'drag', count: gestureBook.drag },\n      webgl,",
+              1,
+          )
+          path.write_text(source)
           PY
           node --check fastplay-003-final-v3.mjs
           ! grep -Fq "waitForFunction(async" fastplay-003-final-v3.mjs
           grep -Fq "stage: 'real-timeout-pass'" fastplay-003-final-v3.mjs
+          grep -Fq "desktop match never exercised a real drag" fastplay-003-final-v3.mjs
 
       - name: Exercise full public first playable
         id: run
