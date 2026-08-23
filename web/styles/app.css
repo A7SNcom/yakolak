@@ -24,6 +24,9 @@ input,
 select,
 textarea { font: inherit; }
 
+button,
+select { color: inherit; }
+
 .app-shell {
   position: relative;
   width: 100vw;
@@ -46,13 +49,7 @@ textarea { font: inherit; }
   outline: none;
 }
 
-/* THREEJS-030: browser scroll/zoom gestures are suppressed only while gameplay
-   explicitly owns canvas gestures. Normal canvas/browser accessibility behavior is
-   preserved before/after that ownership window and controls outside the canvas are
-   never covered by this rule. */
-.scene[data-gesture-owner="gameplay"] {
-  touch-action: none;
-}
+.scene[data-gesture-owner="gameplay"] { touch-action: none; }
 
 .overlay {
   position: absolute;
@@ -85,6 +82,118 @@ h1 {
   line-height: 1.4;
   color: rgba(247, 248, 251, 0.74);
 }
+
+.local-panel {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 50%;
+  width: min(92vw, 420px);
+  transform: translate(-50%, -50%);
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 18px;
+  background: rgba(11, 16, 24, 0.9);
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(14px);
+}
+
+.local-panel h2 { margin: 0 0 14px; font-size: 20px; }
+
+.setup-field,
+.seat-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.setup-field { margin-bottom: 12px; }
+
+.setup-field select,
+.seat-option select {
+  min-width: 118px;
+  min-height: 40px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: #141b27;
+}
+
+.seat-options { display: grid; gap: 8px; }
+
+.seat-option {
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.seat-label { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.seat-swatch { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(255,255,255,.4); }
+.seat-swatch[data-color="marble"] { background: #e8e3d8; }
+.seat-swatch[data-color="blue"] { background: #3d6fe6; }
+.seat-swatch[data-color="gold"] { background: #c99b34; }
+.seat-swatch[data-color="green"] { background: #3d9b62; }
+
+.setup-note {
+  margin: 12px 0;
+  color: rgba(247, 248, 251, 0.66);
+  font-size: 13px;
+}
+
+.primary-action,
+.secondary-action {
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.primary-action {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #f7f8fb;
+  color: #0b1018;
+}
+
+.secondary-action {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f7f8fb;
+}
+
+.primary-action:disabled,
+.secondary-action:disabled { opacity: .5; cursor: default; }
+
+.game-hud {
+  position: absolute;
+  z-index: 5;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  width: min(calc(100vw - 24px), 720px);
+  transform: translateX(-50%);
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(8, 12, 18, 0.72);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+}
+
+.hud-primary,
+.hud-scores,
+.hud-detail { display: flex; align-items: center; gap: 10px; }
+
+.hud-primary { justify-content: space-between; }
+.hud-timer { font-variant-numeric: tabular-nums; font-weight: 800; }
+.hud-scores { margin-top: 6px; flex-wrap: wrap; font-size: 12px; }
+.hud-score { padding: 3px 7px; border-radius: 999px; background: rgba(255,255,255,.07); }
+.hud-detail { margin-top: 6px; flex-wrap: wrap; color: rgba(247,248,251,.72); font-size: 11px; }
+
+.result-panel { text-align: center; }
+.result-panel p { color: rgba(247,248,251,.74); }
+.result-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
 
 .build-marker {
   position: absolute;
@@ -137,9 +246,20 @@ h1 {
   cursor: pointer;
 }
 
-.recovery-action:focus-visible {
+.recovery-action:focus-visible,
+.primary-action:focus-visible,
+.secondary-action:focus-visible,
+select:focus-visible {
   outline: 3px solid rgba(247, 248, 251, 0.42);
   outline-offset: 3px;
+}
+
+[hidden] { display: none !important; }
+
+@media (max-width: 520px) {
+  .game-hud { top: max(8px, env(safe-area-inset-top)); padding: 8px 10px; }
+  .hud-detail { gap: 6px 10px; }
+  .local-panel { padding: 16px; }
 }
 
 @media (max-width: 360px) {
