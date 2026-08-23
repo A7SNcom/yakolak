@@ -144,6 +144,19 @@ export function validatePlacementForSeat(state, seatId, move) {
   });
 }
 
+// Strict canonical commit helper for authorities that carry normalized move
+// intents but use a state shape other than yakolak.session-state/v1. Legality is
+// decided only by placementRejectionCode, so backend/local callers cannot grow a
+// second cell/size/occupancy/inventory rules branch.
+export function placeCanonicalPiece(board, color, move) {
+  const code = placementRejectionCode(board, color, move);
+  if (code) throw rulesError(code);
+  const next = structuredClone(board);
+  next[String(move.cell)] ||= {};
+  next[String(move.cell)][move.size] = color;
+  return next;
+}
+
 // Protocol-v5 compatibility wrapper: v5 historically coerces cell/size and groups
 // invalid cell/size as `invalid_move`. It still calls the same normalized
 // occupancy/piece-availability core, so only the historical input envelope differs.
