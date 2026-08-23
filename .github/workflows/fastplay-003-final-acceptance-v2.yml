@@ -1,0 +1,290 @@
+name: FASTPLAY-003 Final Public Acceptance v2
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - '.github/workflows/fastplay-003-final-acceptance-v2.yml'
+
+permissions:
+  contents: write
+  issues: write
+  statuses: write
+
+concurrency:
+  group: fastplay-003-final-public-v2
+  cancel-in-progress: false
+
+jobs:
+  final-public:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve milestone web candidate
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$(git log -1 --format='%H' -- web)"
+          test "${#candidate}" -eq 40
+          echo "sha=${candidate}" >> "$GITHUB_OUTPUT"
+
+      - name: Mark final acceptance pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
+            -f state=pending \
+            -f context='FASTPLAY-003/final-public' \
+            -f description='Race-free public first-playable acceptance running'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install browser verifier
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          node node_modules/playwright/cli.js install --with-deps chromium
+
+      - name: Build race-free verifier
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('scripts/verify-fastplay003-live.mjs').read_text()
+
+          anchor = "import fs from 'node:fs';"
+          if anchor not in source:
+              raise SystemExit('fs import signature changed')
+          source = source.replace(anchor, anchor + "\nimport { execFileSync } from 'node:child_process';", 1)
+
+          start = source.index('async function waitForExactCandidate() {')
+          end = source.index('\nfunction attachPageErrorCapture', start)
+          replacement = r'''function publicCandidateContainsMilestone(candidateSha) {
+            if (!/^[0-9a-f]{40}$/.test(candidateSha)) return false;
+            try {
+              execFileSync('git', ['merge-base', '--is-ancestor', expectedCandidateSha, candidateSha], { stdio: 'ignore' });
+              return true;
+            } catch {
+              return false;
+            }
+          }
+
+          async function waitForExactCandidate() {
+            let last = null;
+            for (let attempt = 1; attempt <= 120; attempt += 1) {
+              try {
+                const manifest = await fetchJsonNoCache(manifestUrl);
+                last = manifest;
+                const liveCandidateSha = String(manifest?.threejsCandidateSha || '').trim().toLowerCase();
+                if (publicCandidateContainsMilestone(liveCandidateSha)) return { attempt, manifest, liveCandidateSha };
+              } catch (error) {
+                last = { error: error?.message || String(error) };
+              }
+              await delay(5_000);
+            }
+            const error = new Error(`FASTPLAY-003 public generation does not contain milestone ${expectedCandidateSha}`);
+            error.lastObservation = last;
+            throw error;
+          }
+          '''
+          source = source[:start] + replacement + source[end:]
+
+          old = "const browser = await chromium.launch({ headless: true });"
+          new = "const browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });"
+          if old not in source:
+              raise SystemExit('Chromium launch signature changed')
+          source = source.replace(old, new, 1)
+
+          start = source.index('async function allowRealTimeout(page) {')
+          end = source.index('\nasync function verifyWebglRecovery', start)
+          replacement = r'''async function allowRealTimeout(page) {
+            const handle = await page.waitForFunction(async () => {
+              const state = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
+              const seat = state.seats.find(candidate => candidate.seatId === state.activeSeatId);
+              const nowMs = Date.now();
+              const remainingMs = state.deadlineAtMs === null ? null : state.deadlineAtMs - nowMs;
+              if (seat?.type !== 'human'
+                || !Number.isSafeInteger(state.deadlineAtMs)
+                || remainingMs < 15_000
+                || remainingMs > 19_500) return false;
+              return { state, nowMs, remainingMs, startedAt: performance.now() };
+            }, null, { timeout: 20_000, polling: 25 });
+            const observation = await handle.jsonValue();
+            await handle.dispose();
+
+            const before = observation.state;
+            const seat = before.seats.find(candidate => candidate.seatId === before.activeSeatId);
+            assert.equal(seat?.type, 'human', 'captured timeout turn must be human');
+            assert.ok(observation.remainingMs >= 15_000 && observation.remainingMs <= 19_500, 'captured human deadline is not fresh');
+            const minimumElapsedMs = Math.max(14_500, observation.remainingMs - 350);
+
+            await page.waitForTimeout(500);
+            const early = await getState(page);
+            assert.equal(early.revision, before.revision, 'turn advanced before the 18-second human deadline');
+            assert.equal(early.activeSeatId, before.activeSeatId, 'active seat changed before the 18-second human deadline');
+
+            await page.waitForTimeout(Math.max(0, minimumElapsedMs - 500));
+            await page.waitForFunction(async ({ revision }) => {
+              const state = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
+              return state.revision > revision;
+            }, { revision: before.revision }, { timeout: 5_000, polling: 25 });
+
+            const after = await getState(page);
+            const elapsedMs = await page.evaluate(startedAt => performance.now() - startedAt, observation.startedAt);
+            assert.ok(elapsedMs >= minimumElapsedMs, `timeout advanced too early after ${elapsedMs}ms`);
+            const directTimeoutEvidence = after.skips?.some(skip => skip.seatId === seat.seatId && skip.reason === 'timeout');
+            const computerFollowupEvidence = after.revision >= before.revision + 2 && after.lastMove?.seatId !== seat.seatId;
+            assert.ok(directTimeoutEvidence || computerFollowupEvidence, 'timeout transition evidence missing');
+            return {
+              seatId: seat.seatId,
+              deadlineAtMs: before.deadlineAtMs,
+              observedRevision: after.revision,
+              elapsedMs,
+              directTimeoutEvidence,
+              computerFollowupEvidence,
+            };
+          }
+          '''
+          source = source[:start] + replacement + source[end:]
+
+          old_flow = r'''    const timeout = await allowRealTimeout(page);
+              await waitForHumanOrRoundEnd(page, humanSeatId, { timeout: 15_000 });
+
+              const gestureBook = { tap: 0, drag: 0 };
+              const firstMove = await chooseHumanMove(page);
+              assert.ok(firstMove, 'no legal tap move after timeout');
+              const tap = await tapMove(page, firstMove);
+              gestureBook.tap += 1;
+              await waitForHumanOrRoundEnd(page, humanSeatId, { timeout: 15_000 });
+
+              const secondMove = await chooseHumanMove(page);
+              assert.ok(secondMove, 'no legal drag move after tap');
+              const drag = await dragMove(page, secondMove, { pointerType: 'mouse' });
+              gestureBook.drag += 1;
+              await waitForHumanOrRoundEnd(page, humanSeatId, { timeout: 15_000 });'''
+          new_flow = r'''    const gestureBook = { tap: 0, drag: 0 };
+              const firstMove = await chooseHumanMove(page);
+              assert.ok(firstMove, 'no legal opening tap move');
+              const tap = await tapMove(page, firstMove);
+              gestureBook.tap += 1;
+
+              const timeout = await allowRealTimeout(page);
+              await waitForHumanOrRoundEnd(page, humanSeatId, { timeout: 15_000 });
+
+              const secondMove = await chooseHumanMove(page);
+              assert.ok(secondMove, 'no legal drag move after real timeout');
+              const drag = await dragMove(page, secondMove, { pointerType: 'mouse' });
+              gestureBook.drag += 1;
+              await waitForHumanOrRoundEnd(page, humanSeatId, { timeout: 15_000 });'''
+          if old_flow not in source:
+              raise SystemExit('desktop flow signature changed')
+          source = source.replace(old_flow, new_flow, 1)
+
+          old_output = "    candidateSha: expectedCandidateSha,"
+          if old_output not in source:
+              raise SystemExit('candidate output signature changed')
+          source = source.replace(old_output, "    candidateSha: live.liveCandidateSha,\n    milestoneSha: expectedCandidateSha,", 1)
+
+          Path('fastplay-003-final-v2.mjs').write_text(source)
+          PY
+          node --check fastplay-003-final-v2.mjs
+
+      - name: Exercise public first playable
+        id: acceptance
+        env:
+          FASTPLAY003_EXPECTED_CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+          FASTPLAY003_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+          FASTPLAY003_ARTIFACT_PATH: fastplay-003-acceptance.json
+        shell: bash
+        run: |
+          set +e
+          node fastplay-003-final-v2.mjs 2>&1 | tee fastplay-003-final-v2.log
+          code=${PIPESTATUS[0]}
+          set -e
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+
+      - name: Record failure
+        if: steps.acceptance.outputs.exit_code != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MILESTONE_SHA: ${{ steps.candidate.outputs.sha }}
+        shell: bash
+        run: |
+          body_file="$(mktemp)"
+          {
+            echo "FASTPLAY-003 race-free final public acceptance failed."
+            echo
+            echo "milestone_sha: ${MILESTONE_SHA}"
+            echo "workflow_run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            echo '```text'
+            tail -n 180 fastplay-003-final-v2.log
+            echo '```'
+          } > "$body_file"
+          gh issue create --title "FASTPLAY-003 final-v2 blocker ${MILESTONE_SHA}" --body-file "$body_file" >/dev/null
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" \
+            -f state=failure -f context='FASTPLAY-003/final-public' \
+            -f description='Race-free public first-playable acceptance failed'
+          exit 1
+
+      - name: Freeze successful public generation
+        if: steps.acceptance.outputs.exit_code == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MILESTONE_SHA: ${{ steps.candidate.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$(jq -r '.candidateSha' fastplay-003-acceptance.json)"
+          generation="$(jq -r '.deploymentGeneration' fastplay-003-acceptance.json)"
+          result="$(jq -r '.FIRST_PLAYABLE_EXPERIMENTAL' fastplay-003-acceptance.json)"
+          git merge-base --is-ancestor "${MILESTONE_SHA}" "${candidate}"
+          test "${result}" = PASS
+          test -n "${generation}"
+
+          freeze_branch='first-playable-experimental'
+          existing="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${freeze_branch}" --jq '.object.sha' 2>/dev/null || true)"
+          if [ -z "$existing" ]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/heads/${freeze_branch}" -f sha="$candidate" >/dev/null
+          elif [ "$existing" != "$candidate" ]; then
+            echo "freeze branch mismatch: ${existing} != ${candidate}" >&2
+            exit 1
+          fi
+
+          title='FIRST_PLAYABLE_EXPERIMENTAL=PASS'
+          existing_issue="$(gh api "repos/${GITHUB_REPOSITORY}/issues?state=all&per_page=100" --jq '.[] | select(.pull_request == null and .title == "FIRST_PLAYABLE_EXPERIMENTAL=PASS") | .number' | head -n 1)"
+          if [ -z "$existing_issue" ]; then
+            gh issue create --title "$title" --body "FIRST_PLAYABLE_EXPERIMENTAL=PASS
+
+milestone_sha: ${MILESTONE_SHA}
+candidate_sha: ${candidate}
+deployment_generation: ${generation}
+public_url: https://a7sncom.github.io/yakolak/threejs/
+freeze_branch: ${freeze_branch}
+workflow_run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+
+Verified desktop + mobile Human/Computer public play, tap + drag, real 18-second human timeout, scoring, next round, full match, rematch, return to setup, refresh recovery, WebGL recovery, and no fatal/page errors." >/dev/null
+          fi
+
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" \
+            -f state=success -f context='FASTPLAY-003/final-public' \
+            -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS; public candidate frozen'
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastplay-003-final-v2-${{ steps.candidate.outputs.sha }}
+          path: |
+            fastplay-003-acceptance.json
+            fastplay-003-final-v2.log
+          if-no-files-found: warn
+          retention-days: 90
