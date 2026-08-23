@@ -1,0 +1,111 @@
+name: THREEJS-061 Exact Live Local One-Shot
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - '.github/workflows/threejs061-live-once.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: yakolak-threejs061-exact-live-once
+  cancel-in-progress: false
+
+jobs:
+  live-local:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      PINNED_CANDIDATE_SHA: 50e8aad5640c9f262f679a1aa404c2eec3b18674
+      PINNED_DEPLOYMENT_GENERATION: sha256:27a39804b0afe8b3c720d4523c8acfc01baef782303e0155c3888767392fced2
+      PINNED_GODOT_ROOT_SHA: f6e94859095cec0a80e71321265e98a9ea68b347
+    steps:
+      - name: Checkout acceptance harness
+        uses: actions/checkout@v4
+        with:
+          ref: threejs-rebuild
+          fetch-depth: 0
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Require the same exact live PAGES-014 generation
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://a7sncom.github.io/yakolak/deployment-manifest.json'
+          code="$(curl --silent --show-error --location \
+            --header 'Cache-Control: no-cache, max-age=0' \
+            --header 'Pragma: no-cache' \
+            --output /tmp/threejs061-live-manifest.json \
+            --write-out '%{http_code}' \
+            "${url}?threejs061_retry=${GITHUB_RUN_ID}")"
+          test "$code" = '200'
+          test "$(jq -r '.schemaVersion' /tmp/threejs061-live-manifest.json)" = '1'
+          test "$(jq -r '.generationSchema' /tmp/threejs061-live-manifest.json)" = 'pages-deployment-generation-v1'
+          test "$(jq -r '.threejsCandidateSha' /tmp/threejs061-live-manifest.json)" = "$PINNED_CANDIDATE_SHA"
+          test "$(jq -r '.deploymentGeneration' /tmp/threejs061-live-manifest.json)" = "$PINNED_DEPLOYMENT_GENERATION"
+          test "$(jq -r '.godotRootSha' /tmp/threejs061-live-manifest.json)" = "$PINNED_GODOT_ROOT_SHA"
+          echo "Pinned live generation is still current: $PINNED_DEPLOYMENT_GENERATION"
+
+      - name: Run source contract before live acceptance
+        run: node --test tests/threejs061_live_acceptance_contract.test.mjs
+
+      - name: Install live browser verifier only
+        run: npm install --no-save --package-lock=false playwright@1.55.0
+
+      - name: Install Chromium matching Playwright 1.55
+        run: node node_modules/playwright/cli.js install --with-deps chromium
+
+      - name: Run exact-generation GitHub Pages local slice acceptance
+        env:
+          THREEJS061_EXPECTED_CANDIDATE_SHA: 50e8aad5640c9f262f679a1aa404c2eec3b18674
+          THREEJS061_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+          THREEJS061_EVIDENCE_PATH: threejs061-live-local-evidence.json
+        run: node scripts/verify-threejs061-live-local.mjs
+
+      - name: Persist evidence and remove one-shot runner
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -s threejs061-live-local-evidence.json ]; then
+            jq -n \
+              --arg candidate "$PINNED_CANDIDATE_SHA" \
+              --arg generation "$PINNED_DEPLOYMENT_GENERATION" \
+              --arg root "$PINNED_GODOT_ROOT_SHA" \
+              '{
+                schemaVersion: 1,
+                task: "THREEJS-061",
+                status: "failed",
+                expectedCandidateSha: $candidate,
+                deploymentGeneration: $generation,
+                godotRootSha: $root,
+                failures: ["retry runner failed before the live harness produced its evidence file"]
+              }' > threejs061-live-local-evidence.json
+          fi
+          mkdir -p RELEASE_QUALIFICATION
+          jq \
+            --arg runId "$GITHUB_RUN_ID" \
+            --arg runAttempt "$GITHUB_RUN_ATTEMPT" \
+            --arg wrapperSha "$GITHUB_SHA" \
+            '. + {execution: ((.execution // {}) + {
+              githubRunId: $runId,
+              githubRunAttempt: $runAttempt,
+              oneShotWrapperSha: $wrapperSha,
+              publicUrl: "https://a7sncom.github.io/yakolak/threejs/",
+              pinnedSameGenerationRetry: true
+            })}' \
+            threejs061-live-local-evidence.json \
+            > RELEASE_QUALIFICATION/THREEJS061_LIVE_LOCAL_EVIDENCE.json
+          rm -f .github/workflows/threejs061-live-once.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add RELEASE_QUALIFICATION/THREEJS061_LIVE_LOCAL_EVIDENCE.json .github/workflows/threejs061-live-once.yml
+          git commit -m 'THREEJS-061 record pinned live-local retry evidence' || exit 0
+          git push origin HEAD:threejs-rebuild
