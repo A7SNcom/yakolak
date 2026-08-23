@@ -1,0 +1,41 @@
+name: FASTPLAY-002 Live Manifest Probe
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - '.github/workflows/fastplay-002-live-manifest-probe.yml'
+      - 'web/**'
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Compare public manifest to last web candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(git log -1 --format='%H' -- web)"
+          live="$(curl --fail --silent --show-error --location \
+            --header 'Cache-Control: no-cache, max-age=0' \
+            --header 'Pragma: no-cache' \
+            "https://a7sncom.github.io/yakolak/deployment-manifest.json?fastplay002-probe=${GITHUB_RUN_ID}" \
+            | jq -r '.threejsCandidateSha // ""')"
+          state=failure
+          [ "$live" = "$expected" ] && state=success
+          desc="live=${live:0:8} expected=${expected:0:8}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${expected}" \
+            -f state="$state" \
+            -f context='FASTPLAY-002/live-manifest' \
+            -f description="$desc"
+          echo "$desc"
