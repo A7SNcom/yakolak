@@ -170,7 +170,7 @@ assert.deepEqual(cancelled, {
 assert.throws(() => recover(cancelled), /lifecycle_cancelled/);
 assert.throws(() => advance(cancelled, P.INVITATIONS_READY), /lifecycle_cancelled/);
 
-// Hydrated lifecycle snapshots must be reachable under the same interrupt invariants.
+// Hydrated lifecycle snapshots and constructors must reject unreachable or parallel state.
 assert.throws(() => assertSessionLifecycleState({
   phase: P.TURN_LOOP,
   interrupt: I.OFFLINE,
@@ -191,6 +191,13 @@ assert.throws(() => assertSessionLifecycleState({
   presentationGeneration: 0,
   isLoading: false,
 }), /invalid_session_lifecycle_shape/, 'parallel lifecycle booleans are forbidden');
+assert.throws(() => createSessionLifecycleState({
+  phase: P.SETUP,
+  isLoading: false,
+}), /invalid_session_lifecycle_shape/, 'constructors cannot silently discard parallel lifecycle booleans');
+assert.throws(() => createCanonicalSessionState({
+  lifecycle: { phase: P.SETUP, hiddenPhase: 'legacy-loading' },
+}), /invalid_session_lifecycle_shape/, 'canonical construction rejects hidden lifecycle phases/flags');
 
 // Canonical state owns lifecycle truth; callbacks submit a generation-bound event.
 const canonical = createCanonicalSessionState();
