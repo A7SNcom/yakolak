@@ -118,4 +118,5 @@ jobs:
           git add web/app/scene/local-game-scene.js
           git diff --cached --check
           git commit -m "FASTPLAY-003 prevent computer deadline microtask starvation"
+          git pull --rebase origin threejs-rebuild
           git push origin HEAD:threejs-rebuild
