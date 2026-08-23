@@ -5,6 +5,7 @@ on:
     branches:
       - threejs-rebuild
     paths:
+      - 'web/**'
       - 'scripts/verify-fastplay002-live.mjs'
       - 'tests/fastplay002_local_match_config.test.mjs'
       - '.github/workflows/fastplay-002-live-acceptance.yml'
