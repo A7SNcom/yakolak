@@ -60,7 +60,6 @@ jobs:
               return {
                 state,
                 nowMs: Date.now(),
-                startedAt: performance.now(),
                 turnDurationMs: deadlineModule.LOCAL_TURN_DURATION_MS,
               };
             });
@@ -85,16 +84,22 @@ jobs:
               const state = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
               return state.revision > revision && state.skips?.some(skip => skip.seatId === seatId && skip.reason === 'timeout');
             }, { revision: before.revision, seatId: seat.seatId }, { timeout: 23_000, polling: 25 });
-            const after = await getState(page);
-            const elapsedMs = await page.evaluate(startedAt => performance.now() - startedAt, observation.startedAt);
-            assert.ok(elapsedMs >= Math.max(0, remainingMs - 350), `timeout advanced too early after ${elapsedMs}ms`);
+            const afterObservation = await page.evaluate(async () => ({
+              state: await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState(),
+              nowMs: Date.now(),
+            }));
+            const after = afterObservation.state;
+            assert.ok(
+              afterObservation.nowMs >= before.deadlineAtMs,
+              `timeout applied before authority deadline: now=${afterObservation.nowMs} deadline=${before.deadlineAtMs}`,
+            );
             assert.ok(after.skips.some(skip => skip.seatId === seat.seatId && skip.reason === 'timeout'));
             return {
               seatId: seat.seatId,
               deadlineAtMs: before.deadlineAtMs,
               turnDurationMs: observation.turnDurationMs,
+              observedAtMs: afterObservation.nowMs,
               observedRevision: after.revision,
-              elapsedMs,
             };
           }
           '''
