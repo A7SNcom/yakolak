@@ -79,22 +79,41 @@ jobs:
           a = source.index('async function allowRealTimeout(page) {')
           b = source.index('\nasync function verifyWebglRecovery', a)
           timeout = r'''async function allowRealTimeout(page) {
-            const startHandle = await page.waitForFunction(async () => {
-              const state = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
+            const turnDurationMs = await page.evaluate(async () => {
               const deadlineModule = await import(new URL('app/session/local-turn-deadline.js', location.href).href);
+              return deadlineModule.LOCAL_TURN_DURATION_MS;
+            });
+            assert.equal(turnDurationMs, 18_000, 'local turn duration drifted from 18 seconds');
+
+            let observation = null;
+            for (let attempt = 0; attempt < 800; attempt += 1) {
+              const state = await getState(page);
               const seat = state.seats.find(candidate => candidate.seatId === state.activeSeatId);
-              const nowMs = Date.now();
+              const nowMs = await page.evaluate(() => Date.now());
               const remainingMs = state.deadlineAtMs === null ? null : state.deadlineAtMs - nowMs;
-              if (seat?.type !== 'human' || !Number.isSafeInteger(state.deadlineAtMs) || remainingMs <= 0 || remainingMs > deadlineModule.LOCAL_TURN_DURATION_MS) return false;
-              return { state, remainingMs, startedAt: performance.now(), turnDurationMs: deadlineModule.LOCAL_TURN_DURATION_MS };
-            }, null, { timeout: 20_000, polling: 25 });
-            const observation = await startHandle.jsonValue();
-            await startHandle.dispose();
-            assert.equal(observation.turnDurationMs, 18_000, 'local turn duration drifted from 18 seconds');
+              if (
+                seat?.type === 'human'
+                && Number.isSafeInteger(state.deadlineAtMs)
+                && remainingMs > 0
+                && remainingMs <= turnDurationMs
+              ) {
+                observation = {
+                  state,
+                  remainingMs,
+                  startedAt: await page.evaluate(() => performance.now()),
+                  turnDurationMs,
+                };
+                break;
+              }
+              await page.waitForTimeout(25);
+            }
+            assert.ok(observation, 'no unexpired human timeout window observed');
+
             const before = observation.state;
             const seat = before.seats.find(candidate => candidate.seatId === before.activeSeatId);
             assert.equal(seat?.type, 'human', 'real timeout must begin on the human seat');
-            const timeoutSkipCountBefore = (before.skips || []).filter(skip => skip.seatId === seat.seatId && skip.reason === 'timeout').length;
+            const timeoutSkipCountBefore = (before.skips || [])
+              .filter(skip => skip.seatId === seat.seatId && skip.reason === 'timeout').length;
 
             await page.waitForTimeout(500);
             const early = await getState(page);
@@ -103,19 +122,35 @@ jobs:
 
             const minimumElapsedMs = Math.max(0, observation.remainingMs - 350);
             await page.waitForTimeout(Math.max(0, minimumElapsedMs - 500));
-            const transitionHandle = await page.waitForFunction(async ({ revision, seatId, timeoutSkipCountBefore }) => {
-              const state = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
-              const timeoutSkips = (state.skips || []).filter(skip => skip.seatId === seatId && skip.reason === 'timeout').length;
-              const direct = state.revision > revision && timeoutSkips > timeoutSkipCountBefore && state.activeSeatId !== seatId;
-              const handoff = state.revision === revision + 1 && state.activeSeatId !== seatId;
-              const followed = state.revision >= revision + 2 && state.lastMove?.seatId !== seatId;
-              return direct || handoff || followed;
-            }, { revision: before.revision, seatId: seat.seatId, timeoutSkipCountBefore }, { timeout: 5_000, polling: 25 });
-            await transitionHandle.dispose();
+
+            let transition = null;
+            for (let attempt = 0; attempt < 200; attempt += 1) {
+              const state = await getState(page);
+              const timeoutSkips = (state.skips || [])
+                .filter(skip => skip.seatId === seat.seatId && skip.reason === 'timeout').length;
+              const direct = state.revision === before.revision + 1
+                && timeoutSkips > timeoutSkipCountBefore
+                && state.activeSeatId !== seat.seatId;
+              const followed = state.revision >= before.revision + 2
+                && state.lastMove?.seatId !== seat.seatId;
+              if (direct || followed) {
+                transition = {
+                  revision: state.revision,
+                  activeSeatId: state.activeSeatId,
+                  deadlineAtMs: state.deadlineAtMs,
+                  lastMove: state.lastMove,
+                  timeoutSkips,
+                  direct,
+                  followed,
+                };
+                break;
+              }
+              await page.waitForTimeout(25);
+            }
+            assert.ok(transition, 'authoritative timeout transition was not observed');
 
             const elapsedMs = await page.evaluate(startedAt => performance.now() - startedAt, observation.startedAt);
             assert.ok(elapsedMs >= minimumElapsedMs, `timeout advanced too early after ${elapsedMs}ms`);
-            const after = await getState(page);
             console.log(JSON.stringify({
               stage: 'real-timeout-pass',
               beforeRevision: before.revision,
@@ -123,28 +158,30 @@ jobs:
               deadlineAtMs: before.deadlineAtMs,
               remainingMs: observation.remainingMs,
               turnDurationMs: observation.turnDurationMs,
-              observedRevision: after.revision,
-              observedSeatId: after.activeSeatId,
-              observedLastMove: after.lastMove,
-              observedTimeoutSkips: (after.skips || []).filter(skip => skip.seatId === seat.seatId && skip.reason === 'timeout').length,
+              observedRevision: transition.revision,
+              observedSeatId: transition.activeSeatId,
+              observedLastMove: transition.lastMove,
+              observedTimeoutSkips: transition.timeoutSkips,
+              direct: transition.direct,
+              followed: transition.followed,
               elapsedMs,
-              predicateObserved: true,
             }));
             return {
               seatId: seat.seatId,
               deadlineAtMs: before.deadlineAtMs,
               turnDurationMs: observation.turnDurationMs,
-              observedRevision: after.revision,
+              observedRevision: transition.revision,
               elapsedMs,
-              predicateObserved: true,
+              direct: transition.direct,
+              followed: transition.followed,
             };
           }
           '''
           path.write_text(source[:a] + timeout + source[b:])
           PY
           node --check fastplay-003-final-v3.mjs
-          ! grep -Fq "authority advanced materially before timeout deadline" fastplay-003-final-v3.mjs
-          grep -Fq "predicateObserved: true" fastplay-003-final-v3.mjs
+          ! grep -Fq "waitForFunction(async" fastplay-003-final-v3.mjs
+          grep -Fq "stage: 'real-timeout-pass'" fastplay-003-final-v3.mjs
 
       - name: Exercise full public first playable
         id: run
