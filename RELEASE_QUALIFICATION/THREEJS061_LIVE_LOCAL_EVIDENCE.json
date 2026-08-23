@@ -1,9 +1,9 @@
 {
   "schema": "yakolak.threejs061-live-local-acceptance/v1",
-  "status": "failed",
+  "status": "passed",
   "liveUrl": "https://a7sncom.github.io/yakolak/threejs/",
   "expectedCandidateSha": "50e8aad5640c9f262f679a1aa404c2eec3b18674",
-  "startedAt": "2026-08-23T11:45:18.239Z",
+  "startedAt": "2026-08-23T11:47:35.944Z",
   "manifest": {
     "pollAttempt": 1,
     "schemaVersion": 1,
@@ -29,23 +29,311 @@
       "apiOrigin": null
     }
   },
-  "basePath": null,
-  "contextRecovery": null,
-  "gameplay": null,
-  "refreshResume": null,
+  "basePath": {
+    "appBaseUrl": "https://a7sncom.github.io/yakolak/threejs/",
+    "assetUrl": "https://a7sncom.github.io/yakolak/threejs/assets/data/world-layout.json",
+    "pathname": "/yakolak/threejs/"
+  },
+  "contextRecovery": {
+    "before": {
+      "state": "ready",
+      "generation": 0,
+      "restoreCount": 0,
+      "canUseGpu": true,
+      "failure": null
+    },
+    "lost": {
+      "state": "lost",
+      "generation": 1,
+      "restoreCount": 0,
+      "canUseGpu": false,
+      "failure": null
+    },
+    "restored": {
+      "state": "ready",
+      "generation": 1,
+      "restoreCount": 1,
+      "canUseGpu": true,
+      "failure": null
+    },
+    "frameCountWhileLost": 36,
+    "frameCountAfterResume": 50
+  },
+  "gameplay": {
+    "fullMatches": [
+      {
+        "playerCount": 2,
+        "configuration": "all-human",
+        "steps": 30,
+        "rounds": 5,
+        "roundWins": 4,
+        "draws": 0,
+        "botMoves": 0,
+        "humanMoves": 30,
+        "skipCount": 0,
+        "deadlineChecks": 29,
+        "winner": {
+          "seatId": "back",
+          "color": "blue",
+          "wins": 3
+        },
+        "scores": {
+          "right": 2,
+          "back": 3
+        },
+        "finalRevision": 31,
+        "finalState": "{\"schema\":\"yakolak.session-state/v1\",\"lobbyGeneration\":0,\"preferredColor\":\"marble\",\"targetPlayers\":2,\"winsToMatch\":3,\"seats\":[{\"seatId\":\"right\",\"type\":\"human\",\"color\":\"marble\",\"ready\":true},{\"seatId\":\"back\",\"type\":\"human\",\"color\":\"blue\",\"ready\":true}],\"board\":{\"0\":{\"small\":\"blue\",\"medium\":\"marble\"},\"1\":{},\"2\":{},\"3\":{},\"4\":{\"small\":\"marble\",\"medium\":\"blue\",\"large\":\"marble\"},\"5\":{},\"6\":{},\"7\":{},\"8\":{\"large\":\"blue\"}},\"inventory\":{\"right\":{\"small\":2,\"medium\":2,\"large\":2},\"back\":{\"small\":2,\"medium\":2,\"large\":2}},\"activeSeatId\":null,\"deadlineAtMs\":null,\"scores\":{\"right\":2,\"back\":3},\"round\":5,\"completedRounds\":5,\"roundEndRevision\":31,\"lastMove\":{\"seatId\":\"back\",\"color\":\"blue\",\"cell\":8,\"size\":\"large\"},\"skips\":[],\"winner\":{\"seatId\":\"back\",\"color\":\"blue\"},\"draw\":false,\"matchComplete\":true,\"matchWinner\":{\"seatId\":\"back\",\"color\":\"blue\",\"wins\":3},\"matchWinners\":[{\"seatId\":\"back\",\"color\":\"blue\",\"wins\":3}],\"restart\":{\"right\":false,\"back\":false},\"rematch\":{\"right\":false,\"back\":false},\"revision\":31,\"lifecycle\":{\"phase\":\"match-end\",\"interrupt\":null,\"recoveryTarget\":null,\"presentationGeneration\":122}}"
+      },
+      {
+        "playerCount": 2,
+        "configuration": "human+computer",
+        "steps": 30,
+        "rounds": 5,
+        "roundWins": 4,
+        "draws": 0,
+        "botMoves": 15,
+        "humanMoves": 15,
+        "skipCount": 0,
+        "deadlineChecks": 29,
+        "winner": {
+          "seatId": "back",
+          "color": "blue",
+          "wins": 3
+        },
+        "scores": {
+          "right": 2,
+          "back": 3
+        },
+        "finalRevision": 31,
+        "finalState": "{\"schema\":\"yakolak.session-state/v1\",\"lobbyGeneration\":0,\"preferredColor\":\"marble\",\"targetPlayers\":2,\"winsToMatch\":3,\"seats\":[{\"seatId\":\"right\",\"type\":\"human\",\"color\":\"marble\",\"ready\":true},{\"seatId\":\"back\",\"type\":\"computer\",\"color\":\"blue\",\"ready\":true}],\"board\":{\"0\":{\"small\":\"blue\",\"medium\":\"marble\"},\"1\":{},\"2\":{},\"3\":{},\"4\":{\"small\":\"marble\",\"medium\":\"blue\",\"large\":\"marble\"},\"5\":{},\"6\":{},\"7\":{},\"8\":{\"large\":\"blue\"}},\"inventory\":{\"right\":{\"small\":2,\"medium\":2,\"large\":2},\"back\":{\"small\":2,\"medium\":2,\"large\":2}},\"activeSeatId\":null,\"deadlineAtMs\":null,\"scores\":{\"right\":2,\"back\":3},\"round\":5,\"completedRounds\":5,\"roundEndRevision\":31,\"lastMove\":{\"seatId\":\"back\",\"color\":\"blue\",\"cell\":8,\"size\":\"large\"},\"skips\":[],\"winner\":{\"seatId\":\"back\",\"color\":\"blue\"},\"draw\":false,\"matchComplete\":true,\"matchWinner\":{\"seatId\":\"back\",\"color\":\"blue\",\"wins\":3},\"matchWinners\":[{\"seatId\":\"back\",\"color\":\"blue\",\"wins\":3}],\"restart\":{\"right\":false,\"back\":false},\"rematch\":{\"right\":false,\"back\":false},\"revision\":31,\"lifecycle\":{\"phase\":\"match-end\",\"interrupt\":null,\"recoveryTarget\":null,\"presentationGeneration\":132}}"
+      },
+      {
+        "playerCount": 3,
+        "configuration": "all-human",
+        "steps": 49,
+        "rounds": 7,
+        "roundWins": 6,
+        "draws": 0,
+        "botMoves": 0,
+        "humanMoves": 49,
+        "skipCount": 0,
+        "deadlineChecks": 48,
+        "winner": {
+          "seatId": "right",
+          "color": "marble",
+          "wins": 3
+        },
+        "scores": {
+          "right": 3,
+          "back": 2,
+          "left": 2
+        },
+        "finalRevision": 50,
+        "finalState": "{\"schema\":\"yakolak.session-state/v1\",\"lobbyGeneration\":0,\"preferredColor\":\"marble\",\"targetPlayers\":3,\"winsToMatch\":3,\"seats\":[{\"seatId\":\"right\",\"type\":\"human\",\"color\":\"marble\",\"ready\":true},{\"seatId\":\"back\",\"type\":\"human\",\"color\":\"blue\",\"ready\":true},{\"seatId\":\"left\",\"type\":\"human\",\"color\":\"gold\",\"ready\":true}],\"board\":{\"0\":{\"small\":\"marble\",\"medium\":\"blue\",\"large\":\"gold\"},\"1\":{},\"2\":{},\"3\":{},\"4\":{\"small\":\"marble\",\"medium\":\"blue\",\"large\":\"gold\"},\"5\":{},\"6\":{},\"7\":{},\"8\":{\"small\":\"marble\"}},\"inventory\":{\"right\":{\"small\":0,\"medium\":3,\"large\":3},\"back\":{\"small\":3,\"medium\":1,\"large\":3},\"left\":{\"small\":3,\"medium\":3,\"large\":1}},\"activeSeatId\":null,\"deadlineAtMs\":null,\"scores\":{\"right\":3,\"back\":2,\"left\":2},\"round\":7,\"completedRounds\":7,\"roundEndRevision\":50,\"lastMove\":{\"seatId\":\"right\",\"color\":\"marble\",\"cell\":8,\"size\":\"small\"},\"skips\":[],\"winner\":{\"seatId\":\"right\",\"color\":\"marble\"},\"draw\":false,\"matchComplete\":true,\"matchWinner\":{\"seatId\":\"right\",\"color\":\"marble\",\"wins\":3},\"matchWinners\":[{\"seatId\":\"right\",\"color\":\"marble\",\"wins\":3}],\"restart\":{\"right\":false,\"back\":false,\"left\":false},\"rematch\":{\"right\":false,\"back\":false,\"left\":false},\"revision\":50,\"lifecycle\":{\"phase\":\"match-end\",\"interrupt\":null,\"recoveryTarget\":null,\"presentationGeneration\":131}}"
+      },
+      {
+        "playerCount": 3,
+        "configuration": "human+computer",
+        "steps": 49,
+        "rounds": 7,
+        "roundWins": 6,
+        "draws": 0,
+        "botMoves": 32,
+        "humanMoves": 17,
+        "skipCount": 0,
+        "deadlineChecks": 48,
+        "winner": {
+          "seatId": "right",
+          "color": "marble",
+          "wins": 3
+        },
+        "scores": {
+          "right": 3,
+          "back": 2,
+          "left": 2
+        },
+        "finalRevision": 50,
+        "finalState": "{\"schema\":\"yakolak.session-state/v1\",\"lobbyGeneration\":0,\"preferredColor\":\"marble\",\"targetPlayers\":3,\"winsToMatch\":3,\"seats\":[{\"seatId\":\"right\",\"type\":\"human\",\"color\":\"marble\",\"ready\":true},{\"seatId\":\"back\",\"type\":\"computer\",\"color\":\"blue\",\"ready\":true},{\"seatId\":\"left\",\"type\":\"computer\",\"color\":\"gold\",\"ready\":true}],\"board\":{\"0\":{\"small\":\"marble\",\"medium\":\"blue\",\"large\":\"gold\"},\"1\":{},\"2\":{},\"3\":{},\"4\":{\"small\":\"marble\",\"medium\":\"blue\",\"large\":\"gold\"},\"5\":{},\"6\":{},\"7\":{},\"8\":{\"small\":\"marble\"}},\"inventory\":{\"right\":{\"small\":0,\"medium\":3,\"large\":3},\"back\":{\"small\":3,\"medium\":1,\"large\":3},\"left\":{\"small\":3,\"medium\":3,\"large\":1}},\"activeSeatId\":null,\"deadlineAtMs\":null,\"scores\":{\"right\":3,\"back\":2,\"left\":2},\"round\":7,\"completedRounds\":7,\"roundEndRevision\":50,\"lastMove\":{\"seatId\":\"right\",\"color\":\"marble\",\"cell\":8,\"size\":\"small\"},\"skips\":[],\"winner\":{\"seatId\":\"right\",\"color\":\"marble\"},\"draw\":false,\"matchComplete\":true,\"matchWinner\":{\"seatId\":\"right\",\"color\":\"marble\",\"wins\":3},\"matchWinners\":[{\"seatId\":\"right\",\"color\":\"marble\",\"wins\":3}],\"restart\":{\"right\":false,\"back\":false,\"left\":false},\"rematch\":{\"right\":false,\"back\":false,\"left\":false},\"revision\":50,\"lifecycle\":{\"phase\":\"match-end\",\"interrupt\":null,\"recoveryTarget\":null,\"presentationGeneration\":141}}"
+      },
+      {
+        "playerCount": 4,
+        "configuration": "all-human",
+        "steps": 90,
+        "rounds": 9,
+        "roundWins": 8,
+        "draws": 0,
+        "botMoves": 0,
+        "humanMoves": 90,
+        "skipCount": 0,
+        "deadlineChecks": 89,
+        "winner": {
+          "seatId": "back",
+          "color": "blue",
+          "wins": 3
+        },
+        "scores": {
+          "right": 2,
+          "back": 3,
+          "left": 2,
+          "front": 2
+        },
+        "finalRevision": 91,
+        "finalState": "{\"schema\":\"yakolak.session-state/v1\",\"lobbyGeneration\":0,\"preferredColor\":\"marble\",\"targetPlayers\":4,\"winsToMatch\":3,\"seats\":[{\"seatId\":\"right\",\"type\":\"human\",\"color\":\"marble\",\"ready\":true},{\"seatId\":\"back\",\"type\":\"human\",\"color\":\"blue\",\"ready\":true},{\"seatId\":\"left\",\"type\":\"human\",\"color\":\"gold\",\"ready\":true},{\"seatId\":\"front\",\"type\":\"human\",\"color\":\"green\",\"ready\":true}],\"board\":{\"0\":{\"small\":\"green\",\"medium\":\"marble\",\"large\":\"blue\"},\"1\":{\"small\":\"gold\",\"medium\":\"green\",\"large\":\"marble\"},\"2\":{},\"3\":{},\"4\":{\"small\":\"marble\",\"medium\":\"blue\",\"large\":\"gold\"},\"5\":{},\"6\":{},\"7\":{},\"8\":{\"small\":\"blue\"}},\"inventory\":{\"right\":{\"small\":2,\"medium\":2,\"large\":2},\"back\":{\"small\":2,\"medium\":2,\"large\":2},\"left\":{\"small\":2,\"medium\":3,\"large\":2},\"front\":{\"small\":2,\"medium\":2,\"large\":3}},\"activeSeatId\":null,\"deadlineAtMs\":null,\"scores\":{\"right\":2,\"back\":3,\"left\":2,\"front\":2},\"round\":9,\"completedRounds\":9,\"roundEndRevision\":91,\"lastMove\":{\"seatId\":\"back\",\"color\":\"blue\",\"cell\":8,\"size\":\"small\"},\"skips\":[],\"winner\":{\"seatId\":\"back\",\"color\":\"blue\"},\"draw\":false,\"matchComplete\":true,\"matchWinner\":{\"seatId\":\"back\",\"color\":\"blue\",\"wins\":3},\"matchWinners\":[{\"seatId\":\"back\",\"color\":\"blue\",\"wins\":3}],\"restart\":{\"right\":false,\"back\":false,\"left\":false,\"front\":false},\"rematch\":{\"right\":false,\"back\":false,\"left\":false,\"front\":false},\"revision\":91,\"lifecycle\":{\"phase\":\"match-end\",\"interrupt\":null,\"recoveryTarget\":null,\"presentationGeneration\":140}}"
+      },
+      {
+        "playerCount": 4,
+        "configuration": "human+computer",
+        "steps": 90,
+        "rounds": 9,
+        "roundWins": 8,
+        "draws": 0,
+        "botMoves": 67,
+        "humanMoves": 23,
+        "skipCount": 0,
+        "deadlineChecks": 89,
+        "winner": {
+          "seatId": "back",
+          "color": "blue",
+          "wins": 3
+        },
+        "scores": {
+          "right": 2,
+          "back": 3,
+          "left": 2,
+          "front": 2
+        },
+        "finalRevision": 91,
+        "finalState": "{\"schema\":\"yakolak.session-state/v1\",\"lobbyGeneration\":0,\"preferredColor\":\"marble\",\"targetPlayers\":4,\"winsToMatch\":3,\"seats\":[{\"seatId\":\"right\",\"type\":\"human\",\"color\":\"marble\",\"ready\":true},{\"seatId\":\"back\",\"type\":\"computer\",\"color\":\"blue\",\"ready\":true},{\"seatId\":\"left\",\"type\":\"computer\",\"color\":\"gold\",\"ready\":true},{\"seatId\":\"front\",\"type\":\"computer\",\"color\":\"green\",\"ready\":true}],\"board\":{\"0\":{\"small\":\"green\",\"medium\":\"marble\",\"large\":\"blue\"},\"1\":{\"small\":\"gold\",\"medium\":\"green\",\"large\":\"marble\"},\"2\":{},\"3\":{},\"4\":{\"small\":\"marble\",\"medium\":\"blue\",\"large\":\"gold\"},\"5\":{},\"6\":{},\"7\":{},\"8\":{\"small\":\"blue\"}},\"inventory\":{\"right\":{\"small\":2,\"medium\":2,\"large\":2},\"back\":{\"small\":2,\"medium\":2,\"large\":2},\"left\":{\"small\":2,\"medium\":3,\"large\":2},\"front\":{\"small\":2,\"medium\":2,\"large\":3}},\"activeSeatId\":null,\"deadlineAtMs\":null,\"scores\":{\"right\":2,\"back\":3,\"left\":2,\"front\":2},\"round\":9,\"completedRounds\":9,\"roundEndRevision\":91,\"lastMove\":{\"seatId\":\"back\",\"color\":\"blue\",\"cell\":8,\"size\":\"small\"},\"skips\":[],\"winner\":{\"seatId\":\"back\",\"color\":\"blue\"},\"draw\":false,\"matchComplete\":true,\"matchWinner\":{\"seatId\":\"back\",\"color\":\"blue\",\"wins\":3},\"matchWinners\":[{\"seatId\":\"back\",\"color\":\"blue\",\"wins\":3}],\"restart\":{\"right\":false,\"back\":false,\"left\":false,\"front\":false},\"rematch\":{\"right\":false,\"back\":false,\"left\":false,\"front\":false},\"revision\":91,\"lifecycle\":{\"phase\":\"match-end\",\"interrupt\":null,\"recoveryTarget\":null,\"presentationGeneration\":150}}"
+      }
+    ],
+    "inputPaths": {
+      "tap": {
+        "source": "tap",
+        "cell": 0,
+        "size": "large",
+        "outcome": "move",
+        "revision": 61
+      },
+      "click": {
+        "source": "click",
+        "cell": 0,
+        "size": "large",
+        "outcome": "move",
+        "revision": 62
+      },
+      "keyboard": {
+        "source": "keyboard-confirm",
+        "move": {
+          "cell": 0,
+          "size": "large"
+        },
+        "outcome": "move",
+        "revision": 63
+      },
+      "gamepad": {
+        "source": "gamepad-confirm",
+        "move": {
+          "cell": 0,
+          "size": "large"
+        },
+        "outcome": "move",
+        "revision": 64
+      },
+      "drag": {
+        "source": "drag-release",
+        "move": {
+          "cell": 0,
+          "size": "medium"
+        },
+        "outcome": "move",
+        "revision": 65
+      },
+      "computer": {
+        "source": "bot",
+        "exercisedMoves": 114
+      }
+    },
+    "timer": {
+      "durationMs": 18000,
+      "fromSeatId": "right",
+      "toSeatId": "back",
+      "deadlineAtMs": 2018001
+    },
+    "skip": {
+      "move": {
+        "cell": 6,
+        "size": "small"
+      },
+      "skipped": [
+        {
+          "seatId": "back",
+          "reason": "no_legal_move"
+        },
+        {
+          "seatId": "left",
+          "reason": "no_legal_move"
+        }
+      ],
+      "nextSeatId": "front"
+    },
+    "draw": {
+      "outcome": "draw",
+      "revision": 73,
+      "skips": [
+        {
+          "seatId": "right",
+          "reason": "no_legal_move"
+        },
+        {
+          "seatId": "back",
+          "reason": "no_legal_move"
+        }
+      ]
+    },
+    "restart": {
+      "outcome": "restart",
+      "round": 1,
+      "deadlineAtMs": 3018000
+    },
+    "rematch": {
+      "outcome": "rematch",
+      "round": 1,
+      "scores": {
+        "right": 0,
+        "back": 0
+      },
+      "deadlineAtMs": 4018000
+    },
+    "deployedModules": [
+      "https://a7sncom.github.io/yakolak/threejs/app/shared/rules.js",
+      "https://a7sncom.github.io/yakolak/threejs/app/session/canonical-session-state.js",
+      "https://a7sncom.github.io/yakolak/threejs/app/session/local-authority-adapter.js",
+      "https://a7sncom.github.io/yakolak/threejs/app/gameplay/tap-click-confirmation.js",
+      "https://a7sncom.github.io/yakolak/threejs/app/gameplay/keyboard-gamepad-navigation.js",
+      "https://a7sncom.github.io/yakolak/threejs/app/gameplay/drag-interaction.js",
+      "https://a7sncom.github.io/yakolak/threejs/app/gameplay/computer-turn.js"
+    ]
+  },
+  "refreshResume": {
+    "source": "canonical-serialized-snapshot-across-real-page-reload",
+    "beforeRevision": 81,
+    "afterRevision": 82,
+    "activeSeatBeforeReload": "back",
+    "resumedActiveSeatId": "back",
+    "resumedMove": {
+      "cell": 0,
+      "size": "small"
+    },
+    "outcome": "move"
+  },
   "pageErrors": [],
-  "failures": [
-    {
-      "code": "threejs061_acceptance_failed",
-      "message": "browserType.launch: Executable doesn't exist at /home/runner/.cache/ms-playwright/chromium_headless_shell-1187/chrome-linux/headless_shell\n╔═════════════════════════════════════════════════════════════════════════╗\n║ Looks like Playwright Test or Playwright was just installed or updated. ║\n║ Please run the following command to download new browsers:              ║\n║                                                                         ║\n║     npx playwright install                                              ║\n║                                                                         ║\n║ <3 Playwright Team                                                      ║\n╚═════════════════════════════════════════════════════════════════════════╝",
-      "details": null
-    }
-  ],
-  "completedAt": "2026-08-23T11:45:18.382Z",
+  "failures": [],
+  "completedAt": "2026-08-23T11:47:44.439Z",
   "execution": {
-    "githubRunId": "32637400709",
+    "githubRunId": "32637508373",
     "githubRunAttempt": "1",
-    "oneShotWrapperSha": "52c1cf051e5dbf72a6ebe0c04378a357b1a13edb",
-    "publicUrl": "https://a7sncom.github.io/yakolak/threejs/"
+    "oneShotWrapperSha": "76eeb57609cd0d6321168388953467c12cc1af81",
+    "publicUrl": "https://a7sncom.github.io/yakolak/threejs/",
+    "pinnedSameGenerationRetry": true
   }
 }
