@@ -24,24 +24,36 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
+      - name: Checkout acceptance source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve exact published web candidate
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$(git log -1 --format='%H' -- web)"
+          test "${#candidate}" -eq 40
+          echo "sha=${candidate}" >> "$GITHUB_OUTPUT"
+
       - name: Mark exact candidate pending
         env:
           GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
         run: |
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
             -f state=pending \
             -f context='FASTPLAY-003/first-playable' \
-            -f description='Public first-playable acceptance running on exact candidate'
-
-      - name: Checkout exact candidate
-        uses: actions/checkout@v4
+            -f description='Public first-playable acceptance running on exact web candidate'
 
       - name: Set up Node 22
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      - name: Prepare GPU-less browser and monotonic timeout probe
+      - name: Prepare GPU-less browser and timeout diagnostics
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -65,6 +77,12 @@ jobs:
               if old not in text:
                   raise SystemExit(f'FASTPLAY-003 probe signature changed: {old}')
               text = text.replace(old, new, 1)
+
+          anchor = "  assert.ok(remainingMs >= 15_000 && remainingMs <= 19_500, `expected fresh 18-second deadline, got ${remainingMs}ms`);"
+          diagnostic = """  assert.ok(remainingMs >= 15_000 && remainingMs <= 19_500, `expected fresh 18-second deadline, got ${remainingMs}ms`);\n  const browserClock = await page.evaluate(async () => {\n    const state = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();\n    const nowMs = Date.now();\n    return {\n      nowMs,\n      deadlineAtMs: state.deadlineAtMs,\n      remainingMs: state.deadlineAtMs === null ? null : state.deadlineAtMs - nowMs,\n      revision: state.revision,\n      activeSeatId: state.activeSeatId,\n      skips: state.skips,\n    };\n  });\n  console.log(JSON.stringify({ stage: 'real-timeout-clock', nodeRemainingMs: remainingMs, browserClock }, null, 2));"""
+          if anchor not in text:
+              raise SystemExit('FASTPLAY-003 timeout diagnostic anchor changed')
+          text = text.replace(anchor, diagnostic, 1)
           path.write_text(text)
           PY
 
@@ -79,7 +97,7 @@ jobs:
 
       - name: Capture exact public boot diagnostics
         env:
-          EXPECTED_SHA: ${{ github.sha }}
+          EXPECTED_SHA: ${{ steps.candidate.outputs.sha }}
           BASE_URL: https://a7sncom.github.io/yakolak/threejs/
         shell: bash
         run: |
@@ -168,7 +186,7 @@ jobs:
       - name: Exercise exact public first playable
         id: acceptance
         env:
-          FASTPLAY003_EXPECTED_CANDIDATE_SHA: ${{ github.sha }}
+          FASTPLAY003_EXPECTED_CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
           FASTPLAY003_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
           FASTPLAY003_ARTIFACT_PATH: fastplay-003-acceptance.json
         shell: bash
@@ -183,15 +201,17 @@ jobs:
         if: steps.acceptance.outputs.exit_code != '0'
         env:
           GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
         shell: bash
         run: |
           set -euo pipefail
-          title="FASTPLAY-003 blocker ${GITHUB_SHA}"
+          title="FASTPLAY-003 blocker ${CANDIDATE_SHA}"
           body_file="$(mktemp)"
           {
             echo "FASTPLAY-003 failed on the exact public candidate."
             echo
-            echo "candidate_sha: ${GITHUB_SHA}"
+            echo "candidate_sha: ${CANDIDATE_SHA}"
+            echo "workflow_sha: ${GITHUB_SHA}"
             echo "public_url: https://a7sncom.github.io/yakolak/threejs/"
             echo "workflow_run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo
@@ -202,7 +222,7 @@ jobs:
             echo
             echo '### Acceptance failure'
             echo '```text'
-            tail -n 80 fastplay-003-run.log
+            tail -n 120 fastplay-003-run.log
             echo '```'
           } > "${body_file}"
           gh issue create --title "${title}" --body-file "${body_file}" >/dev/null
@@ -211,7 +231,7 @@ jobs:
       - name: Upload acceptance evidence
         uses: actions/upload-artifact@v4
         with:
-          name: fastplay-003-${{ github.sha }}
+          name: fastplay-003-${{ steps.candidate.outputs.sha }}
           path: fastplay-003-acceptance.json
           if-no-files-found: error
           retention-days: 90
@@ -219,6 +239,7 @@ jobs:
       - name: Freeze first green candidate and record PASS
         env:
           GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -226,7 +247,7 @@ jobs:
           generation="$(jq -r '.deploymentGeneration' fastplay-003-acceptance.json)"
           public_url="$(jq -r '.publicUrl' fastplay-003-acceptance.json)"
           result="$(jq -r '.FIRST_PLAYABLE_EXPERIMENTAL' fastplay-003-acceptance.json)"
-          test "${candidate}" = "${GITHUB_SHA}"
+          test "${candidate}" = "${CANDIDATE_SHA}"
           test "${result}" = 'PASS'
           test -n "${generation}"
           test "${public_url}" = 'https://a7sncom.github.io/yakolak/threejs/'
@@ -274,8 +295,9 @@ jobs:
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
         run: |
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
             -f state=success \
             -f context='FASTPLAY-003/first-playable' \
             -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS; exact public candidate frozen'
@@ -284,8 +306,9 @@ jobs:
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
         run: |
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
             -f state=failure \
             -f context='FASTPLAY-003/first-playable' \
             -f description='Public first-playable acceptance failed; deferred work remains blocked'
