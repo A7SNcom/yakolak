@@ -36,7 +36,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
             -f state=pending \
             -f context='FASTPLAY-003/final-public' \
-            -f description='v11 round-boundary public acceptance running' \
+            -f description='v11 reduced-motion public acceptance running' \
             -f target_url="$run_url"
 
       - uses: actions/setup-node@v4
@@ -61,7 +61,26 @@ jobs:
           Path('/tmp/build-v10.sh').write_text(textwrap.dedent(block[r:]))
           PY
           bash /tmp/build-v10.sh
+
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('fastplay-003-final-v3.mjs')
+          source = path.read_text()
+          desktop = "const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });"
+          desktop_reduced = "const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, reducedMotion: 'reduce' });"
+          if desktop not in source:
+              raise SystemExit('desktop context signature changed')
+          source = source.replace(desktop, desktop_reduced, 1)
+          mobile = "    hasTouch: true,\n  });"
+          mobile_reduced = "    hasTouch: true,\n    reducedMotion: 'reduce',\n  });"
+          if mobile not in source:
+              raise SystemExit('mobile context signature changed')
+          source = source.replace(mobile, mobile_reduced, 1)
+          path.write_text(source)
+          PY
+
           node --check fastplay-003-final-v3.mjs
+          grep -Fq "reducedMotion: 'reduce'" fastplay-003-final-v3.mjs
           grep -Fq 'WebGL recovery must run at a stable round boundary' fastplay-003-final-v3.mjs
           grep -Fq 'first round did not reach WebGL boundary' fastplay-003-final-v3.mjs
           grep -Fq "stage: 'real-timeout-pass'" fastplay-003-final-v3.mjs
