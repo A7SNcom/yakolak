@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "gate": "PAGES-015",
-  "phase": "readiness",
+  "phase": "waiting-external-prerequisites",
   "credentials": {
     "pagesReleaseAdminTokenPresent": false,
     "cloudflareApiTokenPresent": false,
@@ -17,5 +17,5 @@
   "containsSecretValues": false,
   "qualificationEvidence": false,
   "workflowRunId": 32642116945,
-  "recordedAt": "2026-08-23T13:22:31Z"
+  "recordedAt": "2026-08-23T13:22:33Z"
 }
