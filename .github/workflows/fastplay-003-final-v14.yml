@@ -1,4 +1,5 @@
 name: FASTPLAY-003 Final Public Acceptance v14
+# Rerun after workflow registration: wait for round-result presentation after canonical completion.
 
 on:
   push:
