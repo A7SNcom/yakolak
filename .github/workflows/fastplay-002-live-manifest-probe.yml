@@ -33,9 +33,10 @@ jobs:
             | jq -r '.threejsCandidateSha // ""')"
           state=failure
           [ "$live" = "$expected" ] && state=success
-          desc="live=${live:0:8} expected=${expected:0:8}"
+          live_short="${live:0:8}"
+          [ -n "$live_short" ] || live_short=unknown
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${expected}" \
             -f state="$state" \
-            -f context='FASTPLAY-002/live-manifest' \
-            -f description="$desc"
-          echo "$desc"
+            -f context="FASTPLAY-002/live-${live_short}" \
+            -f description="expected ${expected:0:8}"
+          echo "live=${live_short} expected=${expected:0:8}"
