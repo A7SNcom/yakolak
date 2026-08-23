@@ -76,9 +76,66 @@ jobs:
           from pathlib import Path
           path = Path('fastplay-003-final-v3.mjs')
           source = path.read_text()
-          redundant = "assert.ok(transition.observedAtMs >= before.deadlineAtMs - 100, 'authority advanced materially before timeout deadline');"
-          source = source.replace(redundant, '')
-          path.write_text(source)
+          a = source.index('async function allowRealTimeout(page) {')
+          b = source.index('\nasync function verifyWebglRecovery', a)
+          timeout = r'''async function allowRealTimeout(page) {
+            const startHandle = await page.waitForFunction(async () => {
+              const state = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
+              const deadlineModule = await import(new URL('app/session/local-turn-deadline.js', location.href).href);
+              const seat = state.seats.find(candidate => candidate.seatId === state.activeSeatId);
+              const nowMs = Date.now();
+              const remainingMs = state.deadlineAtMs === null ? null : state.deadlineAtMs - nowMs;
+              if (seat?.type !== 'human' || !Number.isSafeInteger(state.deadlineAtMs) || remainingMs <= 0 || remainingMs > deadlineModule.LOCAL_TURN_DURATION_MS) return false;
+              return { state, remainingMs, startedAt: performance.now(), turnDurationMs: deadlineModule.LOCAL_TURN_DURATION_MS };
+            }, null, { timeout: 20_000, polling: 25 });
+            const observation = await startHandle.jsonValue();
+            await startHandle.dispose();
+            assert.equal(observation.turnDurationMs, 18_000, 'local turn duration drifted from 18 seconds');
+            const before = observation.state;
+            const seat = before.seats.find(candidate => candidate.seatId === before.activeSeatId);
+            assert.equal(seat?.type, 'human', 'real timeout must begin on the human seat');
+            const timeoutSkipCountBefore = (before.skips || []).filter(skip => skip.seatId === seat.seatId && skip.reason === 'timeout').length;
+
+            await page.waitForTimeout(500);
+            const early = await getState(page);
+            assert.equal(early.revision, before.revision, 'authority advanced before human timeout window');
+            assert.equal(early.activeSeatId, before.activeSeatId, 'active seat changed before human timeout window');
+
+            const minimumElapsedMs = Math.max(0, observation.remainingMs - 350);
+            await page.waitForTimeout(Math.max(0, minimumElapsedMs - 500));
+            const transitionHandle = await page.waitForFunction(async ({ revision, seatId, timeoutSkipCountBefore }) => {
+              const state = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
+              const timeoutSkips = (state.skips || []).filter(skip => skip.seatId === seatId && skip.reason === 'timeout').length;
+              const direct = state.revision > revision && timeoutSkips > timeoutSkipCountBefore && state.activeSeatId !== seatId;
+              const followed = state.revision >= revision + 2 && state.lastMove?.seatId !== seatId;
+              if (!direct && !followed) return false;
+              return {
+                revision: state.revision,
+                activeSeatId: state.activeSeatId,
+                deadlineAtMs: state.deadlineAtMs,
+                lastMove: state.lastMove,
+                timeoutSkips,
+                direct,
+                followed,
+              };
+            }, { revision: before.revision, seatId: seat.seatId, timeoutSkipCountBefore }, { timeout: 5_000, polling: 25 });
+            const transition = await transitionHandle.jsonValue();
+            await transitionHandle.dispose();
+            const elapsedMs = await page.evaluate(startedAt => performance.now() - startedAt, observation.startedAt);
+            assert.ok(elapsedMs >= minimumElapsedMs, `timeout advanced too early after ${elapsedMs}ms`);
+            assert.ok(transition.direct || transition.followed, 'authoritative timeout evidence missing');
+            return {
+              seatId: seat.seatId,
+              deadlineAtMs: before.deadlineAtMs,
+              turnDurationMs: observation.turnDurationMs,
+              observedRevision: transition.revision,
+              elapsedMs,
+              direct: transition.direct,
+              followed: transition.followed,
+            };
+          }
+          '''
+          path.write_text(source[:a] + timeout + source[b:])
           PY
           node --check fastplay-003-final-v3.mjs
           ! grep -Fq "authority advanced materially before timeout deadline" fastplay-003-final-v3.mjs
