@@ -1,0 +1,247 @@
+name: FASTPLAY-003 Final Public Acceptance v11
+
+on:
+  push:
+    branches: [threejs-rebuild]
+    paths: ['.github/workflows/fastplay-003-final-v11.yml']
+
+permissions:
+  contents: read
+  issues: write
+  statuses: write
+
+concurrency:
+  group: fastplay-003-final-v11
+  cancel-in-progress: true
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+
+      - id: candidate
+        shell: bash
+        run: echo "sha=$(git log -1 --format='%H' -- web)" >> "$GITHUB_OUTPUT"
+
+      - name: Mark pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+        shell: bash
+        run: |
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
+            -f state=pending \
+            -f context='FASTPLAY-003/final-public' \
+            -f description='v11 stable WebGL boundary acceptance running' \
+            -f target_url="$run_url"
+
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+
+      - name: Install Chromium
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          node node_modules/playwright/cli.js install --with-deps chromium
+
+      - name: Build v11 verifier from current v10
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path('.github/workflows/fastplay-003-final-v10.yml').read_text()
+          a = workflow.index('      - name: Build verifier\n')
+          b = workflow.index('      - name: Exercise full public first playable\n', a)
+          block = workflow[a:b]
+          r = block.index('        run: |\n') + len('        run: |\n')
+          Path('/tmp/build-v10.sh').write_text(textwrap.dedent(block[r:]))
+          PY
+          bash /tmp/build-v10.sh
+
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('fastplay-003-final-v3.mjs')
+          source = path.read_text()
+          a = source.index('async function verifyWebglRecovery(page) {')
+          b = source.index('\nasync function finishRound', a)
+          replacement = r'''async function verifyWebglRecovery(page) {
+            const stableForMs = 350;
+            const timeoutAt = Date.now() + 20_000;
+            let candidate = null;
+            let before = null;
+
+            while (Date.now() < timeoutAt) {
+              const observation = await page.evaluate(async () => {
+                const shell = window.__YAKOLAK_THREEJS_SHELL__;
+                const state = await shell.getCanonicalState();
+                const presentation = shell.getPresentationSnapshot();
+                return {
+                  state,
+                  nowMs: Date.now(),
+                  lock: presentation?.movePresentationLock || null,
+                  tapPhase: presentation?.tap?.phase || null,
+                  dragPhase: presentation?.drag?.phase || null,
+                  activeTravel: presentation?.acceptedTravel?.activeTravel || null,
+                  pendingTravel: presentation?.acceptedTravel?.pendingLock || null,
+                  motionActive: presentation?.motion?.active?.length || 0,
+                };
+              });
+
+              const state = observation.state;
+              const seat = state.seats.find(item => item.seatId === state.activeSeatId);
+              const remainingMs = state.deadlineAtMs === null ? 0 : state.deadlineAtMs - observation.nowMs;
+              const idlePresentation = !observation.lock
+                && (!observation.tapPhase || observation.tapPhase === 'idle')
+                && (!observation.dragPhase || observation.dragPhase === 'idle')
+                && !observation.activeTravel
+                && !observation.pendingTravel
+                && observation.motionActive === 0;
+              const eligible = state.roundEndRevision === null
+                && !state.matchComplete
+                && seat?.type === 'human'
+                && Number.isSafeInteger(state.deadlineAtMs)
+                && remainingMs >= 10_000
+                && idlePresentation;
+              const key = eligible ? JSON.stringify({
+                revision: state.revision,
+                activeSeatId: state.activeSeatId,
+                board: state.board,
+                lastMove: state.lastMove,
+                round: state.round,
+              }) : null;
+
+              if (!key) {
+                candidate = null;
+              } else if (candidate?.key !== key) {
+                candidate = { key, since: Date.now(), state, remainingMs };
+              } else if (Date.now() - candidate.since >= stableForMs) {
+                const confirm = await getState(page);
+                if (
+                  confirm.revision === candidate.state.revision
+                  && confirm.activeSeatId === candidate.state.activeSeatId
+                  && JSON.stringify(confirm.board) === JSON.stringify(candidate.state.board)
+                  && JSON.stringify(confirm.lastMove) === JSON.stringify(candidate.state.lastMove)
+                ) {
+                  before = { state: confirm, remainingMs };
+                  break;
+                }
+                candidate = null;
+              }
+              await page.waitForTimeout(25);
+            }
+
+            assert.ok(before, 'no presentation-idle stable human turn available for WebGL recovery');
+            const initialGraphics = await page.evaluate(() => window.__YAKOLAK_THREEJS_SHELL__.getGraphicsContextSnapshot());
+            assert.equal(initialGraphics.state, 'ready');
+
+            const supported = await page.evaluate(() => {
+              const canvas = window.__YAKOLAK_THREEJS_SHELL__.canvas;
+              const gl = canvas.getContext('webgl2');
+              const ext = gl?.getExtension('WEBGL_lose_context');
+              if (!ext) return false;
+              window.__FASTPLAY003_WEBGL_LOSE_CONTEXT__ = ext;
+              ext.loseContext();
+              return true;
+            });
+            assert.equal(supported, true, 'WEBGL_lose_context is required to verify real WebGL recovery');
+            await page.waitForFunction(() => window.__YAKOLAK_THREEJS_SHELL__.getGraphicsContextSnapshot().state === 'lost', null, { timeout: 5_000 });
+            await page.evaluate(() => window.__FASTPLAY003_WEBGL_LOSE_CONTEXT__.restoreContext());
+            await page.waitForFunction(() => window.__YAKOLAK_THREEJS_SHELL__.getGraphicsContextSnapshot().state === 'ready', null, { timeout: 10_000 });
+
+            const after = await getState(page);
+            const graphics = await page.evaluate(() => window.__YAKOLAK_THREEJS_SHELL__.getGraphicsContextSnapshot());
+            assert.equal(after.revision, before.state.revision, 'WebGL recovery mutated canonical revision after stable presentation boundary');
+            assert.equal(after.activeSeatId, before.state.activeSeatId, 'WebGL recovery changed active seat after stable presentation boundary');
+            assert.deepEqual(after.board, before.state.board, 'WebGL recovery mutated board');
+            assert.deepEqual(after.scores, before.state.scores, 'WebGL recovery mutated scores');
+            assert.ok(graphics.restoreCount >= initialGraphics.restoreCount + 1);
+            console.log(JSON.stringify({
+              stage: 'webgl-recovery-pass',
+              revision: after.revision,
+              activeSeatId: after.activeSeatId,
+              remainingMsAtStart: before.remainingMs,
+              stableForMs,
+              restoreCountBefore: initialGraphics.restoreCount,
+              restoreCountAfter: graphics.restoreCount,
+            }));
+            return { before: initialGraphics, after: graphics };
+          }
+          '''
+          path.write_text(source[:a] + replacement + source[b:])
+          PY
+
+          node --check fastplay-003-final-v3.mjs
+          grep -Fq 'stableForMs = 350' fastplay-003-final-v3.mjs
+          grep -Fq 'motionActive === 0' fastplay-003-final-v3.mjs
+          grep -Fq "stage: 'real-timeout-pass'" fastplay-003-final-v3.mjs
+          grep -Fq "stage: 'webgl-recovery-pass'" fastplay-003-final-v3.mjs
+          grep -Fq 'waitForRevisionOrRoundEnd' fastplay-003-final-v3.mjs
+
+      - name: Exercise full public first playable
+        env:
+          FASTPLAY003_EXPECTED_CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+          FASTPLAY003_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+          FASTPLAY003_ARTIFACT_PATH: fastplay-003-acceptance.json
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout --signal=TERM 12m node fastplay-003-final-v3.mjs 2>&1 | tee fastplay-003-final-v11.log
+
+      - name: Mark success
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MILESTONE_SHA: ${{ steps.candidate.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$(jq -r '.candidateSha' fastplay-003-acceptance.json)"
+          generation="$(jq -r '.deploymentGeneration' fastplay-003-acceptance.json)"
+          test "$(jq -r '.FIRST_PLAYABLE_EXPERIMENTAL' fastplay-003-acceptance.json)" = PASS
+          test -n "$candidate"
+          test -n "$generation"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" -f state=success -f context='FASTPLAY-003/final-public' -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS' -f target_url="$run_url"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" -f state=success -f context='FASTPLAY-003/first-playable' -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS' -f target_url="$run_url"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${candidate}" -f state=success -f context='FASTPLAY-003/public-pass' -f description="PASS generation ${generation}" -f target_url="$run_url"
+
+      - name: Upload evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastplay-003-v11-${{ steps.candidate.outputs.sha }}
+          path: fastplay-003-acceptance.json
+          retention-days: 90
+
+      - name: Publish failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MILESTONE_SHA: ${{ steps.candidate.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" -f state=failure -f context='FASTPLAY-003/final-public' -f description='v11 acceptance failed' -f target_url="$run_url"
+          title="FASTPLAY-003 final-v11 blocker ${MILESTONE_SHA}"
+          body="$(mktemp)"
+          {
+            echo 'FASTPLAY-003 final-v11 failed.'
+            echo
+            echo "workflow_run: ${run_url}"
+            echo '```text'
+            tail -n 220 fastplay-003-final-v11.log 2>/dev/null || echo '(verifier log unavailable)'
+            echo '```'
+          } > "$body"
+          existing="$(gh api "repos/${GITHUB_REPOSITORY}/issues?state=open&per_page=100" --jq ".[] | select(.title == \"${title}\") | .number" | head -n 1)"
+          if [ -z "$existing" ]; then
+            gh issue create --title "$title" --body-file "$body" >/dev/null
+          else
+            gh issue edit "$existing" --body-file "$body" >/dev/null
+          fi
