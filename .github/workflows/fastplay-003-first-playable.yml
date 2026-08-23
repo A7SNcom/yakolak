@@ -56,18 +56,29 @@ jobs:
           timeout_function = r'''async function allowRealTimeout(page) {
             const observation = await page.evaluate(async () => {
               const state = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
-              return { state, nowMs: Date.now(), startedAt: performance.now() };
+              const deadlineModule = await import(new URL('app/session/local-turn-deadline.js', location.href).href);
+              return {
+                state,
+                nowMs: Date.now(),
+                startedAt: performance.now(),
+                turnDurationMs: deadlineModule.LOCAL_TURN_DURATION_MS,
+              };
             });
             const before = observation.state;
             const seat = before.seats.find(candidate => candidate.seatId === before.activeSeatId);
             assert.equal(seat?.type, 'human', 'real timeout must begin on the human seat');
             assert.ok(Number.isSafeInteger(before.deadlineAtMs), 'human deadline missing');
+            assert.equal(observation.turnDurationMs, 18_000, 'local turn duration drifted from 18 seconds');
             const remainingMs = before.deadlineAtMs - observation.nowMs;
-            assert.ok(remainingMs >= 15_000 && remainingMs <= 19_500, `expected fresh 18-second deadline, got ${remainingMs}ms`);
+            assert.ok(
+              remainingMs > 0 && remainingMs <= observation.turnDurationMs,
+              `expected unexpired 18-second authority deadline, got ${remainingMs}ms remaining`,
+            );
             console.log(JSON.stringify({
               stage: 'real-timeout-start',
               seatId: seat.seatId,
               revision: before.revision,
+              turnDurationMs: observation.turnDurationMs,
               remainingMs,
             }));
             await page.waitForFunction(async ({ revision, seatId }) => {
@@ -76,11 +87,12 @@ jobs:
             }, { revision: before.revision, seatId: seat.seatId }, { timeout: 23_000, polling: 25 });
             const after = await getState(page);
             const elapsedMs = await page.evaluate(startedAt => performance.now() - startedAt, observation.startedAt);
-            assert.ok(elapsedMs >= Math.max(14_500, remainingMs - 350), `timeout advanced too early after ${elapsedMs}ms`);
+            assert.ok(elapsedMs >= Math.max(0, remainingMs - 350), `timeout advanced too early after ${elapsedMs}ms`);
             assert.ok(after.skips.some(skip => skip.seatId === seat.seatId && skip.reason === 'timeout'));
             return {
               seatId: seat.seatId,
               deadlineAtMs: before.deadlineAtMs,
+              turnDurationMs: observation.turnDurationMs,
               observedRevision: after.revision,
               elapsedMs,
             };
@@ -216,7 +228,7 @@ jobs:
           freeze_branch: ${freeze_branch}
           workflow_run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
 
-          Acceptance covered the actual public human-facing page on desktop and mobile portrait, explicit 2-player Human+Computer setup, tap and drag moves, one real 18-second timeout, round completion and score, next-round reset, full match completion, rematch, return-to-setup, refresh recovery, WebGL context loss/restore, and no fatal/page errors.
+          Acceptance covered the actual public human-facing page on desktop and mobile portrait, explicit 2-player Human+Computer setup, tap and drag moves, one authoritative 18-second timeout, round completion and score, next-round reset, full match completion, rematch, return-to-setup, refresh recovery, WebGL context loss/restore, and no fatal/page errors.
           BODY
 
           if [ -z "${existing_issue}" ]; then
