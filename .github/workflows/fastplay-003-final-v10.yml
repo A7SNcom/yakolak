@@ -33,7 +33,7 @@ jobs:
         shell: bash
         run: |
           run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" -f state=pending -f context='FASTPLAY-003/final-public' -f description='v10 revision-gated public acceptance running' -f target_url="$run_url"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" -f state=pending -f context='FASTPLAY-003/final-public' -f description='v10 real-handoff public acceptance running' -f target_url="$run_url"
 
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
@@ -63,19 +63,41 @@ jobs:
           path = Path('fastplay-003-final-v3.mjs')
           source = path.read_text()
 
-          helper = r'''async function waitForPhysicalInputReady(page, seatId) {
-            const handle = await page.waitForFunction(async seatId => {
-              const shell = window.__YAKOLAK_THREEJS_SHELL__;
-              const state = await shell.getCanonicalState();
-              if (state.roundEndRevision !== null || state.matchComplete) return true;
-              const presentation = shell.getPresentationSnapshot();
-              return state.activeSeatId === seatId
-                && !presentation?.movePresentationLock
-                && (!presentation?.drag?.phase || presentation.drag.phase === 'idle')
-                && (!presentation?.tap?.phase || presentation.tap.phase === 'idle');
-            }, seatId, { timeout: 5_000, polling: 25 });
-            await handle.dispose();
-            return getState(page);
+          helper = r'''async function waitForRevisionOrRoundEnd(page, beforeRevision, { timeoutMs = 3_000, pollingMs = 25 } = {}) {
+            const startedAt = Date.now();
+            let lastState = null;
+            while (Date.now() - startedAt < timeoutMs) {
+              lastState = await getState(page);
+              if (lastState.revision > beforeRevision || lastState.roundEndRevision !== null || lastState.matchComplete) {
+                return lastState;
+              }
+              await page.waitForTimeout(pollingMs);
+            }
+            const error = new Error(`canonical state did not advance after revision ${beforeRevision}`);
+            error.lastState = lastState;
+            throw error;
+          }
+
+          async function waitForPhysicalInputReady(page, seatId) {
+            const startedAt = Date.now();
+            let lastObservation = null;
+            while (Date.now() - startedAt < 5_000) {
+              lastObservation = await page.evaluate(async seatId => {
+                const shell = window.__YAKOLAK_THREEJS_SHELL__;
+                const state = await shell.getCanonicalState();
+                const presentation = shell.getPresentationSnapshot();
+                const ready = state.activeSeatId === seatId
+                  && !presentation?.movePresentationLock
+                  && (!presentation?.drag?.phase || presentation.drag.phase === 'idle')
+                  && (!presentation?.tap?.phase || presentation.tap.phase === 'idle');
+                return { state, ready };
+              }, seatId);
+              if (lastObservation.state.roundEndRevision !== null || lastObservation.state.matchComplete || lastObservation.ready) {
+                return lastObservation.state;
+              }
+              await page.waitForTimeout(25);
+            }
+            throw new Error(`physical input did not become ready for ${seatId}: ${JSON.stringify(lastObservation)}`);
           }
 
           '''
@@ -112,44 +134,36 @@ jobs:
             for (let step = 0; step < 80; step += 1) {
               const state = await getState(page);
               if (state.roundEndRevision !== null || state.matchComplete) return state;
-              const seat = state.seats.find(candidate => candidate.seatId === state.activeSeatId);
 
               if (state.activeSeatId === humanSeatId) {
                 const move = await chooseHumanMove(page);
                 if (!move) {
-                  const beforeRevision = state.revision;
-                  await page.waitForFunction(async revision => {
-                    const current = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
-                    return current.revision > revision || current.roundEndRevision !== null || current.matchComplete;
-                  }, beforeRevision, { timeout: 23_000, polling: 50 });
+                  await waitForRevisionOrRoundEnd(page, state.revision, { timeoutMs: 23_000, pollingMs: 50 });
                   continue;
                 }
 
+                let physicalResult;
                 const forceDrag = gestureBook.drag === 0;
                 const forceTap = gestureBook.tap === 0;
                 if (forceTap) {
-                  await tapMove(page, move);
-                  gestureBook.tap += 1;
+                  physicalResult = await tapMove(page, move);
+                  if (!physicalResult?.ended) gestureBook.tap += 1;
                 } else if (forceDrag) {
-                  await dragMove(page, move, { pointerType: 'mouse' });
-                  gestureBook.drag += 1;
+                  physicalResult = await dragMove(page, move, { pointerType: 'mouse' });
+                  if (!physicalResult?.ended) gestureBook.drag += 1;
                 } else if ((gestureBook.tap + gestureBook.drag) % 2 === 0) {
-                  await tapMove(page, move);
-                  gestureBook.tap += 1;
+                  physicalResult = await tapMove(page, move);
+                  if (!physicalResult?.ended) gestureBook.tap += 1;
                 } else {
-                  await dragMove(page, move, { pointerType: 'mouse' });
-                  gestureBook.drag += 1;
+                  physicalResult = await dragMove(page, move, { pointerType: 'mouse' });
+                  if (!physicalResult?.ended) gestureBook.drag += 1;
                 }
                 continue;
               }
 
               const beforeRevision = state.revision;
               try {
-                const handle = await page.waitForFunction(async revision => {
-                  const current = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
-                  return current.revision > revision || current.roundEndRevision !== null || current.matchComplete;
-                }, beforeRevision, { timeout: 3_000, polling: 25 });
-                await handle.dispose();
+                await waitForRevisionOrRoundEnd(page, beforeRevision, { timeoutMs: 3_000, pollingMs: 25 });
               } catch (error) {
                 const diagnostic = await page.evaluate(async () => {
                   const shell = window.__YAKOLAK_THREEJS_SHELL__;
@@ -178,6 +192,8 @@ jobs:
 
           node --check fastplay-003-final-v3.mjs
           test "$(grep -Fc 'const readiness = await waitForPhysicalInputReady(page, move.seatId);' fastplay-003-final-v3.mjs)" -eq 2
+          grep -Fq "waitForRevisionOrRoundEnd" fastplay-003-final-v3.mjs
+          ! grep -Fq "page.waitForFunction(async revision" fastplay-003-final-v3.mjs
           grep -Fq "computer handoff stalled after revision" fastplay-003-final-v3.mjs
           grep -Fq "stage: 'real-timeout-pass'" fastplay-003-final-v3.mjs
           grep -Fq "stage: 'webgl-recovery-pass'" fastplay-003-final-v3.mjs
