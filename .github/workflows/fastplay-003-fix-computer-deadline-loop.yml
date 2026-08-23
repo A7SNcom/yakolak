@@ -1,0 +1,121 @@
+name: FASTPLAY-003 Fix Computer Deadline Retry Starvation
+
+on:
+  push:
+    branches: [threejs-rebuild]
+    paths: ['.github/workflows/fastplay-003-fix-computer-deadline-loop.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch computer turn retry semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('web/app/scene/local-game-scene.js')
+          s = p.read_text()
+          old = '''  async function runComputerTurns() {
+    if (disposed || computerInFlight) return computerInFlight;
+    const seat = activeSeat();
+    if (!seat || !isComputerSeatType(seat.type) || canonicalState.deadlineAtMs === null) return null;
+
+    computerInFlight = (async () => {
+      const result = await computerProducer.playCurrentTurn({ reducedMotion: Boolean(reducedMotionQuery?.matches) });
+      if (disposed || result?.status !== 'submitted') return result;
+      const nextState = result.result.snapshot;
+      const pieceId = chooseComputerPiece(nextState);
+      updateCanonicalState(nextState);
+      if (pieceId) {
+        // Do not keep computerInFlight occupied by presentation. A later canonical
+        // revision cancels/snaps this travel through the shared motion controller.
+        void playAcceptedTravel(nextState, pieceId, null, { observeFirst: true }).catch(error => {
+          console.warn('[fastplay] detached computer accepted travel recovered', error);
+        });
+      } else {
+        acceptedTravel.observeSnapshot(nextState, { reason: 'computer-move-without-piece-presentation' });
+      }
+      clearInputForCanonical(nextState, 'ownership-change', 'computer-authority-advanced');
+      return result;
+    })().finally(() => {
+      computerInFlight = null;
+      if (!disposed && isComputerSeatType(activeSeat()?.type)) void runComputerTurns();
+    });
+    return computerInFlight;
+  }
+'''
+          new = '''  async function runComputerTurns() {
+    if (disposed || computerInFlight) return computerInFlight;
+    const seat = activeSeat();
+    if (!seat || !isComputerSeatType(seat.type) || canonicalState.deadlineAtMs === null) return null;
+
+    let resultStatus = null;
+    computerInFlight = (async () => {
+      const result = await computerProducer.playCurrentTurn({ reducedMotion: Boolean(reducedMotionQuery?.matches) });
+      resultStatus = result?.status || null;
+      if (disposed || resultStatus !== 'submitted') return result;
+      const nextState = result.result.snapshot;
+      const pieceId = chooseComputerPiece(nextState);
+      updateCanonicalState(nextState);
+      if (pieceId) {
+        // Do not keep computerInFlight occupied by presentation. A later canonical
+        // revision cancels/snaps this travel through the shared motion controller.
+        void playAcceptedTravel(nextState, pieceId, null, { observeFirst: true }).catch(error => {
+          console.warn('[fastplay] detached computer accepted travel recovered', error);
+        });
+      } else {
+        acceptedTravel.observeSnapshot(nextState, { reason: 'computer-move-without-piece-presentation' });
+      }
+      clearInputForCanonical(nextState, 'ownership-change', 'computer-authority-advanced');
+      return result;
+    })().catch(error => {
+      console.warn('[fastplay] computer turn producer recovered', error);
+      return null;
+    }).finally(() => {
+      computerInFlight = null;
+      if (disposed || !isComputerSeatType(activeSeat()?.type)) return;
+
+      if (canonicalState.deadlineAtMs !== null && Date.now() >= canonicalState.deadlineAtMs) {
+        void reconcileExpiredDeadline();
+        return;
+      }
+
+      // Only retry states that can legitimately become current after a race or a
+      // successful handoff to another computer. Terminal no-move/deadline states
+      // must yield to the authoritative deadline timer instead of spinning in a
+      // microtask loop that can starve setTimeout reconciliation.
+      if (resultStatus === 'submitted' || resultStatus === 'stale' || resultStatus === 'cancelled') {
+        window.setTimeout(() => {
+          if (!disposed) void runComputerTurns();
+        }, 0);
+      }
+    });
+    return computerInFlight;
+  }
+'''
+          if old not in s:
+              raise SystemExit('runComputerTurns anchor changed')
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+          node --check web/app/scene/local-game-scene.js
+          grep -Fq "resultStatus === 'submitted' || resultStatus === 'stale' || resultStatus === 'cancelled'" web/app/scene/local-game-scene.js
+          grep -Fq "void reconcileExpiredDeadline();" web/app/scene/local-game-scene.js
+      - name: Commit production fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add web/app/scene/local-game-scene.js
+          git diff --cached --check
+          git commit -m "FASTPLAY-003 prevent computer deadline microtask starvation"
+          git push origin HEAD:threejs-rebuild
