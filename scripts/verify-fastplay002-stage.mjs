@@ -61,12 +61,12 @@ async function setupTwoHumans(page) {
     return {
       state,
       scene: document.documentElement.dataset.fastplayScene,
-      milestone: document.querySelector('#app')?.dataset.fastplayMilestone || null,
+      localFlow: document.querySelector('#app')?.dataset.fastplayLocalFlow || null,
       setupHidden: document.querySelector('#local-setup')?.hidden,
       hudHidden: document.querySelector('#game-hud')?.hidden,
     };
   });
-  assert.equal(initial.milestone, 'FASTPLAY-002');
+  assert.equal(initial.localFlow, 'FASTPLAY-002');
   assert.equal(initial.scene, 'real-local-game');
   assert.equal(initial.setupHidden, true);
   assert.equal(initial.hudHidden, false);
