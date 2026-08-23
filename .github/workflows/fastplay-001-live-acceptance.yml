@@ -23,17 +23,19 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - name: Mark exact candidate pending
+      - name: Mark milestone pending
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=pending \
             -f context='FASTPLAY-001/live-pages' \
-            -f description='Waiting for exact Pages generation and browser acceptance'
+            -f description='Waiting for a live Pages generation containing this milestone'
 
-      - name: Checkout exact candidate
+      - name: Checkout candidate history
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node 22
         uses: actions/setup-node@v4
@@ -49,7 +51,7 @@ jobs:
       - name: Install matching Chromium
         run: node node_modules/playwright/cli.js install --with-deps chromium
 
-      - name: Verify exact public desktop click and mobile drag
+      - name: Verify public desktop click and mobile drag
         env:
           FASTPLAY001_EXPECTED_CANDIDATE_SHA: ${{ github.sha }}
           FASTPLAY001_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
@@ -63,7 +65,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=success \
             -f context='FASTPLAY-001/live-pages' \
-            -f description='Desktop click + mobile drag passed on exact public Pages SHA'
+            -f description='Public desktop click + mobile drag passed on a descendant Pages generation'
 
       - name: Mark live acceptance failure
         if: failure()
