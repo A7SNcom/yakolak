@@ -41,17 +41,31 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Enable WebGL on GPU-less CI Chromium
+      - name: Prepare GPU-less browser and monotonic timeout probe
         run: |
           python - <<'PY'
           from pathlib import Path
           path = Path('scripts/verify-fastplay003-live.mjs')
           text = path.read_text()
-          old = "const browser = await chromium.launch({ headless: true });"
-          new = "const browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });"
-          if old not in text:
-              raise SystemExit('FASTPLAY-003 Chromium launch signature changed')
-          path.write_text(text.replace(old, new))
+          replacements = [
+              (
+                  "const browser = await chromium.launch({ headless: true });",
+                  "const browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });",
+              ),
+              (
+                  "  const startedAt = Date.now();",
+                  "  const startedAt = await page.evaluate(() => performance.now());",
+              ),
+              (
+                  "  const elapsedMs = Date.now() - startedAt;",
+                  "  const elapsedMs = await page.evaluate(startedAt => performance.now() - startedAt, startedAt);",
+              ),
+          ]
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f'FASTPLAY-003 probe signature changed: {old}')
+              text = text.replace(old, new, 1)
+          path.write_text(text)
           PY
 
       - name: Syntax-check acceptance probe
