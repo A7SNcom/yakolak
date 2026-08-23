@@ -1,12 +1,12 @@
 # THREEJS-096 — One stale-safe motion controller
 
-Status: **LOCKED by THREEJS-096 (2026-08-19)**
+Status: **LOCKED by THREEJS-096 (2026-08-19; Reduced Motion/audio ownership hardened 2026-08-23)**
 
 THREEJS-096 is the single scheduling/ownership boundary for **setup, camera transition, stack, piece, travel, reveal, unboxing, win and reset motion**. Camera tasks may define camera sequence data, but interpolation/cancellation belongs here. The existing camera frame governor remains render-loop governance only and is not a second tween scheduler. Gameplay authority never waits for presentation motion.
 
 ## Required consumers
 
-THREEJS-032/042/084/091/095 and later presentation/camera tasks may define transforms, timings and sequences, but they must submit motion through this controller. They may not create independent RAF/tween schedulers, completion queues or stale-callback mechanisms.
+THREEJS-032/042/084/091/095 and later presentation/camera tasks may define transforms, approved normal/Reduced Motion timings and sequences, but they must submit motion through this controller. They may not create independent RAF/tween schedulers, completion queues or stale-callback mechanisms.
 
 The controller itself never calls raw `requestAnimationFrame`, `cancelAnimationFrame`, `setTimeout` or `setInterval`; every frame handle belongs to the THREEJS-027 resource registry.
 
@@ -51,13 +51,18 @@ Built-in easing names are `linear`, `easeOutCubic` and `easeInOutCubic`.
 
 ## Reduced Motion
 
-Reduced Motion uses the same semantic transition and lock/authority path:
+Reduced Motion uses the **same motion entry, handle, scope/key lock, authority witness, frame ownership and completion signal**. It is timing policy, not a second lifecycle.
 
-- new motion while reduced motion is enabled applies exact `to` immediately;
-- enabling it mid-flight cancels the owned frame and applies exact `to` once;
-- duration `0` also commits exact `to` immediately.
+`animate(...)` accepts optional `reducedDurationMs` beside normal `durationMs`:
 
-Reduced Motion does **not** invoke cancellation snap and never creates a separate gameplay/lifecycle path.
+- when an approved Reduced Motion duration exists in the Portable Kit/sequence contract, the consumer passes it and THREEJS-096 schedules the same transition at that shorter duration;
+- `reducedDurationMs` must be finite, non-negative and cannot exceed the normal duration;
+- changing the preference mid-flight cancels only the currently owned frame token, preserves the same motion sequence/handle/progress, retimes the remaining work and schedules again through the same THREEJS-027 scope;
+- preference changes never invoke canonical cancellation snap;
+- when no approved Reduced Motion duration exists, the controller invents no timing: reduced mode uses the legacy exact-final fallback (`to` immediately);
+- explicit normal duration `0` also commits exact `to` immediately.
+
+The approved contract currently includes shortened values such as `roomRevealMs: 700` and `setupSurfaceTravelMs: 850`; sequence owners must pass those values rather than bypassing this controller.
 
 ## Resource ownership and stale callbacks
 
@@ -73,6 +78,12 @@ A cancelled platform callback that arrives late cannot mutate because the entry 
 
 Controller release cancels active entries, canonical-snaps live targets once, and releases its resource scope.
 
+## Audio is optional and non-authoritative
+
+THREEJS-096 does not create, load, play or await audio. Audio cues may observe presentation events outside the controller, but they may never gate startup, authority, interpolation or `handle.finished`.
+
+Silence is valid. Autoplay denial, decode/load failure, a muted device or a rejected audio promise must have zero effect on gameplay authority and motion completion.
+
 ## Gameplay must not wait
 
 Picking, selection, legality, intent creation and authority submission must never depend on `handle.finished`. Motion completion is presentation-only. A consumer may observe `finished` for presentation sequencing/cleanup after gameplay is already committed.
@@ -81,23 +92,24 @@ Picking, selection, legality, intent creation and authority submission must neve
 
 `createMotionController(...)` exposes:
 
-- `animate(...)`
-- `cancel(scope, key, reason?)`
-- `cancelScope(scope, reason?)`
-- `setAuthority(generation, revision)`
-- `setGeneration(nextGeneration)`
-- `setRevision(nextRevision)`
-- `syncSessionAuthority(sessionLifecycle, authoritativeRevision)`
-- `setReducedMotion(boolean)`
-- `snapshot()`
-- `release()` / `dispose()`
+- `animate(...)` — including optional `reducedDurationMs`;
+- `cancel(scope, key, reason?)`;
+- `cancelScope(scope, reason?)`;
+- `setAuthority(generation, revision)`;
+- `setGeneration(nextGeneration)`;
+- `setRevision(nextRevision)`;
+- `syncSessionAuthority(sessionLifecycle, authoritativeRevision)`;
+- `setReducedMotion(boolean)`;
+- `snapshot()`;
+- `release()` / `dispose()`.
 
 ## Verification
 
 Run:
 
-- `node --test tests/threejs_motion_controller_contract.test.mjs`
-- `node --test tests/threejs_motion_controller_source_contract.test.mjs`
-- `npm run test:threejs:gameplay`
+- `node --test tests/threejs_motion_controller_contract.test.mjs`;
+- `node --test tests/threejs_motion_reduced_timing_contract.test.mjs`;
+- `node --test tests/threejs_motion_controller_source_contract.test.mjs`;
+- `npm run test:threejs:gameplay`.
 
-The behavioral contract covers interpolation, same-key supersession, revision replacement, direct THREEJS-060 presentation-generation synchronization, late cancelled callbacks, target release/rebuild, exactly-once canonical snap, Reduced Motion, media-query listener ownership and controller release. The source contract forbids raw scheduler ownership and requires lifecycle-generation + revision enforcement.
+The behavioral contract covers interpolation, same-key supersession, revision replacement, direct THREEJS-060 presentation-generation synchronization, late cancelled callbacks, target release/rebuild, exactly-once canonical snap, approved Reduced Motion retiming, media-query listener ownership and controller release. The source contract forbids raw scheduler ownership, guards current motion consumers from duplicating tween loops, keeps audio out of authoritative completion and requires lifecycle-generation + revision enforcement.
