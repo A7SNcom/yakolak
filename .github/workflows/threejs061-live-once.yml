@@ -1,0 +1,134 @@
+name: THREEJS-061 Exact Live Local One-Shot
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - '.github/workflows/threejs061-live-once.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: yakolak-threejs061-exact-live-once
+  cancel-in-progress: false
+
+jobs:
+  live-local:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout acceptance harness
+        uses: actions/checkout@v4
+        with:
+          ref: threejs-rebuild
+          fetch-depth: 0
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Resolve exact currently-live PAGES-014 generation
+        id: live
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://a7sncom.github.io/yakolak/deployment-manifest.json'
+          for attempt in $(seq 1 36); do
+            code="$(curl --silent --show-error --location \
+              --header 'Cache-Control: no-cache, max-age=0' \
+              --header 'Pragma: no-cache' \
+              --output /tmp/threejs061-live-manifest.json \
+              --write-out '%{http_code}' \
+              "${url}?threejs061_once=${GITHUB_RUN_ID}-${attempt}" || true)"
+            if [ "${code}" = '200' ] && jq -e '
+              .schemaVersion == 1 and
+              .generationSchema == "pages-deployment-generation-v1" and
+              (.deploymentGeneration | test("^sha256:[0-9a-f]{64}$")) and
+              (.godotRootSha | test("^[0-9a-f]{40}$")) and
+              (.threejsCandidateSha | test("^[0-9a-f]{40}$")) and
+              (.publicRuntimeProtocol.sha256 | test("^[0-9a-f]{64}$")) and
+              (.publicRuntimeProtocol.protocolVersion | type == "string") and
+              .contentIdentity.algorithm == "sha256-canonical-file-manifest-v1" and
+              (.contentIdentity.sha256 | test("^[0-9a-f]{64}$")) and
+              (.contentIdentity.excludes | index("deployment-manifest.json") != null)
+            ' /tmp/threejs061-live-manifest.json >/dev/null 2>&1; then
+              candidate="$(jq -r '.threejsCandidateSha' /tmp/threejs061-live-manifest.json)"
+              generation="$(jq -r '.deploymentGeneration' /tmp/threejs061-live-manifest.json)"
+              root_sha="$(jq -r '.godotRootSha' /tmp/threejs061-live-manifest.json)"
+              echo "candidate_sha=${candidate}" >> "$GITHUB_OUTPUT"
+              echo "deployment_generation=${generation}" >> "$GITHUB_OUTPUT"
+              echo "godot_root_sha=${root_sha}" >> "$GITHUB_OUTPUT"
+              echo "Resolved live candidate ${candidate} at ${generation}"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'No valid live PAGES-014 deployment manifest became available.' >&2
+          exit 1
+
+      - name: Run source contract before live acceptance
+        run: node --test tests/threejs061_live_acceptance_contract.test.mjs
+
+      - name: Install live browser verifier only
+        run: npm install --no-save --package-lock=false playwright@1.55.0
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run exact-generation GitHub Pages local slice acceptance
+        env:
+          THREEJS061_EXPECTED_CANDIDATE_SHA: ${{ steps.live.outputs.candidate_sha }}
+          THREEJS061_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+          THREEJS061_EVIDENCE_PATH: threejs061-live-local-evidence.json
+        run: node scripts/verify-threejs061-live-local.mjs
+
+      - name: Persist evidence and remove one-shot runner
+        if: always()
+        shell: bash
+        env:
+          RESOLVED_CANDIDATE_SHA: ${{ steps.live.outputs.candidate_sha }}
+          RESOLVED_GENERATION: ${{ steps.live.outputs.deployment_generation }}
+          RESOLVED_GODOT_ROOT_SHA: ${{ steps.live.outputs.godot_root_sha }}
+        run: |
+          set -euo pipefail
+          if [ ! -s threejs061-live-local-evidence.json ]; then
+            jq -n \
+              --arg candidate "${RESOLVED_CANDIDATE_SHA:-unresolved}" \
+              --arg generation "${RESOLVED_GENERATION:-unresolved}" \
+              --arg root "${RESOLVED_GODOT_ROOT_SHA:-unresolved}" \
+              --arg runId "${GITHUB_RUN_ID}" \
+              '{
+                schemaVersion: 1,
+                task: "THREEJS-061",
+                status: "failed",
+                candidateSha: $candidate,
+                deploymentGeneration: $generation,
+                godotRootSha: $root,
+                failures: ["one-shot runner failed before the live harness produced its evidence file"],
+                execution: { githubRunId: $runId, repository: env.GITHUB_REPOSITORY }
+              }' > threejs061-live-local-evidence.json
+          fi
+
+          mkdir -p RELEASE_QUALIFICATION
+          jq \
+            --arg runId "${GITHUB_RUN_ID}" \
+            --arg runAttempt "${GITHUB_RUN_ATTEMPT}" \
+            --arg wrapperSha "${GITHUB_SHA}" \
+            '. + {execution: ((.execution // {}) + {
+              githubRunId: $runId,
+              githubRunAttempt: $runAttempt,
+              oneShotWrapperSha: $wrapperSha,
+              publicUrl: "https://a7sncom.github.io/yakolak/threejs/"
+            })}' \
+            threejs061-live-local-evidence.json \
+            > RELEASE_QUALIFICATION/THREEJS061_LIVE_LOCAL_EVIDENCE.json
+
+          rm -f .github/workflows/threejs061-live-once.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add RELEASE_QUALIFICATION/THREEJS061_LIVE_LOCAL_EVIDENCE.json .github/workflows/threejs061-live-once.yml
+          git commit -m 'THREEJS-061 record exact live-local evidence' || exit 0
+          git push origin HEAD:threejs-rebuild
