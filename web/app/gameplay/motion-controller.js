@@ -57,10 +57,15 @@ function requireScopeOrKey(value, code) {
   return value;
 }
 
-function requireDuration(value) {
+function requireDuration(value, code = 'invalid_motion_duration') {
   const durationMs = Number(value);
-  if (!Number.isFinite(durationMs) || durationMs < 0) fail('invalid_motion_duration');
+  if (!Number.isFinite(durationMs) || durationMs < 0) fail(code);
   return durationMs;
+}
+
+function optionalDuration(value) {
+  if (value === undefined || value === null) return null;
+  return requireDuration(value, 'invalid_reduced_motion_duration');
 }
 
 function requireBoolean(value, code) {
@@ -137,6 +142,7 @@ function resultFor(entry, status, reason = null) {
     sequence: entry.sequence,
     status,
     reason,
+    timingMode: entry.timingMode,
     snapAttempted: entry.snapAttempted,
     snappedCanonical: entry.snappedCanonical,
   });
@@ -151,6 +157,7 @@ function settledHandle({ scope, key, generation, revision, sequence, status, rea
     sequence,
     status,
     reason,
+    timingMode: 'stale',
     snapAttempted: false,
     snappedCanonical: false,
   });
@@ -269,6 +276,7 @@ export function createMotionController({
       sequence: entry.sequence,
       progress,
       easedProgress,
+      timingMode: entry.timingMode,
     }));
     return true;
   }
@@ -276,6 +284,16 @@ export function createMotionController({
   function failEntry(entry, error, stage) {
     settle(entry, 'error', error?.code || error?.message || stage);
     throw error;
+  }
+
+  function effectiveDurationFor(entry, useReduced = reduced) {
+    if (!useReduced) return entry.durationMs;
+    return entry.reducedDurationMs === null ? 0 : entry.reducedDurationMs;
+  }
+
+  function progressAt(entry, timeMs) {
+    if (entry.effectiveDurationMs === 0) return 1;
+    return Math.min(1, Math.max(0, timeMs - entry.startedAtMs) / entry.effectiveDurationMs);
   }
 
   function scheduleFrame(entry) {
@@ -288,8 +306,7 @@ export function createMotionController({
           settle(entry, 'stale-target', 'target-released-or-rebuilt');
           return;
         }
-        const elapsedMs = Math.max(0, clockNow(now) - entry.startedAtMs);
-        const progress = Math.min(1, elapsedMs / entry.durationMs);
+        const progress = progressAt(entry, clockNow(now));
         const easedProgress = entry.easing.fn(progress);
         if (!Number.isFinite(easedProgress)) fail('invalid_motion_easing_result');
         if (!applyEntry(entry, interpolateTree(entry.from, entry.to, easedProgress), progress, easedProgress)) return;
@@ -301,12 +318,49 @@ export function createMotionController({
     }, { label: `motion-frame:${entry.scope}:${entry.key}` });
   }
 
+  function completeImmediately(entry, status, reason) {
+    if (!entryIsCurrent(entry) || entry.settled) return false;
+    if (!targetIsLive(entry)) {
+      settle(entry, 'stale-target', 'target-released-or-rebuilt');
+      return false;
+    }
+    if (!applyEntry(entry, entry.to, 1, 1)) return false;
+    settle(entry, status, reason);
+    return true;
+  }
+
+  function retimeEntry(entry, useReduced) {
+    if (!entryIsCurrent(entry) || entry.settled) return false;
+    const nextDurationMs = effectiveDurationFor(entry, useReduced);
+    const nextTimingMode = useReduced ? 'reduced' : 'normal';
+    if (entry.effectiveDurationMs === nextDurationMs && entry.timingMode === nextTimingMode) return false;
+
+    cancelFrame(entry, useReduced ? 'reduced-motion-retime' : 'normal-motion-retime');
+    try {
+      const timeMs = clockNow(now);
+      const progress = progressAt(entry, timeMs);
+      entry.timingMode = nextTimingMode;
+      entry.effectiveDurationMs = nextDurationMs;
+      if (nextDurationMs === 0) {
+        completeImmediately(entry, 'reduced-motion', 'reduced-motion-final-state');
+        return true;
+      }
+      entry.startedAtMs = timeMs - progress * nextDurationMs;
+      if (progress >= 1) completeImmediately(entry, 'completed', null);
+      else scheduleFrame(entry);
+      return true;
+    } catch (error) {
+      failEntry(entry, error, 'motion-retime-error');
+    }
+  }
+
   function animate({
     scope,
     key,
     generation: motionGeneration,
     revision: motionRevision,
     durationMs,
+    reducedDurationMs = null,
     from,
     to,
     easing = 'easeOutCubic',
@@ -320,6 +374,8 @@ export function createMotionController({
     const requestedGeneration = requireGeneration(motionGeneration);
     const requestedRevision = requireRevision(motionRevision);
     const duration = requireDuration(durationMs);
+    const reducedDuration = optionalDuration(reducedDurationMs);
+    if (reducedDuration !== null && reducedDuration > duration) fail('reduced_motion_duration_must_not_exceed_normal');
     const normalizedFrom = normalizeNumericTree(from, 'from');
     const normalizedTo = normalizeNumericTree(to, 'to');
     assertMatchingShape(normalizedFrom, normalizedTo);
@@ -366,6 +422,9 @@ export function createMotionController({
       revision: requestedRevision,
       sequence: motionSequence,
       durationMs: duration,
+      reducedDurationMs: reducedDuration,
+      effectiveDurationMs: reduced ? (reducedDuration ?? 0) : duration,
+      timingMode: reduced ? 'reduced' : 'normal',
       from: normalizedFrom,
       to: normalizedTo,
       easing: resolvedEasing,
@@ -399,9 +458,12 @@ export function createMotionController({
         settle(entry, 'stale-target', 'target-released-or-rebuilt');
         return handle;
       }
-      if (reduced || duration === 0) {
-        applyEntry(entry, entry.to, 1, 1);
-        settle(entry, reduced ? 'reduced-motion' : 'completed', reduced ? 'reduced-motion-final-state' : null);
+      if (entry.effectiveDurationMs === 0) {
+        completeImmediately(
+          entry,
+          reduced && duration > 0 ? 'reduced-motion' : 'completed',
+          reduced && duration > 0 ? 'reduced-motion-final-state' : null,
+        );
         return handle;
       }
       applyEntry(entry, entry.from, 0, 0);
@@ -465,28 +527,12 @@ export function createMotionController({
     return setAuthority(sessionLifecycle.presentationGeneration, requireRevision(authoritativeRevision));
   }
 
-  function snapActiveToFinalForReducedMotion() {
-    for (const entry of [...active.values()]) {
-      if (!entryIsCurrent(entry) || entry.settled) continue;
-      cancelFrame(entry, 'reduced-motion');
-      try {
-        if (!targetIsLive(entry)) {
-          settle(entry, 'stale-target', 'target-released-or-rebuilt');
-          continue;
-        }
-        if (applyEntry(entry, entry.to, 1, 1)) settle(entry, 'reduced-motion', 'reduced-motion-final-state');
-      } catch (error) {
-        failEntry(entry, error, 'motion-reduced-motion-error');
-      }
-    }
-  }
-
   function setReducedMotion(value) {
     assertLive();
     const next = requireBoolean(value, 'invalid_reduced_motion');
     if (next === reduced) return reduced;
     reduced = next;
-    if (reduced) snapActiveToFinalForReducedMotion();
+    for (const entry of [...active.values()]) retimeEntry(entry, reduced);
     return reduced;
   }
 
@@ -513,6 +559,9 @@ export function createMotionController({
           revision: entry.revision,
           sequence: entry.sequence,
           durationMs: entry.durationMs,
+          reducedDurationMs: entry.reducedDurationMs,
+          effectiveDurationMs: entry.effectiveDurationMs,
+          timingMode: entry.timingMode,
           easing: entry.easing.name,
           frameActive: Boolean(entry.frameToken?.active),
           snapAttempted: entry.snapAttempted,
