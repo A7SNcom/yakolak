@@ -66,29 +66,58 @@ jobs:
 
           python - <<'PY'
           from pathlib import Path
+          import re
+
           p = Path('fastplay-003-final-v3.mjs')
           s = p.read_text()
 
-          old = "const ready = state.activeSeatId === seatId\n                  && !presentation?.movePresentationLock\n                  && (!presentation?.drag?.phase || presentation.drag.phase === 'idle')\n                  && (!presentation?.tap?.phase || presentation.tap.phase === 'idle');"
-          new = "const ready = state.activeSeatId === seatId\n                  && !presentation?.movePresentationLock;"
-          if old in s:
-              s = s.replace(old, new, 1)
-          elif new not in s:
-              raise SystemExit('physical readiness predicate missing old and desired forms')
+          readiness_old = re.compile(
+              r"const ready = state\.activeSeatId === seatId\s*"
+              r"&& !presentation\?\.movePresentationLock\s*"
+              r"&& \(!presentation\?\.drag\?\.phase \|\| presentation\.drag\.phase === 'idle'\)\s*"
+              r"&& \(!presentation\?\.tap\?\.phase \|\| presentation\.tap\.phase === 'idle'\);"
+          )
+          readiness_new = re.compile(
+              r"const ready = state\.activeSeatId === seatId\s*"
+              r"&& !presentation\?\.movePresentationLock;"
+          )
+          desired_readiness = "const ready = state.activeSeatId === seatId\n                  && !presentation?.movePresentationLock;"
+          if readiness_old.search(s):
+              s = readiness_old.sub(desired_readiness, s, count=1)
+          elif not readiness_new.search(s):
+              raise SystemExit('physical readiness predicate missing old and desired semantic forms')
 
-          old_wait = "await waitForRevisionOrRoundEnd(page, beforeRevision, { timeoutMs: 3_000, pollingMs: 25 });"
-          new_wait = "await waitForRevisionOrRoundEnd(page, beforeRevision, { timeoutMs: 23_000, pollingMs: 25 });"
-          if old_wait in s:
-              s = s.replace(old_wait, new_wait, 1)
-          elif new_wait not in s:
-              raise SystemExit('computer handoff timeout missing old and desired forms')
+          wait_old = re.compile(
+              r"await waitForRevisionOrRoundEnd\(page, beforeRevision, \{\s*timeoutMs:\s*3_000,\s*pollingMs:\s*25\s*\}\);"
+          )
+          wait_new = re.compile(
+              r"await waitForRevisionOrRoundEnd\(page, beforeRevision, \{\s*timeoutMs:\s*23_000,\s*pollingMs:\s*25\s*\}\);"
+          )
+          desired_wait = "await waitForRevisionOrRoundEnd(page, beforeRevision, { timeoutMs: 23_000, pollingMs: 25 });"
+          if wait_old.search(s):
+              s = wait_old.sub(desired_wait, s, count=1)
+          elif not wait_new.search(s):
+              raise SystemExit('computer handoff timeout missing old and desired semantic forms')
 
-          old_result = "    const visibleResult = await page.locator('#round-result').isVisible();\n    assert.equal(visibleResult, true, `round result not visible for round ${state.round}`);"
-          new_result = "    try {\n      await page.locator('#round-result').waitFor({ state: 'visible', timeout: 5_000 });\n    } catch (error) {\n      const ui = await page.evaluate(() => ({\n        bootState: document.documentElement.dataset.bootState,\n        scene: document.documentElement.dataset.fastplayScene,\n        roundResultHidden: document.querySelector('#round-result')?.hidden ?? null,\n        roundResultText: document.querySelector('#round-result')?.textContent || '',\n      }));\n      throw new Error(`round result did not become visible for round ${state.round}: ${JSON.stringify(ui)}`, { cause: error });\n    }"
-          if old_result in s:
-              s = s.replace(old_result, new_result, 1)
+          result_old = re.compile(
+              r"const visibleResult = await page\.locator\('#round-result'\)\.isVisible\(\);\s*"
+              r"assert\.equal\(visibleResult, true, `round result not visible for round \$\{state\.round\}`\);"
+          )
+          desired_result = """try {
+      await page.locator('#round-result').waitFor({ state: 'visible', timeout: 5_000 });
+    } catch (error) {
+      const ui = await page.evaluate(() => ({
+        bootState: document.documentElement.dataset.bootState,
+        scene: document.documentElement.dataset.fastplayScene,
+        roundResultHidden: document.querySelector('#round-result')?.hidden ?? null,
+        roundResultText: document.querySelector('#round-result')?.textContent || '',
+      }));
+      throw new Error(`round result did not become visible for round ${state.round}: ${JSON.stringify(ui)}`, { cause: error });
+    }"""
+          if result_old.search(s):
+              s = result_old.sub(desired_result, s, count=1)
           elif "waitFor({ state: 'visible', timeout: 5_000 })" not in s:
-              raise SystemExit('round result visibility missing old and desired forms')
+              raise SystemExit('round result visibility missing old and desired semantic forms')
 
           p.write_text(s)
           PY
