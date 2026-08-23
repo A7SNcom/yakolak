@@ -1,0 +1,125 @@
+name: FASTPLAY-002 Final Public Acceptance
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - '.github/workflows/fastplay-002-final-acceptance.yml'
+
+permissions:
+  contents: read
+  issues: write
+  statuses: write
+
+concurrency:
+  group: fastplay-002-final-public-acceptance
+  cancel-in-progress: false
+
+env:
+  FASTPLAY002_MILESTONE_SHA: 026c8dbb9c0f3ca51de624e1bcbbb14104a26054
+  FASTPLAY002_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+
+jobs:
+  accept:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Mark final acceptance pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${FASTPLAY002_MILESTONE_SHA}" \
+            -f state=pending \
+            -f context='FASTPLAY-002/final-public' \
+            -f description='Isolated final public acceptance running'
+
+      - name: Checkout current verifier history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify milestone is ancestor of checkout
+        shell: bash
+        run: git merge-base --is-ancestor "$FASTPLAY002_MILESTONE_SHA" HEAD
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify canonical local setup contract
+        run: node --test tests/fastplay002_local_match_config.test.mjs
+
+      - name: Install browser verifier
+        run: npm install --no-save --package-lock=false playwright@1.55.0
+
+      - name: Install matching Chromium
+        run: node node_modules/playwright/cli.js install --with-deps chromium
+
+      - name: Verify public setup
+        env:
+          FASTPLAY002_DIAG_STAGE: setup-start
+          FASTPLAY002_EXPECTED_CANDIDATE_SHA: ${{ env.FASTPLAY002_MILESTONE_SHA }}
+        run: node scripts/verify-fastplay002-stage.mjs 2>&1 | tee fastplay-002-final-setup.log
+
+      - name: Verify public selection
+        env:
+          FASTPLAY002_DIAG_STAGE: selection
+          FASTPLAY002_EXPECTED_CANDIDATE_SHA: ${{ env.FASTPLAY002_MILESTONE_SHA }}
+        run: node scripts/verify-fastplay002-stage.mjs 2>&1 | tee fastplay-002-final-selection.log
+
+      - name: Verify public first move
+        env:
+          FASTPLAY002_DIAG_STAGE: commit
+          FASTPLAY002_EXPECTED_CANDIDATE_SHA: ${{ env.FASTPLAY002_MILESTONE_SHA }}
+        run: node scripts/verify-fastplay002-stage.mjs 2>&1 | tee fastplay-002-final-move.log
+
+      - name: Verify full public local match
+        env:
+          FASTPLAY002_EXPECTED_CANDIDATE_SHA: ${{ env.FASTPLAY002_MILESTONE_SHA }}
+        run: node scripts/verify-fastplay002-live.mjs 2>&1 | tee fastplay-002-final-live.log
+
+      - name: Mark final acceptance success
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${FASTPLAY002_MILESTONE_SHA}" \
+            -f state=success \
+            -f context='FASTPLAY-002/final-public' \
+            -f description='Setup selection move and full public match passed'
+
+      - name: Publish final blocker
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title="FASTPLAY-002 final blocker ${FASTPLAY002_MILESTONE_SHA}"
+          body="$(mktemp)"
+          {
+            echo 'FASTPLAY-002 isolated final public acceptance failed.'
+            echo
+            echo "milestone_sha: ${FASTPLAY002_MILESTONE_SHA}"
+            echo "workflow_run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            for item in setup selection move live; do
+              file="fastplay-002-final-${item}.log"
+              echo
+              echo "### ${item}"
+              echo '```text'
+              if [ -s "$file" ]; then tail -n 120 "$file"; else echo '(step did not produce a log)'; fi
+              echo '```'
+            done
+          } > "$body"
+          existing="$(gh api "repos/${GITHUB_REPOSITORY}/issues?state=open&per_page=100" --jq ".[] | select(.title == \"${title}\") | .number" | head -n 1)"
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body-file "$body" >/dev/null
+          else
+            gh issue create --title "$title" --body-file "$body" >/dev/null
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${FASTPLAY002_MILESTONE_SHA}" \
+            -f state=failure \
+            -f context='FASTPLAY-002/final-public' \
+            -f description='Isolated final public acceptance failed'
