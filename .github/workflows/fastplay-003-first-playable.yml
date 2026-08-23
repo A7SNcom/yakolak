@@ -51,12 +51,6 @@ jobs:
 
           source = Path('scripts/verify-fastplay003-live.mjs').read_text()
 
-          launch_old = "const browser = await chromium.launch({ headless: true });"
-          launch_new = "const browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });"
-          if launch_old not in source:
-              raise SystemExit('FASTPLAY-003 Chromium launch signature changed')
-          source = source.replace(launch_old, launch_new, 1)
-
           timeout_start = source.index('async function allowRealTimeout(page) {')
           timeout_end = source.index('\nasync function verifyWebglRecovery', timeout_start)
           timeout_function = r'''async function allowRealTimeout(page) {
