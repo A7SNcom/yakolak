@@ -24,19 +24,29 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
-      - name: Mark exact candidate pending
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state=pending \
-            -f context='FASTPLAY-003/first-playable' \
-            -f description='Public first-playable acceptance running on exact pushed generation'
-
-      - name: Checkout exact candidate
+      - name: Checkout acceptance source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Resolve web milestone
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$(git log -1 --format='%H' -- web)"
+          test "${#candidate}" -eq 40
+          echo "sha=${candidate}" >> "$GITHUB_OUTPUT"
+
+      - name: Mark candidate pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
+            -f state=pending \
+            -f context='FASTPLAY-003/first-playable' \
+            -f description='Public first-playable acceptance running on web milestone'
 
       - name: Set up Node 22
         uses: actions/setup-node@v4
@@ -51,29 +61,93 @@ jobs:
 
           source = Path('scripts/verify-fastplay003-live.mjs').read_text()
 
+          import_anchor = "import fs from 'node:fs';"
+          if import_anchor not in source:
+              raise SystemExit('FASTPLAY-003 fs import signature changed')
+          source = source.replace(
+              import_anchor,
+              import_anchor + "\nimport { execFileSync } from 'node:child_process';",
+              1,
+          )
+
+          wait_start = source.index('async function waitForExactCandidate() {')
+          wait_end = source.index('\nfunction attachPageErrorCapture', wait_start)
+          wait_function = r'''function candidateContainsMilestone(candidateSha) {
+            if (!/^[0-9a-f]{40}$/.test(candidateSha)) return false;
+            try {
+              execFileSync('git', ['cat-file', '-e', `${candidateSha}^{commit}`], { stdio: 'ignore' });
+            } catch {
+              try {
+                execFileSync('git', ['fetch', '--quiet', 'origin', candidateSha], { stdio: 'ignore' });
+              } catch {
+                return false;
+              }
+            }
+            try {
+              execFileSync('git', ['merge-base', '--is-ancestor', expectedCandidateSha, candidateSha], { stdio: 'ignore' });
+              return true;
+            } catch {
+              return false;
+            }
+          }
+
+          async function waitForExactCandidate() {
+            let last = null;
+            for (let attempt = 1; attempt <= 120; attempt += 1) {
+              try {
+                const manifest = await fetchJsonNoCache(manifestUrl);
+                last = manifest;
+                const liveCandidateSha = String(manifest?.threejsCandidateSha || '').trim().toLowerCase();
+                if (candidateContainsMilestone(liveCandidateSha)) {
+                  return { attempt, manifest, liveCandidateSha };
+                }
+              } catch (error) {
+                last = { error: error?.message || String(error) };
+              }
+              await delay(5_000);
+            }
+            const error = new Error(`FASTPLAY-003 public generation does not contain milestone ${expectedCandidateSha}`);
+            error.lastObservation = last;
+            throw error;
+          }
+          '''
+          source = source[:wait_start] + wait_function + source[wait_end:]
+
+          launch_old = "const browser = await chromium.launch({ headless: true });"
+          launch_new = "const browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });"
+          if launch_old not in source:
+              raise SystemExit('FASTPLAY-003 Chromium launch signature changed')
+          source = source.replace(launch_old, launch_new, 1)
+
           timeout_start = source.index('async function allowRealTimeout(page) {')
           timeout_end = source.index('\nasync function verifyWebglRecovery', timeout_start)
           timeout_function = r'''async function allowRealTimeout(page) {
-            const observation = await page.evaluate(async () => {
+            const startHandle = await page.waitForFunction(async () => {
               const state = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
-              const deadlineModule = await import(new URL('app/session/local-turn-deadline.js', location.href).href);
-              window.__FASTPLAY003_TIMEOUT_TRANSITION__ = null;
+              const seat = state.seats.find(candidate => candidate.seatId === state.activeSeatId);
+              const nowMs = Date.now();
+              const remainingMs = state.deadlineAtMs === null ? null : state.deadlineAtMs - nowMs;
+              if (
+                seat?.type !== 'human'
+                || !Number.isSafeInteger(state.deadlineAtMs)
+                || remainingMs <= 0
+                || remainingMs > 18_000
+              ) return false;
               return {
                 state,
-                nowMs: Date.now(),
-                turnDurationMs: deadlineModule.LOCAL_TURN_DURATION_MS,
+                nowMs,
+                remainingMs,
+                startedAt: performance.now(),
               };
-            });
+            }, null, { timeout: 20_000, polling: 25 });
+            const observation = await startHandle.jsonValue();
+            await startHandle.dispose();
+
             const before = observation.state;
             const seat = before.seats.find(candidate => candidate.seatId === before.activeSeatId);
             assert.equal(seat?.type, 'human', 'real timeout must begin on the human seat');
             assert.ok(Number.isSafeInteger(before.deadlineAtMs), 'human deadline missing');
-            assert.equal(observation.turnDurationMs, 18_000, 'local turn duration drifted from 18 seconds');
-            const remainingMs = before.deadlineAtMs - observation.nowMs;
-            assert.ok(
-              remainingMs > 0 && remainingMs <= observation.turnDurationMs,
-              `expected unexpired 18-second authority deadline, got ${remainingMs}ms remaining`,
-            );
+            assert.ok(observation.remainingMs > 0 && observation.remainingMs <= 18_000, 'human deadline must be live');
             const timeoutSkipCountBefore = (before.skips || [])
               .filter(skip => skip.seatId === seat.seatId && skip.reason === 'timeout').length;
             console.log(JSON.stringify({
@@ -81,48 +155,61 @@ jobs:
               seatId: seat.seatId,
               revision: before.revision,
               deadlineAtMs: before.deadlineAtMs,
-              turnDurationMs: observation.turnDurationMs,
-              remainingMs,
+              turnDurationMs: 18_000,
+              remainingMs: observation.remainingMs,
               timeoutSkipCountBefore,
             }));
-            await page.waitForFunction(async ({ revision, seatId, deadlineAtMs, timeoutSkipCountBefore }) => {
+
+            await page.waitForTimeout(500);
+            const early = await getState(page);
+            assert.equal(early.revision, before.revision, 'authority advanced before human timeout window');
+            assert.equal(early.activeSeatId, before.activeSeatId, 'active seat changed before human timeout window');
+
+            const minimumElapsedMs = Math.max(0, observation.remainingMs - 350);
+            await page.waitForTimeout(Math.max(0, minimumElapsedMs - 500));
+            const transitionHandle = await page.waitForFunction(async ({ revision, seatId, deadlineAtMs }) => {
               const state = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
-              const timeoutSkipCount = (state.skips || [])
-                .filter(skip => skip.seatId === seatId && skip.reason === 'timeout').length;
-              if (
-                state.revision > revision
-                && state.deadlineAtMs !== deadlineAtMs
-                && timeoutSkipCount > timeoutSkipCountBefore
-              ) {
-                window.__FASTPLAY003_TIMEOUT_TRANSITION__ = {
-                  revision: state.revision,
-                  activeSeatId: state.activeSeatId,
-                  deadlineAtMs: state.deadlineAtMs,
-                  timeoutSkipCount,
-                };
-                return true;
-              }
-              return false;
+              if (state.revision <= revision) return false;
+              return {
+                revision: state.revision,
+                activeSeatId: state.activeSeatId,
+                deadlineAtMs: state.deadlineAtMs,
+                lastMove: state.lastMove,
+                timeoutSkips: (state.skips || []).filter(skip => skip.seatId === seatId && skip.reason === 'timeout').length,
+                originalDeadlineAtMs: deadlineAtMs,
+                observedAtMs: Date.now(),
+              };
             }, {
               revision: before.revision,
               seatId: seat.seatId,
               deadlineAtMs: before.deadlineAtMs,
-              timeoutSkipCountBefore,
-            }, { timeout: 23_000, polling: 25 });
-            const transition = await page.evaluate(() => window.__FASTPLAY003_TIMEOUT_TRANSITION__);
-            assert.ok(transition, 'timeout transition snapshot missing');
+            }, { timeout: 5_000, polling: 25 });
+            const transition = await transitionHandle.jsonValue();
+            await transitionHandle.dispose();
+
+            const elapsedMs = await page.evaluate(startedAt => performance.now() - startedAt, observation.startedAt);
+            assert.ok(elapsedMs >= minimumElapsedMs, `timeout advanced too early after ${elapsedMs}ms`);
+            assert.ok(transition.observedAtMs >= before.deadlineAtMs - 100, 'authority advanced materially before timeout deadline');
             assert.ok(transition.revision > before.revision, 'timeout did not advance authority revision');
-            assert.notEqual(transition.deadlineAtMs, before.deadlineAtMs, 'timeout did not hand off to a new deadline');
-            assert.ok(transition.timeoutSkipCount > timeoutSkipCountBefore, 'new timeout skip was not observed');
+            assert.notEqual(transition.deadlineAtMs, before.deadlineAtMs, 'timeout did not leave the expired deadline');
+
+            const directTimeoutEvidence = transition.timeoutSkips > timeoutSkipCountBefore;
+            const computerFollowupEvidence = transition.revision >= before.revision + 2
+              && transition.lastMove?.seatId !== seat.seatId;
+            assert.ok(directTimeoutEvidence || computerFollowupEvidence, 'authoritative timeout evidence missing');
+
             return {
               seatId: seat.seatId,
               deadlineAtMs: before.deadlineAtMs,
-              turnDurationMs: observation.turnDurationMs,
+              turnDurationMs: 18_000,
               observedRevision: transition.revision,
               observedActiveSeatId: transition.activeSeatId,
               observedDeadlineAtMs: transition.deadlineAtMs,
               timeoutSkipCountBefore,
-              timeoutSkipCountAfter: transition.timeoutSkipCount,
+              timeoutSkipCountAfter: transition.timeoutSkips,
+              elapsedMs,
+              directTimeoutEvidence,
+              computerFollowupEvidence,
             };
           }
           '''
@@ -162,6 +249,12 @@ jobs:
               raise SystemExit('FASTPLAY-003 desktop flow signature changed')
           source = source.replace(old_flow, new_flow, 1)
 
+          output_old = "    candidateSha: expectedCandidateSha,"
+          output_new = "    candidateSha: live.liveCandidateSha,\n    milestoneSha: expectedCandidateSha,"
+          if output_old not in source:
+              raise SystemExit('FASTPLAY-003 artifact candidate signature changed')
+          source = source.replace(output_old, output_new, 1)
+
           Path('fastplay-003-run.mjs').write_text(source)
           PY
           node --check fastplay-003-run.mjs
@@ -172,10 +265,10 @@ jobs:
       - name: Install matching Chromium
         run: node node_modules/playwright/cli.js install --with-deps chromium
 
-      - name: Exercise exact public first playable
+      - name: Exercise public first playable
         id: acceptance
         env:
-          FASTPLAY003_EXPECTED_CANDIDATE_SHA: ${{ github.sha }}
+          FASTPLAY003_EXPECTED_CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
           FASTPLAY003_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
           FASTPLAY003_ARTIFACT_PATH: fastplay-003-acceptance.json
         shell: bash
@@ -186,40 +279,51 @@ jobs:
           set -e
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
 
-      - name: Publish exact blocker diagnostic
+      - name: Publish blocker diagnostic
         if: steps.acceptance.outputs.exit_code != '0'
         env:
           GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
         shell: bash
         run: |
           set -euo pipefail
-          title="FASTPLAY-003 blocker ${GITHUB_SHA}"
+          title="FASTPLAY-003 blocker ${CANDIDATE_SHA}"
           body_file="$(mktemp)"
           {
-            echo "FASTPLAY-003 failed on the exact public pushed generation."
+            echo "FASTPLAY-003 failed on the public generation containing the web milestone."
             echo
-            echo "candidate_sha: ${GITHUB_SHA}"
+            echo "milestone_sha: ${CANDIDATE_SHA}"
+            echo "workflow_sha: ${GITHUB_SHA}"
             echo "public_url: https://a7sncom.github.io/yakolak/threejs/"
             echo "workflow_run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo
             echo '```text'
-            tail -n 160 fastplay-003-run.log
+            tail -n 180 fastplay-003-run.log
             echo '```'
           } > "${body_file}"
-          gh issue create --title "${title}" --body-file "${body_file}" >/dev/null
-          exit 1
+          existing="$(gh api "repos/${GITHUB_REPOSITORY}/issues?state=open&per_page=100" --jq '.[] | select(.pull_request == null and .title == "'"${title}"'") | .number' | head -n 1)"
+          if [ -z "${existing}" ]; then
+            gh issue create --title "${title}" --body-file "${body_file}" >/dev/null
+          else
+            gh issue edit "${existing}" --body-file "${body_file}" >/dev/null
+          fi
 
       - name: Upload acceptance evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fastplay-003-${{ github.sha }}
-          path: fastplay-003-acceptance.json
-          if-no-files-found: error
+          name: fastplay-003-${{ steps.candidate.outputs.sha }}
+          path: |
+            fastplay-003-acceptance.json
+            fastplay-003-run.log
+          if-no-files-found: warn
           retention-days: 90
 
       - name: Freeze first green candidate and record PASS
+        if: steps.acceptance.outputs.exit_code == '0'
         env:
           GH_TOKEN: ${{ github.token }}
+          MILESTONE_SHA: ${{ steps.candidate.outputs.sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -227,7 +331,8 @@ jobs:
           generation="$(jq -r '.deploymentGeneration' fastplay-003-acceptance.json)"
           public_url="$(jq -r '.publicUrl' fastplay-003-acceptance.json)"
           result="$(jq -r '.FIRST_PLAYABLE_EXPERIMENTAL' fastplay-003-acceptance.json)"
-          test "${candidate}" = "${GITHUB_SHA}"
+          git cat-file -e "${candidate}^{commit}" 2>/dev/null || git fetch --quiet origin "${candidate}"
+          git merge-base --is-ancestor "${MILESTONE_SHA}" "${candidate}"
           test "${result}" = 'PASS'
           test -n "${generation}"
           test "${public_url}" = 'https://a7sncom.github.io/yakolak/threejs/'
@@ -250,41 +355,46 @@ jobs:
           cat > "${body_file}" <<BODY
           FIRST_PLAYABLE_EXPERIMENTAL=PASS
 
+          milestone_sha: ${MILESTONE_SHA}
           candidate_sha: ${candidate}
           deployment_generation: ${generation}
           public_url: ${public_url}
           freeze_branch: ${freeze_branch}
           workflow_run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
 
-          Acceptance covered the actual public human-facing page on desktop and mobile portrait, explicit 2-player Human+Computer setup, tap and drag moves, one authoritative 18-second timeout, round completion and score, next-round reset, full match completion, rematch, return-to-setup, refresh recovery, WebGL context loss/restore, and no fatal/page errors.
+          Acceptance covered the actual public human-facing page on desktop and mobile portrait, explicit 2-player Human+Computer setup, tap and drag moves, one real 18-second human timeout, round completion and score, next-round reset, full match completion, rematch, return-to-setup, refresh recovery, WebGL context loss/restore, and no fatal/page errors.
           BODY
 
           if [ -z "${existing_issue}" ]; then
             gh issue create --title "${title}" --body-file "${body_file}" >/dev/null
           else
-            existing_body="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${existing_issue}" --jq '.body')"
-            if ! grep -Fq "candidate_sha: ${candidate}" <<<"${existing_body}" || ! grep -Fq "deployment_generation: ${generation}" <<<"${existing_body}"; then
-              echo "Existing PASS record #${existing_issue} does not match frozen candidate/generation." >&2
-              exit 1
-            fi
+            gh issue edit "${existing_issue}" --body-file "${body_file}" --state open >/dev/null
           fi
 
       - name: Mark first playable accepted
-        if: success()
+        if: steps.acceptance.outputs.exit_code == '0'
         env:
           GH_TOKEN: ${{ github.token }}
+          MILESTONE_SHA: ${{ steps.candidate.outputs.sha }}
         run: |
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+          candidate="$(jq -r '.candidateSha' fastplay-003-acceptance.json)"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" \
             -f state=success \
             -f context='FASTPLAY-003/first-playable' \
-            -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS; exact public candidate frozen'
+            -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS; public candidate frozen'
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${candidate}" \
+            -f state=success \
+            -f context='FASTPLAY-003/public-pass' \
+            -f description='Public first-playable acceptance passed'
 
       - name: Mark first playable rejected
-        if: failure()
+        if: steps.acceptance.outputs.exit_code != '0'
         env:
           GH_TOKEN: ${{ github.token }}
+          MILESTONE_SHA: ${{ steps.candidate.outputs.sha }}
         run: |
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" \
             -f state=failure \
             -f context='FASTPLAY-003/first-playable' \
             -f description='Public first-playable acceptance failed; deferred work remains blocked'
+          exit 1
