@@ -156,7 +156,7 @@ try {
   await page.waitForFunction(() => document.documentElement.dataset.bootState === 'setup-ready', null, { timeout: 60_000 });
 
   assert.equal(await page.locator('#local-setup').isVisible(), true);
-  assert.equal(await page.locator('#app').getAttribute('data-fastplay-milestone'), 'FASTPLAY-002');
+  assert.equal(await page.locator('#app').getAttribute('data-fastplay-local-flow'), 'FASTPLAY-002');
   await page.locator('#local-seat-count').selectOption('4');
   const fourSeats = await page.evaluate(() => [...document.querySelectorAll('#local-seat-options .seat-option')].map(row => ({
     seatId: row.dataset.seatId,
