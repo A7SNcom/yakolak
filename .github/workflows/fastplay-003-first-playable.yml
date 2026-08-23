@@ -63,6 +63,94 @@ jobs:
       - name: Install matching Chromium
         run: node node_modules/playwright/cli.js install --with-deps chromium
 
+      - name: Capture exact public boot diagnostics
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE' 2>&1 | tee fastplay-003-boot.log
+          import { chromium } from 'playwright';
+          const expected = process.env.EXPECTED_SHA.toLowerCase();
+          const base = new URL(process.env.BASE_URL);
+          const manifestUrl = new URL('../deployment-manifest.json', base);
+          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+          let manifest = null;
+          for (let i = 0; i < 96; i += 1) {
+            try {
+              const url = new URL(manifestUrl);
+              url.searchParams.set('fastplay003-boot', `${Date.now()}-${i}`);
+              const response = await fetch(url, { headers: { 'Cache-Control': 'no-cache, max-age=0', Pragma: 'no-cache' } });
+              manifest = response.ok ? await response.json() : { http: response.status };
+              if (String(manifest?.threejsCandidateSha || '').toLowerCase() === expected) break;
+            } catch (error) {
+              manifest = { error: error?.message || String(error) };
+            }
+            await sleep(5_000);
+          }
+          if (String(manifest?.threejsCandidateSha || '').toLowerCase() !== expected) {
+            console.log(JSON.stringify({ stage: 'manifest-not-exact', expected, manifest }, null, 2));
+            process.exit(0);
+          }
+
+          const browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+          const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+          const page = await context.newPage();
+          const consoleMessages = [];
+          const pageErrors = [];
+          const requestFailures = [];
+          const httpFailures = [];
+          page.on('console', message => {
+            if (['warning', 'error'].includes(message.type())) consoleMessages.push(`${message.type()}: ${message.text()}`);
+          });
+          page.on('pageerror', error => pageErrors.push(error?.stack || error?.message || String(error)));
+          page.on('requestfailed', request => requestFailures.push(`${request.method()} ${request.url()} :: ${request.failure()?.errorText || 'failed'}`));
+          page.on('response', response => {
+            if (response.status() >= 400) httpFailures.push(`${response.status()} ${response.url()}`);
+          });
+          const target = new URL(base);
+          target.searchParams.set('fastplay003-bootdiag', Date.now());
+          await page.goto(target.href, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+          await page.waitForTimeout(15_000);
+          const diagnostic = await page.evaluate(() => {
+            const root = document.documentElement;
+            const loading = window.__YAKOLAK_ASSET_LOADING__;
+            const safeProgress = group => {
+              try { return loading?.getProgress?.(group) || null; } catch (error) { return { error: error?.message || String(error) }; }
+            };
+            return {
+              bootState: root.dataset.bootState || null,
+              runtime: root.dataset.runtime || null,
+              requiredAssets: root.dataset.requiredAssets || null,
+              bootCriticalState: root.dataset.assetBootCritical || null,
+              sceneCriticalState: root.dataset.assetSceneCritical || null,
+              graphicsState: root.dataset.graphicsState || null,
+              statusText: document.querySelector('#boot-status')?.textContent || null,
+              assetErrorVisible: Boolean(document.querySelector('#asset-load-error:not([hidden])')),
+              assetErrorMessage: document.querySelector('#asset-load-error-message')?.textContent || null,
+              unsupportedVisible: Boolean(document.querySelector('#unsupported-webgl:not([hidden])')),
+              recoveryVisible: Boolean(document.querySelector('#graphics-recovery:not([hidden])')),
+              shellExposed: Boolean(window.__YAKOLAK_THREEJS_SHELL__),
+              loadingDiagnosticsExposed: Boolean(loading),
+              bootProgress: safeProgress('boot-critical'),
+              sceneProgress: safeProgress('scene-critical'),
+              overallProgress: safeProgress(null),
+            };
+          });
+          console.log(JSON.stringify({
+            stage: 'public-boot-diagnostic',
+            expected,
+            deploymentGeneration: manifest.deploymentGeneration,
+            diagnostic,
+            consoleMessages: consoleMessages.slice(-30),
+            pageErrors: pageErrors.slice(-20),
+            requestFailures: requestFailures.slice(-30),
+            httpFailures: httpFailures.slice(-30),
+          }, null, 2));
+          await context.close();
+          await browser.close();
+          NODE
+
       - name: Exercise exact public first playable
         id: acceptance
         env:
@@ -93,6 +181,12 @@ jobs:
             echo "public_url: https://a7sncom.github.io/yakolak/threejs/"
             echo "workflow_run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo
+            echo '### Public boot diagnostic'
+            echo '```text'
+            tail -n 140 fastplay-003-boot.log
+            echo '```'
+            echo
+            echo '### Acceptance failure'
             echo '```text'
             tail -n 80 fastplay-003-run.log
             echo '```'
