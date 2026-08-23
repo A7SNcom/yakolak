@@ -54,11 +54,13 @@ async function waitForPlayableCandidate() {
 async function startDefaultLocalMatch(page) {
   await page.waitForFunction(() => ['setup-ready', 'ready'].includes(document.documentElement.dataset.bootState), null, { timeout: 60_000 });
   const state = await page.evaluate(() => document.documentElement.dataset.bootState);
-  if (state === 'setup-ready') {
-    await page.locator('#local-start').click();
-  }
+  if (state === 'setup-ready') await page.locator('#local-start').click();
   await page.waitForFunction(() => document.documentElement.dataset.bootState === 'ready', null, { timeout: 60_000 });
   await page.waitForFunction(() => Boolean(window.__YAKOLAK_THREEJS_SHELL__?.getCanonicalState?.()), null, { timeout: 60_000 });
+  await page.waitForFunction(() => {
+    const frame = window.__YAKOLAK_THREEJS_SHELL__?.getPresentationSnapshot?.()?.frame;
+    return Boolean(frame?.frameCount > 0 && frame?.viewport?.width > 0 && frame?.viewport?.height > 0);
+  }, null, { timeout: 60_000 });
 }
 
 async function projectedTargets(page) {
@@ -69,17 +71,23 @@ async function projectedTargets(page) {
     const worldLayout = shell.getAsset('data.world-layout');
     const activeSeat = state.seats.find(seat => seat.seatId === state.activeSeatId);
     if (!activeSeat) throw new Error('FASTPLAY-001 active seat missing');
-    const piece = snapshot.pieces.placements.find(candidate =>
+
+    const homePieces = snapshot.pieces.placements.filter(candidate =>
       candidate.colorId === activeSeat.color && candidate.destination?.kind === 'home');
-    if (!piece) throw new Error('FASTPLAY-001 active human home piece missing');
+    if (!homePieces.length) throw new Error('FASTPLAY-001 active human home pieces missing');
     const zone = worldLayout.zones.find(candidate => candidate.id === 0);
     if (!zone) throw new Error('FASTPLAY-001 board cell 0 missing');
 
-    const THREE = await import(new URL('vendor/three/r185/three.module.js', location.href).href);
+    const [THREE, cameraModule] = await Promise.all([
+      import(new URL('vendor/three/r185/three.module.js', location.href).href),
+      import(new URL('app/camera/frame-governor.js', location.href).href),
+    ]);
     const rect = shell.canvas.getBoundingClientRect();
     const cameraSpec = worldLayout.cameras[snapshot.cameraId];
     if (!cameraSpec) throw new Error(`FASTPLAY-001 camera spec missing: ${snapshot.cameraId}`);
-    const camera = new THREE.PerspectiveCamera(cameraSpec.fov, rect.width / rect.height, 0.1, 8000);
+    const aspect = rect.width / rect.height;
+    const fittedFov = cameraModule.refitPerspectiveFov({ baseFov: cameraSpec.fov, aspect });
+    const camera = new THREE.PerspectiveCamera(fittedFov, aspect, 0.1, 8000);
     camera.position.fromArray(cameraSpec.position);
     camera.lookAt(new THREE.Vector3(...cameraSpec.target));
     camera.updateProjectionMatrix();
@@ -93,14 +101,26 @@ async function projectedTargets(page) {
       };
     }
 
+    const seenCenters = new Set();
+    const pieceTargets = [];
+    for (const piece of homePieces) {
+      const center = piece.destination.center;
+      const key = center.join(',');
+      if (seenCenters.has(key)) continue;
+      seenCenters.add(key);
+      pieceTargets.push(project(center));
+    }
+
     return {
       activeSeatId: activeSeat.seatId,
       activeColor: activeSeat.color,
       initialRevision: state.revision,
-      piece: project(piece.destination.center),
+      pieces: pieceTargets,
       board: project(zone.position),
       cameraId: snapshot.cameraId,
+      fittedFov,
       pieceCount: snapshot.pieces.counts.total,
+      frameCount: snapshot.frame.frameCount,
       canvas: { width: rect.width, height: rect.height },
     };
   });
@@ -135,18 +155,24 @@ async function assertMoveCommitted(page, initial) {
   });
 }
 
-async function clickPieceUntilSelected(page, point) {
+async function clickPieceUntilSelected(page, points) {
   const offsets = [
-    [0, 0], [12, 0], [-12, 0], [0, 12], [0, -12],
-    [20, 10], [-20, 10], [20, -10], [-20, -10],
+    [0, 0], [10, 0], [-10, 0], [0, 10], [0, -10],
+    [18, 8], [-18, 8], [18, -8], [-18, -8],
   ];
-  for (const [dx, dy] of offsets) {
-    await page.mouse.click(point.x + dx, point.y + dy);
-    const selected = await page.evaluate(() => window.__YAKOLAK_THREEJS_SHELL__.getPresentationSnapshot()?.tap?.phase === 'selected');
-    if (selected) return { x: point.x + dx, y: point.y + dy };
-    await page.waitForTimeout(80);
+  for (const point of points) {
+    for (const [dx, dy] of offsets) {
+      await page.mouse.click(point.x + dx, point.y + dy);
+      const selected = await page.evaluate(() => window.__YAKOLAK_THREEJS_SHELL__.getPresentationSnapshot()?.tap?.phase === 'selected');
+      if (selected) return { x: point.x + dx, y: point.y + dy };
+      await page.waitForTimeout(80);
+    }
   }
-  throw new Error('FASTPLAY-001 desktop could not select a visible home piece');
+  const diagnostic = await page.evaluate(() => {
+    const shell = window.__YAKOLAK_THREEJS_SHELL__;
+    return { pointer: shell.getPresentationSnapshot()?.pointer, tap: shell.getPresentationSnapshot()?.tap };
+  });
+  throw new Error(`FASTPLAY-001 desktop could not select a visible home piece: ${JSON.stringify(diagnostic)}`);
 }
 
 async function dragPieceUntilCommitted(page, targets) {
@@ -154,35 +180,41 @@ async function dragPieceUntilCommitted(page, targets) {
     [0, 0], [10, 0], [-10, 0], [0, 10], [0, -10],
     [18, 8], [-18, 8], [18, -8], [-18, -8],
   ];
-  for (const [dx, dy] of offsets) {
-    if (await moveIsCommitted(page, targets)) return { x: targets.piece.x + dx, y: targets.piece.y + dy };
-    const from = { x: targets.piece.x + dx, y: targets.piece.y + dy };
-    const to = targets.board;
-    await page.evaluate(({ from, to }) => {
-      const canvas = window.__YAKOLAK_THREEJS_SHELL__.canvas;
-      const pointerId = 41;
-      const emit = (type, x, y, buttons) => canvas.dispatchEvent(new PointerEvent(type, {
-        bubbles: true,
-        cancelable: true,
-        pointerId,
-        pointerType: 'touch',
-        isPrimary: true,
-        button: 0,
-        buttons,
-        clientX: x,
-        clientY: y,
-      }));
-      emit('pointerdown', from.x, from.y, 1);
-      for (let step = 1; step <= 8; step += 1) {
-        const t = step / 8;
-        emit('pointermove', from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t, 1);
-      }
-      emit('pointerup', to.x, to.y, 0);
-    }, { from, to });
-    await page.waitForTimeout(250);
-    if (await moveIsCommitted(page, targets)) return from;
+  for (const point of targets.pieces) {
+    for (const [dx, dy] of offsets) {
+      if (await moveIsCommitted(page, targets)) return { x: point.x + dx, y: point.y + dy };
+      const from = { x: point.x + dx, y: point.y + dy };
+      const to = targets.board;
+      await page.evaluate(({ from, to }) => {
+        const canvas = window.__YAKOLAK_THREEJS_SHELL__.canvas;
+        const pointerId = 41;
+        const emit = (type, x, y, buttons) => canvas.dispatchEvent(new PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          pointerId,
+          pointerType: 'touch',
+          isPrimary: true,
+          button: 0,
+          buttons,
+          clientX: x,
+          clientY: y,
+        }));
+        emit('pointerdown', from.x, from.y, 1);
+        for (let step = 1; step <= 8; step += 1) {
+          const t = step / 8;
+          emit('pointermove', from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t, 1);
+        }
+        emit('pointerup', to.x, to.y, 0);
+      }, { from, to });
+      await page.waitForTimeout(250);
+      if (await moveIsCommitted(page, targets)) return from;
+    }
   }
-  throw new Error('FASTPLAY-001 mobile drag did not commit a legal move');
+  const diagnostic = await page.evaluate(() => {
+    const snapshot = window.__YAKOLAK_THREEJS_SHELL__.getPresentationSnapshot();
+    return { pointer: snapshot?.pointer, tap: snapshot?.tap, drag: snapshot?.drag };
+  });
+  throw new Error(`FASTPLAY-001 mobile drag did not commit a legal move: ${JSON.stringify(diagnostic)}`);
 }
 
 async function verifyPageHealth(page, errors) {
@@ -221,7 +253,7 @@ async function runDesktopClick(browser) {
     await startDefaultLocalMatch(page);
     const targets = await projectedTargets(page);
     assert.equal(targets.pieceCount, 36);
-    const selectedAt = await clickPieceUntilSelected(page, targets.piece);
+    const selectedAt = await clickPieceUntilSelected(page, targets.pieces);
     await page.mouse.click(targets.board.x, targets.board.y);
     const move = await assertMoveCommitted(page, targets);
     const health = await verifyPageHealth(page, errors);
