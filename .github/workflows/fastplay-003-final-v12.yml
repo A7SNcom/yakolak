@@ -1,0 +1,269 @@
+name: FASTPLAY-003 Final Public Acceptance v12
+
+on:
+  push:
+    branches: [threejs-rebuild]
+    paths: ['.github/workflows/fastplay-003-final-v12.yml']
+
+permissions:
+  contents: read
+  issues: write
+  statuses: write
+
+concurrency:
+  group: fastplay-003-final-v12
+  cancel-in-progress: true
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+
+      - id: candidate
+        shell: bash
+        run: echo "sha=$(git log -1 --format='%H' -- web)" >> "$GITHUB_OUTPUT"
+
+      - name: Mark pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+        shell: bash
+        run: |
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
+            -f state=pending \
+            -f context='FASTPLAY-003/final-public' \
+            -f description='v12 canonical physical-commit acceptance running' \
+            -f target_url="$run_url"
+
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+
+      - name: Install Chromium
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          node node_modules/playwright/cli.js install --with-deps chromium
+
+      - name: Build v12 verifier from current v10
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+          workflow = Path('.github/workflows/fastplay-003-final-v10.yml').read_text()
+          a = workflow.index('      - name: Build verifier\n')
+          b = workflow.index('      - name: Exercise full public first playable\n', a)
+          block = workflow[a:b]
+          r = block.index('        run: |\n') + len('        run: |\n')
+          Path('/tmp/build-v10.sh').write_text(textwrap.dedent(block[r:]))
+          PY
+          bash /tmp/build-v10.sh
+
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('fastplay-003-final-v3.mjs')
+          source = path.read_text()
+
+          a = source.index('async function waitHumanMoveCommitted(page, beforeRevision, move) {')
+          b = source.index('\nasync function tapMove', a)
+          wait_commit = r'''async function waitHumanMoveCommitted(page, beforeRevision, move, { timeoutMs = 12_000, pollingMs = 25 } = {}) {
+            const startedAt = Date.now();
+            let lastState = null;
+            while (Date.now() - startedAt < timeoutMs) {
+              lastState = await getState(page);
+              if (
+                lastState.revision > beforeRevision
+                && lastState.lastMove?.seatId === move.seatId
+                && lastState.lastMove?.cell === move.cell
+                && lastState.lastMove?.size === move.size
+              ) return lastState;
+              await page.waitForTimeout(pollingMs);
+            }
+            throw new Error(`human move did not commit canonically after revision ${beforeRevision}: ${JSON.stringify({ move, lastState })}`);
+          }
+          '''
+          source = source[:a] + wait_commit + source[b:]
+
+          a = source.index("async function dragMove(page, move, { pointerType = 'mouse' } = {}) {")
+          b = source.index('\nasync function waitForHumanOrRoundEnd', a)
+          drag = r'''async function dragMove(page, move, { pointerType = 'mouse' } = {}) {
+            const readiness = await waitForPhysicalInputReady(page, move.seatId);
+            if (readiness.roundEndRevision !== null || readiness.matchComplete) {
+              return { gesture: 'drag', move, ended: true, revision: readiness.revision, pointerType };
+            }
+            const before = await getState(page);
+            const targets = await projectMove(page, move);
+            const offsets = [[0,0],[10,0],[-10,0],[0,10],[0,-10],[18,8],[-18,8],[18,-8],[-18,-8]];
+            let lastFailure = null;
+            for (const [dx, dy] of offsets) {
+              const from = { x: targets.piece.x + dx, y: targets.piece.y + dy };
+              const to = targets.board;
+              await page.evaluate(({ from, to, pointerType }) => {
+                const canvas = window.__YAKOLAK_THREEJS_SHELL__.canvas;
+                const pointerId = pointerType === 'touch' ? 63 : 62;
+                const emit = (type, x, y, buttons) => canvas.dispatchEvent(new PointerEvent(type, {
+                  bubbles: true,
+                  cancelable: true,
+                  pointerId,
+                  pointerType,
+                  isPrimary: true,
+                  button: 0,
+                  buttons,
+                  clientX: x,
+                  clientY: y,
+                }));
+                emit('pointerdown', from.x, from.y, 1);
+                for (let step = 1; step <= 10; step += 1) {
+                  const t = step / 10;
+                  emit('pointermove', from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t, 1);
+                }
+                emit('pointerup', to.x, to.y, 0);
+              }, { from, to, pointerType });
+              try {
+                const committed = await waitHumanMoveCommitted(page, before.revision, move, { timeoutMs: 1_500, pollingMs: 25 });
+                return { gesture: 'drag', move, from, target: to, revision: committed.revision, pointerType };
+              } catch (error) {
+                lastFailure = error;
+                await page.waitForTimeout(100);
+              }
+            }
+            const diagnostic = await page.evaluate(async () => {
+              const shell = window.__YAKOLAK_THREEJS_SHELL__;
+              return {
+                state: await shell.getCanonicalState(),
+                presentation: shell.getPresentationSnapshot(),
+              };
+            });
+            throw new Error(`could not commit ${move.size} move by ${pointerType} drag: ${JSON.stringify(diagnostic)}`, { cause: lastFailure });
+          }
+          '''
+          source = source[:a] + drag + source[b:]
+
+          a = source.index('async function waitForHumanOrRoundEnd(page, humanSeatId, { timeout = 15_000 } = {}) {')
+          b = source.index('\nasync function allowRealTimeout', a)
+          wait_human = r'''async function waitForHumanOrRoundEnd(page, humanSeatId, { timeout = 15_000 } = {}) {
+            const startedAt = Date.now();
+            let lastState = null;
+            while (Date.now() - startedAt < timeout) {
+              lastState = await getState(page);
+              if (lastState.roundEndRevision !== null || lastState.matchComplete || lastState.activeSeatId === humanSeatId) return lastState;
+              await page.waitForTimeout(25);
+            }
+            throw new Error(`human turn did not return within ${timeout}ms: ${JSON.stringify(lastState)}`);
+          }
+          '''
+          source = source[:a] + wait_human + source[b:]
+
+          a = source.index('async function waitForPhysicalInputReady(page, seatId) {')
+          b = source.index('\n\n', a)
+          # locate the end robustly by the following helper consumer, not the first blank line
+          b = source.index('\n          async function tapMove', a) if '\n          async function tapMove' in source[a:] else source.index('\nasync function tapMove', a)
+          readiness = r'''async function waitForPhysicalInputReady(page, seatId) {
+            const startedAt = Date.now();
+            let lastObservation = null;
+            while (Date.now() - startedAt < 5_000) {
+              lastObservation = await page.evaluate(async seatId => {
+                const shell = window.__YAKOLAK_THREEJS_SHELL__;
+                const state = await shell.getCanonicalState();
+                const presentation = shell.getPresentationSnapshot();
+                const ready = state.activeSeatId === seatId
+                  && !presentation?.movePresentationLock
+                  && (!presentation?.drag?.phase || presentation.drag.phase === 'idle')
+                  && (!presentation?.tap?.phase || presentation.tap.phase === 'idle');
+                return {
+                  state,
+                  ready,
+                  movePresentationLock: presentation?.movePresentationLock || null,
+                  tap: presentation?.tap || null,
+                  drag: presentation?.drag || null,
+                  acceptedTravel: presentation?.acceptedTravel || null,
+                  motion: presentation?.motion || null,
+                };
+              }, seatId);
+              if (lastObservation.state.roundEndRevision !== null || lastObservation.state.matchComplete || lastObservation.ready) {
+                return lastObservation.state;
+              }
+              await page.waitForTimeout(25);
+            }
+            throw new Error(`physical input did not become ready for ${seatId}: ${JSON.stringify(lastObservation)}`);
+          }
+          '''
+          source = source[:a] + readiness + source[b:]
+
+          path.write_text(source)
+          PY
+
+          node --check fastplay-003-final-v3.mjs
+          grep -Fq 'human move did not commit canonically' fastplay-003-final-v3.mjs
+          grep -Fq 'could not commit ${move.size} move by ${pointerType} drag:' fastplay-003-final-v3.mjs
+          grep -Fq 'human turn did not return within' fastplay-003-final-v3.mjs
+          grep -Fq 'movePresentationLock: presentation?.movePresentationLock' fastplay-003-final-v3.mjs
+          grep -Fq 'WebGL recovery must run at a stable round boundary' fastplay-003-final-v3.mjs
+          grep -Fq "stage: 'real-timeout-pass'" fastplay-003-final-v3.mjs
+
+      - name: Exercise full public first playable
+        env:
+          FASTPLAY003_EXPECTED_CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+          FASTPLAY003_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+          FASTPLAY003_ARTIFACT_PATH: fastplay-003-acceptance.json
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout --signal=TERM 12m node fastplay-003-final-v3.mjs 2>&1 | tee fastplay-003-final-v12.log
+
+      - name: Mark success
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MILESTONE_SHA: ${{ steps.candidate.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$(jq -r '.candidateSha' fastplay-003-acceptance.json)"
+          generation="$(jq -r '.deploymentGeneration' fastplay-003-acceptance.json)"
+          test "$(jq -r '.FIRST_PLAYABLE_EXPERIMENTAL' fastplay-003-acceptance.json)" = PASS
+          test -n "$candidate"
+          test -n "$generation"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" -f state=success -f context='FASTPLAY-003/final-public' -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS' -f target_url="$run_url"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" -f state=success -f context='FASTPLAY-003/first-playable' -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS' -f target_url="$run_url"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${candidate}" -f state=success -f context='FASTPLAY-003/public-pass' -f description="PASS generation ${generation}" -f target_url="$run_url"
+
+      - name: Upload evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastplay-003-v12-${{ steps.candidate.outputs.sha }}
+          path: fastplay-003-acceptance.json
+          retention-days: 90
+
+      - name: Publish failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MILESTONE_SHA: ${{ steps.candidate.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" -f state=failure -f context='FASTPLAY-003/final-public' -f description='v12 acceptance failed' -f target_url="$run_url"
+          title="FASTPLAY-003 final-v12 blocker ${MILESTONE_SHA}"
+          body="$(mktemp)"
+          {
+            echo 'FASTPLAY-003 final-v12 failed.'
+            echo
+            echo "workflow_run: ${run_url}"
+            echo '```text'
+            tail -n 240 fastplay-003-final-v12.log 2>/dev/null || echo '(verifier log unavailable)'
+            echo '```'
+          } > "$body"
+          existing="$(gh api "repos/${GITHUB_REPOSITORY}/issues?state=open&per_page=100" --jq ".[] | select(.title == \"${title}\") | .number" | head -n 1)"
+          if [ -z "$existing" ]; then
+            gh issue create --title "$title" --body-file "$body" >/dev/null
+          else
+            gh issue edit "$existing" --body-file "$body" >/dev/null
+          fi
