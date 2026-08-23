@@ -1,0 +1,51 @@
+{
+  "schema": "yakolak.threejs061-live-local-acceptance/v1",
+  "status": "failed",
+  "liveUrl": "https://a7sncom.github.io/yakolak/threejs/",
+  "expectedCandidateSha": "50e8aad5640c9f262f679a1aa404c2eec3b18674",
+  "startedAt": "2026-08-23T11:45:18.239Z",
+  "manifest": {
+    "pollAttempt": 1,
+    "schemaVersion": 1,
+    "generationSchema": "pages-deployment-generation-v1",
+    "deploymentGeneration": "sha256:27a39804b0afe8b3c720d4523c8acfc01baef782303e0155c3888767392fced2",
+    "godotRootSha": "f6e94859095cec0a80e71321265e98a9ea68b347",
+    "threejsCandidateSha": "50e8aad5640c9f262f679a1aa404c2eec3b18674",
+    "publicRuntimeProtocolSha256": "213a0e202d23f176e961ef23a729924a1aaaebfbb1cf963123bf167e51d72fdd",
+    "protocolVersion": "1",
+    "contentIdentityAlgorithm": "sha256-canonical-file-manifest-v1",
+    "contentIdentitySha256": "55cd4854d2f606ad54f2de9c6ebf604f8fd3c12436ed1273273a571f03518b4e"
+  },
+  "httpIdentity": {
+    "rootStillGodot": true,
+    "threejsMarkerPresent": true,
+    "runtime": {
+      "sha256": "213a0e202d23f176e961ef23a729924a1aaaebfbb1cf963123bf167e51d72fdd",
+      "frontendSha": "50e8aad5640c9f262f679a1aa404c2eec3b18674",
+      "protocolVersion": "1",
+      "environment": "production",
+      "branch": "threejs-rebuild",
+      "apiOriginState": "absent",
+      "apiOrigin": null
+    }
+  },
+  "basePath": null,
+  "contextRecovery": null,
+  "gameplay": null,
+  "refreshResume": null,
+  "pageErrors": [],
+  "failures": [
+    {
+      "code": "threejs061_acceptance_failed",
+      "message": "browserType.launch: Executable doesn't exist at /home/runner/.cache/ms-playwright/chromium_headless_shell-1187/chrome-linux/headless_shell\n╔═════════════════════════════════════════════════════════════════════════╗\n║ Looks like Playwright Test or Playwright was just installed or updated. ║\n║ Please run the following command to download new browsers:              ║\n║                                                                         ║\n║     npx playwright install                                              ║\n║                                                                         ║\n║ <3 Playwright Team                                                      ║\n╚═════════════════════════════════════════════════════════════════════════╝",
+      "details": null
+    }
+  ],
+  "completedAt": "2026-08-23T11:45:18.382Z",
+  "execution": {
+    "githubRunId": "32637400709",
+    "githubRunAttempt": "1",
+    "oneShotWrapperSha": "52c1cf051e5dbf72a6ebe0c04378a357b1a13edb",
+    "publicUrl": "https://a7sncom.github.io/yakolak/threejs/"
+  }
+}
