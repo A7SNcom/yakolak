@@ -1,0 +1,170 @@
+name: FASTPLAY-003 Final Public Acceptance v9
+
+on:
+  push:
+    branches: [threejs-rebuild]
+    paths: ['.github/workflows/fastplay-003-final-v9.yml']
+
+permissions:
+  contents: read
+  issues: write
+  statuses: write
+
+concurrency:
+  group: fastplay-003-final-v9
+  cancel-in-progress: true
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+
+      - id: candidate
+        shell: bash
+        run: echo "sha=$(git log -1 --format='%H' -- web)" >> "$GITHUB_OUTPUT"
+
+      - name: Mark pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+        shell: bash
+        run: |
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
+            -f state=pending \
+            -f context='FASTPLAY-003/final-public' \
+            -f description='v9 input-ready public acceptance running' \
+            -f target_url="$run_url"
+
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+
+      - name: Install Chromium
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          node node_modules/playwright/cli.js install --with-deps chromium
+
+      - name: Build verifier
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+          workflow = Path('.github/workflows/fastplay-003-final-v6.yml').read_text()
+          a = workflow.index('      - name: Build verifier\n')
+          b = workflow.index('      - name: Exercise full public first playable\n', a)
+          block = workflow[a:b]
+          r = block.index('        run: |\n') + len('        run: |\n')
+          Path('/tmp/build-v6.sh').write_text(textwrap.dedent(block[r:]))
+          PY
+          bash /tmp/build-v6.sh
+
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('fastplay-003-final-v3.mjs')
+          source = path.read_text()
+
+          helper = r'''async function waitForPhysicalInputReady(page, seatId) {
+            const handle = await page.waitForFunction(async seatId => {
+              const shell = window.__YAKOLAK_THREEJS_SHELL__;
+              const state = await shell.getCanonicalState();
+              const presentation = shell.getPresentationSnapshot();
+              if (state.roundEndRevision !== null || state.matchComplete) return { ended: true };
+              if (state.activeSeatId !== seatId) return false;
+              if (presentation?.movePresentationLock) return false;
+              if (presentation?.drag?.phase && presentation.drag.phase !== 'idle') return false;
+              if (presentation?.tap?.phase && presentation.tap.phase !== 'idle') return false;
+              return { ended: false, revision: state.revision, activeSeatId: state.activeSeatId };
+            }, seatId, { timeout: 5_000, polling: 25 });
+            const ready = await handle.jsonValue();
+            await handle.dispose();
+            assert.equal(ready?.ended, false, 'round ended before physical input became ready');
+            return ready;
+          }
+
+          '''
+
+          tap_sig = 'async function tapMove(page, move) {'
+          drag_sig = "async function dragMove(page, move, { pointerType = 'mouse' } = {}) {"
+          if tap_sig not in source: raise SystemExit('tapMove signature missing')
+          if drag_sig not in source: raise SystemExit('dragMove signature missing')
+          if 'async function waitForPhysicalInputReady(' in source: raise SystemExit('input helper unexpectedly already present')
+
+          tap_start = source.index(tap_sig)
+          source = source[:tap_start] + helper + source[tap_start:]
+
+          tap_start = source.index(tap_sig)
+          tap_insert = tap_start + len(tap_sig)
+          source = source[:tap_insert] + '\n            await waitForPhysicalInputReady(page, move.seatId);' + source[tap_insert:]
+
+          drag_start = source.index(drag_sig)
+          drag_insert = drag_start + len(drag_sig)
+          source = source[:drag_insert] + '\n            await waitForPhysicalInputReady(page, move.seatId);' + source[drag_insert:]
+
+          path.write_text(source)
+          PY
+
+          node --check fastplay-003-final-v3.mjs
+          test "$(grep -Fc 'await waitForPhysicalInputReady(page, move.seatId);' fastplay-003-final-v3.mjs)" -eq 2
+          test "$(grep -Fc 'async function waitForPhysicalInputReady(page, seatId)' fastplay-003-final-v3.mjs)" -eq 1
+          grep -Fq "stage: 'real-timeout-pass'" fastplay-003-final-v3.mjs
+          grep -Fq "stage: 'webgl-recovery-pass'" fastplay-003-final-v3.mjs
+
+      - name: Exercise full public first playable
+        env:
+          FASTPLAY003_EXPECTED_CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+          FASTPLAY003_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+          FASTPLAY003_ARTIFACT_PATH: fastplay-003-acceptance.json
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout --signal=TERM 12m node fastplay-003-final-v3.mjs 2>&1 | tee fastplay-003-final-v9.log
+
+      - name: Mark success
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MILESTONE_SHA: ${{ steps.candidate.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$(jq -r '.candidateSha' fastplay-003-acceptance.json)"
+          generation="$(jq -r '.deploymentGeneration' fastplay-003-acceptance.json)"
+          test "$(jq -r '.FIRST_PLAYABLE_EXPERIMENTAL' fastplay-003-acceptance.json)" = PASS
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" -f state=success -f context='FASTPLAY-003/final-public' -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS' -f target_url="$run_url"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" -f state=success -f context='FASTPLAY-003/first-playable' -f description='FIRST_PLAYABLE_EXPERIMENTAL=PASS' -f target_url="$run_url"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${candidate}" -f state=success -f context='FASTPLAY-003/public-pass' -f description="PASS generation ${generation}" -f target_url="$run_url"
+
+      - name: Upload evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastplay-003-v9-${{ steps.candidate.outputs.sha }}
+          path: fastplay-003-acceptance.json
+          retention-days: 90
+
+      - name: Publish failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MILESTONE_SHA: ${{ steps.candidate.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${MILESTONE_SHA}" -f state=failure -f context='FASTPLAY-003/final-public' -f description='v9 acceptance failed' -f target_url="$run_url"
+          title="FASTPLAY-003 final-v9 blocker ${MILESTONE_SHA}"
+          body="$(mktemp)"
+          {
+            echo 'FASTPLAY-003 final-v9 failed.'
+            echo
+            echo "workflow_run: ${run_url}"
+            echo '```text'
+            tail -n 220 fastplay-003-final-v9.log 2>/dev/null || echo '(verifier log unavailable)'
+            echo '```'
+          } > "$body"
+          gh issue create --title "$title" --body-file "$body" >/dev/null
