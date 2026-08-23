@@ -105,6 +105,11 @@ function requireExactKeys(value, expected, code) {
   if (actual.length !== wanted.length || actual.some((key, index) => key !== wanted[index])) fail(code);
 }
 
+function requireAllowedKeys(value, allowed, code) {
+  const allowedKeys = new Set(allowed);
+  if (Object.keys(value).some(key => !allowedKeys.has(key))) fail(code);
+}
+
 function requireGeneration(value) {
   if (!Number.isInteger(value) || value < 0) fail('invalid_presentation_generation');
   return value;
@@ -173,6 +178,11 @@ export function assertSessionLifecycleState(lifecycle) {
 
 export function createSessionLifecycleState(input = {}) {
   requireRecord(input, 'invalid_session_lifecycle');
+  requireAllowedKeys(
+    input,
+    ['phase', 'interrupt', 'recoveryTarget', 'presentationGeneration'],
+    'invalid_session_lifecycle_shape',
+  );
   const {
     phase = SESSION_LIFECYCLE_PHASES.BOOT,
     interrupt = null,
