@@ -1,0 +1,76 @@
+name: FASTPLAY-001 Live Pages Acceptance
+
+on:
+  push:
+    branches:
+      - threejs-rebuild
+    paths:
+      - 'web/**'
+      - 'scripts/verify-fastplay001-live.mjs'
+      - 'tests/fastplay_real_local_scene_contract.test.mjs'
+      - '.github/workflows/fastplay-001-live-acceptance.yml'
+
+permissions:
+  contents: read
+  statuses: write
+
+concurrency:
+  group: fastplay-001-live-pages
+  cancel-in-progress: true
+
+jobs:
+  live-pages:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Mark exact candidate pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=pending \
+            -f context='FASTPLAY-001/live-pages' \
+            -f description='Waiting for exact Pages generation and browser acceptance'
+
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify real-scene source contract
+        run: node --test tests/fastplay_real_local_scene_contract.test.mjs
+
+      - name: Install browser verifier
+        run: npm install --no-save --package-lock=false playwright@1.55.0
+
+      - name: Install matching Chromium
+        run: node node_modules/playwright/cli.js install --with-deps chromium
+
+      - name: Verify exact public desktop click and mobile drag
+        env:
+          FASTPLAY001_EXPECTED_CANDIDATE_SHA: ${{ github.sha }}
+          FASTPLAY001_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+        run: node scripts/verify-fastplay001-live.mjs
+
+      - name: Mark live acceptance success
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=success \
+            -f context='FASTPLAY-001/live-pages' \
+            -f description='Desktop click + mobile drag passed on exact public Pages SHA'
+
+      - name: Mark live acceptance failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=failure \
+            -f context='FASTPLAY-001/live-pages' \
+            -f description='FASTPLAY-001 public browser acceptance failed'
