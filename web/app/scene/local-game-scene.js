@@ -434,7 +434,11 @@ export async function createLocalGameScene(rendererOwnerInput, {
     try {
       const result = await authority.submit(intent);
       updateCanonicalState(result.snapshot);
-      await playAcceptedTravel(result.snapshot, pieceId, pendingId);
+      // Accepted travel is presentation-only. Authority handoff and bot production
+      // must never wait for a render-frame animation to finish or recover.
+      void playAcceptedTravel(result.snapshot, pieceId, pendingId).catch(error => {
+        console.warn('[fastplay] detached human accepted travel recovered', error);
+      });
       clearInputForCanonical(result.snapshot, 'accepted-resync', 'authority-accepted');
       void runComputerTurns();
       return result;
@@ -505,8 +509,15 @@ export async function createLocalGameScene(rendererOwnerInput, {
       const nextState = result.result.snapshot;
       const pieceId = chooseComputerPiece(nextState);
       updateCanonicalState(nextState);
-      if (pieceId) await playAcceptedTravel(nextState, pieceId, null, { observeFirst: true });
-      else acceptedTravel.observeSnapshot(nextState, { reason: 'computer-move-without-piece-presentation' });
+      if (pieceId) {
+        // Do not keep computerInFlight occupied by presentation. A later canonical
+        // revision cancels/snaps this travel through the shared motion controller.
+        void playAcceptedTravel(nextState, pieceId, null, { observeFirst: true }).catch(error => {
+          console.warn('[fastplay] detached computer accepted travel recovered', error);
+        });
+      } else {
+        acceptedTravel.observeSnapshot(nextState, { reason: 'computer-move-without-piece-presentation' });
+      }
       clearInputForCanonical(nextState, 'ownership-change', 'computer-authority-advanced');
       return result;
     })().finally(() => {
