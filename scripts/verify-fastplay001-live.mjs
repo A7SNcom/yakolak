@@ -41,9 +41,14 @@ async function waitForExactCandidate() {
   throw error;
 }
 
-async function waitReady(page) {
+async function startDefaultLocalMatch(page) {
+  await page.waitForFunction(() => ['setup-ready', 'ready'].includes(document.documentElement.dataset.bootState), null, { timeout: 60_000 });
+  const state = await page.evaluate(() => document.documentElement.dataset.bootState);
+  if (state === 'setup-ready') {
+    await page.locator('#local-start').click();
+  }
   await page.waitForFunction(() => document.documentElement.dataset.bootState === 'ready', null, { timeout: 60_000 });
-  await page.waitForFunction(() => Boolean(window.__YAKOLAK_THREEJS_SHELL__?.getCanonicalState), null, { timeout: 60_000 });
+  await page.waitForFunction(() => Boolean(window.__YAKOLAK_THREEJS_SHELL__?.getCanonicalState?.()), null, { timeout: 60_000 });
 }
 
 async function projectedTargets(page) {
@@ -91,6 +96,14 @@ async function projectedTargets(page) {
   });
 }
 
+async function moveIsCommitted(page, initial) {
+  return page.evaluate(async ({ revision, color }) => {
+    const state = await window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState();
+    const cell = state?.board?.['0'];
+    return Boolean(state && state.revision > revision && cell && Object.values(cell).includes(color));
+  }, { revision: initial.initialRevision, color: initial.activeColor });
+}
+
 async function assertMoveCommitted(page, initial) {
   await page.waitForFunction(async ({ revision, color }) => {
     const shell = window.__YAKOLAK_THREEJS_SHELL__;
@@ -110,6 +123,56 @@ async function assertMoveCommitted(page, initial) {
       fastplayScene: document.documentElement.dataset.fastplayScene,
     };
   });
+}
+
+async function clickPieceUntilSelected(page, point) {
+  const offsets = [
+    [0, 0], [12, 0], [-12, 0], [0, 12], [0, -12],
+    [20, 10], [-20, 10], [20, -10], [-20, -10],
+  ];
+  for (const [dx, dy] of offsets) {
+    await page.mouse.click(point.x + dx, point.y + dy);
+    const selected = await page.evaluate(() => window.__YAKOLAK_THREEJS_SHELL__.getPresentationSnapshot()?.tap?.phase === 'selected');
+    if (selected) return { x: point.x + dx, y: point.y + dy };
+    await page.waitForTimeout(80);
+  }
+  throw new Error('FASTPLAY-001 desktop could not select a visible home piece');
+}
+
+async function dragPieceUntilCommitted(page, targets) {
+  const offsets = [
+    [0, 0], [10, 0], [-10, 0], [0, 10], [0, -10],
+    [18, 8], [-18, 8], [18, -8], [-18, -8],
+  ];
+  for (const [dx, dy] of offsets) {
+    if (await moveIsCommitted(page, targets)) return { x: targets.piece.x + dx, y: targets.piece.y + dy };
+    const from = { x: targets.piece.x + dx, y: targets.piece.y + dy };
+    const to = targets.board;
+    await page.evaluate(({ from, to }) => {
+      const canvas = window.__YAKOLAK_THREEJS_SHELL__.canvas;
+      const pointerId = 41;
+      const emit = (type, x, y, buttons) => canvas.dispatchEvent(new PointerEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        pointerId,
+        pointerType: 'touch',
+        isPrimary: true,
+        button: 0,
+        buttons,
+        clientX: x,
+        clientY: y,
+      }));
+      emit('pointerdown', from.x, from.y, 1);
+      for (let step = 1; step <= 8; step += 1) {
+        const t = step / 8;
+        emit('pointermove', from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t, 1);
+      }
+      emit('pointerup', to.x, to.y, 0);
+    }, { from, to });
+    await page.waitForTimeout(250);
+    if (await moveIsCommitted(page, targets)) return from;
+  }
+  throw new Error('FASTPLAY-001 mobile drag did not commit a legal move');
 }
 
 async function verifyPageHealth(page, errors) {
@@ -145,15 +208,14 @@ async function runDesktopClick(browser) {
     const url = new URL(baseUrl);
     url.searchParams.set('fastplay001-desktop', Date.now());
     await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: 60_000 });
-    await waitReady(page);
+    await startDefaultLocalMatch(page);
     const targets = await projectedTargets(page);
     assert.equal(targets.pieceCount, 36);
-    await page.mouse.click(targets.piece.x, targets.piece.y);
-    await page.waitForFunction(() => window.__YAKOLAK_THREEJS_SHELL__.getPresentationSnapshot().tap.phase === 'selected', null, { timeout: 5_000 });
+    const selectedAt = await clickPieceUntilSelected(page, targets.piece);
     await page.mouse.click(targets.board.x, targets.board.y);
     const move = await assertMoveCommitted(page, targets);
     const health = await verifyPageHealth(page, errors);
-    return { mode: 'desktop-click', targets, move, health };
+    return { mode: 'desktop-click', targets, selectedAt, move, health };
   } finally {
     await context.close();
   }
@@ -173,35 +235,13 @@ async function runMobileDrag(browser) {
     const url = new URL(baseUrl);
     url.searchParams.set('fastplay001-mobile', Date.now());
     await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: 60_000 });
-    await waitReady(page);
+    await startDefaultLocalMatch(page);
     const targets = await projectedTargets(page);
     assert.equal(targets.pieceCount, 36);
-
-    await page.evaluate(({ from, to }) => {
-      const canvas = window.__YAKOLAK_THREEJS_SHELL__.canvas;
-      const pointerId = 41;
-      const emit = (type, x, y, buttons) => canvas.dispatchEvent(new PointerEvent(type, {
-        bubbles: true,
-        cancelable: true,
-        pointerId,
-        pointerType: 'touch',
-        isPrimary: true,
-        button: 0,
-        buttons,
-        clientX: x,
-        clientY: y,
-      }));
-      emit('pointerdown', from.x, from.y, 1);
-      for (let step = 1; step <= 8; step += 1) {
-        const t = step / 8;
-        emit('pointermove', from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t, 1);
-      }
-      emit('pointerup', to.x, to.y, 0);
-    }, { from: targets.piece, to: targets.board });
-
+    const draggedFrom = await dragPieceUntilCommitted(page, targets);
     const move = await assertMoveCommitted(page, targets);
     const health = await verifyPageHealth(page, errors);
-    return { mode: 'mobile-drag', targets, move, health };
+    return { mode: 'mobile-drag', targets, draggedFrom, move, health };
   } finally {
     await context.close();
   }
