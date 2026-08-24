@@ -11,6 +11,7 @@ export const GAMEPLAY_TEST_FILES = Object.freeze([
   'tests/threejs_pointer_css_contract.test.mjs',
   'tests/threejs_interaction_targets_contract.test.mjs',
   'tests/threejs_home_stack_picking_contract.test.mjs',
+  'tests/gameprep_first_piece_picking.test.mjs',
   'tests/threejs_motion_controller_contract.test.mjs',
   'tests/threejs_motion_controller_source_contract.test.mjs',
   'tests/threejs_motion_reduced_timing_contract.test.mjs',
