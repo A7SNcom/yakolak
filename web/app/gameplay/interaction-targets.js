@@ -1,3 +1,5 @@
+import { readRenderedBoardCellCenters } from './rendered-hit-transforms.js';
+
 export const GAMEPLAY_INTERACTION_LAYER = 31;
 export const BOARD_ZONE_TOUCH_RADIUS = 42;
 export const INTERACTION_PROXY_HEIGHT = 6;
@@ -43,21 +45,31 @@ function deriveStackTouchRadius(homeStacks) {
   return minimum / 2;
 }
 
+function renderedBoardCenterMap() {
+  const rendered = readRenderedBoardCellCenters();
+  if (rendered === null) return null;
+  if (!Array.isArray(rendered) || rendered.length !== 9) fail('interaction_rendered_board_requires_nine_cells');
+  return new Map(rendered.map(record => [record.cellId, record.center]));
+}
+
 export function deriveGameplayInteractionTargets(worldLayout) {
   if (!worldLayout || typeof worldLayout !== 'object') fail('world_layout_required');
   if (!Array.isArray(worldLayout.zones) || worldLayout.zones.length !== 9) fail('interaction_requires_nine_zones');
   if (!worldLayout.homeStacks || typeof worldLayout.homeStacks !== 'object') fail('interaction_requires_home_stacks');
 
+  const renderedCenters = renderedBoardCenterMap();
   const stackTouchRadius = deriveStackTouchRadius(worldLayout.homeStacks);
   const zones = [...worldLayout.zones]
     .sort((a, b) => a.id - b.id)
     .map((zone, index) => {
       if (!Number.isInteger(zone?.id) || zone.id !== index) fail('interaction_zone_ids_must_be_zero_to_eight');
+      const renderedCenter = renderedCenters?.get(zone.id) || null;
+      if (renderedCenters && !renderedCenter) fail(`interaction_rendered_board_cell_missing_${zone.id}`);
       return deepFreeze({
         id: `board:${zone.id}`,
         kind: 'board-zone',
         cellId: zone.id,
-        center: finitePoint(zone.position, `invalid_interaction_zone_${zone.id}`),
+        center: finitePoint(renderedCenter || zone.position, `invalid_interaction_zone_${zone.id}`),
         radius: BOARD_ZONE_TOUCH_RADIUS,
         height: INTERACTION_PROXY_HEIGHT,
       });

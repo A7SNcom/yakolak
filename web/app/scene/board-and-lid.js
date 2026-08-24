@@ -1,4 +1,5 @@
-import { Group, Mesh, MathUtils } from 'three';
+import { Group, Mesh, MathUtils, Vector3 } from 'three';
+import { registerRenderedBoardCellCenters } from '../gameplay/rendered-hit-transforms.js';
 
 function applyTransform(object, transform) {
   object.position.fromArray(transform.position);
@@ -73,6 +74,19 @@ export function createBoardAndLidObjects({ runtimeAsset, layout, boardMaterial, 
   applyTransform(lid, layout.lid.introStartTransform);
   root.add(board, lid);
 
+  root.updateMatrixWorld(true);
+  const boardAssetSpace = board.getObjectByName('board:asset-space');
+  if (!boardAssetSpace) throw new Error('Board rendered asset-space is missing');
+  const renderedCellCenters = layout.board.cellVisualGroups.map((cell) => {
+    const sourceX = Number(cell?.measuredSourceCenterXY?.[0]);
+    const sourceY = Number(cell?.measuredSourceCenterXY?.[1]);
+    const sourceZ = Number(cell?.authoritativeWorldCenter?.[1]);
+    if (![sourceX, sourceY, sourceZ].every(Number.isFinite)) throw new Error(`Board cell ${cell?.cellId} rendered center provenance is invalid`);
+    const center = new Vector3(sourceX, sourceY, sourceZ).applyMatrix4(boardAssetSpace.matrixWorld).toArray();
+    return Object.freeze({ cellId: cell.cellId, center: Object.freeze(center) });
+  });
+  const releaseRenderedBoardCellCenters = registerRenderedBoardCellCenters(renderedCellCenters);
+
   function setLidPhase(phase) {
     const transform = phase === 'intro-start'
       ? layout.lid.introStartTransform
@@ -89,6 +103,10 @@ export function createBoardAndLidObjects({ runtimeAsset, layout, boardMaterial, 
     return Object.freeze(layout.board.cellVisualGroups.map((cell) => Object.freeze([...cell.authoritativeWorldCenter])));
   }
 
+  function getRenderedCellCenters() {
+    return Object.freeze(renderedCellCenters.map((cell) => Object.freeze([...cell.center])));
+  }
+
   function getVisualAlignmentReport() {
     return Object.freeze(layout.board.cellVisualGroups.map((cell) => Object.freeze({
       cellId: cell.cellId,
@@ -99,6 +117,7 @@ export function createBoardAndLidObjects({ runtimeAsset, layout, boardMaterial, 
 
   function dispose() {
     // Geometry is owned/disposed by AssetManager; materials are scene-owned and may be shared.
+    releaseRenderedBoardCellCenters();
     root.clear();
     board.clear();
     lid.clear();
@@ -110,6 +129,7 @@ export function createBoardAndLidObjects({ runtimeAsset, layout, boardMaterial, 
     lid,
     setLidPhase,
     getRuleCellCenters,
+    getRenderedCellCenters,
     getVisualAlignmentReport,
     dispose,
   });
