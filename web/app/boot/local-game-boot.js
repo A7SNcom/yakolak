@@ -4,6 +4,7 @@ import { createCanonicalRuntimeData } from '../data/runtime-data.js';
 import { createFastplaySeats } from '../fastplay/local-match-config.js';
 import { createCanonicalMaterialSystem } from '../materials/canonical-materials.js';
 import { markOnce, STARTUP_MARKS, startupMarkSnapshot } from '../perf/startup-marks.js';
+import { createApprovedIntroLoadingStar, createApprovedIntroScene } from '../scene/approved-intro-scene.js';
 import { createLocalGameScene } from '../scene/local-game-scene.js';
 import { createRendererOwner, WebGLNotSupportedError } from '../scene/renderer.js';
 import { advanceCanonicalRound } from '../session/round-advance.js';
@@ -125,6 +126,9 @@ async function boot() {
 
   let rendererOwner = null;
   let gameScene = null;
+  let introScene = null;
+  let introLoadingStar = null;
+  let introStarted = false;
   let canonicalRuntimeData = null;
   let materialSystem = null;
   let contextSubscriptionToken = null;
@@ -240,6 +244,10 @@ async function boot() {
     if (!rendererOwner || !canonicalRuntimeData || !worldLayout || !approvedContract || !materialSystem) {
       throw new Error('fastplay_assets_not_ready');
     }
+    introLoadingStar?.release();
+    introLoadingStar = null;
+    introScene?.release();
+    introScene = null;
     gameScene?.release();
     gameScene = await createLocalGameScene(rendererOwner, {
       runtimeData: canonicalRuntimeData,
@@ -298,6 +306,10 @@ async function boot() {
     assetManager.cancelAll('disposed');
     contextSubscriptionToken?.release('fastplay-context-subscription-released');
     contextSubscriptionToken = null;
+    introLoadingStar?.release();
+    introLoadingStar = null;
+    introScene?.release();
+    introScene = null;
     gameScene?.release();
     gameScene = null;
     materialSystem?.release();
@@ -318,7 +330,8 @@ async function boot() {
     shell = Object.freeze({
       runtime: 'threejs-fastplay-local',
       canvas: rendererOwner.canvas,
-      getPresentationSnapshot: () => gameScene?.getPresentationSnapshot() || null,
+      getPresentationSnapshot: () => gameScene?.getPresentationSnapshot() || introScene?.getPresentationSnapshot() || null,
+      getIntroSnapshot: () => introScene?.getPresentationSnapshot() || null,
       getLightingSnapshot: () => gameScene?.getLightingSnapshot() || null,
       getCanonicalState: () => gameScene?.getCanonicalState() || null,
       setPreviewTurnEmphasis: (playerId = null) => gameScene?.setTurnEmphasis(playerId) || null,
@@ -337,6 +350,8 @@ async function boot() {
   };
 
   const showAssetFailure = error => {
+    introLoadingStar?.release();
+    introLoadingStar = null;
     const group = error?.group || 'required';
     const firstFailure = error?.failures?.[0];
     const detail = firstFailure?.id
@@ -364,6 +379,13 @@ async function boot() {
       const bootRetry = retry && ['failed', 'cancelled'].includes(assetManager.snapshot('boot-critical').status);
       await assetManager.loadGroup('boot-critical', { retry: bootRetry });
       markOnce(STARTUP_MARKS.bootCriticalReady);
+
+      if (!introStarted && !introLoadingStar) {
+        introLoadingStar = createApprovedIntroLoadingStar({
+          mount: appElement,
+          svgText: assetManager.get('ui.loading-star'),
+        });
+      }
 
       if (!rendererOwner) {
         rendererOwner = createRendererOwner({ mount: appElement, resourceRegistry });
@@ -393,6 +415,39 @@ async function boot() {
       document.documentElement.dataset.canonicalLighting = 'ready';
       if (assetErrorElement) assetErrorElement.hidden = true;
       exposeReadyShell();
+
+      if (!introStarted) {
+        introStarted = true;
+        if (overlayElement) overlayElement.hidden = true;
+        try {
+          introScene = await createApprovedIntroScene(rendererOwner, {
+            runtimeData: canonicalRuntimeData,
+            worldLayout,
+            approvedContract,
+            roomSpecText: assetManager.get('scene.room-spec'),
+            assets: {
+              tableFootprint: assetManager.get('scene.table-footprint'),
+              boardAndLid: assetManager.get('model.board-and-lid'),
+              playerBase: assetManager.get('model.player-base'),
+            },
+            materialSystem,
+            resourceRegistry,
+            loadingStar: introLoadingStar,
+          });
+          const introResult = await introScene.play();
+          if (introResult?.status !== 'completed' && introResult?.status !== 'released') {
+            console.warn('[gameprep-003] approved intro settled through safe fallback', introResult?.status);
+          }
+        } catch (error) {
+          console.error('[gameprep-003] approved intro failed safely into setup', error);
+          introScene?.snapSetupFinal?.();
+          document.documentElement.dataset.gameprep003 = 'interrupted-safe-final';
+        } finally {
+          introLoadingStar?.release();
+          introLoadingStar = null;
+        }
+      }
+
       showSetup();
       markOnce(STARTUP_MARKS.firstInteractive);
 
