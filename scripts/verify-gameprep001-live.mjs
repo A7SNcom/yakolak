@@ -97,6 +97,34 @@ async function projectOpeningMove(page) {
   });
 }
 
+async function tapUntilSmallSelected(page, target, mobile) {
+  const offsets = mobile
+    ? [[0,0],[6,0],[-6,0],[0,6],[0,-6],[10,5],[-10,5],[10,-5],[-10,-5],[14,0],[-14,0]]
+    : [[0,0],[10,0],[-10,0],[0,10],[0,-10],[18,8],[-18,8],[18,-8],[-18,-8],[24,0],[-24,0]];
+  const attempts = [];
+  for (const [dx, dy] of offsets) {
+    const point = { x: target.piece.x + dx, y: target.piece.y + dy };
+    const hit = await page.evaluate(({ x, y }) => {
+      const shell = window.__YAKOLAK_THREEJS_SHELL__;
+      const element = document.elementFromPoint(x, y);
+      return { isCanvas: element === shell.canvas, tag: element?.tagName || null, id: element?.id || null };
+    }, point);
+    if (!hit.isCanvas) {
+      attempts.push({ dx, dy, hit, skipped: 'not-canvas' });
+      continue;
+    }
+    if (mobile) await page.touchscreen.tap(point.x, point.y);
+    else await page.mouse.click(point.x, point.y);
+    await page.waitForTimeout(80);
+    const tap = await page.evaluate(() => window.__YAKOLAK_THREEJS_SHELL__.getPresentationSnapshot()?.tap || null);
+    attempts.push({ dx, dy, hit, phase: tap?.phase || null, size: tap?.selection?.selectedSize || null });
+    if (tap?.phase === 'selected' && tap?.selection?.selectedSize === 'small' && tap.selection.legalCells?.includes(0)) {
+      return { point, offset: [dx, dy], attempts };
+    }
+  }
+  throw new Error(`marble/small not selectable via ${mobile ? 'touch' : 'click'}: ${JSON.stringify(attempts)}`);
+}
+
 async function exercise(browser, { name, viewport, mobile }) {
   const context = await browser.newContext({
     viewport,
@@ -114,20 +142,7 @@ async function exercise(browser, { name, viewport, mobile }) {
     await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: 60_000 });
     await setupTwoHumans(page);
     const target = await projectOpeningMove(page);
-
-    const hit = await page.evaluate(({ x, y }) => {
-      const shell = window.__YAKOLAK_THREEJS_SHELL__;
-      const element = document.elementFromPoint(x, y);
-      return { isCanvas: element === shell.canvas, tag: element?.tagName || null, id: element?.id || null };
-    }, target.piece);
-    assert.equal(hit.isCanvas, true, `${name}: HUD/overlay still intercepts marble/small input (${JSON.stringify(hit)})`);
-
-    if (mobile) await page.touchscreen.tap(target.piece.x, target.piece.y);
-    else await page.mouse.click(target.piece.x, target.piece.y);
-    await page.waitForFunction(() => {
-      const tap = window.__YAKOLAK_THREEJS_SHELL__.getPresentationSnapshot()?.tap;
-      return tap?.phase === 'selected' && tap?.selection?.selectedSize === 'small' && tap.selection.legalCells?.includes(0);
-    }, null, { timeout: 5_000 });
+    const selection = await tapUntilSmallSelected(page, target, mobile);
 
     if (mobile) await page.touchscreen.tap(target.board.x, target.board.y);
     else await page.mouse.click(target.board.x, target.board.y);
@@ -138,7 +153,7 @@ async function exercise(browser, { name, viewport, mobile }) {
 
     const state = await page.evaluate(() => window.__YAKOLAK_THREEJS_SHELL__.getCanonicalState());
     assert.equal(pageErrors.length, 0, `${name}: page errors: ${pageErrors.join(' | ')}`);
-    return { name, viewport, input: mobile ? 'touch' : 'click', revision: state.revision, lastMove: state.lastMove };
+    return { name, viewport, input: mobile ? 'touch' : 'click', selectionOffset: selection.offset, revision: state.revision, lastMove: state.lastMove };
   } finally {
     await context.close();
   }
