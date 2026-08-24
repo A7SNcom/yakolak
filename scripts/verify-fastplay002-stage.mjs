@@ -111,6 +111,9 @@ async function projectFirstMove(page) {
       color: activeSeat.color,
       piece: project(piece.destination.center),
       board: project(zone.position),
+      frame: snapshot.frame,
+      pointer: snapshot.pointer,
+      canvasRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
     };
   });
 }
@@ -119,9 +122,14 @@ async function selectFirstPiece(page, target) {
   const offsets = [[0,0],[10,0],[-10,0],[0,10],[0,-10],[18,8],[-18,8],[18,-8],[-18,-8]];
   const attempts = [];
   for (const [dx, dy] of offsets) {
-    await page.mouse.click(target.piece.x + dx, target.piece.y + dy);
-    const probe = await page.evaluate(() => {
-      const snapshot = window.__YAKOLAK_THREEJS_SHELL__.getPresentationSnapshot();
+    const x = target.piece.x + dx;
+    const y = target.piece.y + dy;
+    await page.mouse.click(x, y);
+    const probe = await page.evaluate(({ x, y }) => {
+      const shell = window.__YAKOLAK_THREEJS_SHELL__;
+      const snapshot = shell.getPresentationSnapshot();
+      const hit = document.elementFromPoint(x, y);
+      const rect = shell.canvas.getBoundingClientRect();
       return {
         selectedPieceId: snapshot?.selectedPieceId || null,
         tapPhase: snapshot?.tap?.phase || null,
@@ -129,9 +137,14 @@ async function selectFirstPiece(page, target) {
         stackTargetId: snapshot?.tap?.selection?.stackTargetId || null,
         legalCells: snapshot?.tap?.selection?.legalCells || [],
         dragSelectedSize: snapshot?.drag?.selection?.selectedSize || null,
+        pointer: snapshot?.pointer || null,
+        frame: snapshot?.frame || null,
+        hitElement: hit ? { tag: hit.tagName, id: hit.id || null, className: String(hit.className || '') } : null,
+        canvasIsHit: hit === shell.canvas,
+        canvasRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
       };
-    });
-    attempts.push({ dx, dy, x: target.piece.x + dx, y: target.piece.y + dy, ...probe });
+    }, { x, y });
+    attempts.push({ dx, dy, x, y, ...probe });
     if (probe.tapPhase === 'selected' && probe.selectedSize === 'small') {
       console.log(`GAMEPREP-001 selection diagnostic PASS ${JSON.stringify(attempts)}`);
       return;
