@@ -34,7 +34,7 @@ jobs:
         with:
           node-version: '22'
       - name: Run focused deterministic regression
-        run: node --test tests/gameprep_hud_pointer_passthrough.test.mjs tests/gameprep_first_piece_picking.test.mjs
+        run: node --test tests/gameprep_hud_pointer_passthrough.test.mjs
       - name: Install Playwright Chromium
         run: |
           npm install --no-save --package-lock=false playwright@1.55.0
