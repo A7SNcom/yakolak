@@ -53,22 +53,50 @@ function installNestedPickOrdering(mesh, sourcePivot, size) {
   const baseRaycast = mesh.raycast;
   const instanceMatrix = new Matrix4();
   const instanceCenter = new Vector3();
+  const closestPoint = new Vector3();
   const bias = HOME_PICK_DISTANCE_BIAS[size] ?? 0;
+  const geometry = mesh.geometry;
+  if (!geometry.boundingSphere) geometry.computeBoundingSphere();
+  const pickRadius = Number(geometry.boundingSphere?.radius);
+  if (!Number.isFinite(pickRadius) || pickRadius <= 0) throw new Error(`${size} piece geometry requires a finite pick radius`);
 
-  // Home sizes share the exact same stack center. Three's default InstancedMesh
-  // raycast sorts by the first physical surface, so an enclosing larger shell can
-  // win even when the ray also intersects the visible inner small piece. Preserve
-  // the real hit test but sort nested hits by their shared presentation center,
-  // with a tiny inner-first tie-breaker. Separate stacks retain normal depth order.
+  // The nested home pieces share one logical stack anchor, while the imported GLB
+  // surface can leave that anchor just outside the smallest rendered shell after the
+  // canonical pivot/rotation transform. Keep precise geometry hits first, but also
+  // expose the same live instance anchor with the geometry's own bounding radius as a
+  // picking fallback. This changes input tolerance only; rendering and authority stay
+  // untouched. Nested hits are then ordered from small -> medium -> large at one anchor.
   mesh.raycast = function raycastNestedPiece(raycaster, intersections) {
     const start = intersections.length;
     baseRaycast.call(this, raycaster, intersections);
+    const physicallyHitInstances = new Set();
+
     for (let index = start; index < intersections.length; index += 1) {
       const hit = intersections[index];
       if (!Number.isInteger(hit.instanceId)) continue;
+      physicallyHitInstances.add(hit.instanceId);
       this.getMatrixAt(hit.instanceId, instanceMatrix);
-      instanceCenter.copy(sourcePivot).applyMatrix4(instanceMatrix);
+      instanceCenter.copy(sourcePivot).applyMatrix4(instanceMatrix).applyMatrix4(this.matrixWorld);
       hit.distance = raycaster.ray.origin.distanceTo(instanceCenter) + bias;
+    }
+
+    for (let instanceId = 0; instanceId < this.count; instanceId += 1) {
+      if (physicallyHitInstances.has(instanceId)) continue;
+      this.getMatrixAt(instanceId, instanceMatrix);
+      instanceCenter.copy(sourcePivot).applyMatrix4(instanceMatrix).applyMatrix4(this.matrixWorld);
+      if (raycaster.ray.distanceToPoint(instanceCenter) > pickRadius) continue;
+      raycaster.ray.closestPointToPoint(instanceCenter, closestPoint);
+      const distance = raycaster.ray.origin.distanceTo(instanceCenter) + bias;
+      if (distance < raycaster.near || distance > raycaster.far) continue;
+      intersections.push({
+        distance,
+        point: closestPoint.clone(),
+        object: this,
+        instanceId,
+        face: null,
+        faceIndex: null,
+        uv: null,
+      });
     }
   };
 }
