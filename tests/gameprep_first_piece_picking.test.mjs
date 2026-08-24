@@ -10,8 +10,10 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const worldLayout = JSON.parse(readFileSync(path.join(root, 'YAKOLAK_PORTABLE_KIT/assets/layout/world-layout.json'), 'utf8'));
 const approvedContract = JSON.parse(readFileSync(path.join(root, 'YAKOLAK_PORTABLE_KIT/assets/reference/approved-contract.json'), 'utf8'));
 
-function runtimeAsset(radius) {
+function runtimeAsset(radius, surfaceOffsetX = 0) {
   const geometry = new SphereGeometry(radius, 24, 16);
+  if (surfaceOffsetX) geometry.translate(surfaceOffsetX, 0, 0);
+  geometry.computeBoundingSphere();
   geometry.userData.sourceBounds = {
     min: [-radius, -radius, 0],
     max: [radius, radius, radius * 2],
@@ -44,7 +46,10 @@ const materialsByColor = Object.fromEntries(
 );
 const pieces = createPieceInstances({
   runtimeAssetsBySize: {
-    small: runtimeAsset(2),
+    // Deliberately move only the tiny rendered shell away from its logical anchor.
+    // Precise geometry raycast therefore misses it at the stack center, reproducing
+    // the public blocker while the anchor-radius input fallback must still select it.
+    small: runtimeAsset(2, 6),
     medium: runtimeAsset(4),
     large: runtimeAsset(6),
   },
@@ -62,8 +67,8 @@ raycaster.ray.direction.set(0, -1, 0);
 
 const centerHits = raycaster.intersectObject(pieces.root, true)
   .filter(hit => hit.object?.userData?.colorId === 'marble' && hit.instanceId === 0);
-assert(centerHits.length >= 3, 'fixture must intersect all three nested marble sizes');
-assert.equal(centerHits[0].object.userData.size, 'small', 'visible inner marble/small must win a center click/tap');
+assert(centerHits.length >= 3, 'center input must expose all three nested marble sizes');
+assert.equal(centerHits[0].object.userData.size, 'small', 'marble/small must win the stack-center click/tap even when its exact GLB surface misses');
 
 raycaster.ray.origin.copy(stackCenter).add(new Vector3(5, 100, 0));
 raycaster.ray.direction.set(0, -1, 0);
