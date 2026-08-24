@@ -181,6 +181,10 @@ h1 {
   pointer-events: none;
 }
 
+/* The live HUD uses .hud-panel (not .game-hud). It is status-only and must never
+   intercept piece/cell pointer input beneath it. */
+.hud-panel { pointer-events: none; }
+
 .hud-primary,
 .hud-scores,
 .hud-detail { display: flex; align-items: center; gap: 10px; }
