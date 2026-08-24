@@ -10,6 +10,7 @@ import {
 } from './piece-layout.js';
 
 const ONE = new Vector3(1, 1, 1);
+const HOME_PICK_DISTANCE_BIAS = Object.freeze({ small: 0, medium: 0.0001, large: 0.0002 });
 
 function requireSharedGeometry(runtimeAsset, size) {
   if (runtimeAsset?.format !== 'yakolak-glb-components-v1') throw new TypeError(`${size} pieces require deterministic GLB components`);
@@ -46,6 +47,30 @@ function matrixAt(center, rotation, sourcePivot) {
   return new Matrix4()
     .compose(new Vector3().fromArray(center), rotation, ONE)
     .multiply(new Matrix4().makeTranslation(-sourcePivot.x, -sourcePivot.y, -sourcePivot.z));
+}
+
+function installNestedPickOrdering(mesh, sourcePivot, size) {
+  const baseRaycast = mesh.raycast;
+  const instanceMatrix = new Matrix4();
+  const instanceCenter = new Vector3();
+  const bias = HOME_PICK_DISTANCE_BIAS[size] ?? 0;
+
+  // Home sizes share the exact same stack center. Three's default InstancedMesh
+  // raycast sorts by the first physical surface, so an enclosing larger shell can
+  // win even when the ray also intersects the visible inner small piece. Preserve
+  // the real hit test but sort nested hits by their shared presentation center,
+  // with a tiny inner-first tie-breaker. Separate stacks retain normal depth order.
+  mesh.raycast = function raycastNestedPiece(raycaster, intersections) {
+    const start = intersections.length;
+    baseRaycast.call(this, raycaster, intersections);
+    for (let index = start; index < intersections.length; index += 1) {
+      const hit = intersections[index];
+      if (!Number.isInteger(hit.instanceId)) continue;
+      this.getMatrixAt(hit.instanceId, instanceMatrix);
+      instanceCenter.copy(sourcePivot).applyMatrix4(instanceMatrix);
+      hit.distance = raycaster.ray.origin.distanceTo(instanceCenter) + bias;
+    }
+  };
 }
 
 export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approvedContract, materialsByColor, resourceRegistry } = {}) {
@@ -87,6 +112,7 @@ export function createPieceInstances({ runtimeAssetsBySize, worldLayout, approve
         mesh.userData.presentationOnly = true;
         mesh.userData.size = size;
         mesh.userData.colorId = colorId;
+        installNestedPickOrdering(mesh, resourceBySize.get(size).sourcePivot, size);
         meshByKey.set(`${colorId}:${size}`, mesh);
         root.add(mesh);
       }
