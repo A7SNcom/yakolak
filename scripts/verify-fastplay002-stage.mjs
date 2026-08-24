@@ -117,15 +117,28 @@ async function projectFirstMove(page) {
 
 async function selectFirstPiece(page, target) {
   const offsets = [[0,0],[10,0],[-10,0],[0,10],[0,-10],[18,8],[-18,8],[18,-8],[-18,-8]];
+  const attempts = [];
   for (const [dx, dy] of offsets) {
     await page.mouse.click(target.piece.x + dx, target.piece.y + dy);
-    const selected = await page.evaluate(() => {
-      const tap = window.__YAKOLAK_THREEJS_SHELL__.getPresentationSnapshot()?.tap;
-      return tap?.phase === 'selected' && tap?.selection?.selectedSize === 'small';
+    const probe = await page.evaluate(() => {
+      const snapshot = window.__YAKOLAK_THREEJS_SHELL__.getPresentationSnapshot();
+      return {
+        selectedPieceId: snapshot?.selectedPieceId || null,
+        tapPhase: snapshot?.tap?.phase || null,
+        selectedSize: snapshot?.tap?.selection?.selectedSize || null,
+        stackTargetId: snapshot?.tap?.selection?.stackTargetId || null,
+        legalCells: snapshot?.tap?.selection?.legalCells || [],
+        dragSelectedSize: snapshot?.drag?.selection?.selectedSize || null,
+      };
     });
-    if (selected) return;
+    attempts.push({ dx, dy, x: target.piece.x + dx, y: target.piece.y + dy, ...probe });
+    if (probe.tapPhase === 'selected' && probe.selectedSize === 'small') {
+      console.log(`GAMEPREP-001 selection diagnostic PASS ${JSON.stringify(attempts)}`);
+      return;
+    }
     await page.waitForTimeout(70);
   }
+  console.error(`GAMEPREP-001 selection diagnostic FAIL ${JSON.stringify({ target, attempts })}`);
   throw new Error('first visible home piece could not be selected');
 }
 
