@@ -1,0 +1,68 @@
+name: GAMEPREP-001 Public Selection Acceptance
+
+on:
+  push:
+    branches: [threejs-rebuild]
+    paths:
+      - 'web/styles/app.css'
+      - 'web/index.html'
+      - 'web/app/scene/local-game-scene.js'
+      - 'scripts/verify-gameprep001-live.mjs'
+      - '.github/workflows/gameprep-001-public-selection.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+concurrency:
+  group: gameprep-001-public-selection
+  cancel-in-progress: true
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: candidate
+        shell: bash
+        run: echo "sha=$(git log -1 --format='%H' -- web)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run focused deterministic regression
+        run: node --test tests/gameprep_hud_pointer_passthrough.test.mjs tests/gameprep_first_piece_picking.test.mjs
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          node node_modules/playwright/cli.js install --with-deps chromium
+      - name: Verify public desktop click and mobile touch
+        env:
+          GAMEPREP001_EXPECTED_SHA: ${{ steps.candidate.outputs.sha }}
+          GAMEPREP001_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+        run: node scripts/verify-gameprep001-live.mjs
+      - name: Mark GAMEPREP-001 accepted
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
+            -f state=success -f context='GAMEPREP-001/public-selection' \
+            -f description='marble/small desktop click + mobile touch + local-authority move PASS' \
+            -f target_url="$run_url"
+      - name: Mark GAMEPREP-001 failed
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${CANDIDATE_SHA}" \
+            -f state=failure -f context='GAMEPREP-001/public-selection' \
+            -f description='focused public first-piece acceptance failed' \
+            -f target_url="$run_url"
