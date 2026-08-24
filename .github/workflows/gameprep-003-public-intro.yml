@@ -1,0 +1,36 @@
+name: GAMEPREP-003 Public Intro Acceptance
+
+on:
+  push:
+    branches: [threejs-rebuild]
+    paths:
+      - '.github/workflows/gameprep-003-public-intro.yml'
+      - 'scripts/verify-gameprep003-live.mjs'
+      - 'web/app/scene/approved-intro-scene.js'
+      - 'web/app/boot/local-game-boot.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gameprep-003-public-intro
+  cancel-in-progress: true
+
+jobs:
+  public-intro:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          node node_modules/playwright/cli.js install --with-deps chromium
+      - name: Verify public approved intro
+        env:
+          GAMEPREP003_BASE_URL: https://a7sncom.github.io/yakolak/threejs/
+        run: node scripts/verify-gameprep003-live.mjs
