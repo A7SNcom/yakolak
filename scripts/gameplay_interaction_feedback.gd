@@ -7,6 +7,11 @@ const HOVER_LIGHTEN := 0.10
 const HOVER_EMISSION_ENERGY := 0.34
 const INVALID_FLASH_SECONDS := 0.16
 const INVALID_COLOR := Color(1.0, 0.28, 0.20, 0.62)
+const FEEDBACK_LEGAL_OUTLINE_GROW := 0.035
+const FEEDBACK_INVALID_SCALE := 1.18
+const FEEDBACK_INVALID_OUTLINE_GROW := 0.075
+const FEEDBACK_OUTLINE_LIGHT := Color(0.97, 0.95, 0.90, 0.96)
+const FEEDBACK_OUTLINE_DARK := Color(0.06, 0.08, 0.10, 0.96)
 
 var _feedback_hover_piece_index: int = -1
 var _feedback_hover_original_material: Material
@@ -83,20 +88,58 @@ func _reset_for_intro() -> void:
 	super._reset_for_intro()
 
 
+func _update_legal_markers(size_name: String, piece_color: Color) -> void:
+	super._update_legal_markers(size_name, piece_color)
+	for marker: MeshInstance3D in target_markers:
+		if marker == null or not marker.visible:
+			continue
+		marker.material_override = _feedback_marker_material(
+			marker.material_override,
+			piece_color,
+			FEEDBACK_LEGAL_OUTLINE_GROW
+		)
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("document.body.dataset.yakolakLegalMarkerStyle='surface-ring+contrast-outline';", true)
+
+
+func _feedback_marker_material(source: Material, fill_color: Color, outline_grow: float) -> StandardMaterial3D:
+	var material: StandardMaterial3D
+	if source is StandardMaterial3D:
+		material = (source as StandardMaterial3D).duplicate() as StandardMaterial3D
+	else:
+		material = _surface_ring_material(fill_color)
+	var luminance: float = fill_color.r * 0.2126 + fill_color.g * 0.7152 + fill_color.b * 0.0722
+	var outline := StandardMaterial3D.new()
+	outline.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	outline.albedo_color = FEEDBACK_OUTLINE_DARK if luminance >= 0.62 else FEEDBACK_OUTLINE_LIGHT
+	outline.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	outline.cull_mode = BaseMaterial3D.CULL_FRONT
+	outline.grow = true
+	outline.grow_amount = outline_grow
+	outline.roughness = 1.0
+	material.next_pass = outline
+	return material
+
+
 func _publish_invalid(cell: int) -> void:
 	super._publish_invalid(cell)
 	if cell < 0 or cell >= target_markers.size():
 		return
 	_feedback_invalid_serial += 1
 	var serial: int = _feedback_invalid_serial
+	if legal_marker_pulse != null and legal_marker_pulse.is_valid():
+		legal_marker_pulse.kill()
+	legal_marker_pulse = null
 	var marker: MeshInstance3D = target_markers[cell]
 	if marker == null:
 		return
 	marker.visible = true
-	marker.material_override = _marker_material(INVALID_COLOR)
+	marker.scale = Vector3.ONE * FEEDBACK_INVALID_SCALE
+	var invalid_base: StandardMaterial3D = _surface_ring_material(INVALID_COLOR)
+	marker.material_override = _feedback_marker_material(invalid_base, INVALID_COLOR, FEEDBACK_INVALID_OUTLINE_GROW)
 	_restore_invalid_feedback(cell, serial)
 	if OS.has_feature("web"):
-		JavaScriptBridge.eval("document.body.dataset.yakolakInvalidFeedback='visible';", true)
+		JavaScriptBridge.eval("document.body.dataset.yakolakInvalidFeedback='visible';document.body.dataset.yakolakInvalidCue='oversized-outlined-ring';document.body.dataset.yakolakSelectionRecovery='preserved';", true)
 
 
 func _restore_invalid_feedback(_cell: int, serial: int) -> void:
@@ -109,7 +152,7 @@ func _restore_invalid_feedback(_cell: int, serial: int) -> void:
 	else:
 		_hide_markers()
 	if OS.has_feature("web"):
-		JavaScriptBridge.eval("document.body.dataset.yakolakInvalidFeedback='settled';", true)
+		JavaScriptBridge.eval("document.body.dataset.yakolakInvalidFeedback='settled';document.body.dataset.yakolakSelectionRecovery='preserved';", true)
 
 
 func _feedback_update_piece_hover(screen_position: Vector2) -> void:
@@ -212,7 +255,7 @@ func _publish_gameplay_feedback_contract() -> void:
 	if not OS.has_feature("web"):
 		return
 	JavaScriptBridge.eval(
-		"document.body.dataset.yakolakGameplayFeedback='hover+pressed+selected+invalid+toggle+focus';" +
+		"document.body.dataset.yakolakGameplayFeedback='hover+pressed+selected-outline+legal-ring-outline+invalid-shape+toggle+focus';" +
 		"document.body.dataset.yakolakGameplayFeedbackMotion='instant-subtle';",
 		true
 	)
