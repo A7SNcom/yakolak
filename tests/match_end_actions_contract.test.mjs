@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { __testing } from '../api/rooms.js';
 
-const { applyMove, createState, joinState, rematchState } = __testing;
+const { applyMove, createState, joinState, leaveState, rematchState } = __testing;
 const gameplay = fs.readFileSync(new URL('../scripts/gameplay_rematch_lifecycle.gd', import.meta.url), 'utf8');
+const gameplayUi = fs.readFileSync(new URL('../scripts/gameplay_session_ui.gd', import.meta.url), 'utf8');
+const roomsSource = fs.readFileSync(new URL('../api/rooms.js', import.meta.url), 'utf8');
 
 function completedOnlineMatch() {
   let state = joinState(createState('marble', 2, 3), 'p2', 'blue');
@@ -56,13 +58,39 @@ function completedOnlineMatch() {
   assert.ok(requestAt > lockAt, 'transport request must occur only after the local idempotency lock');
 }
 
-// Online leave/setup is deliberately not exposed until it has an individual,
-// non-cancelling room lifecycle. Local setup is the only secondary post-match action.
+// A final-match leave detaches only the departing client. The authoritative
+// result remains readable, and a vote made before leaving cannot restart a
+// ghost match after the other player votes.
+{
+  const finished = completedOnlineMatch();
+  const voted = rematchState(finished, 'p1');
+  const detached = leaveState(voted, 'p1');
+  assert.equal(detached.status, 'finished');
+  assert.equal(detached.matchComplete, true);
+  assert.equal(detached.cancelledBy, null);
+  assert.deepEqual(detached.players, finished.players);
+  assert.equal(detached.rematch.p1, false);
+  const remainingVote = rematchState(detached, 'p2');
+  assert.equal(remainingVote.status, 'finished');
+  assert.equal(remainingVote.rematch.p1, false);
+  assert.equal(remainingVote.rematch.p2, true);
+
+  const active = joinState(createState('marble', 2, 3), 'p2', 'blue');
+  assert.equal(leaveState(active, 'p1').status, 'cancelled', 'active-match exit keeps cancellation semantics');
+}
+
+// Both the explicit post-match return and the existing quick-menu Exit converge
+// on _return_to_setup(). At final online match end that path now uses terminal
+// detach; auth is retained for the historical seat mapping so the peer can poll.
 {
   const secondary = gameplay.match(/func _on_post_match_secondary_action\(\)[\s\S]*?\n\nfunc _on_online_room_changed/)?.[0] || '';
-  assert.ok(secondary.includes('if online_active or not round_complete or not match_complete or action_in_progress:'), 'secondary action must reject online matches');
-  assert.ok(secondary.includes('_return_to_setup()'), 'local secondary action must use the existing setup lifecycle');
-  assert.ok(!secondary.includes('online.call("leave")'), 'unsafe online leave must not be exposed as a post-match action');
+  assert.ok(gameplay.includes('post_match_secondary_button.visible = true'), 'completed online match exposes return to setup');
+  assert.ok(secondary.includes('if not round_complete or not match_complete or action_in_progress:'), 'secondary action accepts completed online matches');
+  assert.ok(secondary.includes('_return_to_setup()'), 'secondary action uses the existing setup lifecycle');
+  const quickExit = gameplayUi.match(/func _quick_exit\(\)[\s\S]*?\n\nfunc _quick_round_action/)?.[0] || '';
+  assert.ok(quickExit.includes('_return_to_setup()'), 'quick Exit converges on the same safe detach path');
+  assert.ok(roomsSource.includes("const terminalMatchLeave = action === 'leave' && state.status === 'finished' && state.matchComplete;"), 'handler recognizes terminal match detach');
+  assert.ok(roomsSource.includes("action === 'leave' && !terminalMatchLeave"), 'terminal detach retains auth required by historical seat ownership');
 }
 
 console.log('YAKOLAK_MATCH_END_ACTIONS_CONTRACT_OK');

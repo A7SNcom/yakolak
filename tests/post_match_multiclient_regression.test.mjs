@@ -8,6 +8,7 @@ const {
   applyRoomEdit,
   createState,
   joinState,
+  leaveState,
   mutationApplied,
   reconcilePresenceState,
   recordMutation,
@@ -128,10 +129,17 @@ function completeModelMatch(initial, snapshots, cycle) {
 }
 
 function runSurfaceAndLifecycleContract() {
-  assert.ok(gameplay.includes('post_match_secondary_button.visible = not online_active'), 'online post-match exposes no setup/leave secondary action');
+  assert.ok(gameplay.includes('post_match_secondary_button.visible = true'), 'completed online match exposes setup/leave secondary action');
   const secondary = gameplay.match(/func _on_post_match_secondary_action\(\)[\s\S]*?\n\nfunc _on_online_room_changed/)?.[0] || '';
-  assert.ok(secondary.includes('if online_active or not round_complete or not match_complete or action_in_progress:'), 'local setup action rejects online lifecycle');
-  assert.ok(!secondary.includes('online.call("leave")'), 'unsafe online leave remains unexposed');
+  assert.ok(secondary.includes('if not round_complete or not match_complete or action_in_progress:'), 'setup action accepts completed online lifecycle');
+  assert.ok(secondary.includes('_return_to_setup()'), 'online and local setup converge on one cleanup path');
+
+  const finished = completeModelMatch({ ...joinState(createState('marble', 2, WINS_TO_MATCH), 'p2', 'blue'), version: 2 }, [], 0);
+  const voted = rematchState(finished, 'p1');
+  const detached = leaveState(voted, 'p1');
+  assert.equal(detached.status, 'finished', 'post-match leave preserves the authoritative result');
+  assert.equal(detached.rematch.p1, false, 'post-match leave retracts a stale rematch vote');
+  assert.equal(rematchState(detached, 'p2').status, 'finished', 'remaining player cannot restart with a departed ghost seat');
 
   let waiting = createState('marble', 3, 3);
   waiting = joinState(waiting, 'p2', 'blue');

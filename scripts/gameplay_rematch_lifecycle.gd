@@ -5,10 +5,10 @@ extends "res://scripts/gameplay_tutorial_showcase.gd"
 # runtime and visual match state from the same clean baseline used for a fresh
 # session. This deliberately does not reload the page or alter round rules.
 #
-# MATCH-END-26 keeps the exposed post-match surface intentionally small:
-# rematch is available everywhere, while returning to setup is exposed only for
-# local matches. The online server currently treats leave as room cancellation,
-# so presenting it as an individual post-match exit would not be a safe action.
+# MATCH-END-40 keeps the completed-match choices symmetric across local/online:
+# rematch stays room-authoritative, while returning to setup detaches only this
+# client from an already-terminal online match. Active-match leave/cancellation
+# semantics remain unchanged.
 
 var web_force_match_complete_callback: Variant
 var web_rematch_callback: Variant
@@ -106,11 +106,11 @@ func _show_round_result() -> void:
 			result_button.text = "تعادل المباراة\nإعادة المباراة"
 		result_button.visible = true
 
-	# Returning to setup is a safe local lifecycle transition. Do not expose the
-	# current online leave/cancel primitive as though it were an individual exit.
+	# At final match end, online leave is a terminal client detach: the room/result
+	# remain authoritative for everyone else, so the same setup action is safe.
 	if post_match_secondary_button != null:
 		post_match_secondary_button.text = "العودة للإعدادات"
-		post_match_secondary_button.visible = not online_active
+		post_match_secondary_button.visible = true
 	_sync_post_match_controls()
 	_publish_post_match_action_state()
 
@@ -141,7 +141,7 @@ func _on_round_action() -> void:
 
 
 func _on_post_match_secondary_action() -> void:
-	if online_active or not round_complete or not match_complete or action_in_progress:
+	if not round_complete or not match_complete or action_in_progress:
 		return
 	post_match_action_pending = "setup"
 	action_in_progress = true
@@ -265,7 +265,7 @@ func _publish_post_match_action_state() -> void:
 	if not OS.has_feature("web"):
 		return
 	var primary: String = "rematch" if match_complete and not online_cancelled else ""
-	var secondary: String = "setup" if match_complete and not online_active and post_match_secondary_button != null and post_match_secondary_button.visible else ""
+	var secondary: String = "setup" if match_complete and post_match_secondary_button != null and post_match_secondary_button.visible else ""
 	var result_text: String = result_button.text if result_button != null and result_button.visible else ""
 	JavaScriptBridge.eval(
 		"document.body.dataset.yakolakPostMatchPrimary=" + JSON.stringify(primary) + ";" +

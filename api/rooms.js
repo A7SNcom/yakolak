@@ -332,6 +332,13 @@ function rematchState(state, seat, requiredSeats = null) {
 
 function leaveState(state, seat) {
   if (!state.players.some(player => player.seat === seat)) throw new Error('invalid_seat');
+  // A completed match is already terminal authority. Leaving it detaches only
+  // this client; it must not rewrite the shared result into a cancellation.
+  // Clear a prior rematch vote so a player cannot leave behind consent that
+  // later restarts the room with a ghost seat.
+  if (state.status === 'finished' && state.matchComplete) {
+    return { ...state, rematch: { ...state.rematch, [seat]: false }, cancelledBy: null };
+  }
   if (state.status === 'waiting' && seat !== 'p1') {
     const players = state.players.filter(player => player.seat !== seat);
     const scores = { ...state.scores };
@@ -680,6 +687,7 @@ export default async function handler(req, res) {
       try { expectedVersion = requireCurrentVersion(body.version, row.version); }
       catch { return json(res, 409, { ok: false, error: 'version_conflict', room: publicRoom(row, state) }); }
     }
+    const terminalMatchLeave = action === 'leave' && state.status === 'finished' && state.matchComplete;
     let next;
     if (action === 'move') next = applyMove(state, seat, body);
     else if (action === 'rematch') next = rematchState(state, seat);
@@ -687,7 +695,9 @@ export default async function handler(req, res) {
     else if (action === 'leave') next = leaveState(state, seat);
     else throw new Error('invalid_action');
     if (mutationKind) next = recordMutation(next, seat, mutationKind, mutationId);
-    const auth = action === 'leave' ? authEntries(row).filter(entry => entry.seat !== seat) : null;
+    // Terminal detach keeps the historical seat/auth mapping intact so the
+    // remaining player can still read the finished room without identity_conflict.
+    const auth = action === 'leave' && !terminalMatchLeave ? authEntries(row).filter(entry => entry.seat !== seat) : null;
     let updated;
     try { updated = await updateRoom(db, row, next, expectedVersion, auth); }
     catch (error) {
