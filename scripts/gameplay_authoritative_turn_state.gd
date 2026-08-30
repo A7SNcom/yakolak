@@ -7,6 +7,8 @@ extends "res://scripts/gameplay_explicit_handoff.gd"
 # This layer still does not own or advance turns.
 signal authoritative_turn_changed(snapshot: Dictionary)
 
+const KEYBOARD_TARGET_OUTLINE_GROW := 0.065
+
 var authoritative_turn_revision: int = 0
 var authoritative_turn_last_key: String = ""
 var authoritative_turn_cached_snapshot: Dictionary = {}
@@ -16,6 +18,11 @@ var authoritative_input_dispatch_count: int = 0
 var authoritative_input_visual_motion_count: int = 0
 var authoritative_input_last_dispatch_msec: int = 0
 var authoritative_test_refresh_target_callback: Variant
+var keyboard_piece_cursor: int = -1
+var keyboard_cell_cursor: int = -1
+var keyboard_focus_scope: String = "none"
+var keyboard_target_original_material: Material
+var keyboard_target_material_cell: int = -1
 
 
 func _ready() -> void:
@@ -96,6 +103,13 @@ func authoritative_turn_snapshot() -> Dictionary:
 
 
 func _input(event: InputEvent) -> void:
+	# GGH-042: keyboard is an adapter over the existing authority and semantic handlers.
+	if event is InputEventKey and _handle_gameplay_keyboard(event as InputEventKey):
+		get_viewport().set_input_as_handled()
+		return
+	if (event is InputEventMouseMotion or event is InputEventMouseButton or event is InputEventScreenTouch) and keyboard_focus_scope != "none":
+		_release_gameplay_keyboard_focus()
+
 	# Once an accepted room snapshot says this seat owns the turn, dispatch the
 	# exact existing gameplay pointer path directly. The inherited shared-device
 	# path may still gate on camera motion; online authority must not. Duplicate
@@ -142,6 +156,235 @@ func _input(event: InputEvent) -> void:
 	if camera_transition or turn_camera_active:
 		authoritative_input_visual_motion_count += 1
 	_handle_pointer(pointer_position)
+
+
+func _handle_gameplay_keyboard(key: InputEventKey) -> bool:
+	if not match_initialized or not key.pressed or key.echo:
+		return false
+	var owner: Control = get_viewport().gui_get_focus_owner()
+	if owner != null and not owner.is_visible_in_tree():
+		owner.release_focus()
+		owner = null
+	if key.keycode == KEY_TAB:
+		# First Tab hands 3D semantic focus to the existing Godot Control surface.
+		# Once a Control owns focus, normal Godot Tab traversal remains authoritative.
+		if keyboard_focus_scope != "none" or owner == null:
+			_release_gameplay_keyboard_focus()
+			if quick_button != null and quick_button.visible and not quick_button.disabled:
+				quick_button.grab_focus()
+			return true
+		return false
+	if key.is_action_pressed("ui_cancel"):
+		if quick_panel != null and quick_panel.visible:
+			return false
+		if owner != null:
+			owner.release_focus()
+			_keyboard_focus_from_state()
+			return true
+		if selected_index >= 0 or tray_open:
+			var previous_piece: int = selected_index
+			_keyboard_restore_target_material()
+			_clear_selection()
+			keyboard_piece_cursor = previous_piece
+			keyboard_cell_cursor = -1
+			_keyboard_apply_piece_focus()
+			return true
+		return false
+	if owner != null or not _gameplay_keyboard_ready():
+		return false
+	if key.is_action_pressed("ui_accept"):
+		if selected_index < 0:
+			_keyboard_ensure_piece_cursor()
+			if keyboard_piece_cursor < 0:
+				return true
+			var focused_piece: int = keyboard_piece_cursor
+			_feedback_clear_piece_hover()
+			_select_piece(focused_piece)
+			if tray_open and tray_indices.has(focused_piece):
+				_select_tray_piece(focused_piece)
+			keyboard_piece_cursor = focused_piece
+			keyboard_cell_cursor = -1
+			_keyboard_ensure_cell_cursor()
+			_keyboard_apply_target_focus()
+			return true
+		_keyboard_ensure_cell_cursor()
+		if keyboard_cell_cursor >= 0:
+			var target_cell: int = keyboard_cell_cursor
+			_keyboard_restore_target_material()
+			keyboard_focus_scope = "none"
+			keyboard_piece_cursor = -1
+			keyboard_cell_cursor = -1
+			_publish_gameplay_keyboard_focus()
+			_begin_move(target_cell)
+		return true
+	var step: int = 0
+	if key.is_action_pressed("ui_left") or key.is_action_pressed("ui_up"):
+		step = -1
+	elif key.is_action_pressed("ui_right") or key.is_action_pressed("ui_down"):
+		step = 1
+	else:
+		return false
+	if selected_index < 0:
+		_keyboard_move_piece_cursor(step)
+	else:
+		_keyboard_move_cell_cursor(step)
+	return true
+
+
+func _gameplay_keyboard_ready() -> bool:
+	if online_active:
+		return _authoritative_online_pointer_ready()
+	return match_initialized and gameplay_ready and not move_active and not camera_transition and not round_complete and not match_complete and _current_mode() == "local"
+
+
+func _keyboard_piece_candidates() -> Array[int]:
+	var result: Array[int] = []
+	for index: int in _current_piece_candidates():
+		if index < 0 or index >= piece_records.size():
+			continue
+		var record: Dictionary = piece_records[index] as Dictionary
+		if _has_legal_cell_for_size(str(record.get("type", ""))):
+			result.append(index)
+	return result
+
+
+func _keyboard_ensure_piece_cursor() -> void:
+	var candidates: Array[int] = _keyboard_piece_candidates()
+	if candidates.is_empty():
+		keyboard_piece_cursor = -1
+		return
+	if not candidates.has(keyboard_piece_cursor):
+		keyboard_piece_cursor = candidates[0]
+
+
+func _keyboard_move_piece_cursor(step: int) -> void:
+	var candidates: Array[int] = _keyboard_piece_candidates()
+	if candidates.is_empty():
+		_release_gameplay_keyboard_focus()
+		return
+	var index: int = candidates.find(keyboard_piece_cursor)
+	index = (0 if step >= 0 else candidates.size() - 1) if index < 0 else posmod(index + step, candidates.size())
+	keyboard_piece_cursor = candidates[index]
+	_keyboard_apply_piece_focus()
+
+
+func _keyboard_apply_piece_focus() -> void:
+	_keyboard_restore_target_material()
+	_feedback_clear_piece_hover()
+	_keyboard_ensure_piece_cursor()
+	if keyboard_piece_cursor < 0 or keyboard_piece_cursor >= piece_records.size():
+		return
+	var record: Dictionary = piece_records[keyboard_piece_cursor] as Dictionary
+	var piece: MeshInstance3D = record.get("mesh", null) as MeshInstance3D
+	if piece == null:
+		return
+	_feedback_hover_piece_index = keyboard_piece_cursor
+	_feedback_hover_original_material = piece.material_override
+	piece.material_override = _feedback_hover_material(_feedback_hover_original_material)
+	keyboard_focus_scope = "piece"
+	_publish_gameplay_keyboard_focus()
+
+
+func _keyboard_legal_cells() -> Array[int]:
+	var result: Array[int] = []
+	if selected_index < 0:
+		return result
+	for cell: int in range(CELL_COORDS.size()):
+		if _is_legal_cell(cell, _selected_size()):
+			result.append(cell)
+	return result
+
+
+func _keyboard_ensure_cell_cursor() -> void:
+	var legal: Array[int] = _keyboard_legal_cells()
+	if legal.is_empty():
+		keyboard_cell_cursor = -1
+		return
+	if not legal.has(keyboard_cell_cursor):
+		keyboard_cell_cursor = legal[0]
+
+
+func _keyboard_move_cell_cursor(step: int) -> void:
+	var legal: Array[int] = _keyboard_legal_cells()
+	if legal.is_empty():
+		return
+	var index: int = legal.find(keyboard_cell_cursor)
+	index = (0 if step >= 0 else legal.size() - 1) if index < 0 else posmod(index + step, legal.size())
+	keyboard_cell_cursor = legal[index]
+	_keyboard_apply_target_focus()
+
+
+func _keyboard_apply_target_focus() -> void:
+	_keyboard_restore_target_material()
+	_keyboard_ensure_cell_cursor()
+	if keyboard_cell_cursor < 0 or keyboard_cell_cursor >= target_markers.size():
+		return
+	# Focus ownership is semantic and immediate; marker rendering may settle a frame later.
+	keyboard_focus_scope = "target"
+	_publish_gameplay_keyboard_focus()
+	var marker: MeshInstance3D = target_markers[keyboard_cell_cursor]
+	if marker == null or not marker.visible:
+		call_deferred("_keyboard_retry_target_visual", selected_index, keyboard_cell_cursor)
+		return
+	_keyboard_apply_target_visual(marker)
+
+
+func _keyboard_apply_target_visual(marker: MeshInstance3D) -> void:
+	keyboard_target_original_material = marker.material_override
+	keyboard_target_material_cell = keyboard_cell_cursor
+	var record: Dictionary = piece_records[selected_index] as Dictionary
+	marker.material_override = _feedback_marker_material(keyboard_target_original_material, _piece_color(record), KEYBOARD_TARGET_OUTLINE_GROW)
+
+
+func _keyboard_retry_target_visual(expected_piece: int, expected_cell: int) -> void:
+	await get_tree().process_frame
+	if selected_index != expected_piece or keyboard_focus_scope != "target" or keyboard_cell_cursor != expected_cell:
+		return
+	if expected_cell < 0 or expected_cell >= target_markers.size():
+		return
+	var marker: MeshInstance3D = target_markers[expected_cell]
+	if marker != null and marker.visible:
+		_keyboard_apply_target_visual(marker)
+
+
+func _keyboard_restore_target_material() -> void:
+	if keyboard_target_original_material != null and keyboard_target_material_cell >= 0 and keyboard_target_material_cell < target_markers.size():
+		var marker: MeshInstance3D = target_markers[keyboard_target_material_cell]
+		if marker != null:
+			marker.material_override = keyboard_target_original_material
+	keyboard_target_original_material = null
+	keyboard_target_material_cell = -1
+
+
+func _keyboard_focus_from_state() -> void:
+	if selected_index >= 0:
+		_keyboard_ensure_cell_cursor()
+		_keyboard_apply_target_focus()
+	else:
+		_keyboard_apply_piece_focus()
+
+
+func _release_gameplay_keyboard_focus() -> void:
+	_keyboard_restore_target_material()
+	if keyboard_focus_scope == "piece":
+		_feedback_clear_piece_hover()
+	keyboard_focus_scope = "none"
+	keyboard_piece_cursor = -1
+	keyboard_cell_cursor = -1
+	_publish_gameplay_keyboard_focus()
+
+
+func _publish_gameplay_keyboard_focus() -> void:
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.eval(
+		"document.body.dataset.yakolakGameplayKeyboard='semantic-handlers-v1';" +
+		"document.body.dataset.yakolakGameplayKeyboardAuthority='authoritative-turn-state';" +
+		"document.body.dataset.yakolakGameplayKeyboardFocus='%s';" % keyboard_focus_scope +
+		"document.body.dataset.yakolakGameplayKeyboardPiece='%d';" % keyboard_piece_cursor +
+		"document.body.dataset.yakolakGameplayKeyboardCell='%d';" % keyboard_cell_cursor,
+		true
+	)
 
 
 func _authoritative_online_pointer_ready() -> bool:
