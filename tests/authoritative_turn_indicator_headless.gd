@@ -146,6 +146,27 @@ func _run() -> void:
 	_expect(_indicator_text() == "دور لاعب 2", "rematch shows its authoritative starter without stale text")
 	_expect(_indicator_color() == "marble", "rematch color cue follows new authoritative starter")
 
+	# GGH-026: the same authoritative turn snapshot already carries player mode.
+	# A bot owner must read as intentional waiting, never as a human action turn.
+	var bot_revision: int = int(hud.get("applied_revision")) + 1
+	hud.call("_on_authoritative_turn_changed", {
+		"revision": bot_revision,
+		"valid": true,
+		"lifecycle": "turn",
+		"player_number": 2,
+		"seat": "p2",
+		"mode": "bot",
+		"color": "marble",
+		"color_name": "أبيض",
+		"online": false,
+		"local_turn": false,
+	})
+	_expect(_indicator_visible() and _indicator_text() == "روبوت 2 يفكر", "bot turn is explicit waiting copy")
+	_expect(bool(hud.get("indicator_bot_turn")), "bot cue is sourced from authoritative mode")
+	_expect(str(hud.get("indicator_emphasis_key")) == "bot-thinking-authoritative", "bot turn has dedicated semantic emphasis")
+	_expect(not _indicator_local(), "bot turn never inherits human local-turn emphasis")
+	_expect(_legacy_turn_hidden(), "bot cue does not resurrect the legacy human turn banner")
+
 	# Once an authoritative undefined lifecycle event reaches the indicator, it
 	# clears synchronously in the same callback with no deferred blanking.
 	var immediate_clear_revision: int = int(hud.get("applied_revision")) + 1

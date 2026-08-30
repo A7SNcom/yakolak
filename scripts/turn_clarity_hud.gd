@@ -19,6 +19,7 @@ var indicator_style: StyleBoxFlat
 var indicator_width: float = INDICATOR_MIN_WIDTH
 var indicator_color_key: String = ""
 var indicator_local_turn: bool = false
+var indicator_bot_turn: bool = false
 var indicator_emphasis_key: String = ""
 var indicator_owner_seat: String = ""
 var indicator_remote_player_number: int = 0
@@ -139,6 +140,7 @@ func _on_authoritative_turn_changed(snapshot: Dictionary) -> void:
 
 func _apply_visual_state(snapshot: Dictionary) -> void:
 	indicator_local_turn = bool(snapshot.get("local_turn", false))
+	indicator_bot_turn = str(snapshot.get("mode", "")).strip_edges().to_lower() == "bot"
 	indicator_color_key = _indicator_color_key(snapshot)
 	indicator_owner_seat = str(snapshot.get("seat", "")).strip_edges().to_lower()
 	indicator_remote_player_number = 0
@@ -155,6 +157,19 @@ func _apply_visual_state(snapshot: Dictionary) -> void:
 		indicator_label.add_theme_color_override("font_color", Display.TEXT_DARK)
 		indicator_label.add_theme_color_override("font_outline_color", Color(1.0, 1.0, 1.0, 0.0))
 		indicator_label.add_theme_constant_override("outline_size", 0)
+		return
+
+	# GGH-026: a bot-owned authoritative turn is a waiting state, never a human
+	# action prompt. Keep the same single capsule and color support, but give the
+	# state its own semantic key; no timer, animation, or bot logic is consulted.
+	if indicator_bot_turn:
+		indicator_emphasis_key = "bot-thinking-authoritative"
+		indicator_style.border_color = _indicator_cue_color(indicator_color_key)
+		indicator_style.bg_color = Color(0.035, 0.055, 0.062, 0.94)
+		indicator_label.add_theme_font_override("font", Display.FONT_BOLD)
+		indicator_label.add_theme_color_override("font_color", Display.TEXT_PRIMARY)
+		indicator_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.72))
+		indicator_label.add_theme_constant_override("outline_size", 1)
 		return
 
 	# UX-TURN-38: remote ownership is led by the stable authoritative seat label.
@@ -192,6 +207,11 @@ func _indicator_cue_color(key: String) -> Color:
 
 
 func _indicator_copy(snapshot: Dictionary) -> String:
+	# The authoritative player mode already distinguishes bot ownership. Surface
+	# that state directly so the locked board reads as intentional waiting.
+	if str(snapshot.get("mode", "")).strip_edges().to_lower() == "bot":
+		var bot_number: int = int(snapshot.get("player_number", 0))
+		return "روبوت %d يفكر" % bot_number if bot_number > 0 else "الروبوت يفكر"
 	if bool(snapshot.get("online", false)):
 		if bool(snapshot.get("local_turn", false)):
 			return "دورك"
@@ -226,6 +246,7 @@ func _hide_indicator(revision: int, lifecycle: String) -> void:
 		indicator_label.text = ""
 	indicator_color_key = ""
 	indicator_local_turn = false
+	indicator_bot_turn = false
 	indicator_emphasis_key = ""
 	indicator_owner_seat = ""
 	indicator_remote_player_number = 0
@@ -269,6 +290,7 @@ func _publish_contract() -> void:
 		"document.body.dataset.yakolakTurnIndicatorDigits='western-0-9';" +
 		"document.body.dataset.yakolakTurnIndicatorOneGlance='copy+player-color';" +
 		"document.body.dataset.yakolakTurnIndicatorLocalCue='semantic-copy+inverted-design-tokens';" +
+		"document.body.dataset.yakolakTurnIndicatorBotCue='authoritative-mode+semantic-copy';" +
 		"document.body.dataset.yakolakTurnIndicatorRemoteOwnerSource='authoritative-seat';" +
 		"document.body.dataset.yakolakTurnIndicatorRemoteColorRole='supporting-cue';" +
 		"document.body.dataset.yakolakTurnIndicatorMotion='none';" +
@@ -289,6 +311,7 @@ func _publish_state(visible: bool, text: String, snapshot: Dictionary) -> void:
 		"document.body.dataset.yakolakTurnIndicatorRemotePlayer='%d';" % indicator_remote_player_number +
 		"document.body.dataset.yakolakTurnIndicatorColor='%s';" % _js(indicator_color_key) +
 		"document.body.dataset.yakolakTurnIndicatorLocal='%s';" % ("true" if indicator_local_turn else "false") +
+		"document.body.dataset.yakolakTurnIndicatorBot='%s';" % ("true" if indicator_bot_turn else "false") +
 		"document.body.dataset.yakolakTurnIndicatorEmphasis='%s';" % _js(indicator_emphasis_key) +
 		"document.body.dataset.yakolakTurnIndicatorLifecycle='%s';" % _js(str(snapshot.get("lifecycle", ""))) +
 		"document.body.dataset.yakolakTurnIndicatorRevision='%d';" % applied_revision +
@@ -308,6 +331,7 @@ func _publish_hidden(revision: int, lifecycle: String) -> void:
 		"document.body.dataset.yakolakTurnIndicatorRemotePlayer='0';" +
 		"document.body.dataset.yakolakTurnIndicatorColor='';" +
 		"document.body.dataset.yakolakTurnIndicatorLocal='false';" +
+		"document.body.dataset.yakolakTurnIndicatorBot='false';" +
 		"document.body.dataset.yakolakTurnIndicatorEmphasis='';" +
 		"document.body.dataset.yakolakTurnIndicatorLifecycle='%s';" % _js(lifecycle) +
 		"document.body.dataset.yakolakTurnIndicatorRevision='%d';" % revision +
