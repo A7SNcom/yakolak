@@ -32,6 +32,17 @@ func _ready() -> void:
 	_publish_gameplay_feedback_contract()
 
 
+func _build_quick_menu() -> void:
+	super._build_quick_menu()
+	if quick_button != null:
+		quick_button.toggle_mode = true
+		quick_button.tooltip_text = "القائمة"
+	if quick_sound_button != null:
+		quick_sound_button.toggle_mode = true
+		quick_sound_button.tooltip_text = "تشغيل أو كتم الصوت"
+	_feedback_sync_menu_state(true)
+
+
 func _input(event: InputEvent) -> void:
 	if _feedback_is_emulated_mouse_from_touch(event):
 		get_viewport().set_input_as_handled()
