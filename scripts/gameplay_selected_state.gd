@@ -97,6 +97,10 @@ func _cancel_stale_selection_presentation() -> void:
 
 func _reset_board_for_round() -> void:
 	super._reset_board_for_round()
+	# A round boundary owns a full selection reset, including browser-facing state.
+	# `selected_index` is already cleared below us; clear the published size/owner
+	# in the same lifecycle so the previous stone cannot survive as stale UI state.
+	_publish_selection_cleared_probe("round-reset")
 	_publish_selection_emphasis_state("round-reset")
 
 

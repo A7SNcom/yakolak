@@ -181,7 +181,10 @@ func _reset_board_for_round() -> void:
 	else:
 		# A stale/empty reset must not start a Tween with zero Tweeners.
 		call_deferred("_finish_stability_round_reset", generation)
-	_publish_match_state("round-reset")
+	# The board is intentionally non-interactive while stones return home. Publish
+	# that lifecycle through the gameplay channel too so Web/UI readiness cannot
+	# retain the previous turn's stale `ready` state during the reset animation.
+	_publish_gameplay_state("round-reset")
 
 
 func _finish_stability_round_reset(generation: int) -> void:
