@@ -20,6 +20,8 @@ var turn_presentation_stale_finish_count: int = 0
 # menu sync never needs to query browser CSS on every frame.
 var turn41_safe_insets_css: Vector4 = Vector4.ZERO
 var turn41_safe_viewport_size: Vector2 = Vector2(-1.0, -1.0)
+var turn41_safe_insets_read_msec: int = -10000
+const TURN41_SAFE_INSET_REFRESH_MS: int = 500
 var turn41_layout_publish_key: String = ""
 
 
@@ -228,10 +230,16 @@ func _layout_quick_menu() -> void:
 	if quick_button == null or quick_panel == null:
 		return
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
-	if viewport_size != turn41_safe_viewport_size:
+	var now_msec: int = Time.get_ticks_msec()
+	var viewport_changed: bool = viewport_size != turn41_safe_viewport_size
+	var safe_refresh_due: bool = now_msec - turn41_safe_insets_read_msec >= TURN41_SAFE_INSET_REFRESH_MS
+	if viewport_changed or safe_refresh_due:
 		turn41_safe_viewport_size = viewport_size
-		turn41_safe_insets_css = _turn41_read_safe_insets_css(viewport_size)
-		turn41_layout_publish_key = ""
+		turn41_safe_insets_read_msec = now_msec
+		var refreshed_safe: Vector4 = _turn41_read_safe_insets_css(viewport_size)
+		if refreshed_safe != turn41_safe_insets_css:
+			turn41_safe_insets_css = refreshed_safe
+			turn41_layout_publish_key = ""
 
 	var left_margin_css: float = maxf(12.0, turn41_safe_insets_css.x + 8.0)
 	var top_css: float = maxf(12.0, turn41_safe_insets_css.y + 8.0)
