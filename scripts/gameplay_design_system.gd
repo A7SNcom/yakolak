@@ -3,10 +3,38 @@ extends "res://scripts/gameplay_rematch_lifecycle.gd"
 # Design-system adapter for gameplay chrome: quick menu and online waiting UI.
 const Design = preload("res://scripts/ui_design.gd")
 
+const POST_MATCH_SECONDARY_HALF_WIDTH_CSS := 132.0
+const POST_MATCH_SECONDARY_TOP_CSS := 88.0
+
 
 func _ready() -> void:
 	super._ready()
+	_layout_post_match_secondary_button()
 	_publish_design_contract()
+
+
+func _layout_hud() -> void:
+	super._layout_hud()
+	_layout_post_match_secondary_button()
+
+
+func _layout_post_match_secondary_button() -> void:
+	if post_match_secondary_button == null:
+		return
+	# GGH-034: the parent created this control with raw Godot offsets. On the
+	# 720-wide internal canvas those offsets shrink to roughly 54% at 390 CSS px,
+	# making the 48-unit secondary action only ~26 CSS px tall and pulling it into
+	# the primary result target. Keep this action in the same CSS-space contract as
+	# the rest of the HUD: 48px tall, 264px wide, and 11px below the 154px result.
+	var half_width: float = _hud_length(POST_MATCH_SECONDARY_HALF_WIDTH_CSS)
+	var top: float = _hud_length(POST_MATCH_SECONDARY_TOP_CSS)
+	var height: float = _hud_length(Design.TOUCH_MIN)
+	post_match_secondary_button.offset_left = -half_width
+	post_match_secondary_button.offset_top = top
+	post_match_secondary_button.offset_right = half_width
+	post_match_secondary_button.offset_bottom = top + height
+	post_match_secondary_button.custom_minimum_size = Vector2(half_width * 2.0, height)
+	post_match_secondary_button.add_theme_font_size_override("font_size", _hud_font_size(Design.FONT_BODY))
 
 
 func _build_quick_menu() -> void:
@@ -115,6 +143,7 @@ func _publish_design_contract() -> void:
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakDesignGameplay='tokens+primitives';" +
-			"document.body.dataset.yakolakDesignGameplayTouchMin='48';",
+			"document.body.dataset.yakolakDesignGameplayTouchMin='48';" +
+			"document.body.dataset.yakolakDesignPostMatchSecondary='264x48-css+11-gap';",
 			true
 		)
