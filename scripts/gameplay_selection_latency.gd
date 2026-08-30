@@ -13,6 +13,7 @@ var _ux46_marker_generation: int = 0
 var _ux46_pointer_started_usec: int = 0
 var _ux46_pointer_kind: String = ""
 var _ux46_selection_serial: int = 0
+var _ux46_legal_revision: int = 0
 var _ux46_test_enabled: bool = false
 var _ux46_start_requested: bool = false
 var _ux46_start_callback: Variant
@@ -104,6 +105,7 @@ func _hide_markers() -> void:
 	# post-selection frame yet. The legal rules themselves are never deferred.
 	_ux46_marker_generation += 1
 	super._hide_markers()
+	_ux46_publish_legal_targets("")
 
 
 func _select_tray_piece(piece_index: int) -> void:
@@ -189,14 +191,80 @@ func _ux46_finish_after_selected_frame(
 		)
 
 	# Preserve the exact production marker pulse/material behavior; only its work is
-	# moved behind the first selected-state frame.
+	# moved behind the first selected-state frame. GGH-009 publishes the exact same
+	# canonical cell set immediately after that render pass, never a duplicate rule.
 	super._update_legal_markers(size_name, piece_color)
+	_ux46_publish_legal_targets(size_name)
 	if OS.has_feature("web") and _ux46_test_enabled:
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakUxSelect46MarkerSerial='%d';" % serial +
 			"document.body.dataset.yakolakUxSelect46MarkerOwner=" + JSON.stringify(owner_name) + ";",
 			true
 		)
+
+
+func _ux46_publish_legal_targets(size_name: String) -> void:
+	if not OS.has_feature("web"):
+		return
+
+	# GGH-009: publication, rendering, and click verification all consume the same
+	# _is_legal_cell() authority already used by _handle_pointer/_begin_move.
+	# Never cache a legal set across selection, move, turn, or reset boundaries.
+	var selection_current: bool = (
+		selected_index >= 0
+		and not move_active
+		and not size_name.is_empty()
+		and size_name == _selected_size()
+	)
+	var legal_cells: Array[int] = []
+	var click_points: Array[Dictionary] = []
+	var visible_count: int = 0
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var canvas_rect: Rect2 = _gameplay_canvas_css_rect()
+	var can_publish_points: bool = (
+		selection_current
+		and camera != null
+		and viewport_size.x >= 1.0
+		and viewport_size.y >= 1.0
+		and canvas_rect.size.x >= 1.0
+		and canvas_rect.size.y >= 1.0
+	)
+	var css_scale := Vector2.ONE
+	if can_publish_points:
+		css_scale = Vector2(canvas_rect.size.x / viewport_size.x, canvas_rect.size.y / viewport_size.y)
+
+	if selection_current:
+		for cell: int in range(target_markers.size()):
+			if not _is_legal_cell(cell, size_name):
+				continue
+			legal_cells.append(cell)
+			var marker: MeshInstance3D = target_markers[cell]
+			if marker != null and marker.visible:
+				visible_count += 1
+			if not can_publish_points or marker == null or not marker.visible:
+				continue
+			if camera.is_position_behind(marker.global_position):
+				continue
+			var internal_point: Vector2 = camera.unproject_position(marker.global_position)
+			if internal_point.x < 0.0 or internal_point.y < 0.0 or internal_point.x > viewport_size.x or internal_point.y > viewport_size.y:
+				continue
+			var css_point: Vector2 = canvas_rect.position + internal_point * css_scale
+			click_points.append({"cell": cell, "x": css_point.x, "y": css_point.y})
+
+	_ux46_legal_revision += 1
+	var cells_payload: String = JSON.stringify(legal_cells)
+	var points_payload: String = JSON.stringify(click_points)
+	var state: String = "selected" if selection_current else "clear"
+	JavaScriptBridge.eval(
+		"document.body.dataset.yakolakLegalTargetsState=" + JSON.stringify(state) + ";" +
+		"document.body.dataset.yakolakLegalCells=" + JSON.stringify(cells_payload) + ";" +
+		"document.body.dataset.yakolakLegalTargetPoints=" + JSON.stringify(points_payload) + ";" +
+		"document.body.dataset.yakolakLegalCount='%d';" % legal_cells.size() +
+		"document.body.dataset.yakolakLegalVisibleCount='%d';" % visible_count +
+		"document.body.dataset.yakolakLegalSelectedSize=" + JSON.stringify(size_name if selection_current else "") + ";" +
+		"document.body.dataset.yakolakLegalRevision='%d';" % _ux46_legal_revision,
+		true
+	)
 
 
 func _on_web_ux46_start_pass_play(_arguments: Array) -> void:
