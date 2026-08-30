@@ -6,6 +6,15 @@ extends "res://scripts/gameplay_interaction_feedback.gd"
 const OnlineStateCatalog = preload("res://scripts/online_state_catalog.gd")
 const DisplayBoundary = preload("res://scripts/ui_design.gd")
 
+# Full-screen interception is reserved for states where gameplay cannot safely
+# continue until authority arrives or the user explicitly exits. Recoverable
+# transport/commit states remain visible but may not own the whole pointer plane.
+const NON_BLOCKING_ONLINE_STATES: Array[String] = [
+	"submitting-move",
+	"reconnecting",
+	"connected",
+]
+
 var online_ui_state_id: String = ""
 var online_ui_detail: String = ""
 var online_ui_clear_due_msec: int = 0
@@ -159,6 +168,24 @@ func _reset_for_intro() -> void:
 		_show_restore_state_if_pending()
 
 
+func _online_state_blocks_fullscreen(state_id: String) -> bool:
+	# Default to blocking for any unknown/new state. Only explicitly reviewed
+	# automatic/recoverable states may pass pointers through the full-rect root.
+	return not NON_BLOCKING_ONLINE_STATES.has(state_id)
+
+
+func _apply_online_overlay_pointer_policy(state_id: String) -> void:
+	if waiting_root == null:
+		return
+	var blocks_fullscreen: bool = _online_state_blocks_fullscreen(state_id)
+	waiting_root.mouse_filter = Control.MOUSE_FILTER_STOP if blocks_fullscreen else Control.MOUSE_FILTER_IGNORE
+	if waiting_card != null:
+		# The passive card itself is text/chrome only. Its explicit action button
+		# remains a normal STOP control, so reconnect still exposes optional Exit
+		# without turning the surrounding card or viewport into a pointer owner.
+		waiting_card.mouse_filter = Control.MOUSE_FILTER_STOP if blocks_fullscreen else Control.MOUSE_FILTER_IGNORE
+
+
 func _sync_waiting_overlay() -> void:
 	if online_ui_state_id == "connected" and online_ui_clear_due_msec > 0 and Time.get_ticks_msec() >= online_ui_clear_due_msec:
 		_clear_online_ui_state("connected-timeout")
@@ -184,6 +211,7 @@ func _sync_waiting_overlay() -> void:
 		return
 
 	var state: Dictionary = OnlineStateCatalog.get_state(state_id)
+	_apply_online_overlay_pointer_policy(state_id)
 	waiting_root.visible = true
 	var code: String = _waiting_room_code()
 	if waiting_room_label != null:
@@ -226,9 +254,9 @@ func _clear_online_ui_state(reason: String = "unknown") -> void:
 	online_ui_state_id = ""
 	online_ui_detail = ""
 	online_ui_clear_due_msec = 0
-	# Do not leave the full-rect STOP control alive for even one extra frame after
-	# a transient resolves. Waiting/cancelled room states are owned by the base
-	# waiting contract and remain visible through their own explicit conditions.
+	# Do not leave the full-rect pointer owner alive for even one extra frame after
+	# a transient resolves. Waiting/cancelled room states remain true blockers and
+	# are owned by the base waiting contract through their explicit conditions.
 	if waiting_root != null and not (online_active and online_waiting) and not online_cancelled:
 		waiting_root.visible = false
 	if had_state:
@@ -252,16 +280,19 @@ func _publish_online_ui_state(state_id: String, detail: String) -> void:
 			"delete document.body.dataset.yakolakOnlineUiState;" +
 			"delete document.body.dataset.yakolakOnlineUiAction;" +
 			"delete document.body.dataset.yakolakOnlineUiMessage;" +
+			"delete document.body.dataset.yakolakOnlineUiBlocking;" +
 			"document.body.dataset.yakolakOnlineUiSurface='gameplay';",
 			true
 		)
 		return
 	var state: Dictionary = OnlineStateCatalog.get_state(state_id)
 	var message: String = detail if not detail.is_empty() else str(state.get("message", ""))
+	var blocking_mode: String = "full" if _online_state_blocks_fullscreen(state_id) else "pass-through"
 	JavaScriptBridge.eval(
 		"document.body.dataset.yakolakOnlineUiState=" + JSON.stringify(state_id) + ";" +
 		"document.body.dataset.yakolakOnlineUiAction=" + JSON.stringify(str(state.get("action", "none"))) + ";" +
 		"document.body.dataset.yakolakOnlineUiMessage=" + JSON.stringify(str(state.get("title", "")) + " — " + message) + ";" +
+		"document.body.dataset.yakolakOnlineUiBlocking=" + JSON.stringify(blocking_mode) + ";" +
 		"document.body.dataset.yakolakOnlineUiSurface='gameplay';",
 		true
 	)
