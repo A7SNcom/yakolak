@@ -155,6 +155,12 @@ func _settle_dialog() -> void:
 	if not showing or body == null:
 		return
 	_hide_legacy_back_buttons(body)
+	# Container minimum sizes settle on the next layout frame. Fitting in the
+	# same deferred call leaves narrow mobile dialogs at the 148px shell height
+	# while tall preset buttons overflow into the board.
+	await get_tree().process_frame
+	if not showing or body == null:
+		return
 	_fit_card_to_content()
 	_dialog_update_chrome()
 	_schedule_dialog_focus()
