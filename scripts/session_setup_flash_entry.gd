@@ -61,14 +61,20 @@ func _show_knowledge_question() -> void:
 
 
 func _open_first_run_setup(with_tutorial: bool) -> void:
-	# The knowledge answer configures tutorial intent; it does not finish a match
-	# configuration. Setup remains the next usable surface in both branches.
+	# Do not call the inherited `_open_setup()`: the older split-wizard layer
+	# forces `color` as its entry step. The current flow owns structural choices
+	# first, so answer the knowledge question and open `count` directly.
+	joining_room_code = ""
+	online_error_text = ""
+	join_available_colors.clear()
+	room_preview_ready = false
+	room_preview_code = ""
 	tutorial_requested = with_tutorial
 	_publish_learning_choice("learn" if with_tutorial else "skip")
 	custom_setup_active = false
 	wizard_history.clear()
 	wizard_step = "count"
-	_open_setup(with_tutorial)
+	_show_setup()
 
 
 func _continue_after_color() -> void:
