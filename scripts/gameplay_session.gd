@@ -40,6 +40,7 @@ const CAMERA_TRANSITION: float = 0.48
 const ROUND_RESET_DURATION: float = 0.56
 const TRAY_OPEN_DURATION: float = 0.28
 const TRAY_LIFT_STEP: float = 19.0
+const TURN_TIMEOUT_MSEC: int = 18000
 
 var setup: Node
 var online: Node
@@ -109,6 +110,18 @@ func _process(delta: float) -> void:
 	if not match_initialized:
 		return
 	if camera_transition or round_complete or move_active:
+		return
+
+	if not online_active and _current_mode() == "local":
+		if gameplay_ready and turn_deadline_msec > 0 and Time.get_ticks_msec() >= turn_deadline_msec:
+			# Consume this deadline before advancing authority.  _start_turn() arms
+			# the next human only after its camera transition completes, so the
+			# expired turn cannot skip a second seat on a later frame.
+			gameplay_ready = false
+			turn_deadline_msec = 0
+			_clear_selection()
+			_publish_match_state("turn-timeout")
+			_advance_turn_or_draw()
 		return
 
 	if _current_mode() == "bot":
@@ -810,9 +823,9 @@ func _finish_camera_transition() -> void:
 		_publish_gameplay_state("ready" if gameplay_ready else "waiting")
 		return
 	gameplay_ready = _current_mode() == "local"
-	# Local, bot, and online use the same untimed rules.  The old 18-second
-	# local-only timeout made identical moves behave differently by mode.
-	turn_deadline_msec = 0
+	# The local human owns an 18-second authority window.  Arm only after the
+	# camera handoff finishes so transition time never consumes the player's turn.
+	turn_deadline_msec = Time.get_ticks_msec() + TURN_TIMEOUT_MSEC if gameplay_ready else 0
 	_update_hud()
 	_publish_gameplay_state("ready" if gameplay_ready else "waiting")
 	_publish_match_state("turn")
