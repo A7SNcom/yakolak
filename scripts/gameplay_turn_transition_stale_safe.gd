@@ -25,6 +25,14 @@ const TURN41_SAFE_INSET_REFRESH_MS: int = 500
 var turn41_layout_publish_key: String = ""
 
 
+func _process(delta: float) -> void:
+	super._process(delta)
+	if quick_button == null or quick_panel == null:
+		return
+	if Time.get_ticks_msec() - turn41_safe_insets_read_msec >= TURN41_SAFE_INSET_REFRESH_MS:
+		_layout_quick_menu()
+
+
 func _transition_to_current_player() -> void:
 	# Online presentation starts only after the authoritative room snapshot is
 	# published. Offline/shared-device play keeps its established camera/tutorial
