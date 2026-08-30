@@ -247,6 +247,19 @@ func _return_to_setup() -> void:
 	online_cancelled = false
 	_update_hud()
 	_publish_cleanliness_state()
+	_publish_return_to_setup_state()
+
+
+func _publish_return_to_setup_state() -> void:
+	if not OS.has_feature("web"):
+		return
+	# Match telemetry is part of the browser-facing lifecycle contract. Leaving it
+	# at match-complete keeps stale winner/turn/input authority alive after setup
+	# is already editable, so return to the same clean Web baseline as fresh setup.
+	JavaScriptBridge.eval(
+		"(()=>{const d=document.body.dataset;d.yakolakGameplay='setup';d.yakolakMoves='0';d.yakolakSelected='';d.yakolakSelectedSize='';for(const k of ['yakolakMatchState','yakolakCurrentPlayer','yakolakRound','yakolakRoundCount','yakolakWinsToWin','yakolakTurnRemaining','yakolakWinner','yakolakPlayers'])delete d[k];})();",
+		true
+	)
 
 
 func _reset_session_transients() -> void:
