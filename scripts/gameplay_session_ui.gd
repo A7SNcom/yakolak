@@ -243,19 +243,6 @@ func _on_round_action() -> void:
 	super._on_round_action()
 
 
-func _reset_board_for_round() -> void:
-	super._reset_board_for_round()
-	# The result card is hidden synchronously by the reset owner. Mirror that
-	# lifecycle into the Web/UI contract instead of leaving `visible` from the
-	# completed round until some unrelated HUD visibility change happens later.
-	if OS.has_feature("web"):
-		JavaScriptBridge.eval(
-			"document.body.dataset.yakolakResultOverlay='hidden';" +
-			"document.body.dataset.yakolakScoreHud='hidden';",
-			true
-		)
-
-
 func _show_round_result() -> void:
 	# The result card is the explicit handoff: keep it visible until the player
 	# reads the winner/reason and presses it to begin the reset motion.

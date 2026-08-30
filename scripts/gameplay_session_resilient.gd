@@ -185,6 +185,15 @@ func _reset_board_for_round() -> void:
 	# that lifecycle through the gameplay channel too so Web/UI readiness cannot
 	# retain the previous turn's stale `ready` state during the reset animation.
 	_publish_gameplay_state("round-reset")
+	# This override owns the production reset completely (it intentionally does
+	# not call the UI-layer reset), so it must also retire the completed-round card
+	# from the browser-facing contract at the exact same boundary.
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval(
+			"document.body.dataset.yakolakResultOverlay='hidden';" +
+			"document.body.dataset.yakolakScoreHud='hidden';",
+			true
+		)
 
 
 func _finish_stability_round_reset(generation: int) -> void:
