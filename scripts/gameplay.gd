@@ -656,7 +656,9 @@ func _marker_material(color: Color) -> StandardMaterial3D:
 
 func _ease(value: float) -> float:
 	var t: float = clampf(value, 0.0, 1.0)
-	return 4.0 * t * t * t if t < 0.5 else 1.0 - pow(-2.0 * t + 2.0, 3.0) / 2.0
+	# Keep the authoritative 520 ms commit boundary unchanged, but make accepted
+	# placements visibly leave the source sooner instead of lingering near t=0.
+	return t * t * (3.0 - 2.0 * t)
 
 
 func _publish_selection(record: Dictionary) -> void:
