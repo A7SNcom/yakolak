@@ -231,6 +231,12 @@ func _input(event: InputEvent) -> void:
 		_dialog_move_focus(-1 if key.shift_pressed else 1)
 		get_viewport().set_input_as_handled()
 		return
+	if key.is_action_pressed("ui_accept") or key.keycode == KEY_ENTER or key.keycode == KEY_KP_ENTER or key.keycode == KEY_SPACE:
+		var owner: Control = get_viewport().gui_get_focus_owner()
+		if owner is BaseButton and not (owner as BaseButton).disabled:
+			(owner as BaseButton).pressed.emit()
+			get_viewport().set_input_as_handled()
+			return
 	if event.is_action_pressed("ui_cancel"):
 		if active_screen != "room_entry":
 			_dialog_cancel()
