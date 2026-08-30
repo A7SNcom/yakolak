@@ -51,6 +51,8 @@ func _build_post_match_secondary_button() -> void:
 	post_match_secondary_button.offset_right = 132.0
 	post_match_secondary_button.offset_bottom = 122.0
 	post_match_secondary_button.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	post_match_secondary_button.text_direction = Control.TEXT_DIRECTION_RTL
+	post_match_secondary_button.language = "ar"
 	post_match_secondary_button.focus_mode = Control.FOCUS_NONE
 	post_match_secondary_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	post_match_secondary_button.add_theme_font_override("font", ARABIC_FONT)

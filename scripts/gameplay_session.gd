@@ -1302,6 +1302,8 @@ func _build_hud() -> void:
 	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	turn_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	turn_label.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	turn_label.text_direction = Control.TEXT_DIRECTION_RTL
+	turn_label.language = "ar"
 	turn_label.add_theme_font_override("font", ARABIC_FONT)
 	turn_label.add_theme_color_override("font_color", Color.WHITE)
 	turn_label.add_theme_stylebox_override("normal", turn_style)
@@ -1317,6 +1319,8 @@ func _build_hud() -> void:
 	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	score_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	score_label.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	score_label.text_direction = Control.TEXT_DIRECTION_RTL
+	score_label.language = "ar"
 	score_label.add_theme_font_override("font", ARABIC_FONT)
 	score_label.add_theme_color_override("font_color", Color("#f3f4f4"))
 	score_label.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.02, 0.92))
@@ -1331,6 +1335,8 @@ func _build_hud() -> void:
 	result_button.offset_bottom = 62
 	result_button.text = ""
 	result_button.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	result_button.text_direction = Control.TEXT_DIRECTION_RTL
+	result_button.language = "ar"
 	result_button.add_theme_font_override("font", ARABIC_FONT)
 	result_button.add_theme_color_override("font_color", Color.WHITE)
 	result_button.add_theme_stylebox_override("normal", _result_style(Color("#15181aec")))

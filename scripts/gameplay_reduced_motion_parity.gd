@@ -56,6 +56,8 @@ func _build_reduced_motion_ack() -> void:
 	_rm_ack_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_rm_ack_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_rm_ack_label.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	_rm_ack_label.text_direction = Control.TEXT_DIRECTION_RTL
+	_rm_ack_label.language = "ar"
 	_rm_ack_label.add_theme_font_override("font", ARABIC_FONT)
 	_rm_ack_label.add_theme_color_override("font_color", Color.WHITE)
 	_rm_ack_label.mouse_filter = Control.MOUSE_FILTER_IGNORE

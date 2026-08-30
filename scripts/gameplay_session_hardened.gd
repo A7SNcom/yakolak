@@ -1,5 +1,7 @@
 extends "res://scripts/gameplay_session_resilient.gd"
 
+const WaitingDisplay = preload("res://scripts/ui_design.gd")
+
 # Online gameplay hardening: waiting for players is a distinct, unmistakable
 # state. The physical board stays visible, but it is blocked until the
 # authoritative room reaches `playing`.
@@ -60,6 +62,8 @@ func _build_waiting_overlay() -> void:
 	waiting_exit_button = Button.new()
 	waiting_exit_button.text = "خروج"
 	waiting_exit_button.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	waiting_exit_button.text_direction = Control.TEXT_DIRECTION_RTL
+	waiting_exit_button.language = "ar"
 	waiting_exit_button.focus_mode = Control.FOCUS_NONE
 	waiting_exit_button.custom_minimum_size = Vector2(_hud_length(112.0), _hud_length(40.0))
 	waiting_exit_button.add_theme_font_override("font", THMANYAH_MEDIUM)
@@ -79,6 +83,8 @@ func _waiting_label(text_value: String, size: int, font: Font, color: Color) -> 
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	label.text_direction = Control.TEXT_DIRECTION_RTL
+	label.language = "ar"
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.add_theme_font_override("font", font)
@@ -143,14 +149,8 @@ func _waiting_target_count() -> int:
 	return configured.size()
 
 
-func _arabize_waiting(value: String) -> String:
-	var result: String = value
-	var western: Array[String] = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-	var arabic: Array[String] = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"]
-	for index: int in range(10):
-		result = result.replace(western[index], arabic[index])
-	return result
-
+func _waiting_display_text(value: String) -> String:
+	return WaitingDisplay.display_text(value)
 
 func _sync_waiting_overlay() -> void:
 	if waiting_root == null:
@@ -173,9 +173,9 @@ func _sync_waiting_overlay() -> void:
 	var code: String = _waiting_room_code()
 	var joined: int = players.size()
 	var target: int = maxi(_waiting_target_count(), joined)
-	waiting_room_label.text = "تجهيز الغرفة…" if code.is_empty() else "الغرفة " + _arabize_waiting(code)
+	waiting_room_label.text = "تجهيز الغرفة…" if code.is_empty() else "الغرفة " + _waiting_display_text(code)
 	waiting_title_label.text = "بانتظار اللاعبين"
-	waiting_progress_label.text = _arabize_waiting("%d / %d" % [joined, target]) if target > 0 else "…"
+	waiting_progress_label.text = _waiting_display_text("%d / %d" % [joined, target]) if target > 0 else "…"
 	var key: String = "%s:%d:%d" % [code, joined, target]
 	if key == waiting_state_key:
 		return

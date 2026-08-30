@@ -277,9 +277,9 @@ func _showcase_caption(text: String, stage: String) -> void:
 		turn_label.text = text
 	if score_label != null:
 		match stage:
-			"line": score_label.text = "١ / ٣"
-			"stairs": score_label.text = "٢ / ٣"
-			"tower": score_label.text = "٣ / ٣"
+			"line": score_label.text = "1 / 3"
+			"stairs": score_label.text = "2 / 3"
+			"tower": score_label.text = "3 / 3"
 			_: score_label.text = ""
 
 

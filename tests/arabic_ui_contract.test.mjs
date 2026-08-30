@@ -9,6 +9,11 @@ const gameplayDesign = fs.readFileSync(new URL('../scripts/gameplay_design_syste
 const authoritativeTurn = fs.readFileSync(new URL('../scripts/gameplay_authoritative_turn_state.gd', import.meta.url), 'utf8');
 const turnTransition = fs.readFileSync(new URL('../scripts/gameplay_turn_transition_stale_safe.gd', import.meta.url), 'utf8');
 const selectedState = fs.readFileSync(new URL('../scripts/gameplay_selected_state.gd', import.meta.url), 'utf8');
+const selectionLatency = fs.readFileSync(new URL('../scripts/gameplay_selection_latency.gd', import.meta.url), 'utf8');
+const reducedMotion = fs.readFileSync(new URL('../scripts/gameplay_reduced_motion_parity.gd', import.meta.url), 'utf8');
+const gameplaySession = fs.readFileSync(new URL('../scripts/gameplay_session.gd', import.meta.url), 'utf8');
+const rematchLifecycle = fs.readFileSync(new URL('../scripts/gameplay_rematch_lifecycle.gd', import.meta.url), 'utf8');
+const tutorialShowcase = fs.readFileSync(new URL('../scripts/gameplay_tutorial_showcase.gd', import.meta.url), 'utf8');
 const turnHud = fs.readFileSync(new URL('../scripts/turn_clarity_hud.gd', import.meta.url), 'utf8');
 const turnHudDesign = fs.readFileSync(new URL('../scripts/turn_clarity_hud_design_system.gd', import.meta.url), 'utf8');
 const setup = fs.readFileSync(new URL('../scripts/session_setup_arabic.gd', import.meta.url), 'utf8');
@@ -38,7 +43,9 @@ assert.ok(setupDialog.includes('extends "res://scripts/session_setup_flow.gd"'),
 assert.ok(setupFlow.includes('extends "res://scripts/session_setup_arabic.gd"'), 'the user-journey layer must preserve the Arabic setup layer');
 assert.ok(scene.includes('res://scripts/gameplay_design_system.gd'), 'gameplay chrome must use the shared design adapter');
 assert.ok(gameplayDesign.includes('extends "res://scripts/gameplay_rematch_lifecycle.gd"'), 'gameplay design must preserve the rematch/gameplay chain');
-assert.ok(scene.includes('res://scripts/gameplay_selected_state.gd'), 'production gameplay must use the selected-state presentation leaf');
+assert.ok(scene.includes('res://scripts/gameplay_reduced_motion_parity.gd'), 'production gameplay must use the reduced-motion presentation leaf');
+assert.ok(reducedMotion.includes('extends \"res://scripts/gameplay_selection_latency.gd\"'), 'reduced-motion gameplay must preserve the selection-latency layer');
+assert.ok(selectionLatency.includes('extends \"res://scripts/gameplay_selected_state.gd\"'), 'selection latency must preserve the selected-state presentation layer');
 assert.ok(selectedState.includes('extends "res://scripts/gameplay_turn_transition_stale_safe.gd"'), 'selected-state presentation must preserve the stale-safe turn presentation layer');
 assert.ok(turnTransition.includes('extends "res://scripts/gameplay_authoritative_turn_state.gd"'), 'stale-safe presentation must preserve the authoritative turn observer layer');
 assert.ok(authoritativeTurn.includes('signal authoritative_turn_changed'), 'turn presentation must subscribe to one authoritative gameplay event');
@@ -72,6 +79,14 @@ assert.ok(!gameplay.includes('func _arabize_digits'), 'gameplay must not own an 
 assert.ok(gameplay.includes('turn_label.text = Display.display_text(turn_label.text)'), 'legacy turn text must cross the shared display boundary');
 assert.ok(gameplay.includes('score_label.text = Display.display_text(score_label.text)'), 'score text must cross the shared display boundary');
 assert.ok(gameplay.includes('result_button.text = Display.display_text(result_button.text)'), 'result text must cross the shared display boundary');
+
+assert.ok(!gameplayHardened.includes('func _arabize_waiting'), 'waiting UI must not own an Arabic digit shaper');
+assert.ok(gameplayHardened.includes('WaitingDisplay.display_text(value)'), 'waiting UI must use the shared Western-digit display boundary');
+assert.ok(gameplayHardened.includes('waiting_exit_button.text_direction = Control.TEXT_DIRECTION_RTL'), 'waiting action must set RTL text direction explicitly');
+assert.ok(gameplaySession.includes('result_button.text_direction = Control.TEXT_DIRECTION_RTL'), 'match result must set RTL text direction explicitly');
+assert.ok(rematchLifecycle.includes('post_match_secondary_button.text_direction = Control.TEXT_DIRECTION_RTL'), 'post-match secondary action must set RTL text direction explicitly');
+assert.ok(reducedMotion.includes('_rm_ack_label.text_direction = Control.TEXT_DIRECTION_RTL'), 'reduced-motion acknowledgement must set RTL text direction explicitly');
+assert.ok(!/[٠-٩۰-۹]/u.test(tutorialShowcase), 'tutorial progress must render Western digits');
 
 assert.ok(!setup.includes('func _arabize_numbers'), 'setup must not own an ad-hoc Arabic digit converter');
 assert.ok(setup.includes('super._label(Display.display_text(text_value)'), 'every setup label must cross the shared display boundary');
