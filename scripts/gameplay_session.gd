@@ -909,6 +909,7 @@ func _piece_direction(piece_index: int) -> String:
 
 func _finish_round(winner: String, winning: Array[int]) -> void:
 	round_complete = true
+	_set_result_pointer_owner(true)
 	gameplay_ready = false
 	turn_deadline_msec = 0
 	round_winner = winner
@@ -1263,6 +1264,7 @@ func _player_name(direction: String) -> String:
 func _flash_result(message: String) -> void:
 	if result_button == null or round_complete:
 		return
+	_set_result_pointer_owner(false)
 	result_button.text = message
 	result_button.visible = true
 	get_tree().create_timer(0.75).timeout.connect(_hide_transient_result)
@@ -1271,6 +1273,13 @@ func _flash_result(message: String) -> void:
 func _hide_transient_result() -> void:
 	if result_button != null and not round_complete:
 		result_button.visible = false
+
+
+func _set_result_pointer_owner(interactive: bool) -> void:
+	if result_button == null:
+		return
+	result_button.mouse_filter = Control.MOUSE_FILTER_STOP if interactive else Control.MOUSE_FILTER_IGNORE
+	result_button.disabled = not interactive
 
 
 func _build_hud() -> void:

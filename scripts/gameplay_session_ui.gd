@@ -31,7 +31,7 @@ var quick_button: Button
 var quick_panel: PanelContainer
 var quick_round_button: Button
 var quick_sound_button: Button
-var quick_pointer_block_until: int = 0
+var quick_exit_button: Button
 var score_marker_root: Node3D
 var rendered_score_counts: Dictionary = {}
 var local_round_auto_due_msec: int = 0
@@ -70,19 +70,21 @@ func _input(event: InputEvent) -> void:
 		pressed = mouse.pressed and mouse.button_index == MOUSE_BUTTON_LEFT
 		position = mouse.position
 	if pressed and quick_button != null and quick_button.visible:
-		if Time.get_ticks_msec() < quick_pointer_block_until:
-			get_viewport().set_input_as_handled()
-			return
 		if quick_button.get_global_rect().has_point(position):
 			return
 		if quick_panel != null and quick_panel.visible:
-			if quick_panel.get_global_rect().has_point(position):
+			if _quick_menu_action_at(position):
 				return
+			# Closing chrome is noninteractive: the same pointer continues to gameplay.
 			quick_panel.visible = false
-			quick_pointer_block_until = Time.get_ticks_msec() + 280
-			get_viewport().set_input_as_handled()
-			return
 	super._input(event)
+
+
+func _quick_menu_action_at(position: Vector2) -> bool:
+	for button: Button in [quick_round_button, quick_sound_button, quick_exit_button]:
+		if button != null and button.visible and not button.disabled and button.get_global_rect().has_point(position):
+			return true
+	return false
 
 
 func _apply_thmanyah_to_hud() -> void:
@@ -119,11 +121,13 @@ func _build_quick_menu() -> void:
 	quick_root.add_child(quick_button)
 
 	quick_panel = PanelContainer.new()
+	quick_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	quick_panel.add_theme_stylebox_override("panel", _quick_style(Color(0.035, 0.055, 0.067, 0.94), 17.0))
 	quick_panel.visible = false
 	quick_root.add_child(quick_panel)
 
 	var menu := VBoxContainer.new()
+	menu.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	menu.add_theme_constant_override("separation", int(round(_hud_length(7.0))))
 	quick_panel.add_child(menu)
 
@@ -136,9 +140,9 @@ func _build_quick_menu() -> void:
 	quick_sound_button = _quick_action("الصوت")
 	quick_sound_button.pressed.connect(_toggle_sound)
 	menu.add_child(quick_sound_button)
-	var exit := _quick_action("خروج")
-	exit.pressed.connect(_quick_exit)
-	menu.add_child(exit)
+	quick_exit_button = _quick_action("خروج")
+	quick_exit_button.pressed.connect(_quick_exit)
+	menu.add_child(quick_exit_button)
 	_layout_quick_menu()
 
 
