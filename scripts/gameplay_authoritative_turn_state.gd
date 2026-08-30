@@ -28,6 +28,65 @@ func _ready() -> void:
 	call_deferred("_publish_authoritative_turn_state", "ready")
 
 
+# GGH-039: transport recovery is not gameplay readiness. Reuse the existing
+# OnlineSession hydration barrier; do not create a second authority state.
+func _reconnect_hydration_blocked() -> bool:
+	if not online_active or online == null:
+		return false
+	return bool(online.get("reconnecting")) or bool(online.get("reconnect_hydration_pending"))
+
+
+func _handle_pointer(screen_position: Vector2) -> void:
+	if _reconnect_hydration_blocked():
+		return
+	super._handle_pointer(screen_position)
+
+
+func _begin_move(cell: int) -> void:
+	if _reconnect_hydration_blocked():
+		return
+	super._begin_move(cell)
+
+
+func _clear_reconnect_visual_intent() -> void:
+	# Selection/tray state is presentation only. Any unresolved exactly-once
+	# mutation remains owned by OnlineSession/explicit-handoff reconciliation.
+	if tray_tween != null and tray_tween.is_valid():
+		tray_tween.kill()
+	tray_tween = null
+	if tray_open:
+		for index: int in tray_indices:
+			if index < 0 or index >= piece_records.size():
+				continue
+			var record: Dictionary = piece_records[index] as Dictionary
+			var piece: MeshInstance3D = record["mesh"] as MeshInstance3D
+			if index < home_materials.size():
+				piece.material_override = home_materials[index]
+			if not bool(record.get("played", false)) and index < home_transforms.size():
+				piece.position = home_transforms[index].origin
+		tray_open = false
+		tray_side = 0
+		tray_indices.clear()
+		_publish_tray_state("closed")
+	elif selected_index >= 0 and selected_index < piece_records.size():
+		var selected_record: Dictionary = piece_records[selected_index] as Dictionary
+		var selected_mesh: MeshInstance3D = selected_record["mesh"] as MeshInstance3D
+		if selected_mesh != null and not bool(selected_record.get("played", false)) and not move_active:
+			selected_mesh.position = selected_home_position
+			selected_mesh.scale = Vector3.ONE * U
+			selected_mesh.material_override = selected_original_material
+	selected_index = -1
+	selected_original_material = null
+	_hide_markers()
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval(
+			"document.body.dataset.yakolakSelected='';" +
+			"delete document.body.dataset.yakolakSelectedSize;" +
+			"document.body.dataset.yakolakGameplay='restoring';",
+			true
+		)
+
+
 func authoritative_turn_snapshot() -> Dictionary:
 	if authoritative_turn_cached_snapshot.is_empty():
 		var snapshot: Dictionary = _build_authoritative_turn_snapshot("read")
@@ -149,6 +208,11 @@ func _start_online_join(configuration: Dictionary, code: String) -> void:
 
 
 func _on_online_room_changed(remote: Dictionary, identity: Dictionary) -> void:
+	var was_hydrating: bool = _reconnect_hydration_blocked()
+	if was_hydrating:
+		# Remove pre-fresh local visual intent before the accepted authoritative
+		# room is rendered. Network mutation reconciliation remains untouched.
+		_clear_reconnect_visual_intent()
 	var previous_player_index: int = current_player_index
 	super._on_online_room_changed(remote, identity)
 	if remote.is_empty():
@@ -175,13 +239,18 @@ func _on_connection_state_changed(state: String, detail: String) -> void:
 	if not online_active and not restoring_online:
 		return
 	if state == "reconnecting":
+		gameplay_ready = false
+		_clear_reconnect_visual_intent()
 		authoritative_online_snapshot_hydrated = false
 		authoritative_turn_transitioning = true
 		_publish_authoritative_turn_state("reconnecting")
 	elif state == "connected" and not authoritative_online_snapshot_hydrated:
-		# Transport connectivity is not turn authority. Stay hidden until the
-		# post-reconnect accepted room snapshot arrives.
+		# Transport connectivity is not turn authority. Keep the existing restore
+		# surface and input lock until a complete room snapshot is accepted.
+		gameplay_ready = false
 		authoritative_turn_transitioning = true
+		if _reconnect_hydration_blocked():
+			_set_online_ui_state("restoring-room")
 		_publish_authoritative_turn_state("connected-unhydrated")
 
 
