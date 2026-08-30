@@ -197,11 +197,13 @@ func _indicator_copy(snapshot: Dictionary) -> String:
 			return "دورك"
 		var number: int = _remote_player_number(snapshot)
 		return "دور لاعب " + str(number) if number > 0 else ""
+	# Shared-device play needs the person, not a remembered color mapping, to be
+	# the semantic owner. The capsule border keeps color as a supporting cue.
+	var player_number: int = int(snapshot.get("player_number", 0))
+	if player_number > 0:
+		return "دور لاعب " + str(player_number)
 	var color_name: String = str(snapshot.get("color_name", ""))
-	if not color_name.is_empty():
-		return "دور " + color_name
-	var fallback_number: int = int(snapshot.get("player_number", 0))
-	return "دور لاعب " + str(fallback_number) if fallback_number > 0 else ""
+	return "دور " + color_name if not color_name.is_empty() else ""
 
 
 func _remote_player_number(snapshot: Dictionary) -> int:

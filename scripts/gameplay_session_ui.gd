@@ -281,14 +281,15 @@ func _maybe_auto_advance_round() -> void:
 
 
 func _sync_hud_visibility() -> void:
-	var show_turn: bool = match_initialized or online_active
+	# TurnClarityHUD is the single authoritative owner surface. Keep the retired
+	# color-only label hidden across lifecycle changes instead of re-showing it.
 	if turn_label != null:
-		turn_label.visible = show_turn
+		turn_label.visible = false
 	if score_label != null:
 		score_label.visible = false
 	if result_button != null:
 		result_button.visible = match_initialized and round_complete
-	var state: String = "visible" if show_turn else "hidden"
+	var state: String = "hidden"
 	if state == hud_visibility_state:
 		return
 	hud_visibility_state = state
