@@ -207,6 +207,8 @@ func _restart_completed_local_match() -> void:
 	_lock_intro_replay()
 	session_generation += 1
 	_reset_session_transients()
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("document.body.dataset.yakolakSelected='';document.body.dataset.yakolakSelectedSize='';", true)
 	action_in_progress = true
 	_clean_visual_board()
 	_reset_online_round_auto()
