@@ -1,10 +1,11 @@
 extends Node
 
 # Visibility gate only. Layout, typography and framing are owned by the compact
-# split-screen SessionSetup subclass. The guard opens the UI only after the real
-# intro is finished, then hands the first rendered frame to the setup motion.
+# split-screen SessionSetup subclass. The gate opens only after the explicit
+# intro handoff for the current generation has been consumed; the visual clock
+# (`playing`) is intentionally not an ownership signal.
 
-const UI_VERSION := "split-gate-v2-motion"
+const UI_VERSION := "split-gate-v3-explicit-handoff"
 
 var intro: Node3D
 var preintro: Node
@@ -52,9 +53,10 @@ func _process(_delta: float) -> void:
 func _real_intro_finished() -> bool:
 	if intro == null:
 		return false
-	if preintro != null and not bool(preintro.get("completed")):
+	var generation: int = int(intro.get("intro_run_generation"))
+	if generation <= 0:
 		return false
-	return not bool(intro.get("playing"))
+	return int(intro.get("gameplay_handoff_consumed_generation")) == generation
 
 
 func _set_gate(state: String) -> void:

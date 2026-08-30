@@ -1,7 +1,8 @@
 extends "res://scripts/session_setup_state_inventory.gd"
 
-# Hard-owned minimal entry screen: exactly two visible text choices.
-# Do not delegate the entry screen to older setup layers.
+# Hard-owned first-run entry for Flash Mode. A fresh visit asks the knowledge
+# question immediately after the real intro handoff, then opens the existing
+# setup wizard. Invitation URLs keep their direct invitation path.
 
 func show_after_intro() -> void:
 	if showing:
@@ -14,7 +15,73 @@ func show_after_intro() -> void:
 		_request_room_preview(joining_room_code)
 		_show_invitation(joining_room_code)
 	else:
-		_show_room_entry()
+		_prepare_first_run_question()
+
+
+func _prepare_first_run_question() -> void:
+	joining_room_code = ""
+	online_error_text = ""
+	join_available_colors.clear()
+	room_preview_ready = false
+	room_preview_code = ""
+	tutorial_requested = false
+	custom_setup_active = false
+	wizard_history.clear()
+	_reset_seats()
+	wizard_step = "count"
+	_show_knowledge_question()
+
+
+func _start_new_game_flow() -> void:
+	# Returning from the entry chooser must follow the same first-run contract;
+	# never bypass the knowledge decision through the inherited later-flow path.
+	_prepare_first_run_question()
+
+
+func _show_knowledge_question() -> void:
+	active_screen = "question"
+	_clear_body()
+	var content := _content_box()
+	body.add_child(content)
+	content.add_child(_label("هل تعرف اللعبة؟", 25, HORIZONTAL_ALIGNMENT_CENTER))
+	var choices := _choice_row()
+	var yes := _button("نعم، أعرفها", Color("#10201f"), Color("#f2f0e9"))
+	yes.pressed.connect(_open_first_run_setup.bind(false))
+	choices.add_child(yes)
+	var no := _button("أبغى أتعلم", Color.WHITE, Color("#235b50"))
+	no.pressed.connect(_open_first_run_setup.bind(true))
+	choices.add_child(no)
+	content.add_child(choices)
+	var back := _button("رجوع", Color("#eef4f3"), Color(0.10, 0.15, 0.17, 0.72))
+	back.pressed.connect(_show_room_entry)
+	content.add_child(back)
+	_layout_card()
+	_publish_flow_stage("knowledge")
+	call_deferred("_apply_split_framing")
+
+
+func _open_first_run_setup(with_tutorial: bool) -> void:
+	# The knowledge answer configures tutorial intent; it does not finish a match
+	# configuration. Setup remains the next usable surface in both branches.
+	tutorial_requested = with_tutorial
+	_publish_learning_choice("learn" if with_tutorial else "skip")
+	custom_setup_active = false
+	wizard_history.clear()
+	wizard_step = "count"
+	_open_setup(with_tutorial)
+
+
+func _continue_after_color() -> void:
+	# The knowledge decision already happened before setup. Do not ask it again or
+	# emit from the question screen; finish the configured setup exactly once.
+	if not joining_room_code.is_empty():
+		tutorial_requested = false
+		_emit_configuration()
+		return
+	if tutorial_requested and not _tutorial_available_for_current_configuration():
+		tutorial_requested = false
+		_publish_learning_choice("not-applicable")
+	_emit_configuration()
 
 
 func _rebuild_active_screen() -> void:
