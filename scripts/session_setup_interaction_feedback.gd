@@ -1,13 +1,15 @@
 extends "res://scripts/session_setup_design_system.gd"
 
 # One interaction-feedback contract for the setup flow. Keep the motion tiny:
-# immediate visual state changes, a short duplicate-click guard, and no decorative
-# animation that delays the user's next action.
+# immediate visual state changes and no decorative animation that delays the
+# user's next action.
+#
+# GGH-033: Godot identifies mouse events synthesized from a touchscreen with
+# InputEvent.DEVICE_ID_EMULATION. Ignore only those redundant mouse events while
+# setup is visible. Native touch, physical mouse, and keyboard activation remain
+# independent and may intentionally activate a freshly rebuilt control at once.
 const FeedbackDesign = preload("res://scripts/ui_design.gd")
-const RAPID_REPEAT_GUARD_MS := 180
 
-var _feedback_guard_until_msec: int = 0
-var _feedback_guard_serial: int = 0
 var _feedback_ack_tween: Tween
 
 
@@ -16,19 +18,8 @@ func _ready() -> void:
 	_publish_interaction_feedback_contract()
 
 
-func _clear_body() -> void:
-	super._clear_body()
-	# A rebuilt screen can occupy the exact pixels of the control that opened it.
-	# Arm a very short carry-over guard. Each new Button also guards its own
-	# button_down signal, which is the reliable level for Godot GUI activation.
-	_feedback_guard_serial += 1
-	_feedback_guard_until_msec = Time.get_ticks_msec() + RAPID_REPEAT_GUARD_MS
-	_install_pointer_shield(_feedback_guard_serial)
-
-
 func _input(event: InputEvent) -> void:
-	# Fallback for pointer events that do not travel through the Control GUI path.
-	if showing and _is_feedback_pointer_press(event) and Time.get_ticks_msec() < _feedback_guard_until_msec:
+	if showing and _is_emulated_mouse_from_touch(event):
 		_acknowledge_guarded_repeat()
 		get_viewport().set_input_as_handled()
 		return
@@ -98,10 +89,6 @@ func _apply_button_feedback(button: Button) -> void:
 	else:
 		button.focus_mode = Control.FOCUS_ALL
 
-	if not button.has_meta("yakolak_feedback_guard_connected"):
-		button.set_meta("yakolak_feedback_guard_connected", true)
-		button.button_down.connect(_on_feedback_button_down.bind(button))
-
 	var pressed_style: StyleBox = button.get_theme_stylebox("pressed")
 	if pressed_style != null:
 		button.add_theme_stylebox_override("hover_pressed", pressed_style.duplicate() as StyleBox)
@@ -118,31 +105,6 @@ func _apply_button_feedback(button: Button) -> void:
 			button.add_theme_stylebox_override("disabled", disabled_style)
 
 
-func _on_feedback_button_down(button: Button) -> void:
-	if button == null or button.disabled:
-		return
-	var now: int = Time.get_ticks_msec()
-	if now >= _feedback_guard_until_msec:
-		return
-	# Disabling during button_down cancels this activation before Button.pressed
-	# can fire, so a second physical click cannot answer the freshly shown screen.
-	button.disabled = true
-	button.mouse_default_cursor_shape = Control.CURSOR_ARROW
-	button.focus_mode = Control.FOCUS_NONE
-	_acknowledge_guarded_repeat()
-	_release_guarded_button(button, _feedback_guard_serial)
-
-
-func _release_guarded_button(button: Button, serial: int) -> void:
-	var remaining_ms: int = maxi(1, _feedback_guard_until_msec - Time.get_ticks_msec())
-	await get_tree().create_timer(float(remaining_ms) / 1000.0).timeout
-	if serial != _feedback_guard_serial or not is_instance_valid(button):
-		return
-	button.disabled = false
-	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	button.focus_mode = Control.FOCUS_ALL
-
-
 func _apply_line_edit_feedback(field: LineEdit) -> void:
 	if field == null:
 		return
@@ -155,43 +117,10 @@ func _apply_line_edit_feedback(field: LineEdit) -> void:
 	field.add_theme_stylebox_override("focus", focus)
 
 
-func _install_pointer_shield(serial: int) -> void:
-	if root == null:
-		return
-	var shield := Control.new()
-	shield.name = "InteractionRepeatShield"
-	shield.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	shield.mouse_filter = Control.MOUSE_FILTER_STOP
-	shield.focus_mode = Control.FOCUS_NONE
-	shield.z_index = 4096
-	shield.gui_input.connect(_on_pointer_shield_input)
-	root.add_child(shield)
-	_release_pointer_shield(shield, serial)
-	if OS.has_feature("web"):
-		JavaScriptBridge.eval("document.body.dataset.yakolakInteractionRapidGuard='active';", true)
-
-
-func _release_pointer_shield(shield: Control, serial: int) -> void:
-	await get_tree().create_timer(float(RAPID_REPEAT_GUARD_MS) / 1000.0).timeout
-	if is_instance_valid(shield):
-		shield.queue_free()
-	if serial == _feedback_guard_serial and OS.has_feature("web"):
-		JavaScriptBridge.eval("document.body.dataset.yakolakInteractionRapidGuard='ready';", true)
-
-
-func _on_pointer_shield_input(event: InputEvent) -> void:
-	if _is_feedback_pointer_press(event):
-		_acknowledge_guarded_repeat()
-	get_viewport().set_input_as_handled()
-
-
-func _is_feedback_pointer_press(event: InputEvent) -> bool:
-	if event is InputEventScreenTouch:
-		return (event as InputEventScreenTouch).pressed
-	if event is InputEventMouseButton:
-		var mouse := event as InputEventMouseButton
-		return mouse.pressed and mouse.button_index == MOUSE_BUTTON_LEFT
-	return false
+func _is_emulated_mouse_from_touch(event: InputEvent) -> bool:
+	if not event is InputEventMouseButton:
+		return false
+	return (event as InputEventMouseButton).device == InputEvent.DEVICE_ID_EMULATION
 
 
 func _acknowledge_guarded_repeat() -> void:
@@ -203,7 +132,7 @@ func _acknowledge_guarded_repeat() -> void:
 	_feedback_ack_tween = create_tween()
 	_feedback_ack_tween.tween_property(card, "modulate", Color.WHITE, 0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	if OS.has_feature("web"):
-		JavaScriptBridge.eval("document.body.dataset.yakolakInteractionRapidRepeat='acknowledged';", true)
+		JavaScriptBridge.eval("document.body.dataset.yakolakInteractionRapidRepeat='emulated-mouse-suppressed';", true)
 
 
 func _find_button_with_text(node: Node, values: Array[String]) -> Button:
@@ -232,6 +161,9 @@ func _publish_interaction_feedback_contract() -> void:
 		"document.body.dataset.yakolakInteractionFeedback='hover+pressed+selected+disabled+focus+loading';" +
 		"document.body.dataset.yakolakInteractionInputs='mouse+touch+keyboard';" +
 		"document.body.dataset.yakolakInteractionMotion='instant-subtle';" +
-		"document.body.dataset.yakolakInteractionRapidGuardMs='" + str(RAPID_REPEAT_GUARD_MS) + "';",
+		"document.body.dataset.yakolakInteractionCarryGuard='emulated-mouse-device-only';" +
+		"document.body.dataset.yakolakInteractionRapidSecondAction='preserved';" +
+		"delete document.body.dataset.yakolakInteractionRapidGuardMs;" +
+		"delete document.body.dataset.yakolakInteractionRapidGuard;",
 		true
 	)

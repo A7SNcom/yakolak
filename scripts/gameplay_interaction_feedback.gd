@@ -3,6 +3,11 @@ extends "res://scripts/gameplay_design_system.gd"
 # Interaction feedback for the live board and gameplay chrome. Mouse hover is a
 # lightweight material change only; touch gets the existing immediate tray/
 # selection response. Persistent toggles (menu/sound) visibly stay selected.
+#
+# GGH-033: touch already enters gameplay as InputEventScreenTouch. Godot may also
+# synthesize a MouseButton for that same physical touch. DEVICE_ID_EMULATION is
+# the exact modality marker, so discard only that redundant mouse event and let
+# native touch, physical mouse, and keyboard keep their independent semantics.
 const HOVER_LIGHTEN := 0.10
 const HOVER_EMISSION_ENERGY := 0.34
 const INVALID_FLASH_SECONDS := 0.16
@@ -27,18 +32,20 @@ func _ready() -> void:
 	_publish_gameplay_feedback_contract()
 
 
-func _build_quick_menu() -> void:
-	super._build_quick_menu()
-	if quick_button != null:
-		quick_button.toggle_mode = true
-		quick_button.tooltip_text = "القائمة"
-	if quick_sound_button != null:
-		quick_sound_button.toggle_mode = true
-		quick_sound_button.tooltip_text = "تشغيل أو كتم الصوت"
-	_feedback_sync_menu_state(true)
-
-
 func _input(event: InputEvent) -> void:
+	if _feedback_is_emulated_mouse_from_touch(event):
+		get_viewport().set_input_as_handled()
+		_publish_emulated_mouse_suppressed()
+		return
+
+	# The legacy base debounce was a best-effort duplicate filter based on time and
+	# proximity. Once emulated mouse has an exact modality guard, reset that broad
+	# heuristic for each real pointer press so an intentional fast second touch or
+	# physical click is never discarded merely because it is close to the first.
+	if _feedback_is_direct_pointer_press(event):
+		last_pointer_msec = -1000
+		last_pointer_position = Vector2(-9999.0, -9999.0)
+
 	if event is InputEventKey:
 		var key := event as InputEventKey
 		if key.pressed and not key.echo and key.keycode == KEY_ESCAPE and quick_panel != null and quick_panel.visible:
@@ -60,6 +67,26 @@ func _input(event: InputEvent) -> void:
 			_feedback_clear_piece_hover()
 
 	super._input(event)
+
+
+func _feedback_is_emulated_mouse_from_touch(event: InputEvent) -> bool:
+	if not event is InputEventMouseButton:
+		return false
+	return (event as InputEventMouseButton).device == InputEvent.DEVICE_ID_EMULATION
+
+
+func _feedback_is_direct_pointer_press(event: InputEvent) -> bool:
+	if event is InputEventScreenTouch:
+		return (event as InputEventScreenTouch).pressed
+	if event is InputEventMouseButton:
+		var mouse := event as InputEventMouseButton
+		return mouse.device != InputEvent.DEVICE_ID_EMULATION and mouse.pressed and mouse.button_index == MOUSE_BUTTON_LEFT
+	return false
+
+
+func _publish_emulated_mouse_suppressed() -> void:
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("document.body.dataset.yakolakGameplayCarryOver='emulated-mouse-suppressed';", true)
 
 
 func _toggle_quick_menu() -> void:
@@ -256,6 +283,8 @@ func _publish_gameplay_feedback_contract() -> void:
 		return
 	JavaScriptBridge.eval(
 		"document.body.dataset.yakolakGameplayFeedback='hover+pressed+selected-outline+legal-ring-outline+invalid-shape+toggle+focus';" +
-		"document.body.dataset.yakolakGameplayFeedbackMotion='instant-subtle';",
+		"document.body.dataset.yakolakGameplayFeedbackMotion='instant-subtle';" +
+		"document.body.dataset.yakolakGameplayCarryGuard='emulated-mouse-device-only';" +
+		"document.body.dataset.yakolakGameplayRapidSecondAction='preserved';",
 		true
 	)
