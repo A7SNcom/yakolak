@@ -57,9 +57,7 @@ func _show_setup() -> void:
 
 func _wizard_header(title: String) -> Control:
 	var clearer_title: String = title
-	if title == "كم جولة؟":
-		clearer_title = "كم شوط للفوز؟"
-	elif title.begins_with("اللاعب "):
+	if title.begins_with("اللاعب "):
 		clearer_title = title + " بيلعب كيف؟"
 	return super._wizard_header(clearer_title)
 
@@ -127,8 +125,6 @@ func _begin_custom_setup() -> void:
 
 
 func _build_rounds_question(content: VBoxContainer) -> void:
-	var heading := _label("كم فوز تحتاج للمباراة؟", 23, HORIZONTAL_ALIGNMENT_CENTER)
-	content.add_child(heading)
 	var row := _choice_row()
 	for count: int in [3, 5]:
 		var label: String = "%s انتصارات\nللفوز بالمباراة" % str(count)

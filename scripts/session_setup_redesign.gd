@@ -229,7 +229,7 @@ func _show_setup() -> void:
 	elif wizard_step.begins_with("mode:"):
 		title = "اللاعب %s" % _arabic_digit(_mode_seat_index() + 1)
 	elif wizard_step == "rounds":
-		title = "كم جولة؟"
+		title = "كم فوز تحتاج لحسم المباراة؟"
 	content.add_child(_wizard_header(title))
 
 	if not online_error_text.is_empty():
