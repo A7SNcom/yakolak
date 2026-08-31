@@ -5,6 +5,7 @@ extends "res://scripts/session_setup.gd"
 
 const THMANYAH_FONT = preload("res://assets/fonts/thmanyahsans-Regular.otf")
 const SPLIT_UI_VERSION := "split-wizard-v1"
+const IDENTITY_MARKERS := {"marble": "◆", "blue": "●", "gold": "▲", "green": "✦"}
 
 class StoneSetPreview:
 	extends Control
@@ -17,10 +18,11 @@ class StoneSetPreview:
 
 	func _draw() -> void:
 		var center := size * 0.5
-		var radii: Array[float] = [12.0, 20.0, 29.0]
+		var max_radius: float = minf(size.x * 0.32, size.y * 0.42)
+		var radii: Array[float] = [max_radius * 0.42, max_radius * 0.70, max_radius]
 		for radius: float in radii:
-			draw_arc(center, radius, 0.0, TAU, 64, Color(0.0, 0.0, 0.0, 0.42), 6.0, true)
-			draw_arc(center, radius, 0.0, TAU, 64, stone_color, 3.8, true)
+			draw_arc(center, radius, 0.0, TAU, 64, Color(0.0, 0.0, 0.0, 0.42), maxf(2.0, radius * 0.20), true)
+			draw_arc(center, radius, 0.0, TAU, 64, stone_color, maxf(1.6, radius * 0.13), true)
 
 var wizard_step: String = "color"
 var wizard_history: Array[String] = []
@@ -295,7 +297,7 @@ func _build_color_question(content: VBoxContainer) -> void:
 func _color_choice_button(color_id: String, value: Color, selected: bool, enabled: bool) -> Button:
 	var button := Button.new()
 	button.focus_mode = Control.FOCUS_NONE
-	button.custom_minimum_size = Vector2(_ui_length(86.0), _ui_length(74.0))
+	button.custom_minimum_size = Vector2(_ui_length(86.0), _ui_length(78.0))
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.disabled = not enabled
 	button.add_theme_stylebox_override("normal", _color_tile_style(value, selected, false))
@@ -303,10 +305,37 @@ func _color_choice_button(color_id: String, value: Color, selected: bool, enable
 	button.add_theme_stylebox_override("pressed", _color_tile_style(value, true, true))
 	button.add_theme_stylebox_override("disabled", _color_tile_style(value, false, false, 0.28))
 	button.pressed.connect(_choose_wizard_color.bind(color_id))
+	var inner := VBoxContainer.new()
+	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	inner.add_theme_constant_override("separation", int(round(_ui_length(1.0))))
+	button.add_child(inner)
+	inner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	inner.offset_left = _ui_length(5.0)
+	inner.offset_right = -_ui_length(5.0)
+	inner.offset_top = _ui_length(3.0)
+	inner.offset_bottom = -_ui_length(3.0)
+	var title := _label("%s  %s" % [_identity_marker(color_id), _identity_color_name(color_id)], 13, HORIZONTAL_ALIGNMENT_CENTER)
+	title.add_theme_font_override("font", ARABIC_FONT)
+	inner.add_child(title)
 	var preview := StoneSetPreview.new(value)
-	preview.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	button.add_child(preview)
+	preview.custom_minimum_size = Vector2(0.0, _ui_length(30.0))
+	preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	inner.add_child(preview)
+	var state_text: String = "غير متاح" if not enabled else ("مختار" if selected else "متاح")
+	var state_color := Color("#efb79f") if not enabled else (Color("#b9f5d8") if selected else Color("#aab7b5"))
+	inner.add_child(_label(state_text, 10, HORIZONTAL_ALIGNMENT_CENTER, state_color))
 	return button
+
+
+func _identity_marker(color_id: String) -> String:
+	return str(IDENTITY_MARKERS.get(color_id, "◆"))
+
+
+func _identity_color_name(color_id: String) -> String:
+	for color_data: Dictionary in PALETTE:
+		if str(color_data.get("id", "")) == color_id:
+			return str(color_data.get("name", color_id))
+	return color_id
 
 
 func _color_tile_style(value: Color, selected: bool, hover: bool, alpha: float = 1.0) -> StyleBoxFlat:
