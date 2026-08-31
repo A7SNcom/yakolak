@@ -52,7 +52,8 @@ assert.ok(authoritativeTurn.includes('signal authoritative_turn_changed'), 'turn
 assert.ok(authoritativeTurn.includes('authoritative_online_snapshot_hydrated'), 'reconnect must stay hidden until a fresh accepted room snapshot hydrates turn state');
 assert.ok(scene.includes('res://scripts/turn_clarity_hud_design_system.gd'), 'the turn clarity adapter must remain active');
 assert.ok(turnHudDesign.includes('extends "res://scripts/turn_clarity_hud.gd"'), 'the turn clarity adapter must preserve the authoritative indicator state logic');
-assert.ok(turnHudDesign.includes("yakolakDesignTurnCue='top-center-30px-capsule'"), 'turn clarity must use the compact fixed top-center capsule contract');
+assert.ok(turnHudDesign.includes("yakolakDesignTurnCue='top-center-responsive-capsule'"), 'turn clarity must use one responsive top-center capsule');
+assert.ok(turnHudDesign.includes("yakolakDesignTurnCueMobile='prominent-css-space'"), 'mobile hierarchy must stay on the same CSS-space turn surface');
 assert.ok(turnHud.includes("yakolakTurnIndicatorSource='authoritative-turn-signal'"), 'turn indicator must consume the authoritative gameplay signal only');
 assert.ok(turnHud.includes("yakolakTurnIndicatorPolling='none'"), 'turn indicator must explicitly publish its no-polling contract');
 assert.ok(!turnHud.includes('func _process('), 'turn indicator must never poll turn state per frame');

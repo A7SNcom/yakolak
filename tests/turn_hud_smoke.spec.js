@@ -88,7 +88,7 @@ async function startPassPlay(page) {
     () => document.body.dataset.yakolakGameplay === 'ready' &&
           document.body.dataset.yakolakCurrentPlayer === 'right' &&
           document.body.dataset.yakolakTurnIndicatorVisible === 'true' &&
-          document.body.dataset.yakolakTurnIndicatorText === 'دور أبيض',
+          document.body.dataset.yakolakTurnIndicatorText === 'دور لاعب 1',
     null,
     { timeout: 15000 }
   );
@@ -108,7 +108,7 @@ test('UX-TURN-35 single authoritative indicator stays one-glance, compact, and o
   expect(state.oneGlance).toBe('copy+player-color');
   expect(state.stalePolicy).toBe('monotonic-revision');
   expect(state.visible).toBe('true');
-  expect(state.text).toBe('دور أبيض');
+  expect(state.text).toBe('دور لاعب 1');
   expect(state.color).toBe('marble');
   expect(state.local).toBe('false');
   expect(state.top).toBeGreaterThanOrEqual(12);
@@ -118,7 +118,7 @@ test('UX-TURN-35 single authoritative indicator stays one-glance, compact, and o
   expect(state.pointer).toBe('ignore');
   expect(state.overlay).toBe('true');
   expect(state.designHud).toBe('single-authoritative-turn-indicator');
-  expect(state.designCue).toBe('top-center-30px-capsule');
+  expect(state.designCue).toBe('top-center-responsive-capsule');
   expect(state.designAnimation).toBe('none');
   expect(state.designLayout).toBe('overlay-no-shift');
 
@@ -144,7 +144,7 @@ test('UX-TURN-35 single authoritative indicator stays one-glance, compact, and o
   );
   state = await indicator(page);
   expect(state.updates).toBe(beforeSelectionUpdates);
-  expect(state.text).toBe('دور أبيض');
+  expect(state.text).toBe('دور لاعب 1');
 
   await page.evaluate(() => window.yakolakTestPlayOneMove());
   await page.waitForFunction(
@@ -152,24 +152,29 @@ test('UX-TURN-35 single authoritative indicator stays one-glance, compact, and o
                 document.body.dataset.yakolakCurrentPlayer === 'back' &&
                 document.body.dataset.yakolakGameplay === 'ready' &&
                 document.body.dataset.yakolakTurnIndicatorVisible === 'true' &&
-                document.body.dataset.yakolakTurnIndicatorText === 'دور أزرق' &&
+                document.body.dataset.yakolakTurnIndicatorText === 'دور لاعب 2' &&
                 document.body.dataset.yakolakTurnIndicatorColor === 'blue' &&
                 Number(document.body.dataset.yakolakTurnIndicatorUpdates || 0) > previous,
     beforeSelectionUpdates,
     { timeout: 15000 }
   );
   state = await indicator(page);
-  expect(state.text).toBe('دور أزرق');
+  expect(state.text).toBe('دور لاعب 2');
   expect(state.color).toBe('blue');
   const beforeResizeUpdates = state.updates;
 
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.waitForFunction(
-      expected => innerWidth === expected.width && innerHeight === expected.height &&
-        Number(document.body.dataset.yakolakTurnIndicatorHeight || 0) === 30 &&
-        Number(document.body.dataset.yakolakTurnIndicatorTop || 0) >= 12 &&
-        Number(document.body.dataset.yakolakTurnIndicatorWidth || 0) <= 124,
+      expected => {
+        const mobile = expected.width <= 480 && expected.height > expected.width;
+        const d = document.body.dataset;
+        return innerWidth === expected.width && innerHeight === expected.height &&
+          Number(d.yakolakTurnIndicatorHeight || 0) === (mobile ? 40 : 30) &&
+          Number(d.yakolakTurnIndicatorTop || 0) >= (mobile ? 64 : 12) &&
+          Number(d.yakolakTurnIndicatorWidth || 0) <= (mobile ? 180 : 124) &&
+          d.yakolakTurnIndicatorLayout === (mobile ? 'mobile-prominent' : 'desktop-compact');
+      },
       viewport,
       { timeout: 5000 }
     );
@@ -178,12 +183,14 @@ test('UX-TURN-35 single authoritative indicator stays one-glance, compact, and o
     state = await indicator(page);
     const layout = await canvasLayout(page);
     expect(state.updates, `${viewport.name}: resize cannot synthesize turn state`).toBe(beforeResizeUpdates);
-    expect(state.text, `${viewport.name}: active owner remains legible`).toBe('دور أزرق');
+    expect(state.text, `${viewport.name}: active owner remains legible`).toBe('دور لاعب 2');
     expect(state.color, `${viewport.name}: player color cue remains active`).toBe('blue');
     expect(state.pointer, `${viewport.name}: indicator stays non-blocking`).toBe('ignore');
-    expect(state.top, `${viewport.name}: safe top`).toBeGreaterThanOrEqual(12);
-    expect(state.width, `${viewport.name}: compact width`).toBeLessThanOrEqual(124);
-    expect(state.height, `${viewport.name}: compact height`).toBe(30);
+    const mobileLayout = viewport.width <= 480 && viewport.height > viewport.width;
+    expect(state.top, `${viewport.name}: safe/prominent top`).toBeGreaterThanOrEqual(mobileLayout ? 64 : 12);
+    expect(state.width, `${viewport.name}: responsive width`).toBeLessThanOrEqual(mobileLayout ? 180 : 124);
+    if (mobileLayout) expect(state.width, `${viewport.name}: mobile prominence floor`).toBeGreaterThanOrEqual(118);
+    expect(state.height, `${viewport.name}: responsive height`).toBe(mobileLayout ? 40 : 30);
     expect((viewport.width - state.width) / 2, `${viewport.name}: horizontal breathing room`).toBeGreaterThanOrEqual(8);
     expect(layout.canvas, `${viewport.name}: canvas exists`).not.toBeNull();
     expect(Math.abs(layout.canvas.left), `${viewport.name}: overlay cannot push canvas horizontally`).toBeLessThanOrEqual(1);

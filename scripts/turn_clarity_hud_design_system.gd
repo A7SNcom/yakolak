@@ -13,7 +13,7 @@ func _publish_design_contract() -> void:
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakDesignHud='single-authoritative-turn-indicator';" +
-			"document.body.dataset.yakolakDesignTurnCue='top-center-30px-capsule';" +
+			"document.body.dataset.yakolakDesignTurnCue='top-center-responsive-capsule';document.body.dataset.yakolakDesignTurnCueMobile='prominent-css-space';" +
 			"document.body.dataset.yakolakDesignTurnCueAnimation='none';" +
 			"document.body.dataset.yakolakDesignTurnCueLayout='overlay-no-shift';",
 			true

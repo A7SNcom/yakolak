@@ -4,11 +4,17 @@ extends Node
 # It consumes only the authoritative_turn_changed snapshot emitted by gameplay
 # and never polls gameplay, camera, lighting, animation, or DOM state.
 const Display = preload("res://scripts/ui_design.gd")
-const INDICATOR_MIN_WIDTH: float = 56.0
-const INDICATOR_MAX_WIDTH: float = 124.0
-const INDICATOR_HEIGHT: float = 30.0
-const INDICATOR_TOP_MIN: float = 12.0
-const INDICATOR_SAFE_GAP: float = 8.0
+const INDICATOR_DESKTOP_MIN_WIDTH_CSS: float = 56.0
+const INDICATOR_DESKTOP_MAX_WIDTH_CSS: float = 124.0
+const INDICATOR_DESKTOP_HEIGHT_CSS: float = 30.0
+const INDICATOR_DESKTOP_FONT_CSS: int = 15
+const INDICATOR_MOBILE_BREAKPOINT_CSS: float = 480.0
+const INDICATOR_MOBILE_MIN_WIDTH_CSS: float = 118.0
+const INDICATOR_MOBILE_MAX_WIDTH_CSS: float = 180.0
+const INDICATOR_MOBILE_HEIGHT_CSS: float = 40.0
+const INDICATOR_MOBILE_FONT_CSS: int = 18
+const INDICATOR_TOP_MIN_CSS: float = 12.0
+const INDICATOR_SAFE_GAP_CSS: float = 8.0
 
 var intro: Node3D
 var gameplay: Node
@@ -16,7 +22,11 @@ var indicator_layer: CanvasLayer
 var indicator_root: PanelContainer
 var indicator_label: Label
 var indicator_style: StyleBoxFlat
-var indicator_width: float = INDICATOR_MIN_WIDTH
+var indicator_width: float = INDICATOR_DESKTOP_MIN_WIDTH_CSS
+var indicator_height: float = INDICATOR_DESKTOP_HEIGHT_CSS
+var indicator_canvas_scale: float = 1.0
+var indicator_css_size: Vector2 = Vector2.ZERO
+var indicator_mobile_layout: bool = false
 var indicator_color_key: String = ""
 var indicator_local_turn: bool = false
 var indicator_bot_turn: bool = false
@@ -132,7 +142,6 @@ func _on_authoritative_turn_changed(snapshot: Dictionary) -> void:
 		return
 	_apply_visual_state(snapshot)
 	indicator_label.text = text
-	indicator_width = clampf(26.0 + float(text.length()) * 8.2, INDICATOR_MIN_WIDTH, INDICATOR_MAX_WIDTH)
 	_layout_indicator()
 	indicator_root.visible = true
 	_publish_state(true, text, snapshot)
@@ -254,29 +263,75 @@ func _hide_indicator(revision: int, lifecycle: String) -> void:
 
 
 func _layout_indicator() -> void:
-	if indicator_root == null:
+	if indicator_root == null or indicator_label == null:
 		return
-	var top: float = maxf(INDICATOR_TOP_MIN, _safe_area_top() + INDICATOR_SAFE_GAP)
+	_refresh_layout_metrics()
+	var min_width_css: float = INDICATOR_MOBILE_MIN_WIDTH_CSS if indicator_mobile_layout else INDICATOR_DESKTOP_MIN_WIDTH_CSS
+	var max_width_css: float = INDICATOR_MOBILE_MAX_WIDTH_CSS if indicator_mobile_layout else INDICATOR_DESKTOP_MAX_WIDTH_CSS
+	var height_css: float = INDICATOR_MOBILE_HEIGHT_CSS if indicator_mobile_layout else INDICATOR_DESKTOP_HEIGHT_CSS
+	var font_css: int = INDICATOR_MOBILE_FONT_CSS if indicator_mobile_layout else INDICATOR_DESKTOP_FONT_CSS
+	var glyph_width_css: float = 9.0 if indicator_mobile_layout else 8.2
+	var width_css: float = clampf(26.0 + float(indicator_label.text.length()) * glyph_width_css, min_width_css, max_width_css)
+	indicator_width = _indicator_css_length(width_css)
+	indicator_height = _indicator_css_length(height_css)
+	indicator_label.add_theme_font_size_override("font_size", _indicator_css_font_size(font_css))
+	indicator_style.set_corner_radius_all(int(round(indicator_height * 0.5)))
+	indicator_style.set_border_width_all(maxi(2, int(round(_indicator_css_length(2.0)))))
+	var horizontal_margin_css: float = 14.0 if indicator_mobile_layout else 10.0
+	indicator_style.content_margin_left = _indicator_css_length(horizontal_margin_css)
+	indicator_style.content_margin_right = _indicator_css_length(horizontal_margin_css)
+	indicator_style.content_margin_top = _indicator_css_length(2.0)
+	indicator_style.content_margin_bottom = _indicator_css_length(2.0)
+	var top_css: float = maxf(INDICATOR_TOP_MIN_CSS, _safe_area_top_css() + INDICATOR_SAFE_GAP_CSS)
+	if indicator_mobile_layout:
+		top_css = maxf(top_css, clampf(indicator_css_size.y * 0.10, 64.0, 88.0))
+	var top: float = _indicator_css_length(top_css)
 	indicator_root.offset_left = -indicator_width * 0.5
 	indicator_root.offset_right = indicator_width * 0.5
 	indicator_root.offset_top = top
-	indicator_root.offset_bottom = top + INDICATOR_HEIGHT
-	_publish_layout(top)
+	indicator_root.offset_bottom = top + indicator_height
+	_publish_layout(top_css, width_css, height_css)
 
 
-func _safe_area_top() -> float:
-	var safe_top: float = 0.0
+func _refresh_layout_metrics() -> void:
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	indicator_css_size = viewport_size
+	if OS.has_feature("web"):
+		var raw: Variant = JavaScriptBridge.eval(
+			"JSON.stringify((()=>{const c=document.getElementById('canvas');const r=c?c.getBoundingClientRect():{width:innerWidth,height:innerHeight};return{w:r.width||innerWidth,h:r.height||innerHeight};})())",
+			true
+		)
+		var decoded: Variant = JSON.parse_string(str(raw))
+		if decoded is Dictionary:
+			var values: Dictionary = decoded as Dictionary
+			indicator_css_size = Vector2(float(values.get("w", viewport_size.x)), float(values.get("h", viewport_size.y)))
+	var scale_x: float = indicator_css_size.x / maxf(viewport_size.x, 1.0)
+	var scale_y: float = indicator_css_size.y / maxf(viewport_size.y, 1.0)
+	indicator_canvas_scale = clampf(minf(scale_x, scale_y), 0.20, 4.0)
+	indicator_mobile_layout = indicator_css_size.x <= INDICATOR_MOBILE_BREAKPOINT_CSS and indicator_css_size.y > indicator_css_size.x
+
+
+func _indicator_css_length(css_pixels: float) -> float:
+	return css_pixels / maxf(indicator_canvas_scale, 0.20)
+
+
+func _indicator_css_font_size(css_points: int) -> int:
+	return maxi(12, int(round(float(css_points) / maxf(indicator_canvas_scale, 0.20))))
+
+
+func _safe_area_top_css() -> float:
+	var safe_top_css: float = 0.0
 	var safe_rect: Rect2i = DisplayServer.get_display_safe_area()
 	if safe_rect.position.y > 0:
-		safe_top = float(safe_rect.position.y)
+		safe_top_css = float(safe_rect.position.y) * indicator_canvas_scale
 	if OS.has_feature("web"):
 		var css_value: Variant = JavaScriptBridge.eval(
 			"(()=>{const e=document.createElement('div');e.style.cssText='position:fixed;top:0;padding-top:env(safe-area-inset-top);visibility:hidden;pointer-events:none';document.body.appendChild(e);const v=parseFloat(getComputedStyle(e).paddingTop)||0;e.remove();return v;})()",
 			true
 		)
 		if css_value != null:
-			safe_top = maxf(safe_top, float(css_value))
-	return safe_top
+			safe_top_css = maxf(safe_top_css, float(css_value))
+	return safe_top_css
 
 
 func _publish_contract() -> void:
@@ -340,15 +395,18 @@ func _publish_hidden(revision: int, lifecycle: String) -> void:
 	)
 
 
-func _publish_layout(top: float) -> void:
+func _publish_layout(top_css: float, width_css: float, height_css: float) -> void:
 	if not OS.has_feature("web"):
 		return
 	JavaScriptBridge.eval(
-		"document.body.dataset.yakolakTurnIndicatorTop='%.1f';" % top +
-		"document.body.dataset.yakolakTurnIndicatorWidth='%.1f';" % indicator_width +
-		"document.body.dataset.yakolakTurnIndicatorHeight='%.1f';" % INDICATOR_HEIGHT +
+		"document.body.dataset.yakolakTurnIndicatorTop='%.1f';" % top_css +
+		"document.body.dataset.yakolakTurnIndicatorWidth='%.1f';" % width_css +
+		"document.body.dataset.yakolakTurnIndicatorHeight='%.1f';" % height_css +
 		"document.body.dataset.yakolakTurnIndicatorPointer='ignore';" +
-		"document.body.dataset.yakolakTurnIndicatorOverlay='true';",
+		"document.body.dataset.yakolakTurnIndicatorOverlay='true';" +
+		"document.body.dataset.yakolakTurnIndicatorCssSpace='true';" +
+		"document.body.dataset.yakolakTurnIndicatorLayout='" + ("mobile-prominent" if indicator_mobile_layout else "desktop-compact") + "';" +
+		"document.body.dataset.yakolakTurnIndicatorCanvasScale='%.3f';" % indicator_canvas_scale,
 		true
 	)
 
