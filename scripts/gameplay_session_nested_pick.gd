@@ -14,6 +14,12 @@ const TOUCH_RESCUE_ANGLES: int = 8
 const TOUCH_SAFE_GUTTER_CSS: float = 8.0
 const TOUCH_AUDIT_FINGER_DIAMETERS_CSS: Array[float] = [36.0, 44.0, 52.0]
 const TOUCH_AUDIT_REQUIRED_REDUCTION: float = 0.35
+const LEGAL_TARGET_MIN_TOUCH_CSS: float = 48.0
+const LEGAL_TARGET_HALF_TOUCH_CSS: float = LEGAL_TARGET_MIN_TOUCH_CSS * 0.5
+# Squared CSS-pixel tie band for legal-target rescue selection. GGH-081's operational tie
+# differed by ~1.7e-11 CSS^2; 0.0001 CSS^2 is the existing evidence epsilon and
+# remains tiny enough that candidates farther than this keep strict nearest-center authority.
+const LEGAL_TARGET_DISTANCE_EPSILON_CSS_SQ: float = 0.0001
 
 var _pick_face_cache: Dictionary = {}
 var _pick_target_revision: int = 0
@@ -57,8 +63,10 @@ func _handle_pointer(screen_position: Vector2) -> void:
 			return
 
 	if selected_index >= 0:
-		# Board cells intentionally stay exact. Broadening these would overlap
-		# neighboring legal cells and create a worse kind of wrong tap.
+		# Keep the visual/physics target exact. Touch gets a 48x48 CSS input-only
+		# candidate square only after that exact collider misses. Overlaps resolve
+		# to one nearest legal center; an exact illegal collider keeps its existing
+		# invalid result and can never be rescued into a neighboring move.
 		var target_hit: Dictionary = _ray_pick(screen_position, TARGET_LAYER)
 		if not target_hit.is_empty():
 			var target_collider: Object = target_hit["collider"] as Object
@@ -68,6 +76,11 @@ func _handle_pointer(screen_position: Vector2) -> void:
 					_begin_move(cell)
 				else:
 					_publish_invalid(cell)
+				return
+		if _touch_pointer_dispatch:
+			var rescued_cell: int = _nearest_legal_target_touch_cell(screen_position)
+			if rescued_cell >= 0:
+				_begin_move(rescued_cell)
 				return
 
 	# Only unplayed stones owned by the active player may compete for the ray.
@@ -96,6 +109,78 @@ func _handle_pointer(screen_position: Vector2) -> void:
 
 	if selected_index >= 0:
 		_clear_selection()
+
+
+func _nearest_legal_target_touch_cell(screen_position: Vector2) -> int:
+	if selected_index < 0 or camera == null:
+		return -1
+	if not _touch_rescue_allowed(screen_position):
+		return -1
+	var size_name: String = _selected_size()
+	if size_name.is_empty():
+		return -1
+
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var canvas_rect: Rect2 = _gameplay_canvas_css_rect()
+	if viewport_size.x <= 1.0 or viewport_size.y <= 1.0 or canvas_rect.size.x <= 1.0 or canvas_rect.size.y <= 1.0:
+		return -1
+	var css_scale := Vector2(canvas_rect.size.x / viewport_size.x, canvas_rect.size.y / viewport_size.y)
+	var pointer_css: Vector2 = _touch_internal_to_css(screen_position)
+	var candidate_cells: Array[int] = []
+	var candidate_distances_css_sq: Array[float] = []
+	var candidate_centers_css: Array[Vector2] = []
+	var nearest_distance_css_sq: float = INF
+	var nearest_center_css: Vector2 = Vector2.ZERO
+
+	for cell: int in range(target_markers.size()):
+		if not _is_legal_cell(cell, size_name):
+			continue
+		var marker: MeshInstance3D = target_markers[cell]
+		if marker == null or not marker.visible or camera.is_position_behind(marker.global_position):
+			continue
+		var center_internal: Vector2 = camera.unproject_position(marker.global_position)
+		var center_css: Vector2 = canvas_rect.position + center_internal * css_scale
+		var delta_css: Vector2 = pointer_css - center_css
+		if absf(delta_css.x) > LEGAL_TARGET_HALF_TOUCH_CSS or absf(delta_css.y) > LEGAL_TARGET_HALF_TOUCH_CSS:
+			continue
+		var distance_css_sq: float = delta_css.length_squared()
+		candidate_cells.append(cell)
+		candidate_distances_css_sq.append(distance_css_sq)
+		candidate_centers_css.append(center_css)
+		if distance_css_sq < nearest_distance_css_sq:
+			nearest_distance_css_sq = distance_css_sq
+			nearest_center_css = center_css
+
+	# Browser CSS touch coordinates are transported through Godot's float32 Vector2.
+	# Keep the semantic tie epsilon unchanged, and bound only the possible change in
+	# the pairwise squared-distance difference caused by one internal-coordinate ULP.
+	# For D(p)=|p-candidate|^2-|p-nearest|^2, a pointer error e changes D by
+	# 2*e dot (nearest-candidate). A full float32 ULP per axis is conservative.
+	const FLOAT32_MIN_NORMAL: float = 1.1754943508222875e-38
+	var log_two: float = log(2.0)
+	var screen_position_ulp_css_upper := Vector2(
+		pow(2.0, floor(log(maxf(absf(screen_position.x), FLOAT32_MIN_NORMAL)) / log_two) - 23.0) * absf(css_scale.x),
+		pow(2.0, floor(log(maxf(absf(screen_position.y), FLOAT32_MIN_NORMAL)) / log_two) - 23.0) * absf(css_scale.y)
+	)
+
+	# Resolve against the global numerical nearest distance. Only candidates within
+	# semantic epsilon plus their deterministic transport-quantization bound join the
+	# tie class; lower semantic cell index wins only inside that bounded class.
+	var best_cell: int = -1
+	for candidate_index: int in range(candidate_cells.size()):
+		var distance_css_sq: float = candidate_distances_css_sq[candidate_index]
+		var center_separation_css: Vector2 = candidate_centers_css[candidate_index] - nearest_center_css
+		var transport_allowance_css_sq: float = 2.0 * (
+			screen_position_ulp_css_upper.x * absf(center_separation_css.x)
+			+ screen_position_ulp_css_upper.y * absf(center_separation_css.y)
+		)
+		if distance_css_sq > nearest_distance_css_sq + LEGAL_TARGET_DISTANCE_EPSILON_CSS_SQ + transport_allowance_css_sq:
+			continue
+		var cell: int = candidate_cells[candidate_index]
+		if best_cell < 0 or cell < best_cell:
+			best_cell = cell
+
+	return best_cell
 
 
 func _piece_at_current_pointer(screen_position: Vector2, candidate_indices: Array[int]) -> int:
@@ -513,7 +598,11 @@ func _publish_touch_target_contract() -> void:
 		"document.body.dataset.yakolakTouchRescueRadiusCss='18';" +
 		"document.body.dataset.yakolakTouchSafeGutterCss='8';" +
 		"document.body.dataset.yakolakTouchProbeBudget='16';" +
-		"document.body.dataset.yakolakTouchVisualChange='none';",
+		"document.body.dataset.yakolakTouchVisualChange='none';" +
+		"document.body.dataset.yakolakLegalTargetPickModel='exact-collider-then-nearest-legal-css-square';" +
+		"document.body.dataset.yakolakLegalTargetMinTouchCss='48';" +
+		"document.body.dataset.yakolakLegalTargetHalfTouchCss='24';" +
+		"document.body.dataset.yakolakLegalTargetVisualChange='none';",
 		true
 	)
 
