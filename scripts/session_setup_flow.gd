@@ -211,7 +211,8 @@ func _emit_configuration() -> void:
 
 func _build_color_question(content: VBoxContainer) -> void:
 	var grid := GridContainer.new()
-	grid.columns = 2 if card.size.x * canvas_scale < 430.0 else 4
+	var compact_landscape_picker: bool = _is_short_landscape()
+	grid.columns = 4 if compact_landscape_picker else (2 if card.size.x * canvas_scale < 430.0 else 4)
 	grid.add_theme_constant_override("h_separation", int(round(_ui_length(8.0))))
 	grid.add_theme_constant_override("v_separation", int(round(_ui_length(8.0))))
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -220,6 +221,8 @@ func _build_color_question(content: VBoxContainer) -> void:
 		var color_id: String = str(color_data["id"])
 		var enabled: bool = joining_room_code.is_empty() or (room_preview_ready and join_available_colors.has(color_id))
 		var option := _color_choice_button(color_id, color_data["color"] as Color, color_id == selected, enabled)
+		if compact_landscape_picker:
+			option.custom_minimum_size.x = _ui_length(MIN_TOUCH_TARGET_CSS)
 		grid.add_child(option)
 	content.add_child(grid)
 
