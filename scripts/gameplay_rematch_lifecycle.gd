@@ -15,12 +15,14 @@ var web_rematch_callback: Variant
 var web_rematch_lifecycle_test_callback: Variant
 var web_post_match_return_callback: Variant
 
+var post_match_status_label: Label
 var post_match_secondary_button: Button
 var post_match_action_pending: String = ""
 
 
 func _ready() -> void:
 	super._ready()
+	_build_post_match_status_label()
 	_build_post_match_secondary_button()
 	_publish_post_match_action_state()
 	if not OS.has_feature("web"):
@@ -38,6 +40,49 @@ func _ready() -> void:
 		window.set("yakolakTestRematch", web_rematch_callback)
 		window.set("yakolakTestRunRematchLifecycle", web_rematch_lifecycle_test_callback)
 		window.set("yakolakTestPostMatchReturn", web_post_match_return_callback)
+
+
+func _input(event: InputEvent) -> void:
+	if not (round_complete and match_complete):
+		super._input(event)
+		return
+	var pointer_press: bool = false
+	var pointer_position := Vector2.ZERO
+	if event is InputEventScreenTouch:
+		var touch_event := event as InputEventScreenTouch
+		pointer_press = touch_event.pressed
+		pointer_position = touch_event.position
+	elif event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		pointer_press = mouse_event.pressed and mouse_event.button_index == MOUSE_BUTTON_LEFT
+		pointer_position = mouse_event.position
+	if not pointer_press:
+		return
+	var on_primary: bool = result_button != null and result_button.visible and result_button.get_global_rect().has_point(pointer_position)
+	var on_secondary: bool = post_match_secondary_button != null and post_match_secondary_button.visible and post_match_secondary_button.get_global_rect().has_point(pointer_position)
+	if on_primary or on_secondary:
+		return
+	get_viewport().set_input_as_handled()
+
+
+func _build_post_match_status_label() -> void:
+	if hud_layer == null or post_match_status_label != null:
+		return
+	post_match_status_label = Label.new()
+	post_match_status_label.name = "PostMatchStatus"
+	post_match_status_label.set_anchors_preset(Control.PRESET_CENTER)
+	post_match_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	post_match_status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	post_match_status_label.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	post_match_status_label.text_direction = Control.TEXT_DIRECTION_RTL
+	post_match_status_label.language = "ar"
+	post_match_status_label.add_theme_font_override("font", ARABIC_FONT)
+	post_match_status_label.add_theme_color_override("font_color", Color("#f3f4f4"))
+	post_match_status_label.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.02, 0.92))
+	post_match_status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	post_match_status_label.focus_mode = Control.FOCUS_NONE
+	post_match_status_label.visible = false
+	hud_layer.add_child(post_match_status_label)
 
 
 func _build_post_match_secondary_button() -> void:
@@ -89,23 +134,77 @@ func _build_post_match_secondary_button() -> void:
 	hud_layer.add_child(post_match_secondary_button)
 
 
+func _layout_hud() -> void:
+	super._layout_hud()
+	if match_complete:
+		_layout_post_match_affordance()
+
+
+func _layout_post_match_affordance() -> void:
+	if result_button == null:
+		return
+	var action_half_width: float = _hud_length(148.0)
+	result_button.offset_left = -action_half_width
+	result_button.offset_top = _hud_length(-10.0)
+	result_button.offset_right = action_half_width
+	result_button.offset_bottom = _hud_length(46.0)
+	result_button.add_theme_font_size_override("font_size", _hud_font_size(20))
+	var primary_normal := _result_style(Color("#1f6f5d"))
+	primary_normal.border_color = Color("#8fdac7")
+	var primary_hover := _result_style(Color("#2f856a"))
+	primary_hover.border_color = Color("#b5eadc")
+	var primary_pressed := _result_style(Color("#174438"))
+	primary_pressed.border_color = Color("#8fdac7")
+	var primary_disabled := _result_style(Color("#29463f"))
+	primary_disabled.border_color = Color("#6f8f86")
+	var primary_focus := primary_normal.duplicate() as StyleBoxFlat
+	primary_focus.border_color = Color("#ffffffcc")
+	primary_focus.set_border_width_all(maxi(2, int(round(_hud_length(2.0)))))
+	result_button.add_theme_stylebox_override("normal", primary_normal)
+	result_button.add_theme_stylebox_override("hover", primary_hover)
+	result_button.add_theme_stylebox_override("pressed", primary_pressed)
+	result_button.add_theme_stylebox_override("disabled", primary_disabled)
+	result_button.add_theme_stylebox_override("focus", primary_focus)
+	result_button.add_theme_color_override("font_disabled_color", Color("#c8d9d4"))
+	if post_match_status_label != null:
+		var status_half_width: float = _hud_length(179.0)
+		post_match_status_label.offset_left = -status_half_width
+		post_match_status_label.offset_top = _hud_length(-108.0)
+		post_match_status_label.offset_right = status_half_width
+		post_match_status_label.offset_bottom = _hud_length(-22.0)
+		post_match_status_label.add_theme_font_size_override("font_size", _hud_font_size(22))
+		post_match_status_label.add_theme_constant_override("outline_size", maxi(1, int(round(_hud_length(3.0)))))
+	if post_match_secondary_button != null:
+		var secondary_half_width: float = _hud_length(132.0)
+		post_match_secondary_button.offset_left = -secondary_half_width
+		post_match_secondary_button.offset_top = _hud_length(58.0)
+		post_match_secondary_button.offset_right = secondary_half_width
+		post_match_secondary_button.offset_bottom = _hud_length(106.0)
+		post_match_secondary_button.add_theme_font_size_override("font_size", _hud_font_size(17))
+
+
 func _show_round_result() -> void:
 	super._show_round_result()
 	if not match_complete:
+		_hide_post_match_status_label()
 		_hide_post_match_secondary_button()
+		_layout_hud()
 		if result_button != null:
 			result_button.disabled = false
 		_publish_post_match_action_state()
 		return
 
-	# Keep only the result plus the real primary action. Do not add tap hints or
-	# explanatory copy that does not itself perform an action.
-	if result_button != null:
-		var leaders: Array[String] = _match_leaders()
+	# Result/status is deliberately non-interactive; the existing round-action
+	# button remains the primary rematch action so lifecycle/focus semantics stay intact.
+	var leaders: Array[String] = _match_leaders()
+	if post_match_status_label != null:
 		if leaders.size() == 1:
-			result_button.text = "بطل المباراة: %s\nإعادة المباراة" % _player_name(leaders[0])
+			post_match_status_label.text = "بطل المباراة: %s" % _player_name(leaders[0])
 		else:
-			result_button.text = "تعادل المباراة\nإعادة المباراة"
+			post_match_status_label.text = "تعادل المباراة"
+		post_match_status_label.visible = true
+	if result_button != null:
+		result_button.text = "إعادة المباراة"
 		result_button.visible = true
 
 	# At final match end, online leave is a terminal client detach: the room/result
@@ -113,6 +212,7 @@ func _show_round_result() -> void:
 	if post_match_secondary_button != null:
 		post_match_secondary_button.text = "العودة للإعدادات"
 		post_match_secondary_button.visible = true
+	_layout_hud()
 	_sync_post_match_controls()
 	_publish_post_match_action_state()
 
@@ -184,6 +284,7 @@ func _on_online_error(code: String) -> void:
 func _return_to_setup() -> void:
 	post_match_action_pending = ""
 	action_in_progress = false
+	_hide_post_match_status_label()
 	_hide_post_match_secondary_button()
 	if result_button != null:
 		result_button.disabled = false
@@ -195,6 +296,7 @@ func _return_to_setup() -> void:
 func _reset_for_intro() -> void:
 	post_match_action_pending = ""
 	action_in_progress = false
+	_hide_post_match_status_label()
 	_hide_post_match_secondary_button()
 	if result_button != null:
 		result_button.disabled = false
@@ -236,6 +338,7 @@ func _restart_completed_local_match() -> void:
 	_sync_active_sides()
 	_update_hud()
 	post_match_action_pending = ""
+	_hide_post_match_status_label()
 	_hide_post_match_secondary_button()
 	if result_button != null:
 		result_button.disabled = false
@@ -257,6 +360,12 @@ func _sync_post_match_controls() -> void:
 		post_match_secondary_button.disabled = locked
 
 
+func _hide_post_match_status_label() -> void:
+	if post_match_status_label != null:
+		post_match_status_label.visible = false
+		post_match_status_label.text = ""
+
+
 func _hide_post_match_secondary_button() -> void:
 	if post_match_secondary_button != null:
 		post_match_secondary_button.visible = false
@@ -268,7 +377,7 @@ func _publish_post_match_action_state() -> void:
 		return
 	var primary: String = "rematch" if match_complete and not online_cancelled else ""
 	var secondary: String = "setup" if match_complete and post_match_secondary_button != null and post_match_secondary_button.visible else ""
-	var result_text: String = result_button.text if result_button != null and result_button.visible else ""
+	var result_text: String = post_match_status_label.text if post_match_status_label != null and post_match_status_label.visible else ""
 	JavaScriptBridge.eval(
 		"document.body.dataset.yakolakPostMatchPrimary=" + JSON.stringify(primary) + ";" +
 		"document.body.dataset.yakolakPostMatchSecondary=" + JSON.stringify(secondary) + ";" +

@@ -4,7 +4,7 @@ extends "res://scripts/gameplay_rematch_lifecycle.gd"
 const Design = preload("res://scripts/ui_design.gd")
 
 const POST_MATCH_SECONDARY_HALF_WIDTH_CSS := 132.0
-const POST_MATCH_SECONDARY_TOP_CSS := 88.0
+const POST_MATCH_SECONDARY_TOP_CSS := 58.0
 
 
 func _ready() -> void:
@@ -25,7 +25,7 @@ func _layout_post_match_secondary_button() -> void:
 	# 720-wide internal canvas those offsets shrink to roughly 54% at 390 CSS px,
 	# making the 48-unit secondary action only ~26 CSS px tall and pulling it into
 	# the primary result target. Keep this action in the same CSS-space contract as
-	# the rest of the HUD: 48px tall, 264px wide, and 11px below the 154px result.
+	# the rest of the HUD: 48px tall, 264px wide, and 12px below the 56px primary CTA.
 	var half_width: float = _hud_length(POST_MATCH_SECONDARY_HALF_WIDTH_CSS)
 	var top: float = _hud_length(POST_MATCH_SECONDARY_TOP_CSS)
 	var height: float = _hud_length(Design.TOUCH_MIN)
