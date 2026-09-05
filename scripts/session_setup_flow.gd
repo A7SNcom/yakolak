@@ -77,7 +77,7 @@ func _build_mode_question(content: VBoxContainer, seat_index: int) -> void:
 		online_button.pressed.connect(_choose_all_online)
 		options.add_child(online_button)
 
-		var computer_button := _mode_preset("كل اللاعبين كمبيوتر", Color("#235b50"), Color.WHITE)
+		var computer_button := _mode_preset("كل المنافسين كمبيوتر", Color("#235b50"), Color.WHITE)
 		computer_button.tooltip_text = "ابدأ فورًا ضد الكمبيوتر"
 		computer_button.pressed.connect(_choose_all_computer)
 		options.add_child(computer_button)
