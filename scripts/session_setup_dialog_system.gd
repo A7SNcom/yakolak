@@ -73,9 +73,12 @@ func _color_choice_button(color_id: String, value: Color, selected: bool, enable
 
 
 func _wizard_header(title: String) -> Control:
+	var clearer_title: String = title
+	if title.begins_with("اللاعب "):
+		clearer_title = title + " بيلعب كيف؟"
 	var row := HBoxContainer.new()
 	row.layout_direction = Control.LAYOUT_DIRECTION_RTL
-	var heading := _label(title, 24, HORIZONTAL_ALIGNMENT_RIGHT)
+	var heading := _label(clearer_title, 24, HORIZONTAL_ALIGNMENT_RIGHT)
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(heading)
 	return row

@@ -72,12 +72,12 @@ func _build_mode_question(content: VBoxContainer, seat_index: int) -> void:
 		options.add_theme_constant_override("separation", int(round(_ui_length(10.0))))
 		options.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
-		var online_button := _mode_preset("الكل أونلاين", Color("#2a4d63"), Color.WHITE)
+		var online_button := _mode_preset("كل اللاعبين أونلاين", Color("#2a4d63"), Color.WHITE)
 		online_button.tooltip_text = "كل اللاعبين عبر الغرفة"
 		online_button.pressed.connect(_choose_all_online)
 		options.add_child(online_button)
 
-		var computer_button := _mode_preset("الكل كمبيوتر", Color("#235b50"), Color.WHITE)
+		var computer_button := _mode_preset("كل اللاعبين كمبيوتر", Color("#235b50"), Color.WHITE)
 		computer_button.tooltip_text = "ابدأ فورًا ضد الكمبيوتر"
 		computer_button.pressed.connect(_choose_all_computer)
 		options.add_child(computer_button)
