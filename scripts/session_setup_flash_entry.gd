@@ -86,15 +86,15 @@ func _color_continue_label() -> String:
 
 
 func _continue_after_color() -> void:
-	# The knowledge decision already happened before setup. Do not ask it again or
-	# emit from the question screen; finish the configured setup exactly once.
+	# The knowledge decision already happened before setup. Unsupported online
+	# learning must be acknowledged explicitly before the configuration is emitted.
 	if not joining_room_code.is_empty():
 		tutorial_requested = false
 		_emit_configuration()
 		return
-	if tutorial_requested and not _tutorial_available_for_current_configuration():
-		tutorial_requested = false
-		_publish_learning_choice("not-applicable")
+	if _online_learning_disclosure_required():
+		_show_online_learning_disclosure()
+		return
 	_emit_configuration()
 
 

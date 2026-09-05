@@ -299,6 +299,54 @@ func _tutorial_available_for_current_configuration() -> bool:
 	return true
 
 
+func _online_learning_disclosure_required() -> bool:
+	return tutorial_requested and joining_room_code.is_empty() and not _tutorial_available_for_current_configuration()
+
+
+func _show_online_learning_disclosure() -> void:
+	active_screen = "learning-disclosure"
+	_clear_body()
+	var content := _content_box()
+	body.add_child(content)
+	content.add_child(_label("الشرح غير متاح مع اللعب أونلاين", 23, HORIZONTAL_ALIGNMENT_CENTER))
+	content.add_child(_label("تقدر تكمل بدون شرح، أو ترجع وتغيّر إعداد اللاعبين.", 16, HORIZONTAL_ALIGNMENT_CENTER))
+	var continue_without_tutorial := _button("متابعة بدون شرح", Color("#10201f"), Color("#f2f0e9"))
+	continue_without_tutorial.pressed.connect(_confirm_online_learning_without_tutorial)
+	content.add_child(continue_without_tutorial)
+	var back := _button("رجوع لتغيير الإعداد", Color("#eef4f3"), Color(0.10, 0.15, 0.17, 0.72))
+	back.pressed.connect(_back_from_online_learning_disclosure)
+	content.add_child(back)
+	_layout_card()
+	_publish_flow_stage("learning-disclosure")
+	call_deferred("_apply_split_framing")
+
+
+func _confirm_online_learning_without_tutorial() -> void:
+	if active_screen != "learning-disclosure" or not _online_learning_disclosure_required():
+		return
+	# Move out of the actionable disclosure state before emission so repeated
+	# activation cannot submit the same configuration twice.
+	active_screen = "learning-disclosure-confirmed"
+	tutorial_requested = false
+	_publish_learning_choice("not-applicable")
+	_emit_configuration()
+
+
+func _back_from_online_learning_disclosure() -> void:
+	if active_screen != "learning-disclosure":
+		return
+	_wizard_back()
+
+
+func _rebuild_active_screen() -> void:
+	if active_screen == "learning-disclosure":
+		layout_refresh_pending = false
+		if showing:
+			_show_online_learning_disclosure()
+		return
+	super._rebuild_active_screen()
+
+
 func _wizard_back() -> void:
 	if custom_setup_active and wizard_step == "mode:1":
 		custom_setup_active = false
@@ -368,3 +416,7 @@ func _on_web_setup_flow_action(arguments: Array) -> void:
 		"knowledge":
 			if arguments.size() >= 2:
 				_finish_knowledge_decision(str(arguments[1]) == "learn")
+		"learning-continue":
+			_confirm_online_learning_without_tutorial()
+		"learning-back":
+			_back_from_online_learning_disclosure()
