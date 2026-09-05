@@ -27,6 +27,8 @@ var last_visible_text_publish_msec: int = -1000
 var last_visible_text_payload: String = ""
 var digits21_fixture_layer: CanvasLayer
 var digits21_fixture_callback: Variant
+var a11y_action_callback: Variant
+var a11y_activation_serial: int = 0
 
 
 func _ready() -> void:
@@ -34,6 +36,10 @@ func _ready() -> void:
 	intro = get_parent() as Node3D
 	match_controller = intro.get_node_or_null("LocalMatchGameplay")
 	if OS.has_feature("web"):
+		a11y_action_callback = JavaScriptBridge.create_callback(_on_a11y_action_requested)
+		var a11y_window: JavaScriptObject = JavaScriptBridge.get_interface("window")
+		if a11y_window != null:
+			a11y_window.set("yakolakA11yActivate", a11y_action_callback)
 		automation = bool(JavaScriptBridge.eval("Boolean(navigator.webdriver)", true))
 		if automation:
 			digits21_fixture_callback = JavaScriptBridge.create_callback(_on_digits21_fixture_requested)
@@ -108,6 +114,52 @@ func _visible_control_text(control: Control) -> String:
 	if control is TextEdit:
 		return (control as TextEdit).text
 	return ""
+
+
+func _on_a11y_action_requested(arguments: Array) -> void:
+	if not OS.has_feature("web") or intro == null or arguments.is_empty():
+		return
+	var setup: Node = intro.get_node_or_null("SessionSetup")
+	if setup == null or not bool(setup.get("showing")):
+		_publish_a11y_activation(str(arguments[0]), false, "setup-hidden")
+		return
+	var action: String = str(arguments[0])
+	var active_screen: String = str(setup.get("active_screen"))
+	var wizard_step: String = str(setup.get("wizard_step"))
+	var accepted: bool = false
+	match action:
+		"knowledge-known":
+			if active_screen == "question":
+				setup.call("_open_first_run_setup", false)
+				accepted = true
+		"knowledge-learn":
+			if active_screen == "question":
+				setup.call("_open_first_run_setup", true)
+				accepted = true
+		"count-2", "count-3", "count-4":
+			if active_screen == "setup" and wizard_step == "count":
+				var count: int = int({"count-2": 2, "count-3": 3, "count-4": 4}[action])
+				setup.call("_choose_player_count", count)
+				accepted = true
+		"cancel":
+			var close_button: Variant = setup.get("dialog_close_button")
+			if close_button is BaseButton and (close_button as BaseButton).is_visible_in_tree() and not (close_button as BaseButton).disabled:
+				setup.call("_dialog_cancel")
+				accepted = true
+	_publish_a11y_activation(action, accepted, "dispatched" if accepted else "stage-mismatch")
+
+
+func _publish_a11y_activation(action: String, accepted: bool, result: String) -> void:
+	if not OS.has_feature("web"):
+		return
+	if accepted:
+		a11y_activation_serial += 1
+	JavaScriptBridge.eval(
+		"document.body.dataset.yakolakA11yLastAction=" + JSON.stringify(action) + ";" +
+		"document.body.dataset.yakolakA11yActivationResult=" + JSON.stringify(result) + ";" +
+		"document.body.dataset.yakolakA11yActivationSerial='" + str(a11y_activation_serial) + "';",
+		true
+	)
 
 
 func _on_digits21_fixture_requested(arguments: Array) -> void:
