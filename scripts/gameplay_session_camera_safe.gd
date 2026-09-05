@@ -76,7 +76,7 @@ func _transition_to_current_player() -> void:
 	var portrait_weight: float = clampf((0.92 - aspect) / 0.46, 0.0, 1.0)
 	var radius: float = lerpf(18.5, 28.0, portrait_weight)
 	var height: float = lerpf(15.5, 23.0, portrait_weight)
-	var target_fov: float = lerpf(50.0, 72.0, portrait_weight)
+	var target_fov: float = lerpf(50.0, 57.0, portrait_weight)
 
 	turn_camera_direction = direction
 	turn_camera_start_position = camera.position
