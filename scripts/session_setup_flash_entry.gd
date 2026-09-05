@@ -77,6 +77,14 @@ func _open_first_run_setup(with_tutorial: bool) -> void:
 	_show_setup()
 
 
+func _color_continue_label() -> String:
+	if not joining_room_code.is_empty():
+		return "انضم"
+	if tutorial_requested and _tutorial_available_for_current_configuration():
+		return "ابدأ الشرح"
+	return "ابدأ اللعب"
+
+
 func _continue_after_color() -> void:
 	# The knowledge decision already happened before setup. Do not ask it again or
 	# emit from the question screen; finish the configured setup exactly once.

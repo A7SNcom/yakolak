@@ -226,15 +226,19 @@ func _build_color_question(content: VBoxContainer) -> void:
 		grid.add_child(option)
 	content.add_child(grid)
 
-	var next_label: String = "التالي"
-	if not joining_room_code.is_empty():
-		next_label = "انضم"
-	elif not _tutorial_available_for_current_configuration():
-		next_label = "ابدأ اللعب"
+	var next_label: String = _color_continue_label()
 	var next := _button(next_label, Color("#10201f"), Color("#f2f0e9"))
 	next.disabled = (not joining_room_code.is_empty()) and (not room_preview_ready or not join_available_colors.has(selected))
 	next.pressed.connect(_continue_after_color)
 	content.add_child(next)
+
+
+func _color_continue_label() -> String:
+	if not joining_room_code.is_empty():
+		return "انضم"
+	if not _tutorial_available_for_current_configuration():
+		return "ابدأ اللعب"
+	return "التالي"
 
 
 func _choose_rounds(value: int) -> void:
