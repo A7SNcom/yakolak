@@ -41,6 +41,8 @@ const ROUND_RESET_DURATION: float = 0.56
 const TRAY_OPEN_DURATION: float = 0.28
 const TRAY_LIFT_STEP: float = 19.0
 const TURN_TIMEOUT_MSEC: int = 18000
+const FIRST_ACTION_CUE_PICK_PIECE: String = "اختر حجرًا"
+const FIRST_ACTION_CUE_PICK_CELL: String = "اختر خانة مضيئة"
 
 var setup: Node
 var online: Node
@@ -60,6 +62,7 @@ var winning_piece_indices: Array[int] = []
 var action_in_progress: bool = false
 var tutorial_active: bool = false
 var tutorial_complete: bool = false
+var first_action_cue_complete: bool = false
 var bot_due_msec: int = 0
 var bot_scheduled: bool = false
 var camera_transition: bool = false
@@ -84,6 +87,7 @@ var intro_runtime_suspended: bool = false
 var hud_layer: CanvasLayer
 var turn_label: Label
 var score_label: Label
+var first_action_label: Label
 var result_button: Button
 var turn_style: StyleBoxFlat
 var hud_canvas_scale: float = 1.0
@@ -220,6 +224,7 @@ func _reset_for_intro() -> void:
 	action_in_progress = false
 	tutorial_active = false
 	tutorial_complete = false
+	first_action_cue_complete = false
 	bot_scheduled = false
 	bot_due_msec = 0
 	camera_transition = false
@@ -287,6 +292,7 @@ func _on_configuration_ready(configuration: Dictionary) -> void:
 	if not waiting_for_setup:
 		return
 	waiting_for_setup = false
+	first_action_cue_complete = false
 	var join_code: String = str(configuration.get("online_join_code", ""))
 	if not join_code.is_empty():
 		_start_online_join(configuration, join_code)
@@ -574,6 +580,23 @@ func _find_unplayed_piece(direction: String, size_name: String) -> int:
 		if not bool(record.get("played", false)) and str(record.get("dir", "")) == direction and str(record.get("type", "")) == size_name:
 			return index
 	return -1
+
+
+func _publish_selection(record: Dictionary) -> void:
+	super._publish_selection(record)
+	_refresh_first_action_cue()
+
+
+func _publish_move_started(record: Dictionary, cell: int) -> void:
+	super._publish_move_started(record, cell)
+	_refresh_first_action_cue()
+
+
+func _publish_move_complete(record: Dictionary, cell: int) -> void:
+	super._publish_move_complete(record, cell)
+	if move_count >= 1:
+		first_action_cue_complete = true
+	_refresh_first_action_cue()
 
 
 func _begin_move(cell: int) -> void:
@@ -1327,6 +1350,23 @@ func _build_hud() -> void:
 	score_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud_layer.add_child(score_label)
 
+	first_action_label = Label.new()
+	first_action_label.name = "FirstActionCue"
+	first_action_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	first_action_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	first_action_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	first_action_label.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	first_action_label.text_direction = Control.TEXT_DIRECTION_RTL
+	first_action_label.language = "ar"
+	first_action_label.clip_text = true
+	first_action_label.add_theme_font_override("font", ARABIC_FONT)
+	first_action_label.add_theme_color_override("font_color", Color("#f3f4f4"))
+	first_action_label.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.02, 0.92))
+	first_action_label.add_theme_constant_override("outline_size", 2)
+	first_action_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	first_action_label.visible = false
+	hud_layer.add_child(first_action_label)
+
 	result_button = Button.new()
 	result_button.set_anchors_preset(Control.PRESET_CENTER)
 	result_button.offset_left = -166
@@ -1360,7 +1400,7 @@ func _result_style(background: Color) -> StyleBoxFlat:
 
 
 func _layout_hud() -> void:
-	if turn_label == null or score_label == null or result_button == null:
+	if turn_label == null or score_label == null or first_action_label == null or result_button == null:
 		return
 	var viewport: Vector2 = get_viewport().get_visible_rect().size
 	var css_size: Vector2 = viewport
@@ -1399,6 +1439,20 @@ func _layout_hud() -> void:
 	score_label.add_theme_font_size_override("font_size", _hud_font_size(15))
 	score_label.add_theme_constant_override("outline_size", maxi(1, int(round(_hud_length(3.0)))))
 
+	# The authoritative owner capsule is above this layer. Keep the one-line cue
+	# immediately below it and out of the settings target, with no input surface.
+	var mobile_portrait: bool = css_size.x <= 480.0 and css_size.y > css_size.x
+	var cue_top_css: float = 50.0
+	if mobile_portrait:
+		cue_top_css = maxf(64.0, clampf(css_size.y * 0.10, 64.0, 88.0)) + 48.0
+	var cue_margin: float = _hud_length(20.0)
+	first_action_label.offset_left = cue_margin
+	first_action_label.offset_top = _hud_length(cue_top_css)
+	first_action_label.offset_right = -cue_margin
+	first_action_label.offset_bottom = _hud_length(cue_top_css + 26.0)
+	first_action_label.add_theme_font_size_override("font_size", _hud_font_size(16 if mobile_portrait else 14))
+	first_action_label.add_theme_constant_override("outline_size", maxi(1, int(round(_hud_length(2.0)))))
+
 	var result_width_css: float = minf(360.0, maxf(260.0, css_size.x - 32.0))
 	var result_width: float = result_width_css / hud_canvas_scale
 	var result_height: float = _hud_length(154.0)
@@ -1434,9 +1488,77 @@ func _publish_hud_metrics(viewport: Vector2) -> void:
 	)
 
 
+func _refresh_first_action_cue() -> void:
+	if first_action_label == null:
+		return
+	if move_count >= 1:
+		first_action_cue_complete = true
+	var legal_count: int = _first_action_legal_count()
+	var cue: String = _first_action_cue_text(legal_count)
+	first_action_label.text = cue
+	first_action_label.visible = not cue.is_empty()
+	_publish_first_action_cue(cue, legal_count)
+
+
+func _first_action_cue_text(legal_count: int) -> String:
+	if (
+		first_action_cue_complete
+		or not match_initialized
+		or online_active
+		or tutorial_active
+		or _current_mode() != "local"
+		or not gameplay_ready
+		or move_active
+		or camera_transition
+		or round_complete
+		or match_complete
+		or move_count != 0
+	):
+		return ""
+	if selected_index < 0:
+		return FIRST_ACTION_CUE_PICK_PIECE
+	if legal_count > 0:
+		return FIRST_ACTION_CUE_PICK_CELL
+	return ""
+
+
+func _first_action_legal_count() -> int:
+	if selected_index < 0 or selected_index >= piece_records.size():
+		return 0
+	var size_name: String = _selected_size()
+	if size_name.is_empty():
+		return 0
+	var count: int = 0
+	for cell: int in range(CELL_COORDS.size()):
+		if _is_legal_cell(cell, size_name):
+			count += 1
+	return count
+
+
+func _publish_first_action_cue(cue: String, legal_count: int) -> void:
+	if not OS.has_feature("web"):
+		return
+	var state: String = "hidden"
+	if cue == FIRST_ACTION_CUE_PICK_PIECE:
+		state = "pick-piece"
+	elif cue == FIRST_ACTION_CUE_PICK_CELL:
+		state = "pick-cell"
+	JavaScriptBridge.eval(
+		"document.body.dataset.yakolakFirstActionCue=" + JSON.stringify(cue) + ";" +
+		"document.body.dataset.yakolakFirstActionCueState=" + JSON.stringify(state) + ";" +
+		"document.body.dataset.yakolakFirstActionCueVisible='%s';" % ("true" if not cue.is_empty() else "false") +
+		"document.body.dataset.yakolakFirstActionCueMoves='%d';" % move_count +
+		"document.body.dataset.yakolakFirstActionCueSelected='%d';" % selected_index +
+		"document.body.dataset.yakolakFirstActionCueLegal='%d';" % legal_count +
+		"document.body.dataset.yakolakFirstActionCueComplete='%s';" % ("true" if first_action_cue_complete else "false"),
+		true
+	)
+
+
 func _update_hud() -> void:
 	if turn_label == null or score_label == null:
 		return
+	_refresh_first_action_cue()
 	if not match_initialized:
 		turn_label.text = ""
 		score_label.text = ""
@@ -1471,6 +1593,7 @@ func _update_hud() -> void:
 
 func _publish_gameplay_state(state: String) -> void:
 	super._publish_gameplay_state(state)
+	_refresh_first_action_cue()
 	_publish_match_state(state)
 
 
