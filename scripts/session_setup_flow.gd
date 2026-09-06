@@ -72,6 +72,11 @@ func _build_mode_question(content: VBoxContainer, seat_index: int) -> void:
 		options.add_theme_constant_override("separation", int(round(_ui_length(10.0))))
 		options.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
+		var local_button := _mode_preset("على نفس الجهاز", Color("#10201f"), Color("#f2f0e9"))
+		local_button.tooltip_text = "كل اللاعبين على هذا الجهاز"
+		local_button.pressed.connect(_choose_mode.bind(seat_index, "local"))
+		options.add_child(local_button)
+
 		var online_button := _mode_preset("كل اللاعبين أونلاين", Color("#2a4d63"), Color.WHITE)
 		online_button.tooltip_text = "كل اللاعبين عبر الغرفة"
 		online_button.pressed.connect(_choose_all_online)
@@ -147,6 +152,15 @@ func _choose_all_computer() -> void:
 
 
 func _choose_mode(seat_index: int, mode_id: String) -> void:
+	if mode_id == "local" and not custom_setup_active and seat_index == 1:
+		for index: int in range(1, seats.size()):
+			var seat: Dictionary = seats[index]
+			if bool(seat.get("active", false)):
+				seat["mode"] = "local"
+				seats[index] = seat
+		custom_setup_active = false
+		_goto_step("rounds")
+		return
 	# Preserve the semantic shortcut for both visible UI and internal/test callers:
 	# selecting online on the first opponent configures every active secondary seat.
 	if mode_id == "online" and not custom_setup_active and seat_index == 1:
