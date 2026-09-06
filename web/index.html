@@ -178,11 +178,6 @@ body {
 @media (prefers-reduced-motion:reduce){#yakolakLoader{--cycle:1200ms}}
 </style>
 
-<style id="yakolak-browser-a11y-style">
-#yakolakA11yActions:not([hidden]){position:fixed;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;pointer-events:none}
-#yakolakA11yActions button{pointer-events:none}
-</style>
-
 </head>
 	<body>
 
@@ -201,8 +196,6 @@ body {
     <div class="loadingShadow"></div>
   </div>
 </div>
-
-		<div id="yakolakA11yActions" lang="ar" dir="rtl" hidden></div>
 
 		<canvas id="canvas">
 			Your browser does not support the canvas tag.
@@ -615,59 +608,6 @@ const engine = new Engine(GODOT_CONFIG);
 })();
 </script>
 
-
-<script id="yakolak-browser-a11y-script">
-(()=>{
-  const root=document.getElementById('yakolakA11yActions');
-  if(!root)return;
-  let renderedKey='';
-  const action=(id,label)=>({id,label});
-  const render=()=>{
-    const stage=document.body.dataset.yakolakDialogStage||'';
-    const flow=document.body.dataset.yakolakSetupFlowStage||'';
-    const canCancel=document.body.dataset.yakolakDialogClose==='visible';
-    let semanticStage='';
-    let actions=[];
-    if(stage==='question'&&flow==='knowledge'){
-      semanticStage='knowledge';
-      actions=[action('knowledge-known','نعم، أعرفها'),action('knowledge-learn','أبغى أتعلم')];
-    }else if(stage==='setup:count'){
-      semanticStage='count';
-      actions=[action('count-2','2'),action('count-3','3'),action('count-4','4')];
-    }
-    if(semanticStage&&canCancel)actions.push(action('cancel','إغلاق'));
-    const key=semanticStage+'|'+actions.map(item=>item.id).join(',');
-    if(key===renderedKey)return;
-    renderedKey=key;
-    root.replaceChildren();
-    if(!semanticStage){
-      root.hidden=true;
-      delete document.body.dataset.yakolakA11yStage;
-      document.body.dataset.yakolakA11yActionCount='0';
-      return;
-    }
-    for(const item of actions){
-      const control=document.createElement('button');
-      control.type='button';
-      control.tabIndex=-1;
-      control.textContent=item.label;
-      control.setAttribute('aria-label',item.label);
-      control.dataset.yakolakA11yAction=item.id;
-      control.addEventListener('click',()=>{
-        if(typeof window.yakolakA11yActivate==='function')window.yakolakA11yActivate(item.id);
-      });
-      root.appendChild(control);
-    }
-    root.hidden=false;
-    document.body.dataset.yakolakA11yStage=semanticStage;
-    document.body.dataset.yakolakA11yActionCount=String(actions.length);
-  };
-  new MutationObserver(render).observe(document.body,{attributes:true,attributeFilter:[
-    'data-yakolak-dialog-stage','data-yakolak-dialog-close','data-yakolak-setup-flow-stage'
-  ]});
-  render();
-})();
-</script>
 </body>
 </html>
 
