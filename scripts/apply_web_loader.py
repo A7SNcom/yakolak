@@ -407,21 +407,98 @@ SCRIPT = r'''
 </script>
 '''
 
+SEMANTIC_STYLE = r'''
+<style id="yakolak-browser-a11y-style">
+#yakolakA11yActions:not([hidden]){position:fixed;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;pointer-events:none}
+#yakolakA11yActions button{pointer-events:none}
+</style>
+'''
+
+SEMANTIC_MARKUP = r'''
+		<div id="yakolakA11yActions" lang="ar" dir="rtl" hidden></div>
+'''
+
+SEMANTIC_SCRIPT = r'''
+<script id="yakolak-browser-a11y-script">
+(()=>{
+  const root=document.getElementById('yakolakA11yActions');
+  if(!root)return;
+  let renderedKey='';
+  const action=(id,label)=>({id,label});
+  const render=()=>{
+    const stage=document.body.dataset.yakolakDialogStage||'';
+    const flow=document.body.dataset.yakolakSetupFlowStage||'';
+    const canCancel=document.body.dataset.yakolakDialogClose==='visible';
+    let semanticStage='';
+    let actions=[];
+    if(stage==='question'&&flow==='knowledge'){
+      semanticStage='knowledge';
+      actions=[action('knowledge-known','نعم، أعرفها'),action('knowledge-learn','أبغى أتعلم')];
+    }else if(stage==='setup:count'){
+      semanticStage='count';
+      actions=[action('count-2','2'),action('count-3','3'),action('count-4','4')];
+    }
+    if(semanticStage&&canCancel)actions.push(action('cancel','إغلاق'));
+    const key=semanticStage+'|'+actions.map(item=>item.id).join(',');
+    if(key===renderedKey)return;
+    renderedKey=key;
+    root.replaceChildren();
+    if(!semanticStage){
+      root.hidden=true;
+      delete document.body.dataset.yakolakA11yStage;
+      document.body.dataset.yakolakA11yActionCount='0';
+      return;
+    }
+    for(const item of actions){
+      const control=document.createElement('button');
+      control.type='button';
+      control.tabIndex=-1;
+      control.textContent=item.label;
+      control.setAttribute('aria-label',item.label);
+      control.dataset.yakolakA11yAction=item.id;
+      control.addEventListener('click',()=>{
+        if(typeof window.yakolakA11yActivate==='function')window.yakolakA11yActivate(item.id);
+      });
+      root.appendChild(control);
+    }
+    root.hidden=false;
+    document.body.dataset.yakolakA11yStage=semanticStage;
+    document.body.dataset.yakolakA11yActionCount=String(actions.length);
+  };
+  new MutationObserver(render).observe(document.body,{attributes:true,attributeFilter:[
+    'data-yakolak-dialog-stage','data-yakolak-dialog-close','data-yakolak-setup-flow-stage'
+  ]});
+  render();
+})();
+</script>
+'''
+
+
 
 def main() -> None:
     html = INDEX.read_text(encoding="utf-8")
     if "yakolak-v130-loading-star-style" in html:
         raise RuntimeError("loader already injected")
+    semantic_markers = (
+        'id="yakolak-browser-a11y-style"',
+        'id="yakolakA11yActions"',
+        'id="yakolak-browser-a11y-script"',
+    )
+    if any(marker in html for marker in semantic_markers):
+        raise RuntimeError("semantic DOM already injected")
     mtkyf_svg = MTKYF.read_text(encoding="utf-8").strip()
     mtkyf_svg = re.sub(r"<\?xml[^>]*>\s*|<!DOCTYPE[^>]*>\s*", "", mtkyf_svg)
     markup = MARKUP.replace("__MTKYF__", mtkyf_svg)
-    html = html.replace("</head>", STYLE + "\n</head>", 1)
-    html, count = re.subn(r"(<body[^>]*>)", r"\1\n" + markup, html, count=1, flags=re.I)
+    html = html.replace("</head>", STYLE + "\n" + SEMANTIC_STYLE + "\n</head>", 1)
+    html, count = re.subn(r"(<body[^>]*>)", r"\1\n" + markup + "\n" + SEMANTIC_MARKUP, html, count=1, flags=re.I)
     if count != 1:
         raise RuntimeError("body missing")
-    html = html.replace("</body>", SCRIPT + "\n</body>", 1)
+    html = html.replace("</body>", SCRIPT + "\n" + SEMANTIC_SCRIPT + "\n</body>", 1)
+    for marker in semantic_markers:
+        if html.count(marker) != 1:
+            raise RuntimeError(f"semantic marker count mismatch: {marker}")
     INDEX.write_text(html, encoding="utf-8", newline="\n")
-    print("YAKOLAK_BALANCED_BRAND_LOADER_WITH_CANONICAL_SVG_HANDOFF_INJECTED")
+    print("YAKOLAK_BALANCED_BRAND_LOADER_WITH_CANONICAL_SVG_HANDOFF_AND_SEMANTIC_DOM_INJECTED")
 
 
 if __name__ == "__main__":
