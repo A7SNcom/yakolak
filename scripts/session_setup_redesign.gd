@@ -446,6 +446,7 @@ func _goto_step(next_step: String) -> void:
 	if wizard_step != next_step:
 		wizard_history.append(wizard_step)
 		wizard_step = next_step
+	online_error_text = ""
 	_show_setup()
 
 
