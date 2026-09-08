@@ -1,10 +1,8 @@
 extends "res://scripts/gameplay_session_efficient.gd"
 
-# Spectator tutorial restored from the pre-v112 learning journey.
-# The learner watches three complete scripted examples on the real board:
-# 1) same-size line, 2) graded small/medium/large line, 3) full stack/tower.
-# No tutorial move requires user input; the real match starts only afterwards.
-# Keep this journey compact: it is onboarding before the match, not a cutscene.
+# Learn-first tutorial: the first example is a real authoritative move.
+# The normal tutorial HUD guides select -> place on the real board; no move is scripted.
+# Legacy showcase helpers stay available but are not entered by the learn-first start.
 
 const SHOWCASE_CAMERA_POSITION := Vector3(11.8, 17.2, 12.8)
 const SHOWCASE_CAMERA_TARGET := Vector3(0.0, 0.45, 0.0)
@@ -35,25 +33,34 @@ func _process(delta: float) -> void:
 
 func _start_turn() -> void:
 	if tutorial_active and not tutorial_complete and not online_active:
-		if tutorial_showcase_running:
-			return
-		tutorial_showcase_running = true
-		gameplay_ready = false
-		turn_deadline_msec = 0
-		bot_scheduled = false
-		bot_due_msec = 0
-		camera_transition = false
-		_reset_tray_state()
-		selected_index = -1
-		selected_original_material = null
-		_hide_markers()
-		if result_button != null:
-			result_button.visible = false
-		_eff_apply_frame_budget(true)
-		_publish_tutorial_stage("starting")
-		call_deferred("_run_spectator_tutorial")
+		tutorial_showcase_running = false
+		_publish_tutorial_stage("guided-first-action", true)
+		super._start_turn()
 		return
 	super._start_turn()
+
+
+func _refresh_first_action_cue() -> void:
+	if tutorial_active and not tutorial_complete and not online_active and _current_mode() == "local":
+		if first_action_label == null:
+			return
+		var legal_count: int = _first_action_legal_count()
+		var cue: String = FIRST_ACTION_CUE_PICK_CELL if selected_index >= 0 and legal_count > 0 else FIRST_ACTION_CUE_PICK_PIECE
+		first_action_label.text = cue
+		first_action_label.visible = true
+		_publish_first_action_cue(cue, legal_count)
+		return
+	super._refresh_first_action_cue()
+
+
+func _update_move() -> void:
+	var guided_before: bool = tutorial_active and not tutorial_complete and not online_active and _current_mode() == "local"
+	var moves_before: int = move_count
+	super._update_move()
+	if guided_before and tutorial_complete and move_count > moves_before:
+		tutorial_active = false
+		tutorial_showcase_running = false
+		_publish_tutorial_stage("acknowledged")
 
 
 func _reset_for_intro() -> void:
@@ -295,12 +302,14 @@ func _finish_showcase_safely() -> void:
 	_start_turn()
 
 
-func _publish_tutorial_stage(stage: String) -> void:
+func _publish_tutorial_stage(stage: String, interactive: bool = false) -> void:
 	if not OS.has_feature("web"):
 		return
+	var guided: bool = interactive or stage == "acknowledged"
+	var experience: String = "guided-first-action" if guided else "spectator-three-demo"
 	JavaScriptBridge.eval(
-		"document.body.dataset.yakolakTutorialExperience='spectator-three-demo';" +
+		"document.body.dataset.yakolakTutorialExperience='" + experience + "';" +
 		"document.body.dataset.yakolakTutorialStage='" + stage + "';" +
-		"document.body.dataset.yakolakTutorialInteractive='false';",
+		"document.body.dataset.yakolakTutorialInteractive='" + ("true" if interactive else "false") + "';",
 		true
 	)
