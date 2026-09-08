@@ -56,6 +56,8 @@ func _show_setup() -> void:
 
 
 func _wizard_header(title: String) -> Control:
+	if custom_setup_active and wizard_step.begins_with("mode:"):
+		return super._wizard_header("خصّص اللاعبين")
 	var clearer_title: String = title
 	if title.begins_with("اللاعب "):
 		clearer_title = title + " بيلعب كيف؟"
@@ -94,6 +96,10 @@ func _build_mode_question(content: VBoxContainer, seat_index: int) -> void:
 		content.add_child(options)
 		return
 
+	if custom_setup_active:
+		_build_custom_roster(content)
+		return
+
 	var row := _choice_row()
 	var local := _button("على نفس الجهاز", Color("#10201f"), Color("#f2f0e9"))
 	local.pressed.connect(_choose_mode.bind(seat_index, "local"))
@@ -102,6 +108,35 @@ func _build_mode_question(content: VBoxContainer, seat_index: int) -> void:
 	bot.pressed.connect(_choose_mode.bind(seat_index, "bot"))
 	row.add_child(bot)
 	content.add_child(row)
+
+
+func _build_custom_roster(content: VBoxContainer) -> void:
+	var roster := VBoxContainer.new()
+	roster.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	roster.add_theme_constant_override("separation", int(round(_ui_length(10.0))))
+	roster.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for index: int in range(1, seats.size()):
+		var seat: Dictionary = seats[index]
+		if not bool(seat.get("active", false)):
+			continue
+		var mode_id: String = str(seat.get("mode", "local"))
+		var card := VBoxContainer.new()
+		card.add_theme_constant_override("separation", int(round(_ui_length(6.0))))
+		var current_text: String = "على نفس الجهاز" if mode_id == "local" else "كمبيوتر"
+		card.add_child(_label("اللاعب %d — %s" % [index + 1, current_text], 16, HORIZONTAL_ALIGNMENT_RIGHT))
+		var row := _choice_row()
+		var local := _button("على نفس الجهاز ✓" if mode_id == "local" else "على نفس الجهاز", Color("#10201f"), Color("#f2f0e9"))
+		local.pressed.connect(_set_custom_seat_mode.bind(index, "local"))
+		row.add_child(local)
+		var bot := _button("كمبيوتر ✓" if mode_id == "bot" else "كمبيوتر", Color.WHITE, Color("#235b50"))
+		bot.pressed.connect(_set_custom_seat_mode.bind(index, "bot"))
+		row.add_child(bot)
+		card.add_child(row)
+		roster.add_child(card)
+	content.add_child(roster)
+	var continue_button := _mode_preset("متابعة", Color("#235b50"), Color.WHITE)
+	continue_button.pressed.connect(_finish_custom_setup)
+	content.add_child(continue_button)
 
 
 func _mode_preset(text_value: String, background: Color, foreground: Color) -> Button:
@@ -127,6 +162,24 @@ func _choose_all_online() -> void:
 func _begin_custom_setup() -> void:
 	custom_setup_active = true
 	_show_setup()
+
+
+func _set_custom_seat_mode(seat_index: int, mode_id: String) -> void:
+	if not custom_setup_active or not ["local", "bot"].has(mode_id):
+		return
+	if seat_index <= 0 or seat_index >= seats.size() or not bool(seats[seat_index].get("active", false)):
+		return
+	var seat: Dictionary = seats[seat_index]
+	seat["mode"] = mode_id
+	seats[seat_index] = seat
+	_show_setup()
+
+
+func _finish_custom_setup() -> void:
+	if not custom_setup_active:
+		return
+	custom_setup_active = false
+	_goto_step("rounds")
 
 
 func _build_rounds_question(content: VBoxContainer) -> void:
@@ -169,6 +222,9 @@ func _choose_mode(seat_index: int, mode_id: String) -> void:
 	if custom_setup_active and mode_id == "online":
 		return
 	if mode_id == "online" and seat_index != 1:
+		return
+	if custom_setup_active and ["local", "bot"].has(mode_id):
+		_set_custom_seat_mode(seat_index, mode_id)
 		return
 	super._choose_mode(seat_index, mode_id)
 
@@ -407,6 +463,8 @@ func _on_web_setup_flow_action(arguments: Array) -> void:
 		"custom":
 			if wizard_step == "mode:1":
 				_begin_custom_setup()
+		"custom-continue":
+			_finish_custom_setup()
 		"all-online":
 			_choose_all_online()
 		"all-computer":
