@@ -178,7 +178,8 @@ func _set_custom_seat_mode(seat_index: int, mode_id: String) -> void:
 func _finish_custom_setup() -> void:
 	if not custom_setup_active:
 		return
-	custom_setup_active = false
+	# Keep Custom provenance so Back from rounds restores the unified roster directly.
+	# The existing mode:1 Back branch still exits Custom back to the preset choices.
 	_goto_step("rounds")
 
 
