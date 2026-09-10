@@ -74,7 +74,9 @@ func _color_choice_button(color_id: String, value: Color, selected: bool, enable
 
 func _wizard_header(title: String) -> Control:
 	var clearer_title: String = title
-	if title.begins_with("اللاعب "):
+	if custom_setup_active and wizard_step.begins_with("mode:"):
+		clearer_title = "خصّص اللاعبين"
+	elif title.begins_with("اللاعب "):
 		clearer_title = title + " بيلعب كيف؟"
 	var row := HBoxContainer.new()
 	row.layout_direction = Control.LAYOUT_DIRECTION_RTL
