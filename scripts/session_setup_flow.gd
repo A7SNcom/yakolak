@@ -187,6 +187,8 @@ func _build_rounds_question(content: VBoxContainer) -> void:
 	var row := _choice_row()
 	for count: int in [3, 5]:
 		var label: String = "%s انتصارات\nللفوز بالمباراة" % str(count)
+		if count == rounds:
+			label += " ✓"
 		var choice := _mode_preset(label, Color("#f2f0e9"), Color("#10201f"))
 		choice.pressed.connect(_choose_rounds.bind(count))
 		row.add_child(choice)
