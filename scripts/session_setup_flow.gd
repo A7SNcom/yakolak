@@ -194,6 +194,12 @@ func _build_rounds_question(content: VBoxContainer) -> void:
 		choice.tooltip_text = "%s انتصارات للفوز بالمباراة%s" % [str(count), " — مختار" if selected else ""]
 		choice.add_theme_stylebox_override("pressed", _button_style(Color("#235b50")))
 		choice.add_theme_stylebox_override("hover_pressed", _button_style(Color("#2b6b5f")))
+		if selected:
+			var selected_focus: StyleBoxFlat = _button_style(Color("#235b50"))
+			selected_focus.border_color = Color("#8fd8c8")
+			selected_focus.set_border_width_all(3)
+			choice.add_theme_stylebox_override("focus", selected_focus)
+			choice.add_theme_color_override("font_focus_color", Color.WHITE)
 		choice.add_theme_color_override("font_pressed_color", Color.WHITE)
 		choice.add_theme_color_override("font_hover_pressed_color", Color.WHITE)
 		choice.pressed.connect(_choose_rounds.bind(count))
