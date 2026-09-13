@@ -186,10 +186,16 @@ func _finish_custom_setup() -> void:
 func _build_rounds_question(content: VBoxContainer) -> void:
 	var row := _choice_row()
 	for count: int in [3, 5]:
+		var selected: bool = count == rounds
 		var label: String = "%s انتصارات\nللفوز بالمباراة" % str(count)
-		if count == rounds:
-			label += " ✓"
 		var choice := _mode_preset(label, Color("#f2f0e9"), Color("#10201f"))
+		choice.toggle_mode = true
+		choice.button_pressed = selected
+		choice.tooltip_text = "%s انتصارات للفوز بالمباراة%s" % [str(count), " — مختار" if selected else ""]
+		choice.add_theme_stylebox_override("pressed", _button_style(Color("#235b50")))
+		choice.add_theme_stylebox_override("hover_pressed", _button_style(Color("#2b6b5f")))
+		choice.add_theme_color_override("font_pressed_color", Color.WHITE)
+		choice.add_theme_color_override("font_hover_pressed_color", Color.WHITE)
 		choice.pressed.connect(_choose_rounds.bind(count))
 		row.add_child(choice)
 	content.add_child(row)
