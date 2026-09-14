@@ -89,7 +89,7 @@ func _build_mode_question(content: VBoxContainer, seat_index: int) -> void:
 		computer_button.pressed.connect(_choose_all_computer)
 		options.add_child(computer_button)
 
-		var custom_button := _mode_preset("مخصص", Color("#f2f0e9"), Color("#10201f"))
+		var custom_button := _mode_preset("مخصص", Color("#172220"), Color("#f2f0e9"))
 		custom_button.tooltip_text = "اختَر طريقة كل لاعب"
 		custom_button.pressed.connect(_begin_custom_setup)
 		options.add_child(custom_button)
