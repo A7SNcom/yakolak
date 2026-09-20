@@ -1,1 +1,0 @@
-Browser verification trigger for wins-required match logic fix.
