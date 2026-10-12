@@ -9,6 +9,7 @@ var visual_preview_seats: Array = []
 var visual_step: String = "color"
 var visual_last_viewport := Vector2.ZERO
 var visual_piece_visibility: Dictionary = {}
+var visual_inactive_material: StandardMaterial3D
 
 func _ready() -> void:
 	super._ready()
@@ -155,7 +156,7 @@ func _update_visual_seats() -> void:
 			continue
 		var key := mesh.get_instance_id()
 		if not visual_piece_visibility.has(key):
-			visual_piece_visibility[key] = {"node": mesh, "visible": mesh.visible, "transparency": mesh.transparency}
+			visual_piece_visibility[key] = {"node": mesh, "visible": mesh.visible, "material": mesh.material_override}
 		var enabled := visual_step == "color"
 		for value: Variant in visual_preview_seats:
 			var seat := value as Dictionary
@@ -163,7 +164,13 @@ func _update_visual_seats() -> void:
 			if str(palette["direction"]) == str(record.get("dir", "")):
 				enabled = enabled or str(seat.get("mode", "none")) != "none"
 		mesh.visible = true
-		mesh.transparency = 0.0 if enabled else 0.78
+		if visual_inactive_material == null:
+			visual_inactive_material = StandardMaterial3D.new()
+			visual_inactive_material.albedo_color = Color("#182421")
+			visual_inactive_material.roughness = 0.95
+		# GeometryInstance3D.transparency is ignored by the Web Compatibility
+		# renderer. A real opaque material keeps absent seats visibly dark.
+		mesh.material_override = visual_piece_visibility[key]["material"] if enabled else visual_inactive_material
 
 func _validated_visual_configuration(payload: Dictionary) -> Dictionary:
 	var values: Variant = payload.get("players", [])
@@ -222,7 +229,7 @@ func _restore_visual_camera() -> void:
 		if is_instance_valid(record["node"]):
 			var mesh := record["node"] as GeometryInstance3D
 			mesh.visible = bool(record["visible"])
-			mesh.transparency = float(record["transparency"])
+			mesh.material_override = record["material"]
 	visual_piece_visibility.clear()
 
 func _close_visual_setup() -> void:

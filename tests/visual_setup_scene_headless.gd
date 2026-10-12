@@ -15,6 +15,13 @@ func _run() -> void:
 		return
 	await process_frame
 	setup._on_visual_action([JSON.stringify({"action":"preview","step":"ready","all_seats":[{"color":"green","mode":"local"},{"color":"marble","mode":"bot"},{"color":"blue","mode":"none"},{"color":"gold","mode":"none"}]})])
+	for record: Dictionary in intro.pieces:
+		var material: Material = record["mesh"].material_override
+		var inactive: bool = record["dir"] in ["back", "left"]
+		if (material == setup.visual_inactive_material) != inactive:
+			push_error("Seat dimming does not match active seats")
+			quit(1)
+			return
 	setup._on_visual_action([JSON.stringify({"action":"start","rounds":3,"players":[{"color":"green","mode":"local","label":"أحمد","device_owner":"p1"},{"color":"marble","mode":"bot","label":"بوت","device_owner":"p1"}]})])
 	await create_timer(0.8).timeout
 	if not game.match_initialized or game.players.size() != 2 or setup.visual_active or game.tutorial_active:
