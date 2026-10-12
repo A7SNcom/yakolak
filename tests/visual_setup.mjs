@@ -78,7 +78,7 @@ if(process.env.YAKOLAK_JSDOM_MODULE){
   api.open();q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));assert.equal(q('input[autocomplete=given-name]'),null);
   q('.yk-entry button:last-child').click();q('input').value='https://a7sncom.github.io/yakolak/?room=12';q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));assert.match(q('.yk-field-error').textContent,/غير متاح/);
   q('.yk-subtle').click();q('.yk-entry button').click();q('[data-color=blue]').click();q('.yk-confirm').click();q('.yk-counts button').click();
-  q('.yk-sharing').click();assert.equal(copies.length,0);assert.match(q('.yk-error').textContent,/غير متاح/);
+  assert.equal(q('.yk-sharing').disabled,true);q('.yk-sharing').click();assert.equal(copies.length,0);assert.equal(q('.yk-error').textContent,'');
   api.room({code:'12',players:[]});q('.yk-sharing').click();await Promise.resolve();assert.equal(copies[0],'https://a7sncom.github.io/yakolak/?room=12');
   dom.window.close();
  });
