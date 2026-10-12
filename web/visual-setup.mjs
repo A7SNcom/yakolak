@@ -12,7 +12,7 @@ export function validProfile(value) {
   return !!value && typeof value.name === 'string' && value.name.trim().length >= 2 && value.name.trim().length <= 24 && /^[0-9]{7,15}$/.test(value.phone || '');
 }
 export function newSetup(name = '') {
-  return { step: 'entry', selectedColor: '', hostColor: 'marble', rounds: 3, name,
+  return { step: 'entry', countChosen: false, selectedColor: '', hostColor: 'marble', rounds: 3, name,
     seats: COLORS.map((color, i) => ({ color: color.id, mode: i === 0 ? 'local' : i === 1 ? 'bot' : 'none', name: i === 0 ? name : '', owner: 'p1' })) };
 }
 export function chooseColor(state, color) {
@@ -25,7 +25,7 @@ export function confirmColor(state) {
 }
 export function chooseCount(state, count) {
   if (![2, 3, 4].includes(count)) return state;
-  return { ...state, step: 'ready', seats: state.seats.map((seat, i) => ({ ...seat, mode: i === 0 ? 'local' : i < count ? 'bot' : 'none', name: i === 0 ? state.name : '', owner: 'p1' })) };
+  return { ...state, step: 'ready', countChosen: true, seats: state.seats.map((seat, i) => ({ ...seat, mode: i === 0 ? 'local' : i < count ? 'bot' : 'none', name: i === 0 ? state.name : '', owner: 'p1' })) };
 }
 export function changeSeat(state, index, mode, name = '', owner = 'p1') {
   if (index < 1 || index > 3 || !['bot', 'online', 'local', 'none'].includes(mode)) return state;
@@ -113,7 +113,7 @@ export function mountSetup(document, window) {
   function clearError(){errors.textContent='';}
   function showError(text){pending=false;errors.textContent=text;render();}
   function notify(action,override={}){
-    const payload={action,...configuration(state),all_seats:state.seats,host_name:state.name,selected_color:state.selectedColor,step:root.dataset.profile==='active'?'profile':state.step,overlay_open:!modal.hidden,...override};
+    const payload={action,...configuration(state),all_seats:state.seats,host_name:state.name,selected_color:state.selectedColor,count_chosen:state.countChosen,step:root.dataset.profile==='active'?'profile':state.step,overlay_open:!modal.hidden,...override};
     window.yakolakVisualSetupAction?.(JSON.stringify(payload));
   }
   function viewport(){const h=window.visualViewport?.height||window.innerHeight;root.style.setProperty('--yk-vh',`${h}px`);root.classList.toggle('is-keyboard',h<360);position();}
