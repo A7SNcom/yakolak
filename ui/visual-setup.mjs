@@ -270,7 +270,7 @@ export function mountSetup(document, window) {
     const form=el('form','yk-form');form.noValidate=true;
     const name=input('اسم اللاعب',{value:state.seats[index].name,placeholder:'اسم اللاعب',maxLength:24,autocomplete:'off'});name.field.enterKeyHint='done';
     const inputRow=el('div','yk-name-input');inputRow.append(name.wrap);
-    const clearName=button('×',()=>{name.field.value='';name.field.focus({preventScroll:true});},'yk-input-clear');
+    const clearName=button('×',()=>{name.field.value='';clearName.hidden=true;name.field.focus({preventScroll:true});},'yk-input-clear');
     clearName.setAttribute('aria-label','مسح اسم اللاعب');clearName.hidden=!name.field.value;
     name.field.addEventListener('input',()=>{clearName.hidden=!name.field.value;});inputRow.append(clearName);form.append(inputRow);
     nameDraft={index,field:name.field};form.addEventListener('submit',e=>{e.preventDefault();name.field.blur();closeSheet(true);});sheet.append(form);positionSheet();name.field.focus({preventScroll:true});

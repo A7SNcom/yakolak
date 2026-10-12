@@ -72,7 +72,7 @@ if(process.env.YAKOLAK_JSDOM_MODULE){
   assert.equal(q('[data-color=blue] .yk-seat-number'),null);assert.ok(parseFloat(q('[data-color=blue]').style.width)>0);assert.ok(!q('.yk-seats').textContent.includes('لاعب'));
   q('[data-color=gold]').click();assert.equal(q('.yk-sheet').getAttribute('role'),'menu');assert.equal(q('.yk-sheet').getAttribute('aria-modal'),'false');
   [...document.querySelectorAll('.yk-menu-item')].find(x=>x.textContent==='لاعب').click();assert.equal(q('input').placeholder,'اسم اللاعب');assert.equal(q('.yk-modal').dataset.side,'center');
-  q('input').value='ريم';q('input').dispatchEvent(new window.Event('input'));assert.equal(q('.yk-input-clear').hidden,false);q('.yk-input-clear').click();assert.equal(q('input').value,'');
+  q('input').value='ريم';q('input').dispatchEvent(new window.Event('input'));assert.equal(q('.yk-input-clear').hidden,false);q('.yk-input-clear').click();assert.equal(q('input').value,'');assert.equal(q('.yk-input-clear').hidden,true);
   q('input').value='ريم';q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));
   q('.yk-start').click();assert.equal(q('.yk-rounds').hidden,false);assert.equal(q('h1').textContent,'كم شوط للفوز؟');assert.equal(events.some(x=>x.action==='start'),false);
   q('.yk-rounds button[aria-label="الفوز بـ 5 أشواط"]').click();const start=events.find(x=>x.action==='start');assert.equal(start.rounds,5);assert.equal(start.count_chosen,true);assert.equal(start.players[1].label,'ريم');assert.equal(start.players.length,3);
