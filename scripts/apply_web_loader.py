@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import hashlib
+import json
 import shutil
 from pathlib import Path
 
@@ -501,8 +503,25 @@ def main() -> None:
     for filename in ("visual-setup.mjs", "visual-setup.css"):
         shutil.copyfile(ROOT / "ui" / filename, ROOT / "web" / filename)
     shutil.copyfile(ROOT / "assets/fonts/thmanyahsans-Medium.otf", ROOT / "web/setup-font.otf")
-    html = html.replace("</head>", '<link rel="stylesheet" href="visual-setup.css">\n</head>', 1)
-    html = html.replace("</body>", '<script type="module" src="visual-setup.mjs"></script>\n</body>', 1)
+    # Give the pack a content-addressed name so cached exports cannot be mixed
+    # with a newer DOM setup module. Keep index.pck as the canonical artifact.
+    pack_bytes = (ROOT / "web/index.pck").read_bytes()
+    pack_name = "index-" + hashlib.sha256(pack_bytes).hexdigest()[:12] + ".pck"
+    for old_pack in (ROOT / "web").glob("index-*.pck"):
+        if re.fullmatch(r"index-[0-9a-f]{12}\.pck", old_pack.name):
+            old_pack.unlink()
+    shutil.copyfile(ROOT / "web/index.pck", ROOT / "web" / pack_name)
+    def version_pack(match: re.Match[str]) -> str:
+        config = json.loads(match.group(2))
+        config["mainPack"] = pack_name
+        config.setdefault("fileSizes", {})[pack_name] = len(pack_bytes)
+        return match.group(1) + json.dumps(config, ensure_ascii=False, separators=(",", ":")) + match.group(3)
+    html, config_count = re.subn(r"(const GODOT_CONFIG\s*=\s*)(\{[^\n]+\})(\s*;)", version_pack, html, count=1)
+    if config_count != 1:
+        raise RuntimeError("Godot export config missing")
+    setup_version = hashlib.sha256((ROOT / "ui/visual-setup.mjs").read_bytes() + (ROOT / "ui/visual-setup.css").read_bytes()).hexdigest()[:12]
+    html = html.replace("</head>", f'<link rel="stylesheet" href="visual-setup.css?v={setup_version}">\n</head>', 1)
+    html = html.replace("</body>", f'<script type="module" src="visual-setup.mjs?v={setup_version}"></script>\n</body>', 1)
     INDEX.write_text(html, encoding="utf-8", newline="\n")
     print("YAKOLAK_BALANCED_BRAND_LOADER_WITH_CANONICAL_SVG_HANDOFF_AND_SEMANTIC_DOM_INJECTED")
 

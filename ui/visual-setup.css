@@ -1,77 +1,65 @@
 @font-face{font-family:Yakolak;src:url('./setup-font.otf') format('opentype');font-display:swap}
-#yakolakVisualSetup{--ink:#f4f1e8;--muted:#aab6b3;--surface:#101a1a;position:fixed;inset:0;z-index:2147483001;height:var(--yk-vh,100dvh);overflow:hidden;pointer-events:auto;color:var(--ink);font-family:Yakolak,system-ui,sans-serif;box-sizing:border-box;isolation:isolate}
+#yakolakVisualSetup{position:fixed;inset:0;height:var(--yk-vh,100dvh);z-index:2147483001;overflow:hidden;isolation:isolate;color:#f4f1e8;font-family:Yakolak,system-ui,sans-serif;pointer-events:auto;box-sizing:border-box}
 #yakolakVisualSetup *,#yakolakVisualSetup *:before,#yakolakVisualSetup *:after{box-sizing:border-box}
-#yakolakVisualSetup [hidden],#yakolakVisualSetup[hidden]{display:none!important}
+#yakolakVisualSetup[hidden],#yakolakVisualSetup [hidden]{display:none!important}
 #yakolakVisualSetup button,#yakolakVisualSetup input{font:inherit;color:inherit;pointer-events:auto}
-#yakolakVisualSetup button{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;border:1px solid #ffffff20;border-radius:14px;min-height:44px;background:#14201eea;padding:8px 16px;transition:background .15s,border-color .15s,opacity .15s}
-#yakolakVisualSetup button:hover{border-color:#ffffff75;background:#233630}
-#yakolakVisualSetup button:focus-visible,#yakolakVisualSetup input:focus-visible{outline:3px solid #f4d39a;outline-offset:3px}
-#yakolakVisualSetup button:disabled{opacity:.55;cursor:wait}
-#yakolakVisualSetup .yk-header{position:absolute;top:max(12px,env(safe-area-inset-top));left:12px;right:12px;display:flex;flex-direction:column;align-items:center;gap:9px;pointer-events:none}
-#yakolakVisualSetup .yk-identity{position:absolute;right:0;top:0;border:0;background:#101a1acc;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;min-height:36px;padding:5px 12px}
-#yakolakVisualSetup .yk-prompt{margin:8px 0 0;font-weight:600;font-size:clamp(19px,2.5vw,27px);text-shadow:0 2px 10px #000;line-height:1.35}
-#yakolakVisualSetup .yk-segment{display:flex;direction:ltr;padding:4px;gap:3px;border:1px solid #ffffff18;border-radius:16px;background:#081310d9;pointer-events:auto}
-#yakolakVisualSetup .yk-segment button{border:0;min-width:46px;padding:5px 13px;background:transparent;color:#a9b9b4;font-size:20px;min-height:40px}
-#yakolakVisualSetup .yk-segment button[aria-pressed=true]{background:#edeadf;color:#192320;box-shadow:0 2px 8px #0003}
+#yakolakVisualSetup button{border:0;background:transparent;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-height:44px;padding:10px 14px;transition:opacity .18s,transform .18s}
+#yakolakVisualSetup button:active{transform:translateY(1px)}
+#yakolakVisualSetup button:focus-visible,#yakolakVisualSetup input:focus-visible{outline:2px solid #e9d4ae;outline-offset:3px}
+#yakolakVisualSetup button:disabled{opacity:.5;cursor:wait}
+#yakolakVisualSetup .yk-sr-only{position:absolute!important;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+#yakolakVisualSetup .yk-header{position:absolute;inset:12px 16px auto;pointer-events:none}
+#yakolakVisualSetup .yk-identity{position:absolute;right:0;top:0;max-width:150px;min-height:32px;padding:4px 8px;font-size:12px;text-shadow:0 1px 5px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.65}
 #yakolakVisualSetup .yk-seats{position:absolute;inset:0;pointer-events:none}
-#yakolakVisualSetup .yk-seat{position:absolute;transform:translate(-50%,-50%);width:clamp(86px,12vw,142px);min-height:77px;padding:8px 7px;border:1px solid color-mix(in srgb,var(--seat-color) 58%,transparent);background:linear-gradient(160deg,#14201eea,#091210e8);box-shadow:0 8px 26px #0005;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
-#yakolakVisualSetup .yk-seat:before{content:'';width:22px;height:5px;border-radius:9px;background:var(--seat-color);position:absolute;top:-3px;box-shadow:0 0 14px color-mix(in srgb,var(--seat-color) 40%,transparent)}
-#yakolakVisualSetup .yk-seat-number{font-size:13px;font-weight:bold;color:var(--seat-color);line-height:1}
-#yakolakVisualSetup .yk-seat-name{font-size:clamp(12px,1.45vw,17px);line-height:1.3;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#yakolakVisualSetup .yk-seat-status{font-size:clamp(11px,1.2vw,14px);color:#b6c2bd;line-height:1.3}
-#yakolakVisualSetup .yk-seat.is-off{opacity:.4;background:#090e0e;border-style:dashed;box-shadow:none}
-#yakolakVisualSetup .yk-seat.is-off:hover,#yakolakVisualSetup .yk-seat.is-off:focus-visible{opacity:1}
-#yakolakVisualSetup .yk-seat.is-host{border-width:2px}
-#yakolakVisualSetup .yk-seat.is-color{width:clamp(72px,10vw,112px);min-height:54px;border-color:var(--seat-color);box-shadow:0 0 0 4px #101a1a88,0 5px 20px #0005}
-#yakolakVisualSetup .yk-seat.is-color:before{width:26px;height:26px;border:5px solid var(--seat-color);background:transparent;border-radius:50%;top:-18px;box-shadow:0 3px 9px #0007}
-#yakolakVisualSetup .yk-seat.is-color .yk-seat-name{padding-top:8px}
-#yakolakVisualSetup .yk-footer{position:absolute;bottom:max(12px,env(safe-area-inset-bottom));left:12px;right:12px;display:flex;align-items:center;justify-content:center;gap:12px;pointer-events:none;flex-wrap:wrap}
-#yakolakVisualSetup .yk-rounds{display:flex;align-items:center;gap:9px}
-#yakolakVisualSetup .yk-caption{font-size:13px;text-shadow:0 2px 8px #000}
-#yakolakVisualSetup .yk-primary{background:#edeadf;color:#17231f;border-color:#edeadf;font-weight:600;min-height:48px;padding:10px 25px}
-#yakolakVisualSetup .yk-primary:hover{background:#fffdf4}
-#yakolakVisualSetup .yk-subtle{background:#101a1ac9;border-color:#ffffff18;font-size:13px;padding:7px 13px}
-#yakolakVisualSetup .yk-error{flex-basis:100%;min-height:0;text-align:center;color:#ffc7ac;font-size:13px;text-shadow:0 2px 6px #000}
-#yakolakVisualSetup .yk-error:empty{display:none}
-#yakolakVisualSetup .yk-modal{position:absolute;inset:0;pointer-events:auto;display:flex;align-items:center;justify-content:center;background:transparent;padding:max(14px,env(safe-area-inset-top)) 16px max(14px,env(safe-area-inset-bottom))}
-#yakolakVisualSetup .yk-sheet{width:min(100%,390px);max-height:100%;padding:24px;background:linear-gradient(145deg,#182722,#101a17);border:1px solid #ffffff1e;border-radius:24px;box-shadow:0 24px 70px #0007;text-align:center;display:flex;flex-direction:column;gap:16px}
-#yakolakVisualSetup .yk-sheet h2{font-size:25px;font-weight:600;margin:0;line-height:1.3}
-#yakolakVisualSetup .yk-profile-form{display:flex;flex-direction:column;gap:12px;margin:0}
-#yakolakVisualSetup .yk-field{text-align:right;display:flex;flex-direction:column;gap:6px;font-size:14px}
-#yakolakVisualSetup .yk-field input{width:100%;min-width:0;height:48px;border:1px solid #ffffff28;border-radius:12px;background:#07110dcc;padding:9px 14px;caret-color:#f5dfb6;font-size:17px}
-#yakolakVisualSetup .yk-field-error{font-size:13px;color:#ffc7ac;line-height:1.3}
-#yakolakVisualSetup .yk-field-error:empty{display:none}
-#yakolakVisualSetup .yk-mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-#yakolakVisualSetup .yk-mode{min-height:60px;padding:8px;font-size:14px;line-height:1.4;overflow-wrap:anywhere}
-#yakolakVisualSetup .yk-mode[aria-pressed=true]{border-color:#e4dfcf;background:#314b3e}
-@media(max-width:600px){#yakolakVisualSetup .yk-header{top:max(10px,env(safe-area-inset-top));gap:7px}#yakolakVisualSetup .yk-identity{position:static;align-self:flex-end;min-height:28px;padding:2px 10px}#yakolakVisualSetup .yk-prompt{margin-top:-6px}#yakolakVisualSetup .yk-footer{gap:7px}#yakolakVisualSetup .yk-rounds{gap:5px}#yakolakVisualSetup .yk-caption{font-size:11px}#yakolakVisualSetup .yk-primary{padding:9px 17px}#yakolakVisualSetup .yk-footer>.yk-subtle{padding:7px 10px}#yakolakVisualSetup .yk-segment button{min-width:39px;padding:4px 10px}}
-@media(max-height:480px){#yakolakVisualSetup .yk-header{top:8px;gap:4px}#yakolakVisualSetup .yk-prompt{font-size:19px;margin:0}#yakolakVisualSetup .yk-identity{position:absolute;right:0;top:0}#yakolakVisualSetup .yk-counts{position:absolute;right:0;top:38px}#yakolakVisualSetup .yk-seat{min-height:60px;width:98px;gap:0;padding:5px}#yakolakVisualSetup .yk-seat-name{font-size:12px}#yakolakVisualSetup .yk-seat-status{font-size:11px}#yakolakVisualSetup .yk-footer{bottom:8px;gap:8px}#yakolakVisualSetup .yk-footer .yk-segment button{min-height:36px}#yakolakVisualSetup .yk-footer .yk-primary{min-height:42px;padding:6px 22px}#yakolakVisualSetup .yk-sheet{padding:16px;gap:10px}#yakolakVisualSetup .yk-sheet h2{font-size:21px}#yakolakVisualSetup .yk-profile-form{gap:8px}#yakolakVisualSetup .yk-field{gap:3px}#yakolakVisualSetup .yk-field input{height:40px}#yakolakVisualSetup .yk-mode{min-height:44px}#yakolakVisualSetup .yk-sheet .yk-subtle{min-height:36px;padding:4px 10px}}
-@media(prefers-reduced-motion:reduce){#yakolakVisualSetup button{transition:none}}
-
-#yakolakVisualSetup.is-keyboard .yk-sheet{padding:12px;gap:8px}
-#yakolakVisualSetup.is-keyboard .yk-sheet h2{font-size:19px}
-#yakolakVisualSetup.is-keyboard .yk-profile-form{gap:6px}
-#yakolakVisualSetup.is-keyboard .yk-field{display:grid;grid-template-columns:70px 1fr;align-items:center;gap:6px}
-#yakolakVisualSetup.is-keyboard .yk-field input{height:38px}
-#yakolakVisualSetup.is-keyboard .yk-sheet button{min-height:36px;padding:5px 12px}
-/* Controls follow the actual final intro camera, with clear room surroundings. */
-#yakolakVisualSetup .yk-sr-only{position:absolute!important;width:1px;height:1px;clip-path:inset(50%);overflow:hidden;white-space:nowrap}
-#yakolakVisualSetup .yk-seat.is-color,#yakolakVisualSetup .yk-seat.is-color:hover{background:transparent;border:0;box-shadow:none;padding:0;min-height:72px;color:transparent;border-radius:30%;}
-#yakolakVisualSetup .yk-seat.is-color:before{display:none}
+#yakolakVisualSetup .yk-seat{position:absolute;transform:translate(-50%,-50%);width:88px;height:58px;min-height:58px;padding:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;text-shadow:0 1px 5px #000;}
+#yakolakVisualSetup .yk-seat:active{transform:translate(-50%,-50%)}
+#yakolakVisualSetup .yk-seat-status{font-size:14px;line-height:1.2}
+#yakolakVisualSetup .yk-seat-line{display:flex;gap:8px;align-items:center;direction:ltr}
+#yakolakVisualSetup .yk-seat-number{font-size:18px;line-height:1.2;font-variant-numeric:tabular-nums}
+#yakolakVisualSetup .yk-seat-arrow{font-size:17px;opacity:.8}
+#yakolakVisualSetup .yk-seat.is-off{opacity:.55}
+#yakolakVisualSetup .yk-seat.is-color{border-radius:25%;text-shadow:none;}
 #yakolakVisualSetup .yk-seat.is-color>*{display:none}
-#yakolakVisualSetup .yk-seat:not(.is-color){width:104px;min-height:65px;box-shadow:0 4px 0 #020706b0,0 10px 20px #0004;transform:translate(-50%,-50%) perspective(700px) rotateX(-4deg);border-radius:13px}
-#yakolakVisualSetup .yk-counts,#yakolakVisualSetup .yk-confirm{position:absolute;transform:translateX(-50%);z-index:2;right:auto;min-height:40px}
-#yakolakVisualSetup .yk-confirm{padding:7px 22px;box-shadow:0 4px 0 #192a22a8,0 7px 16px #0003}
-#yakolakVisualSetup .yk-modal{background:transparent;backdrop-filter:none;pointer-events:none;padding:14px;}
-#yakolakVisualSetup .yk-sheet{pointer-events:auto;position:absolute;width:288px;padding:16px;gap:12px;border-radius:18px;box-shadow:0 5px 0 #030905c9,0 16px 32px #0005;animation:yk-sheet-in 260ms cubic-bezier(.2,.8,.2,1);}
-#yakolakVisualSetup .yk-modal[data-kind=profile]{pointer-events:auto;}
-#yakolakVisualSetup .yk-modal[data-kind=profile] .yk-sheet{position:relative;width:min(100%,330px);padding:22px;}
-#yakolakVisualSetup .yk-sheet h2{font-size:21px;}
-#yakolakVisualSetup .yk-mode{min-height:44px;font-size:13px;padding:7px;}
-#yakolakVisualSetup[data-profile=active] .yk-header,#yakolakVisualSetup[data-profile=active] .yk-seats,#yakolakVisualSetup[data-profile=active] .yk-footer,#yakolakVisualSetup[data-profile=active] .yk-confirm,#yakolakVisualSetup[data-profile=active] .yk-counts{visibility:hidden;}
-#yakolakVisualSetup .yk-profile-form .yk-field>span{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden;}
-#yakolakVisualSetup.is-keyboard .yk-field{display:flex;}
-@keyframes yk-sheet-in{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
-@media(prefers-reduced-motion:reduce){#yakolakVisualSetup .yk-sheet{animation:none}}
-#yakolakVisualSetup[data-world=true] .yk-seat:not(.is-color),#yakolakVisualSetup[data-world=true] .yk-seat:not(.is-color):hover{border:0;background:transparent;box-shadow:none;opacity:1;}
-#yakolakVisualSetup[data-world=true] .yk-seat:not(.is-color)>*,#yakolakVisualSetup[data-world=true] .yk-seat:not(.is-color):before{visibility:hidden;}
+#yakolakVisualSetup[data-world=true] .yk-seat>*{visibility:hidden}
+#yakolakVisualSetup .yk-actions{position:absolute;left:50%;transform:translateX(-50%);width:min(calc(100% - 32px),560px);display:flex;flex-direction:column;gap:12px;align-items:stretch;pointer-events:none;z-index:2}
+#yakolakVisualSetup .yk-primary,#yakolakVisualSetup .yk-choice{background:#f5f4ec;color:#101714;min-height:54px;border-radius:15px;font-size:19px;font-weight:600;padding:12px 24px;}
+#yakolakVisualSetup .yk-primary:hover,#yakolakVisualSetup .yk-choice:hover{background:#fff}
+#yakolakVisualSetup .yk-outline{border:1px solid #ffffff8c;border-radius:15px;min-height:54px;font-size:17px;}
+#yakolakVisualSetup .yk-entry,#yakolakVisualSetup .yk-counts,#yakolakVisualSetup .yk-rounds{display:flex;gap:10px;pointer-events:auto;}
+#yakolakVisualSetup .yk-entry>*{flex:1;padding:10px;font-size:17px;}
+#yakolakVisualSetup .yk-counts,#yakolakVisualSetup .yk-rounds{direction:ltr}
+#yakolakVisualSetup .yk-choice{flex:1;font-size:23px;}
+#yakolakVisualSetup .yk-sharing{display:flex;align-items:center;align-self:center;gap:12px;min-height:32px;padding:0 12px;text-shadow:0 1px 5px #000;font-size:18px;}
+#yakolakVisualSetup .yk-sharing.is-unavailable{opacity:.38;}
+#yakolakVisualSetup .yk-share-icon{display:flex;width:20px;height:20px;}
+#yakolakVisualSetup .yk-share-icon svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+#yakolakVisualSetup .yk-room-code{letter-spacing:2px;font-variant-numeric:tabular-nums;}
+#yakolakVisualSetup .yk-error{text-align:center;color:#f4c1a5;font-size:13px;line-height:1.3;text-shadow:0 1px 5px #000;}
+#yakolakVisualSetup .yk-error:empty{display:none;}
+#yakolakVisualSetup .yk-modal{position:absolute;inset:0;z-index:5;background:transparent;display:flex;align-items:center;justify-content:center;padding:14px;pointer-events:none;}
+#yakolakVisualSetup .yk-modal[data-kind=profile],#yakolakVisualSetup .yk-modal[data-kind=join]{pointer-events:auto;}
+#yakolakVisualSetup .yk-sheet{pointer-events:auto;position:relative;width:min(100%,330px);max-height:100%;padding:22px;background:#eae7dc;color:#18231e;border-radius:20px;box-shadow:0 12px 30px #0003;display:flex;flex-direction:column;gap:14px;text-align:center;}
+#yakolakVisualSetup .yk-sheet h2{font-size:23px;font-weight:600;line-height:1.3;margin:0;}
+#yakolakVisualSetup .yk-form{display:flex;flex-direction:column;gap:10px;margin:0;}
+#yakolakVisualSetup .yk-field{display:flex;flex-direction:column;}
+#yakolakVisualSetup .yk-field input{width:100%;height:46px;min-width:0;padding:9px 13px;border:1px solid #18231e2e;border-radius:11px;background:#ffffff9c;color:#18231e;font-size:18px;caret-color:#18231e;}
+#yakolakVisualSetup .yk-sheet .yk-primary{min-height:44px;background:#22372c;color:#f4f1e8;font-size:16px;padding:9px 14px;border-radius:11px;}
+#yakolakVisualSetup .yk-field-error{font-size:13px;line-height:1.3;color:#8a3f25;}
+#yakolakVisualSetup .yk-field-error:empty{display:none;}
+#yakolakVisualSetup .yk-subtle{min-height:30px;padding:3px;font-size:13px;}
+#yakolakVisualSetup .yk-modal[data-kind=seat] .yk-sheet,#yakolakVisualSetup .yk-modal[data-kind=name] .yk-sheet{position:absolute;border-radius:12px;padding:5px;gap:0;transform-origin:50% 0;}
+#yakolakVisualSetup .yk-modal[data-side=above] .yk-sheet{transform-origin:50% 100%;}
+#yakolakVisualSetup .yk-modal[data-kind=name] .yk-sheet{padding:14px;gap:10px;}
+#yakolakVisualSetup .yk-modal[data-kind=name] h2{font-size:18px;}
+#yakolakVisualSetup .yk-menu{display:flex;flex-direction:column;}
+#yakolakVisualSetup .yk-menu-item{min-height:38px;padding:8px 10px;text-align:right;font-size:14px;line-height:1.3;border-radius:7px;}
+#yakolakVisualSetup .yk-menu-item:hover,#yakolakVisualSetup .yk-menu-item:focus-visible{background:#d5ddce;}
+#yakolakVisualSetup .yk-menu-item[aria-checked=true]{background:#d7dece;}
+#yakolakVisualSetup[data-overlay=profile] .yk-header,#yakolakVisualSetup[data-overlay=profile] .yk-seats,#yakolakVisualSetup[data-overlay=profile] .yk-actions,#yakolakVisualSetup[data-overlay=join] .yk-header,#yakolakVisualSetup[data-overlay=join] .yk-seats,#yakolakVisualSetup[data-overlay=join] .yk-actions{visibility:hidden;}
+#yakolakVisualSetup[data-moving=true] button{pointer-events:none;}
+#yakolakVisualSetup.is-keyboard .yk-sheet{padding:14px;gap:10px;}
+#yakolakVisualSetup.is-keyboard .yk-sheet h2{font-size:18px;}
+#yakolakVisualSetup.is-keyboard .yk-field input{height:38px;}
+#yakolakVisualSetup.is-keyboard .yk-form{gap:7px;}
+@media(max-height:480px){#yakolakVisualSetup .yk-actions{width:min(calc(100% - 32px),460px);gap:8px;}#yakolakVisualSetup .yk-primary,#yakolakVisualSetup .yk-choice,#yakolakVisualSetup .yk-outline{min-height:46px;padding:8px 18px;}#yakolakVisualSetup .yk-sharing{min-height:28px;font-size:16px;}}
+@media(prefers-reduced-motion:reduce){#yakolakVisualSetup button{transition:none;}}

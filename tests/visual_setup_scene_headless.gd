@@ -14,9 +14,18 @@ func _run() -> void:
 		quit(1)
 		return
 	await process_frame
+	await create_timer(0.65).timeout
+	var framing: Dictionary = setup._visual_seat_points()
+	var table: Array = framing["board"]
+	var table_ratio: Vector2 = Vector2(table[2],table[3])/setup.canvas_css_size
+	if table_ratio.x < 0.65 and table_ratio.y < 0.40:
+		push_error("Real table remains too far away")
+		quit(1)
+		return
+	print("YAKOLAK_REAL_TABLE_FRAMING width_ratio=%.3f height_ratio=%.3f" % [table_ratio.x,table_ratio.y])
 	var cam: Camera3D = intro.camera
-	if not cam.transform.is_equal_approx(setup.visual_camera_snapshot["transform"]):
-		push_error("Setup changed the final intro camera")
+	if not cam.basis.is_equal_approx(setup.visual_camera_snapshot["transform"].basis):
+		push_error("Setup changed the final intro angle")
 		quit(1)
 		return
 	var generation: int = intro.intro_run_generation
@@ -52,7 +61,7 @@ func _run() -> void:
 		push_error("Return to visual setup failed")
 		quit(1)
 		return
-	if not cam.transform.is_equal_approx(setup.visual_intro_camera_snapshot["transform"]):
+	if not cam.basis.is_equal_approx(setup.visual_intro_camera_snapshot["transform"].basis):
 		push_error("Return to setup lost the accepted intro shot")
 		quit(1)
 		return

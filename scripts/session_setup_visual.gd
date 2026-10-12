@@ -2,6 +2,7 @@ extends "res://scripts/session_setup_flash_entry.gd"
 
 # One browser-native setup surface. Godot owns the real table, camera and match
 # configuration; the DOM owns inputs, accessibility and responsive controls.
+var visual_font: Font
 var visual_active: bool = false
 var visual_callback: Variant
 var visual_camera_snapshot: Dictionary = {}
@@ -13,12 +14,25 @@ var visual_last_viewport := Vector2.ZERO
 var visual_piece_visibility: Dictionary = {}
 var visual_inactive_material: StandardMaterial3D
 var visual_prompt: Label3D
-var visual_selection: MeshInstance3D
+var visual_lights: Dictionary = {}
+var visual_light_tween: Tween
+var visual_light_key: String = ""
+var visual_prompt_tween: Tween
+var visual_prompt_stage: String = ""
+var visual_overlay_open: bool = false
+var visual_fit_viewport := Vector2.ZERO
+var visual_fitted_transform := Transform3D.IDENTITY
+var visual_board_rect := Rect2()
+var visual_board_corners: Array[Vector3] = []
+var visual_zoom_mix: float = 0.0
+var visual_zoom_tween: Tween
 var visual_selected_color: String = ""
 var visual_world_seats: Dictionary = {}
 
 func _ready() -> void:
 	super._ready()
+	visual_font = preload("res://assets/fonts/thmanyahsans-Medium.otf").duplicate()
+	visual_font.fallbacks = [ARABIC_FONT]
 	process_priority = 1200
 	if OS.has_feature("web"):
 		visual_callback = JavaScriptBridge.create_callback(_on_visual_action)
@@ -45,6 +59,12 @@ func show_after_intro() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visual_preview_seats.clear()
 	visual_last_viewport = Vector2.ZERO
+	visual_fit_viewport = Vector2.ZERO
+	visual_board_corners.clear()
+	visual_zoom_mix = 0.0
+	if visual_zoom_tween != null and visual_zoom_tween.is_valid(): visual_zoom_tween.kill()
+	visual_zoom_tween = create_tween()
+	visual_zoom_tween.tween_property(self,"visual_zoom_mix",1.0,0.5).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_apply_visual_camera()
 	_publish_setup_state("visible")
 	if OS.has_feature("web"):
@@ -56,7 +76,7 @@ func _process(_delta: float) -> void:
 		return
 	_apply_visual_camera()
 	var viewport := get_viewport().get_visible_rect().size
-	if viewport != visual_last_viewport:
+	if viewport != visual_last_viewport or visual_zoom_mix < 1.0:
 		_publish_visual_geometry()
 
 func _layout_card() -> void:
@@ -104,7 +124,7 @@ func _apply_visual_camera() -> void:
 	var metrics := _canvas_metrics(viewport)
 	canvas_scale = float(metrics["scale"])
 	canvas_css_size = metrics["css_size"] as Vector2
-	# Keep the accepted final intro shot. Setup must never introduce a new angle.
+	# Preserve the accepted intro angle; fit the table without rotating the camera.
 	cam.transform = visual_intro_camera_snapshot["transform"]
 	cam.projection = int(visual_intro_camera_snapshot["projection"])
 	cam.keep_aspect = int(visual_intro_camera_snapshot["aspect"])
@@ -112,102 +132,122 @@ func _apply_visual_camera() -> void:
 	cam.size = float(visual_intro_camera_snapshot["size"])
 	cam.h_offset = float(visual_intro_camera_snapshot["h"])
 	cam.v_offset = float(visual_intro_camera_snapshot["v"])
+	if viewport != visual_fit_viewport:
+		_fit_visual_table(cam, viewport)
+	cam.transform = visual_intro_camera_snapshot["transform"]
+	cam.transform = Transform3D(cam.basis,cam.position.lerp(visual_fitted_transform.origin,visual_zoom_mix))
 	_update_visual_prompt(cam)
 	_update_world_seats(cam)
+
+func _capture_visual_board_corners() -> void:
+	visual_board_corners.clear()
+	var nodes: Array = []
+	if intro.has_method("_base_final"):
+		nodes.append(intro.get("board"))
+		for value: Variant in (intro.get("bases") as Dictionary).values(): nodes.append(value)
+		for value: Variant in (intro.get("pieces") as Array): nodes.append((value as Dictionary).get("mesh"))
+	for value: Variant in nodes:
+		var mesh := value as MeshInstance3D
+		if mesh == null or mesh.mesh == null: continue
+		var box := mesh.get_aabb()
+		for i: int in range(8): visual_board_corners.append(mesh.global_transform * box.get_endpoint(i))
+	if visual_board_corners.is_empty():
+		for x: float in [-6.8,6.8]:
+			for z: float in [-6.8,6.8]: visual_board_corners.append(intro.to_global(Vector3(x,0.24,z)))
+
+func _project_visual_board(cam: Camera3D) -> Rect2:
+	var first := cam.unproject_position(visual_board_corners[0]) * canvas_scale
+	var bounds := Rect2(first,Vector2.ZERO)
+	for point: Vector3 in visual_board_corners: bounds = bounds.expand(cam.unproject_position(point) * canvas_scale)
+	return bounds
+
+func _fit_visual_table(cam: Camera3D, viewport: Vector2) -> void:
+	if visual_board_corners.is_empty(): _capture_visual_board_corners()
+	visual_fit_viewport = viewport
+	var width := canvas_css_size.x
+	var height := canvas_css_size.y
+	var short_view := height < 480.0
+	var available := Vector2(width*0.90,height*(0.46 if short_view else 0.52))
+	var center := Vector2(width*0.5,height*(0.49 if short_view else 0.51))
+	var focus := intro.to_global(Vector3(0,0.35,0))
+	var basis: Basis = visual_intro_camera_snapshot["transform"].basis
+	var low := 8.0
+	var high := 90.0
+	cam.basis = basis
+	for i: int in range(15):
+		var distance := (low+high)*0.5
+		cam.global_position = focus + cam.global_basis.z*distance
+		var bounds := _project_visual_board(cam)
+		if bounds.size.x > available.x or bounds.size.y > available.y: low = distance
+		else: high = distance
+	cam.global_position = focus + cam.global_basis.z*high
+	var bounds := _project_visual_board(cam)
+	var depth := (focus-cam.global_position).dot(-cam.global_basis.z)
+	cam.global_position += cam.project_position(bounds.get_center()/canvas_scale,depth)-cam.project_position(center/canvas_scale,depth)
+	visual_board_rect = _project_visual_board(cam)
+	visual_fitted_transform = cam.transform
 
 func _update_visual_prompt(cam: Camera3D) -> void:
 	if visual_prompt == null:
 		visual_prompt = Label3D.new()
 		visual_prompt.name = "SetupWorldPrompt"
-		visual_prompt.font = preload("res://assets/fonts/thmanyahsans-Medium.otf")
+		visual_prompt.font = visual_font
 		visual_prompt.font_size = 64
-		visual_prompt.outline_size = 10
-		visual_prompt.outline_modulate = Color(0.0, 0.0, 0.0, 0.85)
+		visual_prompt.outline_size = 6
+		visual_prompt.outline_modulate = Color(0,0,0,0.7)
 		visual_prompt.modulate = Color("#f4f1e8")
-		visual_prompt.pixel_size = 0.012
-		visual_prompt.no_depth_test = true
+		visual_prompt.no_depth_test = false
+		visual_prompt.hide()
 		intro.add_child(visual_prompt)
-	visual_prompt.position = Vector3(0.0, 1.2, 0.0)
+	var screen := Vector2(canvas_css_size.x*0.5,maxf(48.0,visual_board_rect.position.y-42.0)) / canvas_scale
+	var depth := (intro.to_global(Vector3.ZERO)-cam.global_position).dot(-cam.global_basis.z)
+	visual_prompt.global_position = cam.project_position(screen,depth)
 	visual_prompt.global_basis = cam.global_basis
-	var anchor := cam.unproject_position(visual_prompt.global_position)
-	var depth := (visual_prompt.global_position - cam.global_position).dot(-cam.global_basis.z)
-	visual_prompt.pixel_size = cam.project_position(anchor + Vector2(0,_ui_length(26.0)),depth).distance_to(visual_prompt.global_position) / 64.0
-	visual_prompt.text = "اختر لونك" if visual_step == "color" else "اختر عدد اللاعبين"
-	visual_prompt.visible = visual_active and visual_step != "profile"
-	if visual_selection == null:
-		visual_selection = MeshInstance3D.new()
-		visual_selection.name = "SetupColorSelection"
-		var ring := TorusMesh.new()
-		ring.inner_radius = 1.08
-		ring.outer_radius = 1.18
-		visual_selection.mesh = ring
-		var material := StandardMaterial3D.new()
-		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		material.albedo_color = Color("#f4dfad")
-		visual_selection.material_override = material
-		intro.add_child(visual_selection)
-	visual_selection.visible = visual_active and visual_step == "color" and not visual_selected_color.is_empty()
-	if visual_selection.visible:
-		var offsets := {"right": Vector3(5.4,0.4,0), "back": Vector3(0,0.4,-5.4), "left": Vector3(-5.4,0.4,0), "front": Vector3(0,0.4,5.4)}
-		visual_selection.position = offsets[str(PALETTE[_palette_index(visual_selected_color)]["direction"])]
+	visual_prompt.pixel_size = cam.project_position(screen+Vector2(0,_ui_length(26.0)),depth).distance_to(visual_prompt.global_position)/64.0
+	var stage := visual_step if not visual_overlay_open else "overlay"
+	if stage == visual_prompt_stage: return
+	visual_prompt_stage = stage
+	if visual_prompt_tween != null and visual_prompt_tween.is_valid(): visual_prompt_tween.kill()
+	visual_prompt_tween = create_tween()
+	if stage not in ["color","count","rounds"]:
+		visual_prompt_tween.tween_property(visual_prompt,"modulate:a",0.0,0.12)
+		visual_prompt_tween.tween_callback(visual_prompt.hide)
+	else:
+		visual_prompt.text = {"color":"اختر لونك","count":"كم لاعب؟","rounds":"كم شوط للفوز؟"}[stage]
+		visual_prompt.modulate.a = 0.0
+		visual_prompt.show()
+		visual_prompt_tween.tween_property(visual_prompt,"modulate:a",1.0,0.22)
 
 func _update_world_seats(cam: Camera3D) -> void:
-	var viewport := get_viewport().get_visible_rect().size
 	var geometry := _visual_seat_points()
-
 	for color: Dictionary in PALETTE:
 		var key: String = color["id"]
 		if not visual_world_seats.has(key):
-			var group := Node3D.new()
-			intro.add_child(group)
-			var panel := MeshInstance3D.new()
-			var quad := QuadMesh.new()
-			panel.mesh = quad
-			var material := StandardMaterial3D.new()
-			material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-			material.albedo_color = Color("#15221d")
-			material.no_depth_test = true
-			material.render_priority = 10
-			panel.material_override = material
-			group.add_child(panel)
 			var label := Label3D.new()
-			label.font = preload("res://assets/fonts/thmanyahsans-Medium.otf")
+			label.font = visual_font
 			label.font_size = 40
 			label.outline_size = 3
-			label.modulate = Color("#f4f1e8")
-			label.no_depth_test = true
-			label.render_priority = 11
-			label.position.z = 0.02
-			group.add_child(label)
-			visual_world_seats[key] = {"node":group,"quad":quad,"label":label,"material":material}
-		var record: Dictionary = visual_world_seats[key]
-		var group := record["node"] as Node3D
-		group.visible = visual_active and visual_step not in ["color","profile"]
-		if not group.visible:
-			continue
-		var point := Vector2(geometry["controls"][key][0],geometry["controls"][key][1]) * canvas_css_size
-		var screen_point := point / canvas_scale
+			label.outline_modulate = Color(0,0,0,0.6)
+			label.no_depth_test = false
+			intro.add_child(label)
+			visual_world_seats[key] = {"node":label,"label":label}
+		var label := visual_world_seats[key]["label"] as Label3D
+		label.visible = visual_active and visual_step == "ready"
+		if not label.visible: continue
+		var point := Vector2(geometry["controls"][key][0],geometry["controls"][key][1]) * canvas_css_size / canvas_scale
 		var depth := (intro.to_global(Vector3.ZERO)-cam.global_position).dot(-cam.global_basis.z)
-		group.global_position = cam.project_position(screen_point,depth)
-		group.global_basis = cam.global_basis
-		var world_pixel := cam.project_position(screen_point+Vector2(_ui_length(1.0),0),depth).distance_to(group.global_position)
-		var quad := record["quad"] as QuadMesh
-		quad.size = Vector2(104,65) * world_pixel
-		var label := record["label"] as Label3D
-		label.pixel_size = world_pixel * 13.0 / 40.0
+		label.global_position = cam.project_position(point,depth)
+		label.global_basis = cam.global_basis
+		var world_pixel := cam.project_position(point+Vector2(_ui_length(1.0),0),depth).distance_to(label.global_position)
+		label.pixel_size = world_pixel*15.0/40.0
 		for index: int in range(visual_preview_seats.size()):
 			var seat := visual_preview_seats[index] as Dictionary
-			if str(seat.get("color","")) != key:
-				continue
+			if str(seat.get("color","")) != key: continue
 			var mode := str(seat.get("mode","none"))
-			var title := str(seat.get("name",""))
-			if title.is_empty(): title = "لاعب %d" % (index+1)
-			if title.length() > 12: title = title.left(11) + "…"
 			var status: String = {"bot":"بوت","online":"أونلاين","local":"نفس الجهاز","none":"بدون"}.get(mode,"بدون")
 			if index == 0: status = "أنت"
-			label.text = "%d · %s\n%s" % [index+1,title,status]
-			label.modulate = Color("#67716c") if mode == "none" else Color("#f4f1e8")
-			(record["material"] as StandardMaterial3D).albedo_color = Color("#0d1512") if mode == "none" else Color("#15221d")
+			label.text = "%s\n%d  ⌄" % [status,index+1]
+			label.modulate = Color("#758078") if mode == "none" else Color("#f4f1e8")
 
 func _visual_seat_points() -> Dictionary:
 	var points: Dictionary = {}
@@ -230,26 +270,17 @@ func _visual_seat_points() -> Dictionary:
 			var corner := cam.unproject_position(intro.to_global(anchor + delta))
 			corners.append([corner.x / viewport.x, corner.y / viewport.y])
 		hit_points[str(color["id"])] = corners
-	var prompt_point := cam.unproject_position(intro.to_global(Vector3(0,1.2,0)))
-	var center_css := prompt_point * canvas_scale
 	var controls: Dictionary = {}
 	for key: String in points:
-		var point_css := Vector2(points[key][0],points[key][1]) * canvas_css_size
-		var direction := (point_css-center_css).normalized()
-		point_css += direction * 32.0
-		var right_side := point_css.x >= center_css.x
-		var lower_side := point_css.y >= center_css.y
-		if canvas_css_size.x >= 430.0:
-			# Wide views keep menus beside the table, clear of the center prompt.
-			point_css.x = maxf(point_css.x,center_css.x+147.0) if right_side else minf(point_css.x,center_css.x-147.0)
-			point_css.y = maxf(point_css.y,center_css.y+38.0) if lower_side else minf(point_css.y,center_css.y-38.0)
-		else:
-			# Portrait views have room vertically; don't cover count/confirm.
-			point_css.y = maxf(point_css.y,center_css.y+130.0) if lower_side else minf(point_css.y,center_css.y-62.0)
-		point_css.x = clampf(point_css.x,54.0,canvas_css_size.x-54.0)
-		point_css.y = clampf(point_css.y,70.0,canvas_css_size.y-82.0)
-		controls[key] = [point_css.x/canvas_css_size.x,point_css.y/canvas_css_size.y]
-	return {"controls": controls, "world": true, "seats": points, "hits": hit_points, "prompt": [prompt_point.x / viewport.x,prompt_point.y / viewport.y]}
+		var p := Vector2(points[key][0],points[key][1])*canvas_css_size
+		# Status sits immediately above the player's pieces, not in a card.
+		p.y -= 42.0
+		p.x = clampf(p.x,44.0,canvas_css_size.x-44.0)
+		p.y = clampf(p.y,72.0,canvas_css_size.y-110.0)
+		controls[key] = [p.x/canvas_css_size.x,p.y/canvas_css_size.y]
+	var heading := Vector2(canvas_css_size.x*0.5,maxf(48.0,visual_board_rect.position.y-42.0))
+	var actions := Vector2(canvas_css_size.x*0.5,minf(canvas_css_size.y-70.0,visual_board_rect.end.y+30.0))
+	return {"controls":controls,"world":true,"seats":points,"hits":hit_points,"prompt":[heading.x/canvas_css_size.x,heading.y/canvas_css_size.y],"actions":[actions.x/canvas_css_size.x,actions.y/canvas_css_size.y],"board":[visual_board_rect.position.x,visual_board_rect.position.y,visual_board_rect.size.x,visual_board_rect.size.y]}
 
 func _publish_visual_geometry() -> void:
 	if not visual_active:
@@ -270,6 +301,7 @@ func _on_visual_action(arguments: Array) -> void:
 			visual_preview_seats = payload.get("all_seats", []) as Array
 			visual_step = str(payload.get("step", "color"))
 			visual_selected_color = str(payload.get("selected_color", ""))
+			visual_overlay_open = bool(payload.get("overlay_open", false))
 			_update_visual_seats()
 		"start":
 			_accept_visual_configuration(payload)
@@ -290,7 +322,10 @@ func _update_visual_seats() -> void:
 		var key := mesh.get_instance_id()
 		if not visual_piece_visibility.has(key):
 			visual_piece_visibility[key] = {"node": mesh, "visible": mesh.visible, "material": mesh.material_override}
-		var enabled := visual_step == "color"
+			if mesh.material_override is BaseMaterial3D:
+				visual_piece_visibility[key]["preview_material"] = mesh.material_override.duplicate()
+				visual_piece_visibility[key]["original_color"] = (mesh.material_override as BaseMaterial3D).albedo_color
+		var enabled := visual_step != "ready"
 		for value: Variant in visual_preview_seats:
 			var seat := value as Dictionary
 			var palette := PALETTE[_palette_index(str(seat.get("color", "")))]
@@ -303,7 +338,49 @@ func _update_visual_seats() -> void:
 			visual_inactive_material.roughness = 0.95
 		# GeometryInstance3D.transparency is ignored by the Web Compatibility
 		# renderer. A real opaque material keeps absent seats visibly dark.
-		mesh.material_override = visual_piece_visibility[key]["material"] if enabled else visual_inactive_material
+		var saved: Dictionary = visual_piece_visibility[key]
+		mesh.material_override = saved.get("preview_material",saved["material"]) if enabled else visual_inactive_material
+
+	_update_visual_lighting()
+
+func _update_visual_lighting() -> void:
+	var offsets := {"right":Vector3(5.4,3.2,0),"back":Vector3(0,3.2,-5.4),"left":Vector3(-5.4,3.2,0),"front":Vector3(0,3.2,5.4)}
+	var signature := visual_step+":"+visual_selected_color+":"+JSON.stringify(visual_preview_seats)
+	if signature == visual_light_key: return
+	visual_light_key = signature
+	if visual_light_tween != null and visual_light_tween.is_valid(): visual_light_tween.kill()
+	visual_light_tween = create_tween().set_parallel(true)
+	for color: Dictionary in PALETTE:
+		var key: String = color["id"]
+		if not visual_lights.has(key):
+			var light := OmniLight3D.new()
+			light.position = offsets[str(color["direction"])]
+			light.omni_range = 5.0
+			light.omni_attenuation = 1.5
+			light.light_color = color["color"].lerp(Color.WHITE,0.82)
+			light.light_energy = 0.0
+			intro.add_child(light)
+			visual_lights[key] = light
+		var target := 0.65
+		if visual_step == "color" and not visual_selected_color.is_empty(): target = 1.15 if key == visual_selected_color else 0.22
+		if visual_step == "ready":
+			for value: Variant in visual_preview_seats:
+				var seat := value as Dictionary
+				if str(seat.get("color","")) == key and str(seat.get("mode","")) == "none": target = 0.08
+		var light := visual_lights[key] as OmniLight3D
+		light.visible = true
+		visual_light_tween.tween_property(light,"light_energy",target,0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	for value: Variant in visual_piece_visibility.values():
+		var record := value as Dictionary
+		if not record.has("preview_material"): continue
+		var factor := 1.0
+		if visual_step == "color" and not visual_selected_color.is_empty():
+			var mesh := record["node"] as MeshInstance3D
+			var direction := str(PALETTE[_palette_index(visual_selected_color)]["direction"])
+			factor = 1.05 if str(mesh.name).contains("Stone_"+direction+"_") else 0.82
+		var original: Color = record["original_color"]
+		var color := Color(original.r*factor,original.g*factor,original.b*factor,original.a)
+		visual_light_tween.tween_property(record["preview_material"],"albedo_color",color,0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _validated_visual_configuration(payload: Dictionary) -> Dictionary:
 	var values: Variant = payload.get("players", [])
@@ -371,8 +448,11 @@ func _close_visual_setup() -> void:
 		(value["node"] as Node3D).hide()
 	if visual_prompt != null:
 		visual_prompt.hide()
-	if visual_selection != null:
-		visual_selection.hide()
+	if visual_prompt_tween != null and visual_prompt_tween.is_valid(): visual_prompt_tween.kill()
+	if visual_light_tween != null and visual_light_tween.is_valid(): visual_light_tween.kill()
+	for value: Variant in visual_lights.values(): (value as OmniLight3D).hide()
+	visual_light_key = ""
+	visual_prompt_stage = ""
 	showing = false
 	root.hide()
 	_restore_visual_camera()
@@ -404,4 +484,4 @@ func _on_visual_room_state(room: Dictionary, _identity: Dictionary) -> void:
 		for value: Variant in room.get("players", []):
 			var player := value as Dictionary
 			participants.append({"seat": str(player.get("seat", "")), "name": str(player.get("name", player.get("label", "")))})
-		JavaScriptBridge.eval("if(window.YakolakSetup)window.YakolakSetup.room(" + JSON.stringify({"players": participants}) + ");", true)
+		JavaScriptBridge.eval("if(window.YakolakSetup)window.YakolakSetup.room(" + JSON.stringify({"players": participants,"code":str(room.get("code",""))}) + ");", true)
