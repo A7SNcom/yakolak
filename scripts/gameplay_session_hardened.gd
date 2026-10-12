@@ -50,7 +50,13 @@ func _build_waiting_overlay() -> void:
 	var content := VBoxContainer.new()
 	content.alignment = BoxContainer.ALIGNMENT_CENTER
 	content.add_theme_constant_override("separation", int(round(_hud_length(7.0))))
-	waiting_card.add_child(content)
+	var scroller := ScrollContainer.new()
+	scroller.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroller.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroller.follow_focus = true
+	waiting_card.add_child(scroller)
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroller.add_child(content)
 
 	waiting_room_label = _waiting_label("", 16, THMANYAH_MEDIUM, Color("#cbd7d9"))
 	content.add_child(waiting_room_label)
@@ -64,7 +70,7 @@ func _build_waiting_overlay() -> void:
 	waiting_exit_button.layout_direction = Control.LAYOUT_DIRECTION_RTL
 	waiting_exit_button.text_direction = Control.TEXT_DIRECTION_RTL
 	waiting_exit_button.language = "ar"
-	waiting_exit_button.focus_mode = Control.FOCUS_NONE
+	waiting_exit_button.focus_mode = Control.FOCUS_ALL
 	waiting_exit_button.custom_minimum_size = Vector2(_hud_length(112.0), _hud_length(48.0))
 	waiting_exit_button.add_theme_font_override("font", THMANYAH_MEDIUM)
 	waiting_exit_button.add_theme_font_size_override("font_size", _hud_font_size(14))
@@ -122,7 +128,7 @@ func _layout_waiting_overlay() -> void:
 		return
 	var viewport: Vector2 = get_viewport().get_visible_rect().size
 	var width: float = minf(_hud_length(360.0), maxf(1.0, viewport.x - _hud_length(24.0)))
-	var height: float = minf(maxf(_hud_length(174.0), waiting_card.get_combined_minimum_size().y), maxf(1.0, viewport.y - _hud_length(24.0)))
+	var height: float = minf(_hud_length(200.0), maxf(1.0, viewport.y - _hud_length(24.0)))
 	waiting_card.position = (viewport - Vector2(width, height)) * 0.5
 	waiting_card.size = Vector2(width, height)
 	waiting_card.add_theme_stylebox_override("panel", _waiting_card_style())

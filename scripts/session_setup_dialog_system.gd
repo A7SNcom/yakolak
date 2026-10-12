@@ -173,8 +173,8 @@ func _settle_dialog() -> void:
 	dialog_layout_generation += 1
 	var generation := dialog_layout_generation
 	_hide_legacy_back_buttons(body)
-	# Two passes: first lays out the fixed width, second measures wrapped labels
-	# and scrollbars. Obsolete navigation/resize passes cannot touch a newer tree.
+	# Layout passes resolve fixed width, adaptive rows, wrapped labels and
+	# scrollbars. Obsolete navigation/resize passes cannot touch a newer tree.
 	for pass_index: int in range(3):
 		await get_tree().process_frame
 		if generation != dialog_layout_generation or not showing or body == null:
