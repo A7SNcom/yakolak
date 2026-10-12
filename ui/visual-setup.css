@@ -1,5 +1,5 @@
 @font-face{font-family:Yakolak;src:url('./setup-font.otf') format('opentype');font-display:swap}
-#yakolakVisualSetup{--ink:#f4f1e8;--muted:#aab6b3;--surface:#101a1a;position:fixed;inset:0;z-index:2147483001;height:var(--yk-vh,100dvh);overflow:hidden;pointer-events:none;color:var(--ink);font-family:Yakolak,system-ui,sans-serif;box-sizing:border-box;isolation:isolate}
+#yakolakVisualSetup{--ink:#f4f1e8;--muted:#aab6b3;--surface:#101a1a;position:fixed;inset:0;z-index:2147483001;height:var(--yk-vh,100dvh);overflow:hidden;pointer-events:auto;color:var(--ink);font-family:Yakolak,system-ui,sans-serif;box-sizing:border-box;isolation:isolate}
 #yakolakVisualSetup *,#yakolakVisualSetup *:before,#yakolakVisualSetup *:after{box-sizing:border-box}
 #yakolakVisualSetup [hidden],#yakolakVisualSetup[hidden]{display:none!important}
 #yakolakVisualSetup button,#yakolakVisualSetup input{font:inherit;color:inherit;pointer-events:auto}

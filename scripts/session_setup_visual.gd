@@ -61,6 +61,7 @@ func _layout_card() -> void:
 
 func _input(event: InputEvent) -> void:
 	if visual_active:
+		get_viewport().set_input_as_handled()
 		return
 	super._input(event)
 
