@@ -25,7 +25,7 @@ func _label(text_value: String, size: int, alignment: HorizontalAlignment, color
 	# Arabic copy reads as one clear block from the physical right edge. Godot
 	# mirrors Label alignment when the Control itself inherits RTL layout, so the
 	# label box stays LTR while text shaping remains explicitly RTL.
-	var resolved_alignment: HorizontalAlignment = HORIZONTAL_ALIGNMENT_RIGHT if alignment == HORIZONTAL_ALIGNMENT_CENTER else alignment
+	var resolved_alignment: HorizontalAlignment = alignment
 	var label: Label = super._label(text_value, size, resolved_alignment, color)
 	label.layout_direction = Control.LAYOUT_DIRECTION_LTR
 	label.text_direction = Control.TEXT_DIRECTION_RTL
@@ -56,6 +56,7 @@ func _content_box() -> VBoxContainer:
 	content.offset_top = margin
 	content.offset_right = -margin
 	content.offset_bottom = -margin
+	content.alignment = BoxContainer.ALIGNMENT_BEGIN
 	content.add_theme_constant_override("separation", int(round(_ui_length(Design.SPACE_4))))
 	return content
 

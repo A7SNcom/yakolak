@@ -65,7 +65,7 @@ func _build_waiting_overlay() -> void:
 	waiting_exit_button.text_direction = Control.TEXT_DIRECTION_RTL
 	waiting_exit_button.language = "ar"
 	waiting_exit_button.focus_mode = Control.FOCUS_NONE
-	waiting_exit_button.custom_minimum_size = Vector2(_hud_length(112.0), _hud_length(40.0))
+	waiting_exit_button.custom_minimum_size = Vector2(_hud_length(112.0), _hud_length(48.0))
 	waiting_exit_button.add_theme_font_override("font", THMANYAH_MEDIUM)
 	waiting_exit_button.add_theme_font_size_override("font_size", _hud_font_size(14))
 	waiting_exit_button.add_theme_color_override("font_color", Color("#f4f7f6"))
@@ -81,8 +81,9 @@ func _waiting_label(text_value: String, size: int, font: Font, color: Color) -> 
 	var label := Label.new()
 	label.text = text_value
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	label.layout_direction = Control.LAYOUT_DIRECTION_LTR
 	label.text_direction = Control.TEXT_DIRECTION_RTL
 	label.language = "ar"
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -120,9 +121,9 @@ func _layout_waiting_overlay() -> void:
 	if waiting_card == null:
 		return
 	var viewport: Vector2 = get_viewport().get_visible_rect().size
-	var width: float = minf(_hud_length(360.0), maxf(_hud_length(280.0), viewport.x - _hud_length(24.0)))
-	var height: float = _hud_length(174.0)
-	waiting_card.position = Vector2(maxf(0.0, (viewport.x - width) * 0.5), _hud_length(18.0))
+	var width: float = minf(_hud_length(360.0), maxf(1.0, viewport.x - _hud_length(24.0)))
+	var height: float = minf(maxf(_hud_length(174.0), waiting_card.get_combined_minimum_size().y), maxf(1.0, viewport.y - _hud_length(24.0)))
+	waiting_card.position = (viewport - Vector2(width, height)) * 0.5
 	waiting_card.size = Vector2(width, height)
 	waiting_card.add_theme_stylebox_override("panel", _waiting_card_style())
 

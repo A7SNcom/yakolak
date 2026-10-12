@@ -4,17 +4,15 @@ extends "res://scripts/session_setup_flow.gd"
 # game look and split-table composition, while centralising sizing, backdrop,
 # focus, cancel/close semantics and mouse/touch/keyboard parity.
 
-const DIALOG_DEFAULT_WIDTH_CSS := 480.0
-const DIALOG_WIDE_WIDTH_CSS := 560.0
 const DIALOG_MIN_HEIGHT_CSS := 148.0
-const DIALOG_CONTENT_EXTRA_CSS := 24.0
 const DIALOG_CLOSE_SIZE_CSS := 48.0
-const DIALOG_CLOSE_GUTTER_CSS := 12.0
 const DIALOG_BACKDROP_COLOR := Color(0.012, 0.017, 0.020, 0.38)
-const DIALOG_ICON_FONT = preload("res://assets/fonts/DejaVuSans.ttf")
 
 var dialog_backdrop: ColorRect
 var dialog_close_button: Button
+var dialog_navigation: HBoxContainer
+var dialog_scroll: ScrollContainer
+var dialog_layout_generation: int = 0
 var dialog_focus_pending: bool = false
 var web_escape_callback: Variant
 
@@ -32,12 +30,13 @@ func _build_shell() -> void:
 
 	dialog_close_button = Button.new()
 	dialog_close_button.name = "DialogClose"
-	dialog_close_button.text = "×"
-	dialog_close_button.tooltip_text = "إغلاق"
+	dialog_close_button.text = "رجوع"
+	dialog_close_button.set_meta("yakolak_navigation", true)
+	dialog_close_button.tooltip_text = "العودة للخطوة السابقة"
 	dialog_close_button.focus_mode = Control.FOCUS_ALL
 	dialog_close_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	dialog_close_button.add_theme_font_override("font", DIALOG_ICON_FONT)
-	dialog_close_button.add_theme_font_size_override("font_size", _ui_font_size(23))
+	dialog_close_button.add_theme_font_override("font", _font_for_ui(16))
+	dialog_close_button.add_theme_font_size_override("font_size", _ui_font_size(16))
 	dialog_close_button.add_theme_color_override("font_color", Color("#eef4f3"))
 	dialog_close_button.add_theme_color_override("font_hover_color", Color.WHITE)
 	dialog_close_button.add_theme_color_override("font_pressed_color", Color.WHITE)
@@ -47,8 +46,28 @@ func _build_shell() -> void:
 	dialog_close_button.add_theme_stylebox_override("pressed", _close_style(Color(0.06, 0.09, 0.10, 0.94), false))
 	dialog_close_button.add_theme_stylebox_override("focus", _close_style(Color(0.10, 0.15, 0.17, 0.94), true))
 	dialog_close_button.pressed.connect(_dialog_cancel)
-	dialog_close_button.z_index = 20
-	root.add_child(dialog_close_button)
+	# Navigation and content share the card's container tree. No root overlay or
+	# independently positioned hit target can drift over wrapped Arabic text.
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 0)
+	card.add_child(stack)
+	dialog_navigation = HBoxContainer.new()
+	dialog_navigation.layout_direction = Control.LAYOUT_DIRECTION_LTR
+	stack.add_child(dialog_navigation)
+	dialog_navigation.add_child(dialog_close_button)
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dialog_navigation.add_child(spacer)
+	dialog_scroll = ScrollContainer.new()
+	dialog_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	dialog_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	dialog_scroll.follow_focus = true
+	dialog_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	stack.add_child(dialog_scroll)
+	body.reparent(dialog_scroll)
+	body.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_install_web_keyboard_guard()
 	_dialog_update_chrome()
 
@@ -86,41 +105,34 @@ func _wizard_header(title: String) -> Control:
 	return row
 
 
+func _dialog_safe_region(viewport: Vector2) -> Rect2:
+	var safe: Vector4 = _safe_area_css()
+	var origin := Vector2(_ui_length(safe.x + 12.0), _ui_length(safe.y + 12.0))
+	var end := viewport - Vector2(_ui_length(safe.z + 12.0), _ui_length(safe.w + 12.0))
+	return Rect2(origin, Vector2(maxf(1.0, end.x - origin.x), maxf(1.0, end.y - origin.y)))
+
+
 func _layout_card() -> void:
 	if root == null or card == null:
 		return
 	var viewport: Vector2 = get_viewport().get_visible_rect().size
+	var previous_css := canvas_css_size
 	var metrics := _canvas_metrics(viewport)
 	canvas_scale = float(metrics["scale"])
 	canvas_css_size = metrics["css_size"] as Vector2
-	var region: Rect2 = _layout_region(viewport)
-
-	var preferred_width_css: float = DIALOG_DEFAULT_WIDTH_CSS
-	if active_screen == "setup" and wizard_step == "color":
-		preferred_width_css = DIALOG_WIDE_WIDTH_CSS
-	var region_width_css: float = region.size.x * canvas_scale
-	var width_css: float = minf(preferred_width_css, region_width_css)
-	if _is_short_landscape():
-		width_css = minf(width_css, clampf(region_width_css * 0.62, 300.0, 430.0))
-	else:
-		width_css = minf(width_css, maxf(280.0, canvas_css_size.x - 24.0))
-
-	var width: float = minf(region.size.x, width_css / canvas_scale)
-	var height: float = minf(_ui_length(DIALOG_MIN_HEIGHT_CSS), region.size.y)
-	var x: float = region.position.x + (region.size.x - width) * 0.5
-	if _is_short_landscape():
-		x = region.position.x + region.size.x - width
-	var y: float = region.position.y + maxf(0.0, (region.size.y - height) * 0.5)
-	card.position = Vector2(x, y)
-	card.size = Vector2(width, height)
+	var safe := _dialog_safe_region(viewport)
+	# Width belongs to the screen, never to the current unwrapped text minimum.
+	var width := minf(_ui_length(_preferred_width_css()), safe.size.x)
 	card.add_theme_stylebox_override("panel", _card_style())
+	card.size = Vector2(width, minf(_ui_length(DIALOG_MIN_HEIGHT_CSS), safe.size.y))
+	card.position = safe.position + (safe.size - card.size) * 0.5
 	card.pivot_offset = card.size * 0.5
-
 	_dialog_update_chrome()
+	if showing and previous_css != Vector2.ZERO and previous_css.distance_to(canvas_css_size) > 1.0 and not layout_refresh_pending:
+		layout_refresh_pending = true
+		call_deferred("_rebuild_active_screen")
 	if body != null and body.get_child_count() > 0:
 		call_deferred("_settle_dialog")
-	if showing:
-		call_deferred("_apply_split_framing")
 
 
 func _fit_card_to_content() -> void:
@@ -131,24 +143,23 @@ func _fit_card_to_content() -> void:
 	if content == null:
 		return
 	var viewport: Vector2 = get_viewport().get_visible_rect().size
-	var region: Rect2 = _layout_region(viewport)
-	var minimum: Vector2 = content.get_combined_minimum_size()
-	var desired_width: float = clampf(
-		minimum.x + _ui_length(36.0),
-		_ui_length(280.0),
-		region.size.x
-	)
-	var desired: float = clampf(
-		minimum.y + _ui_length(DIALOG_CONTENT_EXTRA_CSS),
-		_ui_length(DIALOG_MIN_HEIGHT_CSS),
-		region.size.y
-	)
-	if _is_short_landscape():
-		card.position.x = region.position.x + maxf(0.0, region.size.x - desired_width)
-	else:
-		card.position.x = region.position.x + maxf(0.0, (region.size.x - desired_width) * 0.5)
-	card.position.y = region.position.y + maxf(0.0, (region.size.y - desired) * 0.5)
-	card.size = Vector2(desired_width, desired)
+	var safe := _dialog_safe_region(viewport)
+	var style := card.get_theme_stylebox("panel")
+	var chrome_height := style.get_minimum_size().y
+	if dialog_navigation != null and dialog_navigation.visible:
+		chrome_height += dialog_navigation.get_combined_minimum_size().y
+	# Account for the actual content offsets (different entry screens used
+	# different padding) and measure after wrapping at the fixed available width.
+	var content_height := content.get_combined_minimum_size().y + maxf(0.0, content.offset_top) + maxf(0.0, -content.offset_bottom)
+	body.custom_minimum_size = Vector2(0.0, content_height)
+	var desired := maxf(_ui_length(DIALOG_MIN_HEIGHT_CSS), content_height + chrome_height)
+	var region := _layout_region(viewport).intersection(safe)
+	# A tall dialog gets the safe viewport before needing a scrollbar; do not
+	# squeeze a complete form into the old upper-47% board composition.
+	if region.size.y < desired or _is_short_landscape():
+		region = safe
+	card.size.y = minf(desired, region.size.y)
+	card.position = region.position + (region.size - card.size) * 0.5
 	card.pivot_offset = card.size * 0.5
 	_dialog_update_chrome()
 	if showing:
@@ -159,16 +170,64 @@ func _fit_card_to_content() -> void:
 func _settle_dialog() -> void:
 	if not showing or body == null:
 		return
+	dialog_layout_generation += 1
+	var generation := dialog_layout_generation
 	_hide_legacy_back_buttons(body)
-	# Container minimum sizes settle on the next layout frame. Fitting in the
-	# same deferred call leaves narrow mobile dialogs at the 148px shell height
-	# while tall preset buttons overflow into the board.
-	await get_tree().process_frame
-	if not showing or body == null:
-		return
-	_fit_card_to_content()
-	_dialog_update_chrome()
+	# Two passes: first lays out the fixed width, second measures wrapped labels
+	# and scrollbars. Obsolete navigation/resize passes cannot touch a newer tree.
+	for pass_index: int in range(3):
+		await get_tree().process_frame
+		if generation != dialog_layout_generation or not showing or body == null:
+			return
+		_dialog_reflow_rows(body, maxf(1.0, dialog_scroll.size.x - _ui_length(32.0)))
+		_fit_card_to_content()
 	_schedule_dialog_focus()
+
+
+func _dialog_reflow_rows(node: Node, available_width: float) -> void:
+	for child: Node in node.get_children():
+		_dialog_reflow_rows(child, available_width)
+		if not child is HBoxContainer:
+			continue
+		var row := child as HBoxContainer
+		var buttons: Array[Node] = []
+		var only_buttons := true
+		for item: Node in row.get_children():
+			if item is Control and not (item as Control).visible:
+				continue
+			if not item is BaseButton:
+				only_buttons = false
+				break
+			buttons.append(item)
+		if not only_buttons or buttons.size() < 2 or row.get_combined_minimum_size().x <= available_width:
+			continue
+		# Preserve labels and targets; stack choices instead of clipping/truncating
+		# them when their real minimum width cannot fit the current viewport.
+		var column := VBoxContainer.new()
+		column.layout_direction = row.layout_direction
+		column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		column.add_theme_constant_override("separation", int(round(_ui_length(8.0))))
+		node.add_child(column)
+		node.move_child(column, row.get_index())
+		for item: Node in buttons:
+			item.reparent(column)
+			(item as Control).size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		node.remove_child(row)
+		row.queue_free()
+
+
+func _clear_body() -> void:
+	dialog_layout_generation += 1
+	if body == null:
+		return
+	# queue_free alone leaves the previous screen as child 0 until frame end.
+	# Detach now so sizing/focus always refer to the newly built screen.
+	for child: Node in body.get_children():
+		body.remove_child(child)
+		child.queue_free()
+	body.custom_minimum_size = Vector2.ZERO
+	if dialog_scroll != null:
+		dialog_scroll.scroll_vertical = 0
 
 
 func _hide_legacy_back_buttons(node: Node) -> void:
@@ -181,16 +240,12 @@ func _hide_legacy_back_buttons(node: Node) -> void:
 func _dialog_update_chrome() -> void:
 	if dialog_close_button == null or card == null:
 		return
-	var can_close: bool = showing and active_screen != "" and active_screen != "room_entry"
-	dialog_close_button.visible = can_close
-	if not can_close:
-		return
-	var size_px := Vector2(_ui_length(DIALOG_CLOSE_SIZE_CSS), _ui_length(DIALOG_CLOSE_SIZE_CSS))
-	dialog_close_button.size = size_px
-	dialog_close_button.position = card.position + Vector2(
-		_ui_length(DIALOG_CLOSE_GUTTER_CSS),
-		_ui_length(DIALOG_CLOSE_GUTTER_CSS)
-	)
+	var can_return := showing and active_screen in ["join_room", "invitation", "question", "setup", "learning-disclosure", "online_state"]
+	dialog_close_button.visible = can_return
+	if dialog_navigation != null:
+		dialog_navigation.visible = can_return
+	dialog_close_button.custom_minimum_size = Vector2(_ui_length(88.0), _ui_length(DIALOG_CLOSE_SIZE_CSS))
+	dialog_close_button.add_theme_font_size_override("font_size", _ui_font_size(16))
 
 
 func _dialog_cancel() -> void:
@@ -209,6 +264,8 @@ func _dialog_cancel() -> void:
 				_show_setup()
 		"setup":
 			_wizard_back()
+		"learning-disclosure":
+			_back_from_online_learning_disclosure()
 		_:
 			navigated = false
 	if navigated:
@@ -389,9 +446,9 @@ func _publish_dialog_contract(controls: Array[Control]) -> void:
 
 	var close_state: String = "visible" if dialog_close_button != null and dialog_close_button.visible else "mandatory-root"
 	var script: String = (
-		"document.body.dataset.yakolakDialogSystem='native-control-v1';" +
+		"document.body.dataset.yakolakDialogSystem='native-control-v2';" +
 		"document.body.dataset.yakolakDialogStage='" + stage + "';" +
-		"document.body.dataset.yakolakDialogSizing='content-fit';" +
+		"document.body.dataset.yakolakDialogSizing='fixed-width+wrapped-fit+scroll';" +
 		"document.body.dataset.yakolakDialogBackdrop='blocked-not-dismissible';" +
 		"document.body.dataset.yakolakDialogClose='" + close_state + "';" +
 		"document.body.dataset.yakolakDialogFocus='" + focused + "';" +
@@ -438,8 +495,8 @@ func _publish_setup_metrics() -> void:
 	super._publish_setup_metrics()
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
-			"document.body.dataset.yakolakDialogSystem='native-control-v1';" +
-			"document.body.dataset.yakolakDialogSizing='content-fit';" +
+			"document.body.dataset.yakolakDialogSystem='native-control-v2';" +
+			"document.body.dataset.yakolakDialogSizing='fixed-width+wrapped-fit+scroll';" +
 			"document.body.dataset.yakolakDialogBackdrop='blocked-not-dismissible';",
 			true
 		)

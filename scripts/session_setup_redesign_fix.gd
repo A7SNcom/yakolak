@@ -371,18 +371,10 @@ func animate_setup_entry() -> void:
 	entry_played_for_show = true
 	if setup_panel_tween != null and setup_panel_tween.is_valid():
 		setup_panel_tween.kill()
-	var target_position: Vector2 = card.position
-	var enter_offset := Vector2(0.0, -_ui_length(10.0))
-	if _is_short_landscape():
-		enter_offset = Vector2(_ui_length(12.0), 0.0)
 	root.modulate = Color(1.0, 1.0, 1.0, 0.0)
-	card.position = target_position + enter_offset
-	card.scale = Vector2(0.985, 0.985)
+	card.scale = Vector2.ONE
 	setup_panel_tween = create_tween()
-	setup_panel_tween.set_parallel(true)
 	setup_panel_tween.tween_property(root, "modulate", Color.WHITE, PANEL_ENTER_SECONDS).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
-	setup_panel_tween.tween_property(card, "position", target_position, PANEL_ENTER_SECONDS).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
-	setup_panel_tween.tween_property(card, "scale", Vector2.ONE, PANEL_ENTER_SECONDS).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
 
 
 func _publish_setup_metrics() -> void:

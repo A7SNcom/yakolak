@@ -44,8 +44,12 @@ func _apply_iconography() -> void:
 		var close_value: Variant = setup.get("dialog_close_button")
 		if close_value is Button:
 			var close_button := close_value as Button
-			_apply_icon_button(close_button, close_icon, "إغلاق")
-			close_ok = close_button.text.is_empty() and close_button.icon == close_icon
+			if close_button.has_meta("yakolak_navigation"):
+				# This control navigates back; never overwrite its label with an X.
+				close_ok = close_button.text == "رجوع" and close_button.icon == null
+			else:
+				_apply_icon_button(close_button, close_icon, "إغلاق")
+				close_ok = close_button.text.is_empty() and close_button.icon == close_icon
 
 	var gameplay := root.get_node_or_null("PostIntroGameplay")
 	if gameplay != null and menu_icon != null:
@@ -104,7 +108,7 @@ func _publish_icon_audit(close_ok: bool, menu_ok: bool) -> void:
 	var passed := close_ok and menu_ok
 	JavaScriptBridge.eval(
 		"document.body.dataset.yakolakIconSystem='" + ICON_SYSTEM + "';" +
-		"document.body.dataset.yakolakIconClose='x|icon-only|24-grid|stroke-2';" +
+		"document.body.dataset.yakolakIconClose='back|labelled|container-owned';" +
 		"document.body.dataset.yakolakIconMenu='ellipsis|icon-only|24-grid|stroke-2';" +
 		"document.body.dataset.yakolakIconRtl='no-directional-controls';" +
 		"document.body.dataset.yakolakIconAudit='" + ("passed" if passed else "failed") + "';",
