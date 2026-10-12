@@ -400,7 +400,7 @@ func _install_web_keyboard_guard() -> void:
 	JavaScriptBridge.eval(
 		"if(!window.__yakolakDialogKeyGuardV3){" +
 		"window.__yakolakDialogKeyGuardV3=function(e){" +
-		"if(document.body.dataset.yakolakSetup!=='visible'){return;}" +
+		"if(document.body.dataset.yakolakSetup!=='visible'||document.body.dataset.yakolakVisualSetup==='visible'){return;}" +
 		"if(e.key==='Tab'){e.preventDefault();return;}" +
 		"if(e.key==='Escape'){" +
 		"document.body.dataset.yakolakDialogEscapeSeen='js';" +

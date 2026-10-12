@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -497,6 +498,11 @@ def main() -> None:
     for marker in semantic_markers:
         if html.count(marker) != 1:
             raise RuntimeError(f"semantic marker count mismatch: {marker}")
+    for filename in ("visual-setup.mjs", "visual-setup.css"):
+        shutil.copyfile(ROOT / "ui" / filename, ROOT / "web" / filename)
+    shutil.copyfile(ROOT / "assets/fonts/thmanyahsans-Medium.otf", ROOT / "web/setup-font.otf")
+    html = html.replace("</head>", '<link rel="stylesheet" href="visual-setup.css">\n</head>', 1)
+    html = html.replace("</body>", '<script type="module" src="visual-setup.mjs"></script>\n</body>', 1)
     INDEX.write_text(html, encoding="utf-8", newline="\n")
     print("YAKOLAK_BALANCED_BRAND_LOADER_WITH_CANONICAL_SVG_HANDOFF_AND_SEMANTIC_DOM_INJECTED")
 
