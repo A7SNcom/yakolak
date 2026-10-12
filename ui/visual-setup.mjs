@@ -123,6 +123,7 @@ export function mountSetup(document, window) {
     const h = window.visualViewport?.height || window.innerHeight;
     root.style.setProperty('--yk-vh', `${h}px`);
     root.classList.toggle('is-keyboard', h < 360);
+    if (!modal.hidden && modal.dataset.kind !== 'profile') positionSheet();
   }
   window.visualViewport?.addEventListener('resize', viewport);
   window.addEventListener('resize', () => { viewport(); positionSeats(); }); viewport();
