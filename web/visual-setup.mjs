@@ -180,7 +180,7 @@ export function mountSetup(document, window) {
     prompt.hidden=!prompt.textContent;
     entry.hidden=state.step!=='entry';confirm.hidden=state.step!=='color'||!state.selectedColor;
     counts.hidden=state.step!=='count';start.hidden=sharing.hidden=state.step!=='ready';rounds.hidden=state.step!=='rounds';
-    code.textContent=roomCode||'—';sharing.classList.toggle('is-unavailable',!roomCode);sharing.setAttribute('aria-disabled',String(!roomCode));
+    code.textContent=roomCode||'—';sharing.classList.toggle('is-unavailable',!roomCode);sharing.disabled=!roomCode;sharing.setAttribute('aria-disabled',String(!roomCode));
     [...rounds.children].forEach(b=>b.disabled=pending);
     for(const {b,status,color} of seatButtons){
       const index=state.seats.findIndex(x=>x.color===color.id),seat=state.seats[index];
