@@ -14,6 +14,11 @@ func _run() -> void:
 		quit(1)
 		return
 	await process_frame
+	var cam: Camera3D = intro.camera
+	if not cam.transform.is_equal_approx(setup.visual_camera_snapshot["transform"]):
+		push_error("Setup changed the final intro camera")
+		quit(1)
+		return
 	var generation: int = intro.intro_run_generation
 	var tap := InputEventMouseButton.new()
 	tap.button_index = MOUSE_BUTTON_LEFT

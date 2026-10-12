@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {COLORS,digits,validProfile,newSetup,chooseColor,chooseCount,changeSeat,configuration,configurationError,mountSetup} from '../ui/visual-setup.mjs';
+import {COLORS,digits,validProfile,newSetup,chooseColor,confirmColor,chooseCount,changeSeat,configuration,configurationError,mountSetup} from '../ui/visual-setup.mjs';
 
 test('Arabic/Persian telephone digits normalize and profile validates',()=>{
   assert.equal(digits('٠٥٥ ۱۲۳-٤٥٦٧'),'0551234567');
@@ -10,6 +10,7 @@ test('Arabic/Persian telephone digits normalize and profile validates',()=>{
 test('every host color keeps counterclockwise numbering and defaults to two',()=>{
   for(let start=0;start<4;start++) {
     const state=chooseColor(newSetup('أحمد'),COLORS[start].id);
+    assert.equal(state.step,'color');assert.equal(confirmColor(state).step,'count');
     assert.deepEqual(state.seats.map(x=>x.color),Array.from({length:4},(_,i)=>COLORS[(start+i)%4].id));
     assert.deepEqual(state.seats.map(x=>x.mode),['local','bot','none','none']);
     for(const n of [2,3,4]) {
@@ -41,23 +42,32 @@ if(process.env.YAKOLAK_JSDOM_MODULE){
   const api=mountSetup(document,window);api.open();
   const q=s=>document.querySelector(s);
   assert.equal(q('input[type=tel]').inputMode,'numeric');
-  q('input[autocomplete=given-name]').value='أحمد';
+  assert.equal(q('input[autocomplete=given-name]'),null);
   q('input[type=tel]').value='٠٥٥۱۲۳٤٥٦٧';q('input[type=tel]').dispatchEvent(new window.Event('input'));
   assert.equal(q('input[type=tel]').value,'0551234567');
   q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));
+  assert.equal(q('h2').textContent,'الاسم الكريم');
+  q('input[autocomplete=given-name]').value='أحمد';q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));
   assert.equal(q('.yk-modal').hidden,true);assert.equal(q('h1').textContent,'اختر لونك');
-  q('[data-color=blue]').click();assert.equal(q('h1').textContent,'اختر عدد اللاعبين');
+  assert.equal(q('.yk-confirm').hidden,true);
+  q('[data-color=blue]').click();assert.equal(q('h1').textContent,'اختر لونك');assert.equal(q('.yk-confirm').hidden,false);
+  q('.yk-confirm').click();assert.equal(q('h1').textContent,'اختر عدد اللاعبين');
   q('.yk-counts button[aria-label="3 لاعبين"]').click();
   assert.equal(q('[data-color=marble] .yk-seat-status').textContent,'بدون');
-  q('[data-color=gold]').click();
+  q('[data-color=gold]').click();assert.equal(q('[role=dialog]').getAttribute('aria-modal'),'false');assert.equal(q('.yk-seats').inert,false);
   [...document.querySelectorAll('.yk-mode')].find(x=>x.textContent==='على نفس جهاز أحمد').click();
   q('input').value='ريم';q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));
   q('.yk-start').click();const start=actions.find(x=>x.action==='start');
   assert.equal(start.players.length,3);assert.equal(start.players[1].label,'ريم');assert.equal(start.players[1].mode,'local');
   assert.ok(!JSON.stringify(actions).includes('0551234567'));
-  api.close();api.open();assert.equal(q('.yk-modal').hidden,true);assert.equal(q('.yk-seats').inert,false);
-  q('[data-color=green]').click();q('[data-color=marble]').click();api.close();api.open();
-  assert.equal(q('.yk-seats').inert,false);assert.equal(q('.yk-modal').hidden,true);
+  api.close();api.open();assert.equal(q('.yk-modal').hidden,false);assert.equal(q('input').type,'tel');
+  q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));
+  assert.equal(q('input[autocomplete=given-name]'),null);assert.equal(q('.yk-modal').hidden,true);
+  q('[data-color=green]').click();q('.yk-confirm').click();q('[data-color=marble]').click();
+  document.querySelector('#yakolakVisualSetup').click();assert.equal(q('.yk-modal').hidden,true);
+  api.close();api.open();q('input[type=tel]').value='0557654321';q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));
+  assert.equal(q('h2').textContent,'الاسم الكريم');
+  assert.equal(q('input[autocomplete=given-name]').value,'');
   dom.window.close();
  });
 }

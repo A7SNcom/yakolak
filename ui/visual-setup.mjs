@@ -12,13 +12,16 @@ export function validProfile(value) {
   return !!value && typeof value.name === 'string' && value.name.trim().length >= 2 && value.name.trim().length <= 24 && /^[0-9]{7,15}$/.test(value.phone || '');
 }
 export function newSetup(name = '') {
-  return { step: 'color', hostColor: 'marble', rounds: 3, name,
+  return { step: 'color', selectedColor: '', hostColor: 'marble', rounds: 3, name,
     seats: COLORS.map((color, i) => ({ color: color.id, mode: i === 0 ? 'local' : i === 1 ? 'bot' : 'none', name: i === 0 ? name : '', owner: 'p1' })) };
 }
 export function chooseColor(state, color) {
   const start = COLORS.findIndex(x => x.id === color);
   if (start < 0) return state;
-  return { ...state, hostColor: color, step: 'count', seats: state.seats.map((seat, i) => ({ ...seat, color: COLORS[(start + i) % 4].id })) };
+  return { ...state, hostColor: color, selectedColor: color, step: 'color', seats: state.seats.map((seat, i) => ({ ...seat, color: COLORS[(start + i) % 4].id })) };
+}
+export function confirmColor(state) {
+  return state.selectedColor ? { ...state, step: 'count' } : state;
 }
 export function chooseCount(state, count) {
   if (![2, 3, 4].includes(count)) return state;
@@ -50,6 +53,9 @@ export function mountSetup(document, window) {
   const STORE = 'yakolak-visitor-v1';
   let profile = null;
   try { const saved = JSON.parse(window.localStorage.getItem(STORE)); if (validProfile(saved)) profile = saved; } catch {}
+  let profiles = {};
+  try { profiles = JSON.parse(window.localStorage.getItem('yakolak-profiles-v2')) || {}; } catch {}
+  if (profile) profiles[profile.phone] = profile.name;
   let state = newSetup(profile?.name || '');
   let capabilities = { online: false, mixed: false };
   let connections = [];
@@ -63,7 +69,7 @@ export function mountSetup(document, window) {
     return node;
   };
   const button = (label, action, className = '') => {
-    const node = el('button', className, label); node.type = 'button'; node.addEventListener('click', action); return node;
+    const node = el('button', className, label); node.type = 'button'; node.addEventListener('click', e => { e.stopPropagation(); action(e); }); return node;
   };
   const root = el('section', 'yk-setup'); root.id = 'yakolakVisualSetup'; root.dir = 'rtl'; root.hidden = true;
   root.setAttribute('aria-label', 'إعداد اللعبة');
@@ -72,14 +78,22 @@ export function mountSetup(document, window) {
   const prompt = el('h1', 'yk-prompt'); prompt.id = 'ykPrompt';
   const counts = el('div', 'yk-segment yk-counts'); counts.setAttribute('role', 'group'); counts.setAttribute('aria-label', 'عدد اللاعبين');
   const countButtons = [2, 3, 4].map(n => {
-    const b = button(String(n), () => { state = chooseCount(state, n); clearError(); render(); notify('preview'); });
+    const b = button(String(n), () => { closeSheet(); state = chooseCount(state, n); clearError(); render(); notify('preview'); });
     b.setAttribute('aria-label', `${n} لاعبين`); counts.append(b); return b;
   });
-  bar.append(identity, prompt, counts);
+  prompt.classList.add('yk-sr-only');
+  const confirm = button('تأكيد', () => { state = confirmColor(state); render(); notify('preview'); }, 'yk-primary yk-confirm');
+  bar.append(identity, prompt); root.append(counts, confirm);
   const seats = el('div', 'yk-seats');
   const seatButtons = COLORS.map(color => {
-    const b = button('', () => {
-      if (state.step === 'color') { state = chooseColor(state, color.id); clearError(); render(); notify('preview'); }
+    const b = button('', e => {
+      if (state.step === 'color') {
+        let selected = color.id;
+        if (e.detail > 0 && geometry.seats) selected = COLORS.reduce((best,c) => {
+          const p = geometry.seats[c.id]; const d = Math.hypot(e.clientX-p[0]*window.innerWidth,e.clientY-p[1]*window.innerHeight);
+          return d < best.distance ? {id:c.id,distance:d} : best;
+        },{id:color.id,distance:Infinity}).id;
+        state = chooseColor(state, selected); clearError(); render(); notify('preview'); }
       else { const index = state.seats.findIndex(x => x.color === color.id); if (index === 0) { state.step = 'color'; render(); notify('preview'); } else openSeat(index, b); }
     }, 'yk-seat');
     b.dataset.color = color.id; b.style.setProperty('--seat-color', color.hex);
@@ -87,7 +101,7 @@ export function mountSetup(document, window) {
     b.append(number, name, status); seats.append(b); return { b, number, name, status, color };
   });
   const footer = el('footer', 'yk-footer');
-  const colorAgain = button('اللون', () => { state.step = 'color'; render(); notify('preview'); }, 'yk-subtle');
+  const colorAgain = button('اللون', () => { closeSheet(); state.step = 'color'; render(); notify('preview'); }, 'yk-subtle');
   const rounds = el('div', 'yk-rounds');
   rounds.append(el('span', 'yk-caption', 'أشواط الفوز'));
   const roundGroup = el('div', 'yk-segment'); roundGroup.setAttribute('role', 'group'); roundGroup.setAttribute('aria-label', 'أشواط الفوز');
@@ -115,23 +129,51 @@ export function mountSetup(document, window) {
   function clearError() { errors.textContent = ''; }
   function showError(text) { pending = false; errors.textContent = text; render(); }
   function notify(action) {
-    const payload = { action, ...configuration(state), all_seats: state.seats, host_name: state.name, step: state.step };
+    const payload = { action, selected_color: state.selectedColor, ...configuration(state), all_seats: state.seats, host_name: state.name, step: root.dataset.profile === 'active' ? 'profile' : state.step };
     // The telephone number stays in this device's profile storage only.
     if (typeof window.yakolakVisualSetupAction === 'function') window.yakolakVisualSetupAction(JSON.stringify(payload));
   }
   function positionSeats() {
-    // Native bridge projects each real 3D base into normalized screen space.
-    const fallback = { marble: [.78, .5], blue: [.5, .27], gold: [.22, .5], green: [.5, .73] };
+    const fallback = { marble: [.66, .59], blue: [.66, .40], gold: [.34, .40], green: [.34, .59] };
+    const width = window.innerWidth, height = window.innerHeight;
     for (const { b, color } of seatButtons) {
-      const point = geometry[color.id] || fallback[color.id];
-      b.style.left = `${point[0] * 100}%`; b.style.top = `${point[1] * 100}%`;
+      const point = geometry.seats?.[color.id] || fallback[color.id];
+      if (state.step === 'color') {
+        const corners = geometry.hits?.[color.id] || [point];
+        const xs = corners.map(x=>x[0]*width), ys = corners.map(x=>x[1]*height);
+        const w = Math.max(88,Math.max(...xs)-Math.min(...xs)+24);
+        const h = Math.max(72,Math.max(...ys)-Math.min(...ys)+24);
+        b.style.width = `${w}px`; b.style.height = `${h}px`;
+        b.style.left = `${point[0]*100}%`; b.style.top = `${point[1]*100}%`;
+      } else {
+        b.style.width = ''; b.style.height = '';
+        const control = geometry.controls?.[color.id] || point;
+        b.style.left = `${control[0]*100}%`; b.style.top = `${control[1]*100}%`;
+      }
     }
+    const center = geometry.prompt || [.5,.47];
+    confirm.style.left = counts.style.left = `${center[0]*100}%`;
+    confirm.style.top = counts.style.top = `${center[1]*height+32}px`;
+    if (!modal.hidden && modal.dataset.kind !== 'profile' && returnFocus?.getBoundingClientRect) positionSheet();
   }
+  function positionSheet() {
+    const anchor = returnFocus?.getBoundingClientRect();
+    if (!anchor) return;
+    const width = window.innerWidth, height = window.visualViewport?.height || window.innerHeight;
+    const w = Math.min(288,width-24), h = sheet.getBoundingClientRect().height || 230;
+    sheet.style.width = `${w}px`;
+    const beside = anchor.right+10+w <= width-12 ? anchor.right+10 : anchor.left-10-w >= 12 ? anchor.left-10-w : anchor.left+anchor.width/2-w/2;
+    const below = anchor.bottom+10+h <= height-12 ? anchor.bottom+10 : anchor.top-10-h;
+    sheet.style.left = `${Math.max(12,Math.min(width-w-12,beside))}px`;
+    sheet.style.top = `${Math.max(12,Math.min(height-h-12,below))}px`;
+  }
+
   function render() {
     identity.textContent = state.name;
     prompt.textContent = state.step === 'color' ? 'اختر لونك' : 'اختر عدد اللاعبين';
     root.dataset.step = state.step;
     counts.hidden = state.step === 'color';
+    confirm.hidden = state.step !== 'color' || !state.selectedColor;
     const total = state.seats.filter(x => x.mode !== 'none').length;
     countButtons.forEach((b, i) => b.setAttribute('aria-pressed', String(total === i + 2)));
     roundButtons.forEach((b, i) => b.setAttribute('aria-pressed', String(state.rounds === [3, 5][i])));
@@ -140,8 +182,10 @@ export function mountSetup(document, window) {
       b.classList.toggle('is-off', state.step !== 'color' && seat.mode === 'none');
       b.classList.toggle('is-host', state.step !== 'color' && index === 0);
       b.classList.toggle('is-color', state.step === 'color');
+      b.classList.toggle('is-selected', state.step === 'color' && state.selectedColor === color.id);
+      b.setAttribute('aria-pressed', String(state.step === 'color' && state.selectedColor === color.id));
       number.textContent = state.step === 'color' ? '' : String(index + 1);
-      name.textContent = state.step === 'color' ? color.name : index === 0 ? state.name : seat.name || `لاعب ${index + 1}`;
+      name.textContent = state.step === 'color' ? '' : index === 0 ? state.name : seat.name || `لاعب ${index + 1}`;
       status.textContent = state.step === 'color' ? '' : index === 0 ? 'أنت' : ({ bot: 'بوت', online: 'أونلاين', local: 'على نفس الجهاز', none: 'بدون' }[seat.mode]);
       b.setAttribute('aria-label', state.step === 'color' ? `اختر ${color.name}` : `${name.textContent}، ${status.textContent}`);
     }
@@ -154,39 +198,65 @@ export function mountSetup(document, window) {
   function openSheet(title, origin) {
     returnFocus = origin || document.activeElement;
     sheet.replaceChildren(); const h = el('h2', '', title); h.id = 'ykSheetTitle'; sheet.append(h);
-    modal.hidden = false; bar.inert = true; seats.inert = true; footer.inert = true;
+    modal.hidden = false; modal.classList.remove('is-closing');
+    sheet.style.left = ''; sheet.style.top = ''; sheet.style.width = '';
+    bar.inert = false; seats.inert = false; footer.inert = false;
+    sheet.setAttribute('aria-modal', 'false');
     return sheet;
   }
-  function closeSheet() {
-    modal.hidden = true; sheet.replaceChildren(); bar.inert = false; seats.inert = false; footer.inert = false;
-    if (returnFocus?.isConnected) returnFocus.focus();
+  function closeSheet(animated = false, after = () => {}) {
+    const finish = () => {
+      modal.hidden = true; sheet.replaceChildren(); modal.classList.remove('is-closing');
+      delete root.dataset.profile; bar.inert = false; seats.inert = false; footer.inert = false;
+      if (returnFocus?.isConnected) returnFocus.focus();
+      after();
+    };
+    if (animated && typeof sheet.animate === 'function' && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      const motion = sheet.animate([{opacity:1,transform:'translateY(0)'},{opacity:0,transform:'translateY(-12px)'}],{duration:180,easing:'ease-in',fill:'forwards'});
+      motion.finished.then(()=>{motion.cancel();finish();},finish);
+    } else finish();
   }
+
   function input(label, options = {}) {
     const wrap = el('label', 'yk-field'); wrap.append(el('span', '', label));
     const field = el('input'); Object.assign(field, options); field.setAttribute('aria-label', label); wrap.append(field); return { wrap, field };
   }
-  function openProfile(edit = false) {
-    openSheet('أهلاً بك', identity); modal.dataset.kind = 'profile';
+  function openProfile() {
+    openSheet('رقم الجوال', identity); modal.dataset.kind = 'profile'; root.dataset.profile = 'active';
+    bar.inert = true; seats.inert = true; footer.inert = true; sheet.setAttribute('aria-modal','true');
+    notify('preview');
     const form = el('form', 'yk-profile-form'); form.noValidate = true;
-    const name = input('الاسم', { value: profile?.name || '', maxLength: 24, required: true, autocomplete: 'given-name' });
-    const phone = input('رقم الجوال', { value: profile?.phone || '', type: 'tel', inputMode: 'numeric', autocomplete: 'tel', maxLength: 15, required: true, dir: 'ltr' });
-    phone.field.pattern = '[0-9]{7,15}'; phone.field.enterKeyHint = 'done'; name.field.enterKeyHint = 'next';
-    phone.field.addEventListener('input', () => { const cursor = phone.field.selectionStart; phone.field.value = digits(phone.field.value); try { phone.field.setSelectionRange(cursor, cursor); } catch {} });
-    const error = el('div', 'yk-field-error'); error.setAttribute('role', 'alert');
-    const submit = el('button', 'yk-primary', edit ? 'حفظ' : 'متابعة'); submit.type = 'submit';
-    form.append(name.wrap, phone.wrap, error, submit);
-    if (edit) form.append(button('إلغاء', closeSheet, 'yk-subtle'));
-    form.addEventListener('submit', e => {
-      e.preventDefault();
-      const candidate = { name: name.field.value.trim(), phone: digits(phone.field.value) };
-      if (candidate.name.length < 2) { error.textContent = 'اكتب اسمك'; name.field.focus(); return; }
-      if (!validProfile(candidate)) { error.textContent = 'تأكد من رقم الجوال'; phone.field.focus(); return; }
-      profile = candidate; state.name = profile.name; state.seats[0].name = profile.name;
-      try { window.localStorage.setItem(STORE, JSON.stringify(profile)); } catch {}
-      closeSheet(); render(); notify('preview');
+    const phone = input('رقم الجوال', { value: profile?.phone || '', type:'tel', inputMode:'numeric', autocomplete:'tel', maxLength:15, required:true, dir:'ltr' });
+    phone.field.pattern = '[0-9]{7,15}'; phone.field.enterKeyHint = 'done';
+    phone.field.addEventListener('input',()=>{ const cursor=phone.field.selectionStart; phone.field.value=digits(phone.field.value); try{phone.field.setSelectionRange(cursor,cursor);}catch{} });
+    const error = el('div','yk-field-error'); error.setAttribute('role','alert');
+    const next = el('button','yk-primary','متابعة'); next.type='submit';
+    form.append(phone.wrap,error,next);
+    form.addEventListener('submit',e=>{
+      e.preventDefault(); const number=digits(phone.field.value);
+      if(!/^[0-9]{7,15}$/.test(number)){error.textContent='تأكد من رقم الجوال';phone.field.focus();return;}
+      const savedName=profiles[number];
+      if(typeof savedName==='string' && validProfile({name:savedName,phone:number})) finishProfile(savedName,number);
+      else openProfileName(number);
     });
-    sheet.append(form); window.requestAnimationFrame(() => name.field.focus());
+    sheet.append(form); window.requestAnimationFrame(()=>phone.field.focus());
   }
+  function openProfileName(number) {
+    sheet.replaceChildren(); const title=el('h2','','الاسم الكريم');title.id='ykSheetTitle';sheet.append(title);
+    const form=el('form','yk-profile-form');form.noValidate=true;
+    const name=input('الاسم الكريم',{maxLength:24,required:true,autocomplete:'given-name'});name.field.enterKeyHint='done';
+    const error=el('div','yk-field-error');error.setAttribute('role','alert');
+    const next=el('button','yk-primary','متابعة');next.type='submit';form.append(name.wrap,error,next);
+    form.addEventListener('submit',e=>{e.preventDefault();if(name.field.value.trim().length<2){error.textContent='اكتب اسمك';return;}finishProfile(name.field.value.trim(),number);});
+    sheet.append(form);name.field.focus();
+    sheet.animate?.([{opacity:0,transform:'translateX(10px)'},{opacity:1,transform:'translateX(0)'}],{duration:220,easing:'ease-out'});
+  }
+  function finishProfile(name,phone) {
+    profile={name,phone};profiles[phone]=name;state.name=name;state.seats[0].name=name;
+    try{window.localStorage.setItem(STORE,JSON.stringify(profile));window.localStorage.setItem('yakolak-profiles-v2',JSON.stringify(profiles));}catch{}
+    closeSheet(true,()=>{render();notify('preview');});
+  }
+
   function openSeat(index, origin) {
     openSheet(`لاعب ${index + 1}`, origin); modal.dataset.kind = 'seat';
     const choices = el('div', 'yk-mode-grid');
@@ -201,7 +271,7 @@ export function mountSetup(document, window) {
     choose(`على نفس جهاز ${state.name}`, 'local');
     for (const connection of connections) if (connection.seat !== 'p1') choose(`على نفس جهاز ${connection.name}`, 'local', connection.seat);
     choose('بدون', 'none'); sheet.append(choices, button('تم', closeSheet, 'yk-subtle'));
-    choices.querySelector('button').focus();
+    positionSheet(); choices.querySelector('button').focus();
   }
   function openPlayerName(index, owner, origin) {
     openSheet(`لاعب ${index + 1}`, origin); modal.dataset.kind = 'name';
@@ -212,7 +282,7 @@ export function mountSetup(document, window) {
     form.addEventListener('submit', e => {
       e.preventDefault(); if (name.field.value.trim().length < 2) return;
       state = changeSeat(state, index, 'local', name.field.value, owner); clearError(); closeSheet(); render(); notify('preview');
-    }); sheet.append(form); name.field.focus();
+    }); sheet.append(form); positionSheet(); name.field.focus();
   }
   function openJoin() {
     openSheet('رقم الغرفة', join); modal.dataset.kind = 'join';
@@ -225,16 +295,17 @@ export function mountSetup(document, window) {
       e.preventDefault(); if (!capabilities.online) { error.textContent = 'الأونلاين غير متاح حالياً'; return; }
       if (!/^\d{2}$/.test(code.field.value)) { error.textContent = 'رقم الغرفة من خانتين'; return; }
       closeSheet(); window.yakolakVisualSetupAction?.(JSON.stringify({ action: 'join', code: code.field.value }));
-    }); sheet.append(form); code.field.focus();
+    }); sheet.append(form); positionSheet(); code.field.focus();
   }
   modal.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && profile) { e.preventDefault(); e.stopPropagation(); closeSheet(); }
-    if (e.key !== 'Tab') return;
+    if (e.key === 'Escape' && modal.dataset.kind !== 'profile') { e.preventDefault(); e.stopPropagation(); closeSheet(); }
+    if (e.key !== 'Tab' || modal.dataset.kind !== 'profile') return;
     const items = [...sheet.querySelectorAll('input,button')].filter(x => !x.disabled && !x.hidden);
     const first = items[0], last = items.at(-1);
     if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
   });
+  root.addEventListener('click',e=>{ if(!modal.hidden && modal.dataset.kind!=='profile' && !sheet.contains(e.target) && !returnFocus?.contains(e.target)) closeSheet(); });
   // Keep DOM keyboard input away from the canvas's legacy dialog key handler.
   root.addEventListener('keydown', e => e.stopPropagation());
   const api = {
@@ -244,10 +315,10 @@ export function mountSetup(document, window) {
       pending = false; state = newSetup(profile?.name || ''); geometry = options.geometry || geometry;
       root.hidden = false; clearError(); render();
       document.body.dataset.yakolakVisualSetup = 'visible';
-      if (!profile) openProfile(); else notify('preview');
+      openProfile();
     },
     close() { root.hidden = true; modal.hidden = true; document.body.dataset.yakolakVisualSetup = 'hidden'; },
-    geometry(points) { geometry = points; positionSeats(); },
+    geometry(points) { geometry = points; root.dataset.world = String(!!points.world); positionSeats(); },
     error(text) { root.hidden = false; showError(text); },
     room(room) { connections = (room.players || []).filter(x => x.connected !== false && x.name).map(x => ({ seat: String(x.seat), name: String(x.name).slice(0,24) })); },
   };
