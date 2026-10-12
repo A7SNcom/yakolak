@@ -1,8 +1,10 @@
+import {attachLiquidLens} from './vendor/liquefy-core-1.1.0.mjs';
+
 export const COLORS = [
-  { id: 'marble', name: 'وردي', direction: 'right', hex: '#ed5f7d' },
-  { id: 'blue', name: 'أزرق', direction: 'back', hex: '#3488f6' },
-  { id: 'gold', name: 'ذهبي', direction: 'left', hex: '#f2b84b' },
-  { id: 'green', name: 'بنفسجي', direction: 'front', hex: '#8b63e8' },
+  { id: 'marble', name: 'أبيض', direction: 'right', hex: '#ddd7ce' },
+  { id: 'blue', name: 'أزرق', direction: 'back', hex: '#3764b2' },
+  { id: 'gold', name: 'ذهبي', direction: 'left', hex: '#bd7d2e' },
+  { id: 'green', name: 'أخضر', direction: 'front', hex: '#267a61' },
 ];
 export function digits(value) {
   return String(value).replace(/[٠-٩]/g, x => String(x.charCodeAt(0) - 0x660))
@@ -31,17 +33,28 @@ export function changeSeat(state, index, mode, name = '', owner = 'p1') {
   if (index < 1 || index > 3 || !['bot', 'online', 'local', 'none'].includes(mode)) return state;
   return { ...state, seats: state.seats.map((seat, i) => i === index ? { ...seat, mode, name: mode === 'local' ? name.trim().slice(0, 24) : '', owner: mode === 'local' ? owner : 'p1' } : seat) };
 }
+export function seatLabel(seat) {
+  const color = COLORS.find(x => x.id === seat.color)?.name || '';
+  return seat.mode === 'none' ? 'فاضي' : seat.mode === 'bot' ? `كمبيوتر ${color}` : seat.mode === 'online' ? seat.name.trim() || 'اونلاين' : seat.name.trim() || `لاعب ${color}`;
+}
+export function swapPlayers(state, target, source) {
+  if (target === source || !state.seats[target] || state.seats[source]?.mode !== 'local') return state;
+  const seats = state.seats.map(x => ({...x}));
+  const color = seats[target].color;
+  seats[target] = {...seats[target],color:seats[source].color};
+  seats[source] = {...seats[source],color};
+  return {...state,seats,hostColor:seats[0].color};
+}
 export function configuration(state) {
   return { tutorial: false, rounds: state.rounds, online_join_code: '', players: state.seats.filter(x => x.mode !== 'none').map((seat, i) => {
     const color = COLORS.find(x => x.id === seat.color);
-    return { seat: `p${i + 1}`, label: i === 0 ? state.name : seat.name || String(state.seats.indexOf(seat) + 1), mode: seat.mode,
+    return { seat: `p${i + 1}`, label: seatLabel(seat), mode: seat.mode,
       color: color.id, color_name: color.name, direction: color.direction, device_owner: seat.owner };
   }) };
 }
 export function configurationError(state, capabilities = {}) {
   const active = state.seats.filter(x => x.mode !== 'none');
   if (active.length < 2) return 'اختر لاعبين على الأقل';
-  if (active.some((x, i) => i > 0 && x.mode === 'local' && x.name.trim().length < 2)) return 'اكتب اسم اللاعب';
   if (active.some(x => x.mode === 'online' || (x.mode === 'local' && x.owner !== 'p1'))) {
     if (!capabilities.online) return 'الأونلاين غير متاح حالياً';
     if (!capabilities.mixed && active.slice(1).some(x => x.mode !== 'online')) return 'الغرفة لا تدعم خلط الأجهزة حالياً';
@@ -65,11 +78,11 @@ export function mountSetup(document, window) {
   if (profile) profiles[profile.phone] = profile.name;
   let state = newSetup(profile?.name || '');
   let capabilities = { online: false, mixed: false }, connections = [], geometry = {}, roomCode = '';
-  let pending = false, returnFocus = null, sheetGeneration = 0, moving = false;
+  let pending = false, returnFocus = null, sheetGeneration = 0, moving = false, nameDraft = null, flowGeneration = 0;
   const el = (tag, cls, text) => { const node = document.createElement(tag); if (cls) node.className = cls; if (text !== undefined) node.textContent = text; return node; };
   const button = (label, action, cls = '') => { const node = el('button',cls,label); node.type = 'button'; node.addEventListener('click',e=>{e.stopPropagation();action(e);}); return node; };
   const reduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const animate = (node,frames,duration=280) => { if (!reduced()) return node.animate?.(frames,{duration,easing:'cubic-bezier(.16,1,.3,1)',fill:'both'}); };
+  const animate = (node,frames,duration=320) => { node.getAnimations?.().forEach(x=>x.cancel());if (!reduced()) return node.animate?.(frames,{duration,easing:'cubic-bezier(.4,0,.2,1)'}); };
   const root = el('section','yk-setup'); root.id = 'yakolakVisualSetup'; root.dir = 'rtl'; root.hidden = true; root.setAttribute('aria-label','إعداد اللعبة');
   const header = el('header','yk-header');
   const identity = button('',openProfile,'yk-identity');
@@ -85,8 +98,8 @@ export function mountSetup(document, window) {
       } else if (state.step==='ready') openSeat(state.seats.findIndex(x=>x.color===color.id),b);
     },'yk-seat');
     b.dataset.color=color.id; b.style.setProperty('--seat-color',color.hex);
-    const status=el('span','yk-seat-status'), number=el('span','yk-seat-number'), arrow=el('span','yk-seat-arrow','⌄');arrow.setAttribute('aria-hidden','true');
-    const line=el('span','yk-seat-line');line.append(number,arrow);b.append(status,line);seats.append(b);return {b,status,number,color};
+    const status=el('span','yk-seat-status'), arrow=el('span','yk-seat-arrow','⌄');arrow.setAttribute('aria-hidden','true');
+    b.append(status,arrow);seats.append(b);return {b,status,color};
   });
   const actions = el('footer','yk-actions');
   const entry = el('div','yk-entry');
@@ -103,12 +116,26 @@ export function mountSetup(document, window) {
   const code=el('span','yk-room-code','—');code.dir='ltr';sharing.append(shareIcon,code);
   const start=button('ابدأ اللعب',()=>{const problem=configurationError(state,capabilities);if(problem){showError(problem);return;}closeSheet();go('rounds');},'yk-primary yk-start');
   const rounds=el('div','yk-rounds');rounds.setAttribute('role','group');rounds.setAttribute('aria-label','أشواط الفوز');
-  [3,5].forEach(n=>{const b=button(String(n),()=>{if(pending)return;state.rounds=n;pending=true;render();notify('start');},'yk-choice');b.setAttribute('aria-label',`الفوز بـ ${n} أشواط`);rounds.append(b);});
+  [3,5].forEach(n=>{const b=button(String(n),()=>beginMatch(n),'yk-choice');b.setAttribute('aria-label',`الفوز بـ ${n} أشواط`);rounds.append(b);});
   const errors=el('div','yk-error');errors.setAttribute('role','status');errors.setAttribute('aria-live','polite');
   actions.append(entry,confirm,counts,sharing,start,rounds,errors);
   const modal=el('div','yk-modal');modal.hidden=true;
   const sheet=el('section','yk-sheet');sheet.setAttribute('role','dialog');sheet.setAttribute('aria-labelledby','ykSheetTitle');modal.append(sheet);
   root.append(header,seats,actions,modal);document.body.append(root);
+  const lenses=new Map();
+  function refreshGlass(){
+    // Actual Liquefy Core optics. WebKit uses the same neutral CSS material:
+    // it cannot render SVG displacement in backdrop-filter. No RGB dispersion
+    // or spring transforms: the board anchors and text must remain steady.
+    const nodes=[prompt,sheet,create,join,confirm,start,sharing,...counts.children,...rounds.children,...seatButtons.map(x=>x.b)];
+    for(const node of nodes){
+      if(node===prompt)continue;
+      const visible=!root.hidden&&!node.hidden&&!node.closest('[hidden]')&&!node.classList.contains('is-color');
+      if(!visible){lenses.get(node)?.destroy();lenses.delete(node);continue;}
+      if(!lenses.has(node)){const lens=attachLiquidLens(node,{strength:.32,dispersion:0,blur:1,saturation:1,respectReducedTransparency:true});if(lens)lenses.set(node,lens);}
+    }
+  }
+  root.dataset.glassEngine='liquefy-core-1.1.0';
 
   function clearError(){errors.textContent='';}
   function showError(text){pending=false;errors.textContent=text;render();}
@@ -116,7 +143,7 @@ export function mountSetup(document, window) {
     const payload={action,...configuration(state),all_seats:state.seats,host_name:state.name,selected_color:state.selectedColor,count_chosen:state.countChosen,step:root.dataset.profile==='active'?'profile':state.step,overlay_open:!modal.hidden,...override};
     window.yakolakVisualSetupAction?.(JSON.stringify(payload));
   }
-  function viewport(){const vv=window.visualViewport;const h=vv?.height||window.innerHeight;root.style.setProperty('--yk-vh',`${h}px`);root.style.setProperty('--yk-vv-top',`${vv?.offsetTop||0}px`);root.classList.toggle('is-keyboard',h<520&&h<window.innerHeight*.78);position();}
+  function viewport(){const vv=window.visualViewport;const h=vv?.height||window.innerHeight;const base=Math.max(root.getBoundingClientRect().height||0,window.innerHeight);root.style.setProperty('--yk-vv-height',`${h}px`);root.style.setProperty('--yk-vv-top',`${vv?.offsetTop||0}px`);root.classList.toggle('is-keyboard',h<base*.78);position();}
   window.visualViewport?.addEventListener('resize',viewport);window.visualViewport?.addEventListener('scroll',viewport);window.addEventListener('resize',viewport);
   function position(){
     const width=window.innerWidth,height=window.innerHeight;
@@ -126,51 +153,62 @@ export function mountSetup(document, window) {
       if(state.step==='color'){
         const corners=geometry.hits?.[color.id]||[point];const xs=corners.map(x=>x[0]*width),ys=corners.map(x=>x[1]*height);
         b.style.width=`${Math.max(80,Math.max(...xs)-Math.min(...xs)+20)}px`;b.style.height=`${Math.max(68,Math.max(...ys)-Math.min(...ys)+20)}px`;
-        b.style.left=`${point[0]*100}%`;b.style.top=`${point[1]*100}%`;
-      }else{const p=geometry.controls?.[color.id]||point;b.style.width='';b.style.height='';b.style.left=`${p[0]*100}%`;b.style.top=`${p[1]*100}%`;}
+        b.style.left=`${point[0]*width}px`;b.style.top=`${point[1]*height}px`;
+      }else{const p=geometry.controls?.[color.id]||point;b.style.width='';b.style.height='';b.style.left=`${Math.max(68,Math.min(width-68,p[0]*width))}px`;b.style.top=`${p[1]*height}px`;}
     }
     const target=geometry.actions||[.5,.75];
     const h=actions.getBoundingClientRect().height|| (state.step==='ready'?112:60);
     const visibleHeight=window.visualViewport?.height||height;
-    const centeredEntry=state.step==='entry'&&width>=700;
+    const centeredEntry=state.step==='entry';
     actions.style.top=`${centeredEntry?Math.max(16,(visibleHeight-h)/2):Math.max(12,Math.min(target[1]*height,visibleHeight-h-16))}px`;
+    const heading=geometry.prompt||[.5,.25];prompt.style.top=`${Math.max(20,heading[1]*height)}px`;
     if(!modal.hidden && ['seat','name'].includes(modal.dataset.kind))positionSheet();
   }
   function positionSheet(){
     const anchor=returnFocus?.getBoundingClientRect();if(!anchor)return;
-    const width=window.innerWidth,height=window.visualViewport?.height||window.innerHeight;
-    const w=Math.min(modal.dataset.kind==='seat'?190:240,width-24);sheet.style.width=`${w}px`;
-    const h=sheet.getBoundingClientRect().height|| (modal.dataset.kind==='seat'?172:160);
+    const width=window.innerWidth,height=window.visualViewport?.height||window.innerHeight,top=window.visualViewport?.offsetTop||0;
+    const w=Math.min(modal.dataset.kind==='seat'?210:260,width-24);sheet.style.width=`${w}px`;
+    const h=sheet.getBoundingClientRect().height|| (modal.dataset.kind==='seat'?172:64);
     const x=Math.max(12,Math.min(width-w-12,anchor.left+anchor.width/2-w/2));
     const below=anchor.bottom+4+h<=height-12;
-    sheet.style.left=`${x}px`;sheet.style.top=`${Math.max(12,Math.min(height-h-12,below?anchor.bottom+4:anchor.top-h-4))}px`;
+    sheet.style.left=`${x}px`;sheet.style.top=`${Math.max(12,Math.min(height-h-12,below?anchor.bottom+4-top:anchor.top-h-4-top))}px`;
     modal.dataset.side=below?'below':'above';
   }
   function render(){
     root.dataset.step=state.step;identity.textContent=state.name;
     prompt.textContent=({color:'اختر لونك',count:'كم لاعب؟',rounds:'كم شوط للفوز؟'}[state.step]||'');
+    prompt.hidden=!prompt.textContent;
     entry.hidden=state.step!=='entry';confirm.hidden=state.step!=='color'||!state.selectedColor;
     counts.hidden=state.step!=='count';start.hidden=sharing.hidden=state.step!=='ready';rounds.hidden=state.step!=='rounds';
     code.textContent=roomCode||'—';sharing.classList.toggle('is-unavailable',!roomCode);sharing.setAttribute('aria-disabled',String(!roomCode));
     [...rounds.children].forEach(b=>b.disabled=pending);
-    for(const {b,status,number,color} of seatButtons){
+    for(const {b,status,color} of seatButtons){
       const index=state.seats.findIndex(x=>x.color===color.id),seat=state.seats[index];
       b.hidden=!['color','ready'].includes(state.step);b.classList.toggle('is-color',state.step==='color');b.classList.toggle('is-off',seat.mode==='none');
       b.setAttribute('aria-pressed',String(state.step==='color'&&state.selectedColor===color.id));
-      status.textContent=index===0?'أنت':({bot:'بوت',online:'أونلاين',local:'نفس الجهاز',none:'بدون'}[seat.mode]);number.textContent=String(index+1);
-      b.setAttribute('aria-label',state.step==='color'?`اختر ${color.name}`:`${index+1}، ${status.textContent}${seat.name?'، '+seat.name:''}`);
+      status.textContent=seatLabel(seat);
+      b.setAttribute('aria-label',state.step==='color'?`اختر ${color.name}`:status.textContent);
       b.setAttribute('aria-haspopup',state.step==='ready'?'menu':'false');
     }
     position();
+    refreshGlass();
   }
   function go(next){
     if(moving)return;closeSheet();clearError();
     const target=typeof next==='string'?{...state,step:next}:next;
-    const apply=()=>{state=target;moving=false;delete root.dataset.moving;render();notify('preview');animate(actions,[{opacity:0,transform:'translate(-50%,12px) scale(.985)'},{opacity:1,transform:'translate(-50%,0) scale(1)'}],340);};
+    const apply=()=>{state=target;moving=false;delete root.dataset.moving;render();notify('preview');animate(actions,[{opacity:0,transform:'translate(-50%,12px) scale(.985)'},{opacity:1,transform:'translate(-50%,0) scale(1)'}],420);};
     if(!reduced()&&typeof actions.animate==='function'){
       moving=true;root.dataset.moving='true';notify('preview',{step:'transition'});
-      const motion=animate(actions,[{opacity:1,transform:'translate(-50%,0) scale(1)'},{opacity:0,transform:'translate(-50%,-8px) scale(.985)'}],180);motion.finished.then(apply,apply);
+      const motion=animate(actions,[{opacity:1,transform:'translate(-50%,0) scale(1)'},{opacity:0,transform:'translate(-50%,-8px) scale(.985)'}],240);motion.finished.then(apply,apply);
     }else apply();
+  }
+  function beginMatch(n){
+    if(pending||moving)return;state.rounds=n;pending=true;render();const token=++flowGeneration;
+    const done=()=>{if(token===flowGeneration&&!root.hidden)notify('start');};
+    if(!reduced()&&typeof actions.animate==='function'){
+      animate(prompt,[{opacity:1},{opacity:0}],300);
+      const motion=animate(actions,[{opacity:1,transform:'translate(-50%,0)'},{opacity:0,transform:'translate(-50%,8px)'}],480);motion.finished.then(done,done);
+    }else done();
   }
   async function copyRoom(){
     if(!roomCode){showError('الأونلاين غير متاح حالياً');return;}
@@ -183,13 +221,14 @@ export function mountSetup(document, window) {
     const h=el('h2','',title);h.id='ykSheetTitle';h.hidden=!title;sheet.append(h);
     modal.hidden=false;modal.dataset.kind=kind;root.dataset.overlay=kind;
     const blocking=!['seat','name'].includes(kind);header.inert=seats.inert=actions.inert=blocking;sheet.setAttribute('aria-modal',String(blocking));
-    notify('preview');animate(sheet,[{opacity:0,transform:kind==='seat'?'scale(.96) translateY(-6px)':'translateY(12px) scale(.985)'},{opacity:1,transform:'none'}],260);
+    notify('preview');refreshGlass();animate(sheet,[{opacity:0,transform:kind==='seat'?'scale(.98) translateY(-4px)':'translateY(8px) scale(.99)'},{opacity:1,transform:'none'}],280);
     return sheet;
   }
   function closeSheet(animated=false,after=()=>{}){
     if(modal.hidden){after();return;}
+    commitName();
     const token=++sheetGeneration;
-    const finish=()=>{if(token!==sheetGeneration)return;modal.hidden=true;sheet.replaceChildren();delete root.dataset.profile;delete root.dataset.overlay;header.inert=seats.inert=actions.inert=false;returnFocus?.setAttribute?.('aria-expanded','false');returnFocus?.focus?.();render();notify('preview');after();};
+    const finish=()=>{if(token!==sheetGeneration)return;modal.hidden=true;sheet.replaceChildren();delete root.dataset.profile;delete root.dataset.overlay;header.inert=seats.inert=actions.inert=false;returnFocus?.setAttribute?.('aria-expanded','false');returnFocus?.focus?.({preventScroll:true});render();notify('preview');after();};
     if(animated && !reduced()&&typeof sheet.animate==='function'){
       const motion=animate(sheet,[{opacity:1,transform:'none'},{opacity:0,transform:'translateY(-6px) scale(.985)'}],190);motion.finished.then(finish,finish);
     }else finish();
@@ -201,7 +240,7 @@ export function mountSetup(document, window) {
     const phone=input('رقم الجوال',{value:profile?.phone||'',type:'tel',inputMode:'numeric',autocomplete:'tel',maxLength:15,required:true,dir:'ltr'});phone.field.enterKeyHint='done';
     phone.field.addEventListener('input',()=>{phone.field.value=digits(phone.field.value);});
     const error=el('div','yk-field-error');error.setAttribute('role','alert');const next=el('button','yk-primary','متابعة');next.type='submit';form.append(phone.wrap,error,next);
-    form.addEventListener('submit',e=>{e.preventDefault();const number=digits(phone.field.value);if(!/^\d{7,15}$/.test(number)){error.textContent='تأكد من رقم الجوال';return;}const name=profiles[number];if(typeof name==='string'&&validProfile({name,phone:number}))finishProfile(name,number);else profileName(number);});sheet.append(form);window.requestAnimationFrame(()=>phone.field.focus());
+    form.addEventListener('submit',e=>{e.preventDefault();const number=digits(phone.field.value);if(!/^\d{7,15}$/.test(number)){error.textContent='تأكد من رقم الجوال';return;}const name=profiles[number];if(typeof name==='string'&&validProfile({name,phone:number}))finishProfile(name,number);else profileName(number);});sheet.append(form);
   }
   function profileName(number){
     sheet.replaceChildren();const title=el('h2','','الاسم الكريم');title.id='ykSheetTitle';const form=el('form','yk-form');form.noValidate=true;
@@ -214,16 +253,25 @@ export function mountSetup(document, window) {
     closeSheet(true,()=>{render();notify('preview');});
   }
   function openSeat(index,origin){
-    openSheet('',origin,'seat');sheet.setAttribute('aria-label',`حالة ${index+1}`);sheet.setAttribute('role','menu');sheet.removeAttribute('aria-labelledby');
+    closeSheet();openSheet('',origin,'seat');sheet.setAttribute('aria-label',seatLabel(state.seats[index]));sheet.setAttribute('role','menu');sheet.removeAttribute('aria-labelledby');
     const choices=el('div','yk-menu');
-    const choose=(label,mode,owner='p1')=>{const b=button(label,()=>{if(mode==='local'){playerName(index,owner,origin);return;}state=changeSeat(state,index,mode);clearError();closeSheet(true);render();notify('preview');},'yk-menu-item');b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String(state.seats[index].mode===mode&&(mode!=='local'||state.seats[index].owner===owner)));choices.append(b);};
-    if(index===0)choose('تغيير الاسم','local');
-    else{choose('بوت','bot');choose('أونلاين','online');choose(`نفس جهاز ${state.name}`,'local');for(const c of connections)if(c.seat!=='p1')choose(`نفس جهاز ${c.name}`,'local',c.seat);choose('بدون','none');}
-    sheet.append(choices);positionSheet();choices.querySelector('button').focus();
+    const item=(label,action,selected=false)=>{const b=button(label,action,'yk-menu-item');b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String(selected));choices.append(b);return b;};
+    item('لاعب',()=>{if(index>0)state=changeSeat(state,index,'local',state.seats[index].name);playerName(index,origin);},state.seats[index].mode==='local');
+    if(index>0){item('الكمبيوتر (بوت)',()=>{state=changeSeat(state,index,'bot');closeSheet(true);},state.seats[index].mode==='bot');item('فاضي (بدون لاعب)',()=>{state=changeSeat(state,index,'none');closeSheet(true);},state.seats[index].mode==='none');}
+    for(const [source,seat] of state.seats.entries())if(seat.mode==='local'){
+      item(seatLabel(seat),()=>{if(source===index)playerName(index,origin);else{state=swapPlayers(state,index,source);closeSheet(true);}},source===index);
+    }
+    sheet.append(choices);positionSheet();choices.querySelector('button').focus({preventScroll:true});
   }
-  function playerName(index,owner,origin){
-    openSheet('الاسم',origin,'name');const form=el('form','yk-form');const name=input('اسم اللاعب',{value:state.seats[index].name,maxLength:24,minLength:2,required:true,autocomplete:'off'});const save=el('button','yk-primary','حفظ');save.type='submit';form.append(name.wrap,save);
-    form.addEventListener('submit',e=>{e.preventDefault();const value=name.field.value.trim();if(value.length<2)return;if(index===0){state.name=value;state.seats[0].name=value;profile.name=value;profiles[profile.phone]=value;try{window.localStorage.setItem(STORE,JSON.stringify(profile));window.localStorage.setItem('yakolak-profiles-v2',JSON.stringify(profiles));}catch{}}else state=changeSeat(state,index,'local',value,owner);closeSheet(true);});sheet.append(form);positionSheet();name.field.focus();
+  function playerName(index,origin){
+    openSheet('',origin,'name');sheet.setAttribute('aria-label','اسم اللاعب');sheet.removeAttribute('aria-labelledby');
+    const form=el('form','yk-form');form.noValidate=true;
+    const name=input('اسم اللاعب',{value:state.seats[index].name,placeholder:'اسم اللاعب',maxLength:24,autocomplete:'off'});name.field.enterKeyHint='done';form.append(name.wrap);
+    nameDraft={index,field:name.field};form.addEventListener('submit',e=>{e.preventDefault();name.field.blur();closeSheet(true);});sheet.append(form);positionSheet();name.field.focus({preventScroll:true});
+  }
+  function commitName(){
+    if(!nameDraft)return;const {index,field}=nameDraft;nameDraft=null;const value=field.value.trim().slice(0,24);
+    if(index===0){state.name=value;state.seats[0].name=value;}else state=changeSeat(state,index,'local',value);
   }
   function openJoin(){
     openSheet('رابط أو رمز الغرفة',join,'join');const form=el('form','yk-form');form.noValidate=true;
@@ -235,10 +283,11 @@ export function mountSetup(document, window) {
     if(modal.dataset.kind==='seat'&&['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();const items=[...sheet.querySelectorAll('button')];const index=items.indexOf(document.activeElement);items[e.key==='Home'?0:e.key==='End'?items.length-1:(index+(e.key==='ArrowDown'?1:-1)+items.length)%items.length]?.focus();}
     if(e.key==='Tab'&&sheet.getAttribute('aria-modal')==='true'){const list=[...sheet.querySelectorAll('input,button')];if(e.shiftKey&&document.activeElement===list[0]){e.preventDefault();list.at(-1)?.focus();}else if(!e.shiftKey&&document.activeElement===list.at(-1)){e.preventDefault();list[0]?.focus();}}
   });
+  root.addEventListener('pointerdown',e=>{if(nameDraft&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet();},true);
   root.addEventListener('click',e=>{if(!modal.hidden&&modal.dataset.kind!=='profile'&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet(true);});root.addEventListener('keydown',e=>e.stopPropagation());
   const api={
-    open(options={}){closeSheet();capabilities={online:!!options.online,mixed:!!options.mixed};connections=[];roomCode='';pending=moving=false;state=newSetup(profile?.name||'');geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();openProfile();},
-    close(){sheetGeneration++;root.hidden=true;modal.hidden=true;document.body.dataset.yakolakVisualSetup='hidden';},
+    open(options={}){flowGeneration++;nameDraft=null;closeSheet();capabilities={online:!!options.online,mixed:!!options.mixed};connections=[];roomCode='';pending=moving=false;state=newSetup(profile?.name||'');geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();openProfile();},
+    close(){flowGeneration++;sheetGeneration++;nameDraft=null;root.hidden=true;modal.hidden=true;refreshGlass();document.body.dataset.yakolakVisualSetup='hidden';},
     geometry(points){geometry=points;root.dataset.world=String(!!points.world);position();},
     error(text){root.hidden=false;showError(text);},
     room(room){roomCode=/^\d{2}$/.test(String(room.code||''))?String(room.code):'';connections=(room.players||[]).filter(x=>x.connected!==false&&x.name).map(x=>({seat:String(x.seat),name:String(x.name).slice(0,24)}));render();}
