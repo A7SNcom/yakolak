@@ -13,6 +13,7 @@ var visual_step: String = "color"
 var visual_last_viewport := Vector2.ZERO
 var visual_piece_visibility: Dictionary = {}
 var visual_inactive_material: StandardMaterial3D
+var visual_selection_black_material: StandardMaterial3D
 var visual_prompt: Label3D
 var visual_lights: Dictionary = {}
 var visual_light_tween: Tween
@@ -334,21 +335,36 @@ func _update_visual_seats() -> void:
 			if mesh.material_override is BaseMaterial3D:
 				visual_piece_visibility[key]["preview_material"] = mesh.material_override.duplicate()
 				visual_piece_visibility[key]["original_color"] = (mesh.material_override as BaseMaterial3D).albedo_color
-		var enabled := not visual_count_chosen
-		for value: Variant in visual_preview_seats:
-			var seat := value as Dictionary
-			var palette := PALETTE[_palette_index(str(seat.get("color", "")))]
-			if str(palette["direction"]) == str(record.get("dir", "")):
-				enabled = enabled or str(seat.get("mode", "none")) != "none"
+		var selected_direction := ""
+		if visual_step == "color" and not visual_selected_color.is_empty():
+			selected_direction = str(PALETTE[_palette_index(visual_selected_color)]["direction"])
+		var enabled := selected_direction.is_empty() and not visual_count_chosen
+		if not selected_direction.is_empty():
+			enabled = str(record.get("dir", "")) == selected_direction
+		else:
+			for value: Variant in visual_preview_seats:
+				var seat := value as Dictionary
+				var palette := PALETTE[_palette_index(str(seat.get("color", "")))]
+				if str(palette["direction"]) == str(record.get("dir", "")):
+					enabled = enabled or str(seat.get("mode", "none")) != "none"
 		mesh.visible = true
 		if visual_inactive_material == null:
 			visual_inactive_material = StandardMaterial3D.new()
 			visual_inactive_material.albedo_color = Color("#191a1c")
 			visual_inactive_material.roughness = 0.95
-		# GeometryInstance3D.transparency is ignored by the Web Compatibility
-		# renderer. A real opaque material keeps absent seats visibly dark.
+		if visual_selection_black_material == null:
+			visual_selection_black_material = StandardMaterial3D.new()
+			visual_selection_black_material.albedo_color = Color.BLACK
+			visual_selection_black_material.roughness = 0.95
+		# Keep the chosen seat's source material intact; use a true black material
+		# for the other seats while the player is choosing a color.
 		var saved: Dictionary = visual_piece_visibility[key]
-		mesh.material_override = saved.get("preview_material",saved["material"]) if enabled else visual_inactive_material
+		if enabled:
+			mesh.material_override = saved.get("preview_material",saved["material"])
+		elif not selected_direction.is_empty():
+			mesh.material_override = visual_selection_black_material
+		else:
+			mesh.material_override = visual_inactive_material
 
 	_update_visual_lighting()
 
@@ -372,7 +388,7 @@ func _update_visual_lighting() -> void:
 			intro.add_child(light)
 			visual_lights[key] = light
 		var target := 0.62
-		if visual_step == "color" and not visual_selected_color.is_empty(): target = 1.55 if key == visual_selected_color else 0.035
+		if visual_step == "color" and not visual_selected_color.is_empty(): target = 0.62 if key == visual_selected_color else 0.0
 		if visual_count_chosen:
 			for value: Variant in visual_preview_seats:
 				var seat := value as Dictionary
