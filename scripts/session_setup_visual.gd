@@ -20,6 +20,7 @@ var visual_light_key: String = ""
 var visual_prompt_tween: Tween
 var visual_prompt_stage: String = ""
 var visual_overlay_open: bool = false
+var visual_count_chosen: bool = false
 var visual_fit_viewport := Vector2.ZERO
 var visual_fitted_transform := Transform3D.IDENTITY
 var visual_board_rect := Rect2()
@@ -48,6 +49,7 @@ func show_after_intro() -> void:
 	showing = true
 	visual_active = true
 	visual_step = "profile"
+	visual_count_chosen = false
 	visual_selected_color = ""
 	active_screen = "visual"
 	tutorial_requested = false
@@ -302,6 +304,7 @@ func _on_visual_action(arguments: Array) -> void:
 			visual_step = str(payload.get("step", "color"))
 			visual_selected_color = str(payload.get("selected_color", ""))
 			visual_overlay_open = bool(payload.get("overlay_open", false))
+			visual_count_chosen = bool(payload.get("count_chosen", visual_step in ["ready","rounds"]))
 			_update_visual_seats()
 		"start":
 			_accept_visual_configuration(payload)
@@ -325,7 +328,7 @@ func _update_visual_seats() -> void:
 			if mesh.material_override is BaseMaterial3D:
 				visual_piece_visibility[key]["preview_material"] = mesh.material_override.duplicate()
 				visual_piece_visibility[key]["original_color"] = (mesh.material_override as BaseMaterial3D).albedo_color
-		var enabled := visual_step != "ready"
+		var enabled := not visual_count_chosen
 		for value: Variant in visual_preview_seats:
 			var seat := value as Dictionary
 			var palette := PALETTE[_palette_index(str(seat.get("color", "")))]
@@ -363,7 +366,7 @@ func _update_visual_lighting() -> void:
 			visual_lights[key] = light
 		var target := 0.65
 		if visual_step == "color" and not visual_selected_color.is_empty(): target = 1.15 if key == visual_selected_color else 0.22
-		if visual_step == "ready":
+		if visual_count_chosen:
 			for value: Variant in visual_preview_seats:
 				var seat := value as Dictionary
 				if str(seat.get("color","")) == key and str(seat.get("mode","")) == "none": target = 0.08
