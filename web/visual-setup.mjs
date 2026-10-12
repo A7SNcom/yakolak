@@ -169,10 +169,12 @@ export function mountSetup(document, window) {
     const width=window.innerWidth,height=window.visualViewport?.height||window.innerHeight,top=window.visualViewport?.offsetTop||0;
     const w=Math.min(modal.dataset.kind==='seat'?210:260,width-24);sheet.style.width=`${w}px`;
     const h=sheet.getBoundingClientRect().height|| (modal.dataset.kind==='seat'?172:64);
-    const x=Math.max(12,Math.min(width-w-12,anchor.left+anchor.width/2-w/2));
+    const centered=modal.dataset.kind==='name';
+    const x=centered?Math.max(12,(width-w)/2):Math.max(12,Math.min(width-w-12,anchor.left+anchor.width/2-w/2));
     const below=anchor.bottom+4+h<=height-12;
-    sheet.style.left=`${x}px`;sheet.style.top=`${Math.max(12,Math.min(height-h-12,below?anchor.bottom+4-top:anchor.top-h-4-top))}px`;
-    modal.dataset.side=below?'below':'above';
+    const y=centered?Math.max(12,(height-h)/2):Math.max(12,Math.min(height-h-12,below?anchor.bottom+4-top:anchor.top-h-4-top));
+    sheet.style.left=`${x}px`;sheet.style.top=`${y}px`;
+    modal.dataset.side=centered?'center':below?'below':'above';
   }
   function render(){
     root.dataset.step=state.step;identity.textContent=state.name;
@@ -266,7 +268,11 @@ export function mountSetup(document, window) {
   function playerName(index,origin){
     openSheet('',origin,'name');sheet.setAttribute('aria-label','اسم اللاعب');sheet.removeAttribute('aria-labelledby');
     const form=el('form','yk-form');form.noValidate=true;
-    const name=input('اسم اللاعب',{value:state.seats[index].name,placeholder:'اسم اللاعب',maxLength:24,autocomplete:'off'});name.field.enterKeyHint='done';form.append(name.wrap);
+    const name=input('اسم اللاعب',{value:state.seats[index].name,placeholder:'اسم اللاعب',maxLength:24,autocomplete:'off'});name.field.enterKeyHint='done';
+    const inputRow=el('div','yk-name-input');inputRow.append(name.wrap);
+    const clearName=button('×',()=>{name.field.value='';clearName.hidden=true;name.field.focus({preventScroll:true});},'yk-input-clear');
+    clearName.setAttribute('aria-label','مسح اسم اللاعب');clearName.hidden=!name.field.value;
+    name.field.addEventListener('input',()=>{clearName.hidden=!name.field.value;});inputRow.append(clearName);form.append(inputRow);
     nameDraft={index,field:name.field};form.addEventListener('submit',e=>{e.preventDefault();name.field.blur();closeSheet(true);});sheet.append(form);positionSheet();name.field.focus({preventScroll:true});
   }
   function commitName(){
