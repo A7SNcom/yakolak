@@ -1,1 +1,83 @@
-ZXh0ZW5kcyBTY2VuZVRyZWUKY2xhc3MgU2V0dXBIb3N0OgoJZXh0ZW5kcyBOb2RlM0QKCXZhciBjYW1lcmE6IENhbWVyYTNECgl2YXIgcGxheWluZzogYm9vbCA9IGZhbHNlCgl2YXIgcGllY2VzOiBBcnJheSA9IFtdCmNvbnN0IFNldHVwID0gcHJlbG9hZCgicmVzOi8vc2NyaXB0cy9zZXNzaW9uX3NldHVwX3Zpc3VhbC5nZCIpCnZhciBmYWlsdXJlczogQXJyYXlbU3RyaW5nXSA9IFtdCmZ1bmMgX2luaXQoKSAtPiB2b2lkOgoJY2FsbF9kZWZlcnJlZCgiX3J1biIpCmZ1bmMgX3J1bigpIC0+IHZvaWQ6Cglmb3IgZGltZW5zaW9uczogVmVjdG9yMmkgaW4gW1ZlY3RvcjJpKDMyMCw1NjgpLFZlY3RvcjJpKDM5MCw4NDQpLFZlY3RvcjJpKDc2OCwxMDI0KSxWZWN0b3IyaSgxMzY2LDc2OCksVmVjdG9yMmkoODQ0LDM5MCksVmVjdG9yMmkoNTY4LDMyMCldOgoJCXZhciB2aWV3cG9ydCA6PSBTdWJWaWV3cG9ydC5uZXcoKQoJCXZpZXdwb3J0LnNpemUgPSBkaW1lbnNpb25zCgkJcm9vdC5hZGRfY2hpbGQodmlld3BvcnQpCgkJdmFyIGhvc3QgOj0gU2V0dXBIb3N0Lm5ldygpCgkJdmlld3BvcnQuYWRkX2NoaWxkKGhvc3QpCgkJaG9zdC5jYW1lcmEgPSBDYW1lcmEzRC5uZXcoKQoJCWhvc3QuYWRkX2NoaWxkKGhvc3QuY2FtZXJhKQoJCWhvc3QuY2FtZXJhLmN1cnJlbnQgPSB0cnVlCgkJaG9zdC5jYW1lcmEucG9zaXRpb24gPSBWZWN0b3IzKDE3LjYsMTQuNDMyLDE3LjYpCgkJaG9zdC5jYW1lcmEubG9va19hdChWZWN0b3IzKDAsMC4zNSwwKSxWZWN0b3IzLlVQKQoJCWhvc3QuY2FtZXJhLmZvdiA9IDQ1CgkJdmFyIG9yaWdpbmFsIDo9IGhvc3QuY2FtZXJhLnRyYW5zZm9ybQoJCXZhciBzZXR1cCA9IFNldHVwLm5ldygpCgkJaG9zdC5hZGRfY2hpbGQoc2V0dXApCgkJYXdhaXQgcHJvY2Vzc19mcmFtZQoJCXNldHVwLnNob3dfYWZ0ZXJfaW50cm8oKQoJCWF3YWl0IGNyZWF0ZV90aW1lcigwLjYpLnRpbWVvdXQKCQlfZXhwZWN0KG5vdCBzZXR1cC5jYXJkLnZpc2libGUsICJsZWdhY3kgc2Nyb2xsIHdpbmRvdyBoaWRkZW4iKQoJCV9leHBlY3Qobm90IHNldHVwLmRpYWxvZ19uYXZpZ2F0aW9uLnZpc2libGUsICJsZWdhY3kgYmFjayBoaWRkZW4iKQoJCV9leHBlY3QoaG9zdC5jYW1lcmEucHJvamVjdGlvbiA9PSBDYW1lcmEzRC5QUk9KRUNUSU9OX1BFUlNQRUNUSVZFLCAiaW50cm8gcGVyc3BlY3RpdmUgcHJlc2VydmVkIikKCQlfZXhwZWN0KGhvc3QuY2FtZXJhLmJhc2lzLmlzX2VxdWFsX2FwcHJveChvcmlnaW5hbC5iYXNpcyksICJpbnRybyBhbmdsZSBwcmVzZXJ2ZWQiKQoJCXNldHVwLnZpc3VhbF9zdGVwID0gImNvbG9yIgoJCXNldHVwLnZpc3VhbF9zZWxlY3RlZF9jb2xvciA9ICJibHVlIgoJCXNldHVwLl9hcHBseV92aXN1YWxfY2FtZXJhKCkKCQlfZXhwZWN0KHNldHVwLnZpc3VhbF9wcm9tcHQgaXMgTGFiZWwzRCBhbmQgc2V0dXAudmlzdWFsX3Byb21wdC50ZXh0ID09ICLYp9iu2KrYsSDZhNmI2YbZgyIsICJyZWFsIHdvcmxkIHByb21wdCIpCgkJX2V4cGVjdChzZXR1cC52aXN1YWxfcHJvbXB0Lmdsb2JhbF9iYXNpcy5pc19lcXVhbF9hcHByb3goaG9zdC5jYW1lcmEuZ2xvYmFsX2Jhc2lzKSwgInByb21wdCBmYWNlcyBjYW1lcmEiKQoJCXNldHVwLnZpc3VhbF9wcmV2aWV3X3NlYXRzID0gW3siY29sb3IiOiJibHVlIiwibW9kZSI6ImxvY2FsIn0seyJjb2xvciI6ImdvbGQiLCJtb2RlIjoiYm90In0seyJjb2xvciI6ImdyZWVuIiwibW9kZSI6Im5vbmUifSx7ImNvbG9yIjoibWFyYmxlIiwibW9kZSI6Im5vbmUifV0KCQlzZXR1cC5fdXBkYXRlX3Zpc3VhbF9zZWF0cygpCgkJYXdhaXQgY3JlYXRlX3RpbWVyKDAuMzIpLnRpbWVvdXQKCQlfZXhwZWN0KChzZXR1cC52aXN1YWxfbGlnaHRzWyJibHVlIl0gYXMgT21uaUxpZ2h0M0QpLmxpZ2h0X2VuZXJneSA+IChzZXR1cC52aXN1YWxfbGlnaHRzWyJnb2xkIl0gYXMgT21uaUxpZ2h0M0QpLmxpZ2h0X2VuZXJneSwic2VsZWN0ZWQgY29sb3IgZ2V0cyBzdHJvbmdlciBsaWdodCIpCgkJdmFyIGdlb21ldHJ5OiBEaWN0aW9uYXJ5ID0gc2V0dXAuX3Zpc3VhbF9zZWF0X3BvaW50cygpCgkJdmFyIHBvaW50czogRGljdGlvbmFyeSA9IGdlb21ldHJ5WyJzZWF0cyJdCgkJX2V4cGVjdChwb2ludHNbIm1hcmJsZSJdWzBdID4gLjUgYW5kIHBvaW50c1siYmx1ZSJdWzFdIDwgLjUgYW5kIHBvaW50c1siZ29sZCJdWzBdIDwgLjUgYW5kIHBvaW50c1siZ3JlZW4iXVsxXSA+IC41LCJjb3VudGVyY2xvY2t3aXNlIHByb2plY3Rpb24iKQoJCWZvciB2YWx1ZTogVmFyaWFudCBpbiBwb2ludHMudmFsdWVzKCk6CgkJCV9leHBlY3QodmFsdWVbMF0gPj0gMCBhbmQgdmFsdWVbMF0gPD0gMSBhbmQgdmFsdWVbMV0gPj0gMCBhbmQgdmFsdWVbMV0gPD0gMSwicHJvamVjdGVkIGNvbG9yIHN0YXlzIG9uIHRhYmxlIikKCQlfZXhwZWN0KGdlb21ldHJ5WyJoaXRzIl0uc2l6ZSgpID09IDQsImZvdXIgcHJvamVjdGVkIHRvdWNoIHJlZ2lvbnMiKQoJCXZhciBib2FyZDogQXJyYXkgPSBnZW9tZXRyeVsiYm9hcmQiXQoJCXZhciByZWN0IDo9IFJlY3QyKGJvYXJkWzBdLGJvYXJkWzFdLGJvYXJkWzJdLGJvYXJkWzNdKQoJCV9leHBlY3QocmVjdC5zaXplLnggPiBkaW1lbnNpb25zLngqLjY1IG9yIHJlY3Quc2l6ZS55ID4gZGltZW5zaW9ucy55Ki40MCwidGFibGUgZmlsbHMgYXZhaWxhYmxlIHJlZ2lvbiAlcyIgJSBkaW1lbnNpb25zKQoJCV9leHBlY3QoZ2VvbWV0cnlbInByb21wdCJdWzFdKmRpbWVuc2lvbnMueSA8IHJlY3QucG9zaXRpb24ueSwicHJvbXB0IGlzIGFib3ZlIHRoZSB0YWJsZSIpCgkJX2V4cGVjdChnZW9tZXRyeVsiYWN0aW9ucyJdWzFdKmRpbWVuc2lvbnMueSA+IHJlY3QuZW5kLnksImNob2ljZXMgYXJlIGJlbG93IHRoZSB0YWJsZSIpCgkJc2V0dXAudmlzdWFsX3N0ZXAgPSAiY291bnQiCgkJc2V0dXAuX2FwcGx5X3Zpc3VhbF9jYW1lcmEoKQoJCV9leHBlY3Qobm90IChzZXR1cC52aXN1YWxfd29ybGRfc2VhdHNbImJsdWUiXVsibm9kZSJdIGFzIE5vZGUzRCkudmlzaWJsZSwibm8gc2VhdCBudW1iZXJzIGJlZm9yZSBjb3VudCBzZWxlY3RlZCIpCgkJc2V0dXAudmlzdWFsX3N0ZXAgPSAicmVhZHkiCgkJc2V0dXAuX2FwcGx5X3Zpc3VhbF9jYW1lcmEoKQoJCXZhciBsYWJlbDogTGFiZWwzRCA9IHNldHVwLnZpc3VhbF93b3JsZF9zZWF0c1siYmx1ZSJdWyJsYWJlbCJdCgkJX2V4cGVjdChub3QgbGFiZWwudmlzaWJsZSwic2VhdCB0ZXh0IGlzIHJlbmRlcmVkIGJ5IHRoZSBnbGFzcyBET00gbGF5ZXIsIG5vdCBkdXBsaWNhdGVkIGluIDNEIikKCQlfZXhwZWN0KGxhYmVsLmZvbnQuaGFzX2NoYXIoMHgyMzA0KSwiYXJyb3cgZm9udCBnbHlwaCBpcyBhdmFpbGFibGUgaW4gd2ViIGV4cG9ydCIpCgoJCXZhciBwYXlsb2FkIDo9IHsicm91bmRzIjo1LCJwbGF5ZXJzIjpbeyJjb2xvciI6ImdyZWVuIiwibW9kZSI6ImxvY2FsIiwibGFiZWwiOiLYo9it2YXYryJ9LHsiY29sb3IiOiJtYXJibGUiLCJtb2RlIjoiYm90IiwibGFiZWwiOiLYqNmI2KoifSx7ImNvbG9yIjoiYmx1ZSIsIm1vZGUiOiJsb2NhbCIsImxhYmVsIjoi2LHZitmFIn1dfQoJCXZhciByZXN1bHQ6IERpY3Rpb25hcnkgPSBzZXR1cC5fdmFsaWRhdGVkX3Zpc3VhbF9jb25maWd1cmF0aW9uKHBheWxvYWQpCgkJX2V4cGVjdChyZXN1bHQuZ2V0KCJyb3VuZHMiKSA9PSA1IGFuZCByZXN1bHQuZ2V0KCJ0dXRvcmlhbCIpID09IGZhbHNlLCJwbGF5YWJsZSBjb25maWd1cmF0aW9uIikKCQlfZXhwZWN0KHJlc3VsdFsicGxheWVycyJdWzBdWyJkaXJlY3Rpb24iXSA9PSAiZnJvbnQiLCJob3N0IGRpcmVjdGlvbiIpCgkJcGF5bG9hZFsicGxheWVycyJdWzFdWyJjb2xvciJdID0gImdyZWVuIgoJCV9leHBlY3Qoc2V0dXAuX3ZhbGlkYXRlZF92aXN1YWxfY29uZmlndXJhdGlvbihwYXlsb2FkKS5pc19lbXB0eSgpLCJyZWplY3QgZHVwbGljYXRlIGNvbG9ycyIpCgkJcGF5bG9hZFsicGxheWVycyJdWzFdWyJjb2xvciJdID0gIm1hcmJsZSIKCQlwYXlsb2FkWyJwbGF5ZXJzIl1bMV1bIm1vZGUiXSA9ICJvbmxpbmUiCgkJX2V4cGVjdChzZXR1cC5fdmFsaWRhdGVkX3Zpc3VhbF9jb25maWd1cmF0aW9uKHBheWxvYWQpLmlzX2VtcHR5KCksIm5vIGZha2Ugb25saW5lIHN0YXJ0IikKCQlzZXR1cC5fY2xvc2VfdmlzdWFsX3NldHVwKCkKCQlfZXhwZWN0KGhvc3QuY2FtZXJhLnRyYW5zZm9ybS5pc19lcXVhbF9hcHByb3gob3JpZ2luYWwpLCJyZXN0b3JlIGdhbWVwbGF5IGNhbWVyYSIpCgkJdmlld3BvcnQucXVldWVfZnJlZSgpCgkJYXdhaXQgcHJvY2Vzc19mcmFtZQoJaWYgZmFpbHVyZXMuaXNfZW1wdHkoKToKCQlwcmludCgiWUFLT0xBS19WSVNVQUxfU0VUVVBfT0sgc2l6ZXM9NiBjYW1lcmE9ZnJhbWVkX2ludHJvX2FuZ2xlIGNvbmZpZ3VyYXRpb249dmFsaWRhdGVkIikKCQlxdWl0KDApCgllbHNlOgoJCWZvciBmYWlsdXJlOiBTdHJpbmcgaW4gZmFpbHVyZXM6IHB1c2hfZXJyb3IoZmFpbHVyZSkKCQlxdWl0KDEpCmZ1bmMgX2V4cGVjdChjb25kaXRpb246IGJvb2wsIG1lc3NhZ2U6IFN0cmluZykgLT4gdm9pZDoKCWlmIG5vdCBjb25kaXRpb246IGZhaWx1cmVzLmFwcGVuZChtZXNzYWdlKQo=
+extends SceneTree
+class SetupHost:
+	extends Node3D
+	var camera: Camera3D
+	var playing: bool = false
+	var pieces: Array = []
+const Setup = preload("res://scripts/session_setup_visual.gd")
+var failures: Array[String] = []
+func _init() -> void:
+	call_deferred("_run")
+func _run() -> void:
+	for dimensions: Vector2i in [Vector2i(320,568),Vector2i(390,844),Vector2i(768,1024),Vector2i(1366,768),Vector2i(844,390),Vector2i(568,320)]:
+		var viewport := SubViewport.new()
+		viewport.size = dimensions
+		root.add_child(viewport)
+		var host := SetupHost.new()
+		viewport.add_child(host)
+		host.camera = Camera3D.new()
+		host.add_child(host.camera)
+		host.camera.current = true
+		host.camera.position = Vector3(17.6,14.432,17.6)
+		host.camera.look_at(Vector3(0,0.35,0),Vector3.UP)
+		host.camera.fov = 45
+		var original := host.camera.transform
+		var setup = Setup.new()
+		host.add_child(setup)
+		await process_frame
+		setup.show_after_intro()
+		await create_timer(0.6).timeout
+		_expect(not setup.card.visible, "legacy scroll window hidden")
+		_expect(not setup.dialog_navigation.visible, "legacy back hidden")
+		_expect(host.camera.projection == Camera3D.PROJECTION_PERSPECTIVE, "intro perspective preserved")
+		_expect(host.camera.basis.is_equal_approx(original.basis), "intro angle preserved")
+		setup.visual_step = "color"
+		setup.visual_selected_color = "blue"
+		setup._apply_visual_camera()
+		_expect(setup.visual_prompt is Label3D and setup.visual_prompt.text == "اختر لونك", "real world prompt")
+		_expect(setup.visual_prompt.global_basis.is_equal_approx(host.camera.global_basis), "prompt faces camera")
+		setup.visual_preview_seats = [{"color":"blue","mode":"local"},{"color":"gold","mode":"bot"},{"color":"green","mode":"none"},{"color":"marble","mode":"none"}]
+		setup._update_visual_seats()
+		await create_timer(0.32).timeout
+		_expect((setup.visual_lights["blue"] as OmniLight3D).light_energy > (setup.visual_lights["gold"] as OmniLight3D).light_energy,"selected color gets stronger light")
+		var geometry: Dictionary = setup._visual_seat_points()
+		var points: Dictionary = geometry["seats"]
+		_expect(points["marble"][0] > .5 and points["blue"][1] < .5 and points["gold"][0] < .5 and points["green"][1] > .5,"counterclockwise projection")
+		for value: Variant in points.values():
+			_expect(value[0] >= 0 and value[0] <= 1 and value[1] >= 0 and value[1] <= 1,"projected color stays on table")
+		_expect(geometry["hits"].size() == 4,"four projected touch regions")
+		var board: Array = geometry["board"]
+		var rect := Rect2(board[0],board[1],board[2],board[3])
+		_expect(rect.size.x > dimensions.x*.65 or rect.size.y > dimensions.y*.40,"table fills available region %s" % dimensions)
+		_expect(geometry["prompt"][1]*dimensions.y < rect.position.y,"prompt is above the table")
+		_expect(geometry["actions"][1]*dimensions.y > rect.end.y,"choices are below the table")
+		setup.visual_step = "count"
+		setup._apply_visual_camera()
+		_expect(not (setup.visual_world_seats["blue"]["node"] as Node3D).visible,"no seat numbers before count selected")
+		setup.visual_step = "ready"
+		setup._apply_visual_camera()
+		var label: Label3D = setup.visual_world_seats["blue"]["label"]
+		_expect(not label.visible,"seat text is rendered by the glass DOM layer, not duplicated in 3D")
+		_expect(label.font.has_char(0x2304),"arrow font glyph is available in web export")
+
+		var payload := {"rounds":5,"players":[{"color":"green","mode":"local","label":"أحمد"},{"color":"marble","mode":"bot","label":"بوت"},{"color":"blue","mode":"local","label":"ريم"}]}
+		var result: Dictionary = setup._validated_visual_configuration(payload)
+		_expect(result.get("rounds") == 5 and result.get("tutorial") == false,"playable configuration")
+		_expect(result["players"][0]["direction"] == "front","host direction")
+		payload["players"][1]["color"] = "green"
+		_expect(setup._validated_visual_configuration(payload).is_empty(),"reject duplicate colors")
+		payload["players"][1]["color"] = "marble"
+		payload["players"][1]["mode"] = "online"
+		_expect(setup._validated_visual_configuration(payload).is_empty(),"no fake online start")
+		setup._close_visual_setup()
+		_expect(host.camera.transform.is_equal_approx(original),"restore gameplay camera")
+		viewport.queue_free()
+		await process_frame
+	if failures.is_empty():
+		print("YAKOLAK_VISUAL_SETUP_OK sizes=6 camera=framed_intro_angle configuration=validated")
+		quit(0)
+	else:
+		for failure: String in failures: push_error(failure)
+		quit(1)
+func _expect(condition: bool, message: String) -> void:
+	if not condition: failures.append(message)
