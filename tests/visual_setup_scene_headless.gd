@@ -52,6 +52,10 @@ func _run() -> void:
 		push_error("Return to visual setup failed")
 		quit(1)
 		return
+	if not cam.transform.is_equal_approx(setup.visual_intro_camera_snapshot["transform"]):
+		push_error("Return to setup lost the accepted intro shot")
+		quit(1)
+		return
 	print("YAKOLAK_VISUAL_SCENE_OK intro_to_setup_to_match_to_setup")
 	intro.queue_free()
 	await process_frame

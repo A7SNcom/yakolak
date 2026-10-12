@@ -5,6 +5,8 @@ extends "res://scripts/session_setup_flash_entry.gd"
 var visual_active: bool = false
 var visual_callback: Variant
 var visual_camera_snapshot: Dictionary = {}
+var visual_intro_camera_snapshot: Dictionary = {}
+var visual_intro_camera_generation: int = -1
 var visual_preview_seats: Array = []
 var visual_step: String = "color"
 var visual_last_viewport := Vector2.ZERO
@@ -92,6 +94,10 @@ func _apply_visual_camera() -> void:
 		return
 	if visual_camera_snapshot.is_empty():
 		visual_camera_snapshot = {"transform": cam.transform, "projection": cam.projection, "size": cam.size, "fov": cam.fov, "h": cam.h_offset, "v": cam.v_offset, "aspect": cam.keep_aspect}
+	var generation := int(intro.get("intro_run_generation")) if intro.has_signal("intro_run_started") else 1
+	if visual_intro_camera_snapshot.is_empty() or generation != visual_intro_camera_generation:
+		visual_intro_camera_snapshot = visual_camera_snapshot.duplicate()
+		visual_intro_camera_generation = generation
 	if setup_camera_tween != null and setup_camera_tween.is_valid():
 		setup_camera_tween.kill()
 	var viewport := get_viewport().get_visible_rect().size
@@ -99,13 +105,13 @@ func _apply_visual_camera() -> void:
 	canvas_scale = float(metrics["scale"])
 	canvas_css_size = metrics["css_size"] as Vector2
 	# Keep the accepted final intro shot. Setup must never introduce a new angle.
-	cam.transform = visual_camera_snapshot["transform"]
-	cam.projection = int(visual_camera_snapshot["projection"])
-	cam.keep_aspect = int(visual_camera_snapshot["aspect"])
-	cam.fov = float(visual_camera_snapshot["fov"])
-	cam.size = float(visual_camera_snapshot["size"])
-	cam.h_offset = float(visual_camera_snapshot["h"])
-	cam.v_offset = float(visual_camera_snapshot["v"])
+	cam.transform = visual_intro_camera_snapshot["transform"]
+	cam.projection = int(visual_intro_camera_snapshot["projection"])
+	cam.keep_aspect = int(visual_intro_camera_snapshot["aspect"])
+	cam.fov = float(visual_intro_camera_snapshot["fov"])
+	cam.size = float(visual_intro_camera_snapshot["size"])
+	cam.h_offset = float(visual_intro_camera_snapshot["h"])
+	cam.v_offset = float(visual_intro_camera_snapshot["v"])
 	_update_visual_prompt(cam)
 	_update_world_seats(cam)
 
