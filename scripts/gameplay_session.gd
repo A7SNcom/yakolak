@@ -1582,11 +1582,11 @@ func _update_hud() -> void:
 		score_parts.append(str(int(scores.get(direction, 0))))
 	score_label.text = "النتيجة " + " · ".join(score_parts)
 
-	var palette_color: Color = Color("#e95472")
+	var palette_color: Color = Color("#252729")
 	match str(player.get("color", "")):
-		"blue": palette_color = Color("#2376e8")
-		"gold": palette_color = Color("#e7a831")
-		"green": palette_color = Color("#7953d8")
+		"blue": palette_color = Color("#173fa8")
+		"gold": palette_color = Color("#8c5b18")
+		"green": palette_color = Color("#087455")
 	turn_style.bg_color = palette_color
 	turn_label.queue_redraw()
 

@@ -14,7 +14,15 @@ func _run() -> void:
 		quit(1)
 		return
 	await process_frame
-	await create_timer(0.65).timeout
+	if setup.visual_zoom_mix > 0.1:
+		push_error("Setup camera should begin from the final intro frame")
+		quit(1)
+		return
+	await create_timer(1.4).timeout
+	if setup.visual_zoom_mix < 0.98:
+		push_error("Setup camera did not settle smoothly into table framing")
+		quit(1)
+		return
 	var framing: Dictionary = setup._visual_seat_points()
 	var table: Array = framing["board"]
 	var table_ratio: Vector2 = Vector2(table[2],table[3])/setup.canvas_css_size

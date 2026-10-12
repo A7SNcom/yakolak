@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {COLORS,digits,validProfile,newSetup,chooseColor,confirmColor,chooseCount,changeSeat,configuration,configurationError,parseRoomInput,mountSetup} from '../ui/visual-setup.mjs';
+import {COLORS,digits,validProfile,newSetup,chooseColor,confirmColor,chooseCount,changeSeat,seatLabel,swapPlayers,configuration,configurationError,parseRoomInput,mountSetup} from '../ui/visual-setup.mjs';
 
 test('Arabic/Persian telephone digits normalize and profile validates',()=>{
   assert.equal(digits('٠٥٥ ۱۲۳-٤٥٦٧'),'0551234567');
   assert.ok(validProfile({name:'أحمد',phone:'0551234567'}));
   assert.ok(!validProfile({name:'أ',phone:'055'}));
+  assert.deepEqual(COLORS.map(x=>x.name),['أبيض','أزرق','ذهبي','أخضر']);
 });
 test('every host color keeps counterclockwise numbering and defaults to two',()=>{
   for(let start=0;start<4;start++) {
@@ -25,12 +26,25 @@ test('every host color keeps counterclockwise numbering and defaults to two',()=
 test('seat types, absent middle seats, names and offline limits',()=>{
   let state=chooseCount(chooseColor(newSetup('أحمد'),'green'),4);
   state=changeSeat(state,1,'none');state=changeSeat(state,2,'local','ريم');
-  assert.deepEqual(configuration(state).players.map(x=>[x.seat,x.mode,x.label]),[['p1','local','أحمد'],['p2','local','ريم'],['p3','bot','4']]);
+  assert.deepEqual(configuration(state).players.map(x=>[x.seat,x.mode,x.label]),[['p1','local','أحمد'],['p2','local','ريم'],['p3','bot','كمبيوتر ذهبي']]);
   assert.equal(configurationError(state),'');
   assert.equal(configuration(state).tutorial,false);
+  state=changeSeat(state,3,'local');
+  assert.equal(configuration(state).players.at(-1).label,'لاعب ذهبي');
+  assert.equal(configurationError(state),'');
   state=changeSeat(state,3,'online');assert.match(configurationError(state),/غير متاح/);
   state=changeSeat(state,3,'local','عمر','p2');assert.match(configurationError(state),/غير متاح/);
   state=changeSeat(state,3,'none');state=changeSeat(state,2,'none');assert.match(configurationError(state),/على الأقل/);
+});
+test('selecting a named local player swaps colors while preserving identities and the host seat',()=>{
+  let state=chooseCount(chooseColor(newSetup('أحمد'),'blue'),3);
+  state=changeSeat(state,2,'local','ريم');
+  const hostColor=state.seats[0].color,targetColor=state.seats[1].color,playerColor=state.seats[2].color;
+  const next=swapPlayers(state,1,2);
+  assert.equal(next.seats[1].color,playerColor);assert.equal(next.seats[2].color,targetColor);
+  assert.equal(next.seats[0].color,hostColor);assert.equal(next.hostColor,hostColor);
+  assert.equal(next.seats[0].name,'أحمد');assert.equal(next.seats[2].name,'ريم');
+  assert.equal(seatLabel(next.seats[1]),'كمبيوتر أخضر');
 });
 
 test('room code or same-origin invitation link normalizes',()=>{
@@ -54,10 +68,10 @@ if(process.env.YAKOLAK_JSDOM_MODULE){
   q('.yk-confirm').click();assert.equal(q('h1').textContent,'كم لاعب؟');assert.equal(q('.yk-counts').hidden,false);
   assert.ok([...document.querySelectorAll('.yk-seat')].every(x=>x.hidden));
   q('.yk-counts button[aria-label="3 لاعبين"]').click();assert.equal(q('.yk-counts').hidden,true);assert.equal(q('h1').textContent,'');
-  assert.equal(q('.yk-start').hidden,false);assert.equal(q('.yk-rounds').hidden,true);assert.equal(q('[data-color=marble] .yk-seat-status').textContent,'بدون');
-  assert.equal(q('[data-color=blue] .yk-seat-number').textContent,'1');assert.ok(!q('.yk-seats').textContent.includes('لاعب'));
+  assert.equal(q('.yk-start').hidden,false);assert.equal(q('.yk-rounds').hidden,true);assert.equal(q('[data-color=marble] .yk-seat-status').textContent,'فاضي');
+  assert.equal(q('[data-color=blue] .yk-seat-number'),null);assert.ok(parseFloat(q('[data-color=blue]').style.width)>0);assert.ok(!q('.yk-seats').textContent.includes('لاعب'));
   q('[data-color=gold]').click();assert.equal(q('.yk-sheet').getAttribute('role'),'menu');assert.equal(q('.yk-sheet').getAttribute('aria-modal'),'false');
-  [...document.querySelectorAll('.yk-menu-item')].find(x=>x.textContent==='نفس جهاز أحمد').click();q('input').value='ريم';q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));
+  [...document.querySelectorAll('.yk-menu-item')].find(x=>x.textContent==='لاعب').click();assert.equal(q('input').placeholder,'اسم اللاعب');q('input').value='ريم';q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));
   q('.yk-start').click();assert.equal(q('.yk-rounds').hidden,false);assert.equal(q('h1').textContent,'كم شوط للفوز؟');assert.equal(events.some(x=>x.action==='start'),false);
   q('.yk-rounds button[aria-label="الفوز بـ 5 أشواط"]').click();const start=events.find(x=>x.action==='start');assert.equal(start.rounds,5);assert.equal(start.count_chosen,true);assert.equal(start.players[1].label,'ريم');assert.equal(start.players.length,3);
   assert.ok(!JSON.stringify(events).includes('0551234567'));

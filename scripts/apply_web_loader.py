@@ -502,6 +502,9 @@ def main() -> None:
             raise RuntimeError(f"semantic marker count mismatch: {marker}")
     for filename in ("visual-setup.mjs", "visual-setup.css"):
         shutil.copyfile(ROOT / "ui" / filename, ROOT / "web" / filename)
+    (ROOT / "web/vendor").mkdir(exist_ok=True)
+    for filename in ("liquefy-core-1.1.0.mjs", "LIQUEFY-LICENSE.txt"):
+        shutil.copyfile(ROOT / "ui/vendor" / filename, ROOT / "web/vendor" / filename)
     shutil.copyfile(ROOT / "assets/fonts/thmanyahsans-Medium.otf", ROOT / "web/setup-font.otf")
     # Give the pack a content-addressed name so cached exports cannot be mixed
     # with a newer DOM setup module. Keep index.pck as the canonical artifact.
@@ -519,7 +522,8 @@ def main() -> None:
     html, config_count = re.subn(r"(const GODOT_CONFIG\s*=\s*)(\{[^\n]+\})(\s*;)", version_pack, html, count=1)
     if config_count != 1:
         raise RuntimeError("Godot export config missing")
-    setup_version = hashlib.sha256((ROOT / "ui/visual-setup.mjs").read_bytes() + (ROOT / "ui/visual-setup.css").read_bytes()).hexdigest()[:12]
+    setup_assets = ("ui/visual-setup.mjs", "ui/visual-setup.css", "ui/vendor/liquefy-core-1.1.0.mjs")
+    setup_version = hashlib.sha256(b"".join((ROOT / path).read_bytes() for path in setup_assets)).hexdigest()[:12]
     html = html.replace("</head>", f'<link rel="stylesheet" href="visual-setup.css?v={setup_version}">\n</head>', 1)
     html = html.replace("</body>", f'<script type="module" src="visual-setup.mjs?v={setup_version}"></script>\n</body>', 1)
     INDEX.write_text(html, encoding="utf-8", newline="\n")

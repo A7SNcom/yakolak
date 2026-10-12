@@ -63,10 +63,12 @@ func show_after_intro() -> void:
 	visual_last_viewport = Vector2.ZERO
 	visual_fit_viewport = Vector2.ZERO
 	visual_board_corners.clear()
-	# The table must already be framed when the phone form appears.  Delaying the
-	# camera fit made the page feel as if it zoomed away behind the keyboard.
-	visual_zoom_mix = 1.0
+	# Keep the intro shot as the first frame, then settle into the playable table
+	# framing gently instead of snapping to a much closer camera position.
+	visual_zoom_mix = 0.0
 	if visual_zoom_tween != null and visual_zoom_tween.is_valid(): visual_zoom_tween.kill()
+	visual_zoom_tween = create_tween()
+	visual_zoom_tween.tween_property(self,"visual_zoom_mix",1.0,1.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_apply_visual_camera()
 	_publish_setup_state("visible")
 	if OS.has_feature("web"):
@@ -341,7 +343,7 @@ func _update_visual_seats() -> void:
 		mesh.visible = true
 		if visual_inactive_material == null:
 			visual_inactive_material = StandardMaterial3D.new()
-			visual_inactive_material.albedo_color = Color("#182421")
+			visual_inactive_material.albedo_color = Color("#191a1c")
 			visual_inactive_material.roughness = 0.95
 		# GeometryInstance3D.transparency is ignored by the Web Compatibility
 		# renderer. A real opaque material keeps absent seats visibly dark.
@@ -364,12 +366,13 @@ func _update_visual_lighting() -> void:
 			light.position = offsets[str(color["direction"])]
 			light.omni_range = 6.8
 			light.omni_attenuation = 1.05
-			light.light_color = color["color"].lerp(Color.WHITE,0.28)
+			# White lighting changes intensity without tinting the original piece.
+			light.light_color = Color.WHITE
 			light.light_energy = 0.0
 			intro.add_child(light)
 			visual_lights[key] = light
 		var target := 0.62
-		if visual_step == "color" and not visual_selected_color.is_empty(): target = 3.0 if key == visual_selected_color else 0.06
+		if visual_step == "color" and not visual_selected_color.is_empty(): target = 1.55 if key == visual_selected_color else 0.035
 		if visual_count_chosen:
 			for value: Variant in visual_preview_seats:
 				var seat := value as Dictionary
@@ -377,24 +380,8 @@ func _update_visual_lighting() -> void:
 		var light := visual_lights[key] as OmniLight3D
 		light.visible = true
 		visual_light_tween.tween_property(light,"light_energy",target,0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	for value: Variant in visual_piece_visibility.values():
-		var record := value as Dictionary
-		if not record.has("preview_material"): continue
-		var factor := 1.0
-		var emission_strength := 0.0
-		if visual_step == "color" and not visual_selected_color.is_empty():
-			var mesh := record["node"] as MeshInstance3D
-			var direction := str(PALETTE[_palette_index(visual_selected_color)]["direction"])
-			var selected := str(mesh.name).contains("Stone_"+direction+"_")
-			factor = 1.42 if selected else 0.42
-			emission_strength = 1.5 if selected else 0.0
-		var original: Color = record["original_color"]
-		var color := Color(original.r*factor,original.g*factor,original.b*factor,original.a)
-		var material := record["preview_material"] as BaseMaterial3D
-		material.emission_enabled = true
-		material.emission = PALETTE[_palette_index(visual_selected_color)]["color"] as Color if not visual_selected_color.is_empty() else Color.BLACK
-		visual_light_tween.tween_property(material,"albedo_color",color,0.32).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		visual_light_tween.tween_property(material,"emission_energy_multiplier",emission_strength,0.32).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	# Do not recolor or emit from the meshes here: the selected base is highlighted
+	# by a neutral white light, so its original white/blue/gold/green hue stays true.
 
 func _validated_visual_configuration(payload: Dictionary) -> Dictionary:
 	var values: Variant = payload.get("players", [])
@@ -420,10 +407,10 @@ func _validated_visual_configuration(payload: Dictionary) -> Dictionary:
 			return {}
 		if index == 0 and mode != "local":
 			return {}
-		var label := str(player.get("label", "")).strip_edges().left(24)
-		if mode == "local" and label.length() < 2:
-			return {}
 		var palette := PALETTE[_palette_index(color)]
+		var label := str(player.get("label", "")).strip_edges().left(24)
+		if label.is_empty():
+			label = ("لاعب " if mode == "local" else "كمبيوتر ") + str(palette["name"])
 		configured.append({"seat": "p%d" % (index + 1), "label": label, "mode": mode, "color": color, "color_name": palette["name"], "direction": palette["direction"]})
 	return {"tutorial": false, "rounds": selected_rounds, "players": configured, "online_join_code": ""}
 

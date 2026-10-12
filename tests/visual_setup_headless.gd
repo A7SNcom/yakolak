@@ -26,7 +26,7 @@ func _run() -> void:
 		host.add_child(setup)
 		await process_frame
 		setup.show_after_intro()
-		await create_timer(0.6).timeout
+		await create_timer(1.35).timeout
 		_expect(not setup.card.visible, "legacy scroll window hidden")
 		_expect(not setup.dialog_navigation.visible, "legacy back hidden")
 		_expect(host.camera.projection == Camera3D.PROJECTION_PERSPECTIVE, "intro perspective preserved")
@@ -40,6 +40,10 @@ func _run() -> void:
 		setup._update_visual_seats()
 		await create_timer(0.32).timeout
 		_expect((setup.visual_lights["blue"] as OmniLight3D).light_energy > (setup.visual_lights["gold"] as OmniLight3D).light_energy,"selected color gets stronger light")
+		for record: Dictionary in setup.visual_piece_visibility.values():
+			if record.has("preview_material"):
+				var material := record["preview_material"] as BaseMaterial3D
+				_expect(material.albedo_color.is_equal_approx(record["original_color"]),"selection lighting preserves original piece color")
 		var geometry: Dictionary = setup._visual_seat_points()
 		var points: Dictionary = geometry["seats"]
 		_expect(points["marble"][0] > .5 and points["blue"][1] < .5 and points["gold"][0] < .5 and points["green"][1] > .5,"counterclockwise projection")
@@ -69,6 +73,10 @@ func _run() -> void:
 		payload["players"][1]["color"] = "marble"
 		payload["players"][1]["mode"] = "online"
 		_expect(setup._validated_visual_configuration(payload).is_empty(),"no fake online start")
+		payload["players"][1]["mode"] = "local"
+		payload["players"][1]["label"] = ""
+		var optional_name: Dictionary = setup._validated_visual_configuration(payload)
+		_expect(optional_name.get("players",[]).size() == 3 and optional_name["players"][1]["label"].begins_with("لاعب "),"blank local name uses a color fallback")
 		setup._close_visual_setup()
 		_expect(host.camera.transform.is_equal_approx(original),"restore gameplay camera")
 		viewport.queue_free()

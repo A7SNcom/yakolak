@@ -8,10 +8,10 @@ signal configuration_ready(configuration: Dictionary)
 const ARABIC_FONT = preload("res://assets/fonts/DejaVuSans.ttf")
 
 const PALETTE: Array[Dictionary] = [
-	{"id": "marble", "name": "وردي", "direction": "right", "color": Color("#e95472")},
-	{"id": "blue", "name": "أزرق", "direction": "back", "color": Color("#2376e8")},
-	{"id": "gold", "name": "ذهبي", "direction": "left", "color": Color("#e7a831")},
-	{"id": "green", "name": "بنفسجي", "direction": "front", "color": Color("#7953d8")},
+	{"id": "marble", "name": "أبيض", "direction": "right", "color": Color("#f4f4f1")},
+	{"id": "blue", "name": "أزرق", "direction": "back", "color": Color("#173fa8")},
+	{"id": "gold", "name": "ذهبي", "direction": "left", "color": Color("#9d6415")},
+	{"id": "green", "name": "أخضر", "direction": "front", "color": Color("#087455")},
 ]
 
 const MODE_OPTIONS: Array[Dictionary] = [

@@ -25,10 +25,10 @@ const DIRECTION_COLOR: Dictionary = {
 	"back": "blue",
 }
 const STONE_COLORS: Dictionary = {
-	"marble": Color("#e95472"),
-	"gold": Color("#e7a831"),
-	"green": Color("#7953d8"),
-	"blue": Color("#2376e8"),
+	"marble": Color("#ffffff"),
+	"gold": Color("#8a570f"),
+	"green": Color("#006144"),
+	"blue": Color("#001f8f"),
 }
 
 # Exact accepted Three.js timing values, milliseconds.
