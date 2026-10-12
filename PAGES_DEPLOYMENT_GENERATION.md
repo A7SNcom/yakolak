@@ -6,6 +6,6 @@ This document records the former GitHub Pages generation scheme that combined a 
 
 The only current operational path is:
 
-`GitHub main` → `YAKOLAK Flash Publish` → Godot Web export → `[flash-ready]` → Vercel → https://yakolak.vercel.app/
+`GitHub main` → `YAKOLAK Flash Publish` → Godot Web export → `[flash-ready]` → GitHub Pages → https://a7sncom.github.io/yakolak/
 
 Do not execute or restore the old PAGES-014/PAGES-015/Three.js workflows from this document. Their full implementation and evidence remain available in Git history for historical inspection only.

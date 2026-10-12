@@ -11,4 +11,4 @@ At the time, the preview gate covered one visual journey:
 5. Start the approved box-unboxing intro only after the table had settled.
 6. Preserve the approved loader, table, camera, intro, and post-intro stone interaction checks.
 
-For current work, use latest GitHub `main` and the Flash Publish → `[flash-ready]` → Vercel path documented in `AGENTS.md` and `PROJECT_ORDER.md`.
+For current work, use latest GitHub `main` and the Flash Publish → `[flash-ready]` → GitHub Pages path documented in `AGENTS.md` and `PROJECT_ORDER.md`.

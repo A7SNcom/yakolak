@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: yakolak-flash-main
@@ -15,9 +17,11 @@ concurrency:
 
 jobs:
   flash-publish:
-    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[flash-ready]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -52,9 +56,11 @@ jobs:
           fi
 
       - name: Flash export Godot Web
-        run: bash scripts/vercel-flash-build.sh
+        if: ${{ !contains(github.event.head_commit.message, '[flash-ready]') }}
+        run: bash scripts/godot-flash-build.sh
 
       - name: Publish ready files back to main
+        if: ${{ !contains(github.event.head_commit.message, '[flash-ready]') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -72,3 +78,17 @@ jobs:
           git add -f web assets/fonts/thmanyahsans-*.otf
           git commit --allow-empty -m "[flash-ready] publish ${SOURCE_SHA:0:8}"
           git push origin HEAD:main
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Godot Web preview
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - name: Deploy GitHub Pages preview
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -6,7 +6,7 @@ This directory preserves legacy assets and rebuild-reference material. Its forme
 
 Current operational source of truth is the latest GitHub `main` Godot project. Publish only through:
 
-`main` → `YAKOLAK Flash Publish` → Godot Web export → `[flash-ready]` → Vercel → https://yakolak.vercel.app/
+`main` → `YAKOLAK Flash Publish` → Godot Web export → `[flash-ready]` → GitHub Pages → https://a7sncom.github.io/yakolak/
 
 PCLOCAL, Three.js, old framework/runtime chains, and historical branches are reference-only. Do not copy or activate them as an alternative implementation path.
 

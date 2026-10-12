@@ -1,13 +1,11 @@
 # YAKOLAK Flash Mode
 
-The only active development and publish loop is:
+`GitHub main -> Godot Web export -> web/ -> GitHub Pages`
 
-`GitHub main source change -> YAKOLAK Flash Publish -> Godot Web export only -> [flash-ready] -> Vercel production -> https://yakolak.vercel.app/`
-
-Automatic gameplay, Playwright, regression, latency, visual, and quality test workflows are not part of the daily publish path.
-
-- Fast publisher: `.github/workflows/online-build-publish.yml`
-- Minimal exporter: `scripts/vercel-flash-build.sh`
-- Production URL: https://yakolak.vercel.app/
-- Heavy tests remain in the repository and should be run manually only when explicitly requested.
-- PCLOCAL, Three.js, GitHub Pages, old branches, and old deployment generations are historical READ-ONLY references only and must never be used as an executable fallback.
+- Preview: https://a7sncom.github.io/yakolak/
+- Publisher: `.github/workflows/online-build-publish.yml`
+- Exporter: `scripts/godot-flash-build.sh`
+- `[flash-ready]` publishes the committed export without rebuilding.
+- Heavy tests run manually only when requested.
+- Vercel is canceled. Pages is static hosting; online rooms require a separate server.
+- Legacy engines and branches are historical references only.

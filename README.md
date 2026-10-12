@@ -1,28 +1,15 @@
 # YAKOLAK — ياكلك
 
-هذا هو مستودع التطوير الحي للعبة ياكلك.
+مستودع التطوير الحي للعبة ياكلك. المصدر الحالي أحدث `main`، والمحرك Godot.
 
-## مصدر الحقيقة التشغيلي
+## المعاينة
 
-**المصدر الحالي الوحيد هو أحدث `main` على GitHub، والمحرك الحالي هو Godot.**
+https://a7sncom.github.io/yakolak/
 
-خط النشر الوحيد:
+`main` → GitHub Actions → Godot Web Export → GitHub Pages.
 
-`main` → `YAKOLAK Flash Publish` → Godot Web Export → `[flash-ready]` → Vercel → https://yakolak.vercel.app/
+Vercel ملغى بطلب المستخدم، وملف إعداداته محذوف. يجب ضبط Settings → Pages → Source على GitHub Actions إذا لم يكن Pages مفعّلًا.
 
-- الرابط الأساسي الوحيد للمستخدم: https://yakolak.vercel.app/
-- Vercel يعرض ملفات `web/` الجاهزة من `[flash-ready]` ولا يعيد بناء Godot.
-- أي تعديل جديد يبدأ من أحدث `main` ويدخل إلى `main` مباشرة.
-- لا توجد معاينة أو فرع أو منصة نشر بديلة تُعامل كمصدر حقيقة.
+GitHub Pages يعرض اللعبة الثابتة؛ غرف الأونلاين وواجهات `api/` تحتاج استضافة خادم منفصلة ولا تعمل على Pages وحده.
 
-## المسارات التاريخية
-
-PCLOCAL وThree.js وGitHub Pages والفروع القديمة والـdeployment generations القديمة محفوظة للمرجعية التاريخية فقط. هي READ-ONLY وليست مسار تنفيذ أو بناء أو نشر أو استرجاع أو fallback.
-
-## الاختبارات
-
-الاختبارات الثقيلة ليست جزءًا من Flash Publish. تبقى متاحة للتشغيل اليدوي عند طلب فحص شامل أو Release مستقر أو تشخيص محدد.
-
-## تعليمات الوكلاء والمطورين
-
-اقرأ [`AGENTS.md`](AGENTS.md) ثم [`PROJECT_ORDER.md`](PROJECT_ORDER.md) قبل أي تعديل؛ وهما المرجع التشغيلي الأعلى لطريقة تطوير ونشر المشروع.
+اقرأ `AGENTS.md` و`PROJECT_ORDER.md` قبل التعديل. الاختبارات الثقيلة تُشغّل يدويًا عند الطلب. PCLOCAL وThree.js والفروع القديمة مراجع تاريخية فقط.

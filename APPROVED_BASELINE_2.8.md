@@ -2,7 +2,7 @@
 
 Status: **HISTORICAL / READ-ONLY**. This file records a visual baseline approved on 2026-08-05. It is not a current source, branch, build, test, deploy, rollback, or fallback instruction.
 
-Current operational source of truth is latest GitHub `main`, published only through Flash Publish to https://yakolak.vercel.app/. See `AGENTS.md` and `PROJECT_ORDER.md`.
+Current operational source of truth is latest GitHub `main`, published only through Flash Publish to https://a7sncom.github.io/yakolak/. See `AGENTS.md` and `PROJECT_ORDER.md`.
 
 ## Historical recovery identity
 
@@ -35,4 +35,4 @@ These identifiers may be inspected for reference only; do not check them out or 
 - Base color: `161616`
 - Intro duration: `5730ms`
 
-The former PR/regression/build procedure for this baseline is retired. Any current testing is manual and must follow the current `main`/Flash policy rather than old branch or Vercel-build paths.
+The former PR/regression/build procedure for this baseline is retired. Any current testing is manual and must follow the current `main`/Flash policy rather than old branch or GitHub Pages-build paths.
