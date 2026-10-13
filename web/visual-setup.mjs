@@ -132,7 +132,7 @@ export function mountSetup(document, window) {
       if(node===prompt)continue;
       const visible=!root.hidden&&!node.hidden&&!node.closest('[hidden]')&&!node.classList.contains('is-color');
       if(!visible){lenses.get(node)?.destroy();lenses.delete(node);continue;}
-      if(!lenses.has(node)){const lens=attachLiquidLens(node,{strength:.32,dispersion:0,blur:1,saturation:1,respectReducedTransparency:true});if(lens)lenses.set(node,lens);}
+      if(!lenses.has(node)){const desktop=window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;const lens=attachLiquidLens(node,{strength:.32,dispersion:0,blur:desktop?12:1,saturation:1,respectReducedTransparency:true});if(lens)lenses.set(node,lens);}
     }
   }
   root.dataset.glassEngine='liquefy-core-1.1.0';
@@ -146,7 +146,7 @@ export function mountSetup(document, window) {
   function viewport(){const vv=window.visualViewport;const h=vv?.height||window.innerHeight;const base=Math.max(root.getBoundingClientRect().height||0,window.innerHeight);root.style.setProperty('--yk-vv-height',`${h}px`);root.style.setProperty('--yk-vv-top',`${vv?.offsetTop||0}px`);root.classList.toggle('is-keyboard',h<base*.78);position();}
   window.visualViewport?.addEventListener('resize',viewport);window.visualViewport?.addEventListener('scroll',viewport);window.addEventListener('resize',viewport);
   function position(){
-    const width=window.innerWidth,height=window.innerHeight;
+    const width=window.innerWidth,height=root.getBoundingClientRect().height||window.innerHeight;
     const fallback={marble:[.7,.61],blue:[.7,.40],gold:[.3,.40],green:[.3,.61]};
     for(const {b,color} of seatButtons){
       const point=geometry.seats?.[color.id]||fallback[color.id];
@@ -158,9 +158,10 @@ export function mountSetup(document, window) {
     }
     const target=geometry.actions||[.5,.75];
     const h=actions.getBoundingClientRect().height|| (state.step==='ready'?112:60);
-    const visibleHeight=window.visualViewport?.height||height;
     const centeredEntry=state.step==='entry';
-    actions.style.top=`${centeredEntry?Math.max(16,(visibleHeight-h)/2):Math.max(12,Math.min(target[1]*height,visibleHeight-h-16))}px`;
+    // The footer belongs to the layout viewport. Only the editing sheet follows
+    // VisualViewport, so opening a keyboard never lifts Start/Share over the board.
+    actions.style.top=`${centeredEntry?Math.max(16,(height-h)/2):Math.max(12,Math.min(target[1]*height,height-h-16))}px`;
     const heading=geometry.prompt||[.5,.25];prompt.style.top=`${Math.max(20,heading[1]*height)}px`;
     if(!modal.hidden && ['seat','name'].includes(modal.dataset.kind))positionSheet();
   }
