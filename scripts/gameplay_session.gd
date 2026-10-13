@@ -36,11 +36,11 @@ const BOT_DIRECTION_POWER: Dictionary = {
 	"left": 0.66,
 	"front": 0.80,
 }
-const CAMERA_TRANSITION: float = 0.48
+const CAMERA_TRANSITION: float = preload("res://scripts/game_layout.gd").TURN_CAMERA_SECONDS
 const ROUND_RESET_DURATION: float = 0.56
 const TRAY_OPEN_DURATION: float = 0.28
 const TRAY_LIFT_STEP: float = 19.0
-const TURN_TIMEOUT_MSEC: int = 18000
+const TURN_TIMEOUT_MSEC: int = preload("res://scripts/game_layout.gd").TURN_TIMEOUT_MS
 const FIRST_ACTION_CUE_PICK_PIECE: String = "اختر حجرًا"
 const FIRST_ACTION_CUE_PICK_CELL: String = "اختر خانة مضيئة"
 
@@ -846,7 +846,7 @@ func _finish_camera_transition() -> void:
 		_publish_gameplay_state("ready" if gameplay_ready else "waiting")
 		return
 	gameplay_ready = _current_mode() == "local"
-	# The local human owns an 18-second authority window.  Arm only after the
+	# The local human owns a 30-second authority window. Arm only after the
 	# camera handoff finishes so transition time never consumes the player's turn.
 	turn_deadline_msec = Time.get_ticks_msec() + TURN_TIMEOUT_MSEC if gameplay_ready else 0
 	_update_hud()

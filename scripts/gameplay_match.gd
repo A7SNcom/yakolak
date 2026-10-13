@@ -206,7 +206,7 @@ func _publish_test_targets() -> void:
 	script += "document.body.dataset.yakolakTestPiece='%s';" % str(generic_mesh.name)
 
 	for cell: int in range(CELL_COORDS.size()):
-		var world_point: Vector3 = Vector3(CELL_COORDS[cell].x * U, 0.52, CELL_COORDS[cell].z * U)
+		var world_point: Vector3 = Vector3(CELL_COORDS[cell].x * U, CELL_COORDS[cell].y * U, CELL_COORDS[cell].z * U)
 		var screen_point: Vector2 = camera.unproject_position(world_point)
 		script += "document.body.dataset.yakolakTestCell%dX='%s';" % [cell, str(screen_point.x)]
 		script += "document.body.dataset.yakolakTestCell%dY='%s';" % [cell, str(screen_point.y)]

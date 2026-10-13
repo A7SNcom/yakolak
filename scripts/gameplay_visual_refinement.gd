@@ -3,7 +3,9 @@ extends "res://scripts/gameplay_reduced_motion_parity.gd"
 # Presentation only. The previous outline remains archived in
 # gameplay_selected_state.gd; move legality and authority stay inherited.
 const TRAY_GAP_UNITS := 27.0
-const REST_OFFSET := 0.85
+const TRAY_OUTWARD_STEP := 0.25
+const Layout = preload("res://scripts/game_layout.gd")
+const REST_OFFSET := Layout.REST_CLEARANCE
 const DIM_MIX := 0.70
 const CHOICE_FADE := 0.22
 const VICTORY_HALF_CYCLE := 1.65
@@ -15,8 +17,78 @@ var victory_tween: Tween
 var victory_mix: float = 0.0
 var rest_shifted: bool = false
 var footprint_cache: Dictionary = {}
+var footprint_fade: Tween
+var board_surface_heights: Array[float] = []
+var turn_countdown: PanelContainer
+var turn_countdown_label: Label
+var turn_countdown_motion: Tween
+var countdown_last_fov: float = -1.0
 var continue_pending: bool = false
 var rest_tween: Tween
+
+func _ready() -> void:
+	super._ready()
+	turn_countdown = PanelContainer.new()
+	turn_countdown.name = "TurnCountdown"
+	turn_countdown.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.09,0.10,0.12,0.80)
+	style.border_color = Color(1,1,1,0.38)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(14)
+	turn_countdown.add_theme_stylebox_override("panel",style)
+	turn_countdown.hide()
+	turn_countdown_label = Label.new()
+	turn_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	turn_countdown_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	turn_countdown_label.add_theme_font_override("font",ARABIC_FONT)
+	turn_countdown_label.add_theme_color_override("font_color",Color.WHITE)
+	turn_countdown_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	turn_countdown.add_child(turn_countdown_label)
+	hud_layer.add_child(turn_countdown)
+
+
+func _process(delta: float) -> void:
+	super._process(delta)
+	_update_turn_countdown(Time.get_ticks_msec())
+
+
+func _update_turn_countdown(now: int) -> void:
+	if turn_countdown == null: return
+	var remaining := turn_deadline_msec-now
+	var visible_turn := match_initialized and gameplay_ready and not online_active and not round_complete and not camera_transition and not move_active and _current_mode()=="local" and turn_deadline_msec>0
+	var show_counter := visible_turn and remaining>0 and remaining<=TURN_TIMEOUT_MSEC-Layout.COUNTDOWN_DELAY_MS
+	if not show_counter:
+		if turn_countdown_motion != null and turn_countdown_motion.is_valid(): turn_countdown_motion.kill()
+		turn_countdown.hide()
+		return
+	var text := str(int(ceil(float(remaining)/1000.0)))
+	var changed := turn_countdown_label.text != text
+	if changed:
+		turn_countdown_label.text = text
+	if changed or not turn_countdown.visible or (camera != null and countdown_last_fov != camera.fov):
+		_position_turn_countdown()
+	if not turn_countdown.visible:
+		turn_countdown.show()
+		turn_countdown.modulate.a = 1.0 if _rm_enabled else 0.0
+		if not _rm_enabled:
+			turn_countdown_motion = create_tween()
+			turn_countdown_motion.tween_property(turn_countdown,"modulate:a",1.0,0.24)
+
+
+func _position_turn_countdown() -> void:
+	if turn_countdown == null or camera == null: return
+	var board := intro.get("board") as MeshInstance3D
+	if board == null: return
+	var box := board.get_aabb()
+	var rect := Rect2(camera.unproject_position(board.to_global(box.get_endpoint(0))),Vector2.ZERO)
+	for i: int in range(8): rect = rect.expand(camera.unproject_position(board.to_global(box.get_endpoint(i))))
+	var viewport := get_viewport().get_visible_rect().size
+	var size := Vector2(_hud_length(38.0),_hud_length(40.0))
+	turn_countdown.size = size
+	turn_countdown.position = Vector2(clampf(rect.end.x+_hud_length(10),_hud_length(12),viewport.x-size.x-_hud_length(12)),clampf(rect.get_center().y-size.y*0.5,_hud_length(60),viewport.y-size.y-_hud_length(16)))
+	turn_countdown_label.add_theme_font_size_override("font_size",_hud_font_size(20))
+	countdown_last_fov = camera.fov
 
 
 func _capture_home_state() -> void:
@@ -32,12 +104,12 @@ func _capture_home_state() -> void:
 		var axis: Vector3 = DIRECTION_VECTORS.get(str(record.get("dir", "")), Vector3.ZERO)
 		home_transforms[index].origin += axis * REST_OFFSET
 		var piece: MeshInstance3D = record["mesh"]
-		motion.tween_property(piece, "position", home_transforms[index].origin, 0.0 if _rm_enabled else 0.45).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		motion.tween_property(piece, "position", home_transforms[index].origin, 0.0 if _rm_enabled else 0.65).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	var bases: Dictionary = intro.get("bases")
 	for direction: String in bases:
 		var base: Node3D = bases[direction]
 		var axis: Vector3 = DIRECTION_VECTORS.get(direction, Vector3.ZERO)
-		motion.tween_property(base, "position", base.position + axis * REST_OFFSET, 0.0 if _rm_enabled else 0.45).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		motion.tween_property(base, "position", base.position + axis * REST_OFFSET, 0.0 if _rm_enabled else 0.65).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 func _selection_material(source: Material) -> StandardMaterial3D:
@@ -56,7 +128,8 @@ func _open_piece_tray(piece_index: int) -> void:
 	for order: int in range(tray_indices.size()):
 		var index: int = tray_indices[order]
 		var piece: MeshInstance3D = piece_records[index]["mesh"]
-		var target := home_transforms[index].origin + Vector3.UP * (float(order) * TRAY_GAP_UNITS * U)
+		var axis: Vector3 = DIRECTION_VECTORS[str(piece_records[index]["dir"])]
+		var target := home_transforms[index].origin + Vector3.UP * (float(order) * TRAY_GAP_UNITS * U) + axis*float(order)*TRAY_OUTWARD_STEP
 		if _rm_enabled:
 			piece.position = target
 		else:
@@ -135,44 +208,83 @@ func _piece_at_current_pointer(point: Vector2, candidates: Array[int]) -> int:
 	return best if not first and bounds.grow(_hud_length(12.0)).has_point(point) else -1
 
 
+func _hide_markers() -> void:
+	if footprint_fade != null and footprint_fade.is_valid(): footprint_fade.kill()
+	footprint_fade = null
+	super._hide_markers()
+
+
 func _update_legal_markers(size_name: String, piece_color: Color) -> void:
 	if legal_marker_pulse != null and legal_marker_pulse.is_valid(): legal_marker_pulse.kill()
 	legal_marker_pulse = null
+	if footprint_fade != null and footprint_fade.is_valid(): footprint_fade.kill()
 	var footprint: ArrayMesh = _stone_footprint(size_name)
-	if footprint == null: return
+	if footprint == null:
+		_hide_markers()
+		return
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(piece_color.r, piece_color.g, piece_color.b, 0.48)
+	var tint := piece_color.lightened(0.20)
+	material.albedo_color = Color(tint.r,tint.g,tint.b,0.36)
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	var surface_y := 0.48
-	var board := intro.get("board") as MeshInstance3D
-	if board != null:
-		surface_y = -INF
-		for corner: int in range(8):
-			surface_y = maxf(surface_y,(board.transform * board.get_aabb().get_endpoint(corner)).y)
 	for cell: int in range(target_markers.size()):
 		var marker: MeshInstance3D = target_markers[cell]
 		marker.mesh = footprint
 		marker.scale = Vector3.ONE
-		marker.position = Vector3(CELL_COORDS[cell].x * U, surface_y + 0.012, CELL_COORDS[cell].z * U)
+		marker.position = Vector3(CELL_COORDS[cell].x*U,_cell_surface_height(cell)+0.003,CELL_COORDS[cell].z*U)
 		marker.material_override = material
-		marker.visible = _is_legal_cell(cell, size_name)
+		marker.set_meta("stone_size",size_name)
+		marker.visible = _is_legal_cell(cell,size_name)
+	# Gentle transparency breathing. Geometry stays at its true size and height.
+	if not _rm_enabled:
+		footprint_fade = create_tween().set_loops()
+		footprint_fade.tween_property(material,"albedo_color:a",0.48,1.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		footprint_fade.tween_property(material,"albedo_color:a",0.36,1.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	if OS.has_feature("web"):
-		JavaScriptBridge.eval("document.body.dataset.yakolakLegalMarkerStyle='static-stone-footprint';document.body.dataset.yakolakLegalMarkerSize=" + JSON.stringify(size_name) + ";", true)
+		JavaScriptBridge.eval("document.body.dataset.yakolakLegalMarkerStyle='surface-stone-footprint';document.body.dataset.yakolakLegalMarkerSize="+JSON.stringify(size_name)+";",true)
+
+
+func _cell_surface_height(cell: int) -> float:
+	if board_surface_heights.is_empty():
+		var board := intro.get("board") as MeshInstance3D
+		for coordinate: Vector3 in CELL_COORDS:
+			var origin := Vector3(coordinate.x*U,10.0,coordinate.z*U)
+			var surface_y := -INF
+			if board != null and board.mesh != null:
+				for surface: int in range(board.mesh.get_surface_count()):
+					var data := board.mesh.surface_get_arrays(surface)
+					var points: PackedVector3Array = data[Mesh.ARRAY_VERTEX]
+					var indices: PackedInt32Array = data[Mesh.ARRAY_INDEX]
+					var count := indices.size() if not indices.is_empty() else points.size()
+					for i: int in range(0,count,3):
+						var a := board.transform*points[indices[i] if not indices.is_empty() else i]
+						var b := board.transform*points[indices[i+1] if not indices.is_empty() else i+1]
+						var c := board.transform*points[indices[i+2] if not indices.is_empty() else i+2]
+						var hit: Variant = Geometry3D.segment_intersects_triangle(origin,origin-Vector3.UP*20.0,a,b,c)
+						if hit != null: surface_y = maxf(surface_y,hit.y)
+			board_surface_heights.append(coordinate.y*U if surface_y == -INF else surface_y)
+	return board_surface_heights[cell]
 
 
 func _stone_footprint(size_name: String) -> ArrayMesh:
-	if footprint_cache.has(size_name): return footprint_cache[size_name] as ArrayMesh
 	var source: Mesh = null
 	var basis := Basis.IDENTITY
-	for index: int in range(piece_records.size()):
+	var candidates: Array[int] = []
+	if selected_index >= 0 and _selected_size() == size_name: candidates.append(selected_index)
+	for index: int in range(piece_records.size()): candidates.append(index)
+	for index: int in candidates:
 		if str(piece_records[index].get("type", "")) == size_name:
 			source = (piece_records[index]["mesh"] as MeshInstance3D).mesh
 			basis = home_transforms[index].basis
 			break
 	if source == null: return null
-	# Project the actual upward faces, including its central cutout and spikes.
+	var cache_key := size_name+":"+str(basis)
+	if footprint_cache.has(cache_key): return footprint_cache[cache_key] as ArrayMesh
+	var bottom_y := INF
+	for corner: int in range(8): bottom_y = minf(bottom_y,(basis*source.get_aabb().get_endpoint(corner)).y)
+	# Trace the actual contact face, with its cutout and spikes. Upper bevels
+	# and cap faces must not create overlapping or disconnected flat contours.
 	# No generic circle, invented star, scale pulse, or extra outline pass.
 	var vertices := PackedVector3Array()
 	var edges: Dictionary = {}
@@ -185,8 +297,8 @@ func _stone_footprint(size_name: String) -> ArrayMesh:
 			var a: Vector3 = basis * points[indices[triangle] if not indices.is_empty() else triangle]
 			var b: Vector3 = basis * points[indices[triangle + 1] if not indices.is_empty() else triangle + 1]
 			var c: Vector3 = basis * points[indices[triangle + 2] if not indices.is_empty() else triangle + 2]
-			# Godot meshes use clockwise front faces.
-			if (c - a).cross(b - a).normalized().dot(Vector3.UP) < 0.45: continue
+			# Only the planar underside is the footprint of the selected stone.
+			if maxf(absf(a.y-bottom_y),maxf(absf(b.y-bottom_y),absf(c.y-bottom_y))) > 0.001: continue
 			var triangle_points: Array[Vector3] = [Vector3(a.x,0,a.z),Vector3(b.x,0,b.z),Vector3(c.x,0,c.z)]
 			for side: int in range(3):
 				var start: Vector3 = triangle_points[side]
@@ -196,7 +308,7 @@ func _stone_footprint(size_name: String) -> ArrayMesh:
 				var key := start_key+":"+end_key if start_key < end_key else end_key+":"+start_key
 				if edges.has(key): edges[key]["count"] += 1
 				else: edges[key] = {"start":start,"end":end,"count":1}
-	var width: float = clampf(source.get_aabb().size.x * U * 0.018,0.014,0.028)
+	var width: float = clampf(source.get_aabb().size.x * U * 0.010,0.010,0.016)
 	for edge: Dictionary in edges.values():
 		if int(edge["count"]) != 1: continue
 		var start: Vector3 = edge["start"]
@@ -209,7 +321,7 @@ func _stone_footprint(size_name: String) -> ArrayMesh:
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
 	flat.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	footprint_cache[size_name] = flat
+	footprint_cache[cache_key] = flat
 	return flat
 
 
@@ -229,6 +341,7 @@ func _show_round_result() -> void:
 
 func _layout_hud() -> void:
 	super._layout_hud()
+	_position_turn_countdown()
 	if result_button == null: return
 	var viewport := get_viewport().get_visible_rect().size
 	var width := minf(_hud_length(400.0), viewport.x - _hud_length(28.0))
@@ -344,4 +457,5 @@ func _reset_for_intro() -> void:
 	if rest_tween != null and rest_tween.is_valid(): rest_tween.kill()
 	rest_shifted = false
 	footprint_cache.clear()
+	board_surface_heights.clear()
 	super._reset_for_intro()

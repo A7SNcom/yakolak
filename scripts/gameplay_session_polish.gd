@@ -89,11 +89,11 @@ func _build_board_targets() -> void:
 		body.name = "BoardTarget_%d" % cell
 		body.collision_layer = TARGET_LAYER
 		body.collision_mask = 0
-		body.position = Vector3(raw_position.x * U, 0.25, raw_position.z * U)
+		body.position = Vector3(raw_position.x * U, raw_position.y*U+0.015, raw_position.z * U)
 		body.set_meta("cell", cell)
 		var target_shape := CylinderShape3D.new()
-		target_shape.radius = DROP_RADIUS * U * 1.18
-		target_shape.height = 0.50
+		target_shape.radius = DROP_RADIUS * U
+		target_shape.height = 0.04
 		var collision := CollisionShape3D.new()
 		collision.shape = target_shape
 		body.add_child(collision)

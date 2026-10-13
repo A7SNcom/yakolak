@@ -3,16 +3,17 @@ extends Node3D
 # LIGHTING-11: one event-driven owner for localized turn emphasis. Static studio
 # lighting remains owned by intro.gd/visual_polish.gd; this controller only owns
 # the four small seat spotlights and their single crossfade tween.
+const Layout = preload("res://scripts/game_layout.gd")
 const DIRECTIONS: Array[String] = ["right", "back", "left", "front"]
 const BASE_TARGETS: Dictionary = {
-	"right": Vector3(5.4, 0.34, 0.0),
-	"back": Vector3(0.0, 0.34, -5.4),
-	"left": Vector3(-5.4, 0.34, 0.0),
-	"front": Vector3(0.0, 0.34, 5.4),
+	"right": Vector3(Layout.REST_CENTER, 0.34, 0.0),
+	"back": Vector3(0.0, 0.34, -Layout.REST_CENTER),
+	"left": Vector3(-Layout.REST_CENTER, 0.34, 0.0),
+	"front": Vector3(0.0, 0.34, Layout.REST_CENTER),
 }
 const ACTIVE_ENERGY: float = 1.05
 const NEUTRAL_ENERGY: float = 0.0
-const CROSSFADE_DURATION: float = 0.34
+const CROSSFADE_DURATION: float = 0.80
 const LIGHT_HEIGHT: float = 3.8
 const LIGHT_OUTWARD_OFFSET: float = 1.75
 const LIGHT_RANGE: float = 6.4
@@ -56,7 +57,7 @@ func _build_seat_lights() -> void:
 		var outward := Vector3(target.x, 0.0, target.z).normalized()
 		var light := SpotLight3D.new()
 		light.name = "TurnSeatLight_%s" % direction
-		light.light_color = Color("#fff5e6")
+		light.light_color = Color("#fafafa")
 		light.light_energy = NEUTRAL_ENERGY
 		light.shadow_enabled = false
 		light.spot_range = LIGHT_RANGE

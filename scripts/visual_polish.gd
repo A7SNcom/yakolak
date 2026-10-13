@@ -4,7 +4,7 @@ extends Node
 # The wall logo uses the same SVG file as the DOM loader so the logo handoff
 # can be screen-space matched instead of approximated.
 
-const VISUAL_VERSION: String = "black-studio-v3"
+const VISUAL_VERSION: String = "black-studio-v4-contact-detail"
 const LOGO_PATH: String = "res://generated/YAKOLAK_INVERTED.svg"
 const BACKGROUND_COLOR: Color = Color("#000000")
 const FLOOR_COLOR: Color = Color("#080a0d")
@@ -24,11 +24,27 @@ var intro: Node3D
 var initialized: bool = false
 var wall_logo: MeshInstance3D
 var material_cache: Dictionary = {}
+var detail_normal: NoiseTexture2D
 
 
 func _ready() -> void:
 	process_priority = 150
 	intro = get_parent() as Node3D
+	var touch_device := OS.has_feature("mobile")
+	if OS.has_feature("web"):
+		touch_device = bool(JavaScriptBridge.eval("matchMedia('(pointer: coarse)').matches",true))
+	get_viewport().msaa_3d = Viewport.MSAA_2X if touch_device else Viewport.MSAA_4X
+	var noise := FastNoiseLite.new()
+	noise.seed = 2406
+	noise.frequency = 0.11
+	noise.fractal_octaves = 2
+	detail_normal = NoiseTexture2D.new()
+	detail_normal.width = 128
+	detail_normal.height = 128
+	detail_normal.seamless = true
+	detail_normal.as_normal_map = true
+	detail_normal.bump_strength = 0.18
+	detail_normal.noise = noise
 	set_process(true)
 
 
@@ -76,24 +92,26 @@ func _apply_when_ready() -> bool:
 			continue
 		var stone := child as MeshInstance3D
 		var stone_color: Color = IVORY_COLOR
-		var roughness: float = 0.70
+		var roughness: float = 0.46
 		var metallic: float = 0.01
 		if String(stone.name).begins_with("Stone_left_"):
 			stone_color = GOLD_COLOR
-			roughness = 0.42
-			metallic = 0.24
+			roughness = 0.34
+			metallic = 0.28
 		elif String(stone.name).begins_with("Stone_front_"):
 			stone_color = GREEN_COLOR
-			roughness = 0.50
+			roughness = 0.42
 			metallic = 0.08
 		elif String(stone.name).begins_with("Stone_back_"):
 			stone_color = BLUE_COLOR
-			roughness = 0.50
+			roughness = 0.42
 			metallic = 0.08
 		_apply_material(stone, stone_color, roughness, metallic)
-		stone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_apply_surface_detail(stone,0.12,0.16)
+		stone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
-	_apply_material(tabletop, TABLE_COLOR, 0.66, 0.08)
+	_apply_material(tabletop, TABLE_COLOR, 0.54, 0.08)
+	_apply_surface_detail(tabletop,4.0,0.10)
 	_apply_material(pedestal, PEDESTAL_COLOR, 0.58, 0.12)
 	_shorten_pedestal(pedestal)
 	_add_studio_architecture()
@@ -105,39 +123,49 @@ func _apply_environment(environment: Environment) -> void:
 	environment.background_mode = Environment.BG_COLOR
 	environment.background_color = BACKGROUND_COLOR
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color("#aebbd0")
-	environment.ambient_light_energy = 0.36
+	environment.ambient_light_color = Color("#d3d7dd")
+	environment.ambient_light_energy = 0.40
 	environment.tonemap_mode = Environment.TONE_MAPPER_ACES
-	environment.tonemap_exposure = 0.80
+	environment.tonemap_exposure = 0.95
 	environment.adjustment_enabled = true
 	environment.adjustment_brightness = 1.0
-	environment.adjustment_contrast = 1.10
-	environment.adjustment_saturation = 0.94
+	environment.adjustment_contrast = 1.04
+	environment.adjustment_saturation = 1.0
 
 
 func _apply_lights(directionals: Array[DirectionalLight3D], omnis: Array[OmniLight3D]) -> void:
 	var key := directionals[0]
-	key.light_color = Color("#f4f6ff")
-	key.light_energy = 0.82
+	key.light_color = Color("#fafafa")
+	key.light_energy = 1.05
 	key.shadow_enabled = true
 	key.directional_shadow_max_distance = 48.0
-	key.shadow_bias = 0.08
+	key.shadow_bias = 0.035
 
 	var fill := directionals[1]
-	fill.light_color = Color("#9eb8ff")
-	fill.light_energy = 0.30
+	fill.light_color = Color("#dce3ec")
+	fill.light_energy = 0.34
 	fill.shadow_enabled = false
 
 	var rim := directionals[2]
 	rim.light_color = Color("#ffffff")
-	rim.light_energy = 0.52
+	rim.light_energy = 0.66
 	rim.shadow_enabled = false
 
 	for omni: OmniLight3D in omnis:
-		omni.light_color = Color("#7182ff")
+		omni.light_color = Color("#e0e5eb")
 		omni.light_energy = 0.08
 		omni.omni_range = 16.0
 		omni.shadow_enabled = false
+
+
+func _apply_surface_detail(instance: MeshInstance3D, frequency: float, strength: float) -> void:
+	var material := instance.material_override as StandardMaterial3D
+	if material == null: return
+	material.normal_enabled = true
+	material.normal_texture = detail_normal
+	material.normal_scale = strength
+	material.uv1_triplanar = true
+	material.uv1_scale = Vector3.ONE*frequency
 
 
 func _shorten_pedestal(pedestal: MeshInstance3D) -> void:

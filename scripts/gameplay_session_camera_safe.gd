@@ -94,13 +94,18 @@ func _transition_to_current_player() -> void:
 	# z=-18.5 (or farther on portrait), so the wall would completely occlude the
 	# board. Keep it hidden for the whole crossing whenever either endpoint is
 	# behind the wall. It is restored after reaching a safe side again.
-	var crosses_back_wall: bool = turn_camera_start_position.z < STUDIO_WALL_SAFE_Z or turn_camera_target_position.z < STUDIO_WALL_SAFE_Z
+	var crosses_back_wall: bool = _turn_camera_crosses_back_wall()
 	_set_studio_backdrop_visible(not crosses_back_wall)
 
 	if camera_tween != null and camera_tween.is_valid():
 		camera_tween.kill()
+	# A bot turn keeps the same human view. Do not introduce an invisible wait
+	# when that human receives control again and the camera has nowhere to move.
+	if turn_camera_start_position.distance_to(turn_camera_target_position)<0.001 and is_equal_approx(turn_camera_start_fov,turn_camera_effective_fov):
+		_finish_camera_transition()
+		return
 	camera_tween = create_tween()
-	camera_tween.tween_method(Callable(self, "_apply_turn_camera_progress"), 0.0, 1.0, CAMERA_TRANSITION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	camera_tween.tween_method(Callable(self, "_apply_turn_camera_progress"), 0.0, 1.0, _turn_camera_duration()).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	camera_tween.finished.connect(_finish_camera_transition)
 	_apply_turn_camera_progress(0.0)
 	_publish_match_state("camera-transition")
@@ -122,10 +127,31 @@ func _apply_turn_camera_progress(progress: float) -> void:
 	if not turn_camera_active or camera == null:
 		return
 	var t: float = clampf(progress, 0.0, 1.0)
-	camera.position = turn_camera_start_position.lerp(turn_camera_target_position, t)
+	camera.position = _turn_camera_orbit_position(t)
 	camera.fov = lerpf(turn_camera_start_fov, turn_camera_effective_fov, t)
 	camera.current = true
 	camera.look_at(turn_camera_focus, Vector3.UP)
+
+
+func _turn_camera_duration() -> float:
+	var start_angle := atan2(turn_camera_start_position.z, turn_camera_start_position.x)
+	var end_angle := atan2(turn_camera_target_position.z, turn_camera_target_position.x)
+	return maxf(CAMERA_TRANSITION, absf(wrapf(end_angle-start_angle,-PI,PI))*0.58)
+
+
+func _turn_camera_orbit_position(t: float) -> Vector3:
+	var start := Vector2(turn_camera_start_position.x,turn_camera_start_position.z)
+	var finish := Vector2(turn_camera_target_position.x,turn_camera_target_position.z)
+	var angle := lerp_angle(atan2(start.y,start.x),atan2(finish.y,finish.x),t)
+	var radius := lerpf(start.length(),finish.length(),t)
+	return Vector3(cos(angle)*radius,lerpf(turn_camera_start_position.y,turn_camera_target_position.y,t),sin(angle)*radius)
+
+
+func _turn_camera_crosses_back_wall() -> bool:
+	# Opposite-side orbits may pass behind the wall despite safe endpoints.
+	for i: int in range(9):
+		if _turn_camera_orbit_position(float(i)/8.0).z < STUDIO_WALL_SAFE_Z: return true
+	return false
 
 
 func _finish_camera_transition() -> void:
@@ -248,7 +274,7 @@ func _publish_test_targets() -> void:
 		probe = Vector3(7.0, 0.0, 4.0)
 	var piece_screen: Vector2 = camera.unproject_position(sample_mesh.to_global(probe))
 	var raw_cell: Vector3 = CELL_COORDS[sample_cell]
-	var cell_screen: Vector2 = camera.unproject_position(Vector3(raw_cell.x * U, 0.52, raw_cell.z * U))
+	var cell_screen: Vector2 = camera.unproject_position(Vector3(raw_cell.x * U, raw_cell.y * U, raw_cell.z * U))
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakTestPieceX='%.3f';" % piece_screen.x +

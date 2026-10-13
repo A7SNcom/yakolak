@@ -193,7 +193,10 @@ func _ux46_finish_after_selected_frame(
 	# Preserve the exact production marker pulse/material behavior; only its work is
 	# moved behind the first selected-state frame. GGH-009 publishes the exact same
 	# canonical cell set immediately after that render pass, never a duplicate rule.
-	super._update_legal_markers(size_name, piece_color)
+	# Dispatch to the current presentation layer. Calling super here bypassed
+	# the stone footprint and restored the old oversized pulsing rings one frame
+	# after selection, even though the selected piece and size were still correct.
+	_update_legal_markers(size_name, piece_color)
 	_ux46_publish_legal_targets(size_name)
 	if OS.has_feature("web") and _ux46_test_enabled:
 		JavaScriptBridge.eval(

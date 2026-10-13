@@ -4,7 +4,7 @@ extends Node3D
 # Source of truth: src/app-live.js at commit 4096a243, intro version v071.
 # No setup screen, gameplay, labels, invented transitions, or coloured bases.
 
-const U: float = 0.04
+const U: float = preload("res://scripts/game_layout.gd").UNIT
 const BOARD_MESH: String = "res://generated/board_and_lid.obj"
 const BASE_MESH: String = "res://generated/player_base.obj"
 const PIECE_MESHES: Dictionary = {

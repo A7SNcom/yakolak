@@ -6,7 +6,7 @@ extends Node
 # - approved horizontal star table generated from table.svg
 # The camera, table and lights keep Godot's normal transform semantics.
 
-const U: float = 0.04
+const U: float = preload("res://scripts/game_layout.gd").UNIT
 const R3: float = 135.0
 const LID_SHAKE: float = 550.0
 const LID_LIFT: float = 1300.0

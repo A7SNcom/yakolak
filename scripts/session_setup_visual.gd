@@ -1,5 +1,7 @@
 extends "res://scripts/session_setup_flash_entry.gd"
 
+const Layout = preload("res://scripts/game_layout.gd")
+
 # One browser-native setup surface. Godot owns the real table, camera and match
 # configuration; the DOM owns inputs, accessibility and responsive controls.
 var visual_font: Font
@@ -298,7 +300,7 @@ func _visual_seat_points() -> Dictionary:
 	if cam == null:
 		return points
 	var viewport := get_viewport().get_visible_rect().size
-	var offsets := {"right": Vector3(5.4, 0.24, 0), "back": Vector3(0, 0.24, -5.4), "left": Vector3(-5.4, 0.24, 0), "front": Vector3(0, 0.24, 5.4)}
+	var offsets := {"right": Vector3(Layout.REST_CENTER, 6.0*Layout.UNIT, 0), "back": Vector3(0, 6.0*Layout.UNIT, -Layout.REST_CENTER), "left": Vector3(-Layout.REST_CENTER, 6.0*Layout.UNIT, 0), "front": Vector3(0, 6.0*Layout.UNIT, Layout.REST_CENTER)}
 	var hit_points: Dictionary = {}
 	for color: Dictionary in PALETTE:
 		var anchor: Vector3 = offsets[str(color["direction"])]
@@ -414,7 +416,7 @@ func _visual_reduced_motion() -> bool:
 	return OS.has_feature("web") and bool(JavaScriptBridge.eval("matchMedia('(prefers-reduced-motion: reduce)').matches",true))
 
 func _update_visual_lighting() -> void:
-	var offsets := {"right":Vector3(5.4,3.2,0),"back":Vector3(0,3.2,-5.4),"left":Vector3(-5.4,3.2,0),"front":Vector3(0,3.2,5.4)}
+	var offsets := {"right":Vector3(Layout.REST_CENTER,3.2,0),"back":Vector3(0,3.2,-Layout.REST_CENTER),"left":Vector3(-Layout.REST_CENTER,3.2,0),"front":Vector3(0,3.2,Layout.REST_CENTER)}
 	var signature := visual_step+":"+visual_selected_color+":"+JSON.stringify(visual_preview_seats)
 	if signature == visual_light_key: return
 	visual_light_key = signature

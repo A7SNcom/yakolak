@@ -4,7 +4,7 @@ extends Node
 # This script does not alter the loader, camera, table, lid, bases, or intro timeline.
 # Tap/click one remaining physical stone, then tap/click a legal board cell.
 
-const U: float = 0.04
+const U: float = preload("res://scripts/game_layout.gd").UNIT
 const PIECE_LAYER: int = 1
 const TARGET_LAYER: int = 2
 # Match the visible target.  31 overlapped adjacent 48-unit cells and made a
@@ -399,11 +399,11 @@ func _build_board_targets() -> void:
 		body.name = "BoardTarget_%d" % cell
 		body.collision_layer = TARGET_LAYER
 		body.collision_mask = 0
-		body.position = Vector3(raw_position.x * U, 0.25, raw_position.z * U)
+		body.position = Vector3(raw_position.x * U, raw_position.y*U+0.015, raw_position.z * U)
 		body.set_meta("cell", cell)
 		var target_shape := CylinderShape3D.new()
 		target_shape.radius = DROP_RADIUS * U
-		target_shape.height = 0.50
+		target_shape.height = 0.04
 		var collision := CollisionShape3D.new()
 		collision.shape = target_shape
 		body.add_child(collision)
@@ -739,7 +739,7 @@ func _publish_test_targets() -> void:
 	var sample_mesh := sample_record["mesh"] as MeshInstance3D
 	var piece_world_point: Vector3 = sample_mesh.to_global(Vector3(17.0, 0.0, 9.5))
 	var piece_screen: Vector2 = camera.unproject_position(piece_world_point)
-	var cell_world_point: Vector3 = Vector3(CELL_COORDS[4].x * U, 0.52, CELL_COORDS[4].z * U)
+	var cell_world_point: Vector3 = Vector3(CELL_COORDS[4].x * U, CELL_COORDS[4].y * U, CELL_COORDS[4].z * U)
 	var cell_screen: Vector2 = camera.unproject_position(cell_world_point)
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(

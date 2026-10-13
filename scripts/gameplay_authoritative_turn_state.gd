@@ -423,7 +423,7 @@ func _on_authoritative_test_target_requested(_arguments: Array) -> void:
 	var piece_css: Vector2 = Vector2(-1.0, -1.0)
 	if piece_internal.x >= 0.0 and piece_internal.y >= 0.0:
 		piece_css = canvas_rect.position + piece_internal * css_scale
-	var cell_world_point: Vector3 = Vector3(CELL_COORDS[4].x * U, 0.52, CELL_COORDS[4].z * U)
+	var cell_world_point: Vector3 = Vector3(CELL_COORDS[4].x * U, CELL_COORDS[4].y * U, CELL_COORDS[4].z * U)
 	var cell_internal: Vector2 = camera.unproject_position(cell_world_point)
 	var cell_css: Vector2 = canvas_rect.position + cell_internal * css_scale
 	JavaScriptBridge.eval(

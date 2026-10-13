@@ -11,7 +11,7 @@ const THMANYAH_BOLD = preload("res://assets/fonts/thmanyahsans-Bold.otf")
 const SCORE_MARKER_MESH = preload("res://generated/score_marker.obj")
 
 # Exact legacy Three.js score-row geometry from v092.
-const LEGACY_UNIT: float = 0.04
+const LEGACY_UNIT: float = preload("res://scripts/game_layout.gd").UNIT
 const SCORE_RADIUS: float = 85.0 * LEGACY_UNIT
 const SCORE_GAP: float = 11.0 * LEGACY_UNIT
 const SCORE_HEIGHT: float = 7.0 * LEGACY_UNIT

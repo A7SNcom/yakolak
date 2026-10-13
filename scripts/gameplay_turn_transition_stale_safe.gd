@@ -120,7 +120,7 @@ func _start_authoritative_turn_camera(direction: String, revision: int, lifecycl
 	camera.current = true
 	_ensure_game_scene_visible()
 
-	var crosses_back_wall: bool = turn_camera_start_position.z < STUDIO_WALL_SAFE_Z or turn_camera_target_position.z < STUDIO_WALL_SAFE_Z
+	var crosses_back_wall: bool = _turn_camera_crosses_back_wall()
 	_set_studio_backdrop_visible(not crosses_back_wall)
 
 	camera_tween = create_tween()
@@ -128,8 +128,8 @@ func _start_authoritative_turn_camera(direction: String, revision: int, lifecycl
 		Callable(self, "_apply_authoritative_turn_camera_progress").bind(serial),
 		0.0,
 		1.0,
-		CAMERA_TRANSITION
-	).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+		_turn_camera_duration()
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	camera_tween.finished.connect(_finish_authoritative_turn_camera.bind(serial, direction))
 	_apply_authoritative_turn_camera_progress(0.0, serial)
 	_publish_turn_camera(direction, aspect, radius, height, target_fov)
@@ -142,7 +142,7 @@ func _apply_authoritative_turn_camera_progress(progress: float, serial: int) -> 
 	if serial != turn_presentation_serial or not turn_camera_active or camera == null:
 		return
 	var t: float = clampf(progress, 0.0, 1.0)
-	camera.position = turn_camera_start_position.lerp(turn_camera_target_position, t)
+	camera.position = _turn_camera_orbit_position(t)
 	camera.fov = lerpf(turn_camera_start_fov, turn_camera_effective_fov, t)
 	camera.current = true
 	camera.look_at(turn_camera_focus, Vector3.UP)
