@@ -78,7 +78,7 @@ export function mountSetup(document, window) {
   if (profile) profiles[profile.phone] = profile.name;
   let state = newSetup(profile?.name || '');
   let capabilities = { online: false, mixed: false }, connections = [], geometry = {}, roomCode = '';
-  let pending = false, returnFocus = null, sheetGeneration = 0, moving = false, nameDraft = null, flowGeneration = 0;
+  let pending = false, returnFocus = null, sheetGeneration = 0, moving = false, nameDraft = null, flowGeneration = 0, profileContinuation = null;
   const el = (tag, cls, text) => { const node = document.createElement(tag); if (cls) node.className = cls; if (text !== undefined) node.textContent = text; return node; };
   const button = (label, action, cls = '') => { const node = el('button',cls,label); node.type = 'button'; node.addEventListener('click',e=>{e.stopPropagation();action(e);}); return node; };
   const reduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -103,8 +103,8 @@ export function mountSetup(document, window) {
   });
   const actions = el('footer','yk-actions');
   const entry = el('div','yk-entry');
-  const create=button('غرفة جديدة',()=>go('color'),'yk-primary');
-  const join=button('انضمام لغرفة',openJoin,'yk-outline'); entry.append(create,join);
+  const create=button('غرفة جديدة',()=>requireProfile(()=>go('color')),'yk-primary');
+  const join=button('انضمام لغرفة',()=>requireProfile(openJoin),'yk-outline'); entry.append(create,join);
   const confirm=button('تأكيد',()=>{if(state.selectedColor)go('count');},'yk-primary yk-confirm');
   const counts=el('div','yk-counts');counts.setAttribute('role','group');counts.setAttribute('aria-label','عدد اللاعبين');
   [2,3,4].forEach(n=>{const b=button(String(n),()=>go(chooseCount(state,n)),'yk-choice');b.setAttribute('aria-label',`${n} لاعبين`);counts.append(b);});
@@ -237,7 +237,12 @@ export function mountSetup(document, window) {
     }else finish();
   }
   function input(label,options={}){const wrap=el('label','yk-field');const text=el('span','yk-sr-only',label);const field=el('input');Object.assign(field,options);field.setAttribute('aria-label',label);wrap.append(text,field);return {wrap,field};}
-  function openProfile(){
+  function requireProfile(after){
+    if(profile){after();return;}
+    openProfile(after);
+  }
+  function openProfile(after=null){
+    profileContinuation=typeof after==='function'?after:null;
     openSheet('رقم الجوال',identity,'profile');root.dataset.profile='active';notify('preview');
     const form=el('form','yk-form');form.noValidate=true;
     const phone=input('رقم الجوال',{value:profile?.phone||'',type:'tel',inputMode:'numeric',autocomplete:'tel',maxLength:15,required:true,dir:'ltr'});phone.field.enterKeyHint='done';
@@ -253,7 +258,8 @@ export function mountSetup(document, window) {
   function finishProfile(name,phone){
     profile={name,phone};profiles[phone]=name;state=newSetup(name);
     try{window.localStorage.setItem(STORE,JSON.stringify(profile));window.localStorage.setItem('yakolak-profiles-v2',JSON.stringify(profiles));}catch{}
-    closeSheet(true,()=>{render();notify('preview');});
+    const after=profileContinuation;profileContinuation=null;
+    closeSheet(true,()=>{render();notify('preview');if(after)after();});
   }
   function openSeat(index,origin){
     closeSheet();openSheet('',origin,'seat');sheet.setAttribute('aria-label',seatLabel(state.seats[index]));sheet.setAttribute('role','menu');sheet.removeAttribute('aria-labelledby');
@@ -293,8 +299,8 @@ export function mountSetup(document, window) {
   root.addEventListener('pointerdown',e=>{if(nameDraft&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet();},true);
   root.addEventListener('click',e=>{if(!modal.hidden&&modal.dataset.kind!=='profile'&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet(true);});root.addEventListener('keydown',e=>e.stopPropagation());
   const api={
-    open(options={}){flowGeneration++;nameDraft=null;closeSheet();capabilities={online:!!options.online,mixed:!!options.mixed};connections=[];roomCode='';pending=moving=false;state=newSetup(profile?.name||'');geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();openProfile();},
-    close(){flowGeneration++;sheetGeneration++;nameDraft=null;root.hidden=true;modal.hidden=true;refreshGlass();document.body.dataset.yakolakVisualSetup='hidden';},
+    open(options={}){flowGeneration++;nameDraft=null;profileContinuation=null;closeSheet();capabilities={online:!!options.online,mixed:!!options.mixed};connections=[];roomCode='';pending=moving=false;state=newSetup(profile?.name||'');geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();},
+    close(){flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;root.hidden=true;modal.hidden=true;refreshGlass();document.body.dataset.yakolakVisualSetup='hidden';},
     geometry(points){geometry=points;root.dataset.world=String(!!points.world);position();},
     error(text){root.hidden=false;showError(text);},
     room(room){roomCode=/^\d{2}$/.test(String(room.code||''))?String(room.code):'';connections=(room.players||[]).filter(x=>x.connected!==false&&x.name).map(x=>({seat:String(x.seat),name:String(x.name).slice(0,24)}));render();}
