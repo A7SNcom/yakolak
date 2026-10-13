@@ -48,6 +48,9 @@ func _ready() -> void:
 func show_after_intro() -> void:
 	if visual_active:
 		return
+	# Lock the finished intro before exposing setup controls, including on Safari.
+	if intro != null:
+		intro.set_process_unhandled_input(false)
 	showing = true
 	visual_active = true
 	visual_step = "profile"

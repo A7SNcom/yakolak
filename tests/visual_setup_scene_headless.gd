@@ -48,6 +48,21 @@ func _run() -> void:
 		push_error("Table tap restarted intro during setup")
 		quit(1)
 		return
+	var touch := InputEventScreenTouch.new()
+	touch.pressed = true
+	touch.index = 0
+	touch.position = Vector2(360,640)
+	Input.parse_input_event(touch)
+	var replay_key := InputEventKey.new()
+	replay_key.pressed = true
+	replay_key.keycode = KEY_R
+	Input.parse_input_event(replay_key)
+	await process_frame
+	await process_frame
+	if intro.intro_run_generation != generation or not setup.visual_active or not game.waiting_for_setup:
+		push_error("Setup input restarted the completed intro")
+		quit(1)
+		return
 	setup._on_visual_action([JSON.stringify({"action":"preview","step":"ready","all_seats":[{"color":"green","mode":"local"},{"color":"marble","mode":"bot"},{"color":"blue","mode":"none"},{"color":"gold","mode":"none"}]})])
 	for record: Dictionary in intro.pieces:
 		var material: Material = record["mesh"].material_override

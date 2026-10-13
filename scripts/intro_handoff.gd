@@ -15,6 +15,15 @@ var gameplay_handoff_emit_count: int = 0
 var gameplay_handoff_consume_count: int = 0
 
 
+func _unhandled_input(event: InputEvent) -> void:
+	# Once this generation belongs to setup/gameplay, no input may return it to
+	# the cinematic. This also closes the handoff race in debug builds.
+	if gameplay_handoff_pending or gameplay_handoff_consumed_generation == intro_run_generation:
+		get_viewport().set_input_as_handled()
+		return
+	super._unhandled_input(event)
+
+
 func _restart_intro() -> void:
 	intro_run_generation += 1
 	# A replay invalidates any stale, unconsumed token from the previous run.

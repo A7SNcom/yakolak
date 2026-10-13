@@ -109,11 +109,11 @@ func _process(_delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventScreenTouch and event.pressed:
-		_restart_intro()
-	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_restart_intro()
-	elif event is InputEventKey and event.pressed and event.keycode == KEY_R:
+	# Taps are part of the game and setup UI. Replaying the cinematic from an
+	# unhandled tap creates a race at its final frame: the first tap intended for
+	# "غرفة جديدة" can restart the whole intro instead. Keep replay as a
+	# debug-only keyboard shortcut; it is never a player action.
+	if OS.is_debug_build() and event is InputEventKey and event.pressed and event.keycode == KEY_R:
 		_restart_intro()
 
 
