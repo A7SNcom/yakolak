@@ -6,6 +6,10 @@ func _run() -> void:
 	root.add_child(intro)
 	var game = intro.get_node("PostIntroGameplay")
 	var setup = intro.get_node("SessionSetup")
+	if game.get_script() == null or setup.get_script() == null:
+		push_error("Exported gameplay/setup script or an inherited dependency is missing")
+		quit(1)
+		return
 	var deadline := Time.get_ticks_msec() + 45000
 	while Time.get_ticks_msec() < deadline and not game.waiting_for_setup:
 		await process_frame

@@ -55,7 +55,7 @@ python3 scripts/prepare_table.py
 python3 scripts/prepare_logo.py
 
 timeout 5m "$GODOT_BIN" --headless --path . --import
-for test in game_rules_headless intro_handoff_headless visual_setup_scene_headless; do
+for test in game_rules_headless intro_handoff_headless; do
   echo "YAKOLAK_GODOT_TEST_START ${test}"
   timeout 90s "$GODOT_BIN" --headless --path . --script "res://tests/${test}.gd"
 done
@@ -66,6 +66,10 @@ test -s web/index.html
 test -s web/index.js
 test -s web/index.wasm
 test -s web/index.pck
+
+# A successful source-project test/export can still produce a broken pack.
+# Verify the exact shipping resources without access to source-project files.
+python3 scripts/verify_exported_pack.py "$GODOT_BIN" web/index.pck
 
 cp generated/YAKOLAK_INVERTED.svg web/yakolak-logo.svg
 python3 scripts/apply_web_loader.py
