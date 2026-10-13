@@ -19,12 +19,25 @@ var rest_shifted: bool = false
 var footprint_cache: Dictionary = {}
 var footprint_fade: Tween
 var board_surface_heights: Array[float] = []
+var board_cell_faces: Array = []
+var surface_footprint_cache: Dictionary = {}
 var turn_countdown: PanelContainer
 var turn_countdown_label: Label
 var turn_countdown_motion: Tween
 var countdown_last_fov: float = -1.0
 var continue_pending: bool = false
 var rest_tween: Tween
+const RESULT_DELAY := 2.3
+const RESULT_FONT = preload("res://assets/fonts/thmanyahsans-Medium.otf")
+const RESULT_BOLD = preload("res://assets/fonts/thmanyahsans-Bold.otf")
+var result_card: PanelContainer
+var result_title: Label
+var result_scores: Label
+var result_generation: int = 0
+var result_scheduled: bool = false
+var result_reveal: Tween
+var celebration: CPUParticles3D
+var victory_visibility: Dictionary = {}
 
 func _ready() -> void:
 	super._ready()
@@ -46,6 +59,7 @@ func _ready() -> void:
 	turn_countdown_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	turn_countdown.add_child(turn_countdown_label)
 	hud_layer.add_child(turn_countdown)
+	_build_result_card()
 
 
 func _process(delta: float) -> void:
@@ -143,7 +157,8 @@ func _select_tray_piece(piece_index: int) -> void:
 	# Parent latency layer publishes ownership immediately. Restore the prior
 	# material after that operation so the color can ease from its current value.
 	super._select_tray_piece(piece_index)
-	for index: int in tray_indices:
+	for index: int in range(piece_records.size()):
+		if bool(piece_records[index].get("played",false)) or str(piece_records[index]["dir"]) != _current_direction(): continue
 		var source := home_materials[index] as StandardMaterial3D
 		if source == null: continue
 		if not choice_materials.has(index): choice_materials[index] = source.duplicate()
@@ -170,9 +185,16 @@ func _stop_choice_tweens() -> void:
 	choice_tweens.clear()
 
 
+func _restore_choice_materials() -> void:
+	for index: int in choice_materials:
+		if index < piece_records.size():
+			(piece_records[index]["mesh"] as MeshInstance3D).material_override = home_materials[index]
+	choice_materials.clear()
+
+
 func _close_piece_tray(skip_index: int = -1, immediate: bool = false) -> void:
 	_stop_choice_tweens()
-	choice_materials.clear()
+	_restore_choice_materials()
 	if skip_index >= 0 and skip_index < home_materials.size():
 		(piece_records[skip_index]["mesh"] as MeshInstance3D).material_override = home_materials[skip_index]
 	super._close_piece_tray(skip_index, immediate)
@@ -180,7 +202,7 @@ func _close_piece_tray(skip_index: int = -1, immediate: bool = false) -> void:
 
 func _reset_tray_state() -> void:
 	_stop_choice_tweens()
-	choice_materials.clear()
+	_restore_choice_materials()
 	super._reset_tray_state()
 
 
@@ -224,13 +246,13 @@ func _update_legal_markers(size_name: String, piece_color: Color) -> void:
 		return
 	var material := StandardMaterial3D.new()
 	var tint := piece_color.lightened(0.20)
-	material.albedo_color = Color(tint.r,tint.g,tint.b,0.36)
+	material.albedo_color = Color(tint.r,tint.g,tint.b,0.62)
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	for cell: int in range(target_markers.size()):
 		var marker: MeshInstance3D = target_markers[cell]
-		marker.mesh = footprint
+		marker.mesh = _surface_footprint(footprint,cell)
 		marker.scale = Vector3.ONE
 		marker.position = Vector3(CELL_COORDS[cell].x*U,_cell_surface_height(cell)+0.003,CELL_COORDS[cell].z*U)
 		marker.material_override = material
@@ -239,32 +261,79 @@ func _update_legal_markers(size_name: String, piece_color: Color) -> void:
 	# Gentle transparency breathing. Geometry stays at its true size and height.
 	if not _rm_enabled:
 		footprint_fade = create_tween().set_loops()
-		footprint_fade.tween_property(material,"albedo_color:a",0.48,1.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		footprint_fade.tween_property(material,"albedo_color:a",0.36,1.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		footprint_fade.tween_property(material,"albedo_color:a",0.72,1.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		footprint_fade.tween_property(material,"albedo_color:a",0.62,1.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("document.body.dataset.yakolakLegalMarkerStyle='surface-stone-footprint';document.body.dataset.yakolakLegalMarkerSize="+JSON.stringify(size_name)+";",true)
 
 
+func _prepare_board_faces() -> void:
+	if not board_cell_faces.is_empty(): return
+	for cell: int in range(CELL_COORDS.size()): board_cell_faces.append([])
+	var board := intro.get("board") as MeshInstance3D
+	if board == null or board.mesh == null: return
+	for surface: int in range(board.mesh.get_surface_count()):
+		var data := board.mesh.surface_get_arrays(surface)
+		var points: PackedVector3Array = data[Mesh.ARRAY_VERTEX]
+		var indices: PackedInt32Array = data[Mesh.ARRAY_INDEX]
+		var count := indices.size() if not indices.is_empty() else points.size()
+		for i: int in range(0,count,3):
+			var a := board.transform*points[indices[i] if not indices.is_empty() else i]
+			var b := board.transform*points[indices[i+1] if not indices.is_empty() else i+1]
+			var c := board.transform*points[indices[i+2] if not indices.is_empty() else i+2]
+			if absf((b-a).cross(c-a).y)<0.000001: continue
+			var bounds := Rect2(Vector2(a.x,a.z),Vector2.ZERO).expand(Vector2(b.x,b.z)).expand(Vector2(c.x,c.z))
+			for cell: int in range(CELL_COORDS.size()):
+				var center := Vector2(CELL_COORDS[cell].x,CELL_COORDS[cell].z)*U
+				if bounds.intersects(Rect2(center-Vector2.ONE*1.1,Vector2.ONE*2.2)):
+					board_cell_faces[cell].append(PackedVector3Array([a,b,c]))
+
+
+func _board_height_at(point: Vector3, cell: int) -> float:
+	_prepare_board_faces()
+	var height := -INF
+	for triangle: PackedVector3Array in board_cell_faces[cell]:
+		var hit: Variant = Geometry3D.segment_intersects_triangle(Vector3(point.x,10,point.z),Vector3(point.x,-10,point.z),triangle[0],triangle[1],triangle[2])
+		if hit != null: height = maxf(height,hit.y)
+	return CELL_COORDS[cell].y*U if height == -INF else height
+
+
 func _cell_surface_height(cell: int) -> float:
 	if board_surface_heights.is_empty():
-		var board := intro.get("board") as MeshInstance3D
-		for coordinate: Vector3 in CELL_COORDS:
-			var origin := Vector3(coordinate.x*U,10.0,coordinate.z*U)
-			var surface_y := -INF
-			if board != null and board.mesh != null:
-				for surface: int in range(board.mesh.get_surface_count()):
-					var data := board.mesh.surface_get_arrays(surface)
-					var points: PackedVector3Array = data[Mesh.ARRAY_VERTEX]
-					var indices: PackedInt32Array = data[Mesh.ARRAY_INDEX]
-					var count := indices.size() if not indices.is_empty() else points.size()
-					for i: int in range(0,count,3):
-						var a := board.transform*points[indices[i] if not indices.is_empty() else i]
-						var b := board.transform*points[indices[i+1] if not indices.is_empty() else i+1]
-						var c := board.transform*points[indices[i+2] if not indices.is_empty() else i+2]
-						var hit: Variant = Geometry3D.segment_intersects_triangle(origin,origin-Vector3.UP*20.0,a,b,c)
-						if hit != null: surface_y = maxf(surface_y,hit.y)
-			board_surface_heights.append(coordinate.y*U if surface_y == -INF else surface_y)
+		for i: int in range(CELL_COORDS.size()): board_surface_heights.append(_board_height_at(CELL_COORDS[i]*U,i))
 	return board_surface_heights[cell]
+
+
+func _surface_footprint(flat: ArrayMesh, cell: int) -> ArrayMesh:
+	var key := str(flat.get_instance_id())+":"+str(cell)
+	if surface_footprint_cache.has(key): return surface_footprint_cache[key]
+	var points: PackedVector3Array = flat.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var vertices := PackedVector3Array()
+	var center := Vector3(CELL_COORDS[cell].x*U,_cell_surface_height(cell),CELL_COORDS[cell].z*U)
+	# Subdivide the thin strips so a large stone's contour follows the pocket's
+	# actual bevel, instead of disappearing inside it or floating above the bed.
+	var heights: Dictionary = {}
+	for i: int in range(0,points.size(),6):
+		var steps := maxi(1,int(ceil(points[i].distance_to(points[i+1])/0.08)))
+		for j: int in range(steps):
+			var t0 := float(j)/steps
+			var t1 := float(j+1)/steps
+			var a := points[i].lerp(points[i+1],t0)
+			var b := points[i].lerp(points[i+1],t1)
+			var c := points[i+5].lerp(points[i+2],t1)
+			var d := points[i+5].lerp(points[i+2],t0)
+			for point: Vector3 in [a,b,c,a,c,d]:
+				var coordinate := Vector2(point.x,point.z)
+				if not heights.has(coordinate): heights[coordinate] = _board_height_at(center+point,cell)-center.y
+				point.y = heights[coordinate]
+				vertices.append(point)
+	var mesh := ArrayMesh.new()
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
+	surface_footprint_cache[key] = mesh
+	return mesh
 
 
 func _stone_footprint(size_name: String) -> ArrayMesh:
@@ -308,7 +377,7 @@ func _stone_footprint(size_name: String) -> ArrayMesh:
 				var key := start_key+":"+end_key if start_key < end_key else end_key+":"+start_key
 				if edges.has(key): edges[key]["count"] += 1
 				else: edges[key] = {"start":start,"end":end,"count":1}
-	var width: float = clampf(source.get_aabb().size.x * U * 0.010,0.010,0.016)
+	var width: float = clampf(source.get_aabb().size.x * U * 0.028,0.035,0.050)
 	for edge: Dictionary in edges.values():
 		if int(edge["count"]) != 1: continue
 		var start: Vector3 = edge["start"]
@@ -337,11 +406,13 @@ func _show_round_result() -> void:
 		result_button.disabled = continue_pending
 	_layout_hud()
 	_start_victory_colors()
+	_schedule_results()
 
 
 func _layout_hud() -> void:
 	super._layout_hud()
 	_position_turn_countdown()
+	_layout_result_card()
 	if result_button == null: return
 	var viewport := get_viewport().get_visible_rect().size
 	var width := minf(_hud_length(400.0), viewport.x - _hud_length(28.0))
@@ -368,16 +439,16 @@ func _start_victory_colors() -> void:
 	if not round_complete or round_winner.is_empty(): return
 	for index: int in range(piece_records.size()):
 		var piece: MeshInstance3D = piece_records[index]["mesh"]
-		if winning_piece_indices.has(index):
-			piece.material_override = home_materials[index]
-			continue
+		if not bool(piece_records[index].get("played",false)) or winning_piece_indices.has(index): continue
 		if not victory_materials.has(index) and home_materials[index] is StandardMaterial3D:
 			victory_materials[index] = home_materials[index].duplicate()
+			victory_materials[index].transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			victory_visibility[index] = piece.visible
 		if victory_materials.has(index): piece.material_override = victory_materials[index]
 	_set_victory_mix(victory_mix)
 	if victory_tween != null and victory_tween.is_valid(): return
 	if _rm_enabled:
-		_set_victory_mix(0.85)
+		_set_victory_mix(1.0)
 		return
 	victory_tween = create_tween().set_loops()
 	victory_tween.tween_method(_set_victory_mix, 0.0, 1.0, VICTORY_HALF_CYCLE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
@@ -391,20 +462,21 @@ func _set_victory_mix(value: float) -> void:
 	for index: int in victory_materials:
 		var source := home_materials[index] as StandardMaterial3D
 		var material := victory_materials[index] as StandardMaterial3D
-		material.albedo_color = source.albedo_color.lerp(Color.BLACK, value)
-		material.metallic = lerpf(source.metallic, 0.0, value)
-		material.metallic_specular = lerpf(source.metallic_specular, 0.0, value)
-		material.roughness = lerpf(source.roughness, 1.0, value)
-		material.emission_enabled = false
-		material.next_pass = null
+		# Preserve hue, lighting and finish. Only board pieces' opacity changes.
+		material.albedo_color = Color(source.albedo_color,source.albedo_color.a*(1.0-value))
+		(piece_records[index]["mesh"] as MeshInstance3D).visible = bool(victory_visibility[index]) and value<0.999
+
 
 
 func _stop_victory_colors() -> void:
+	_clear_results()
 	if victory_tween != null and victory_tween.is_valid(): victory_tween.kill()
 	victory_tween = null
 	for index: int in victory_materials:
 		if index < piece_records.size() and index < home_materials.size():
 			(piece_records[index]["mesh"] as MeshInstance3D).material_override = home_materials[index]
+			(piece_records[index]["mesh"] as MeshInstance3D).visible = bool(victory_visibility.get(index,true))
+	victory_visibility.clear()
 	victory_materials.clear()
 	victory_mix = 0.0
 	continue_pending = false
@@ -458,4 +530,125 @@ func _reset_for_intro() -> void:
 	rest_shifted = false
 	footprint_cache.clear()
 	board_surface_heights.clear()
+	board_cell_faces.clear()
+	surface_footprint_cache.clear()
 	super._reset_for_intro()
+
+
+func _build_result_card() -> void:
+	result_card = PanelContainer.new()
+	result_card.name = "RoundResults"
+	result_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.09,0.10,0.12,0.92)
+	style.border_color = Color(1,1,1,0.32)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(22)
+	style.content_margin_left = 22
+	style.content_margin_right = 22
+	style.content_margin_top = 16
+	style.content_margin_bottom = 16
+	result_card.add_theme_stylebox_override("panel",style)
+	var column := VBoxContainer.new()
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_theme_constant_override("separation",8)
+	result_card.add_child(column)
+	result_title = Label.new()
+	result_scores = Label.new()
+	for label: Label in [result_title,result_scores]:
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.layout_direction = Control.LAYOUT_DIRECTION_RTL
+		label.text_direction = Control.TEXT_DIRECTION_RTL
+		label.language = "ar"
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.add_theme_font_override("font",RESULT_BOLD if label==result_title else RESULT_FONT)
+		label.add_theme_color_override("font_color",Color.WHITE if label==result_title else Color(0.83,0.84,0.87))
+		column.add_child(label)
+	result_card.hide()
+	hud_layer.add_child(result_card)
+
+
+func _layout_result_card() -> void:
+	if result_card == null: return
+	var viewport := get_viewport().get_visible_rect().size
+	var width := minf(_hud_length(440),viewport.x-_hud_length(28))
+	result_card.custom_minimum_size = Vector2(width,0)
+	result_card.size = Vector2(width,0)
+	result_card.position = Vector2((viewport.x-width)*0.5,_hud_length(76))
+	result_title.add_theme_font_size_override("font_size",_hud_font_size(27))
+	result_scores.add_theme_font_size_override("font_size",_hud_font_size(17))
+
+
+func _schedule_results() -> void:
+	if result_scheduled or not round_complete or online_cancelled: return
+	result_scheduled = true
+	var generation := result_generation
+	await get_tree().create_timer(RESULT_DELAY).timeout
+	if generation != result_generation or not round_complete or not match_initialized: return
+	result_title.text = "تعادل الجولة" if round_winner.is_empty() else ("بطل المباراة" if match_complete else "فاز بالجولة")+" · "+_player_name(round_winner)
+	var rows: PackedStringArray = []
+	for player: Dictionary in players:
+		var direction := str(player["direction"])
+		rows.append("%s   %d" % [_player_name(direction),int(scores.get(direction,0))])
+	result_scores.text = "   ·   ".join(rows)
+	_layout_result_card()
+	result_card.show()
+	result_card.modulate.a = 1.0 if _rm_enabled else 0.0
+	if not _rm_enabled:
+		result_reveal = create_tween()
+		result_reveal.tween_property(result_card,"modulate:a",1.0,0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		if not round_winner.is_empty(): _celebrate_win()
+
+
+func _celebrate_win() -> void:
+	# One bounded burst; no looping system, shaders, physics or imported library.
+	celebration = CPUParticles3D.new()
+	celebration.name = "VictoryCelebration"
+	celebration.emitting = false
+	celebration.amount = 48
+	celebration.one_shot = true
+	celebration.lifetime = 2.8
+	celebration.explosiveness = 0.85
+	celebration.direction = Vector3.UP
+	celebration.spread = 55.0
+	celebration.initial_velocity_min = 1.6
+	celebration.initial_velocity_max = 3.0
+	celebration.gravity = Vector3(0,-1.1,0)
+	celebration.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
+	celebration.emission_ring_axis = Vector3.UP
+	celebration.emission_ring_radius = 2.8
+	celebration.emission_ring_inner_radius = 2.4
+	celebration.emission_ring_height = 0.1
+	celebration.scale_amount_min = 0.55
+	celebration.scale_amount_max = 1.0
+	celebration.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	celebration.position = Vector3(0,0.55,0)
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.065
+	sphere.height = 0.13
+	sphere.radial_segments = 8
+	sphere.rings = 4
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.vertex_color_use_as_albedo = true
+	sphere.material = material
+	celebration.mesh = sphere
+	var ramp := Gradient.new()
+	ramp.colors = PackedColorArray([Color(0.95,0.96,1,0.8),Color(0.95,0.96,1,0.8),Color(0.95,0.96,1,0)])
+	ramp.offsets = PackedFloat32Array([0,0.65,1])
+	celebration.color_ramp = ramp
+	intro.add_child(celebration)
+	celebration.finished.connect(celebration.queue_free)
+	celebration.emitting = true
+
+
+func _clear_results() -> void:
+	result_generation += 1
+	result_scheduled = false
+	if result_reveal != null and result_reveal.is_valid(): result_reveal.kill()
+	result_reveal = null
+	if result_card != null: result_card.hide()
+	if is_instance_valid(celebration): celebration.queue_free()
+	celebration = null

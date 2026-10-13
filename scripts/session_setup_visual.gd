@@ -482,12 +482,12 @@ func _accept_visual_configuration(payload: Dictionary) -> void:
 	if configuration.is_empty():
 		show_setup_error("راجع حالات اللاعبين")
 		return
-	_close_visual_setup()
+	_close_visual_setup(true)
 	_publish_setup_state("complete")
 	configuration_ready.emit(configuration)
 
-func _restore_visual_camera() -> void:
-	if intro != null and not visual_camera_snapshot.is_empty():
+func _restore_visual_camera(preserve_pose: bool = false) -> void:
+	if not preserve_pose and intro != null and not visual_camera_snapshot.is_empty():
 		var cam := intro.get("camera") as Camera3D
 		if cam != null:
 			cam.transform = visual_camera_snapshot["transform"]
@@ -510,7 +510,7 @@ func _restore_visual_camera() -> void:
 	visual_color_tweens.clear()
 	visual_piece_visibility.clear()
 
-func _close_visual_setup() -> void:
+func _close_visual_setup(preserve_pose: bool = false) -> void:
 	visual_active = false
 	for value: Variant in visual_world_seats.values():
 		(value["node"] as Node3D).hide()
@@ -523,7 +523,8 @@ func _close_visual_setup() -> void:
 	visual_prompt_stage = ""
 	showing = false
 	root.hide()
-	_restore_visual_camera()
+	if visual_zoom_tween != null and visual_zoom_tween.is_valid(): visual_zoom_tween.kill()
+	_restore_visual_camera(preserve_pose)
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("if(window.YakolakSetup)window.YakolakSetup.close();", true)
 

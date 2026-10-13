@@ -11,6 +11,7 @@ const STUDIO_WALL_SAFE_Z: float = -13.2
 var turn_camera_start_position: Vector3 = Vector3.ZERO
 var turn_camera_target_position: Vector3 = Vector3.ZERO
 var turn_camera_focus: Vector3 = Vector3(0.0, 0.42, 0.0)
+var turn_camera_start_rotation: Quaternion = Quaternion.IDENTITY
 var turn_camera_start_fov: float = 50.0
 # Base adaptive FOV for the viewport. GameplayCameraZoom uses this to preserve
 # the user's relative zoom when the camera moves to another side.
@@ -79,6 +80,7 @@ func _transition_to_current_player() -> void:
 	var target_fov: float = lerpf(50.0, 57.0, portrait_weight)
 
 	turn_camera_direction = direction
+	turn_camera_start_rotation = camera.basis.get_rotation_quaternion()
 	turn_camera_start_position = camera.position
 	turn_camera_target_position = axis * radius + Vector3(0.0, height, 0.0)
 	turn_camera_start_fov = camera.fov
@@ -130,7 +132,16 @@ func _apply_turn_camera_progress(progress: float) -> void:
 	camera.position = _turn_camera_orbit_position(t)
 	camera.fov = lerpf(turn_camera_start_fov, turn_camera_effective_fov, t)
 	camera.current = true
-	camera.look_at(turn_camera_focus, Vector3.UP)
+	_apply_turn_camera_orientation(t)
+
+
+func _apply_turn_camera_orientation(t: float) -> void:
+	var target_basis := Basis.looking_at(turn_camera_focus-camera.position, Vector3.UP)
+	var start_look := Basis.looking_at(turn_camera_focus-turn_camera_start_position,Vector3.UP).get_rotation_quaternion()
+	var start_offset := start_look.inverse()*turn_camera_start_rotation
+	# Carry the settled shot's small aiming offset, easing it away while the
+	# orbit keeps the board in view. Direct slerp to a moving target lags behind.
+	camera.basis = Basis(target_basis.get_rotation_quaternion()*start_offset.slerp(Quaternion.IDENTITY,t))
 
 
 func _turn_camera_duration() -> float:

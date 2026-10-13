@@ -1,11 +1,11 @@
 @font-face{font-family:Yakolak;src:url('./setup-font.otf') format('opentype');font-display:swap}
-#yakolakVisualSetup{position:fixed;inset:0;height:100dvh;height:100svh;z-index:2147483001;overflow:hidden;isolation:isolate;color:#f4f1e8;font-family:Yakolak,system-ui,sans-serif;pointer-events:auto;box-sizing:border-box;--yk-glass:linear-gradient(135deg,rgba(148,151,158,.42),rgba(56,59,65,.28));--yk-glass-edge:rgba(255,255,255,.58);--yk-glass-shadow:0 12px 30px rgba(0,0,0,.32)}
+#yakolakVisualSetup{position:fixed;inset:0;height:100dvh;height:100svh;z-index:2147483001;overflow:hidden;isolation:isolate;color:#f4f4f5;font-family:Yakolak,system-ui,sans-serif;pointer-events:auto;box-sizing:border-box;--yk-glass:linear-gradient(135deg,rgba(148,151,158,.42),rgba(56,59,65,.28));--yk-glass-edge:rgba(255,255,255,.58);--yk-glass-shadow:0 12px 30px rgba(0,0,0,.32)}
 #yakolakVisualSetup *,#yakolakVisualSetup *:before,#yakolakVisualSetup *:after{box-sizing:border-box}
 #yakolakVisualSetup[hidden],#yakolakVisualSetup [hidden]{display:none!important}
 #yakolakVisualSetup button,#yakolakVisualSetup input{font:inherit;color:inherit;pointer-events:auto}
 #yakolakVisualSetup button{border:0;background:transparent;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-height:44px;padding:10px 14px;transition:opacity .18s,transform .18s}
 #yakolakVisualSetup button:active{transform:translateY(1px)}
-#yakolakVisualSetup button:focus-visible,#yakolakVisualSetup input:focus-visible{outline:2px solid #e9d4ae;outline-offset:3px}
+#yakolakVisualSetup button:focus-visible,#yakolakVisualSetup input:focus-visible{outline:2px solid #bfc4cc;outline-offset:3px}
 #yakolakVisualSetup button:disabled{opacity:.5;cursor:wait}
 #yakolakVisualSetup .yk-sr-only{position:absolute!important;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 #yakolakVisualSetup .yk-header{position:absolute;inset:12px 16px auto;pointer-events:none}
@@ -49,7 +49,9 @@
 #yakolakVisualSetup .yk-field input::placeholder{color:rgba(255,255,255,.58);}
 #yakolakVisualSetup .yk-name-input{position:relative;width:100%;}
 #yakolakVisualSetup .yk-name-input .yk-field input{padding-left:48px;}
-#yakolakVisualSetup .yk-input-clear{position:absolute;left:7px;top:25px;display:grid;place-items:center;width:34px;height:34px;min-height:34px;padding:0;border-radius:50%;color:rgba(255,255,255,.82);font-size:24px;line-height:1;text-shadow:none;}
+#yakolakVisualSetup .yk-input-clear{position:absolute;left:4px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:34px;height:34px;min-height:34px;padding:0;border-radius:50%;color:rgba(255,255,255,.82);font-size:18px;line-height:1;text-shadow:none;}
+#yakolakVisualSetup .yk-input-clear:active{transform:translateY(-50%) scale(.94)}
+#yakolakVisualSetup .yk-input-clear svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round}
 #yakolakVisualSetup .yk-input-clear:hover{background:rgba(255,255,255,.12);}
 #yakolakVisualSetup .yk-input-clear[hidden]{display:none!important;}
 #yakolakVisualSetup .yk-sheet .yk-primary{min-height:46px;background:linear-gradient(135deg,#3d4046,#181a1e);border-color:rgba(255,255,255,.46);color:#f8f8fa;font-size:16px;padding:9px 14px;border-radius:13px;}
@@ -58,9 +60,11 @@
 #yakolakVisualSetup .yk-subtle{min-height:30px;padding:3px;font-size:13px;}
 #yakolakVisualSetup .yk-modal[data-kind=seat] .yk-sheet,#yakolakVisualSetup .yk-modal[data-kind=name] .yk-sheet{position:absolute;border-radius:16px;padding:6px;gap:0;transform-origin:50% 0;background:linear-gradient(140deg,rgba(119,122,129,.94),rgba(43,45,50,.94));}
 #yakolakVisualSetup .yk-modal[data-side=above] .yk-sheet{transform-origin:50% 100%;}
-#yakolakVisualSetup .yk-modal[data-kind=name] .yk-sheet{padding:14px;gap:10px;}
+#yakolakVisualSetup .yk-modal[data-kind=name] .yk-sheet{padding:8px;gap:0;}
+#yakolakVisualSetup .yk-modal[data-kind=name] .yk-field input:focus-visible{outline:0;border-color:rgba(255,255,255,.58);box-shadow:inset 0 1px 4px rgba(0,0,0,.3),0 0 0 2px rgba(255,255,255,.10)}
 #yakolakVisualSetup .yk-modal[data-kind=name] h2{font-size:18px;}
 #yakolakVisualSetup .yk-menu{display:flex;flex-direction:column;}
+#yakolakVisualSetup .yk-menu-players{display:flex;flex-direction:column;border-top:1px solid rgba(255,255,255,.16);margin-top:4px;padding-top:4px;}
 #yakolakVisualSetup .yk-menu-item{min-height:42px;padding:8px 11px;text-align:right;font-size:14px;line-height:1.3;border-radius:11px;color:#fff;}
 #yakolakVisualSetup .yk-menu-item:hover,#yakolakVisualSetup .yk-menu-item:focus-visible{background:rgba(255,255,255,.15);}
 #yakolakVisualSetup .yk-menu-item[aria-checked=true]{background:rgba(255,255,255,.19);box-shadow:inset 0 1px 0 rgba(255,255,255,.4);}
@@ -73,6 +77,16 @@
 #yakolakVisualSetup.is-keyboard .yk-field input{height:42px;}
 #yakolakVisualSetup.is-keyboard .yk-form{gap:7px;}
 @media(max-height:480px){#yakolakVisualSetup .yk-actions{width:min(calc(100% - 32px),460px);gap:8px;}#yakolakVisualSetup .yk-primary,#yakolakVisualSetup .yk-choice,#yakolakVisualSetup .yk-outline{min-height:46px;padding:8px 18px;}#yakolakVisualSetup .yk-sharing{min-height:30px;font-size:16px;}}
+@media(max-width:699px){
+ #yakolakVisualSetup .yk-seat:not(.is-color){width:112px;height:44px;min-height:44px;padding:5px 9px;gap:5px;border-radius:14px;transform:translate(-50%,-50%) rotate(var(--yk-seat-tilt,0deg));box-shadow:0 5px 12px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.36);}
+ #yakolakVisualSetup .yk-seat:not(.is-color):active{transform:translate(-50%,-50%) rotate(var(--yk-seat-tilt,0deg)) scale(.97)}
+ #yakolakVisualSetup .yk-seat:not(.is-color)::after{content:"";position:absolute;top:calc(100% + 1px);left:50%;width:1px;height:12px;background:linear-gradient(rgba(255,255,255,.28),rgba(255,255,255,0));pointer-events:none;}
+ #yakolakVisualSetup .yk-seat-status{font-size:13px;max-width:87px;}
+ #yakolakVisualSetup .yk-seat-arrow{font-size:15px;}
+ #yakolakVisualSetup .yk-modal[data-kind=seat] .yk-sheet{padding:4px;border-radius:14px;box-shadow:0 8px 22px rgba(0,0,0,.30),inset 0 1px 0 rgba(255,255,255,.34);}
+ #yakolakVisualSetup .yk-modal[data-kind=seat] .yk-menu-item{min-height:44px;padding:7px 10px;font-size:14px;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+ #yakolakVisualSetup .yk-menu-players.is-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px;}
+}
 @media(min-width:700px){#yakolakVisualSetup[data-step=entry] .yk-actions{width:min(390px,calc(100% - 48px));}}
 @media(hover:hover) and (pointer:fine){
  #yakolakVisualSetup .yk-seat,#yakolakVisualSetup .yk-primary,#yakolakVisualSetup .yk-choice,#yakolakVisualSetup .yk-sharing{

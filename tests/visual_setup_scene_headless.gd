@@ -85,8 +85,20 @@ func _run() -> void:
 			push_error("Inactive seats became active at win target question")
 			quit(1)
 			return
+	var setup_pose := cam.transform
+	var setup_fov := cam.fov
 	setup._on_visual_action([JSON.stringify({"action":"start","rounds":3,"players":[{"color":"green","mode":"local","label":"أحمد","device_owner":"p1"},{"color":"marble","mode":"bot","label":"بوت","device_owner":"p1"}]})])
+	if not cam.transform.is_equal_approx(setup_pose) or not is_equal_approx(cam.fov,setup_fov):
+		push_error("Match camera snapped away from the settled setup frame")
+		quit(1)
+		return
 	await create_timer(0.8).timeout
+	if game.camera_transition:
+		var focus: Vector2 = cam.unproject_position(intro.to_global(game.turn_camera_focus))
+		if not root.get_visible_rect().has_point(focus):
+			push_error("Camera orbit lost the board before settling")
+			quit(1)
+			return
 	if not game.match_initialized or game.players.size() != 2 or setup.visual_active or game.tutorial_active:
 		push_error("Configuration did not start real match")
 		quit(1)

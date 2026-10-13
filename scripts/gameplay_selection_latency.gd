@@ -5,8 +5,8 @@ extends "res://scripts/gameplay_selected_state.gd"
 #
 # The authoritative path remains:
 # input -> rendered-mesh pick -> owner/legal-size validation -> selected_index.
-# Only legal-marker painting is deferred until the selected piece has had one
-# render opportunity. A generation token cancels stale marker work on rapid taps.
+# Legal hints are essential feedback and appear with selection. Optional
+# first-draw telemetry has generation guards against stale rapid taps.
 
 var _ux46_selection_material_cache: Dictionary = {}
 var _ux46_marker_generation: int = 0
@@ -161,6 +161,12 @@ func _ux46_finish_after_selected_frame(
 	owner_name: String,
 	pointer_kind: String
 ) -> void:
+	# Essential move feedback cannot depend on a render-notification callback.
+	# Paint it now; the post-draw signal is used only for optional telemetry.
+	if serial == _ux46_selection_serial and marker_generation == _ux46_marker_generation and selected_index == piece_index and not move_active:
+		_update_legal_markers(size_name, piece_color)
+		_ux46_publish_legal_targets(size_name)
+	if not _ux46_test_enabled: return
 	await RenderingServer.frame_post_draw
 	if serial != _ux46_selection_serial:
 		return
@@ -190,14 +196,6 @@ func _ux46_finish_after_selected_frame(
 			true
 		)
 
-	# Preserve the exact production marker pulse/material behavior; only its work is
-	# moved behind the first selected-state frame. GGH-009 publishes the exact same
-	# canonical cell set immediately after that render pass, never a duplicate rule.
-	# Dispatch to the current presentation layer. Calling super here bypassed
-	# the stone footprint and restored the old oversized pulsing rings one frame
-	# after selection, even though the selected piece and size were still correct.
-	_update_legal_markers(size_name, piece_color)
-	_ux46_publish_legal_targets(size_name)
 	if OS.has_feature("web") and _ux46_test_enabled:
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakUxSelect46MarkerSerial='%d';" % serial +

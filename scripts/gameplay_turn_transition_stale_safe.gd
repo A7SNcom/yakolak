@@ -109,6 +109,7 @@ func _start_authoritative_turn_camera(direction: String, revision: int, lifecycl
 	turn_presentation_target_revision = revision
 	turn_presentation_target_lifecycle = lifecycle
 	turn_camera_direction = direction
+	turn_camera_start_rotation = camera.basis.get_rotation_quaternion()
 	turn_camera_start_position = camera.position
 	turn_camera_target_position = axis * radius + Vector3(0.0, height, 0.0)
 	turn_camera_start_fov = camera.fov
@@ -145,7 +146,7 @@ func _apply_authoritative_turn_camera_progress(progress: float, serial: int) -> 
 	camera.position = _turn_camera_orbit_position(t)
 	camera.fov = lerpf(turn_camera_start_fov, turn_camera_effective_fov, t)
 	camera.current = true
-	camera.look_at(turn_camera_focus, Vector3.UP)
+	_apply_turn_camera_orientation(t)
 
 
 func _finish_authoritative_turn_camera(serial: int, direction: String) -> void:

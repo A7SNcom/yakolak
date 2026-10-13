@@ -90,7 +90,8 @@ func _run() -> void:
 			RenderingServer.frame_post_draw.emit()
 			_expect(game.target_markers[0].mesh is ArrayMesh,"post-selection draw keeps the real footprint")
 			_expect(game.target_markers[0].get_meta("stone_size","")==game._selected_size(),"delayed render uses the current selected size")
-			for index: int in indices:
+			for index: int in range(game.piece_records.size()):
+				if str(game.piece_records[index]["dir"]) != direction: continue
 				var source: StandardMaterial3D = game.home_materials[index]
 				var material: StandardMaterial3D = game.piece_records[index]["mesh"].material_override
 				var expected := source.albedo_color if index == game.selected_index else source.albedo_color.lerp(Color.BLACK,0.70)
@@ -129,11 +130,19 @@ func _run() -> void:
 					_expect(flat.get_aabb().size.x>previous_width,"small medium large footprints have strictly increasing true widths")
 					previous_width=flat.get_aabb().size.x
 				_expect(absf(game.target_markers[0].position.y-(2.0*game.U+0.003)) < 0.0001,"contour touches the recessed cell bed instead of floating above its rim")
+				var shown: MeshInstance3D = game.target_markers[4]
+				var contour: PackedVector3Array = shown.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+				for vertex: Vector3 in contour:
+					var point := shown.position+vertex
+					_expect(point.y>=game._board_height_at(point,4)+0.002,"every contour vertex is above its actual pocket surface")
+				_expect(shown.material_override.albedo_color.a>=0.60,"legal contour remains readable")
 				_expect(game.legal_marker_pulse == null,"no legal hint wave")
 				for cell: int in range(game.target_markers.size()):
 					var hit: Dictionary = game._ray_pick(intro.camera.unproject_position(game.target_markers[cell].global_position),game.TARGET_LAYER)
 					_expect(not hit.is_empty() and int(hit["collider"].get_meta("cell",-1))==cell,"tapping the visible footprint resolves its own cell")
 			game._close_piece_tray(-1,true)
+			for index: int in range(game.piece_records.size()):
+				_expect(game.piece_records[index]["mesh"].material_override == game.home_materials[index],"all reserve materials restored after selection closes")
 			_expect(game.choice_materials.is_empty(),"choice materials cleared")
 	game.current_player_index = 3
 	game._rm_enabled = false
@@ -147,22 +156,30 @@ func _run() -> void:
 		_expect(material.albedo_color.is_equal_approx(target),"animated dimming settles on correct color")
 	game._close_piece_tray(-1,true)
 	var winning: Array[int] = game._available_stack_indices("right",0)
+	for index: int in winning: game.piece_records[index]["played"] = true
+	var other: int = game._available_stack_indices("front",0)[0]
+	game.piece_records[other]["played"] = true
 	game._finish_round("right",winning)
+	_expect(not game.result_card.visible,"results wait while the board celebrates")
 	_expect(game.result_button.text == "استمرار","round button has text")
 	_expect(game.result_button.position.y > root.get_visible_rect().size.y*0.65,"continue is below board")
 	await create_timer(1.9).timeout
-	_expect(game.round_complete and game.victory_mix > 0.9,"victory eases to black and waits for explicit consent")
+	_expect(game.round_complete and game.victory_mix > 0.9,"board pieces ease out and wait for explicit consent")
 	game._set_victory_mix(1.0)
 	for index: int in range(game.piece_records.size()):
 		var material: StandardMaterial3D = game.piece_records[index]["mesh"].material_override
-		if winning.has(index):
-			_expect(material == game.home_materials[index],"winning stone retains exact material")
+		if winning.has(index) or not bool(game.piece_records[index]["played"]):
+			_expect(material == game.home_materials[index],"winning and reserve stones retain exact material")
 		else:
-			_expect(material.albedo_color.is_equal_approx(Color.BLACK),"nonwinning stone reaches black")
+			_expect(material.albedo_color.a==0.0 and not game.piece_records[index]["mesh"].visible,"only nonwinning played stones disappear")
 	game._set_victory_mix(0.0)
 	for index: int in game.victory_materials:
 		_expect(game.victory_materials[index].albedo_color.is_equal_approx(game.home_materials[index].albedo_color),"original color returns")
+	await create_timer(0.6).timeout
+	_expect(game.result_card.visible and game.result_title.text.contains("اسم 0"),"delayed result identifies the winner")
+	_expect(is_instance_valid(game.celebration) and game.celebration.amount<=48 and game.celebration.one_shot,"bounded one-shot 3D celebration")
 	game._on_round_action()
+	_expect(not game.result_card.visible and game.celebration==null,"continuation clears result and celebration")
 	_expect(game.victory_materials.is_empty(),"continue stops victory cycle")
 	_expect(game.victory_tween == null,"no cycle survives the round boundary")
 	_expect(not game.round_complete,"one device action advances all local players")
