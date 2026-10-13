@@ -31,6 +31,9 @@ var visual_zoom_mix: float = 0.0
 var visual_zoom_tween: Tween
 var visual_selected_color: String = ""
 var visual_world_seats: Dictionary = {}
+var visual_entry_generation: int = 0
+var visual_entry_acknowledged: bool = false
+var visual_entry_check_elapsed: float = 0.0
 
 func _ready() -> void:
 	super._ready()
@@ -53,7 +56,10 @@ func show_after_intro() -> void:
 		intro.set_process_unhandled_input(false)
 	showing = true
 	visual_active = true
-	visual_step = "profile"
+	visual_step = "entry"
+	visual_entry_generation += 1
+	visual_entry_acknowledged = false
+	visual_entry_check_elapsed = 0.0
 	visual_count_chosen = false
 	visual_selected_color = ""
 	active_screen = "visual"
@@ -64,6 +70,10 @@ func show_after_intro() -> void:
 	if dialog_navigation != null:
 		dialog_navigation.hide()
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Publish the entry before camera/material work. Browser readiness is a
+	# durable, acknowledged request rather than a one-shot nested bridge call.
+	_publish_setup_state("visible")
+	_publish_visual_entry_request()
 	visual_preview_seats.clear()
 	visual_last_viewport = Vector2.ZERO
 	visual_fit_viewport = Vector2.ZERO
@@ -75,14 +85,32 @@ func show_after_intro() -> void:
 	visual_zoom_tween = create_tween()
 	visual_zoom_tween.tween_property(self,"visual_zoom_mix",1.0,1.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_apply_visual_camera()
-	_publish_setup_state("visible")
-	if OS.has_feature("web"):
-		JavaScriptBridge.eval("document.body.dataset.yakolakDialogStage='visual';if(window.YakolakSetup)window.YakolakSetup.open({online:false,mixed:false});else window.yakolakPendingVisualSetup={online:false,mixed:false};", true)
 	_publish_visual_geometry()
 
-func _process(_delta: float) -> void:
+func _publish_visual_entry_request() -> void:
+	if not OS.has_feature("web"):
+		return
+	var request := str(visual_entry_generation)
+	JavaScriptBridge.eval(
+		"window.yakolakPendingVisualSetup={online:false,mixed:false,request:'" + request + "'};" +
+		"document.body.dataset.yakolakDialogStage='visual';" +
+		"document.body.dataset.yakolakVisualSetupRequest='" + request + "';",
+		true
+	)
+
+func _process(delta: float) -> void:
 	if not visual_active:
 		return
+	if OS.has_feature("web") and not visual_entry_acknowledged:
+		visual_entry_check_elapsed += delta
+		if visual_entry_check_elapsed >= 0.25:
+			visual_entry_check_elapsed = 0.0
+			visual_entry_acknowledged = bool(JavaScriptBridge.eval(
+				"document.body.dataset.yakolakVisualSetupAck==='" + str(visual_entry_generation) + "'",
+				true
+			))
+			if not visual_entry_acknowledged:
+				_publish_visual_entry_request()
 	_apply_visual_camera()
 	var viewport := get_viewport().get_visible_rect().size
 	if viewport != visual_last_viewport or visual_zoom_mix < 1.0:

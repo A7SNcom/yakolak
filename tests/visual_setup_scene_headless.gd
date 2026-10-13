@@ -13,6 +13,10 @@ func _run() -> void:
 		push_error("Visual setup did not open after real intro")
 		quit(1)
 		return
+	if setup.visual_step != "entry" or setup.visual_entry_generation != 1:
+		push_error("Intro handoff did not request room entry automatically")
+		quit(1)
+		return
 	await process_frame
 	if setup.visual_zoom_mix > 0.1:
 		push_error("Setup camera should begin from the final intro frame")
@@ -88,6 +92,10 @@ func _run() -> void:
 	await process_frame
 	if not setup.visual_active or not game.waiting_for_setup:
 		push_error("Return to visual setup failed")
+		quit(1)
+		return
+	if setup.visual_entry_generation != 2:
+		push_error("Return to setup reused a stale browser entry request")
 		quit(1)
 		return
 	if not cam.basis.is_equal_approx(setup.visual_intro_camera_snapshot["transform"].basis):

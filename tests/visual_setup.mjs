@@ -53,6 +53,48 @@ test('room code or same-origin invitation link normalizes',()=>{
 });
 if(process.env.YAKOLAK_JSDOM_MODULE){
  const {JSDOM}=await import(process.env.YAKOLAK_JSDOM_MODULE);
+ test('real engine entry request opens room choices without a click or direct API call',async()=>{
+  const dom=new JSDOM('<body></body>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});
+  const {window}=dom,{document}=window,events=[];
+  window.yakolakVisualSetupAction=value=>events.push(JSON.parse(value));
+  mountSetup(document,window);
+  const root=document.getElementById('yakolakVisualSetup');
+  assert.equal(root.hidden,true);
+  // This is the exact durable request published by SessionSetup after handoff.
+  window.yakolakPendingVisualSetup={online:false,mixed:false,request:'1'};
+  document.body.dataset.yakolakVisualSetupRequest='1';
+  assert.equal(events.length,0,'engine publication must not reenter its callback');
+  await new Promise(resolve=>window.setTimeout(resolve,0));
+  assert.equal(root.hidden,false);assert.equal(root.dataset.step,'entry');
+  assert.equal(root.querySelector('.yk-entry').hidden,false);
+  assert.deepEqual([...root.querySelectorAll('.yk-entry button')].map(x=>x.textContent),['غرفة جديدة','انضمام لغرفة']);
+  assert.equal(document.body.dataset.yakolakVisualSetupAck,'1');
+  root.querySelector('.yk-entry button').click();
+  assert.equal(root.querySelector('.yk-modal').dataset.kind,'profile');
+  document.body.dataset.yakolakVisualSetupRequest='1';
+  await new Promise(resolve=>window.setTimeout(resolve,0));
+  assert.equal(root.querySelector('.yk-modal').hidden,false,'retry must preserve visitor input');
+  window.YakolakSetup.close();
+  document.body.dataset.yakolakVisualSetupRequest='1';
+  await new Promise(resolve=>window.setTimeout(resolve,0));
+  assert.equal(root.hidden,true,'stale request cannot reopen setup during play');
+  document.body.dataset.yakolakVisualSetupRequest='2';
+  await new Promise(resolve=>window.setTimeout(resolve,0));
+  assert.equal(root.hidden,false);assert.equal(root.querySelector('.yk-entry').hidden,false);
+  assert.equal(document.body.dataset.yakolakVisualSetupAck,'2');
+  dom.window.close();
+ });
+ test('a late-loaded setup module consumes an already published engine request',async()=>{
+  const dom=new JSDOM('<body data-yakolak-visual-setup-request="7"></body>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});
+  const {window}=dom,{document}=window;
+  window.yakolakPendingVisualSetup={online:false,mixed:false,request:'7'};
+  mountSetup(document,window);
+  assert.equal(document.getElementById('yakolakVisualSetup').hidden,false);
+  assert.equal(document.querySelector('.yk-entry').hidden,false);
+  assert.equal(document.body.dataset.yakolakVisualSetupAck,'7');
+  assert.equal(window.yakolakPendingVisualSetup,undefined);
+  dom.window.close();
+ });
  test('phone, entry, color, count, dropdown, win target and start are separate stages',async()=>{
   const dom=new JSDOM('<body></body>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});
   const {window}=dom,{document}=window,events=[],copies=[];

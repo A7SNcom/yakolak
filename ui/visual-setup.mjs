@@ -79,6 +79,7 @@ export function mountSetup(document, window) {
   let state = newSetup(profile?.name || '');
   let capabilities = { online: false, mixed: false }, connections = [], geometry = {}, roomCode = '';
   let pending = false, returnFocus = null, sheetGeneration = 0, moving = false, nameDraft = null, flowGeneration = 0, profileContinuation = null;
+  let lastEntryRequest = '';
   const el = (tag, cls, text) => { const node = document.createElement(tag); if (cls) node.className = cls; if (text !== undefined) node.textContent = text; return node; };
   const button = (label, action, cls = '') => { const node = el('button',cls,label); node.type = 'button'; node.addEventListener('click',e=>{e.stopPropagation();action(e);}); return node; };
   const reduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -308,14 +309,25 @@ export function mountSetup(document, window) {
   root.addEventListener('pointerdown',e=>{if(nameDraft&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet();},true);
   root.addEventListener('click',e=>{if(!modal.hidden&&modal.dataset.kind!=='profile'&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet(true);});root.addEventListener('keydown',e=>e.stopPropagation());
   const api={
-    open(options={}){flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;closeSheet();resetOverlay();capabilities={online:!!options.online,mixed:!!options.mixed};connections=[];roomCode='';pending=moving=false;state=newSetup(profile?.name||'');geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();notify('preview');},
-    close(){flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;pending=moving=false;resetOverlay();root.hidden=true;refreshGlass();document.body.dataset.yakolakVisualSetup='hidden';},
+    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;closeSheet();resetOverlay();capabilities={online:!!options.online,mixed:!!options.mixed};connections=[];roomCode='';pending=moving=false;state=newSetup(profile?.name||'');geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
+      // Never synchronously call back into Godot while it is publishing entry.
+      const token=flowGeneration;window.setTimeout(()=>{if(token===flowGeneration&&!root.hidden)notify('preview');},0);},
+    close(){flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;pending=moving=false;resetOverlay();root.hidden=true;refreshGlass();delete window.yakolakPendingVisualSetup;document.body.dataset.yakolakVisualSetup='hidden';},
     geometry(points){geometry=points;root.dataset.world=String(!!points.world);position();},
     error(text){root.hidden=false;showError(text);},
     room(room){roomCode=/^\d{2}$/.test(String(room.code||''))?String(room.code):'';connections=(room.players||[]).filter(x=>x.connected!==false&&x.name).map(x=>({seat:String(x.seat),name:String(x.name).slice(0,24)}));render();}
   };
   window.YakolakSetup=api;viewport();
-  if(window.yakolakPendingVisualSetup){api.open(window.yakolakPendingVisualSetup);delete window.yakolakPendingVisualSetup;}
+  const acceptEntryRequest=()=>{
+    const request=document.body.dataset.yakolakVisualSetupRequest||'';
+    const options=window.yakolakPendingVisualSetup;
+    if(request&&request!==lastEntryRequest){api.open({...options,request});delete window.yakolakPendingVisualSetup;}
+    else if(!request&&options){api.open(options);delete window.yakolakPendingVisualSetup;}
+  };
+  // Covers engine-first/module-first loading and a missed direct bridge call.
+  // Repeated requests acknowledge delivery without resetting the current step.
+  new window.MutationObserver(acceptEntryRequest).observe(document.body,{attributes:true,attributeFilter:['data-yakolak-visual-setup-request']});
+  acceptEntryRequest();
   if(window.yakolakPendingVisualGeometry){api.geometry(window.yakolakPendingVisualGeometry);delete window.yakolakPendingVisualGeometry;}
   return api;
 }
