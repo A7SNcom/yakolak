@@ -69,9 +69,16 @@ if(process.env.YAKOLAK_JSDOM_MODULE){
   assert.ok([...document.querySelectorAll('.yk-seat')].every(x=>x.hidden));
   q('.yk-counts button[aria-label="3 لاعبين"]').click();assert.equal(q('.yk-counts').hidden,true);assert.equal(q('h1').textContent,'');
   assert.equal(q('.yk-start').hidden,false);assert.equal(q('.yk-rounds').hidden,true);assert.equal(q('[data-color=marble] .yk-seat-status').textContent,'فاضي');
-  assert.equal(q('[data-color=blue] .yk-seat-number'),null);assert.ok(parseFloat(q('[data-color=blue]').style.width)>0);assert.ok(!q('.yk-seats').textContent.includes('لاعب'));
+  assert.equal(q('[data-color=blue] .yk-seat-number'),null);assert.ok(parseFloat(q('[data-color=blue]').style.left)>0);assert.ok(!q('.yk-seats').textContent.includes('لاعب'));
   q('[data-color=gold]').click();assert.equal(q('.yk-sheet').getAttribute('role'),'menu');assert.equal(q('.yk-sheet').getAttribute('aria-modal'),'false');
   [...document.querySelectorAll('.yk-menu-item')].find(x=>x.textContent==='لاعب').click();assert.equal(q('input').placeholder,'اسم اللاعب');assert.equal(q('.yk-modal').dataset.side,'center');
+  const footerTop=q('.yk-actions').style.top;
+  const viewport=new window.EventTarget();viewport.height=340;viewport.offsetTop=20;
+  Object.defineProperty(window,'visualViewport',{configurable:true,value:viewport});
+  window.dispatchEvent(new window.Event('resize'));
+  assert.equal(q('.yk-actions').style.top,footerTop,'keyboard leaves Start/Share below its overlay');
+  assert.ok(q('#yakolakVisualSetup').classList.contains('is-keyboard'));
+  assert.ok(parseFloat(q('.yk-sheet').style.top)<340,'editing sheet stays inside visible viewport');
   q('input').value='ريم';q('input').dispatchEvent(new window.Event('input'));assert.equal(q('.yk-input-clear').hidden,false);q('.yk-input-clear').click();assert.equal(q('input').value,'');assert.equal(q('.yk-input-clear').hidden,true);
   q('input').value='ريم';q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));
   q('.yk-start').click();assert.equal(q('.yk-rounds').hidden,false);assert.equal(q('h1').textContent,'كم شوط للفوز؟');assert.equal(events.some(x=>x.action==='start'),false);

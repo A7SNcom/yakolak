@@ -118,7 +118,7 @@ function completeModelMatch(initial, snapshots, cycle) {
     capture(snapshots, cycle, `round-${win}-finish`, beforeRound, room);
     if (win < WINS_TO_MATCH) {
       const beforeAdvance = structuredClone(room);
-      room = { ...rematchState(room, 'p1'), version: Number(beforeAdvance.version) + 1 };
+      for (const player of room.players) room = { ...rematchState(room, player.seat), version: Number(room.version) + 1 };
       capture(snapshots, cycle, `round-${win}-advance`, beforeAdvance, room);
     }
   }

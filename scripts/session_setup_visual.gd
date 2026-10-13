@@ -16,6 +16,7 @@ var visual_inactive_material: StandardMaterial3D
 var visual_selection_black_material: StandardMaterial3D
 var visual_prompt: Label3D
 var visual_lights: Dictionary = {}
+var visual_color_tweens: Dictionary = {}
 var visual_light_tween: Tween
 var visual_light_key: String = ""
 var visual_prompt_tween: Tween
@@ -359,14 +360,27 @@ func _update_visual_seats() -> void:
 		# Keep the chosen seat's source material intact; use a true black material
 		# for the other seats while the player is choosing a color.
 		var saved: Dictionary = visual_piece_visibility[key]
-		if enabled:
-			mesh.material_override = saved.get("preview_material",saved["material"])
-		elif not selected_direction.is_empty():
-			mesh.material_override = visual_selection_black_material
+		if not selected_direction.is_empty() and saved.has("preview_material"):
+			var preview := saved["preview_material"] as BaseMaterial3D
+			var original: Color = saved["original_color"]
+			var target: Color = original if enabled else original.lerp(Color.BLACK, 0.70)
+			mesh.material_override = preview
+			var old_tween: Tween = visual_color_tweens.get(key)
+			if old_tween != null and old_tween.is_valid(): old_tween.kill()
+			var duration := 0.0 if _visual_reduced_motion() else 0.24
+			var color_tween := create_tween()
+			color_tween.tween_property(preview,"albedo_color",target,duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			visual_color_tweens[key] = color_tween
 		else:
-			mesh.material_override = visual_inactive_material
+			var old_tween: Tween = visual_color_tweens.get(key)
+			if old_tween != null and old_tween.is_valid(): old_tween.kill()
+			if saved.has("preview_material"): (saved["preview_material"] as BaseMaterial3D).albedo_color = saved["original_color"]
+			mesh.material_override = saved["material"] if enabled else visual_inactive_material
 
 	_update_visual_lighting()
+
+func _visual_reduced_motion() -> bool:
+	return OS.has_feature("web") and bool(JavaScriptBridge.eval("matchMedia('(prefers-reduced-motion: reduce)').matches",true))
 
 func _update_visual_lighting() -> void:
 	var offsets := {"right":Vector3(5.4,3.2,0),"back":Vector3(0,3.2,-5.4),"left":Vector3(-5.4,3.2,0),"front":Vector3(0,3.2,5.4)}
@@ -457,6 +471,10 @@ func _restore_visual_camera() -> void:
 			var mesh := record["node"] as GeometryInstance3D
 			mesh.visible = bool(record["visible"])
 			mesh.material_override = record["material"]
+	for value: Variant in visual_color_tweens.values():
+		var color_tween := value as Tween
+		if color_tween != null and color_tween.is_valid(): color_tween.kill()
+	visual_color_tweens.clear()
 	visual_piece_visibility.clear()
 
 func _close_visual_setup() -> void:

@@ -323,11 +323,10 @@ function restartMatchState(state) {
 function rematchState(state, seat, requiredSeats = null) {
   if (state.status !== 'finished') throw new Error('round_not_finished');
   if (!state.players.some(player => player.seat === seat)) throw new Error('invalid_seat');
-  if (!state.matchComplete) return advanceRoundState(state, seat);
   const rematch = { ...state.rematch, [seat]: true };
   const required = requiredSeats || state.players.map(player => player.seat);
   if (!required.every(requiredSeat => rematch[requiredSeat])) return { ...state, rematch };
-  return restartMatchState({ ...state, rematch });
+  return state.matchComplete ? restartMatchState({ ...state, rematch }) : advanceRoundState({ ...state, rematch }, seat);
 }
 
 function leaveState(state, seat) {

@@ -259,7 +259,20 @@ async function raceNextRound(clients, preBoundary) {
   assert.equal(successes.length, 1, `exactly one next-round request commits: ${JSON.stringify(attempts.map(item => [item.status, item.data.error]))}`);
   assert.equal(conflicts.length, clients.length - 1, 'every competing boundary request loses to the same CAS');
   assert.ok(conflicts.every(item => item.data.error === 'version_conflict'), 'losing clients receive the authoritative version conflict');
-  return { room: successes[0].data.room, attempts };
+  let room = successes[0].data.room;
+  assert.equal(room.status, 'finished', 'one consent never resets a multiplayer round');
+  assert.deepEqual(room.board, preBoundary.board, 'board remains visible while waiting for consent');
+  for (const client of clients) {
+    if (room.rematch[client.seat]) continue;
+    const vote = await request('/api/rooms', {
+      method: 'POST', token: client.token,
+      body: { action: 'rematch', code: client.code, version: room.version, mutationId: secret() },
+    });
+    assert.equal(vote.status, 200);
+    room = vote.data.room;
+  }
+  assert.equal(room.status, 'playing', 'all devices acknowledged before reset');
+  return { room, attempts };
 }
 
 async function cleanup(clients) {

@@ -19,6 +19,7 @@ var pinch_start_fov: float = 50.0
 var user_zoom_ratio: float = 1.0
 var previous_transition: bool = false
 var previous_match_initialized: bool = false
+var initial_zoom_applied: bool = false
 
 
 func _ready() -> void:
@@ -153,6 +154,13 @@ func _base_turn_fov() -> float:
 
 
 func effective_fov_for_base(base_fov: float) -> float:
+	if not initial_zoom_applied:
+		initial_zoom_applied = true
+		var touch_device: bool = OS.has_feature("mobile")
+		if OS.has_feature("web"):
+			touch_device = bool(JavaScriptBridge.eval("matchMedia('(pointer: coarse)').matches", true))
+		if touch_device:
+			user_zoom_ratio = MIN_FOV / maxf(base_fov, 1.0)
 	return clampf(maxf(base_fov, 1.0) * user_zoom_ratio, MIN_FOV, MAX_FOV)
 
 
@@ -169,6 +177,7 @@ func _reset_zoom_state() -> void:
 	pinch_start_distance = 0.0
 	pinch_start_fov = 50.0
 	user_zoom_ratio = 1.0
+	initial_zoom_applied = false
 
 
 func _publish_zoom_state() -> void:

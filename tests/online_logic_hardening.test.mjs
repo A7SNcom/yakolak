@@ -235,7 +235,9 @@ function twoPlayerRoom() {
   assert.equal(unchanged.round, 1);
   assert.throws(() => rematchState(unchanged, 'p9'), /invalid_seat/);
 
-  const advanced = rematchState(unchanged, 'p2');
+  const acknowledged = rematchState(unchanged, 'p2');
+  assert.equal(acknowledged.status, 'finished');
+  const advanced = rematchState(acknowledged, 'p1');
   assert.equal(advanced.status, 'playing');
   assert.equal(advanced.round, 2);
   assert.deepEqual(advanced.board['0'], {});
