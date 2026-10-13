@@ -283,22 +283,29 @@ func _update_legal_markers(size_name: String, piece_color: Color) -> void:
 
 
 func _ghost_surface_height(mesh: Mesh, basis: Basis, bottom: float, cell: int) -> float:
-	var key := str(mesh.get_instance_id())+":"+str(basis)+":"+str(cell)
-	if ghost_height_cache.has(key): return ghost_height_cache[key]
-	var height := _cell_surface_height(cell)
-	var center := Vector3(CELL_COORDS[cell].x*U,0,CELL_COORDS[cell].z*U)
-	var visited: Dictionary = {}
-	for surface: int in range(mesh.get_surface_count()):
-		var points: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
-		for vertex: Vector3 in points:
-			var point := basis*vertex
-			if absf(point.y-bottom)>0.001: continue
-			var coordinate := Vector2(point.x,point.z)
-			if visited.has(coordinate): continue
-			visited[coordinate]=true
-			height=maxf(height,_board_height_at(center+point,cell))
-	ghost_height_cache[key]=height
-	return height
+	# The nine pockets are copies of the same layout. Sample one canonical
+	# pocket for this exact mesh/orientation, then apply its relative clearance
+	# to every cell. Edge precision must not lift one preview onto the outer rim.
+	var key := str(mesh.get_instance_id())+":"+str(basis)
+	if not ghost_height_cache.has(key):
+		var reference := 4
+		var bed := _cell_surface_height(reference)
+		var height := bed
+		var center := Vector3(CELL_COORDS[reference].x*U,0,CELL_COORDS[reference].z*U)
+		var visited: Dictionary = {}
+		for surface: int in range(mesh.get_surface_count()):
+			var points: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
+			for vertex: Vector3 in points:
+				var point := basis*vertex
+				if absf(point.y-bottom)>0.001: continue
+				var coordinate := Vector2(point.x,point.z)
+				if visited.has(coordinate): continue
+				visited[coordinate]=true
+				height=maxf(height,_board_height_at(center+point,reference))
+		# Pocket relief reaches five layout units, the bed is at two. The twelve
+		# unit perimeter belongs to the box, never to a legal placement preview.
+		ghost_height_cache[key]=clampf(height-bed,0.0,3.0*U)
+	return _cell_surface_height(cell)+float(ghost_height_cache[key])
 
 
 func _prepare_board_faces() -> void:

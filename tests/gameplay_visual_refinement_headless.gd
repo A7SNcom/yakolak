@@ -134,6 +134,9 @@ func _run() -> void:
 				previous_width=ghost_box.size.x
 				_expect(game.legal_marker_pulse==null and game.footprint_fade==null,"preview has no geometric or opacity wave")
 				for cell: int in range(game.target_markers.size()):
+					var preview: MeshInstance3D = game.target_markers[cell]
+					_expect(absf(preview.position.y-shown.position.y)<0.0001,"all nine copies of a chosen size have a consistent surface height")
+					_expect((preview.transform*original).position.y<=5.0*game.U+0.005,"preview never floats on the high box perimeter")
 					var hit: Dictionary = game._ray_pick(intro.camera.unproject_position(game.CELL_COORDS[cell]*game.U),game.TARGET_LAYER)
 					_expect(not hit.is_empty() and int(hit["collider"].get_meta("cell",-1))==cell,"visible preview uses the same placement cell")
 			game._close_piece_tray(-1,true)

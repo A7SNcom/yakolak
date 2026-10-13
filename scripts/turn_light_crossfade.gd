@@ -11,7 +11,7 @@ const BASE_TARGETS: Dictionary = {
 	"left": Vector3(-Layout.REST_CENTER, 0.34, 0.0),
 	"front": Vector3(0.0, 0.34, Layout.REST_CENTER),
 }
-const ACTIVE_ENERGY: float = 1.05
+const ACTIVE_ENERGY: float = 0.55
 const NEUTRAL_ENERGY: float = 0.0
 const CROSSFADE_DURATION: float = 0.80
 const LIGHT_HEIGHT: float = 3.8

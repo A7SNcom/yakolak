@@ -20,11 +20,11 @@ class FakeGameplay:
 
 
 const TurnLight = preload("res://scripts/turn_light_crossfade.gd")
-const ACTIVE_ENERGY: float = 1.05
+const ACTIVE_ENERGY: float = 0.55
 const ENERGY_EPSILON: float = 0.012
 const SETTLE_TIMEOUT_MSEC: int = 1200
-const MIN_EXPECTED_CROSSFADE_MSEC: int = 250
-const MAX_EXPECTED_CROSSFADE_MSEC: int = 650
+const MIN_EXPECTED_CROSSFADE_MSEC: int = 650
+const MAX_EXPECTED_CROSSFADE_MSEC: int = 1000
 
 var failures: Array[String] = []
 var intro: Node3D

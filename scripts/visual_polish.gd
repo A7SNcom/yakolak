@@ -4,7 +4,7 @@ extends Node
 # The wall logo uses the same SVG file as the DOM loader so the logo handoff
 # can be screen-space matched instead of approximated.
 
-const VISUAL_VERSION: String = "black-studio-v4-contact-detail"
+const VISUAL_VERSION: String = "black-studio-v5-soft-detail"
 const LOGO_PATH: String = "res://generated/YAKOLAK_INVERTED.svg"
 const BACKGROUND_COLOR: Color = Color("#000000")
 const FLOOR_COLOR: Color = Color("#080a0d")
@@ -92,25 +92,25 @@ func _apply_when_ready() -> bool:
 			continue
 		var stone := child as MeshInstance3D
 		var stone_color: Color = IVORY_COLOR
-		var roughness: float = 0.46
+		var roughness: float = 0.52
 		var metallic: float = 0.01
 		if String(stone.name).begins_with("Stone_left_"):
 			stone_color = GOLD_COLOR
-			roughness = 0.34
-			metallic = 0.28
+			roughness = 0.42
+			metallic = 0.24
 		elif String(stone.name).begins_with("Stone_front_"):
 			stone_color = GREEN_COLOR
-			roughness = 0.42
+			roughness = 0.48
 			metallic = 0.08
 		elif String(stone.name).begins_with("Stone_back_"):
 			stone_color = BLUE_COLOR
-			roughness = 0.42
+			roughness = 0.48
 			metallic = 0.08
 		_apply_material(stone, stone_color, roughness, metallic)
 		_apply_surface_detail(stone,0.12,0.16)
 		stone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
-	_apply_material(tabletop, TABLE_COLOR, 0.54, 0.08)
+	_apply_material(tabletop, TABLE_COLOR, 0.62, 0.08)
 	_apply_surface_detail(tabletop,4.0,0.10)
 	_apply_material(pedestal, PEDESTAL_COLOR, 0.58, 0.12)
 	_shorten_pedestal(pedestal)
@@ -124,9 +124,9 @@ func _apply_environment(environment: Environment) -> void:
 	environment.background_color = BACKGROUND_COLOR
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	environment.ambient_light_color = Color("#d3d7dd")
-	environment.ambient_light_energy = 0.40
+	environment.ambient_light_energy = 0.32
 	environment.tonemap_mode = Environment.TONE_MAPPER_ACES
-	environment.tonemap_exposure = 0.95
+	environment.tonemap_exposure = 0.85
 	environment.adjustment_enabled = true
 	environment.adjustment_brightness = 1.0
 	environment.adjustment_contrast = 1.04
@@ -136,19 +136,19 @@ func _apply_environment(environment: Environment) -> void:
 func _apply_lights(directionals: Array[DirectionalLight3D], omnis: Array[OmniLight3D]) -> void:
 	var key := directionals[0]
 	key.light_color = Color("#fafafa")
-	key.light_energy = 1.05
+	key.light_energy = 0.78
 	key.shadow_enabled = true
 	key.directional_shadow_max_distance = 48.0
 	key.shadow_bias = 0.035
 
 	var fill := directionals[1]
 	fill.light_color = Color("#dce3ec")
-	fill.light_energy = 0.34
+	fill.light_energy = 0.26
 	fill.shadow_enabled = false
 
 	var rim := directionals[2]
 	rim.light_color = Color("#ffffff")
-	rim.light_energy = 0.66
+	rim.light_energy = 0.40
 	rim.shadow_enabled = false
 
 	for omni: OmniLight3D in omnis:
