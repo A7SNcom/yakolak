@@ -58,12 +58,15 @@ if(process.env.YAKOLAK_JSDOM_MODULE){
   const {window}=dom,{document}=window,events=[],copies=[];
   window.yakolakVisualSetupAction=value=>events.push(JSON.parse(value));window.navigator.clipboard={writeText:async value=>copies.push(value)};
   const api=mountSetup(document,window);api.open();const q=s=>document.querySelector(s);
+  assert.equal(q('.yk-entry').hidden,false);
+  assert.equal(q('.yk-modal').hidden,true);
+  assert.equal(q('.yk-entry button').textContent,'غرفة جديدة');
+  q('.yk-entry button').click();
   q('input[type=tel]').value='٠٥٥۱۲۳٤٥٦٧';q('input[type=tel]').dispatchEvent(new window.Event('input'));
   assert.equal(q('input[type=tel]').inputMode,'numeric');assert.equal(q('input[type=tel]').value,'0551234567');
   q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));assert.equal(q('h2').textContent,'الاسم الكريم');
   q('input[autocomplete=given-name]').value='أحمد';q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));
-  assert.equal(q('.yk-entry').hidden,false);assert.equal(q('h1').textContent,'');assert.ok([...document.querySelectorAll('.yk-seat')].every(x=>x.hidden));
-  q('.yk-entry button').click();assert.equal(q('h1').textContent,'اختر لونك');assert.equal(q('.yk-confirm').hidden,true);
+  assert.equal(q('h1').textContent,'اختر لونك');assert.equal(q('.yk-confirm').hidden,true);
   q('[data-color=blue]').click();assert.equal(q('.yk-confirm').hidden,false);assert.equal(q('[data-color=blue]').getAttribute('aria-pressed'),'true');assert.equal(q('[data-color=gold]').getAttribute('aria-pressed'),'false');assert.equal(q('.yk-start').hidden,true);
   q('.yk-confirm').click();assert.equal(q('h1').textContent,'كم لاعب؟');assert.equal(q('.yk-counts').hidden,false);
   assert.ok([...document.querySelectorAll('.yk-seat')].every(x=>x.hidden));
@@ -84,7 +87,7 @@ if(process.env.YAKOLAK_JSDOM_MODULE){
   q('.yk-start').click();assert.equal(q('.yk-rounds').hidden,false);assert.equal(q('h1').textContent,'كم شوط للفوز؟');assert.equal(events.some(x=>x.action==='start'),false);
   q('.yk-rounds button[aria-label="الفوز بـ 5 أشواط"]').click();const start=events.find(x=>x.action==='start');assert.equal(start.rounds,5);assert.equal(start.count_chosen,true);assert.equal(start.players[1].label,'ريم');assert.equal(start.players.length,3);
   assert.ok(!JSON.stringify(events).includes('0551234567'));
-  api.open();q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));assert.equal(q('input[autocomplete=given-name]'),null);
+  api.open();assert.equal(q('.yk-entry').hidden,false);assert.equal(q('.yk-modal').hidden,true);assert.equal(q('input[autocomplete=given-name]'),null);
   q('.yk-entry button:last-child').click();q('input').value='https://a7sncom.github.io/yakolak/?room=12';q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));assert.match(q('.yk-field-error').textContent,/غير متاح/);
   q('.yk-subtle').click();q('.yk-entry button').click();q('[data-color=blue]').click();q('.yk-confirm').click();q('.yk-counts button').click();
   assert.equal(q('.yk-sharing').disabled,true);q('.yk-sharing').click();assert.equal(copies.length,0);assert.equal(q('.yk-error').textContent,'');
