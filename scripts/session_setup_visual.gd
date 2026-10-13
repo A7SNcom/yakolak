@@ -36,12 +36,18 @@ var visual_world_seats: Dictionary = {}
 var visual_entry_generation: int = 0
 var visual_entry_acknowledged: bool = false
 var visual_entry_check_elapsed: float = 0.0
+var visual_resume_configuration: Dictionary = {}
+var visual_lobby_angle := 0.0
+var visual_geometry_elapsed := 0.0
+var visual_reduce_motion := false
 
 func _ready() -> void:
 	super._ready()
 	visual_font = preload("res://assets/fonts/thmanyahsans-Medium.otf").duplicate()
 	visual_font.fallbacks = [ARABIC_FONT]
 	process_priority = 1200
+	if OS.has_feature("web"):
+		visual_reduce_motion = bool(JavaScriptBridge.eval("matchMedia('(prefers-reduced-motion: reduce)').matches",true))
 	if OS.has_feature("web"):
 		visual_callback = JavaScriptBridge.create_callback(_on_visual_action)
 		var window: JavaScriptObject = JavaScriptBridge.get_interface("window")
@@ -58,7 +64,8 @@ func show_after_intro() -> void:
 		intro.set_process_unhandled_input(false)
 	showing = true
 	visual_active = true
-	visual_step = "entry"
+	visual_step = "ready" if not visual_resume_configuration.is_empty() else "entry"
+	visual_lobby_angle = 0.0
 	visual_entry_generation += 1
 	visual_entry_acknowledged = false
 	visual_entry_check_elapsed = 0.0
@@ -94,7 +101,7 @@ func _publish_visual_entry_request() -> void:
 		return
 	var request := str(visual_entry_generation)
 	JavaScriptBridge.eval(
-		"window.yakolakPendingVisualSetup={online:false,mixed:false,request:'" + request + "'};" +
+		"window.yakolakPendingVisualSetup={online:false,mixed:false,resume:"+JSON.stringify(visual_resume_configuration)+",request:'" + request + "'};" +
 		"document.body.dataset.yakolakDialogStage='visual';" +
 		"document.body.dataset.yakolakVisualSetupRequest='" + request + "';",
 		true
@@ -113,9 +120,13 @@ func _process(delta: float) -> void:
 			))
 			if not visual_entry_acknowledged:
 				_publish_visual_entry_request()
+	var orbiting := visual_step=="entry" and not visual_overlay_open and visual_zoom_mix>=0.999 and not visual_reduce_motion
+	if orbiting: visual_lobby_angle += delta*0.020
+	visual_geometry_elapsed += delta
 	_apply_visual_camera()
 	var viewport := get_viewport().get_visible_rect().size
-	if viewport != visual_last_viewport or visual_zoom_mix < 1.0:
+	if viewport != visual_last_viewport or visual_zoom_mix < 1.0 or (orbiting and visual_geometry_elapsed>=0.10):
+		visual_geometry_elapsed=0.0
 		_publish_visual_geometry()
 
 func _layout_card() -> void:
@@ -173,10 +184,37 @@ func _apply_visual_camera() -> void:
 	cam.v_offset = float(visual_intro_camera_snapshot["v"])
 	if viewport != visual_fit_viewport:
 		_fit_visual_table(cam, viewport)
-	cam.transform = visual_intro_camera_snapshot["transform"]
-	cam.transform = Transform3D(cam.basis,cam.position.lerp(visual_fitted_transform.origin,visual_zoom_mix))
+	var start: Transform3D = visual_camera_snapshot["transform"]
+	cam.transform = start.interpolate_with(visual_fitted_transform,visual_zoom_mix)
+	cam.fov = lerpf(float(visual_camera_snapshot["fov"]),float(visual_intro_camera_snapshot["fov"]),visual_zoom_mix)
+	if visual_lobby_angle!=0.0:
+		# A very slow bounded orbit preserves the approved framing at every angle.
+		var orbit := Basis(Vector3.UP,0.12*sin(visual_lobby_angle))
+		var center := Vector3(0,0.35,0)
+		cam.position = center+orbit*(cam.position-center)
+		cam.basis = orbit*cam.basis
+	for name: String in ["StudioBackWall","StudioWallLogo"]:
+		var background := intro.get_node_or_null(name) as GeometryInstance3D
+		if background != null: background.visible=cam.position.z>=-13.2
 	_update_visual_prompt(cam)
 	_update_world_seats(cam)
+
+func lobby_camera_target() -> Dictionary:
+	var cam := intro.get("camera") as Camera3D
+	if cam==null or visual_intro_camera_snapshot.is_empty(): return {}
+	var saved := {"transform":cam.transform,"fov":cam.fov}
+	var viewport := get_viewport().get_visible_rect().size
+	var metrics := _canvas_metrics(viewport)
+	canvas_scale=float(metrics["scale"])
+	canvas_css_size=metrics["css_size"]
+	cam.transform=visual_intro_camera_snapshot["transform"]
+	cam.fov=float(visual_intro_camera_snapshot["fov"])
+	_capture_visual_board_corners()
+	_fit_visual_table(cam,viewport)
+	var target := {"transform":visual_fitted_transform,"fov":cam.fov}
+	cam.transform=saved["transform"]
+	cam.fov=float(saved["fov"])
+	return target
 
 func _capture_visual_board_corners() -> void:
 	visual_board_corners.clear()
@@ -483,6 +521,7 @@ func _accept_visual_configuration(payload: Dictionary) -> void:
 		show_setup_error("راجع حالات اللاعبين")
 		return
 	_close_visual_setup(true)
+	visual_resume_configuration.clear()
 	_publish_setup_state("complete")
 	configuration_ready.emit(configuration)
 

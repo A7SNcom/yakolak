@@ -62,6 +62,16 @@ export function configurationError(state, capabilities = {}) {
   return '';
 }
 
+export function restoreSetup(config, fallbackName='') {
+  const players=Array.isArray(config?.players)?config.players:[];
+  if(players.length<2||players.length>4||!COLORS.some(c=>c.id===players[0]?.color))return newSetup(fallbackName);
+  let state=chooseCount(confirmColor(chooseColor(newSetup(players[0].label||fallbackName),players[0].color)),players.length);
+  return {...state,rounds:[3,5].includes(config.rounds)?config.rounds:3,seats:state.seats.map(seat=>{
+    const player=players.find(p=>p.color===seat.color);
+    return player?{...seat,mode:player.mode==='bot'?'bot':'local',name:player.mode==='bot'?'':String(player.label||'').slice(0,24),owner:player.device_owner||'p1'}:{...seat,mode:'none',name:''};
+  })};
+}
+
 export function parseRoomInput(value, base = 'https://a7sncom.github.io/yakolak/') {
   const text = String(value).trim();
   if (/^[0-9٠-٩۰-۹\s]+$/.test(text)) { const code = digits(text); return /^\d{2}$/.test(code) ? code : ''; }
@@ -315,7 +325,7 @@ export function mountSetup(document, window) {
   root.addEventListener('pointerdown',e=>{if(nameDraft&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet();},true);
   root.addEventListener('click',e=>{if(!modal.hidden&&modal.dataset.kind!=='profile'&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet(true);});root.addEventListener('keydown',e=>e.stopPropagation());
   const api={
-    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;closeSheet();resetOverlay();capabilities={online:!!options.online,mixed:!!options.mixed};connections=[];roomCode='';pending=moving=false;state=newSetup(profile?.name||'');geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
+    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;closeSheet();resetOverlay();capabilities={online:!!options.online,mixed:!!options.mixed};connections=options.resume?.players?connections:[];roomCode=options.resume?.players?roomCode:'';pending=moving=false;state=options.resume?.players?restoreSetup(options.resume,profile?.name||''):newSetup(profile?.name||'');geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
       // Never synchronously call back into Godot while it is publishing entry.
       const token=flowGeneration;window.setTimeout(()=>{if(token===flowGeneration&&!root.hidden)notify('preview');},0);},
     close(){flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;pending=moving=false;resetOverlay();root.hidden=true;refreshGlass();delete window.yakolakPendingVisualSetup;document.body.dataset.yakolakVisualSetup='hidden';},

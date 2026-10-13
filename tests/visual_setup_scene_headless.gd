@@ -40,7 +40,7 @@ func _run() -> void:
 		return
 	print("YAKOLAK_REAL_TABLE_FRAMING width_ratio=%.3f height_ratio=%.3f" % [table_ratio.x,table_ratio.y])
 	var cam: Camera3D = intro.camera
-	if not cam.basis.is_equal_approx(setup.visual_camera_snapshot["transform"].basis):
+	if absf(cam.basis.get_rotation_quaternion().angle_to(setup.visual_camera_snapshot["transform"].basis.get_rotation_quaternion()))>0.02:
 		push_error("Setup changed the final intro angle")
 		quit(1)
 		return
@@ -103,7 +103,13 @@ func _run() -> void:
 		push_error("Configuration did not start real match")
 		quit(1)
 		return
+	var exit_pose := cam.transform
 	game._return_to_setup()
+	if not cam.transform.is_equal_approx(exit_pose):
+		push_error("Exit snapped the camera before its transition")
+		quit(1)
+		return
+	await create_timer(1.8).timeout
 	await process_frame
 	await process_frame
 	if not setup.visual_active or not game.waiting_for_setup:
@@ -114,7 +120,7 @@ func _run() -> void:
 		push_error("Return to setup reused a stale browser entry request")
 		quit(1)
 		return
-	if not cam.basis.is_equal_approx(setup.visual_intro_camera_snapshot["transform"].basis):
+	if absf(cam.basis.get_rotation_quaternion().angle_to(setup.visual_intro_camera_snapshot["transform"].basis.get_rotation_quaternion()))>0.02:
 		push_error("Return to setup lost the accepted intro shot")
 		quit(1)
 		return

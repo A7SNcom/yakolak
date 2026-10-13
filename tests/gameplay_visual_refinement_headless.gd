@@ -88,7 +88,7 @@ func _run() -> void:
 			_expect(game.selected_index == indices[1],"exact initial size retained")
 			# Exercise the delayed production render path that previously restored rings.
 			RenderingServer.frame_post_draw.emit()
-			_expect(game.target_markers[0].mesh is ArrayMesh,"post-selection draw keeps the real footprint")
+			_expect(game.target_markers[0].mesh == game.piece_records[game.selected_index]["mesh"].mesh,"preview uses the selected stone resource itself")
 			_expect(game.target_markers[0].get_meta("stone_size","")==game._selected_size(),"delayed render uses the current selected size")
 			for index: int in range(game.piece_records.size()):
 				if str(game.piece_records[index]["dir"]) != direction: continue
@@ -122,24 +122,20 @@ func _run() -> void:
 			var previous_width := 0.0
 			for size_name: String in ["small","medium","large"]:
 				game._update_legal_markers(size_name,Color("#318849"))
-				var flat: ArrayMesh = game._stone_footprint(size_name)
-				_expect(flat != null,"native stone footprint exists")
-				if flat != null:
-					_expect(flat.get_aabb().size.y < 0.001,"legal hint is flat")
-					_expect(flat.get_aabb().size.x < 48.0*game.U,"hint fits cell")
-					_expect(flat.get_aabb().size.x>previous_width,"small medium large footprints have strictly increasing true widths")
-					previous_width=flat.get_aabb().size.x
-				_expect(absf(game.target_markers[0].position.y-(2.0*game.U+0.003)) < 0.0001,"contour touches the recessed cell bed instead of floating above its rim")
 				var shown: MeshInstance3D = game.target_markers[4]
-				var contour: PackedVector3Array = shown.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
-				for vertex: Vector3 in contour:
-					var point := shown.position+vertex
-					_expect(point.y>=game._board_height_at(point,4)+0.002,"every contour vertex is above its actual pocket surface")
-				_expect(shown.material_override.albedo_color.a>=0.60,"legal contour remains readable")
-				_expect(game.legal_marker_pulse == null,"no legal hint wave")
+				var selected: MeshInstance3D = game.piece_records[game._available_stack_indices(direction,0)[["large","medium","small"].find(size_name)]]["mesh"]
+				_expect(shown.mesh==selected.mesh,"each size reuses the actual stone rather than generating a contour")
+				var original := selected.get_aabb()
+				var original_box: AABB = game.home_transforms[game._available_stack_indices(direction,0)[["large","medium","small"].find(size_name)]]*original
+				var ghost_box: AABB = shown.transform*original
+				_expect(is_equal_approx(ghost_box.size.x,original_box.size.x) and is_equal_approx(ghost_box.size.z,original_box.size.z),"preview preserves placement width and depth")
+				_expect(is_equal_approx(ghost_box.size.y,original_box.size.y*0.02),"only height is compressed to two percent")
+				_expect(ghost_box.size.x>previous_width,"size ordering remains exact")
+				previous_width=ghost_box.size.x
+				_expect(game.legal_marker_pulse==null and game.footprint_fade==null,"preview has no geometric or opacity wave")
 				for cell: int in range(game.target_markers.size()):
-					var hit: Dictionary = game._ray_pick(intro.camera.unproject_position(game.target_markers[cell].global_position),game.TARGET_LAYER)
-					_expect(not hit.is_empty() and int(hit["collider"].get_meta("cell",-1))==cell,"tapping the visible footprint resolves its own cell")
+					var hit: Dictionary = game._ray_pick(intro.camera.unproject_position(game.CELL_COORDS[cell]*game.U),game.TARGET_LAYER)
+					_expect(not hit.is_empty() and int(hit["collider"].get_meta("cell",-1))==cell,"visible preview uses the same placement cell")
 			game._close_piece_tray(-1,true)
 			for index: int in range(game.piece_records.size()):
 				_expect(game.piece_records[index]["mesh"].material_override == game.home_materials[index],"all reserve materials restored after selection closes")
@@ -176,8 +172,7 @@ func _run() -> void:
 	for index: int in game.victory_materials:
 		_expect(game.victory_materials[index].albedo_color.is_equal_approx(game.home_materials[index].albedo_color),"original color returns")
 	await create_timer(0.6).timeout
-	_expect(game.result_card.visible and game.result_title.text.contains("اسم 0"),"delayed result identifies the winner")
-	_expect(is_instance_valid(game.celebration) and game.celebration.amount<=48 and game.celebration.one_shot,"bounded one-shot 3D celebration")
+	_expect(not game.result_card.visible and game.celebration==null,"intermediate rounds never open the final standings")
 	game._on_round_action()
 	_expect(not game.result_card.visible and game.celebration==null,"continuation clears result and celebration")
 	_expect(game.victory_materials.is_empty(),"continue stops victory cycle")
@@ -190,13 +185,28 @@ func _run() -> void:
 	_expect(is_equal_approx(zoom.effective_fov_for_base(57.0),34.0),"existing max zoom respected")
 	zoom._apply_fov(45.0)
 	_expect(is_equal_approx(zoom.effective_fov_for_base(game.turn_camera_target_fov),45.0),"user zoom preserved")
-	var footprints: Dictionary = {}
-	for size_name: String in ["small","medium","large"]:
-		var flat: ArrayMesh = game._stone_footprint(size_name)
-		var points: PackedVector3Array = flat.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
-		var coordinates: Array = []
-		for point: Vector3 in points: coordinates.append([point.x,point.z])
-		footprints[size_name] = coordinates
+	game._rm_enabled = false
+	game.scores["right"] = game.total_rounds-1
+	game._finish_round("right",winning)
+	_expect(game.match_complete and not game.result_card.visible,"final standings wait for their reveal")
+	await create_timer(2.5).timeout
+	_expect(game.result_card.visible and game.result_rows.get_child_count()==4,"final standings have one row per player")
+	_expect(game.result_button.get_parent()==game.result_actions and game.post_match_secondary_button.get_parent()==game.result_actions,"both final actions belong to the same result card")
+	_expect(root.get_visible_rect().encloses(game.result_card.get_global_rect()),"standings fit the short landscape viewport without scrolling")
+	_expect(game.result_rows.get_child(0).get_child(0).get_child(1).text=="اسم 0","winner is first in ranked player rows")
+	_expect(game.result_button.text=="إعادة اللعبة" and game.post_match_secondary_button.text=="إعدادات جديدة","final actions have the requested labels")
+	_expect(is_instance_valid(game.celebration) and game.celebration.amount<=48 and game.celebration.one_shot,"bounded final-match celebration")
+	game._on_round_action()
+	_expect(not game.match_complete and game.match_initialized and game.players.size()==4,"rematch retains the same roster")
+	_expect(not game.result_card.visible and game.celebration==null,"rematch clears the result card and burst")
+	game.scores["right"] = game.total_rounds-1
+	game._finish_round("right",winning)
+	game._on_post_match_secondary_action()
+	await create_timer(1.9).timeout
+	_expect(game.waiting_for_setup and setup.visual_active and setup.visual_step=="ready","new settings return directly to the final configuration page")
+	_expect(setup.visual_resume_configuration.get("players",[]).size()==4,"new settings preserve the configured players")
+	await create_timer(0.6).timeout
+	_expect(not game.result_card.visible,"no delayed final result survives return to settings")
 	intro.queue_free()
 	await process_frame
 	if failures.is_empty(): print("YAKOLAK_VISUAL_REFINEMENT_OK selection+static-footprints+victory+continue+projection+zoom")

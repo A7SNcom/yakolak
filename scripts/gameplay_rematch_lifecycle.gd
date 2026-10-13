@@ -60,7 +60,8 @@ func _input(event: InputEvent) -> void:
 		return
 	var on_primary: bool = result_button != null and result_button.visible and result_button.get_global_rect().has_point(pointer_position)
 	var on_secondary: bool = post_match_secondary_button != null and post_match_secondary_button.visible and post_match_secondary_button.get_global_rect().has_point(pointer_position)
-	if on_primary or on_secondary:
+	var on_menu := (quick_button != null and quick_button.visible and quick_button.get_global_rect().has_point(pointer_position)) or (quick_panel != null and quick_panel.visible and quick_panel.get_global_rect().has_point(pointer_position))
+	if on_primary or on_secondary or on_menu:
 		return
 	get_viewport().set_input_as_handled()
 

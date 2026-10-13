@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {COLORS,digits,validProfile,newSetup,chooseColor,confirmColor,chooseCount,changeSeat,seatLabel,swapPlayers,configuration,configurationError,parseRoomInput,mountSetup} from '../ui/visual-setup.mjs';
+import {COLORS,digits,validProfile,newSetup,chooseColor,confirmColor,chooseCount,changeSeat,seatLabel,swapPlayers,configuration,configurationError,parseRoomInput,restoreSetup,mountSetup} from '../ui/visual-setup.mjs';
 
 test('Arabic/Persian telephone digits normalize and profile validates',()=>{
   assert.equal(digits('٠٥٥ ۱۲۳-٤٥٦٧'),'0551234567');
@@ -161,4 +161,15 @@ if(process.env.YAKOLAK_JSDOM_MODULE){
   assert.equal(q('#yakolakVisualSetup').dataset.moving,undefined);
   dom.window.close();
  });
+
+test('new settings restore the same roster directly to ready without visitor onboarding',()=>{
+ const config={rounds:5,players:[{color:'green',label:'أحمد',mode:'local'},{color:'blue',label:'ريم',mode:'local'},{color:'gold',label:'كمبيوتر ذهبي',mode:'bot'}]};
+ const restored=restoreSetup(config);assert.equal(restored.step,'ready');assert.equal(restored.rounds,5);assert.equal(restored.hostColor,'green');
+ assert.equal(restored.seats.find(x=>x.color==='marble').mode,'none');assert.equal(restored.seats.find(x=>x.color==='blue').name,'ريم');
+ const dom=new JSDOM('<body></body>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});
+ const api=mountSetup(dom.window.document,dom.window);api.open({resume:config,request:'resume-1'});
+ const root=dom.window.document.getElementById('yakolakVisualSetup');assert.equal(root.dataset.step,'ready');assert.equal(root.querySelector('.yk-modal').hidden,true);assert.equal(root.querySelector('.yk-start').hidden,false);
+ assert.equal(root.querySelector('[data-color=blue] .yk-seat-status').textContent,'ريم');dom.window.close();
+});
+
 }

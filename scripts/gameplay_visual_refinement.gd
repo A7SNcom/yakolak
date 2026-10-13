@@ -16,11 +16,10 @@ var victory_materials: Dictionary = {}
 var victory_tween: Tween
 var victory_mix: float = 0.0
 var rest_shifted: bool = false
-var footprint_cache: Dictionary = {}
+var ghost_height_cache: Dictionary = {}
 var footprint_fade: Tween
 var board_surface_heights: Array[float] = []
 var board_cell_faces: Array = []
-var surface_footprint_cache: Dictionary = {}
 var turn_countdown: PanelContainer
 var turn_countdown_label: Label
 var turn_countdown_motion: Tween
@@ -32,7 +31,17 @@ const RESULT_FONT = preload("res://assets/fonts/thmanyahsans-Medium.otf")
 const RESULT_BOLD = preload("res://assets/fonts/thmanyahsans-Bold.otf")
 var result_card: PanelContainer
 var result_title: Label
-var result_scores: Label
+var result_rows: VBoxContainer
+var result_actions: VBoxContainer
+var result_column: VBoxContainer
+var lobby_return_active := false
+var lobby_return_tween: Tween
+var lobby_return_generation := 0
+var lobby_return_start := Transform3D.IDENTITY
+var lobby_return_target := Transform3D.IDENTITY
+var lobby_return_start_fov := 50.0
+var lobby_return_target_fov := 50.0
+var resume_configuration: Dictionary = {}
 var result_generation: int = 0
 var result_scheduled: bool = false
 var result_reveal: Tween
@@ -240,31 +249,56 @@ func _update_legal_markers(size_name: String, piece_color: Color) -> void:
 	if legal_marker_pulse != null and legal_marker_pulse.is_valid(): legal_marker_pulse.kill()
 	legal_marker_pulse = null
 	if footprint_fade != null and footprint_fade.is_valid(): footprint_fade.kill()
-	var footprint: ArrayMesh = _stone_footprint(size_name)
-	if footprint == null:
-		_hide_markers()
-		return
+	var index := selected_index
+	if index<0 or str(piece_records[index]["type"])!=size_name:
+		index = -1
+		for i: int in range(piece_records.size()):
+			if str(piece_records[i]["type"])==size_name and str(piece_records[i]["dir"])==_current_direction(): index=i; break
+	if index<0: _hide_markers(); return
+	var source: MeshInstance3D = piece_records[index]["mesh"]
+	var source_basis := home_transforms[index].basis
+	var bottom := INF
+	for corner: int in range(8):
+		var point := source_basis*source.get_aabb().get_endpoint(corner)
+		bottom=minf(bottom,point.y)
+	# Reuse the exact stone resource and its placement orientation. Only height
+	# is compressed to 2%; no traced outline or reconstructed/surface-warped mesh.
+	var compression := 0.02
+	var flat_basis := Basis.from_scale(Vector3(1,compression,1))*source_basis
 	var material := StandardMaterial3D.new()
-	var tint := piece_color.lightened(0.20)
-	material.albedo_color = Color(tint.r,tint.g,tint.b,0.62)
+	material.albedo_color = Color(piece_color.lightened(0.12),0.46)
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	material.cull_mode = BaseMaterial3D.CULL_BACK
 	for cell: int in range(target_markers.size()):
-		var marker: MeshInstance3D = target_markers[cell]
-		marker.mesh = _surface_footprint(footprint,cell)
-		marker.scale = Vector3.ONE
-		marker.position = Vector3(CELL_COORDS[cell].x*U,_cell_surface_height(cell)+0.003,CELL_COORDS[cell].z*U)
+		var marker := target_markers[cell]
+		marker.mesh = source.mesh
+		var surface := _ghost_surface_height(source.mesh,source_basis,bottom,cell)
+		marker.transform = Transform3D(flat_basis,Vector3(CELL_COORDS[cell].x*U,surface+0.004-bottom*compression,CELL_COORDS[cell].z*U))
 		marker.material_override = material
 		marker.set_meta("stone_size",size_name)
 		marker.visible = _is_legal_cell(cell,size_name)
-	# Gentle transparency breathing. Geometry stays at its true size and height.
-	if not _rm_enabled:
-		footprint_fade = create_tween().set_loops()
-		footprint_fade.tween_property(material,"albedo_color:a",0.72,1.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		footprint_fade.tween_property(material,"albedo_color:a",0.62,1.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	if OS.has_feature("web"):
-		JavaScriptBridge.eval("document.body.dataset.yakolakLegalMarkerStyle='surface-stone-footprint';document.body.dataset.yakolakLegalMarkerSize="+JSON.stringify(size_name)+";",true)
+		JavaScriptBridge.eval("document.body.dataset.yakolakLegalMarkerStyle='compressed-exact-stone';document.body.dataset.yakolakLegalMarkerSize="+JSON.stringify(size_name)+";",true)
+
+
+func _ghost_surface_height(mesh: Mesh, basis: Basis, bottom: float, cell: int) -> float:
+	var key := str(mesh.get_instance_id())+":"+str(basis)+":"+str(cell)
+	if ghost_height_cache.has(key): return ghost_height_cache[key]
+	var height := _cell_surface_height(cell)
+	var center := Vector3(CELL_COORDS[cell].x*U,0,CELL_COORDS[cell].z*U)
+	var visited: Dictionary = {}
+	for surface: int in range(mesh.get_surface_count()):
+		var points: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
+		for vertex: Vector3 in points:
+			var point := basis*vertex
+			if absf(point.y-bottom)>0.001: continue
+			var coordinate := Vector2(point.x,point.z)
+			if visited.has(coordinate): continue
+			visited[coordinate]=true
+			height=maxf(height,_board_height_at(center+point,cell))
+	ghost_height_cache[key]=height
+	return height
 
 
 func _prepare_board_faces() -> void:
@@ -304,96 +338,6 @@ func _cell_surface_height(cell: int) -> float:
 	return board_surface_heights[cell]
 
 
-func _surface_footprint(flat: ArrayMesh, cell: int) -> ArrayMesh:
-	var key := str(flat.get_instance_id())+":"+str(cell)
-	if surface_footprint_cache.has(key): return surface_footprint_cache[key]
-	var points: PackedVector3Array = flat.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
-	var vertices := PackedVector3Array()
-	var center := Vector3(CELL_COORDS[cell].x*U,_cell_surface_height(cell),CELL_COORDS[cell].z*U)
-	# Subdivide the thin strips so a large stone's contour follows the pocket's
-	# actual bevel, instead of disappearing inside it or floating above the bed.
-	var heights: Dictionary = {}
-	for i: int in range(0,points.size(),6):
-		var steps := maxi(1,int(ceil(points[i].distance_to(points[i+1])/0.08)))
-		for j: int in range(steps):
-			var t0 := float(j)/steps
-			var t1 := float(j+1)/steps
-			var a := points[i].lerp(points[i+1],t0)
-			var b := points[i].lerp(points[i+1],t1)
-			var c := points[i+5].lerp(points[i+2],t1)
-			var d := points[i+5].lerp(points[i+2],t0)
-			for point: Vector3 in [a,b,c,a,c,d]:
-				var coordinate := Vector2(point.x,point.z)
-				if not heights.has(coordinate): heights[coordinate] = _board_height_at(center+point,cell)-center.y
-				point.y = heights[coordinate]
-				vertices.append(point)
-	var mesh := ArrayMesh.new()
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
-	surface_footprint_cache[key] = mesh
-	return mesh
-
-
-func _stone_footprint(size_name: String) -> ArrayMesh:
-	var source: Mesh = null
-	var basis := Basis.IDENTITY
-	var candidates: Array[int] = []
-	if selected_index >= 0 and _selected_size() == size_name: candidates.append(selected_index)
-	for index: int in range(piece_records.size()): candidates.append(index)
-	for index: int in candidates:
-		if str(piece_records[index].get("type", "")) == size_name:
-			source = (piece_records[index]["mesh"] as MeshInstance3D).mesh
-			basis = home_transforms[index].basis
-			break
-	if source == null: return null
-	var cache_key := size_name+":"+str(basis)
-	if footprint_cache.has(cache_key): return footprint_cache[cache_key] as ArrayMesh
-	var bottom_y := INF
-	for corner: int in range(8): bottom_y = minf(bottom_y,(basis*source.get_aabb().get_endpoint(corner)).y)
-	# Trace the actual contact face, with its cutout and spikes. Upper bevels
-	# and cap faces must not create overlapping or disconnected flat contours.
-	# No generic circle, invented star, scale pulse, or extra outline pass.
-	var vertices := PackedVector3Array()
-	var edges: Dictionary = {}
-	for surface: int in range(source.get_surface_count()):
-		var arrays := source.surface_get_arrays(surface)
-		var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
-		var count: int = indices.size() if not indices.is_empty() else points.size()
-		for triangle: int in range(0, count, 3):
-			var a: Vector3 = basis * points[indices[triangle] if not indices.is_empty() else triangle]
-			var b: Vector3 = basis * points[indices[triangle + 1] if not indices.is_empty() else triangle + 1]
-			var c: Vector3 = basis * points[indices[triangle + 2] if not indices.is_empty() else triangle + 2]
-			# Only the planar underside is the footprint of the selected stone.
-			if maxf(absf(a.y-bottom_y),maxf(absf(b.y-bottom_y),absf(c.y-bottom_y))) > 0.001: continue
-			var triangle_points: Array[Vector3] = [Vector3(a.x,0,a.z),Vector3(b.x,0,b.z),Vector3(c.x,0,c.z)]
-			for side: int in range(3):
-				var start: Vector3 = triangle_points[side]
-				var end: Vector3 = triangle_points[(side+1)%3]
-				var start_key := "%d,%d" % [roundi(start.x*10000),roundi(start.z*10000)]
-				var end_key := "%d,%d" % [roundi(end.x*10000),roundi(end.z*10000)]
-				var key := start_key+":"+end_key if start_key < end_key else end_key+":"+start_key
-				if edges.has(key): edges[key]["count"] += 1
-				else: edges[key] = {"start":start,"end":end,"count":1}
-	var width: float = clampf(source.get_aabb().size.x * U * 0.028,0.035,0.050)
-	for edge: Dictionary in edges.values():
-		if int(edge["count"]) != 1: continue
-		var start: Vector3 = edge["start"]
-		var end: Vector3 = edge["end"]
-		var offset := (end-start).normalized().cross(Vector3.UP)*width*0.5
-		vertices.append_array(PackedVector3Array([start-offset,end-offset,end+offset,start-offset,end+offset,start+offset]))
-	if vertices.is_empty(): return null
-	var flat := ArrayMesh.new()
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	flat.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	footprint_cache[cache_key] = flat
-	return flat
-
-
 func _highlight_winning_pieces(_winning: Array[int]) -> void:
 	# The winning stones keep their exact material; the other stones carry the cue.
 	pass
@@ -402,11 +346,15 @@ func _highlight_winning_pieces(_winning: Array[int]) -> void:
 func _show_round_result() -> void:
 	super._show_round_result()
 	if result_button != null and not online_cancelled:
-		result_button.text = "استمرار"
+		result_button.text = "إعادة اللعبة" if match_complete else "استمرار"
 		result_button.disabled = continue_pending
 	_layout_hud()
 	_start_victory_colors()
-	_schedule_results()
+	_hide_post_match_status_label()
+	if match_complete:
+		result_button.hide()
+		post_match_secondary_button.hide()
+		_schedule_results()
 
 
 func _layout_hud() -> void:
@@ -414,6 +362,7 @@ func _layout_hud() -> void:
 	_position_turn_countdown()
 	_layout_result_card()
 	if result_button == null: return
+	if result_button.get_parent() == result_actions: return
 	var viewport := get_viewport().get_visible_rect().size
 	var width := minf(_hud_length(400.0), viewport.x - _hud_length(28.0))
 	var height := _hud_length(56.0)
@@ -518,20 +467,76 @@ func _reset_session_transients() -> void:
 	super._reset_session_transients()
 
 
+func _on_post_match_secondary_action() -> void:
+	if not round_complete or not match_complete or action_in_progress: return
+	resume_configuration = {"players":players.duplicate(true),"rounds":total_rounds}
+	_return_to_setup()
+
+
 func _return_to_setup() -> void:
+	if lobby_return_active: return
+	lobby_return_active = true
+	lobby_return_generation += 1
+	var generation := lobby_return_generation
 	_stop_victory_colors()
+	_reset_session_transients()
 	if rest_tween != null and rest_tween.is_valid(): rest_tween.kill()
+	gameplay_ready = false
+	match_initialized = false
+	action_in_progress = true
+	waiting_for_setup = false
+	result_button.hide()
+	post_match_secondary_button.hide()
+	if setup != null:
+		setup.set("visual_resume_configuration",resume_configuration.duplicate(true))
+	var target: Dictionary = setup.call("lobby_camera_target") if setup != null else {}
+	lobby_return_start = camera.transform
+	lobby_return_target = target.get("transform",camera.transform)
+	lobby_return_start_fov = camera.fov
+	lobby_return_target_fov = float(target.get("fov",camera.fov))
+	turn_camera_start_position = camera.position
+	turn_camera_target_position = lobby_return_target.origin
+	_set_studio_backdrop_visible(not _turn_camera_crosses_back_wall())
+	lobby_return_tween = create_tween().set_parallel(true)
+	var duration := 0.0 if _rm_enabled else 1.65
+	lobby_return_tween.tween_method(_apply_lobby_return,0.0,1.0,duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	for index: int in range(piece_records.size()):
+		var piece: MeshInstance3D = piece_records[index]["mesh"]
+		piece.material_override=home_materials[index]
+		piece.show()
+		lobby_return_tween.tween_property(piece,"transform",home_transforms[index],duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	await lobby_return_tween.finished
+	if generation != lobby_return_generation: return
+	_set_studio_backdrop_visible(camera.position.z>=STUDIO_WALL_SAFE_Z)
+	lobby_return_active=false
+	resume_configuration.clear()
 	super._return_to_setup()
 
 
+func _apply_lobby_return(t: float) -> void:
+	camera.position=_turn_camera_orbit_position(t)
+	camera.fov=lerpf(lobby_return_start_fov,lobby_return_target_fov,t)
+	var focus := Vector3(0,0.35,0)
+	var start_look := Basis.looking_at(focus-lobby_return_start.origin,Vector3.UP).get_rotation_quaternion()
+	var end_look := Basis.looking_at(focus-lobby_return_target.origin,Vector3.UP).get_rotation_quaternion()
+	var start_offset := start_look.inverse()*lobby_return_start.basis.get_rotation_quaternion()
+	var end_offset := end_look.inverse()*lobby_return_target.basis.get_rotation_quaternion()
+	var look := Basis.looking_at(focus-camera.position,Vector3.UP).get_rotation_quaternion()
+	camera.basis=Basis(look*start_offset.slerp(end_offset,t))
+
+
 func _reset_for_intro() -> void:
+	lobby_return_generation += 1
+	lobby_return_active = false
+	if lobby_return_tween != null and lobby_return_tween.is_valid(): lobby_return_tween.kill()
+	resume_configuration.clear()
+	if setup != null: setup.set("visual_resume_configuration",{})
 	_stop_victory_colors()
 	if rest_tween != null and rest_tween.is_valid(): rest_tween.kill()
 	rest_shifted = false
-	footprint_cache.clear()
+	ghost_height_cache.clear()
 	board_surface_heights.clear()
 	board_cell_faces.clear()
-	surface_footprint_cache.clear()
 	super._reset_for_intro()
 
 
@@ -549,22 +554,25 @@ func _build_result_card() -> void:
 	style.content_margin_top = 16
 	style.content_margin_bottom = 16
 	result_card.add_theme_stylebox_override("panel",style)
-	var column := VBoxContainer.new()
-	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_theme_constant_override("separation",8)
-	result_card.add_child(column)
+	result_column = VBoxContainer.new()
+	result_column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	result_column.add_theme_constant_override("separation",12)
+	result_card.add_child(result_column)
 	result_title = Label.new()
-	result_scores = Label.new()
-	for label: Label in [result_title,result_scores]:
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		label.layout_direction = Control.LAYOUT_DIRECTION_RTL
-		label.text_direction = Control.TEXT_DIRECTION_RTL
-		label.language = "ar"
-		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		label.add_theme_font_override("font",RESULT_BOLD if label==result_title else RESULT_FONT)
-		label.add_theme_color_override("font_color",Color.WHITE if label==result_title else Color(0.83,0.84,0.87))
-		column.add_child(label)
+	result_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	result_title.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	result_title.text_direction = Control.TEXT_DIRECTION_RTL
+	result_title.add_theme_font_override("font",RESULT_BOLD)
+	result_title.add_theme_color_override("font_color",Color.WHITE)
+	result_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	result_column.add_child(result_title)
+	result_rows = VBoxContainer.new()
+	result_rows.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	result_rows.add_theme_constant_override("separation",6)
+	result_column.add_child(result_rows)
+	result_actions = VBoxContainer.new()
+	result_actions.add_theme_constant_override("separation",8)
+	result_column.add_child(result_actions)
 	result_card.hide()
 	hud_layer.add_child(result_card)
 
@@ -572,26 +580,85 @@ func _build_result_card() -> void:
 func _layout_result_card() -> void:
 	if result_card == null: return
 	var viewport := get_viewport().get_visible_rect().size
-	var width := minf(_hud_length(440),viewport.x-_hud_length(28))
+	var width := minf(_hud_length(420),viewport.x-_hud_length(28))
+	var short_view := viewport.y<480
+	var height := _hud_length((150 if short_view else 190)+players.size()*(40 if short_view else 48))
+	result_column.add_theme_constant_override("separation",8 if short_view else 12)
+	result_rows.add_theme_constant_override("separation",4 if short_view else 6)
+	for panel: Node in result_rows.get_children():
+		for label: Label in panel.get_child(0).get_children():
+			label.custom_minimum_size.y = _hud_length(32 if short_view else 42)
+			label.add_theme_font_size_override("font_size",_hud_font_size(16 if short_view else 19))
+	for button: Button in [result_button,post_match_secondary_button]:
+		if button != null and button.get_parent()==result_actions: button.custom_minimum_size.y=_hud_length(44 if short_view else 50)
 	result_card.custom_minimum_size = Vector2(width,0)
-	result_card.size = Vector2(width,0)
-	result_card.position = Vector2((viewport.x-width)*0.5,_hud_length(76))
-	result_title.add_theme_font_size_override("font_size",_hud_font_size(27))
-	result_scores.add_theme_font_size_override("font_size",_hud_font_size(17))
+	result_card.size = Vector2(width,height)
+	result_card.position = Vector2((viewport.x-width)*0.5,maxf(_hud_length(12),(viewport.y-height)*0.5))
+	result_title.add_theme_font_size_override("font_size",_hud_font_size(22 if short_view else 26))
 
 
 func _schedule_results() -> void:
-	if result_scheduled or not round_complete or online_cancelled: return
+	if result_scheduled or not round_complete or not match_complete or online_cancelled: return
 	result_scheduled = true
 	var generation := result_generation
 	await get_tree().create_timer(RESULT_DELAY).timeout
-	if generation != result_generation or not round_complete or not match_initialized: return
-	result_title.text = "تعادل الجولة" if round_winner.is_empty() else ("بطل المباراة" if match_complete else "فاز بالجولة")+" · "+_player_name(round_winner)
-	var rows: PackedStringArray = []
-	for player: Dictionary in players:
+	if generation != result_generation or not match_complete or not match_initialized: return
+	result_title.text = "نتائج المباراة"
+	for child: Node in result_rows.get_children(): child.free()
+	var ordered: Array = players.duplicate(true)
+	ordered.sort_custom(func(a: Dictionary,b: Dictionary) -> bool: return int(scores.get(str(a["direction"]),0))>int(scores.get(str(b["direction"]),0)))
+	var previous := -1
+	var rank := 0
+	for i: int in range(ordered.size()):
+		var player: Dictionary = ordered[i]
 		var direction := str(player["direction"])
-		rows.append("%s   %d" % [_player_name(direction),int(scores.get(direction,0))])
-	result_scores.text = "   ·   ".join(rows)
+		var score := int(scores.get(direction,0))
+		if score!=previous: rank=i+1
+		previous=score
+		var panel := PanelContainer.new()
+		panel.mouse_filter=Control.MOUSE_FILTER_IGNORE
+		var style := StyleBoxFlat.new()
+		style.bg_color=Color(1,1,1,0.14 if rank==1 else 0.04)
+		style.set_corner_radius_all(12)
+		style.content_margin_left=12
+		style.content_margin_right=12
+		panel.add_theme_stylebox_override("panel",style)
+		var row := HBoxContainer.new()
+		row.layout_direction=Control.LAYOUT_DIRECTION_RTL
+		row.mouse_filter=Control.MOUSE_FILTER_IGNORE
+		row.add_theme_constant_override("separation",12)
+		panel.add_child(row)
+		for value: String in [str(rank),_player_name(direction),str(score)]:
+			var label := Label.new()
+			label.text=value
+			label.tooltip_text=_player_name(direction)
+			label.custom_minimum_size=Vector2(24,_hud_length(42))
+			label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER
+			label.add_theme_font_override("font",RESULT_BOLD if value==str(score) else RESULT_FONT)
+			label.add_theme_font_size_override("font_size",_hud_font_size(19))
+			label.add_theme_color_override("font_color",Color.WHITE)
+			label.mouse_filter=Control.MOUSE_FILTER_IGNORE
+			if row.get_child_count()==1:
+				label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+				label.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
+			row.add_child(label)
+		result_rows.add_child(panel)
+	result_button.reparent(result_actions)
+	post_match_secondary_button.reparent(result_actions)
+	result_button.text="إعادة اللعبة"
+	post_match_secondary_button.text="إعدادات جديدة"
+	for button: Button in [result_button,post_match_secondary_button]:
+		button.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		button.custom_minimum_size=Vector2(0,_hud_length(50))
+		button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+		button.add_theme_font_override("font",RESULT_FONT)
+		button.add_theme_font_size_override("font_size",_hud_font_size(18))
+		var style := _result_style(Color("#e4e6eb") if button==result_button else Color("#303239"))
+		style.border_color=Color(1,1,1,0.35)
+		style.set_border_width_all(1)
+		for state: String in ["normal","hover","pressed","focus"]: button.add_theme_stylebox_override(state,style)
+		for state: String in ["font_color","font_hover_color","font_pressed_color","font_focus_color"]: button.add_theme_color_override(state,Color("#17181c") if button==result_button else Color.WHITE)
+		button.show()
 	_layout_result_card()
 	result_card.show()
 	result_card.modulate.a = 1.0 if _rm_enabled else 0.0
@@ -650,5 +717,9 @@ func _clear_results() -> void:
 	if result_reveal != null and result_reveal.is_valid(): result_reveal.kill()
 	result_reveal = null
 	if result_card != null: result_card.hide()
+	for button: Button in [result_button,post_match_secondary_button]:
+		if button != null and button.get_parent()==result_actions:
+			button.reparent(hud_layer)
+			button.custom_minimum_size=Vector2.ZERO
 	if is_instance_valid(celebration): celebration.queue_free()
 	celebration = null
