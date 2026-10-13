@@ -5,6 +5,12 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      fast_publish:
+        description: Deploy the committed web/ bundle without tests or a Godot rebuild
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -25,9 +31,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
+
+      - name: Setup Node.js contract tests
+        if: ${{ !inputs.fast_publish && !contains(github.event.head_commit.message, '[flash-ready]') }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked Node.js dependencies
+        if: ${{ !inputs.fast_publish && !contains(github.event.head_commit.message, '[flash-ready]') }}
+        run: npm ci
+
+      - name: Audit Node.js dependencies
+        if: ${{ !inputs.fast_publish && !contains(github.event.head_commit.message, '[flash-ready]') }}
+        run: npm audit --audit-level=high
+
+      - name: Run backend and setup contracts
+        if: ${{ !inputs.fast_publish && !contains(github.event.head_commit.message, '[flash-ready]') }}
+        run: npm run test:release
 
       - name: Restore Godot caches
+        if: ${{ !inputs.fast_publish && !contains(github.event.head_commit.message, '[flash-ready]') }}
         uses: actions/cache@v4
         with:
           path: |
@@ -40,6 +66,7 @@ jobs:
             yakolak-godot-4.7.1-
 
       - name: Ensure UI fonts exist
+        if: ${{ !inputs.fast_publish && !contains(github.event.head_commit.message, '[flash-ready]') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -56,11 +83,11 @@ jobs:
           fi
 
       - name: Flash export Godot Web
-        if: ${{ !contains(github.event.head_commit.message, '[flash-ready]') }}
+        if: ${{ !inputs.fast_publish && !contains(github.event.head_commit.message, '[flash-ready]') }}
         run: bash scripts/godot-flash-build.sh
 
       - name: Publish ready files back to main
-        if: ${{ !contains(github.event.head_commit.message, '[flash-ready]') }}
+        if: ${{ !inputs.fast_publish && !contains(github.event.head_commit.message, '[flash-ready]') }}
         shell: bash
         run: |
           set -euo pipefail

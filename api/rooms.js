@@ -79,7 +79,10 @@ async function ensureTable(db) {
         expires_at TEXT NOT NULL
       )
     `),
-  ]);
+  ]).catch(error => {
+    tablesReady = null;
+    throw error;
+  });
   await tablesReady;
 }
 
@@ -719,4 +722,4 @@ export default async function handler(req, res) {
   }
 }
 
-export const __testing = { PROTOCOL, PLAYER_STALE_MS, PRESENCE_WRITE_INTERVAL_MS, advanceRoundState, applyMove, applyRoomEdit, createState, emptyBoard, hasLegalMove, joinState, leaveState, materializeUpdatedRow, mutationApplied, normalizeCode, preview, publicRoom, publicState, reconcilePresenceState, recordMutation, rematchState, requireCurrentVersion, seatOwnership, validMutationId, validatePlacement, winner, winningPatterns: rulesWinningPatterns };
+export const __testing = { PROTOCOL, PLAYER_STALE_MS, PRESENCE_WRITE_INTERVAL_MS, advanceRoundState, applyMove, applyRoomEdit, createState, emptyBoard, ensureTable, hasLegalMove, joinState, leaveState, materializeUpdatedRow, mutationApplied, normalizeCode, preview, publicRoom, publicState, reconcilePresenceState, recordMutation, rematchState, requireCurrentVersion, seatOwnership, validMutationId, validatePlacement, winner, winningPatterns: rulesWinningPatterns };

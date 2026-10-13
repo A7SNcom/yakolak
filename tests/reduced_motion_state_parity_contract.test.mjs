@@ -3,6 +3,7 @@ import fs from 'node:fs';
 
 const read = path => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const scene = read('scenes/intro.tscn');
+const visual = read('scripts/gameplay_visual_refinement.gd');
 const reduced = read('scripts/gameplay_reduced_motion_parity.gd');
 const selected = read('scripts/gameplay_selected_state.gd');
 const feedback = read('scripts/gameplay_interaction_feedback.gd');
@@ -10,7 +11,8 @@ const turnHud = read('scripts/turn_clarity_hud.gd');
 const turnLight = read('scripts/turn_light_crossfade.gd');
 const session = read('scripts/gameplay_session.gd');
 
-assert.ok(scene.includes('gameplay_reduced_motion_parity.gd'), 'production scene must use reduced-motion parity leaf');
+assert.ok(scene.includes('gameplay_visual_refinement.gd'), 'production scene must use the active gameplay presentation layer');
+assert.ok(visual.startsWith('extends "res://scripts/gameplay_reduced_motion_parity.gd"'), 'active gameplay presentation must inherit reduced-motion parity');
 assert.ok(reduced.startsWith('extends "res://scripts/gameplay_selection_latency.gd"'), 'parity must layer above current gameplay');
 assert.ok(reduced.includes("matchMedia('(prefers-reduced-motion: reduce)')"), 'browser Reduced Motion preference must drive gameplay');
 

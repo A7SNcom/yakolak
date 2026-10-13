@@ -28,6 +28,7 @@ const online = fs.readFileSync(new URL('../scripts/online_session.gd', import.me
 const onlineHardened = fs.readFileSync(new URL('../scripts/online_session_hardened.gd', import.meta.url), 'utf8');
 const onlineReconnect = fs.readFileSync(new URL('../scripts/online_session_reconnect_hydration.gd', import.meta.url), 'utf8');
 const scene = fs.readFileSync(new URL('../scenes/intro.tscn', import.meta.url), 'utf8');
+const gameplayVisual = fs.readFileSync(new URL('../scripts/gameplay_visual_refinement.gd', import.meta.url), 'utf8');
 const server = fs.readFileSync(new URL('../api/rooms.js', import.meta.url), 'utf8');
 
 assert.ok(scene.includes('res://scripts/gameplay_session_nested_pick.gd'), 'the nested piece picker must remain active');
@@ -43,7 +44,8 @@ assert.ok(setupDialog.includes('extends "res://scripts/session_setup_flow.gd"'),
 assert.ok(setupFlow.includes('extends "res://scripts/session_setup_arabic.gd"'), 'the user-journey layer must preserve the Arabic setup layer');
 assert.ok(scene.includes('res://scripts/gameplay_design_system.gd'), 'gameplay chrome must use the shared design adapter');
 assert.ok(gameplayDesign.includes('extends "res://scripts/gameplay_rematch_lifecycle.gd"'), 'gameplay design must preserve the rematch/gameplay chain');
-assert.ok(scene.includes('res://scripts/gameplay_reduced_motion_parity.gd'), 'production gameplay must use the reduced-motion presentation leaf');
+assert.ok(scene.includes('res://scripts/gameplay_visual_refinement.gd'), 'production gameplay must use the active visual presentation layer');
+assert.ok(gameplayVisual.includes('extends "res://scripts/gameplay_reduced_motion_parity.gd"'), 'the active visual layer must preserve reduced-motion state parity');
 assert.ok(reducedMotion.includes('extends \"res://scripts/gameplay_selection_latency.gd\"'), 'reduced-motion gameplay must preserve the selection-latency layer');
 assert.ok(selectionLatency.includes('extends \"res://scripts/gameplay_selected_state.gd\"'), 'selection latency must preserve the selected-state presentation layer');
 assert.ok(selectedState.includes('extends "res://scripts/gameplay_turn_transition_stale_safe.gd"'), 'selected-state presentation must preserve the stale-safe turn presentation layer');

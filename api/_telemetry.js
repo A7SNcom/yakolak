@@ -46,7 +46,10 @@ export async function ensureTelemetryTable(db) {
     await db.execute(`CREATE INDEX IF NOT EXISTS idx_${TABLE}_room_time ON ${TABLE}(room_code, occurred_at)`);
     await db.execute(`CREATE INDEX IF NOT EXISTS idx_${TABLE}_trace_time ON ${TABLE}(trace_id, occurred_at)`);
     await db.execute(`CREATE INDEX IF NOT EXISTS idx_${TABLE}_event_time ON ${TABLE}(event_name, occurred_at)`);
-  })();
+  })().catch(error => {
+    tableReady = null;
+    throw error;
+  });
   await tableReady;
 }
 
@@ -158,6 +161,7 @@ export async function writeTelemetryBatch(db, events, req = null) {
 
 export const __testing = {
   TABLE,
+  ensureTelemetryTable,
   normalizeTelemetryEvent,
   sanitizeTelemetryValue,
 };

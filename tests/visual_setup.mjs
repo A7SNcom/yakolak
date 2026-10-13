@@ -94,4 +94,29 @@ if(process.env.YAKOLAK_JSDOM_MODULE){
   api.room({code:'12',players:[]});q('.yk-sharing').click();await Promise.resolve();assert.equal(copies[0],'https://a7sncom.github.io/yakolak/?room=12');
   dom.window.close();
  });
+ test('closing and reopening during the profile step clears stale overlay state',()=>{
+  const dom=new JSDOM('<head><style>#yakolakVisualSetup[data-overlay=profile] .yk-actions{visibility:hidden}#yakolakVisualSetup[data-moving=true] button{pointer-events:none}</style></head><body></body>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});
+  const {window}=dom,{document}=window;const api=mountSetup(document,window);api.open();const q=s=>document.querySelector(s);
+  q('.yk-entry button:first-child').click();
+  assert.equal(q('.yk-modal').hidden,false);assert.equal(q('#yakolakVisualSetup').dataset.overlay,'profile');
+  assert.equal(window.getComputedStyle(q('.yk-actions')).visibility,'hidden');
+  api.close();api.open();
+  assert.equal(q('.yk-entry').hidden,false);assert.equal(q('.yk-modal').hidden,true);
+  assert.equal(q('#yakolakVisualSetup').dataset.overlay,undefined);assert.equal(q('#yakolakVisualSetup').dataset.profile,undefined);
+  assert.equal(q('#yakolakVisualSetup').dataset.moving,undefined);assert.equal(q('.yk-actions').inert,false);
+  assert.equal(window.getComputedStyle(q('.yk-actions')).visibility,'visible');
+  q('.yk-entry button:first-child').click();assert.equal(q('.yk-modal').hidden,false);
+  dom.window.close();
+ });
+ test('a late screen transition cannot overwrite a newly opened setup',async()=>{
+  const dom=new JSDOM('<body></body>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});
+  const {window}=dom,{document}=window;window.localStorage.setItem('yakolak-visitor-v1',JSON.stringify({name:'أحمد',phone:'0551234567'}));
+  const api=mountSetup(document,window);api.open();const q=s=>document.querySelector(s);let finish;
+  q('.yk-actions').animate=()=>({finished:new Promise(resolve=>{finish=resolve;})});
+  q('.yk-entry button:first-child').click();assert.equal(q('#yakolakVisualSetup').dataset.moving,'true');
+  api.close();api.open();finish();await new Promise(resolve=>window.setTimeout(resolve,0));
+  assert.equal(q('#yakolakVisualSetup').dataset.step,'entry');assert.equal(q('.yk-entry').hidden,false);
+  assert.equal(q('#yakolakVisualSetup').dataset.moving,undefined);
+  dom.window.close();
+ });
 }

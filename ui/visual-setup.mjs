@@ -199,7 +199,8 @@ export function mountSetup(document, window) {
   function go(next){
     if(moving)return;closeSheet();clearError();
     const target=typeof next==='string'?{...state,step:next}:next;
-    const apply=()=>{state=target;moving=false;delete root.dataset.moving;render();notify('preview');animate(actions,[{opacity:0,transform:'translate(-50%,12px) scale(.985)'},{opacity:1,transform:'translate(-50%,0) scale(1)'}],420);};
+    const token=flowGeneration;
+    const apply=()=>{if(token!==flowGeneration||root.hidden)return;state=target;moving=false;delete root.dataset.moving;render();notify('preview');animate(actions,[{opacity:0,transform:'translate(-50%,12px) scale(.985)'},{opacity:1,transform:'translate(-50%,0) scale(1)'}],420);};
     if(!reduced()&&typeof actions.animate==='function'){
       moving=true;root.dataset.moving='true';notify('preview',{step:'transition'});
       const motion=animate(actions,[{opacity:1,transform:'translate(-50%,0) scale(1)'},{opacity:0,transform:'translate(-50%,-8px) scale(.985)'}],240);motion.finished.then(apply,apply);
@@ -235,6 +236,14 @@ export function mountSetup(document, window) {
     if(animated && !reduced()&&typeof sheet.animate==='function'){
       const motion=animate(sheet,[{opacity:1,transform:'none'},{opacity:0,transform:'translateY(-6px) scale(.985)'}],190);motion.finished.then(finish,finish);
     }else finish();
+  }
+  function resetOverlay(){
+    for(const node of [actions,prompt,sheet])node.getAnimations?.().forEach(animation=>animation.cancel());
+    modal.hidden=true;sheet.replaceChildren();sheet.style.left=sheet.style.top=sheet.style.width='';
+    delete modal.dataset.kind;delete modal.dataset.side;
+    delete root.dataset.profile;delete root.dataset.overlay;delete root.dataset.moving;
+    header.inert=seats.inert=actions.inert=false;
+    returnFocus?.setAttribute?.('aria-expanded','false');returnFocus=null;
   }
   function input(label,options={}){const wrap=el('label','yk-field');const text=el('span','yk-sr-only',label);const field=el('input');Object.assign(field,options);field.setAttribute('aria-label',label);wrap.append(text,field);return {wrap,field};}
   function requireProfile(after){
@@ -299,8 +308,8 @@ export function mountSetup(document, window) {
   root.addEventListener('pointerdown',e=>{if(nameDraft&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet();},true);
   root.addEventListener('click',e=>{if(!modal.hidden&&modal.dataset.kind!=='profile'&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet(true);});root.addEventListener('keydown',e=>e.stopPropagation());
   const api={
-    open(options={}){flowGeneration++;nameDraft=null;profileContinuation=null;closeSheet();capabilities={online:!!options.online,mixed:!!options.mixed};connections=[];roomCode='';pending=moving=false;state=newSetup(profile?.name||'');geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();},
-    close(){flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;root.hidden=true;modal.hidden=true;refreshGlass();document.body.dataset.yakolakVisualSetup='hidden';},
+    open(options={}){flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;closeSheet();resetOverlay();capabilities={online:!!options.online,mixed:!!options.mixed};connections=[];roomCode='';pending=moving=false;state=newSetup(profile?.name||'');geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();notify('preview');},
+    close(){flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;pending=moving=false;resetOverlay();root.hidden=true;refreshGlass();document.body.dataset.yakolakVisualSetup='hidden';},
     geometry(points){geometry=points;root.dataset.world=String(!!points.world);position();},
     error(text){root.hidden=false;showError(text);},
     room(room){roomCode=/^\d{2}$/.test(String(room.code||''))?String(room.code):'';connections=(room.players||[]).filter(x=>x.connected!==false&&x.name).map(x=>({seat:String(x.seat),name:String(x.name).slice(0,24)}));render();}

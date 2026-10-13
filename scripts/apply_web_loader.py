@@ -481,7 +481,40 @@ SEMANTIC_SCRIPT = r'''
 def main() -> None:
     html = INDEX.read_text(encoding="utf-8")
     if "yakolak-v130-loading-star-style" in html:
-        raise RuntimeError("loader already injected")
+        # A fast publish can reuse the already-exported Godot bundle. Refresh
+        # the separately loaded setup UI and its content hash without injecting
+        # the intro markup a second time or rebuilding the WebAssembly export.
+        for filename in ("visual-setup.mjs", "visual-setup.css"):
+            shutil.copyfile(ROOT / "ui" / filename, ROOT / "web" / filename)
+        (ROOT / "web/vendor").mkdir(exist_ok=True)
+        for filename in ("liquefy-core-1.1.0.mjs", "LIQUEFY-LICENSE.txt"):
+            shutil.copyfile(ROOT / "ui/vendor" / filename, ROOT / "web/vendor" / filename)
+        shutil.copyfile(ROOT / "assets/fonts/thmanyahsans-Medium.otf", ROOT / "web/setup-font.otf")
+        setup_assets = (
+            "ui/visual-setup.mjs",
+            "ui/visual-setup.css",
+            "ui/vendor/liquefy-core-1.1.0.mjs",
+        )
+        setup_version = hashlib.sha256(
+            b"".join((ROOT / path).read_bytes() for path in setup_assets)
+        ).hexdigest()[:12]
+        html, css_count = re.subn(
+            r'(<link rel="stylesheet" href="visual-setup\.css)(?:\?v=[^"]*)?(">)',
+            rf"\1?v={setup_version}\2",
+            html,
+            count=1,
+        )
+        html, script_count = re.subn(
+            r'(<script type="module" src="visual-setup\.mjs)(?:\?v=[^"]*)?("></script>)',
+            rf"\1?v={setup_version}\2",
+            html,
+            count=1,
+        )
+        if css_count != 1 or script_count != 1:
+            raise RuntimeError("existing setup asset references missing")
+        INDEX.write_text(html, encoding="utf-8", newline="\n")
+        print(f"YAKOLAK_WEB_SETUP_ASSETS_REFRESHED version={setup_version}")
+        return
     semantic_markers = (
         'id="yakolak-browser-a11y-style"',
         'id="yakolakA11yActions"',

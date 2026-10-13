@@ -49,12 +49,17 @@ chmod +x "$GODOT_BIN"
 rm -rf generated web .godot/exported
 mkdir -p generated web
 
-# Build assets only. No gameplay tests, browser tests, CI quality gates, or regression suites.
+# Prepare deterministic source assets before engine import and regression gates.
 python3 scripts/prepare_intro_assets.py
 python3 scripts/prepare_table.py
 python3 scripts/prepare_logo.py
 
 timeout 5m "$GODOT_BIN" --headless --path . --import
+for test in game_rules_headless intro_handoff_headless visual_setup_scene_headless; do
+  echo "YAKOLAK_GODOT_TEST_START ${test}"
+  timeout 90s "$GODOT_BIN" --headless --path . --script "res://tests/${test}.gd"
+done
+
 timeout 7m "$GODOT_BIN" --headless --path . --export-release "Web" web/index.html
 
 test -s web/index.html
