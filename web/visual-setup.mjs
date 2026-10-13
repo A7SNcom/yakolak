@@ -155,7 +155,7 @@ export function mountSetup(document, window) {
         const corners=geometry.hits?.[color.id]||[point];const xs=corners.map(x=>x[0]*width),ys=corners.map(x=>x[1]*height);
         b.style.width=`${Math.max(80,Math.max(...xs)-Math.min(...xs)+20)}px`;b.style.height=`${Math.max(68,Math.max(...ys)-Math.min(...ys)+20)}px`;
         b.style.left=`${point[0]*width}px`;b.style.top=`${point[1]*height}px`;
-      }else{const p=geometry.controls?.[color.id]||point;b.style.width='';b.style.height='';b.style.left=`${Math.max(68,Math.min(width-68,p[0]*width))}px`;b.style.top=`${p[1]*height}px`;}
+      }else{const p=geometry.controls?.[color.id]||point;const mobile=width<700,half=mobile?56:68;const x=Math.max(half+12,Math.min(width-half-12,p[0]*width));b.style.width='';b.style.height='';b.style.left=`${x}px`;b.style.top=`${p[1]*height}px`;b.style.setProperty('--yk-seat-tilt',mobile?(x<width/2?'-2deg':'2deg'):'0deg');}
     }
     const target=geometry.actions||[.5,.75];
     const h=actions.getBoundingClientRect().height|| (state.step==='ready'?112:60);
@@ -169,11 +169,13 @@ export function mountSetup(document, window) {
   function positionSheet(){
     const anchor=returnFocus?.getBoundingClientRect();if(!anchor)return;
     const width=window.innerWidth,height=window.visualViewport?.height||window.innerHeight,top=window.visualViewport?.offsetTop||0;
-    const w=Math.min(modal.dataset.kind==='seat'?210:260,width-24);sheet.style.width=`${w}px`;
+    const w=Math.min(modal.dataset.kind==='seat'?(width<700?184:210):260,width-24);sheet.style.width=`${w}px`;
     const h=sheet.getBoundingClientRect().height|| (modal.dataset.kind==='seat'?172:64);
     const centered=modal.dataset.kind==='name';
     const x=centered?Math.max(12,(width-w)/2):Math.max(12,Math.min(width-w-12,anchor.left+anchor.width/2-w/2));
-    const below=anchor.bottom+4+h<=height-12;
+    const spaceBelow=height-12-(anchor.bottom-top+4),spaceAbove=anchor.top-top-16;
+    const preferBelow=(anchor.top+anchor.bottom)/2-top>=height/2;
+    const below=preferBelow?spaceBelow>=h||spaceBelow>spaceAbove:spaceAbove<h&&spaceBelow>=spaceAbove;
     const y=centered?Math.max(12,(height-h)/2):Math.max(12,Math.min(height-h-12,below?anchor.bottom+4-top:anchor.top-h-4-top));
     sheet.style.left=`${x}px`;sheet.style.top=`${y}px`;
     modal.dataset.side=centered?'center':below?'below':'above';
@@ -274,12 +276,15 @@ export function mountSetup(document, window) {
   function openSeat(index,origin){
     closeSheet();openSheet('',origin,'seat');sheet.setAttribute('aria-label',seatLabel(state.seats[index]));sheet.setAttribute('role','menu');sheet.removeAttribute('aria-labelledby');
     const choices=el('div','yk-menu');
-    const item=(label,action,selected=false)=>{const b=button(label,action,'yk-menu-item');b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String(selected));choices.append(b);return b;};
-    item('لاعب',()=>{if(index>0)state=changeSeat(state,index,'local',state.seats[index].name);playerName(index,origin);},state.seats[index].mode==='local');
+    const item=(label,action,selected=false,parent=choices)=>{const b=button(label,action,'yk-menu-item');b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String(selected));parent.append(b);return b;};
+    if(state.seats[index].mode!=='local')item('لاعب',()=>{if(index>0)state=changeSeat(state,index,'local',state.seats[index].name);playerName(index,origin);},state.seats[index].mode==='local');
     if(index>0){item('الكمبيوتر (بوت)',()=>{state=changeSeat(state,index,'bot');closeSheet(true);},state.seats[index].mode==='bot');item('فاضي (بدون لاعب)',()=>{state=changeSeat(state,index,'none');closeSheet(true);},state.seats[index].mode==='none');}
+    const names=el('div','yk-menu-players');
+    names.classList.toggle('is-grid',state.seats.filter(seat=>seat.mode==='local').length>2);
     for(const [source,seat] of state.seats.entries())if(seat.mode==='local'){
-      item(seatLabel(seat),()=>{if(source===index)playerName(index,origin);else{state=swapPlayers(state,index,source);closeSheet(true);}},source===index);
+      item(seatLabel(seat),()=>{if(source===index)playerName(index,origin);else{state=swapPlayers(state,index,source);closeSheet(true);}},source===index,names);
     }
+    choices.append(names);
     sheet.append(choices);positionSheet();choices.querySelector('button').focus({preventScroll:true});
   }
   function playerName(index,origin){
@@ -287,7 +292,8 @@ export function mountSetup(document, window) {
     const form=el('form','yk-form');form.noValidate=true;
     const name=input('اسم اللاعب',{value:state.seats[index].name,placeholder:'اسم اللاعب',maxLength:24,autocomplete:'off'});name.field.enterKeyHint='done';
     const inputRow=el('div','yk-name-input');inputRow.append(name.wrap);
-    const clearName=button('×',()=>{name.field.value='';clearName.hidden=true;name.field.focus({preventScroll:true});},'yk-input-clear');
+    const clearName=button('',()=>{name.field.value='';clearName.hidden=true;name.field.focus({preventScroll:true});},'yk-input-clear');
+    const clearSvg=document.createElementNS('http://www.w3.org/2000/svg','svg');clearSvg.setAttribute('viewBox','0 0 16 16');clearSvg.setAttribute('aria-hidden','true');const clearPath=document.createElementNS(clearSvg.namespaceURI,'path');clearPath.setAttribute('d','m4 4 8 8M12 4l-8 8');clearSvg.append(clearPath);clearName.append(clearSvg);
     clearName.setAttribute('aria-label','مسح اسم اللاعب');clearName.hidden=!name.field.value;
     name.field.addEventListener('input',()=>{clearName.hidden=!name.field.value;});inputRow.append(clearName);form.append(inputRow);
     nameDraft={index,field:name.field};form.addEventListener('submit',e=>{e.preventDefault();name.field.blur();closeSheet(true);});sheet.append(form);positionSheet();name.field.focus({preventScroll:true});
