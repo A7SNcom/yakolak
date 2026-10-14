@@ -1,14 +1,17 @@
 import {attachLiquidLens} from './vendor/liquefy-core-1.1.0.mjs';
-// Shallow cylindrical paper geometry, assembled from tangent planes in CSS 3D.
-// The original DOM remains the one accessible label and the fixed touch target.
-export function paperFold(width, sign, maximumAngle=.24, count=7) {
-  const w=Math.max(1,Number(width)||1),direction=sign<0?-1:1;
-  const alpha=Math.min(maximumAngle,32/w),radius=w/(2*alpha),step=w/count;
-  return Array.from({length:count},(_,i)=>{
-    const arc=(i+.5)*step-w/2,phi=arc/radius;
-    return {offset:i*step,width:step+.3,x:radius*Math.sin(phi),
-      z:direction*radius*(1-Math.cos(phi)),angle:-direction*phi*180/Math.PI};
-  });
+
+// Inverse orthographic projection of one continuous sheet around a cylinder.
+// The entire SourceGraphic (including Arabic shaping) is sampled once; there
+// are no duplicated labels, cropped columns or per-segment borders.
+export function cylinderSample(width, tableRadius, sign, destinationX) {
+  const radius=Math.max(Number(tableRadius)||120,width*1.1,120);
+  const x=destinationX-width/2;
+  const ratio=Math.max(-.85,Math.min(.85,x/radius));
+  const sourceX=radius*Math.asin(ratio);
+  const depth=radius*(1-Math.sqrt(1-ratio*ratio));
+  const edgeDepth=radius*(1-Math.sqrt(1-(width/2/radius)**2));
+  const elevation=Math.min(.7,7/Math.max(.01,edgeDepth));
+  return {dx:sourceX-x,dy:-(sign<0?-1:1)*depth*elevation,radius};
 }
 
 export const COLORS = [
@@ -144,7 +147,54 @@ export function mountSetup(document, window) {
   const modal=el('div','yk-modal');modal.hidden=true;
   const sheet=el('section','yk-sheet');sheet.setAttribute('role','dialog');sheet.setAttribute('aria-labelledby','ykSheetTitle');modal.append(sheet);
   root.append(header,seats,actions,modal);document.body.append(root);
-  const lenses=new Map(),folds=new Map();
+  const lenses=new Map(),cylinders=new Map();
+  const ns='http://www.w3.org/2000/svg';
+  const svgNode=(tag,attrs={})=>{const n=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,v);return n;};
+  const filterHost=svgNode('svg',{width:'0',height:'0','aria-hidden':'true'}),filterDefs=svgNode('defs');
+  filterHost.classList.add('yk-cylinder-definitions');filterHost.append(filterDefs);root.append(filterHost);
+  let mapCanvas=null,mapContext=null,filterSerial=0;
+  function clearCylinder(node){
+    node.classList.remove('yk-cylinder');node.style.removeProperty('--yk-cylinder-filter');delete node.dataset.cylinder;
+    const entry=cylinders.get(node);if(entry){entry.filter.remove();cylinders.delete(node);}
+  }
+  function refreshCylinders(){
+    for(const {b} of seatButtons)if(state.step==='color')clearCylinder(b);
+    if(root.hidden)return;
+    for(const [node] of cylinders)if(!node.isConnected)clearCylinder(node);
+    const height=root.getBoundingClientRect().height||window.innerHeight;
+    const center=geometry.board?geometry.board[1]+geometry.board[3]/2:height*.5;
+    const radius=(geometry.board?.[2]||window.innerWidth*.85)/2;
+    for(const node of root.querySelectorAll('.yk-seat,.yk-primary,.yk-outline,.yk-choice,.yk-sharing,.yk-menu-item')){
+      if(node.hidden||node.closest('[hidden]')||node.classList.contains('is-color'))continue;
+      const rect=node.getBoundingClientRect(),seat=node.classList.contains('yk-seat');
+      const w=node.offsetWidth||rect.width||(seat?(window.innerWidth<700?112:136):200),h=node.offsetHeight||rect.height||(seat?44:50);
+      const middle=rect.height?rect.top+rect.height/2:seat?parseFloat(node.style.top)||0:parseFloat(actions.style.top)||height*.75;
+      const sign=middle<center?-1:1;node.dataset.cylinder=sign<0?'inward':'outward';
+      // jsdom has no raster renderer. Browser Canvas2D is independent of WebGL.
+      if(typeof window.CanvasRenderingContext2D!=='function')continue;
+      if(!mapCanvas){mapCanvas=document.createElement('canvas');mapCanvas.width=512;mapCanvas.height=1;mapContext=mapCanvas.getContext('2d');}
+      if(!mapContext)continue;
+      const key=[Math.round(w),Math.round(h),Math.round(radius),sign].join(':');
+      let entry=cylinders.get(node);if(entry?.key===key)continue;
+      if(!entry){
+        const filter=svgNode('filter',{id:`yk-cylinder-${++filterSerial}`,filterUnits:'userSpaceOnUse',primitiveUnits:'userSpaceOnUse','color-interpolation-filters':'sRGB'});
+        const image=svgNode('feImage',{result:'cylinderMap',preserveAspectRatio:'none'});
+        filter.append(image,svgNode('feDisplacementMap',{in:'SourceGraphic',in2:'cylinderMap',scale:'32',xChannelSelector:'R',yChannelSelector:'G'}));
+        filterDefs.append(filter);entry={filter,image,key:''};cylinders.set(node,entry);
+      }
+      const padding=24,map=mapContext.createImageData(512,1);
+      for(let i=0;i<512;i++){
+        const p=cylinderSample(w,radius,sign,-padding+(i+.5)/512*(w+2*padding));
+        map.data[i*4]=Math.round(255*Math.max(0,Math.min(1,.5+p.dx/32)));
+        map.data[i*4+1]=Math.round(255*Math.max(0,Math.min(1,.5+p.dy/32)));
+        map.data[i*4+2]=128;map.data[i*4+3]=255;
+      }
+      mapContext.putImageData(map,0,0);const url=mapCanvas.toDataURL('image/png');
+      for(const n of [entry.filter,entry.image])for(const [k,v] of Object.entries({x:-padding,y:-padding,width:w+2*padding,height:h+2*padding}))n.setAttribute(k,v);
+      entry.image.setAttribute('href',url);entry.image.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href',url);entry.key=key;
+      node.style.setProperty('--yk-cylinder-filter',`url(#${entry.filter.id})`);node.classList.add('yk-cylinder');
+    }
+  }
   function refreshGlass(){
     // Actual Liquefy Core optics. WebKit uses the same neutral CSS material:
     // it cannot render SVG displacement in backdrop-filter. No RGB dispersion
@@ -152,71 +202,12 @@ export function mountSetup(document, window) {
     const nodes=[prompt,sheet,create,join,confirm,start,sharing,...counts.children,...rounds.children,...seatButtons.map(x=>x.b)];
     for(const node of nodes){
       if(node===prompt)continue;
-      const visible=!root.hidden&&!node.hidden&&!node.closest('[hidden]')&&!node.closest('.is-color');
+      const visible=!root.hidden&&!node.hidden&&!node.closest('[hidden]')&&!node.classList.contains('is-color');
       if(!visible){lenses.get(node)?.destroy();lenses.delete(node);continue;}
       if(!lenses.has(node)){const desktop=window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;const lens=attachLiquidLens(node,{strength:.32,dispersion:0,blur:desktop?12:1,saturation:1,respectReducedTransparency:true});if(lens)lenses.set(node,lens);}
     }
   }
   root.dataset.glassEngine='liquefy-core-1.1.0';
-
-  function captureFoldMaterial(node){
-    const folded=node.classList.contains('is-folded');node.classList.remove('is-folded');
-    const style=window.getComputedStyle(node),label=node.querySelector('.yk-seat-status');
-    for(const [name,value] of Object.entries({
-      '--yk-fold-bg':style.backgroundImage,'--yk-fold-fill':style.backgroundColor,
-      '--yk-fold-radius':style.borderRadius,'--yk-fold-edge':style.borderTopColor,
-      '--yk-fold-font':label?window.getComputedStyle(label).fontSize:style.fontSize,
-      '--yk-fold-weight':label?window.getComputedStyle(label).fontWeight:style.fontWeight
-    }))node.style.setProperty(name,value);
-    if(folded)node.classList.add('is-folded');
-  }
-
-  function refreshFolds(){
-    if(root.hidden)return;
-    for(const [node] of folds)if(!node.isConnected)folds.delete(node);
-    const height=root.getBoundingClientRect().height||window.innerHeight;
-    const boardMiddle=geometry.board?geometry.board[1]+geometry.board[3]/2:height*.5;
-    for(const node of root.querySelectorAll('.yk-seat,.yk-primary,.yk-outline,.yk-choice,.yk-sharing,.yk-menu-item')){
-      if(node.hidden||node.closest('[hidden]')||node.classList.contains('is-color'))continue;
-      let fold=folds.get(node);
-      if(!fold){
-        captureFoldMaterial(node);
-        const source=el('span','yk-fold-source');source.append(...node.childNodes);
-        const backdrop=el('span','yk-fold-backdrop');backdrop.setAttribute('aria-hidden','true');
-        const surface=el('span','yk-fold-surface');surface.setAttribute('aria-hidden','true');
-        node.append(source,backdrop,surface);node.classList.add('is-folded');
-        fold={source,surface,key:'',screen:window.innerWidth};folds.set(node,fold);
-      }
-      if(fold.screen!==window.innerWidth){captureFoldMaterial(node);fold.screen=window.innerWidth;}
-      const rect=node.getBoundingClientRect(),isSeat=node.classList.contains('yk-seat');
-      const width=rect.width||(isSeat?(window.innerWidth<700?112:136):200);
-      const h=rect.height||(isSeat?(window.innerWidth<700?44:56):50);
-      const middle=rect.height?rect.top+rect.height/2:isSeat?parseFloat(node.style.top)||0:parseFloat(actions.style.top)||height*.75;
-      const sign=middle<boardMiddle?-1:1;
-      const status=fold.source.querySelector('.yk-seat-status');
-      const text=status?status.textContent:fold.source.textContent.trim();
-      const arrow=!!fold.source.querySelector('.yk-seat-arrow');
-      const icon=fold.source.querySelector('.yk-share-icon svg');
-      const roll=isSeat?node.style.getPropertyValue('--yk-seat-tilt')||'0deg':'0deg';
-      const key=JSON.stringify([width,h,sign,text,arrow,!!icon,roll]);
-      if(key===fold.key)continue;
-      fold.key=key;node.dataset.fold=sign<0?'inward':'outward';
-      fold.surface.style.setProperty('--yk-fold-roll',roll);fold.surface.replaceChildren();
-      for(const piece of paperFold(width,sign,isSeat?.24:.16)){
-        const strip=el('span','yk-fold-strip'),face=el('span','yk-fold-plane');
-        strip.style.width=`${piece.width}px`;strip.style.height=`${h}px`;
-        strip.style.transform=`translate3d(${width/2+piece.x-piece.width/2}px,0,${piece.z}px) rotateY(${piece.angle}deg)`;
-        face.style.width=`${width}px`;face.style.height=`${h}px`;face.style.left=`${-piece.offset}px`;
-        const label=el('span','yk-fold-caption');label.dataset.text=text;
-        if(icon){const copy=icon.cloneNode(true);copy.classList.add('yk-fold-icon');face.append(copy);}
-        face.append(label);
-        if(arrow){const chevron=el('span','yk-fold-chevron');face.append(chevron);}
-        // A restrained normal-dependent sheen describes the paper's depth.
-        face.style.setProperty('--yk-fold-shade',String(Math.abs(piece.angle)/14*.035));
-        strip.append(face);fold.surface.append(strip);
-      }
-    }
-  }
 
   function clearError(){errors.textContent='';}
   function showError(text){pending=false;errors.textContent=text;render();}
@@ -233,21 +224,19 @@ export function mountSetup(document, window) {
       const point=geometry.seats?.[color.id]||fallback[color.id];
       if(state.step==='color'){
         const corners=geometry.hits?.[color.id]||[point];const xs=corners.map(x=>x[0]*width),ys=corners.map(x=>x[1]*height);
-        b.style.width=`${Math.max(80,Math.max(...xs)-Math.min(...xs)+20)}px`;b.style.height=`${Math.max(68,Math.max(...ys)-Math.min(...ys)+20)}px`;
+        clearCylinder(b);
+        b.style.width=`${Math.max(104,Math.max(...xs)-Math.min(...xs)+52)}px`;b.style.height=`${Math.max(88,Math.max(...ys)-Math.min(...ys)+52)}px`;
         b.style.left=`${point[0]*width}px`;b.style.top=`${point[1]*height}px`;
       }else{
         const p=geometry.controls?.[color.id]||point,mobile=width<700;
-        const roll=Math.max(-10,Math.min(10,Number(geometry.control_angles?.[color.id])||0));
-        const radians=roll*Math.PI/180;
+        const angle=Math.max(-10,Math.min(10,Number(geometry.control_angles?.[color.id])||0)),radians=angle*Math.PI/180;
         const halfWidth=mobile?56:68,halfHeight=mobile?22:28;
         // Clamp the rotated footprint rather than the unrotated button width.
-        // Include the perspective shell's small protrusion in screen-edge bounds.
-        const edgeX=Math.abs(Math.cos(radians))*halfWidth+Math.abs(Math.sin(radians))*halfHeight+5;
-        const edgeY=Math.abs(Math.sin(radians))*halfWidth+Math.abs(Math.cos(radians))*halfHeight+5;
+        const edgeX=Math.abs(Math.cos(radians))*halfWidth+Math.abs(Math.sin(radians))*halfHeight;
+        const edgeY=Math.abs(Math.sin(radians))*halfWidth+Math.abs(Math.cos(radians))*halfHeight;
         const x=Math.max(edgeX+12,Math.min(width-edgeX-12,p[0]*width+(p[0]<.5?-6:6)));
         const y=Math.max(edgeY+16,Math.min(height-edgeY-16,p[1]*height));
-        b.style.width='';b.style.height='';b.style.left=`${x}px`;b.style.top=`${y}px`;
-        b.style.setProperty('--yk-seat-tilt',`${roll}deg`);
+        b.style.width='';b.style.height='';b.style.left=`${x}px`;b.style.top=`${y}px`;b.style.setProperty('--yk-seat-tilt',`${angle}deg`);
       }
     }
     const target=geometry.actions||[.5,.75];
@@ -258,7 +247,7 @@ export function mountSetup(document, window) {
     actions.style.top=`${centeredEntry?Math.max(16,(height-h)/2):Math.max(12,Math.min(target[1]*height,height-h-16))}px`;
     const heading=geometry.prompt||[.5,.25];prompt.style.top=`${Math.max(20,heading[1]*height)}px`;
     if(!modal.hidden && ['seat','name'].includes(modal.dataset.kind))positionSheet();
-    refreshFolds();
+    refreshCylinders();
   }
   function positionSheet(){
     const anchor=returnFocus?.getBoundingClientRect();if(!anchor)return;
@@ -273,7 +262,7 @@ export function mountSetup(document, window) {
     const y=centered?Math.max(12,(height-h)/2):Math.max(12,Math.min(height-h-12,below?anchor.bottom+4-top:anchor.top-h-4-top));
     sheet.style.left=`${x}px`;sheet.style.top=`${y}px`;
     modal.dataset.side=centered?'center':below?'below':'above';
-    refreshFolds();
+    refreshCylinders();
   }
   function render(){
     root.dataset.step=state.step;identity.textContent=state.name;
@@ -315,7 +304,7 @@ export function mountSetup(document, window) {
   async function copyRoom(){
     if(!roomCode){showError('الأونلاين غير متاح حالياً');return;}
     const url=new URL(window.location.origin+window.location.pathname);url.searchParams.set('room',roomCode);
-    try{await window.navigator.clipboard.writeText(url.toString());code.textContent='تم النسخ';refreshFolds();window.setTimeout(()=>{if(!root.hidden){code.textContent=roomCode;refreshFolds();}},1100);}catch{showError('تعذر النسخ');}
+    try{await window.navigator.clipboard.writeText(url.toString());code.textContent='تم النسخ';window.setTimeout(()=>{if(!root.hidden)code.textContent=roomCode;},1100);}catch{showError('تعذر النسخ');}
   }
   function openSheet(title,origin,kind){
     returnFocus?.setAttribute?.('aria-expanded','false');sheetGeneration++;returnFocus=origin||document.activeElement;returnFocus?.setAttribute?.('aria-expanded','true');
@@ -355,12 +344,12 @@ export function mountSetup(document, window) {
     const phone=input('رقم الجوال',{value:profile?.phone||'',type:'tel',inputMode:'numeric',autocomplete:'tel',maxLength:15,required:true,dir:'ltr'});phone.field.enterKeyHint='done';
     phone.field.addEventListener('input',()=>{phone.field.value=digits(phone.field.value);});
     const error=el('div','yk-field-error');error.setAttribute('role','alert');const next=el('button','yk-primary','متابعة');next.type='submit';form.append(phone.wrap,error,next);
-    form.addEventListener('submit',e=>{e.preventDefault();const number=digits(phone.field.value);if(!/^\d{7,15}$/.test(number)){error.textContent='تأكد من رقم الجوال';return;}const name=profiles[number];if(typeof name==='string'&&validProfile({name,phone:number}))finishProfile(name,number);else profileName(number);});sheet.append(form);refreshFolds();
+    form.addEventListener('submit',e=>{e.preventDefault();const number=digits(phone.field.value);if(!/^\d{7,15}$/.test(number)){error.textContent='تأكد من رقم الجوال';return;}const name=profiles[number];if(typeof name==='string'&&validProfile({name,phone:number}))finishProfile(name,number);else profileName(number);});sheet.append(form);refreshCylinders();
   }
   function profileName(number){
     sheet.replaceChildren();const title=el('h2','','الاسم الكريم');title.id='ykSheetTitle';const form=el('form','yk-form');form.noValidate=true;
     const name=input('الاسم الكريم',{maxLength:24,required:true,autocomplete:'given-name'});name.field.enterKeyHint='done';const error=el('div','yk-field-error');error.setAttribute('role','alert');const next=el('button','yk-primary','متابعة');next.type='submit';form.append(name.wrap,error,next);
-    form.addEventListener('submit',e=>{e.preventDefault();if(name.field.value.trim().length<2){error.textContent='اكتب اسمك';return;}finishProfile(name.field.value.trim(),number);});sheet.append(title,form);refreshFolds();name.field.focus();animate(sheet,[{opacity:0,transform:'translateX(8px)'},{opacity:1,transform:'none'}]);
+    form.addEventListener('submit',e=>{e.preventDefault();if(name.field.value.trim().length<2){error.textContent='اكتب اسمك';return;}finishProfile(name.field.value.trim(),number);});sheet.append(title,form);refreshCylinders();name.field.focus();animate(sheet,[{opacity:0,transform:'translateX(8px)'},{opacity:1,transform:'none'}]);
   }
   function finishProfile(name,phone){
     profile={name,phone};profiles[phone]=name;state=newSetup(name);
@@ -400,7 +389,7 @@ export function mountSetup(document, window) {
   function openJoin(){
     openSheet('رابط أو رمز الغرفة',join,'join');const form=el('form','yk-form');form.noValidate=true;
     const value=input('رابط أو رمز الغرفة',{type:'text',autocomplete:'off',required:true,dir:'ltr'});const error=el('div','yk-field-error');error.setAttribute('role','alert');const submit=el('button','yk-primary','انضمام');submit.type='submit';form.append(value.wrap,error,submit,button('إلغاء',()=>closeSheet(true),'yk-subtle'));
-    form.addEventListener('submit',e=>{e.preventDefault();const code=parseRoomInput(value.field.value,window.location.href);if(!code){error.textContent='تأكد من الرابط أو الرمز';return;}if(!capabilities.online){error.textContent='الأونلاين غير متاح حالياً';return;}closeSheet(true,()=>window.yakolakVisualSetupAction?.(JSON.stringify({action:'join',code})));});sheet.append(form);refreshFolds();value.field.focus();
+    form.addEventListener('submit',e=>{e.preventDefault();const code=parseRoomInput(value.field.value,window.location.href);if(!code){error.textContent='تأكد من الرابط أو الرمز';return;}if(!capabilities.online){error.textContent='الأونلاين غير متاح حالياً';return;}closeSheet(true,()=>window.yakolakVisualSetupAction?.(JSON.stringify({action:'join',code})));});sheet.append(form);refreshCylinders();value.field.focus();
   }
   modal.addEventListener('keydown',e=>{
     if(e.key==='Escape'&&modal.dataset.kind!=='profile'){e.preventDefault();closeSheet(true);return;}
@@ -410,7 +399,7 @@ export function mountSetup(document, window) {
   root.addEventListener('pointerdown',e=>{if(nameDraft&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet();},true);
   root.addEventListener('click',e=>{if(!modal.hidden&&modal.dataset.kind!=='profile'&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet(true);});root.addEventListener('keydown',e=>e.stopPropagation());
   const api={
-    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;closeSheet();resetOverlay();capabilities={online:!!options.online,mixed:!!options.mixed};connections=options.resume?.players?connections:[];roomCode=options.resume?.players?roomCode:'';pending=moving=false;state=options.resume?.players?restoreSetup(options.resume,profile?.name||''):newSetup(profile?.name||'');geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
+    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;closeSheet();resetOverlay();capabilities={online:!!options.online,mixed:!!options.mixed};connections=options.resume?.players?connections:[];roomCode=options.resume?.players?roomCode:'';pending=moving=false;state=options.resume?.players?restoreSetup(options.resume,profile?.name||''):newSetup(profile?.name||'');if(options.preview_step==='color')state={...state,step:'color',selectedColor:''};geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
       // Never synchronously call back into Godot while it is publishing entry.
       const token=flowGeneration;window.setTimeout(()=>{if(token===flowGeneration&&!root.hidden)notify('preview');},0);},
     close(){flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;pending=moving=false;resetOverlay();root.hidden=true;refreshGlass();delete window.yakolakPendingVisualSetup;document.body.dataset.yakolakVisualSetup='hidden';},
