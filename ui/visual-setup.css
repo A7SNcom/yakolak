@@ -110,3 +110,37 @@
 #yakolakVisualSetup .yk-cylinder::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;border:1px solid var(--yk-paper-border,rgba(255,255,255,.58));border-radius:inherit;background:var(--yk-paper-fill,rgba(80,83,90,.55));box-shadow:var(--yk-paper-shadow,none);filter:var(--yk-cylinder-filter);}
 #yakolakVisualSetup .yk-cylinder>.yk-button-label,#yakolakVisualSetup .yk-cylinder>.yk-seat-status,#yakolakVisualSetup .yk-cylinder>.yk-seat-arrow,#yakolakVisualSetup .yk-cylinder>.yk-share-icon,#yakolakVisualSetup .yk-cylinder>.yk-room-code{position:relative;z-index:1;}
 #yakolakVisualSetup .yk-cylinder.is-off::before{opacity:.72;}
+
+/* Elliptical cylindrical glass-metal wall (one ring, four readable selector plates). */
+#yakolakVisualSetup .yk-orbit-ribbon{
+ position:absolute;inset:0;width:100%;height:100%;z-index:0;
+ overflow:visible;pointer-events:none;
+ filter:drop-shadow(0 7px 10px rgba(0,0,0,.36));
+}
+#yakolakVisualSetup .yk-orbit-ribbon[hidden]{display:none!important}
+#yakolakVisualSetup .yk-seat{z-index:1}
+#yakolakVisualSetup[data-step=ready] .yk-seat:not(.is-color){
+ border-radius:999px;padding:5px 6px;gap:4px;
+ border:1.5px solid rgba(244,249,255,.79);
+ background:linear-gradient(145deg,rgba(170,185,201,.42),rgba(34,41,50,.89) 76%);
+ box-shadow:0 6px 18px rgba(0,0,0,.36),inset 0 1px 1px rgba(255,255,255,.48);
+}
+#yakolakVisualSetup[data-step=ready] .yk-seat[data-color=blue]:not(.is-color){
+ border-color:rgba(114,175,255,.93);
+ background:linear-gradient(140deg,rgba(38,104,204,.90),rgba(12,27,65,.92));
+}
+#yakolakVisualSetup[data-step=ready] .yk-seat[data-color=green]:not(.is-color){
+ border-color:rgba(100,243,212,.89);
+ background:linear-gradient(140deg,rgba(13,132,103,.88),rgba(9,49,44,.91));
+}
+#yakolakVisualSetup[data-step=ready] .yk-seat.is-off:not(.is-color){opacity:.90;filter:none}
+#yakolakVisualSetup[data-step=ready] .yk-seat-status{
+ min-width:0;overflow:hidden;text-overflow:ellipsis;
+ font-weight:650;line-height:1.25;white-space:nowrap;text-shadow:none;
+}
+#yakolakVisualSetup[data-step=ready] .yk-seat-arrow{flex-shrink:0;font-size:16px}
+@media(max-width:699px){
+ #yakolakVisualSetup[data-step=ready] .yk-seat:not(.is-color){padding:4px 6px;gap:4px}
+ #yakolakVisualSetup[data-step=ready] .yk-seat-arrow{font-size:14px}
+}
+@media(prefers-reduced-transparency:reduce){#yakolakVisualSetup .yk-orbit-ribbon{filter:none}}

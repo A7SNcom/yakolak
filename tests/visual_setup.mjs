@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {COLORS,digits,validProfile,newSetup,chooseColor,confirmColor,chooseCount,changeSeat,seatLabel,swapPlayers,configuration,configurationError,parseRoomInput,restoreSetup,mountSetup,cylinderSample,cylinderNormal} from '../ui/visual-setup.mjs';
+import {COLORS,digits,validProfile,newSetup,chooseColor,confirmColor,chooseCount,changeSeat,seatLabel,swapPlayers,configuration,configurationError,parseRoomInput,restoreSetup,mountSetup,cylinderSample,cylinderNormal,orbitRibbonGeometry} from '../ui/visual-setup.mjs';
 
 test('all four folded sheets follow one table-centered orbit without reversing their captions',()=>{
  const seats=[[-100,-120,-8],[100,-120,8],[-100,120,8],[100,120,-8]];
@@ -20,6 +20,21 @@ test('all four folded sheets follow one table-centered orbit without reversing t
  assert.equal(cylinderSample(112,180,{x:0,y:1},112).radius,cylinderSample(560,180,{x:0,y:1},560).radius);
 });
 
+test('elliptical cylindrical ribbon tracks the four corner selectors',()=>{
+ for(const [width,height,points] of [
+  [390,844,[[95,260],[295,260],[95,575],[295,575]]],
+  [320,568,[[76,170],[244,170],[76,383],[244,383]]],
+  [1366,768,[[350,170],[1016,170],[350,586],[1016,586]]]
+ ]){
+  const ring=orbitRibbonGeometry(points,width,height);
+  assert.ok(ring&&ring.rx>0&&ring.ry>0&&ring.thickness>=36);
+  for(const [x,y] of points){
+   const radius=(x-ring.cx)**2/ring.rx**2+(y-ring.cy)**2/ring.ry**2;
+   assert.ok(Math.abs(radius-1)<1e-8,'ring touches each plate center');
+  }
+ }
+ assert.equal(orbitRibbonGeometry([[0,0]],390,844),null);
+});
 test('Arabic/Persian telephone digits normalize and profile validates',()=>{
   assert.equal(digits('٠٥٥ ۱۲۳-٤٥٦٧'),'0551234567');
   assert.ok(validProfile({name:'أحمد',phone:'0551234567'}));

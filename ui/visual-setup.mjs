@@ -28,6 +28,21 @@ export function cylinderSample(width, tableRadius, normal, destinationX) {
   return {dx:Math.max(-4,Math.min(4,sourceX-x))*(1-nx*nx)+nx*bow,dy:ny*bow,radius};
 }
 
+/** One elliptical orbit through the four projected player selectors. */
+export function orbitRibbonGeometry(points,width,height){
+  if(!Array.isArray(points)||points.length!==4||width<=0||height<=0||points.some(p=>!Array.isArray(p)||p.length!==2||!p.every(Number.isFinite)))return null;
+  const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);
+  const xSpan=(Math.max(...xs)-Math.min(...xs))/2,ySpan=(Math.max(...ys)-Math.min(...ys))/2;
+  if(xSpan<20||ySpan<24)return null;
+  const cx=(Math.max(...xs)+Math.min(...xs))/2,cy=(Math.max(...ys)+Math.min(...ys))/2;
+  const room=Math.max(ySpan+12,Math.min(cy-8,height-cy-8));
+  const neededRx=xSpan/Math.sqrt(Math.max(.04,1-(ySpan/room)**2));
+  const rx=Math.max(xSpan+16,Math.min(width*.63,Math.max(width*.405,xSpan*1.34)),neededRx);
+  const ry=ySpan/Math.sqrt(Math.max(.04,1-(xSpan/rx)**2));
+  const thickness=Math.max(36,Math.min(76,Math.min(width,height)*.115));
+  return {cx,cy,rx,ry,thickness};
+}
+
 export const COLORS = [
   { id: 'marble', name: 'أبيض', direction: 'right', hex: '#ddd7ce' },
   { id: 'blue', name: 'أزرق', direction: 'back', hex: '#3764b2' },
@@ -166,6 +181,37 @@ export function mountSetup(document, window) {
   const svgNode=(tag,attrs={})=>{const n=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,v);return n;};
   const filterHost=svgNode('svg',{width:'0',height:'0','aria-hidden':'true'}),filterDefs=svgNode('defs');
   filterHost.classList.add('yk-cylinder-definitions');filterHost.append(filterDefs);root.append(filterHost);
+
+  // One continuous cylindrical wall. Controls are on its surface, with flat readable text.
+  const orbitRibbon=svgNode('svg',{class:'yk-orbit-ribbon',viewBox:'0 0 1 1',preserveAspectRatio:'none','aria-hidden':'true'});
+  const orbitDefs=svgNode('defs'),metal=svgNode('linearGradient',{id:'yk-orbit-metal',x1:'0%',y1:'0%',x2:'12%',y2:'100%'});
+  for(const [offset,color,opacity] of [['0%','#273950','.86'],['31%','#202832','.85'],['58%','#53616d','.67'],['82%','#222b35','.88'],['100%','#64717b','.81']]){
+    metal.append(svgNode('stop',{offset,'stop-color':color,'stop-opacity':opacity}));
+  }
+  orbitDefs.append(metal);
+  const orbitWall=svgNode('ellipse',{fill:'none',stroke:'url(#yk-orbit-metal)'});
+  const orbitInner=svgNode('ellipse',{fill:'none',stroke:'rgba(8,13,19,.75)'});
+  const orbitOuter=svgNode('ellipse',{fill:'none',stroke:'rgba(239,246,255,.81)'});
+  const orbitSheen=svgNode('ellipse',{fill:'none',stroke:'rgba(187,205,226,.18)'});
+  orbitRibbon.append(orbitDefs,orbitWall,orbitInner,orbitOuter,orbitSheen);
+  orbitRibbon.hidden=true;seats.prepend(orbitRibbon);
+  function refreshOrbitRibbon(){
+    if(root.hidden||state.step!=='ready'){orbitRibbon.hidden=true;return;}
+    const width=window.innerWidth,height=root.getBoundingClientRect().height||window.innerHeight;
+    const points=seatButtons.map(({b})=>[Number.parseFloat(b.style.left),Number.parseFloat(b.style.top)]);
+    const ellipse=orbitRibbonGeometry(points,width,height);
+    if(!ellipse){orbitRibbon.hidden=true;return;}
+    orbitRibbon.hidden=false;orbitRibbon.setAttribute('viewBox',`0 0 ${width} ${height}`);
+    const {cx,cy,rx,ry,thickness}=ellipse;
+    for(const [node,delta,strokeWidth] of [
+      [orbitWall,0,thickness],[orbitInner,-thickness/2,2],
+      [orbitOuter,thickness/2,1.7],[orbitSheen,thickness*.37,1.5]]){
+      for(const [key,value] of Object.entries({cx,cy,rx:Math.max(1,rx+delta),ry:Math.max(1,ry+delta)}))node.setAttribute(key,String(value));
+      node.setAttribute('stroke-width',String(strokeWidth));
+    }
+    orbitRibbon.dataset.shape='elliptical-cylinder';
+  }
+
   let mapCanvas=null,mapContext=null,filterSerial=0;
   function clearCylinder(node){
     node.classList.remove('yk-cylinder');for(const name of ['--yk-cylinder-filter','--yk-paper-fill','--yk-paper-border','--yk-paper-shadow'])node.style.removeProperty(name);delete node.dataset.cylinder;
@@ -259,14 +305,19 @@ export function mountSetup(document, window) {
         b.style.left=`${point[0]*width}px`;b.style.top=`${point[1]*height}px`;
       }else{
         const p=geometry.controls?.[color.id]||point,mobile=width<700;
-        const angle=Math.max(-10,Math.min(10,Number(geometry.control_angles?.[color.id])||0)),radians=angle*Math.PI/180;
-        const halfWidth=mobile?56:68,halfHeight=mobile?22:28;
+        const seatWidth=mobile?Math.max(116,Math.min(158,width*.385)):Math.max(150,Math.min(205,width*.16));
+        const seatHeight=mobile?50:62;
+        const angle=Math.max(-8,Math.min(8,Number(geometry.control_angles?.[color.id])||0)),radians=angle*Math.PI/180;
+        const halfWidth=seatWidth/2,halfHeight=seatHeight/2;
         // Clamp the rotated footprint rather than the unrotated button width.
         const edgeX=Math.abs(Math.cos(radians))*halfWidth+Math.abs(Math.sin(radians))*halfHeight;
         const edgeY=Math.abs(Math.sin(radians))*halfWidth+Math.abs(Math.cos(radians))*halfHeight;
         const x=Math.max(edgeX+12,Math.min(width-edgeX-12,p[0]*width+(p[0]<.5?-6:6)));
         const y=Math.max(edgeY+16,Math.min(height-edgeY-16,p[1]*height));
-        b.style.width='';b.style.height='';b.style.left=`${x}px`;b.style.top=`${y}px`;b.style.setProperty('--yk-seat-tilt',`${angle}deg`);
+        b.style.width=`${seatWidth}px`;b.style.height=`${seatHeight}px`;b.style.left=`${x}px`;b.style.top=`${y}px`;b.style.setProperty('--yk-seat-tilt',`${angle}deg`);
+        const caption=b.querySelector('.yk-seat-status');
+        caption.style.maxWidth=`${seatWidth-30}px`;
+        caption.style.fontSize=mobile?(width<355?'12px':'13px'):'16px';
       }
     }
     const target=geometry.actions||[.5,.75];
@@ -277,6 +328,7 @@ export function mountSetup(document, window) {
     actions.style.top=`${centeredEntry?Math.max(16,(height-h)/2):Math.max(12,Math.min(target[1]*height,height-h-16))}px`;
     const heading=geometry.prompt||[.5,.25];prompt.style.top=`${Math.max(20,heading[1]*height)}px`;
     if(!modal.hidden && ['seat','name'].includes(modal.dataset.kind))positionSheet();
+    refreshOrbitRibbon();
     refreshCylinders();
   }
   function positionSheet(){
