@@ -1,17 +1,31 @@
 import {attachLiquidLens} from './vendor/liquefy-core-1.1.0.mjs';
 
-// Inverse orthographic projection of one continuous sheet around a cylinder.
-// The entire SourceGraphic (including Arabic shaping) is sampled once; there
-// are no duplicated labels, cropped columns or per-segment borders.
-export function cylinderSample(width, tableRadius, sign, destinationX) {
-  const radius=Math.max(Number(tableRadius)||120,width*1.1,120);
+// Project each sheet against the SAME cylinder centered on the board. Its
+// outward surface normal comes from the button's position around that center,
+// then is expressed in the button's own tilted coordinates. SourceGraphic is
+// displaced as a whole so Arabic glyph shaping and the glass border stay one.
+export function cylinderNormal(buttonX, buttonY, centerX, centerY, tiltDegrees=0) {
+  const vx=buttonX-centerX,vy=buttonY-centerY,length=Math.hypot(vx,vy);
+  const radians=tiltDegrees*Math.PI/180,c=Math.cos(radians),s=Math.sin(radians);
+  const nx=length>1? vx/length:0,ny=length>1? vy/length:1;
+  return {x:c*nx+s*ny,y:-s*nx+c*ny};
+}
+export function cylinderSample(width, tableRadius, normal, destinationX) {
+  const radius=Math.max(Number(tableRadius)||120,120);
   const x=destinationX-width/2;
-  const ratio=Math.max(-.85,Math.min(.85,x/radius));
-  const sourceX=radius*Math.asin(ratio);
+  // Wide central actions span only the visible arc; the physical cylinder
+  // radius remains shared with the smaller tags around the table.
+  const arcScale=Math.min(1,1.4*radius/Math.max(width,1));
+  const ratio=Math.max(-.7,Math.min(.7,x*arcScale/radius));
+  const sourceX=radius*Math.asin(ratio)/arcScale;
   const depth=radius*(1-Math.sqrt(1-ratio*ratio));
-  const edgeDepth=radius*(1-Math.sqrt(1-(width/2/radius)**2));
-  const elevation=Math.min(.7,7/Math.max(.01,edgeDepth));
-  return {dx:sourceX-x,dy:-(sign<0?-1:1)*depth*elevation,radius};
+  const edgeRatio=Math.min(.7,width*arcScale/(2*radius));
+  const edgeDepth=radius*(1-Math.sqrt(1-edgeRatio*edgeRatio));
+  const bow=depth*Math.min(.7,7/Math.max(.01,edgeDepth));
+  const nx=normal?.x||0,ny=normal?.y||0;
+  // Inverse sampling follows the outward normal; the painted edges then bend
+  // inward toward the table center, including on the left and right sides.
+  return {dx:Math.max(-4,Math.min(4,sourceX-x))*(1-nx*nx)+nx*bow,dy:ny*bow,radius};
 }
 
 export const COLORS = [
@@ -162,19 +176,23 @@ export function mountSetup(document, window) {
     if(root.hidden)return;
     for(const [node] of cylinders)if(!node.isConnected)clearCylinder(node);
     const height=root.getBoundingClientRect().height||window.innerHeight;
-    const center=geometry.board?geometry.board[1]+geometry.board[3]/2:height*.5;
+    const centerX=geometry.board?geometry.board[0]+geometry.board[2]/2:window.innerWidth*.5;
+    const centerY=geometry.board?geometry.board[1]+geometry.board[3]/2:height*.5;
     const radius=(geometry.board?.[2]||window.innerWidth*.85)/2;
     for(const node of root.querySelectorAll('.yk-seat,.yk-primary,.yk-outline,.yk-choice,.yk-sharing,.yk-menu-item')){
       if(node.hidden||node.closest('[hidden]')||node.classList.contains('is-color'))continue;
       const rect=node.getBoundingClientRect(),seat=node.classList.contains('yk-seat');
       const w=node.offsetWidth||rect.width||(seat?(window.innerWidth<700?112:136):200),h=node.offsetHeight||rect.height||(seat?44:50);
-      const middle=rect.height?rect.top+rect.height/2:seat?parseFloat(node.style.top)||0:parseFloat(actions.style.top)||height*.75;
-      const sign=middle<center?-1:1;node.dataset.cylinder=sign<0?'inward':'outward';
+      const middleX=rect.width?rect.left+rect.width/2:seat?parseFloat(node.style.left)||centerX:centerX;
+      const middleY=rect.height?rect.top+rect.height/2:seat?parseFloat(node.style.top)||0:parseFloat(actions.style.top)||height*.75;
+      const tilt=seat?Number.parseFloat(node.style.getPropertyValue('--yk-seat-tilt'))||0:0;
+      const normal=cylinderNormal(middleX,middleY,centerX,centerY,tilt);
+      node.dataset.cylinder='table-orbit';
       // jsdom has no raster renderer. Browser Canvas2D is independent of WebGL.
       if(typeof window.CanvasRenderingContext2D!=='function')continue;
       if(!mapCanvas){mapCanvas=document.createElement('canvas');mapCanvas.width=512;mapCanvas.height=1;mapContext=mapCanvas.getContext('2d');}
       if(!mapContext)continue;
-      const key=[Math.round(w),Math.round(h),Math.round(radius),sign].join(':');
+      const key=[Math.round(w),Math.round(h),Math.round(radius),normal.x.toFixed(3),normal.y.toFixed(3)].join(':');
       let entry=cylinders.get(node);if(entry?.key===key)continue;
       if(!entry){
         const filter=svgNode('filter',{id:`yk-cylinder-${++filterSerial}`,filterUnits:'userSpaceOnUse',primitiveUnits:'userSpaceOnUse','color-interpolation-filters':'sRGB'});
@@ -185,7 +203,7 @@ export function mountSetup(document, window) {
       }
       const padding=24,map=mapContext.createImageData(512,1);
       for(let i=0;i<512;i++){
-        const p=cylinderSample(w,radius,sign,-padding+(i+.5)/512*(w+2*padding));
+        const p=cylinderSample(w,radius,normal,-padding+(i+.5)/512*(w+2*padding));
         map.data[i*4]=Math.round(255*Math.max(0,Math.min(1,.5+p.dx/32)));
         map.data[i*4+1]=Math.round(255*Math.max(0,Math.min(1,.5+p.dy/32)));
         map.data[i*4+2]=128;map.data[i*4+3]=255;
