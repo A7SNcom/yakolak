@@ -179,7 +179,8 @@ export function mountSetup(document, window) {
       if(!entry){
         const filter=svgNode('filter',{id:`yk-cylinder-${++filterSerial}`,filterUnits:'userSpaceOnUse',primitiveUnits:'userSpaceOnUse','color-interpolation-filters':'sRGB'});
         const image=svgNode('feImage',{result:'cylinderMap',preserveAspectRatio:'none'});
-        filter.append(image,svgNode('feDisplacementMap',{in:'SourceGraphic',in2:'cylinderMap',scale:'32',xChannelSelector:'R',yChannelSelector:'G'}));
+        filter.append(image,svgNode('feDisplacementMap',{in:'SourceGraphic',in2:'cylinderMap',scale:'32',xChannelSelector:'R',yChannelSelector:'G',result:'bentSurface'}),
+          svgNode('feGaussianBlur',{in:'bentSurface',stdDeviation:'.32'}));
         filterDefs.append(filter);entry={filter,image,key:''};cylinders.set(node,entry);
       }
       const padding=24,map=mapContext.createImageData(512,1);
