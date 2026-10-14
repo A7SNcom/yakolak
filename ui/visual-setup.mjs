@@ -168,7 +168,7 @@ export function mountSetup(document, window) {
   filterHost.classList.add('yk-cylinder-definitions');filterHost.append(filterDefs);root.append(filterHost);
   let mapCanvas=null,mapContext=null,filterSerial=0;
   function clearCylinder(node){
-    node.classList.remove('yk-cylinder');node.style.removeProperty('--yk-cylinder-filter');delete node.dataset.cylinder;
+    node.classList.remove('yk-cylinder');for(const name of ['--yk-cylinder-filter','--yk-paper-fill','--yk-paper-border','--yk-paper-shadow'])node.style.removeProperty(name);delete node.dataset.cylinder;
     const entry=cylinders.get(node);if(entry){entry.filter.remove();cylinders.delete(node);}
   }
   function refreshCylinders(){
@@ -195,6 +195,12 @@ export function mountSetup(document, window) {
       const key=[Math.round(w),Math.round(h),Math.round(radius),normal.x.toFixed(3),normal.y.toFixed(3)].join(':');
       let entry=cylinders.get(node);if(entry?.key===key)continue;
       if(!entry){
+        // Sample the original glass before the class moves only its surface
+        // into ::before. Keep the live Arabic label on an untouched DOM layer.
+        const style=window.getComputedStyle(node);
+        node.style.setProperty('--yk-paper-fill',style.backgroundImage==='none'?style.backgroundColor:style.backgroundImage);
+        node.style.setProperty('--yk-paper-border',style.borderColor);
+        node.style.setProperty('--yk-paper-shadow',style.boxShadow);
         const filter=svgNode('filter',{id:`yk-cylinder-${++filterSerial}`,filterUnits:'userSpaceOnUse',primitiveUnits:'userSpaceOnUse','color-interpolation-filters':'sRGB'});
         const image=svgNode('feImage',{result:'cylinderMap',preserveAspectRatio:'none'});
         filter.append(image,svgNode('feDisplacementMap',{in:'SourceGraphic',in2:'cylinderMap',scale:'32',xChannelSelector:'R',yChannelSelector:'G',result:'bentSurface'}),
