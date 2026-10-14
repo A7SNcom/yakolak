@@ -1,6 +1,18 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {COLORS,digits,validProfile,newSetup,chooseColor,confirmColor,chooseCount,changeSeat,seatLabel,swapPlayers,configuration,configurationError,parseRoomInput,restoreSetup,mountSetup} from '../ui/visual-setup.mjs';
+import {COLORS,digits,validProfile,newSetup,chooseColor,confirmColor,chooseCount,changeSeat,seatLabel,swapPlayers,configuration,configurationError,parseRoomInput,restoreSetup,mountSetup,paperFold} from '../ui/visual-setup.mjs';
+
+test('paper surfaces bend in depth with opposite upper/lower normals and continuous joins',()=>{
+  for(const width of [112,136,184,360,560]){
+    const inside=paperFold(width,-1),outside=paperFold(width,1);
+    assert.equal(Math.abs(inside[3].z),0);assert.equal(Math.abs(outside[3].z),0);
+    assert.ok(inside[0].z<0&&outside[0].z>0);
+    assert.ok(inside[0].angle!==inside[3].angle,'individual normals must change across the sheet');
+    inside.forEach((p,i)=>{assert.equal(p.x,outside[i].x);assert.equal(p.z,-outside[i].z);assert.ok(Math.abs(p.z)<8.1);});
+    const edge=(p,side)=>{const half=(p.width-.3)/2*side,a=p.angle*Math.PI/180;return [p.x+half*Math.cos(a),p.z-half*Math.sin(a)];};
+    for(let i=0;i<outside.length-1;i++){const a=edge(outside[i],1),b=edge(outside[i+1],-1);assert.ok(Math.hypot(a[0]-b[0],a[1]-b[1])<.12,'adjacent planes must not leave a visible tear');}
+  }
+});
 
 test('Arabic/Persian telephone digits normalize and profile validates',()=>{
   assert.equal(digits('٠٥٥ ۱۲۳-٤٥٦٧'),'0551234567');
@@ -53,6 +65,21 @@ test('room code or same-origin invitation link normalizes',()=>{
 });
 if(process.env.YAKOLAK_JSDOM_MODULE){
  const {JSDOM}=await import(process.env.YAKOLAK_JSDOM_MODULE);
+ test('folded controls retain one semantic label, editable names and position-aware bending',()=>{
+  const dom=new JSDOM('<body></body>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});
+  const {document}=dom.window,api=mountSetup(document,dom.window);
+  const players=COLORS.map((c,i)=>({color:c.id,mode:i===3?'local':'bot',label:i===3?'أحمد':`كمبيوتر ${c.name}`}));
+  players.unshift(players.pop());
+  api.open({resume:{players,rounds:3},geometry:{board:[0,200,1024,200],controls:{blue:[.7,.2],gold:[.3,.2],green:[.3,.75],marble:[.7,.75]}}});
+  for(const color of ['blue','gold'])assert.equal(document.querySelector(`[data-color=${color}]`).dataset.fold,'inward');
+  for(const color of ['green','marble'])assert.equal(document.querySelector(`[data-color=${color}]`).dataset.fold,'outward');
+  const blue=document.querySelector('[data-color=blue]');assert.equal(blue.textContent,'كمبيوتر أزرق⌄');
+  assert.equal(blue.querySelectorAll('.yk-fold-strip').length,7);assert.equal(blue.querySelector('clipPath'),null);
+  blue.click();[...document.querySelectorAll('.yk-menu-item')].find(n=>n.textContent==='لاعب').click();
+  document.querySelector('input').value='ريم';document.querySelector('form').dispatchEvent(new dom.window.Event('submit',{cancelable:true}));
+  assert.equal(blue.textContent,'ريم⌄');assert.ok([...blue.querySelectorAll('.yk-fold-caption')].every(n=>n.dataset.text==='ريم'));
+  dom.window.close();
+ });
  test('real engine entry request opens room choices without a click or direct API call',async()=>{
   const dom=new JSDOM('<body></body>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});
   const {window}=dom,{document}=window,events=[];
