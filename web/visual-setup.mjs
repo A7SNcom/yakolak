@@ -1,32 +1,14 @@
 import {attachLiquidLens} from './vendor/liquefy-core-1.1.0.mjs';
-// A shallow curved glass shell. SVG changes the silhouette; CSS perspective
-// changes the viewing plane. The parent button keeps a full-size touch target.
-// References: w3.org/TR/css-masking-1/ and w3.org/TR/css-transforms-2/.
-export function createSeatSurface(document, key) {
-  const ns='http://www.w3.org/2000/svg';
-  const svgNode=(tag,attrs={})=>{const n=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,v);return n;};
-  const face=document.createElement('span');face.className='yk-seat-face';
-  const glass=document.createElement('span');glass.className='yk-seat-glass';glass.setAttribute('aria-hidden','true');
-  const border=svgNode('svg',{viewBox:'0 0 100 44',preserveAspectRatio:'none','aria-hidden':'true'});border.classList.add('yk-seat-bezel');
-  const defs=svgNode('defs'),clip=svgNode('clipPath',{id:`yk-seat-curve-${key}`,clipPathUnits:'objectBoundingBox'});
-  // About 2.5px of bow on a 44px mobile control, with rounded ends. A shared
-  // path gives the backdrop clip and the visible bezel exactly the same edge.
-  const d='M14 5 Q50 0 86 5 C94 6 99 11 99 20 L99 24 C99 33 94 38 86 39 Q50 44 14 39 C6 38 1 33 1 24 L1 20 C1 11 6 6 14 5 Z';
-  clip.append(svgNode('path',{d,transform:'scale(.01 .022727272727)'}));defs.append(clip);
-  const sheen=svgNode('linearGradient',{id:`yk-seat-edge-${key}`,x1:'0',y1:'0',x2:'.3',y2:'1'});
-  for(const [offset,opacity] of [['0','0.85'],['.5','0.34'],['1','0.54']])sheen.append(svgNode('stop',{offset,'stop-color':'#fff','stop-opacity':opacity}));
-  defs.append(sheen);border.append(defs,svgNode('path',{d,fill:'none',stroke:`url(#yk-seat-edge-${key})`,'stroke-width':'1','vector-effect':'non-scaling-stroke'}));
-  glass.style.clipPath=`url(#yk-seat-curve-${key})`;glass.style.webkitClipPath=`url(#yk-seat-curve-${key})`;
-  face.append(glass,border);return {face,glass};
-}
-
-export function seatPerspective(angle, x, y) {
-  const finite=(n,fallback)=>Number.isFinite(Number(n))?Number(n):fallback;
-  const roll=Math.max(-10,Math.min(10,finite(angle,0)));
-  // Face gently toward the table center. No pointer-follow or continuous motion.
-  const yaw=Math.max(-14,Math.min(14,(finite(x,.5)-.5)*48));
-  const pitch=Math.max(-5,Math.min(5,(finite(y,.5)-.5)*18));
-  return {roll,yaw,pitch};
+// Shallow cylindrical paper geometry, assembled from tangent planes in CSS 3D.
+// The original DOM remains the one accessible label and the fixed touch target.
+export function paperFold(width, sign, maximumAngle=.24, count=7) {
+  const w=Math.max(1,Number(width)||1),direction=sign<0?-1:1;
+  const alpha=Math.min(maximumAngle,32/w),radius=w/(2*alpha),step=w/count;
+  return Array.from({length:count},(_,i)=>{
+    const arc=(i+.5)*step-w/2,phi=arc/radius;
+    return {offset:i*step,width:step+.3,x:radius*Math.sin(phi),
+      z:direction*radius*(1-Math.cos(phi)),angle:-direction*phi*180/Math.PI};
+  });
 }
 
 export const COLORS = [
@@ -139,8 +121,7 @@ export function mountSetup(document, window) {
     },'yk-seat');
     b.dataset.color=color.id; b.style.setProperty('--seat-color',color.hex);
     const status=el('span','yk-seat-status'), arrow=el('span','yk-seat-arrow','⌄');arrow.setAttribute('aria-hidden','true');
-    const {face,glass}=createSeatSurface(document,color.id);
-    face.append(status,arrow);b.append(face);seats.append(b);return {b,status,color,glass};
+    b.append(status,arrow);seats.append(b);return {b,status,color};
   });
   const actions = el('footer','yk-actions');
   const entry = el('div','yk-entry');
@@ -163,12 +144,12 @@ export function mountSetup(document, window) {
   const modal=el('div','yk-modal');modal.hidden=true;
   const sheet=el('section','yk-sheet');sheet.setAttribute('role','dialog');sheet.setAttribute('aria-labelledby','ykSheetTitle');modal.append(sheet);
   root.append(header,seats,actions,modal);document.body.append(root);
-  const lenses=new Map();
+  const lenses=new Map(),folds=new Map();
   function refreshGlass(){
     // Actual Liquefy Core optics. WebKit uses the same neutral CSS material:
     // it cannot render SVG displacement in backdrop-filter. No RGB dispersion
     // or spring transforms: the board anchors and text must remain steady.
-    const nodes=[prompt,sheet,create,join,confirm,start,sharing,...counts.children,...rounds.children,...seatButtons.map(x=>x.glass)];
+    const nodes=[prompt,sheet,create,join,confirm,start,sharing,...counts.children,...rounds.children,...seatButtons.map(x=>x.b)];
     for(const node of nodes){
       if(node===prompt)continue;
       const visible=!root.hidden&&!node.hidden&&!node.closest('[hidden]')&&!node.closest('.is-color');
@@ -177,6 +158,65 @@ export function mountSetup(document, window) {
     }
   }
   root.dataset.glassEngine='liquefy-core-1.1.0';
+
+  function captureFoldMaterial(node){
+    const folded=node.classList.contains('is-folded');node.classList.remove('is-folded');
+    const style=window.getComputedStyle(node),label=node.querySelector('.yk-seat-status');
+    for(const [name,value] of Object.entries({
+      '--yk-fold-bg':style.backgroundImage,'--yk-fold-fill':style.backgroundColor,
+      '--yk-fold-radius':style.borderRadius,'--yk-fold-edge':style.borderTopColor,
+      '--yk-fold-font':label?window.getComputedStyle(label).fontSize:style.fontSize,
+      '--yk-fold-weight':label?window.getComputedStyle(label).fontWeight:style.fontWeight
+    }))node.style.setProperty(name,value);
+    if(folded)node.classList.add('is-folded');
+  }
+
+  function refreshFolds(){
+    if(root.hidden)return;
+    for(const [node] of folds)if(!node.isConnected)folds.delete(node);
+    const height=root.getBoundingClientRect().height||window.innerHeight;
+    const boardMiddle=geometry.board?geometry.board[1]+geometry.board[3]/2:height*.5;
+    for(const node of root.querySelectorAll('.yk-seat,.yk-primary,.yk-outline,.yk-choice,.yk-sharing,.yk-menu-item')){
+      if(node.hidden||node.closest('[hidden]')||node.classList.contains('is-color'))continue;
+      let fold=folds.get(node);
+      if(!fold){
+        captureFoldMaterial(node);
+        const source=el('span','yk-fold-source');source.append(...node.childNodes);
+        const backdrop=el('span','yk-fold-backdrop');backdrop.setAttribute('aria-hidden','true');
+        const surface=el('span','yk-fold-surface');surface.setAttribute('aria-hidden','true');
+        node.append(source,backdrop,surface);node.classList.add('is-folded');
+        fold={source,surface,key:'',screen:window.innerWidth};folds.set(node,fold);
+      }
+      if(fold.screen!==window.innerWidth){captureFoldMaterial(node);fold.screen=window.innerWidth;}
+      const rect=node.getBoundingClientRect(),isSeat=node.classList.contains('yk-seat');
+      const width=rect.width||(isSeat?(window.innerWidth<700?112:136):200);
+      const h=rect.height||(isSeat?(window.innerWidth<700?44:56):50);
+      const middle=rect.height?rect.top+rect.height/2:isSeat?parseFloat(node.style.top)||0:parseFloat(actions.style.top)||height*.75;
+      const sign=middle<boardMiddle?-1:1;
+      const status=fold.source.querySelector('.yk-seat-status');
+      const text=status?status.textContent:fold.source.textContent.trim();
+      const arrow=!!fold.source.querySelector('.yk-seat-arrow');
+      const icon=fold.source.querySelector('.yk-share-icon svg');
+      const roll=isSeat?node.style.getPropertyValue('--yk-seat-tilt')||'0deg':'0deg';
+      const key=JSON.stringify([width,h,sign,text,arrow,!!icon,roll]);
+      if(key===fold.key)continue;
+      fold.key=key;node.dataset.fold=sign<0?'inward':'outward';
+      fold.surface.style.setProperty('--yk-fold-roll',roll);fold.surface.replaceChildren();
+      for(const piece of paperFold(width,sign,isSeat?.24:.16)){
+        const strip=el('span','yk-fold-strip'),face=el('span','yk-fold-plane');
+        strip.style.width=`${piece.width}px`;strip.style.height=`${h}px`;
+        strip.style.transform=`translate3d(${width/2+piece.x-piece.width/2}px,0,${piece.z}px) rotateY(${piece.angle}deg)`;
+        face.style.width=`${width}px`;face.style.height=`${h}px`;face.style.left=`${-piece.offset}px`;
+        const label=el('span','yk-fold-caption');label.dataset.text=text;
+        if(icon){const copy=icon.cloneNode(true);copy.classList.add('yk-fold-icon');face.append(copy);}
+        face.append(label);
+        if(arrow){const chevron=el('span','yk-fold-chevron');face.append(chevron);}
+        // A restrained normal-dependent sheen describes the paper's depth.
+        face.style.setProperty('--yk-fold-shade',String(Math.abs(piece.angle)/14*.035));
+        strip.append(face);fold.surface.append(strip);
+      }
+    }
+  }
 
   function clearError(){errors.textContent='';}
   function showError(text){pending=false;errors.textContent=text;render();}
@@ -197,7 +237,7 @@ export function mountSetup(document, window) {
         b.style.left=`${point[0]*width}px`;b.style.top=`${point[1]*height}px`;
       }else{
         const p=geometry.controls?.[color.id]||point,mobile=width<700;
-        const {roll,yaw,pitch}=seatPerspective(geometry.control_angles?.[color.id],point[0],point[1]);
+        const roll=Math.max(-10,Math.min(10,Number(geometry.control_angles?.[color.id])||0));
         const radians=roll*Math.PI/180;
         const halfWidth=mobile?56:68,halfHeight=mobile?22:28;
         // Clamp the rotated footprint rather than the unrotated button width.
@@ -207,7 +247,7 @@ export function mountSetup(document, window) {
         const x=Math.max(edgeX+12,Math.min(width-edgeX-12,p[0]*width+(p[0]<.5?-6:6)));
         const y=Math.max(edgeY+16,Math.min(height-edgeY-16,p[1]*height));
         b.style.width='';b.style.height='';b.style.left=`${x}px`;b.style.top=`${y}px`;
-        b.style.setProperty('--yk-seat-tilt',`${roll}deg`);b.style.setProperty('--yk-seat-yaw',`${yaw}deg`);b.style.setProperty('--yk-seat-pitch',`${pitch}deg`);
+        b.style.setProperty('--yk-seat-tilt',`${roll}deg`);
       }
     }
     const target=geometry.actions||[.5,.75];
@@ -218,6 +258,7 @@ export function mountSetup(document, window) {
     actions.style.top=`${centeredEntry?Math.max(16,(height-h)/2):Math.max(12,Math.min(target[1]*height,height-h-16))}px`;
     const heading=geometry.prompt||[.5,.25];prompt.style.top=`${Math.max(20,heading[1]*height)}px`;
     if(!modal.hidden && ['seat','name'].includes(modal.dataset.kind))positionSheet();
+    refreshFolds();
   }
   function positionSheet(){
     const anchor=returnFocus?.getBoundingClientRect();if(!anchor)return;
@@ -232,6 +273,7 @@ export function mountSetup(document, window) {
     const y=centered?Math.max(12,(height-h)/2):Math.max(12,Math.min(height-h-12,below?anchor.bottom+4-top:anchor.top-h-4-top));
     sheet.style.left=`${x}px`;sheet.style.top=`${y}px`;
     modal.dataset.side=centered?'center':below?'below':'above';
+    refreshFolds();
   }
   function render(){
     root.dataset.step=state.step;identity.textContent=state.name;
@@ -273,7 +315,7 @@ export function mountSetup(document, window) {
   async function copyRoom(){
     if(!roomCode){showError('الأونلاين غير متاح حالياً');return;}
     const url=new URL(window.location.origin+window.location.pathname);url.searchParams.set('room',roomCode);
-    try{await window.navigator.clipboard.writeText(url.toString());code.textContent='تم النسخ';window.setTimeout(()=>{if(!root.hidden)code.textContent=roomCode;},1100);}catch{showError('تعذر النسخ');}
+    try{await window.navigator.clipboard.writeText(url.toString());code.textContent='تم النسخ';refreshFolds();window.setTimeout(()=>{if(!root.hidden){code.textContent=roomCode;refreshFolds();}},1100);}catch{showError('تعذر النسخ');}
   }
   function openSheet(title,origin,kind){
     returnFocus?.setAttribute?.('aria-expanded','false');sheetGeneration++;returnFocus=origin||document.activeElement;returnFocus?.setAttribute?.('aria-expanded','true');
@@ -313,12 +355,12 @@ export function mountSetup(document, window) {
     const phone=input('رقم الجوال',{value:profile?.phone||'',type:'tel',inputMode:'numeric',autocomplete:'tel',maxLength:15,required:true,dir:'ltr'});phone.field.enterKeyHint='done';
     phone.field.addEventListener('input',()=>{phone.field.value=digits(phone.field.value);});
     const error=el('div','yk-field-error');error.setAttribute('role','alert');const next=el('button','yk-primary','متابعة');next.type='submit';form.append(phone.wrap,error,next);
-    form.addEventListener('submit',e=>{e.preventDefault();const number=digits(phone.field.value);if(!/^\d{7,15}$/.test(number)){error.textContent='تأكد من رقم الجوال';return;}const name=profiles[number];if(typeof name==='string'&&validProfile({name,phone:number}))finishProfile(name,number);else profileName(number);});sheet.append(form);
+    form.addEventListener('submit',e=>{e.preventDefault();const number=digits(phone.field.value);if(!/^\d{7,15}$/.test(number)){error.textContent='تأكد من رقم الجوال';return;}const name=profiles[number];if(typeof name==='string'&&validProfile({name,phone:number}))finishProfile(name,number);else profileName(number);});sheet.append(form);refreshFolds();
   }
   function profileName(number){
     sheet.replaceChildren();const title=el('h2','','الاسم الكريم');title.id='ykSheetTitle';const form=el('form','yk-form');form.noValidate=true;
     const name=input('الاسم الكريم',{maxLength:24,required:true,autocomplete:'given-name'});name.field.enterKeyHint='done';const error=el('div','yk-field-error');error.setAttribute('role','alert');const next=el('button','yk-primary','متابعة');next.type='submit';form.append(name.wrap,error,next);
-    form.addEventListener('submit',e=>{e.preventDefault();if(name.field.value.trim().length<2){error.textContent='اكتب اسمك';return;}finishProfile(name.field.value.trim(),number);});sheet.append(title,form);name.field.focus();animate(sheet,[{opacity:0,transform:'translateX(8px)'},{opacity:1,transform:'none'}]);
+    form.addEventListener('submit',e=>{e.preventDefault();if(name.field.value.trim().length<2){error.textContent='اكتب اسمك';return;}finishProfile(name.field.value.trim(),number);});sheet.append(title,form);refreshFolds();name.field.focus();animate(sheet,[{opacity:0,transform:'translateX(8px)'},{opacity:1,transform:'none'}]);
   }
   function finishProfile(name,phone){
     profile={name,phone};profiles[phone]=name;state=newSetup(name);
@@ -358,7 +400,7 @@ export function mountSetup(document, window) {
   function openJoin(){
     openSheet('رابط أو رمز الغرفة',join,'join');const form=el('form','yk-form');form.noValidate=true;
     const value=input('رابط أو رمز الغرفة',{type:'text',autocomplete:'off',required:true,dir:'ltr'});const error=el('div','yk-field-error');error.setAttribute('role','alert');const submit=el('button','yk-primary','انضمام');submit.type='submit';form.append(value.wrap,error,submit,button('إلغاء',()=>closeSheet(true),'yk-subtle'));
-    form.addEventListener('submit',e=>{e.preventDefault();const code=parseRoomInput(value.field.value,window.location.href);if(!code){error.textContent='تأكد من الرابط أو الرمز';return;}if(!capabilities.online){error.textContent='الأونلاين غير متاح حالياً';return;}closeSheet(true,()=>window.yakolakVisualSetupAction?.(JSON.stringify({action:'join',code})));});sheet.append(form);value.field.focus();
+    form.addEventListener('submit',e=>{e.preventDefault();const code=parseRoomInput(value.field.value,window.location.href);if(!code){error.textContent='تأكد من الرابط أو الرمز';return;}if(!capabilities.online){error.textContent='الأونلاين غير متاح حالياً';return;}closeSheet(true,()=>window.yakolakVisualSetupAction?.(JSON.stringify({action:'join',code})));});sheet.append(form);refreshFolds();value.field.focus();
   }
   modal.addEventListener('keydown',e=>{
     if(e.key==='Escape'&&modal.dataset.kind!=='profile'){e.preventDefault();closeSheet(true);return;}
