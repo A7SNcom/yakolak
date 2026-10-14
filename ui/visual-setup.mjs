@@ -179,7 +179,7 @@ export function mountSetup(document, window) {
     const centerX=geometry.board?geometry.board[0]+geometry.board[2]/2:window.innerWidth*.5;
     const centerY=geometry.board?geometry.board[1]+geometry.board[3]/2:height*.5;
     const radius=(geometry.board?.[2]||window.innerWidth*.85)/2;
-    for(const node of root.querySelectorAll('.yk-seat,.yk-primary,.yk-outline,.yk-choice,.yk-sharing')){
+    for(const node of root.querySelectorAll('.yk-seat')){
       if(node.hidden||node.closest('[hidden]')||node.classList.contains('is-color'))continue;
       const rect=node.getBoundingClientRect(),seat=node.classList.contains('yk-seat');
       const w=node.offsetWidth||rect.width||(seat?(window.innerWidth<700?112:136):200),h=node.offsetHeight||rect.height||(seat?44:50);
@@ -190,7 +190,8 @@ export function mountSetup(document, window) {
       node.dataset.cylinder='table-orbit';
       // jsdom has no raster renderer. Browser Canvas2D is independent of WebGL.
       if(typeof window.CanvasRenderingContext2D!=='function')continue;
-      if(!mapCanvas){mapCanvas=document.createElement('canvas');mapCanvas.width=512;mapCanvas.height=1;mapContext=mapCanvas.getContext('2d');}
+      const mapColumns=1024,mapRows=32;
+      if(!mapCanvas){mapCanvas=document.createElement('canvas');mapCanvas.width=mapColumns;mapCanvas.height=mapRows;mapContext=mapCanvas.getContext('2d');}
       if(!mapContext)continue;
       const key=[Math.round(w),Math.round(h),Math.round(radius),normal.x.toFixed(3),normal.y.toFixed(3)].join(':');
       let entry=cylinders.get(node);if(entry?.key===key)continue;
@@ -207,12 +208,16 @@ export function mountSetup(document, window) {
           svgNode('feGaussianBlur',{in:'bentSurface',stdDeviation:'.32'}));
         filterDefs.append(filter);entry={filter,image,key:''};cylinders.set(node,entry);
       }
-      const padding=24,map=mapContext.createImageData(512,1);
-      for(let i=0;i<512;i++){
-        const p=cylinderSample(w,radius,normal,-padding+(i+.5)/512*(w+2*padding));
-        map.data[i*4]=Math.round(255*Math.max(0,Math.min(1,.5+p.dx/32)));
-        map.data[i*4+1]=Math.round(255*Math.max(0,Math.min(1,.5+p.dy/32)));
-        map.data[i*4+2]=128;map.data[i*4+3]=255;
+      const padding=24,map=mapContext.createImageData(mapColumns,mapRows);
+      for(let i=0;i<mapColumns;i++){
+        const p=cylinderSample(w,radius,normal,-padding+(i+.5)/mapColumns*(w+2*padding));
+        const red=Math.round(255*Math.max(0,Math.min(1,.5+p.dx/32)));
+        const green=Math.round(255*Math.max(0,Math.min(1,.5+p.dy/32)));
+        for(let row=0;row<mapRows;row++){
+          const offset=(row*mapColumns+i)*4;
+          map.data[offset]=red;map.data[offset+1]=green;
+          map.data[offset+2]=128;map.data[offset+3]=255;
+        }
       }
       mapContext.putImageData(map,0,0);const url=mapCanvas.toDataURL('image/png');
       for(const n of [entry.filter,entry.image])for(const [k,v] of Object.entries({x:-padding,y:-padding,width:w+2*padding,height:h+2*padding}))n.setAttribute(k,v);
