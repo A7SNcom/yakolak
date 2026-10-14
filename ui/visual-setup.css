@@ -106,5 +106,6 @@
 
 #yakolakVisualSetup .yk-cylinder-definitions{position:absolute;width:0;height:0;pointer-events:none;}
 #yakolakVisualSetup .yk-cylinder{position:relative;isolation:isolate;filter:none!important;background:transparent!important;border-color:transparent!important;box-shadow:none!important;}
-#yakolakVisualSetup .yk-cylinder::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border:1px solid var(--yk-paper-border,rgba(255,255,255,.58));border-radius:inherit;background:var(--yk-paper-fill,rgba(80,83,90,.55));box-shadow:var(--yk-paper-shadow,none);filter:var(--yk-cylinder-filter);}
+#yakolakVisualSetup .yk-cylinder::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;border:1px solid var(--yk-paper-border,rgba(255,255,255,.58));border-radius:inherit;background:var(--yk-paper-fill,rgba(80,83,90,.55));box-shadow:var(--yk-paper-shadow,none);filter:var(--yk-cylinder-filter);}
+#yakolakVisualSetup .yk-cylinder>.yk-button-label,#yakolakVisualSetup .yk-cylinder>.yk-seat-status,#yakolakVisualSetup .yk-cylinder>.yk-seat-arrow,#yakolakVisualSetup .yk-cylinder>.yk-share-icon,#yakolakVisualSetup .yk-cylinder>.yk-room-code{position:relative;z-index:1;}
 #yakolakVisualSetup .yk-cylinder.is-off::before{opacity:.72;}
