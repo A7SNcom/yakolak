@@ -340,9 +340,18 @@ func _visual_seat_points() -> Dictionary:
 	var viewport := get_viewport().get_visible_rect().size
 	var offsets := {"right": Vector3(Layout.REST_CENTER, 6.0*Layout.UNIT, 0), "back": Vector3(0, 6.0*Layout.UNIT, -Layout.REST_CENTER), "left": Vector3(-Layout.REST_CENTER, 6.0*Layout.UNIT, 0), "front": Vector3(0, 6.0*Layout.UNIT, Layout.REST_CENTER)}
 	var hit_points: Dictionary = {}
+	var control_angles: Dictionary = {}
 	for color: Dictionary in PALETTE:
 		var anchor: Vector3 = offsets[str(color["direction"])]
 		var point := cam.unproject_position(intro.to_global(anchor))
+		# Follow the projected long edge of this rack, including the opposing
+		# slopes of the two near players. Screen-left/right alone is insufficient.
+		var tangent := Vector3.FORWARD if str(color["direction"]) in ["right", "left"] else Vector3.RIGHT
+		var edge := cam.unproject_position(intro.to_global(anchor+tangent))-point
+		var angle := rad_to_deg(edge.angle())
+		if angle>90.0: angle-=180.0
+		if angle< -90.0: angle+=180.0
+		control_angles[str(color["id"])] = clampf(angle,-10.0,10.0)
 		# Seat controls stay beside their base; transparent color hit areas stay
 		# directly over it, independently of the diagonal perspective.
 		points[str(color["id"])] = [point.x / viewport.x, point.y / viewport.y]
@@ -361,7 +370,7 @@ func _visual_seat_points() -> Dictionary:
 		controls[key] = [p.x/canvas_css_size.x,p.y/canvas_css_size.y]
 	var heading := Vector2(canvas_css_size.x*0.5,maxf(48.0,visual_board_rect.position.y-42.0))
 	var actions := Vector2(canvas_css_size.x*0.5,minf(canvas_css_size.y-70.0,visual_board_rect.end.y+30.0))
-	return {"controls":controls,"world":true,"seats":points,"hits":hit_points,"prompt":[heading.x/canvas_css_size.x,heading.y/canvas_css_size.y],"actions":[actions.x/canvas_css_size.x,actions.y/canvas_css_size.y],"board":[visual_board_rect.position.x,visual_board_rect.position.y,visual_board_rect.size.x,visual_board_rect.size.y]}
+	return {"controls":controls,"control_angles":control_angles,"world":true,"seats":points,"hits":hit_points,"prompt":[heading.x/canvas_css_size.x,heading.y/canvas_css_size.y],"actions":[actions.x/canvas_css_size.x,actions.y/canvas_css_size.y],"board":[visual_board_rect.position.x,visual_board_rect.position.y,visual_board_rect.size.x,visual_board_rect.size.y]}
 
 func _publish_visual_geometry() -> void:
 	if not visual_active:

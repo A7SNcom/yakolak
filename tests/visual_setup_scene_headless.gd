@@ -32,6 +32,16 @@ func _run() -> void:
 		quit(1)
 		return
 	var framing: Dictionary = setup._visual_seat_points()
+	var angles: Dictionary = framing.get("control_angles",{})
+	if angles.size()!=4 or float(angles["blue"])*float(angles["green"])<=0.0 or float(angles["marble"])*float(angles["gold"])<=0.0 or float(angles["blue"])*float(angles["marble"])>=0.0:
+		push_error("Seat controls must follow their rack edges across both near and far players")
+		quit(1)
+		return
+	for angle: float in angles.values():
+		if absf(angle)>10.0:
+			push_error("Seat tilt exceeds the readable perspective limit")
+			quit(1)
+			return
 	var table: Array = framing["board"]
 	var table_ratio: Vector2 = Vector2(table[2],table[3])/setup.canvas_css_size
 	if table_ratio.x < 0.65 and table_ratio.y < 0.40:
