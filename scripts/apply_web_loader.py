@@ -478,6 +478,13 @@ SEMANTIC_SCRIPT = r'''
 
 
 
+def write_surface_preview(version: str) -> None:
+    source = ROOT / "ui/surface-preview.html"
+    (ROOT / "web/surface-preview.html").write_text(
+        source.read_text(encoding="utf-8").replace("__SETUP_VERSION__", version), encoding="utf-8"
+    )
+
+
 def main() -> None:
     html = INDEX.read_text(encoding="utf-8")
     if "yakolak-v130-loading-star-style" in html:
@@ -498,6 +505,7 @@ def main() -> None:
         setup_version = hashlib.sha256(
             b"".join((ROOT / path).read_bytes() for path in setup_assets)
         ).hexdigest()[:12]
+        write_surface_preview(setup_version)
         html, css_count = re.subn(
             r'(<link rel="stylesheet" href="visual-setup\.css)(?:\?v=[^"]*)?(">)',
             rf"\1?v={setup_version}\2",
@@ -557,6 +565,7 @@ def main() -> None:
         raise RuntimeError("Godot export config missing")
     setup_assets = ("ui/visual-setup.mjs", "ui/visual-setup.css", "ui/vendor/liquefy-core-1.1.0.mjs")
     setup_version = hashlib.sha256(b"".join((ROOT / path).read_bytes() for path in setup_assets)).hexdigest()[:12]
+    write_surface_preview(setup_version)
     html = html.replace("</head>", f'<link rel="stylesheet" href="visual-setup.css?v={setup_version}">\n</head>', 1)
     html = html.replace("</body>", f'<script type="module" src="visual-setup.mjs?v={setup_version}"></script>\n</body>', 1)
     INDEX.write_text(html, encoding="utf-8", newline="\n")
