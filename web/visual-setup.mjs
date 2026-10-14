@@ -165,7 +165,17 @@ export function mountSetup(document, window) {
         const corners=geometry.hits?.[color.id]||[point];const xs=corners.map(x=>x[0]*width),ys=corners.map(x=>x[1]*height);
         b.style.width=`${Math.max(80,Math.max(...xs)-Math.min(...xs)+20)}px`;b.style.height=`${Math.max(68,Math.max(...ys)-Math.min(...ys)+20)}px`;
         b.style.left=`${point[0]*width}px`;b.style.top=`${point[1]*height}px`;
-      }else{const p=geometry.controls?.[color.id]||point;const mobile=width<700,half=mobile?56:68;const x=Math.max(half+12,Math.min(width-half-12,p[0]*width));b.style.width='';b.style.height='';b.style.left=`${x}px`;b.style.top=`${p[1]*height}px`;b.style.setProperty('--yk-seat-tilt',mobile?(x<width/2?'-2deg':'2deg'):'0deg');}
+      }else{
+        const p=geometry.controls?.[color.id]||point,mobile=width<700;
+        const angle=Math.max(-10,Math.min(10,Number(geometry.control_angles?.[color.id])||0)),radians=angle*Math.PI/180;
+        const halfWidth=mobile?56:68,halfHeight=mobile?22:28;
+        // Clamp the rotated footprint rather than the unrotated button width.
+        const edgeX=Math.abs(Math.cos(radians))*halfWidth+Math.abs(Math.sin(radians))*halfHeight;
+        const edgeY=Math.abs(Math.sin(radians))*halfWidth+Math.abs(Math.cos(radians))*halfHeight;
+        const x=Math.max(edgeX+12,Math.min(width-edgeX-12,p[0]*width+(p[0]<.5?-6:6)));
+        const y=Math.max(edgeY+16,Math.min(height-edgeY-16,p[1]*height));
+        b.style.width='';b.style.height='';b.style.left=`${x}px`;b.style.top=`${y}px`;b.style.setProperty('--yk-seat-tilt',`${angle}deg`);
+      }
     }
     const target=geometry.actions||[.5,.75];
     const h=actions.getBoundingClientRect().height|| (state.step==='ready'?112:60);
