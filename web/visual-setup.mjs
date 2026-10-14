@@ -1,4 +1,33 @@
 import {attachLiquidLens} from './vendor/liquefy-core-1.1.0.mjs';
+// A shallow curved glass shell. SVG changes the silhouette; CSS perspective
+// changes the viewing plane. The parent button keeps a full-size touch target.
+// References: w3.org/TR/css-masking-1/ and w3.org/TR/css-transforms-2/.
+export function createSeatSurface(document, key) {
+  const ns='http://www.w3.org/2000/svg';
+  const svgNode=(tag,attrs={})=>{const n=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,v);return n;};
+  const face=document.createElement('span');face.className='yk-seat-face';
+  const glass=document.createElement('span');glass.className='yk-seat-glass';glass.setAttribute('aria-hidden','true');
+  const border=svgNode('svg',{viewBox:'0 0 100 44',preserveAspectRatio:'none','aria-hidden':'true'});border.classList.add('yk-seat-bezel');
+  const defs=svgNode('defs'),clip=svgNode('clipPath',{id:`yk-seat-curve-${key}`,clipPathUnits:'objectBoundingBox'});
+  // About 2.5px of bow on a 44px mobile control, with rounded ends. A shared
+  // path gives the backdrop clip and the visible bezel exactly the same edge.
+  const d='M14 5 Q50 0 86 5 C94 6 99 11 99 20 L99 24 C99 33 94 38 86 39 Q50 44 14 39 C6 38 1 33 1 24 L1 20 C1 11 6 6 14 5 Z';
+  clip.append(svgNode('path',{d,transform:'scale(.01 .022727272727)'}));defs.append(clip);
+  const sheen=svgNode('linearGradient',{id:`yk-seat-edge-${key}`,x1:'0',y1:'0',x2:'.3',y2:'1'});
+  for(const [offset,opacity] of [['0','0.85'],['.5','0.34'],['1','0.54']])sheen.append(svgNode('stop',{offset,'stop-color':'#fff','stop-opacity':opacity}));
+  defs.append(sheen);border.append(defs,svgNode('path',{d,fill:'none',stroke:`url(#yk-seat-edge-${key})`,'stroke-width':'1','vector-effect':'non-scaling-stroke'}));
+  glass.style.clipPath=`url(#yk-seat-curve-${key})`;glass.style.webkitClipPath=`url(#yk-seat-curve-${key})`;
+  face.append(glass,border);return {face,glass};
+}
+
+export function seatPerspective(angle, x, y) {
+  const finite=(n,fallback)=>Number.isFinite(Number(n))?Number(n):fallback;
+  const roll=Math.max(-10,Math.min(10,finite(angle,0)));
+  // Face gently toward the table center. No pointer-follow or continuous motion.
+  const yaw=Math.max(-14,Math.min(14,(finite(x,.5)-.5)*48));
+  const pitch=Math.max(-5,Math.min(5,(finite(y,.5)-.5)*18));
+  return {roll,yaw,pitch};
+}
 
 export const COLORS = [
   { id: 'marble', name: 'أبيض', direction: 'right', hex: '#ddd7ce' },
@@ -110,7 +139,8 @@ export function mountSetup(document, window) {
     },'yk-seat');
     b.dataset.color=color.id; b.style.setProperty('--seat-color',color.hex);
     const status=el('span','yk-seat-status'), arrow=el('span','yk-seat-arrow','⌄');arrow.setAttribute('aria-hidden','true');
-    b.append(status,arrow);seats.append(b);return {b,status,color};
+    const {face,glass}=createSeatSurface(document,color.id);
+    face.append(status,arrow);b.append(face);seats.append(b);return {b,status,color,glass};
   });
   const actions = el('footer','yk-actions');
   const entry = el('div','yk-entry');
@@ -138,10 +168,10 @@ export function mountSetup(document, window) {
     // Actual Liquefy Core optics. WebKit uses the same neutral CSS material:
     // it cannot render SVG displacement in backdrop-filter. No RGB dispersion
     // or spring transforms: the board anchors and text must remain steady.
-    const nodes=[prompt,sheet,create,join,confirm,start,sharing,...counts.children,...rounds.children,...seatButtons.map(x=>x.b)];
+    const nodes=[prompt,sheet,create,join,confirm,start,sharing,...counts.children,...rounds.children,...seatButtons.map(x=>x.glass)];
     for(const node of nodes){
       if(node===prompt)continue;
-      const visible=!root.hidden&&!node.hidden&&!node.closest('[hidden]')&&!node.classList.contains('is-color');
+      const visible=!root.hidden&&!node.hidden&&!node.closest('[hidden]')&&!node.closest('.is-color');
       if(!visible){lenses.get(node)?.destroy();lenses.delete(node);continue;}
       if(!lenses.has(node)){const desktop=window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;const lens=attachLiquidLens(node,{strength:.32,dispersion:0,blur:desktop?12:1,saturation:1,respectReducedTransparency:true});if(lens)lenses.set(node,lens);}
     }
@@ -167,14 +197,17 @@ export function mountSetup(document, window) {
         b.style.left=`${point[0]*width}px`;b.style.top=`${point[1]*height}px`;
       }else{
         const p=geometry.controls?.[color.id]||point,mobile=width<700;
-        const angle=Math.max(-10,Math.min(10,Number(geometry.control_angles?.[color.id])||0)),radians=angle*Math.PI/180;
+        const {roll,yaw,pitch}=seatPerspective(geometry.control_angles?.[color.id],point[0],point[1]);
+        const radians=roll*Math.PI/180;
         const halfWidth=mobile?56:68,halfHeight=mobile?22:28;
         // Clamp the rotated footprint rather than the unrotated button width.
-        const edgeX=Math.abs(Math.cos(radians))*halfWidth+Math.abs(Math.sin(radians))*halfHeight;
-        const edgeY=Math.abs(Math.sin(radians))*halfWidth+Math.abs(Math.cos(radians))*halfHeight;
+        // Include the perspective shell's small protrusion in screen-edge bounds.
+        const edgeX=Math.abs(Math.cos(radians))*halfWidth+Math.abs(Math.sin(radians))*halfHeight+5;
+        const edgeY=Math.abs(Math.sin(radians))*halfWidth+Math.abs(Math.cos(radians))*halfHeight+5;
         const x=Math.max(edgeX+12,Math.min(width-edgeX-12,p[0]*width+(p[0]<.5?-6:6)));
         const y=Math.max(edgeY+16,Math.min(height-edgeY-16,p[1]*height));
-        b.style.width='';b.style.height='';b.style.left=`${x}px`;b.style.top=`${y}px`;b.style.setProperty('--yk-seat-tilt',`${angle}deg`);
+        b.style.width='';b.style.height='';b.style.left=`${x}px`;b.style.top=`${y}px`;
+        b.style.setProperty('--yk-seat-tilt',`${roll}deg`);b.style.setProperty('--yk-seat-yaw',`${yaw}deg`);b.style.setProperty('--yk-seat-pitch',`${pitch}deg`);
       }
     }
     const target=geometry.actions||[.5,.75];
