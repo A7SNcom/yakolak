@@ -1,15 +1,23 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {COLORS,digits,validProfile,newSetup,chooseColor,confirmColor,chooseCount,changeSeat,seatLabel,swapPlayers,configuration,configurationError,parseRoomInput,restoreSetup,mountSetup,cylinderSample} from '../ui/visual-setup.mjs';
+import {COLORS,digits,validProfile,newSetup,chooseColor,confirmColor,chooseCount,changeSeat,seatLabel,swapPlayers,configuration,configurationError,parseRoomInput,restoreSetup,mountSetup,cylinderSample,cylinderNormal} from '../ui/visual-setup.mjs';
 
-test('one cylinder radius yields a continuous inverse map with bounded readable bow',()=>{
- for(const width of [112,136,360,560]){
-  const center=cylinderSample(width,180,1,width/2);assert.equal(center.dx,0);assert.equal(Math.abs(center.dy),0);
-  const top=cylinderSample(width,180,-1,width),bottom=cylinderSample(width,180,1,width);
-  assert.equal(top.radius,bottom.radius);assert.equal(top.dy,-bottom.dy);assert.ok(Math.abs(top.dy)<=7.001);
-  for(let x=1;x<=width;x++){const a=cylinderSample(width,180,1,x-1),b=cylinderSample(width,180,1,x);assert.ok(Math.abs(a.dy-b.dy)<.5);assert.ok(Math.abs(a.dx-b.dx)<.2);}
+test('all four folded sheets follow one table-centered orbit without reversing their captions',()=>{
+ const seats=[[-100,-120,-8],[100,-120,8],[-100,120,8],[100,120,-8]];
+ for(const [x,y,angle] of seats){
+  const normal=cylinderNormal(x,y,0,0,angle),edge=cylinderSample(112,180,normal,112);
+  const worldX=Math.cos(angle*Math.PI/180)*edge.dx-Math.sin(angle*Math.PI/180)*edge.dy;
+  const worldY=Math.sin(angle*Math.PI/180)*edge.dx+Math.cos(angle*Math.PI/180)*edge.dy;
+  assert.ok(worldX*x+worldY*y>0,'inverse displacement follows the same outward-facing cylinder');
+  assert.equal(edge.radius,180);
  }
- assert.equal(cylinderSample(112,180,1,112).radius,cylinderSample(136,180,1,136).radius);
+ for(const width of [112,136,360,560]){
+  const normal=cylinderNormal(0,-120,0,0);
+  const center=cylinderSample(width,180,normal,width/2);assert.ok(Math.abs(center.dx)<1e-9);assert.ok(Math.abs(center.dy)<1e-9);
+  const edge=cylinderSample(width,180,normal,width);assert.ok(Math.abs(edge.dy)<=7.001);
+  for(let x=1;x<=width;x++){const a=cylinderSample(width,180,normal,x-1),b=cylinderSample(width,180,normal,x);assert.ok(Math.abs(a.dy-b.dy)<.5);assert.ok(Math.abs(a.dx-b.dx)<.5);}
+ }
+ assert.equal(cylinderSample(112,180,{x:0,y:1},112).radius,cylinderSample(560,180,{x:0,y:1},560).radius);
 });
 
 test('Arabic/Persian telephone digits normalize and profile validates',()=>{
