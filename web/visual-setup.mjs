@@ -119,7 +119,7 @@ export function mountSetup(document, window) {
   let pending = false, returnFocus = null, sheetGeneration = 0, moving = false, nameDraft = null, flowGeneration = 0, profileContinuation = null;
   let lastEntryRequest = '';
   const el = (tag, cls, text) => { const node = document.createElement(tag); if (cls) node.className = cls; if (text !== undefined) node.textContent = text; return node; };
-  const button = (label, action, cls = '') => { const node = el('button',cls,label); node.type = 'button'; node.addEventListener('click',e=>{e.stopPropagation();action(e);}); return node; };
+  const button = (label, action, cls = '') => { const node = el('button',cls);if(label)node.append(el('span','yk-button-label',label)); node.type = 'button'; node.addEventListener('click',e=>{e.stopPropagation();action(e);}); return node; };
   const reduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const animate = (node,frames,duration=320) => { node.getAnimations?.().forEach(x=>x.cancel());if (!reduced()) return node.animate?.(frames,{duration,easing:'cubic-bezier(.4,0,.2,1)'}); };
   const root = el('section','yk-setup'); root.id = 'yakolakVisualSetup'; root.dir = 'rtl'; root.hidden = true; root.setAttribute('aria-label','إعداد اللعبة');
@@ -179,7 +179,7 @@ export function mountSetup(document, window) {
     const centerX=geometry.board?geometry.board[0]+geometry.board[2]/2:window.innerWidth*.5;
     const centerY=geometry.board?geometry.board[1]+geometry.board[3]/2:height*.5;
     const radius=(geometry.board?.[2]||window.innerWidth*.85)/2;
-    for(const node of root.querySelectorAll('.yk-seat,.yk-primary,.yk-outline,.yk-choice,.yk-sharing,.yk-menu-item')){
+    for(const node of root.querySelectorAll('.yk-seat,.yk-primary,.yk-outline,.yk-choice,.yk-sharing')){
       if(node.hidden||node.closest('[hidden]')||node.classList.contains('is-color'))continue;
       const rect=node.getBoundingClientRect(),seat=node.classList.contains('yk-seat');
       const w=node.offsetWidth||rect.width||(seat?(window.innerWidth<700?112:136):200),h=node.offsetHeight||rect.height||(seat?44:50);
