@@ -352,11 +352,7 @@ func _should_host_online(configuration: Dictionary) -> bool:
 	var host: Dictionary = configured_players[0] as Dictionary
 	if str(host.get("mode", "local")) != "local":
 		return false
-	for index: int in range(1, configured_players.size()):
-		var player: Dictionary = configured_players[index] as Dictionary
-		if str(player.get("mode", "local")) != "online":
-			return false
-	return true
+	return _has_online_mode(configuration)
 
 
 func _has_online_mode(configuration: Dictionary) -> bool:
@@ -458,7 +454,9 @@ func _apply_online_room(remote: Dictionary) -> void:
 		players.append({
 			"seat": seat,
 			"label": str(remote_player.get("name", "أنا" if seat == str(online_identity.get("seat", "")) else "لاعب %d" % (index + 1))).left(24),
-			"mode": "local" if seat == str(online_identity.get("seat", "")) else "online",
+			"mode": "local" if str(remote_player.get("mode", "online")) != "bot" and str(remote_player.get("controller", seat)) == str(online_identity.get("seat", "")) else "online",
+			"controller": str(remote_player.get("controller", seat)),
+			"kind": str(remote_player.get("mode", "online")),
 			"color": color,
 			"color_name": str(COLOR_NAMES.get(color, color)),
 			"direction": direction,
@@ -536,6 +534,22 @@ func _apply_online_room(remote: Dictionary) -> void:
 		turn_deadline_msec = 0
 		_update_hud()
 		_publish_match_state("turn")
+	_apply_online_clock(remote)
+
+
+func _apply_online_clock(remote: Dictionary) -> void:
+	if str(remote.get("status","")) != "playing" or bool(remote.get("paused",false)):
+		turn_deadline_msec=0
+		return
+	var remaining: int = clampi(int(remote.get("turnRemainingMs",0)),0,TURN_TIMEOUT_MSEC)
+	turn_deadline_msec=Time.get_ticks_msec()+remaining if remaining>0 else 0
+
+
+func _online_controls_seat(seat: String) -> bool:
+	for player: Dictionary in players:
+		if str(player.get("seat", "")) == seat:
+			return str(player.get("controller", seat)) == str(online_identity.get("seat", "")) and str(player.get("kind", "")) != "bot"
+	return false
 
 
 func _apply_online_board(board: Dictionary) -> void:
@@ -938,7 +952,6 @@ func _finish_camera_transition() -> void:
 		return
 	if online_active:
 		gameplay_ready = _current_mode() == "local"
-		turn_deadline_msec = 0
 		_update_hud()
 		_publish_gameplay_state("ready" if gameplay_ready else "waiting")
 		return

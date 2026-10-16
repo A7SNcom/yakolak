@@ -30,10 +30,10 @@ var detail_normal: NoiseTexture2D
 func _ready() -> void:
 	process_priority = 150
 	intro = get_parent() as Node3D
-	var touch_device := OS.has_feature("mobile")
-	if OS.has_feature("web"):
-		touch_device = bool(JavaScriptBridge.eval("matchMedia('(pointer: coarse)').matches",true))
-	get_viewport().msaa_3d = Viewport.MSAA_2X if touch_device else Viewport.MSAA_4X
+	# Touch input is not a GPU capability tier. Keep the approved desktop edge
+	# quality on phones; Godot negotiates the supported multisample count.
+	get_viewport().msaa_3d = Viewport.MSAA_4X
+
 	var noise := FastNoiseLite.new()
 	noise.seed = 2406
 	noise.frequency = 0.11

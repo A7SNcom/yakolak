@@ -102,7 +102,7 @@ func _publish_visual_entry_request() -> void:
 		return
 	var request := str(visual_entry_generation)
 	JavaScriptBridge.eval(
-		"window.yakolakPendingVisualSetup={online:false,mixed:false,resume:"+JSON.stringify(visual_resume_configuration)+",request:'" + request + "'};" +
+		"window.yakolakPendingVisualSetup={online:true,mixed:true,resume:"+JSON.stringify(visual_resume_configuration)+",request:'" + request + "'};" +
 		"document.body.dataset.yakolakDialogStage='visual';" +
 		"document.body.dataset.yakolakVisualSetupRequest='" + request + "';",
 		true
@@ -407,7 +407,8 @@ func _on_visual_action(arguments: Array) -> void:
 				show_setup_error("اكتب رمزًا من 3 أرقام")
 				return
 			var name := str(payload.get("name","لاعب")).left(24)
-			var configuration := {"tutorial":false,"rounds":3,"online_join_code":code,"players":[{"seat":"p1","label":name,"mode":"local","color":"marble","color_name":"أبيض","direction":"right"}]}
+			var color := str(payload.get("color","marble"))
+			var configuration := {"tutorial":false,"rounds":3,"online_join_code":code,"players":[{"seat":"p1","label":name,"mode":"local","color":color,"color_name":"","direction":"right"}]}
 			_close_visual_setup(true)
 			_publish_setup_state("complete")
 			configuration_ready.emit(configuration)

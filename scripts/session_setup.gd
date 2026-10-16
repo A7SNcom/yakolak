@@ -591,24 +591,6 @@ func _on_mode_selected(choice: int, seat_index: int) -> void:
 	var seat: Dictionary = seats[seat_index]
 	seat["mode"] = requested
 	seats[seat_index] = seat
-	# The existing online protocol is a room-wide mode.  Keep the picker from
-	# offering a mixed configuration that the server cannot actually play.
-	# Local + bot remains freely mixable; choosing an invite makes every remote
-	# seat an invite, and leaving invite mode returns the other seats to local.
-	if requested == "online":
-		for index: int in range(1, seats.size()):
-			var other: Dictionary = seats[index]
-			if bool(other["active"]):
-				other["mode"] = "online"
-				seats[index] = other
-	else:
-		for index: int in range(1, seats.size()):
-			if index == seat_index:
-				continue
-			var other: Dictionary = seats[index]
-			if bool(other["active"]) and str(other["mode"]) == "online":
-				other["mode"] = "local"
-				seats[index] = other
 	_show_setup()
 
 

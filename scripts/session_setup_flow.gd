@@ -277,10 +277,6 @@ func _configuration_validation_error() -> String:
 		if mode_id == "online":
 			has_online = true
 
-	# The authoritative online room model is all-online after p1. This is the
-	# same rule enforced by gameplay's host gate and by the existing mode setter.
-	if has_online and not _active_secondary_players_are_online():
-		return "لا يمكن خلط الأونلاين مع لاعبين محليين أو الكمبيوتر."
 	return ""
 
 

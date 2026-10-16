@@ -36,5 +36,8 @@
   "gradedOrders": [
     ["small", "medium", "large"],
     ["large", "medium", "small"]
-  ]
+  ],
+  "turnTimeoutMs": 30000,
+  "continueTimeoutMs": 10000,
+  "botThinkMs": 650
 }

@@ -40,7 +40,7 @@ func _on_online_room_changed(remote: Dictionary, identity: Dictionary) -> void:
 	# Camera completion is presentation only and must never be able to strand a
 	# valid owner with gameplay_ready=false after p3 -> p4 (or any later turn).
 	gameplay_ready = _current_mode() == "local"
-	turn_deadline_msec = 0
+	_apply_online_clock(remote)
 
 
 func _input(event: InputEvent) -> void:

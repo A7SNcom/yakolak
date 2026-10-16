@@ -12,7 +12,7 @@ test('three digits preserve leading zeroes and normalize Arabic; no partial/link
  for(const code of ['000','007','999','٠٠٧','۰۰۷'])assert.ok(validCode(code));
  for(const code of ['','00','0000','7','00x','1 23','?room=123'])assert.ok(!validCode(code));
  assert.equal(normalizeCode(' ٠٠٧ '),'007');assert.equal(cleanName('\u202eريم\u0000'),'ريم');
- assert.throws(()=>validateRoster({...config(),players:[{color:COLORS[0],mode:'local'},{color:COLORS[1],mode:'bot'}]}),/mixed_not_supported/);
+ assert.equal(validateRoster({...config(),players:[{color:COLORS[0],mode:'local'},{color:COLORS[1],mode:'bot'}]})[1].controller,'p1');
 });
 test('real admissions assign configured seats and names; snapshots never leak credentials',()=>{
  const {a}=setup(3);const r=join(a);assert.equal(r.seat,'p2');assert.equal(r.room.status,'waiting');
@@ -25,9 +25,9 @@ test('real admissions assign configured seats and names; snapshots never leak cr
 test('only admitted channel owner can move; host applies canonical rules and exact-once immutable IDs',()=>{
  const {a}=setup();join(a);a.start(config());
  assert.throws(()=>a.command('stranger','move',intent(a,{cell:0,size:'small',seat:'p1'})),/unauthorized/);
- assert.throws(()=>a.command('guest','move',intent(a,{cell:0,size:'small',seat:'p1'})),/not_your_turn/);
+ assert.throws(()=>a.command('guest','move',intent(a,{cell:0,size:'small',seat:'p1'})),/unauthorized/);
  assert.throws(()=>a.command('host','move',intent(a,{cell:99,size:'small'})),/invalid_move/);
- const move=intent(a,{cell:0,size:'small',seat:'p2',color:COLORS[1],board:{}}),first=a.command('host','move',move);
+ const move=intent(a,{cell:0,size:'small',seat:'p1',color:COLORS[1],board:{}}),first=a.command('host','move',move);
  assert.equal(first.board[0].small,COLORS[0]);assert.equal(first.moveNumber,1);
  assert.deepEqual(a.command('host','move',move),first);
  assert.throws(()=>a.command('host','move',{...move,cell:1}),/invalid_mutation/);

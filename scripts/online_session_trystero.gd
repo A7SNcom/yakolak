@@ -37,6 +37,13 @@ func host_match(configuration: Dictionary) -> void:
 	_reset_transport_state(true)
 	_start_bootstrap("create",{"players":configuration.get("players",[]),"targetRounds":int(configuration.get("rounds",3)),"clientToken":_new_secret(32),"requestId":_new_secret(24)})
 
+func submit_move(cell: int,size_name: String) -> void:
+	if not active or room.is_empty() or _reconnect_gameplay_input_blocked(): return
+	var roster: Array = room.get("players",[])
+	var turn: int = int(room.get("turnIndex",-1))
+	if turn<0 or turn>=roster.size(): return
+	_queue_or_send("move",{"action":"move","code":str(room.get("code","")),"version":int(room.get("version",0)),"seat":str(roster[turn].get("seat","")),"cell":cell,"size":size_name,"mutationId":_new_secret(24)})
+
 func _request_post(kind: String,payload: Dictionary) -> void:
 	if busy:
 		_enqueue_action(kind,payload)
@@ -70,7 +77,8 @@ func _handle_request_failure(kind: String,payload: Dictionary,error_code: String
 		_show_connection_status("انقطع اتصال منشئ الغرفة؛ ننتظر عودته" if error_code=="host_disconnected" else "انقطع اتصال أحد اللاعبين؛ ننتظر عودته")
 		next_poll_msec=Time.get_ticks_msec()+500
 		return
-	if kind=="move" and error_code=="invalid_move":
+	if kind=="move" and error_code in ["invalid_move","turn_expired","not_your_turn","occupied_slot","no_piece_remaining"]:
+		_clear_pending_mutation()
 		if data.get("room",null) is Dictionary: _accept_room(data["room"])
 		return
 	super._handle_request_failure(kind,payload,error_code,status,data)

@@ -212,4 +212,24 @@ test('online error releases a pending start and keeps the roster available for r
  dom.window.close();
 });
 
+test('guest chooses a genuinely available color before engine join, and taken colors are disabled',async()=>{
+ const {RoomAuthority}=await import('../ui/p2p-authority.mjs');
+ const authority=new RoomAuthority({code:'007',epoch:'e'.repeat(48),peerId:'host',token:'h'.repeat(48),config:{rounds:3,players:[{color:'marble',mode:'local'},{color:'blue',mode:'online'},{color:'gold',mode:'bot'}]}});
+ // Component adapter exercises canonical admission; it is not a network test.
+ const client={role:'',session:null,subscribe(){},async inspectRoom(){this.role='guest';return this.session={preview:authority.preview()}},async chooseColor(color){const r=authority.join('guest',{token:'g'.repeat(48),name:'ريم',color});this.session={snapshot:r.room,identity:{seat:r.seat}};},async leave(){},async close(){this.session=null}};
+ const dom=new JSDOM('<body></body>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});
+ const {window}=dom,{document}=window;window.localStorage.setItem('yakolak-visitor-v1',JSON.stringify({name:'ريم',phone:'0551234567'}));const events=[];window.yakolakVisualSetupAction=v=>events.push(JSON.parse(v));
+ const api=mountSetup(document,window,client);api.open({online:true});document.querySelector('.yk-entry button:last-child').click();document.querySelector('input').value='٠٠٧';document.querySelector('form').dispatchEvent(new window.Event('submit',{cancelable:true}));await new Promise(r=>window.setTimeout(r,0));
+ assert.equal(document.querySelector('.yk-modal').dataset.kind,'join-color');assert.equal(authority.members.size,1);assert.equal(events.filter(e=>e.action==='join').length,0);
+ assert.equal(document.querySelector('.yk-guest-color[data-color=marble]').disabled,true);assert.equal(document.querySelector('.yk-guest-color[data-color=gold]').disabled,true);assert.equal(document.querySelector('.yk-guest-color[data-color=green]').disabled,false);
+ document.querySelector('.yk-guest-color[data-color=green]').click();await new Promise(r=>window.setTimeout(r,0));
+ assert.equal(authority.snapshot().players.find(p=>p.seat==='p2').color,'green');const joined=events.find(e=>e.action==='join');assert.equal(joined.color,'green');assert.equal(joined.code,'007');dom.window.close();
+});
+test('host UI preserves canonical mixed-seat order when a guest chooses an inactive color',()=>{
+ const dom=new JSDOM('<body></body>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});const {window}=dom,events=[];window.yakolakVisualSetupAction=v=>events.push(JSON.parse(v));
+ const api=mountSetup(window.document,window);api.open({online:true,resume:{rounds:3,players:[{mode:'local',color:'marble',label:'أحمد'},{mode:'online',color:'blue'},{mode:'local',color:'gold',label:'ريم'}]}});
+ api.room({code:'007',players:[{seat:'p1',name:'أحمد'},{seat:'p2',name:'ضيف'},{seat:'p3',name:'ريم'}],slots:[{seat:'p1',mode:'local',color:'marble',name:'أحمد'},{seat:'p2',mode:'online',color:'green',name:'ضيف'},{seat:'p3',mode:'local',color:'gold',name:'ريم'}]});
+ window.document.querySelector('.yk-start').click();window.document.querySelector('.yk-rounds button').click();const start=events.find(e=>e.action==='start');assert.ok(start);assert.deepEqual(start.players.map(p=>p.color),['marble','green','gold']);assert.deepEqual(start.players.map(p=>p.mode),['local','online','local']);dom.window.close();
+});
+
 }

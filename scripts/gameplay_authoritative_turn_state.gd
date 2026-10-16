@@ -394,7 +394,7 @@ func _authoritative_online_pointer_ready() -> bool:
 	if not bool(snapshot.get("valid", false)) or not bool(snapshot.get("online", false)) or not bool(snapshot.get("local_turn", false)):
 		return false
 	var authoritative_seat: String = str(snapshot.get("seat", ""))
-	return not authoritative_seat.is_empty() and authoritative_seat == str(online_identity.get("seat", ""))
+	return not authoritative_seat.is_empty() and _online_controls_seat(authoritative_seat)
 
 
 func _on_authoritative_test_target_requested(_arguments: Array) -> void:
@@ -472,6 +472,7 @@ func _on_online_room_changed(remote: Dictionary, identity: Dictionary) -> void:
 	# OnlineSession emits only accepted room snapshots. Once that snapshot has
 	# been applied by gameplay_session, turnIndex/current_player_index is the
 	# authoritative owner presented here.
+	_apply_online_clock(remote)
 	authoritative_online_snapshot_hydrated = true
 	authoritative_turn_transitioning = false
 	_publish_authoritative_turn_state("online-room")
@@ -567,7 +568,7 @@ func _build_authoritative_turn_snapshot(lifecycle: String) -> Dictionary:
 	var seat: String = str(player.get("seat", ""))
 	var local_turn: bool = false
 	if valid and online_active:
-		local_turn = not seat.is_empty() and seat == str(online_identity.get("seat", ""))
+		local_turn = not seat.is_empty() and _online_controls_seat(seat)
 
 	return {
 		"valid": valid,

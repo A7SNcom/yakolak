@@ -98,7 +98,7 @@ export function swapPlayers(state, target, source) {
   return {...state,seats,hostColor:seats[0].color};
 }
 export function configuration(state) {
-  return { tutorial: false, rounds: state.rounds, online_join_code: '', players: state.seats.filter(x => x.mode !== 'none').map((seat, i) => {
+  return { tutorial: false, rounds: state.rounds, online_join_code: '', players: state.seats.filter(x => x.mode !== 'none').sort((a,b)=>{const order=state.onlineSeatOrder||state.seats.map(x=>x.color);const rank=c=>order.includes(c)?order.indexOf(c):4+state.seats.findIndex(x=>x.color===c);return rank(a.color)-rank(b.color)}).map((seat, i) => {
     const color = COLORS.find(x => x.id === seat.color);
     return { seat: `p${i + 1}`, label: seatLabel(seat), mode: seat.mode,
       color: color.id, color_name: color.name, direction: color.direction, device_owner: seat.owner };
@@ -109,7 +109,6 @@ export function configurationError(state, capabilities = {}) {
   if (active.length < 2) return 'اختر لاعبين على الأقل';
   if (active.some(x => x.mode === 'online' || (x.mode === 'local' && x.owner !== 'p1'))) {
     if (!capabilities.online) return 'الأونلاين غير متاح حالياً';
-    if (!capabilities.mixed && active.slice(1).some(x => x.mode !== 'online')) return 'الغرفة لا تدعم خلط الأجهزة حالياً';
   }
   return '';
 }
@@ -132,7 +131,7 @@ export function parseRoomInput(value, base = 'https://a7sncom.github.io/yakolak/
   } catch { return ''; }
 }
 
-export function mountSetup(document, window) {
+export function mountSetup(document, window, client=P2P) {
   const STORE = 'yakolak-visitor-v1';
   let profile = null, profiles = {};
   try { const saved = JSON.parse(window.localStorage.getItem(STORE)); if (validProfile(saved)) profile = saved; } catch {}
@@ -243,16 +242,20 @@ export function mountSetup(document, window) {
   }
 
   function refreshGlass(){
-    // Actual Liquefy Core optics. WebKit uses the same neutral CSS material:
-    // it cannot render SVG displacement in backdrop-filter. No RGB dispersion
-    // or spring transforms: the board anchors and text must remain steady.
+    // Native blur gives Chromium and WebKit touch surfaces the same optical
+    // backing; desktop retains the existing displacement lens.
+    const touch=!!window.matchMedia?.('(pointer: coarse)').matches;
     const nodes=[prompt,sheet,create,join,confirm,start,sharing,...counts.children,...rounds.children,...seatButtons.map(x=>x.b)];
     for(const node of nodes){
       if(node===prompt)continue;
-      if(node.classList.contains('yk-seat')||(node===sheet&&modal.dataset.kind==='seat')){lenses.get(node)?.destroy();lenses.delete(node);continue;}
+      const folded=node.classList.contains('yk-seat')||(node===sheet&&modal.dataset.kind==='seat');
       const visible=!root.hidden&&!node.hidden&&!node.closest('[hidden]')&&!node.classList.contains('is-color');
-      if(!visible){lenses.get(node)?.destroy();lenses.delete(node);continue;}
-      if(!lenses.has(node)){const desktop=window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;const lens=attachLiquidLens(node,{strength:.32,dispersion:0,blur:desktop?12:1,saturation:1,respectReducedTransparency:true});if(lens)lenses.set(node,lens);}
+      if(folded||!visible||touch){
+        lenses.get(node)?.destroy();lenses.delete(node);node.style.removeProperty('--lq-lens');
+        if(touch&&visible&&!folded)node.style.setProperty('--lq-lens','blur(14px)');
+        continue;
+      }
+      if(!lenses.has(node)){const lens=attachLiquidLens(node,{strength:.32,dispersion:0,blur:14,saturation:1,respectReducedTransparency:true});if(lens)lenses.set(node,lens);}
     }
   }
   root.dataset.glassEngine='liquefy-core-1.1.0';
@@ -337,15 +340,15 @@ export function mountSetup(document, window) {
     modal.dataset.side='center';
   }
   async function syncOnlineLobby(){
-    if(!P2P||networkBusy||root.hidden||state.step!=='ready')return;
+    if(!client||networkBusy||root.hidden||state.step!=='ready')return;
     const online=state.seats.some(s=>s.mode==='online');
-    if(!online){if(P2P.role==='host')await P2P.leave();roomCode='';lobbySignature='';return;}
+    if(!online){if(client.role==='host')await client.leave();roomCode='';lobbySignature='';return;}
     const config=configuration(state),problem=configurationError(state,capabilities);
     if(problem){showError(problem);return;}
-    const signature=JSON.stringify(config);if(signature===lobbySignature&&P2P.code)return;
+    const signature=JSON.stringify(config);if(signature===lobbySignature&&client.code)return;
     networkBusy=true;start.disabled=true;sharing.disabled=true;code.textContent='…';
-    try{const room=await P2P.prepareHost(config);lobbySignature=signature;api.room(room);clearError();}
-    catch(e){showError(arabicNetworkError(e.message));if(P2P.session?.snapshot)api.room(P2P.session.snapshot);}
+    try{const room=await client.prepareHost(config);lobbySignature=signature;api.room(room);clearError();}
+    catch(e){showError(arabicNetworkError(e.message));if(client.session?.snapshot)api.room(client.session.snapshot);}
     finally{networkBusy=false;start.disabled=false;render();}
   }
   function render(){
@@ -402,6 +405,7 @@ export function mountSetup(document, window) {
   function closeSheet(animated=false,after=()=>{}){
     if(modal.hidden){after();return;}
     commitName();
+    if(modal.dataset.kind==='join-color'&&client?.role==='guest'&&!client.session?.identity)void client.close();
     const token=++sheetGeneration;
     const finish=()=>{if(token!==sheetGeneration)return;modal.hidden=true;sheet.replaceChildren();delete root.dataset.profile;delete root.dataset.overlay;header.inert=seats.inert=actions.inert=false;returnFocus?.setAttribute?.('aria-expanded','false');returnFocus?.focus?.({preventScroll:true});render();notify('preview');after();if(state.step==='ready'&&!networkBusy)void syncOnlineLobby();};
     if(animated && !reduced()&&typeof sheet.animate==='function'){
@@ -471,10 +475,41 @@ export function mountSetup(document, window) {
     if(!nameDraft)return;const {index,field}=nameDraft;nameDraft=null;const value=field.value.trim().slice(0,24);
     if(index===0){state.name=value;state.seats[0].name=value;}else state=changeSeat(state,index,'local',value);
   }
+  function finishGuestJoin(code){
+    const color=client?.session?.snapshot?.players.find(p=>p.seat===client.session.identity?.seat)?.color||'marble';
+    closeSheet(true,()=>window.yakolakVisualSetupAction?.(JSON.stringify({action:'join',code,name:state.name,color,rounds:state.rounds})));
+  }
+  function renderJoinColors(preview){
+    if(modal.dataset.kind!=='join-color')openSheet('اختر لونك',join,'join-color');
+    const colors=preview?.availableColors||[];
+    let grid=sheet.querySelector('.yk-join-colors'),error=sheet.querySelector('.yk-field-error');
+    if(!grid){
+      grid=el('div','yk-join-colors');error=el('div','yk-field-error');error.setAttribute('role','alert');
+      sheet.append(grid,error,button('إلغاء',()=>closeSheet(true),'yk-subtle'));
+    }
+    if(grid.dataset.busy==='true')return;
+    grid.replaceChildren();
+    for(const color of COLORS){
+      const b=button(color.name,async()=>{
+        const token=sheetGeneration;grid.dataset.busy='true';[...grid.children].forEach(x=>x.disabled=true);error.textContent='';
+        try{await client.chooseColor(color.id);if(token!==sheetGeneration){await client.leave();return}finishGuestJoin(preview.code)}
+        catch(e){if(token===sheetGeneration){grid.dataset.busy='false';renderJoinColors(client.session?.preview||preview);error.textContent=arabicNetworkError(e.message)}}
+      },'yk-guest-color');
+      b.style.setProperty('--yk-color',color.hex);b.dataset.color=color.id;b.disabled=!colors.includes(color.id);b.setAttribute('aria-label','اختر '+color.name);grid.append(b);
+    }
+    if(!colors.length)error.textContent='لا توجد ألوان شاغرة في الغرفة';
+    positionSheet();
+  }
   function openJoin(invitation=''){
     openSheet('رابط أو رمز الغرفة',join,'join');const form=el('form','yk-form');form.noValidate=true;
     const value=input('رابط أو رمز الغرفة',{value:typeof invitation==='string'?invitation:'',type:'text',autocomplete:'off',required:true,dir:'ltr'});const error=el('div','yk-field-error');error.setAttribute('role','alert');const submit=el('button','yk-primary','انضمام');submit.type='submit';form.append(value.wrap,error,submit,button('إلغاء',()=>closeSheet(true),'yk-subtle'));
-    form.addEventListener('submit',e=>{e.preventDefault();const code=parseRoomInput(value.field.value,window.location.href);if(!code){error.textContent='تأكد من الرابط أو الرمز';return;}if(!capabilities.online){error.textContent='الأونلاين غير متاح حالياً';return;}closeSheet(true,()=>window.yakolakVisualSetupAction?.(JSON.stringify({action:'join',code,name:state.name,rounds:state.rounds})));});sheet.append(form);value.field.focus();
+    form.addEventListener('submit',async e=>{
+      e.preventDefault();const code=parseRoomInput(value.field.value,window.location.href);if(!code){error.textContent='تأكد من الرابط أو الرمز';return}
+      if(!capabilities.online||!client){error.textContent='الأونلاين غير متاح حالياً';return}
+      const token=sheetGeneration;submit.disabled=true;submit.textContent='جارٍ الاتصال…';
+      try{const session=await client.inspectRoom(code);if(token!==sheetGeneration){await client.leave();return}if(session.identity)finishGuestJoin(code);else renderJoinColors(session.preview)}
+      catch(e){if(token===sheetGeneration){error.textContent=arabicNetworkError(e.message);submit.disabled=false;submit.textContent='انضمام'}}
+    });sheet.append(form);value.field.focus();
   }
   modal.addEventListener('keydown',e=>{
     if(e.key==='Escape'&&modal.dataset.kind!=='profile'){e.preventDefault();closeSheet(true);return;}
@@ -484,17 +519,17 @@ export function mountSetup(document, window) {
   root.addEventListener('pointerdown',e=>{if(nameDraft&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet();},true);
   root.addEventListener('click',e=>{if(!modal.hidden&&modal.dataset.kind!=='profile'&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet(true);});root.addEventListener('keydown',e=>e.stopPropagation());
   const api={
-    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;closeSheet();resetOverlay();capabilities={online:!!options.online||supportsP2P(window),mixed:!!options.mixed};connections=options.resume?.players?connections:[];roomCode=options.resume?.players?roomCode:'';pending=moving=false;state=options.resume?.players?restoreSetup(options.resume,profile?.name||''):newSetup(profile?.name||'');if(options.preview_step==='color')state={...state,step:'color',selectedColor:''};geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
+    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;closeSheet();resetOverlay();capabilities={online:!!options.online||supportsP2P(window),mixed:true};connections=options.resume?.players?connections:[];roomCode=options.resume?.players?roomCode:'';pending=moving=false;state=options.resume?.players?restoreSetup(options.resume,profile?.name||''):newSetup(profile?.name||'');if(options.preview_step==='color')state={...state,step:'color',selectedColor:''};geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
       // Never synchronously call back into Godot while it is publishing entry.
-      const token=flowGeneration;window.setTimeout(()=>{if(token!==flowGeneration||root.hidden)return;notify('preview');const invitation=parseRoomInput(new URL(window.location.href).searchParams.get('room')||'',window.location.href);if(invitation&&!inviteHandled&&!options.resume?.players&&P2P?.role!=='host'){inviteHandled=true;requireProfile(()=>openJoin(invitation));}},0);},
+      const token=flowGeneration;window.setTimeout(()=>{if(token!==flowGeneration||root.hidden)return;notify('preview');const invitation=parseRoomInput(new URL(window.location.href).searchParams.get('room')||'',window.location.href);if(invitation&&!inviteHandled&&!options.resume?.players&&client?.role!=='host'){inviteHandled=true;requireProfile(()=>openJoin(invitation));}},0);},
     close(){flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;pending=moving=false;resetOverlay();root.hidden=true;refreshGlass();delete window.yakolakPendingVisualSetup;document.body.dataset.yakolakVisualSetup='hidden';},
     geometry(points){geometry=points;root.dataset.world=String(!!points.world);position();},
     error(text){root.hidden=false;showError(text);},
-    networkError(code){pending=moving=networkBusy=false;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';if(state.step==='rounds')state={...state,step:'ready'};roomCode=P2P?.code||'';lobbySignature='';render();showError(arabicNetworkError(code));},
-    room(room){roomCode=/^\d{3}$/.test(String(room.code||''))?String(room.code):'';connections=(room.players||[]).filter(x=>x.connected!==false&&x.name).map(x=>({seat:String(x.seat),name:String(x.name).slice(0,24)}));if(Array.isArray(room.slots))state={...state,seats:state.seats.map(seat=>{const slot=room.slots.find(s=>s.color===seat.color);return slot?{...seat,mode:slot.mode,name:slot.name||''}:seat})};render();}
+    networkError(code){pending=moving=networkBusy=false;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';if(state.step==='rounds')state={...state,step:'ready'};roomCode=client?.code||'';lobbySignature='';render();showError(arabicNetworkError(code));},
+    room(room){roomCode=/^\d{3}$/.test(String(room.code||''))?String(room.code):'';connections=(room.players||[]).filter(x=>x.connected!==false&&x.name).map(x=>({seat:String(x.seat),name:String(x.name).slice(0,24)}));if(Array.isArray(room.slots))state={...state,onlineSeatOrder:room.slots.map(s=>s.color),seats:state.seats.map(seat=>{const slot=room.slots.find(s=>s.color===seat.color);return slot?{...seat,mode:slot.mode,name:slot.name||''}:{...seat,mode:'none',name:''}})};render();}
   };
   window.YakolakSetup=api;viewport();
-  P2P?.subscribe(detail=>{if(!root.hidden&&state.step==='ready'&&detail.role==='host'){if(detail.room)api.room(detail.room);if(detail.error){roomCode='';lobbySignature='';render();showError(arabicNetworkError(detail.error));}}});
+  client?.subscribe(detail=>{if(detail.preview&&modal.dataset.kind==='join-color'&&!modal.hidden)renderJoinColors(detail.preview);if(!root.hidden&&state.step==='ready'&&detail.role==='host'){if(detail.room)api.room(detail.room);if(detail.error){roomCode='';lobbySignature='';render();showError(arabicNetworkError(detail.error));}}});
   const acceptEntryRequest=()=>{
     const request=document.body.dataset.yakolakVisualSetupRequest||'';
     const options=window.yakolakPendingVisualSetup;

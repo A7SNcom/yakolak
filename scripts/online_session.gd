@@ -355,7 +355,7 @@ func _reconcile_pending_mutation() -> void:
 
 
 func _mutation_already_applied(kind: String, payload: Dictionary) -> bool:
-	var seat: String = str(identity.get("seat", ""))
+	var seat: String = str(payload.get("seat",identity.get("seat", ""))) if kind=="move" else str(identity.get("seat", ""))
 	if seat.is_empty():
 		return false
 	if kind == "move":
@@ -381,7 +381,9 @@ func _can_apply_move_intent(payload: Dictionary) -> bool:
 	if turn_index < 0 or turn_index >= players.size():
 		return false
 	var current: Dictionary = players[turn_index] as Dictionary
-	if str(current.get("seat", "")) != str(identity.get("seat", "")):
+	if str(current.get("controller",current.get("seat", ""))) != str(identity.get("seat", "")) or str(current.get("mode",""))=="bot":
+		return false
+	if str(payload.get("seat",identity.get("seat",""))) != str(current.get("seat","")):
 		return false
 	var cell: int = int(payload.get("cell", -1))
 	var size_name: String = str(payload.get("size", ""))

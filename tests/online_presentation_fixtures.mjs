@@ -16,5 +16,9 @@ for(const [peer,cell,size] of [['peer1',8,'small'],['peer2',6,'large'],['peer1',
 cases.vote=command(two,'peer1','rematch');
 cases.nextRound=command(two,'peer2','rematch');
 for(const [peer,cell,size] of [['peer1',8,'small'],['peer2',7,'medium'],['peer3',6,'large'],['peer4',5,'small']])cases.four.push(command(four,peer,'move',{cell,size}));
+let now=100000;
+const mixedConfig={rounds:3,players:[{color:'marble',mode:'local'},{color:'blue',mode:'online'},{color:'gold',mode:'local'},{color:'green',mode:'bot'}]};
+const mixed=new RoomAuthority({code:'630',epoch:'e'.repeat(48),peerId:'peer1',token:'h'.repeat(48),config:mixedConfig,now:()=>now});mixed.join('peer2',{token:'2'.repeat(48),name:'ريم'});mixed.start(mixedConfig);
+cases.mixed=[mixed.snapshot()];cases.mixed.push(command(mixed,'peer1','move',{cell:0,size:'small',seat:'p1'}));cases.mixed.push(command(mixed,'peer2','move',{cell:8,size:'large',seat:'p2'}));cases.mixed.push(command(mixed,'peer1','move',{cell:1,size:'small',seat:'p3'}));now+=650;mixed.advance();cases.mixed.push(mixed.snapshot());
 await mkdir(new URL('../generated/',import.meta.url),{recursive:true});
 await writeFile(new URL('../generated/online-presentation.json',import.meta.url),JSON.stringify(cases));

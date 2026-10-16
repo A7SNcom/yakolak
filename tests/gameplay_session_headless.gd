@@ -67,9 +67,9 @@ func _run() -> void:
 	_expect(game._should_host_online({"players": [
 		{"mode": "local"}, {"mode": "online"}
 	]}), "a host plus online invitee creates an online room")
-	_expect(not game._should_host_online({"players": [
+	_expect(game._should_host_online({"players": [
 		{"mode": "local"}, {"mode": "online"}, {"mode": "bot"}
-	]}), "mixed local/online seats are rejected before a room is created")
+	]}), "mixed local/online/bot seats create a shared room")
 
 	game._on_configuration_ready({
 		"tutorial": true,

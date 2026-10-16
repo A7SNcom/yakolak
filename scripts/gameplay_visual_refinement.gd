@@ -25,6 +25,11 @@ var turn_countdown_label: Label
 var turn_countdown_motion: Tween
 var countdown_last_fov: float = -1.0
 var continue_pending: bool = false
+const CONTINUE_TIMEOUT_MS: int = 10000
+var continue_due_msec: int = 0
+var continue_round_key: String = ""
+var continue_fill: ProgressBar
+var continue_waiting: Label
 var rest_tween: Tween
 const RESULT_DELAY := 2.3
 const RESULT_FONT = preload("res://assets/fonts/thmanyahsans-Medium.otf")
@@ -69,17 +74,19 @@ func _ready() -> void:
 	turn_countdown.add_child(turn_countdown_label)
 	hud_layer.add_child(turn_countdown)
 	_build_result_card()
+	_build_continue_feedback()
 
 
 func _process(delta: float) -> void:
 	super._process(delta)
 	_update_turn_countdown(Time.get_ticks_msec())
+	_sync_continue_controls()
 
 
 func _update_turn_countdown(now: int) -> void:
 	if turn_countdown == null: return
 	var remaining := turn_deadline_msec-now
-	var visible_turn := match_initialized and gameplay_ready and not online_active and not round_complete and not camera_transition and not move_active and _current_mode()=="local" and turn_deadline_msec>0
+	var visible_turn := match_initialized and (online_active or gameplay_ready) and not round_complete and (online_active or (not camera_transition and not move_active and _current_mode()=="local")) and turn_deadline_msec>0
 	var show_counter := visible_turn and remaining>0 and remaining<=TURN_TIMEOUT_MSEC-Layout.COUNTDOWN_DELAY_MS
 	if not show_counter:
 		if turn_countdown_motion != null and turn_countdown_motion.is_valid(): turn_countdown_motion.kill()
@@ -362,6 +369,8 @@ func _show_round_result() -> void:
 		result_button.hide()
 		post_match_secondary_button.hide()
 		_schedule_results()
+	_arm_continue_countdown()
+	_sync_continue_controls()
 
 
 func _layout_hud() -> void:
@@ -444,6 +453,10 @@ func _stop_victory_colors() -> void:
 	victory_materials.clear()
 	victory_mix = 0.0
 	continue_pending = false
+	continue_due_msec = 0
+	continue_round_key = ""
+	if continue_waiting != null: continue_waiting.hide()
+	if continue_fill != null: continue_fill.hide()
 
 
 func _on_round_action() -> void:
@@ -453,10 +466,11 @@ func _on_round_action() -> void:
 		result_button.disabled = true
 	# Local pass-and-play has one confirmation for this device, bots included.
 	super._on_round_action()
+	_sync_continue_controls()
 
 
 func _maybe_auto_advance_online_round() -> void:
-	# Every remote device must explicitly acknowledge; polling is never consent.
+	# Continue is acknowledged by a click or the shared ten-second deadline.
 	_reset_online_round_auto()
 
 
@@ -469,7 +483,87 @@ func _on_online_error(code: String) -> void:
 func _apply_online_room(remote: Dictionary) -> void:
 	if str(remote.get("status", "")) != "finished": _stop_victory_colors()
 	super._apply_online_room(remote)
-	if round_complete: _start_victory_colors()
+	if round_complete:
+		_start_victory_colors()
+		var votes: Dictionary = remote.get("rematch",{})
+		var owned: Array = players.filter(func(p: Dictionary) -> bool: return _online_controls_seat(str(p.get("seat",""))))
+		var voted: bool = not owned.is_empty()
+		for p: Dictionary in owned:
+			if not bool(votes.get(str(p["seat"]),false)): voted=false
+		continue_pending = voted or (online != null and str(online.get("inflight_kind"))=="rematch")
+		if not match_complete and remote.has("continueRemainingMs"):
+			continue_due_msec=Time.get_ticks_msec()+clampi(int(remote["continueRemainingMs"]),0,CONTINUE_TIMEOUT_MS)
+	_sync_continue_controls()
+
+
+func _build_continue_feedback() -> void:
+	continue_fill=ProgressBar.new()
+	continue_fill.name="ContinueCountdownFill"
+	continue_fill.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	continue_fill.show_percentage=false
+	continue_fill.layout_direction=Control.LAYOUT_DIRECTION_LTR
+	continue_fill.fill_mode=ProgressBar.FILL_END_TO_BEGIN
+	continue_fill.max_value=100.0
+	var clear:=StyleBoxFlat.new()
+	clear.bg_color=Color.TRANSPARENT
+	var fill:=StyleBoxFlat.new()
+	fill.bg_color=Color(1,1,1,0.13)
+	fill.set_corner_radius_all(16)
+	continue_fill.add_theme_stylebox_override("background",clear)
+	continue_fill.add_theme_stylebox_override("fill",fill)
+	result_button.add_child(continue_fill)
+	continue_fill.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	continue_fill.hide()
+	continue_waiting=Label.new()
+	continue_waiting.name="ContinueWaiting"
+	continue_waiting.text="بانتظار بقية اللاعبين…"
+	continue_waiting.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	continue_waiting.vertical_alignment=VERTICAL_ALIGNMENT_CENTER
+	continue_waiting.text_direction=Control.TEXT_DIRECTION_RTL
+	continue_waiting.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	continue_waiting.add_theme_font_override("font",RESULT_FONT)
+	continue_waiting.add_theme_font_size_override("font_size",_hud_font_size(16))
+	hud_layer.add_child(continue_waiting)
+	continue_waiting.hide()
+
+
+func _arm_continue_countdown() -> void:
+	if not round_complete or match_complete or online_cancelled: return
+	var key: String = "%d:%d" % [session_generation,round_number]
+	if key==continue_round_key: return
+	continue_round_key=key
+	continue_due_msec=Time.get_ticks_msec()+CONTINUE_TIMEOUT_MS
+
+
+func _sync_continue_controls() -> void:
+	if continue_fill==null or continue_waiting==null or result_button==null: return
+	var result_active: bool = match_initialized and round_complete and not online_cancelled
+	if not result_active:
+		continue_fill.hide()
+		continue_waiting.hide()
+		return
+	if continue_pending:
+		result_button.hide()
+		continue_fill.hide()
+		if continue_waiting.get_parent()!=result_button.get_parent(): continue_waiting.reparent(result_button.get_parent())
+		continue_waiting.custom_minimum_size=Vector2(0,_hud_length(48))
+		if not result_button.get_parent() is Container:
+			continue_waiting.position=result_button.position
+			continue_waiting.size=result_button.size
+		continue_waiting.show()
+		return
+	continue_waiting.hide()
+	if match_complete:
+		continue_fill.hide()
+		return
+	result_button.show()
+	result_button.disabled=false
+	continue_fill.show()
+	var remaining: int = maxi(0,continue_due_msec-Time.get_ticks_msec())
+	continue_fill.value=100.0*(1.0-float(remaining)/float(CONTINUE_TIMEOUT_MS))
+	if continue_due_msec>0 and remaining==0:
+		continue_due_msec=0
+		_on_round_action()
 
 
 func _online_piece_motion_seconds() -> float:
@@ -691,6 +785,7 @@ func _schedule_results() -> void:
 		result_reveal = create_tween()
 		result_reveal.tween_property(result_card,"modulate:a",1.0,0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		if not round_winner.is_empty(): _celebrate_win()
+		_sync_continue_controls()
 
 
 func _celebrate_win() -> void:
