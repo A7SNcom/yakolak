@@ -88,7 +88,15 @@ func _run() -> void:
 	_expect(camera.transform.is_equal_approx(home_camera),"leaving starts at actual camera pose")
 	_expect(raised.transform.is_equal_approx(raised_pose),"leaving preserves current raised stone pose")
 	_expect(inactive.position.y>40.0,"returning unused stones enter from above")
+	var return_target: Transform3D = game.get("lobby_return_target")
+	var moving_pose := camera.transform
+	camera.transform = return_target
+	var focus := camera.unproject_position(intro.to_global(Vector3(0,0.35,0)))
+	camera.transform = moving_pose
+	var view_height := root.get_visible_rect().size.y
+	_expect(absf(focus.y-view_height*0.51)<view_height*0.15,"return frames the destination table, excluding airborne exits focus=%s viewport=%s" % [str(focus),str(root.get_visible_rect().size)])
 	await _watch(2.1)
+	_expect(camera.transform.is_equal_approx(return_target),"setup adopts the return endpoint without a second zoom")
 	_expect(bool(setup.get("visual_active")) and bool(game.get("waiting_for_setup")),"exit hands off to the existing setup")
 	for index: int in range(game.get("piece_records").size()):
 		var mesh: MeshInstance3D = game.get("piece_records")[index].mesh

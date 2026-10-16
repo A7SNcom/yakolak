@@ -224,7 +224,10 @@ func lobby_camera_target() -> Dictionary:
 	cam.transform=visual_intro_camera_snapshot["transform"]
 	cam.fov=float(visual_intro_camera_snapshot["fov"])
 	_capture_visual_board_corners()
+	var previous_step := visual_step
+	visual_step = "ready" if not visual_resume_configuration.is_empty() else "entry"
 	_fit_visual_table(cam,viewport)
+	visual_step = previous_step
 	var target := {"transform":visual_fitted_transform,"fov":cam.fov}
 	cam.transform=saved["transform"]
 	cam.fov=float(saved["fov"])
@@ -241,7 +244,20 @@ func _capture_visual_board_corners() -> void:
 		var mesh := value as MeshInstance3D
 		if mesh == null or mesh.mesh == null: continue
 		var box := mesh.get_aabb()
-		for i: int in range(8): visual_board_corners.append(mesh.global_transform * box.get_endpoint(i))
+		var pose := mesh.global_transform
+		# Fit the destination scene, never airborne exits or stones on the board.
+		var game := intro.get_node_or_null("PostIntroGameplay")
+		if game != null:
+			var homes: Array = game.get("home_transforms")
+			var records: Array = game.get("piece_records")
+			for index: int in range(mini(homes.size(),records.size())):
+				if records[index].get("mesh")==mesh:
+					pose = intro.global_transform * (homes[index] as Transform3D)
+					break
+			var base_homes: Dictionary = game.get("base_home_poses")
+			for direction: String in base_homes:
+				if intro.get_node_or_null("Base_%s" % direction)==mesh: pose = intro.global_transform * (base_homes[direction] as Transform3D)
+		for i: int in range(8): visual_board_corners.append(pose * box.get_endpoint(i))
 	if visual_board_corners.is_empty():
 		for x: float in [-6.8,6.8]:
 			for z: float in [-6.8,6.8]: visual_board_corners.append(intro.to_global(Vector3(x,0.24,z)))
