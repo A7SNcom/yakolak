@@ -1,36 +1,20 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {COLORS,digits,validProfile,newSetup,chooseColor,confirmColor,chooseCount,changeSeat,seatLabel,swapPlayers,configuration,configurationError,parseRoomInput,restoreSetup,mountSetup,cylinderSample,cylinderNormal,orbitRibbonGeometry} from '../ui/visual-setup.mjs';
+import {COLORS,digits,validProfile,newSetup,chooseColor,confirmColor,chooseCount,changeSeat,seatLabel,swapPlayers,configuration,configurationError,parseRoomInput,restoreSetup,mountSetup,orbitRibbonGeometry,orbitPlateGeometry,orbitY} from '../ui/visual-setup.mjs';
 
-test('all four folded sheets follow one table-centered orbit without reversing their captions',()=>{
- const seats=[[-100,-120,-8],[100,-120,8],[-100,120,8],[100,120,-8]];
- for(const [x,y,angle] of seats){
-  const normal=cylinderNormal(x,y,0,0,angle),edge=cylinderSample(112,180,normal,112);
-  const worldX=Math.cos(angle*Math.PI/180)*edge.dx-Math.sin(angle*Math.PI/180)*edge.dy;
-  const worldY=Math.sin(angle*Math.PI/180)*edge.dx+Math.cos(angle*Math.PI/180)*edge.dy;
-  assert.ok(worldX*x+worldY*y>0,'inverse displacement follows the same outward-facing cylinder');
-  assert.equal(edge.radius,180);
- }
- for(const width of [112,136,360,560]){
-  const normal=cylinderNormal(0,-120,0,0);
-  const center=cylinderSample(width,180,normal,width/2);assert.ok(Math.abs(center.dx)<1e-9);assert.ok(Math.abs(center.dy)<1e-9);
-  const edge=cylinderSample(width,180,normal,width);assert.ok(Math.abs(edge.dy)<=7.001);
-  for(let x=1;x<=width;x++){const a=cylinderSample(width,180,normal,x-1),b=cylinderSample(width,180,normal,x);assert.ok(Math.abs(a.dy-b.dy)<.5);assert.ok(Math.abs(a.dx-b.dx)<.5);}
- }
- assert.equal(cylinderSample(112,180,{x:0,y:1},112).radius,cylinderSample(560,180,{x:0,y:1},560).radius);
-});
-
-test('elliptical cylindrical ribbon tracks the four corner selectors',()=>{
- for(const [width,height,points] of [
-  [390,844,[[95,260],[295,260],[95,575],[295,575]]],
-  [320,568,[[76,170],[244,170],[76,383],[244,383]]],
-  [1366,768,[[350,170],[1016,170],[350,586],[1016,586]]]
- ]){
-  const ring=orbitRibbonGeometry(points,width,height);
-  assert.ok(ring&&ring.rx>0&&ring.ry>0&&ring.thickness>=36);
-  for(const [x,y] of points){
-   const radius=(x-ring.cx)**2/ring.rx**2+(y-ring.cy)**2/ring.ry**2;
-   assert.ok(Math.abs(radius-1)<1e-8,'ring touches each plate center');
+test('standing cylinder stays in the viewport and plates follow its same curved rims',()=>{
+ for(const [width,height] of [[320,568],[390,844],[768,1024],[1280,900],[844,390]]){
+  const points=[[width*.28,height*.3],[width*.72,height*.3],[width*.28,height*.65],[width*.72,height*.65]];
+  const ring=orbitRibbonGeometry(points,width,height,[width*.08,height*.3,width*.84,height*.36]);
+  assert.ok(ring.cx-ring.rx>=11.9&&ring.cx+ring.rx<=width-11.9);
+  for(const side of [-1,1])for(const sign of [-1,1]){
+   const x=ring.cx+sign*ring.rx*.54;
+   const plate=orbitPlateGeometry(ring,x,side,ring.rx*.72,ring.thickness*.79);
+   assert.ok(plate.left>=0&&plate.left+plate.width<=width);
+   assert.ok(plate.top>=0&&plate.top+plate.height<=height);
+   assert.ok(plate.height>=44);
+   assert.ok(!/NaN|Infinity/.test(plate.path+plate.baseline));
+   assert.ok(side*(orbitY(ring,x,side)-ring.cy)>0);
   }
  }
  assert.equal(orbitRibbonGeometry([[0,0]],390,844),null);
@@ -89,9 +73,9 @@ if(process.env.YAKOLAK_JSDOM_MODULE){
  test('returning from ready to color restores large plain touch targets and unfragmented names',()=>{
   const dom=new JSDOM('<body></body>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});
   const {document}=dom.window,api=mountSetup(document,dom.window),resume={players:[{color:'green',label:'أحمد',mode:'local'},{color:'blue',label:'كمبيوتر أزرق',mode:'bot'}]};
-  api.open({resume,request:'ready-1'});const blue=document.querySelector('[data-color=blue]');
+  api.open({resume,request:'ready-1'});assert.equal(document.querySelector('.yk-orbit-ribbon').hasAttribute('hidden'),false);const blue=document.querySelector('[data-color=blue]');
   assert.equal(blue.querySelector('.yk-seat-status').parentElement,blue);assert.equal(blue.querySelector('.yk-fold-strip'),null);
-  api.open({resume,preview_step:'color',request:'color-2'});
+  api.open({resume,preview_step:'color',request:'color-2'});assert.equal(document.querySelector('.yk-orbit-ribbon').hasAttribute('hidden'),true);
   for(const target of document.querySelectorAll('.yk-seat')){assert.ok(parseFloat(target.style.width)>=104);assert.ok(parseFloat(target.style.height)>=88);assert.equal(target.classList.contains('yk-cylinder'),false);assert.equal(target.style.getPropertyValue('--yk-cylinder-filter'),'');}
   blue.click();assert.equal(blue.getAttribute('aria-pressed'),'true');assert.equal(document.querySelector('.yk-confirm').hidden,false);
   dom.window.close();

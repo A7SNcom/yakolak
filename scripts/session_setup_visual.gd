@@ -26,6 +26,7 @@ var visual_prompt_stage: String = ""
 var visual_overlay_open: bool = false
 var visual_count_chosen: bool = false
 var visual_fit_viewport := Vector2.ZERO
+var visual_fit_ready: bool = false
 var visual_fitted_transform := Transform3D.IDENTITY
 var visual_board_rect := Rect2()
 var visual_board_corners: Array[Vector3] = []
@@ -182,7 +183,7 @@ func _apply_visual_camera() -> void:
 	cam.size = float(visual_intro_camera_snapshot["size"])
 	cam.h_offset = float(visual_intro_camera_snapshot["h"])
 	cam.v_offset = float(visual_intro_camera_snapshot["v"])
-	if viewport != visual_fit_viewport:
+	if viewport != visual_fit_viewport or visual_fit_ready != (visual_step == "ready"):
 		_fit_visual_table(cam, viewport)
 	var start: Transform3D = visual_camera_snapshot["transform"]
 	cam.transform = start.interpolate_with(visual_fitted_transform,visual_zoom_mix)
@@ -241,10 +242,14 @@ func _project_visual_board(cam: Camera3D) -> Rect2:
 func _fit_visual_table(cam: Camera3D, viewport: Vector2) -> void:
 	if visual_board_corners.is_empty(): _capture_visual_board_corners()
 	visual_fit_viewport = viewport
+	visual_fit_ready = visual_step == "ready"
 	var width := canvas_css_size.x
 	var height := canvas_css_size.y
 	var short_view := height < 480.0
-	var available := Vector2(width*0.90,height*(0.46 if short_view else 0.52))
+	# Reserve the outer glass wall on narrow player-selection screens. The
+	# color hit targets and gameplay retain their existing camera framing.
+	var ready_mobile := visual_fit_ready and width < 700.0
+	var available := Vector2(width*(0.74 if ready_mobile else 0.90),height*(0.46 if short_view else 0.52))
 	var center := Vector2(width*0.5,height*(0.49 if short_view else 0.51))
 	var focus := intro.to_global(Vector3(0,0.35,0))
 	var basis: Basis = visual_intro_camera_snapshot["transform"].basis

@@ -1,46 +1,38 @@
 import {attachLiquidLens} from './vendor/liquefy-core-1.1.0.mjs';
 
-// Project each sheet against the SAME cylinder centered on the board. Its
-// outward surface normal comes from the button's position around that center,
-// then is expressed in the button's own tilted coordinates. SourceGraphic is
-// displaced as a whole so Arabic glyph shaping and the glass border stay one.
-export function cylinderNormal(buttonX, buttonY, centerX, centerY, tiltDegrees=0) {
-  const vx=buttonX-centerX,vy=buttonY-centerY,length=Math.hypot(vx,vy);
-  const radians=tiltDegrees*Math.PI/180,c=Math.cos(radians),s=Math.sin(radians);
-  const nx=length>1? vx/length:0,ny=length>1? vy/length:1;
-  return {x:c*nx+s*ny,y:-s*nx+c*ny};
-}
-export function cylinderSample(width, tableRadius, normal, destinationX) {
-  const radius=Math.max(Number(tableRadius)||120,120);
-  const x=destinationX-width/2;
-  // Wide central actions span only the visible arc; the physical cylinder
-  // radius remains shared with the smaller tags around the table.
-  const arcScale=Math.min(1,1.4*radius/Math.max(width,1));
-  const ratio=Math.max(-.7,Math.min(.7,x*arcScale/radius));
-  const sourceX=radius*Math.asin(ratio)/arcScale;
-  const depth=radius*(1-Math.sqrt(1-ratio*ratio));
-  const edgeRatio=Math.min(.7,width*arcScale/(2*radius));
-  const edgeDepth=radius*(1-Math.sqrt(1-edgeRatio*edgeRatio));
-  const bow=depth*Math.min(.7,7/Math.max(.01,edgeDepth));
-  const nx=normal?.x||0,ny=normal?.y||0;
-  // Inverse sampling follows the outward normal; the painted edges then bend
-  // inward toward the table center, including on the left and right sides.
-  return {dx:Math.max(-4,Math.min(4,sourceX-x))*(1-nx*nx)+nx*bow,dy:ny*bow,radius};
-}
-
-/** One elliptical orbit through the four projected player selectors. */
-export function orbitRibbonGeometry(points,width,height){
+// A standing cylindrical wall: equal horizontal radii, vertically separated
+// rims. A thick ellipse stroke would be a flat washer, not this reference.
+export function orbitRibbonGeometry(points,width,height,board=null){
   if(!Array.isArray(points)||points.length!==4||width<=0||height<=0||points.some(p=>!Array.isArray(p)||p.length!==2||!p.every(Number.isFinite)))return null;
   const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);
-  const xSpan=(Math.max(...xs)-Math.min(...xs))/2,ySpan=(Math.max(...ys)-Math.min(...ys))/2;
-  if(xSpan<20||ySpan<24)return null;
-  const cx=(Math.max(...xs)+Math.min(...xs))/2,cy=(Math.max(...ys)+Math.min(...ys))/2;
-  const room=Math.max(ySpan+12,Math.min(cy-8,height-cy-8));
-  const neededRx=xSpan/Math.sqrt(Math.max(.04,1-(ySpan/room)**2));
-  const rx=Math.max(xSpan+16,Math.min(width*.63,Math.max(width*.405,xSpan*1.34)),neededRx);
-  const ry=ySpan/Math.sqrt(Math.max(.04,1-(xSpan/rx)**2));
-  const thickness=Math.max(36,Math.min(76,Math.min(width,height)*.115));
+  const validBoard=Array.isArray(board)&&board.length===4&&board.every(Number.isFinite)&&board[2]>0&&board[3]>0;
+  const [bx,by,bw,bh]=validBoard?board:[Math.min(...xs)-width*.15,Math.min(...ys),Math.max(...xs)-Math.min(...xs)+width*.3,Math.max(...ys)-Math.min(...ys)];
+  const thickness=Math.max(48,Math.min(92,bw*.085,height*.14));
+  const rx=Math.max(90,Math.min(width/2-12,bw*(width<700?.63:.47)+8));
+  const cx=Math.max(rx+12,Math.min(width-rx-12,bx+bw/2));
+  const cy=Math.max(thickness+24,Math.min(height-thickness-140,by+bh*.49));
+  const ry=Math.max(62,Math.min(bh*(width<700?.65:.50)+thickness*.2,cy-thickness/2-44,height-cy-thickness/2-144));
   return {cx,cy,rx,ry,thickness};
+}
+export function orbitY(ring,x,side){
+  const u=Math.max(-1,Math.min(1,(x-ring.cx)/ring.rx));
+  return ring.cy+side*ring.ry*Math.sqrt(Math.max(0,1-u*u));
+}
+// Project a rounded rectangle onto the same cylinder as the two glass rims.
+// Keep the Arabic label a single shaped SVG text run along its own baseline.
+export function orbitPlateGeometry(ring,centerX,side,width,height){
+  const left=centerX-width/2,r=Math.min(20,height*.33),points=[];
+  const add=(x,y)=>points.push([x,orbitY(ring,x,side)+y]);
+  const line=(x1,y1,x2,y2)=>{for(let i=0;i<=20;i++)add(x1+(x2-x1)*i/20,y1+(y2-y1)*i/20);};
+  const arc=(cx,cy,a)=>{for(let i=0;i<=10;i++){const t=(a+i*9)*Math.PI/180;add(cx+r*Math.cos(t),cy+r*Math.sin(t));}};
+  line(left+r,-height/2,left+width-r,-height/2);arc(left+width-r,-height/2+r,-90);
+  line(left+width,-height/2+r,left+width,height/2-r);arc(left+width-r,height/2-r,0);
+  line(left+width-r,height/2,left+r,height/2);arc(left+r,height/2-r,90);
+  line(left,height/2-r,left,-height/2+r);arc(left+r,-height/2+r,180);
+  const top=Math.min(...points.map(p=>p[1]))-8,bottom=Math.max(...points.map(p=>p[1]))+8;
+  const path=points.map(([x,y],i)=>`${i?'L':'M'}${(x-left).toFixed(2)},${(y-top).toFixed(2)}`).join(' ')+' Z';
+  const baseline=[];for(let i=0;i<=60;i++){const x=left+12+(width-24)*i/60;baseline.push(`${i?'L':'M'}${(x-left).toFixed(2)},${(orbitY(ring,x,side)-top).toFixed(2)}`);}
+  return {left,top,width,height:bottom-top,path,baseline:baseline.join(' ')};
 }
 
 export const COLORS = [
@@ -176,101 +168,82 @@ export function mountSetup(document, window) {
   const modal=el('div','yk-modal');modal.hidden=true;
   const sheet=el('section','yk-sheet');sheet.setAttribute('role','dialog');sheet.setAttribute('aria-labelledby','ykSheetTitle');modal.append(sheet);
   root.append(header,seats,actions,modal);document.body.append(root);
-  const lenses=new Map(),cylinders=new Map();
+  const lenses=new Map();
   const ns='http://www.w3.org/2000/svg';
   const svgNode=(tag,attrs={})=>{const n=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,v);return n;};
-  const filterHost=svgNode('svg',{width:'0',height:'0','aria-hidden':'true'}),filterDefs=svgNode('defs');
-  filterHost.classList.add('yk-cylinder-definitions');filterHost.append(filterDefs);root.append(filterHost);
-
-  // One continuous cylindrical wall. Controls are on its surface, with flat readable text.
-  const orbitRibbon=svgNode('svg',{class:'yk-orbit-ribbon',viewBox:'0 0 1 1',preserveAspectRatio:'none','aria-hidden':'true'});
-  const orbitDefs=svgNode('defs'),metal=svgNode('linearGradient',{id:'yk-orbit-metal',x1:'0%',y1:'0%',x2:'12%',y2:'100%'});
-  for(const [offset,color,opacity] of [['0%','#273950','.86'],['31%','#202832','.85'],['58%','#53616d','.67'],['82%','#222b35','.88'],['100%','#64717b','.81']]){
-    metal.append(svgNode('stop',{offset,'stop-color':color,'stop-opacity':opacity}));
+  const gradient=(id,stops,vertical=false)=>{
+    const n=svgNode('linearGradient',{id,x1:'0%',y1:'0%',x2:vertical?'0%':'100%',y2:vertical?'100%':'0%'});
+    for(const [offset,color,opacity=1] of stops)n.append(svgNode('stop',{offset,'stop-color':color,'stop-opacity':opacity}));
+    return n;
+  };
+  const orbitRibbon=svgNode('svg',{class:'yk-orbit-ribbon','aria-hidden':'true'}),defs=svgNode('defs');
+  defs.append(
+    gradient('yk-orbit-back', [['0%','#f4f6ff',.8],['5%','#9ca6b8',.55],['18%','#30333b',.72],['48%','#0a1729',.9],['75%','#063a9b',.8],['95%','#3c8eff',.8],['100%','#d7ecff',.9]]),
+    gradient('yk-orbit-front',[['0%','#92fff0',.9],['10%','#006e60',.85],['32%','#09352e',.85],['50%','#18232e',.85],['70%','#3d434b',.85],['91%','#c5c6cb',.8],['100%','#f4f6ff',.9]]),
+    gradient('yk-orbit-sheen',[['0%','#fff',.23],['12%','#fff',.03],['55%','#000',.08],['88%','#030810',.3],['100%','#fff',.2]],true)
+  );
+  orbitRibbon.append(defs);
+  const walls=[-1,1].map(side=>{
+    const group=svgNode('g',{'data-side':side<0?'back':'front'});
+    const wall=svgNode('path',{fill:`url(#yk-orbit-${side<0?'back':'front'})`}),sheen=svgNode('path',{fill:'url(#yk-orbit-sheen)'});
+    const rims=[-1,1].map(()=>svgNode('path',{fill:'none',stroke:side<0?'#dbeaff':'#edffff','stroke-width':'1.5','stroke-opacity':'.8'}));
+    const seam=svgNode('path',{fill:'none',stroke:'#b5d8ff','stroke-width':'.8','stroke-opacity':'.38'});
+    group.append(wall,sheen,...rims,seam);orbitRibbon.append(group);return {side,wall,sheen,rims,seam};
+  });
+  orbitRibbon.setAttribute('hidden','');seats.prepend(orbitRibbon);
+  for(const {b,color} of seatButtons){
+    const svg=svgNode('svg',{class:'yk-orbit-plate','aria-hidden':'true'}),d=svgNode('defs');
+    const glow=color.id==='blue'?'#1985ff':color.id==='green'?'#00e1bc':'#fff';
+    const dark=color.id==='blue'?'#031331':color.id==='green'?'#002e27':'#22252b';
+    d.append(gradient(`yk-plate-${color.id}`,[['0%',dark,.82],['42%',dark,.96],['100%',dark,.82]],true));
+    const baseline=svgNode('path',{id:`yk-baseline-${color.id}`,fill:'none'});d.append(baseline);
+    const halo=svgNode('path',{class:'yk-plate-halo',fill:'none',stroke:glow,'stroke-width':'5'});
+    const face=svgNode('path',{class:'yk-plate-face',fill:`url(#yk-plate-${color.id})`,stroke:glow,'stroke-width':'1.7'});
+    const edge=svgNode('path',{class:'yk-plate-edge',fill:'none',stroke:'#fff','stroke-width':'1.1','stroke-opacity':'.96'});
+    const text=svgNode('text',{'text-anchor':'middle',direction:'rtl',fill:'#fff',dy:'.34em'});
+    const caption=svgNode('textPath',{href:`#yk-baseline-${color.id}`,startOffset:'50%'});text.append(caption);
+    svg.append(d,halo,face,edge,text);b.append(svg);b.orbit={svg,baseline,halo,face,edge,text,caption};
   }
-  orbitDefs.append(metal);
-  const orbitWall=svgNode('ellipse',{fill:'none',stroke:'url(#yk-orbit-metal)'});
-  const orbitInner=svgNode('ellipse',{fill:'none',stroke:'rgba(8,13,19,.75)'});
-  const orbitOuter=svgNode('ellipse',{fill:'none',stroke:'rgba(239,246,255,.81)'});
-  const orbitSheen=svgNode('ellipse',{fill:'none',stroke:'rgba(187,205,226,.18)'});
-  orbitRibbon.append(orbitDefs,orbitWall,orbitInner,orbitOuter,orbitSheen);
-  orbitRibbon.hidden=true;seats.prepend(orbitRibbon);
+  let currentOrbit=null;
   function refreshOrbitRibbon(){
-    if(root.hidden||state.step!=='ready'){orbitRibbon.hidden=true;return;}
+    if(root.hidden||state.step!=='ready'){orbitRibbon.setAttribute('hidden','');currentOrbit=null;return;}
     const width=window.innerWidth,height=root.getBoundingClientRect().height||window.innerHeight;
-    const points=seatButtons.map(({b})=>[Number.parseFloat(b.style.left),Number.parseFloat(b.style.top)]);
-    const ellipse=orbitRibbonGeometry(points,width,height);
-    if(!ellipse){orbitRibbon.hidden=true;return;}
-    orbitRibbon.hidden=false;orbitRibbon.setAttribute('viewBox',`0 0 ${width} ${height}`);
-    const {cx,cy,rx,ry,thickness}=ellipse;
-    for(const [node,delta,strokeWidth] of [
-      [orbitWall,0,thickness],[orbitInner,-thickness/2,2],
-      [orbitOuter,thickness/2,1.7],[orbitSheen,thickness*.37,1.5]]){
-      for(const [key,value] of Object.entries({cx,cy,rx:Math.max(1,rx+delta),ry:Math.max(1,ry+delta)}))node.setAttribute(key,String(value));
-      node.setAttribute('stroke-width',String(strokeWidth));
+    const fallback={gold:[.28,.30],blue:[.72,.30],green:[.28,.66],marble:[.72,.66]};
+    const points=seatButtons.map(({color})=>{const p=geometry.seats?.[color.id]||fallback[color.id];return [p[0]*width,p[1]*height];});
+    const ring=orbitRibbonGeometry(points,width,height,geometry.board);if(!ring)return;
+    currentOrbit=ring;orbitRibbon.removeAttribute('hidden');orbitRibbon.setAttribute('viewBox',`0 0 ${width} ${height}`);
+    const {cx,cy,rx,ry,thickness}=ring;
+    // Each half is a vertically extruded arc, never a stroked ellipse.
+    const arc=(side,offset)=>`M ${cx-rx},${cy+offset} A ${rx},${ry} 0 0 ${side<0?1:0} ${cx+rx},${cy+offset}`;
+    for(const {side,wall,sheen,rims,seam} of walls){
+      const d=arc(side,-thickness/2)+` L ${cx+rx},${cy+thickness/2} A ${rx},${ry} 0 0 ${side<0?0:1} ${cx-rx},${cy+thickness/2} Z`;
+      wall.setAttribute('d',d);sheen.setAttribute('d',d);
+      rims[0].setAttribute('d',arc(side,-thickness/2));rims[1].setAttribute('d',arc(side,thickness/2));seam.setAttribute('d',arc(side,-thickness/2+4));
     }
-    orbitRibbon.dataset.shape='elliptical-cylinder';
+    const middleY=(Math.min(...points.map(p=>p[1]))+Math.max(...points.map(p=>p[1])))/2;
+    seatButtons.forEach(({b,status,color},i)=>{
+      const side=points[i][1]<middleY?-1:1,sign=points[i][0]<cx?-1:1;
+      const plateWidth=rx*(width<700?.72:.65),plateHeight=thickness*.79;
+      const plate=orbitPlateGeometry(ring,cx+sign*rx*.54,side,plateWidth,plateHeight);
+      b.style.left=`${plate.left+plate.width/2}px`;b.style.top=`${plate.top+plate.height/2}px`;b.style.width=`${plate.width}px`;b.style.height=`${plate.height}px`;b.style.setProperty('--yk-seat-tilt','0deg');
+      b.dataset.cylinder='standing-orbit';
+      const art=b.orbit;art.svg.setAttribute('viewBox',`0 0 ${plate.width} ${plate.height}`);
+      for(const path of [art.halo,art.face,art.edge])path.setAttribute('d',plate.path);
+      art.baseline.setAttribute('d',plate.baseline);
+      // The DOM label remains the accessible source. One text run preserves
+      // Arabic joining; textPath bends it without splitting letters or strips.
+      const label=status.textContent,short=label.length>23?label.slice(0,22)+'…':label;
+      art.caption.textContent=short+'  ⌄';
+      const fontSize=Math.max(12,Math.min(24,plateWidth/(short.length>18?12:9.1)));
+      art.text.setAttribute('font-size',String(fontSize));
+      art.text.removeAttribute('textLength');
+      // Only fit unusually long names; never stretch short names or Arabic spaces.
+      const measured=typeof art.text.getComputedTextLength==='function'?art.text.getComputedTextLength():0;
+      if(measured>plateWidth-28){art.text.setAttribute('textLength',String(plateWidth-28));art.text.setAttribute('lengthAdjust','spacingAndGlyphs');}
+    });
+    orbitRibbon.dataset.shape='standing-cylinder';
   }
 
-  let mapCanvas=null,mapContext=null,filterSerial=0;
-  function clearCylinder(node){
-    node.classList.remove('yk-cylinder');for(const name of ['--yk-cylinder-filter','--yk-paper-fill','--yk-paper-border','--yk-paper-shadow'])node.style.removeProperty(name);delete node.dataset.cylinder;
-    const entry=cylinders.get(node);if(entry){entry.filter.remove();cylinders.delete(node);}
-  }
-  function refreshCylinders(){
-    for(const {b} of seatButtons)if(state.step==='color')clearCylinder(b);
-    if(root.hidden)return;
-    for(const [node] of cylinders)if(!node.isConnected)clearCylinder(node);
-    const height=root.getBoundingClientRect().height||window.innerHeight;
-    const centerX=geometry.board?geometry.board[0]+geometry.board[2]/2:window.innerWidth*.5;
-    const centerY=geometry.board?geometry.board[1]+geometry.board[3]/2:height*.5;
-    const radius=(geometry.board?.[2]||window.innerWidth*.85)/2;
-    for(const node of root.querySelectorAll('.yk-seat')){
-      if(node.hidden||node.closest('[hidden]')||node.classList.contains('is-color'))continue;
-      const rect=node.getBoundingClientRect(),seat=node.classList.contains('yk-seat');
-      const w=node.offsetWidth||rect.width||(seat?(window.innerWidth<700?112:136):200),h=node.offsetHeight||rect.height||(seat?44:50);
-      const middleX=rect.width?rect.left+rect.width/2:seat?parseFloat(node.style.left)||centerX:centerX;
-      const middleY=rect.height?rect.top+rect.height/2:seat?parseFloat(node.style.top)||0:parseFloat(actions.style.top)||height*.75;
-      const tilt=seat?Number.parseFloat(node.style.getPropertyValue('--yk-seat-tilt'))||0:0;
-      const normal=cylinderNormal(middleX,middleY,centerX,centerY,tilt);
-      node.dataset.cylinder='table-orbit';
-      // jsdom has no raster renderer. Browser Canvas2D is independent of WebGL.
-      if(typeof window.CanvasRenderingContext2D!=='function')continue;
-      const mapColumns=1024,mapRows=32;
-      if(!mapCanvas){mapCanvas=document.createElement('canvas');mapCanvas.width=mapColumns;mapCanvas.height=mapRows;mapContext=mapCanvas.getContext('2d');}
-      if(!mapContext)continue;
-      const key=[Math.round(w),Math.round(h),Math.round(radius),normal.x.toFixed(3),normal.y.toFixed(3)].join(':');
-      let entry=cylinders.get(node);if(entry?.key===key)continue;
-      if(!entry){
-        // Sample the original glass before the class moves only its surface
-        // into ::before. Keep the live Arabic label on an untouched DOM layer.
-        const style=window.getComputedStyle(node);
-        node.style.setProperty('--yk-paper-fill',style.backgroundImage==='none'?style.backgroundColor:style.backgroundImage);
-        node.style.setProperty('--yk-paper-border',style.borderColor);
-        node.style.setProperty('--yk-paper-shadow',style.boxShadow);
-        const filter=svgNode('filter',{id:`yk-cylinder-${++filterSerial}`,filterUnits:'userSpaceOnUse',primitiveUnits:'userSpaceOnUse','color-interpolation-filters':'sRGB'});
-        const image=svgNode('feImage',{result:'cylinderMap',preserveAspectRatio:'none'});
-        filter.append(image,svgNode('feDisplacementMap',{in:'SourceGraphic',in2:'cylinderMap',scale:'32',xChannelSelector:'R',yChannelSelector:'G',result:'bentSurface'}),
-          svgNode('feGaussianBlur',{in:'bentSurface',stdDeviation:'.32'}));
-        filterDefs.append(filter);entry={filter,image,key:''};cylinders.set(node,entry);
-      }
-      const padding=24,map=mapContext.createImageData(mapColumns,mapRows);
-      for(let i=0;i<mapColumns;i++){
-        const p=cylinderSample(w,radius,normal,-padding+(i+.5)/mapColumns*(w+2*padding));
-        const red=Math.round(255*Math.max(0,Math.min(1,.5+p.dx/32)));
-        const green=Math.round(255*Math.max(0,Math.min(1,.5+p.dy/32)));
-        for(let row=0;row<mapRows;row++){
-          const offset=(row*mapColumns+i)*4;
-          map.data[offset]=red;map.data[offset+1]=green;
-          map.data[offset+2]=128;map.data[offset+3]=255;
-        }
-      }
-      mapContext.putImageData(map,0,0);const url=mapCanvas.toDataURL('image/png');
-      for(const n of [entry.filter,entry.image])for(const [k,v] of Object.entries({x:-padding,y:-padding,width:w+2*padding,height:h+2*padding}))n.setAttribute(k,v);
-      entry.image.setAttribute('href',url);entry.image.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href',url);entry.key=key;
-      node.style.setProperty('--yk-cylinder-filter',`url(#${entry.filter.id})`);node.classList.add('yk-cylinder');
-    }
-  }
   function refreshGlass(){
     // Actual Liquefy Core optics. WebKit uses the same neutral CSS material:
     // it cannot render SVG displacement in backdrop-filter. No RGB dispersion
@@ -278,6 +251,7 @@ export function mountSetup(document, window) {
     const nodes=[prompt,sheet,create,join,confirm,start,sharing,...counts.children,...rounds.children,...seatButtons.map(x=>x.b)];
     for(const node of nodes){
       if(node===prompt)continue;
+      if(node.classList.contains('yk-seat')){lenses.get(node)?.destroy();lenses.delete(node);continue;}
       const visible=!root.hidden&&!node.hidden&&!node.closest('[hidden]')&&!node.classList.contains('is-color');
       if(!visible){lenses.get(node)?.destroy();lenses.delete(node);continue;}
       if(!lenses.has(node)){const desktop=window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;const lens=attachLiquidLens(node,{strength:.32,dispersion:0,blur:desktop?12:1,saturation:1,respectReducedTransparency:true});if(lens)lenses.set(node,lens);}
@@ -300,7 +274,7 @@ export function mountSetup(document, window) {
       const point=geometry.seats?.[color.id]||fallback[color.id];
       if(state.step==='color'){
         const corners=geometry.hits?.[color.id]||[point];const xs=corners.map(x=>x[0]*width),ys=corners.map(x=>x[1]*height);
-        clearCylinder(b);
+        delete b.dataset.cylinder;
         b.style.width=`${Math.max(104,Math.max(...xs)-Math.min(...xs)+52)}px`;b.style.height=`${Math.max(88,Math.max(...ys)-Math.min(...ys)+52)}px`;
         b.style.left=`${point[0]*width}px`;b.style.top=`${point[1]*height}px`;
       }else{
@@ -327,9 +301,10 @@ export function mountSetup(document, window) {
     // VisualViewport, so opening a keyboard never lifts Start/Share over the board.
     actions.style.top=`${centeredEntry?Math.max(16,(height-h)/2):Math.max(12,Math.min(target[1]*height,height-h-16))}px`;
     const heading=geometry.prompt||[.5,.25];prompt.style.top=`${Math.max(20,heading[1]*height)}px`;
-    if(!modal.hidden && ['seat','name'].includes(modal.dataset.kind))positionSheet();
     refreshOrbitRibbon();
-    refreshCylinders();
+    if(currentOrbit&&state.step==='ready')actions.style.top=`${Math.min(height-h-16,Math.max(parseFloat(actions.style.top),currentOrbit.cy+currentOrbit.ry+currentOrbit.thickness/2+18))}px`;
+    if(!modal.hidden && ['seat','name'].includes(modal.dataset.kind))positionSheet();
+
   }
   function positionSheet(){
     const anchor=returnFocus?.getBoundingClientRect();if(!anchor)return;
@@ -344,7 +319,7 @@ export function mountSetup(document, window) {
     const y=centered?Math.max(12,(height-h)/2):Math.max(12,Math.min(height-h-12,below?anchor.bottom+4-top:anchor.top-h-4-top));
     sheet.style.left=`${x}px`;sheet.style.top=`${y}px`;
     modal.dataset.side=centered?'center':below?'below':'above';
-    refreshCylinders();
+
   }
   function render(){
     root.dataset.step=state.step;identity.textContent=state.name;
@@ -426,12 +401,12 @@ export function mountSetup(document, window) {
     const phone=input('رقم الجوال',{value:profile?.phone||'',type:'tel',inputMode:'numeric',autocomplete:'tel',maxLength:15,required:true,dir:'ltr'});phone.field.enterKeyHint='done';
     phone.field.addEventListener('input',()=>{phone.field.value=digits(phone.field.value);});
     const error=el('div','yk-field-error');error.setAttribute('role','alert');const next=el('button','yk-primary','متابعة');next.type='submit';form.append(phone.wrap,error,next);
-    form.addEventListener('submit',e=>{e.preventDefault();const number=digits(phone.field.value);if(!/^\d{7,15}$/.test(number)){error.textContent='تأكد من رقم الجوال';return;}const name=profiles[number];if(typeof name==='string'&&validProfile({name,phone:number}))finishProfile(name,number);else profileName(number);});sheet.append(form);refreshCylinders();
+    form.addEventListener('submit',e=>{e.preventDefault();const number=digits(phone.field.value);if(!/^\d{7,15}$/.test(number)){error.textContent='تأكد من رقم الجوال';return;}const name=profiles[number];if(typeof name==='string'&&validProfile({name,phone:number}))finishProfile(name,number);else profileName(number);});sheet.append(form);
   }
   function profileName(number){
     sheet.replaceChildren();const title=el('h2','','الاسم الكريم');title.id='ykSheetTitle';const form=el('form','yk-form');form.noValidate=true;
     const name=input('الاسم الكريم',{maxLength:24,required:true,autocomplete:'given-name'});name.field.enterKeyHint='done';const error=el('div','yk-field-error');error.setAttribute('role','alert');const next=el('button','yk-primary','متابعة');next.type='submit';form.append(name.wrap,error,next);
-    form.addEventListener('submit',e=>{e.preventDefault();if(name.field.value.trim().length<2){error.textContent='اكتب اسمك';return;}finishProfile(name.field.value.trim(),number);});sheet.append(title,form);refreshCylinders();name.field.focus();animate(sheet,[{opacity:0,transform:'translateX(8px)'},{opacity:1,transform:'none'}]);
+    form.addEventListener('submit',e=>{e.preventDefault();if(name.field.value.trim().length<2){error.textContent='اكتب اسمك';return;}finishProfile(name.field.value.trim(),number);});sheet.append(title,form);name.field.focus();animate(sheet,[{opacity:0,transform:'translateX(8px)'},{opacity:1,transform:'none'}]);
   }
   function finishProfile(name,phone){
     profile={name,phone};profiles[phone]=name;state=newSetup(name);
@@ -471,7 +446,7 @@ export function mountSetup(document, window) {
   function openJoin(){
     openSheet('رابط أو رمز الغرفة',join,'join');const form=el('form','yk-form');form.noValidate=true;
     const value=input('رابط أو رمز الغرفة',{type:'text',autocomplete:'off',required:true,dir:'ltr'});const error=el('div','yk-field-error');error.setAttribute('role','alert');const submit=el('button','yk-primary','انضمام');submit.type='submit';form.append(value.wrap,error,submit,button('إلغاء',()=>closeSheet(true),'yk-subtle'));
-    form.addEventListener('submit',e=>{e.preventDefault();const code=parseRoomInput(value.field.value,window.location.href);if(!code){error.textContent='تأكد من الرابط أو الرمز';return;}if(!capabilities.online){error.textContent='الأونلاين غير متاح حالياً';return;}closeSheet(true,()=>window.yakolakVisualSetupAction?.(JSON.stringify({action:'join',code})));});sheet.append(form);refreshCylinders();value.field.focus();
+    form.addEventListener('submit',e=>{e.preventDefault();const code=parseRoomInput(value.field.value,window.location.href);if(!code){error.textContent='تأكد من الرابط أو الرمز';return;}if(!capabilities.online){error.textContent='الأونلاين غير متاح حالياً';return;}closeSheet(true,()=>window.yakolakVisualSetupAction?.(JSON.stringify({action:'join',code})));});sheet.append(form);value.field.focus();
   }
   modal.addEventListener('keydown',e=>{
     if(e.key==='Escape'&&modal.dataset.kind!=='profile'){e.preventDefault();closeSheet(true);return;}
