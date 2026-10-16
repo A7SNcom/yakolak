@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {COLORS,digits,validProfile,newSetup,chooseColor,confirmColor,chooseCount,changeSeat,seatLabel,swapPlayers,configuration,configurationError,parseRoomInput,restoreSetup,mountSetup,orbitRibbonGeometry,orbitPlateGeometry,orbitY} from '../ui/visual-setup.mjs';
 
-test('standing cylinder stays in the viewport and plates follow its same curved rims',()=>{
+test('invisible orbit keeps mirrored smooth plates within the viewport',()=>{
  for(const [width,height] of [[320,568],[390,844],[768,1024],[1280,900],[844,390]]){
   const points=[[width*.28,height*.3],[width*.72,height*.3],[width*.28,height*.65],[width*.72,height*.65]];
   const ring=orbitRibbonGeometry(points,width,height,[width*.08,height*.3,width*.84,height*.36]);
@@ -13,7 +13,7 @@ test('standing cylinder stays in the viewport and plates follow its same curved 
    assert.ok(plate.left>=0&&plate.left+plate.width<=width);
    assert.ok(plate.top>=0&&plate.top+plate.height<=height);
    assert.ok(plate.height>=44);
-   assert.ok(!/NaN|Infinity/.test(plate.path+plate.baseline));
+   assert.ok(!/NaN|Infinity/.test(plate.path));
    assert.ok(side*(orbitY(ring,x,side)-ring.cy)>0);
   }
  }
@@ -73,9 +73,9 @@ if(process.env.YAKOLAK_JSDOM_MODULE){
  test('returning from ready to color restores large plain touch targets and unfragmented names',()=>{
   const dom=new JSDOM('<body></body>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});
   const {document}=dom.window,api=mountSetup(document,dom.window),resume={players:[{color:'green',label:'أحمد',mode:'local'},{color:'blue',label:'كمبيوتر أزرق',mode:'bot'}]};
-  api.open({resume,request:'ready-1'});assert.equal(document.querySelector('.yk-orbit-ribbon').hasAttribute('hidden'),false);const blue=document.querySelector('[data-color=blue]');
-  assert.equal(blue.querySelector('.yk-seat-status').parentElement,blue);assert.equal(blue.querySelector('.yk-fold-strip'),null);
-  api.open({resume,preview_step:'color',request:'color-2'});assert.equal(document.querySelector('.yk-orbit-ribbon').hasAttribute('hidden'),true);
+  api.open({resume,request:'ready-1'});assert.equal(document.querySelector('.yk-orbit-ribbon'),null);assert.equal(document.querySelector('textPath'),null);const blue=document.querySelector('[data-color=blue]');
+  assert.equal(blue.querySelector('.yk-seat-status').parentElement,blue);assert.equal(blue.querySelector('.yk-seat-status').namespaceURI,'http://www.w3.org/1999/xhtml');assert.equal(blue.querySelector('.yk-seat-status').dir,'rtl');assert.equal(blue.querySelector('.yk-fold-strip'),null);
+  api.open({resume,preview_step:'color',request:'color-2'});assert.equal(document.querySelector('.yk-orbit-ribbon'),null);
   for(const target of document.querySelectorAll('.yk-seat')){assert.ok(parseFloat(target.style.width)>=104);assert.ok(parseFloat(target.style.height)>=88);assert.equal(target.classList.contains('yk-cylinder'),false);assert.equal(target.style.getPropertyValue('--yk-cylinder-filter'),'');}
   blue.click();assert.equal(blue.getAttribute('aria-pressed'),'true');assert.equal(document.querySelector('.yk-confirm').hidden,false);
   dom.window.close();

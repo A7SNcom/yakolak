@@ -1,7 +1,7 @@
 import {attachLiquidLens} from './vendor/liquefy-core-1.1.0.mjs';
 
-// A standing cylindrical wall: equal horizontal radii, vertically separated
-// rims. A thick ellipse stroke would be a flat washer, not this reference.
+// Invisible layout guide only. No belt is painted; the four independent
+// controls share its center, spacing and mirrored tangent angles.
 export function orbitRibbonGeometry(points,width,height,board=null){
   if(!Array.isArray(points)||points.length!==4||width<=0||height<=0||points.some(p=>!Array.isArray(p)||p.length!==2||!p.every(Number.isFinite)))return null;
   const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);
@@ -11,28 +11,44 @@ export function orbitRibbonGeometry(points,width,height,board=null){
   const rx=Math.max(90,Math.min(width/2-12,bw*(width<700?.63:.47)+8));
   const cx=Math.max(rx+12,Math.min(width-rx-12,bx+bw/2));
   const cy=Math.max(thickness+24,Math.min(height-thickness-140,by+bh*.49));
-  const ry=Math.max(62,Math.min(bh*(width<700?.65:.50)+thickness*.2,cy-thickness/2-44,height-cy-thickness/2-144));
+  const ry=Math.max(62,Math.min(bh*(width<700?.65:.68)+thickness*.2,cy-thickness/2-44,height-cy-thickness/2-144));
   return {cx,cy,rx,ry,thickness};
 }
 export function orbitY(ring,x,side){
   const u=Math.max(-1,Math.min(1,(x-ring.cx)/ring.rx));
   return ring.cy+side*ring.ry*Math.sqrt(Math.max(0,1-u*u));
 }
-// Project a rounded rectangle onto the same cylinder as the two glass rims.
-// Keep the Arabic label a single shaped SVG text run along its own baseline.
+// Smooth, equal-radius corners with a deliberately shallow bend. Offset the
+// material alone; native HTML text keeps the browser's complete RTL shaping.
+export function foldedSurfaceGeometry(width,height,side=1){
+  const pad=5,sag=Math.min(6,height*.10,width*.034),radius=Math.min(18,height*.32);
+  const fullHeight=height+2*(pad+sag),bodyWidth=width-2*pad;
+  const bend=x=>side*sag*(1-((x-width/2)/(bodyWidth/2))**2);
+  const slope=x=>-side*sag*8*(x-width/2)/(bodyWidth*bodyWidth);
+  const project=(x,y,dx,dy)=>({x,y:y+pad+sag+bend(x),dx,dy:dy+slope(x)*dx});
+  const f=n=>Number(n.toFixed(3));let path='';
+  const segment=(sample,steps=1)=>{
+    for(let i=0;i<steps;i++){
+      const t0=i/steps,t1=(i+1)/steps,dt=t1-t0,p0=sample(t0),p1=sample(t1);
+      if(!path)path=`M ${f(p0.x)} ${f(p0.y)}`;
+      path+=` C ${f(p0.x+p0.dx*dt/3)} ${f(p0.y+p0.dy*dt/3)} ${f(p1.x-p1.dx*dt/3)} ${f(p1.y-p1.dy*dt/3)} ${f(p1.x)} ${f(p1.y)}`;
+    }
+  };
+  const line=(x1,y1,x2,y2)=>segment(t=>project(x1+(x2-x1)*t,y1+(y2-y1)*t,x2-x1,y2-y1));
+  const arc=(cx,cy,angle)=>segment(t=>{const a=angle+t*Math.PI/2;return project(cx+radius*Math.cos(a),cy+radius*Math.sin(a),-radius*Math.sin(a)*Math.PI/2,radius*Math.cos(a)*Math.PI/2);},6);
+  const left=pad,right=width-pad;
+  line(left+radius,0,right-radius,0);arc(right-radius,radius,-Math.PI/2);
+  line(right,radius,right,height-radius);arc(right-radius,height-radius,0);
+  line(right-radius,height,left+radius,height);arc(left+radius,height-radius,Math.PI/2);
+  line(left,height-radius,left,radius);arc(left+radius,radius,Math.PI);
+  return {width,height:fullHeight,path:path+' Z',bow:side*sag};
+}
 export function orbitPlateGeometry(ring,centerX,side,width,height){
-  const left=centerX-width/2,r=Math.min(20,height*.33),points=[];
-  const add=(x,y)=>points.push([x,orbitY(ring,x,side)+y]);
-  const line=(x1,y1,x2,y2)=>{for(let i=0;i<=20;i++)add(x1+(x2-x1)*i/20,y1+(y2-y1)*i/20);};
-  const arc=(cx,cy,a)=>{for(let i=0;i<=10;i++){const t=(a+i*9)*Math.PI/180;add(cx+r*Math.cos(t),cy+r*Math.sin(t));}};
-  line(left+r,-height/2,left+width-r,-height/2);arc(left+width-r,-height/2+r,-90);
-  line(left+width,-height/2+r,left+width,height/2-r);arc(left+width-r,height/2-r,0);
-  line(left+width-r,height/2,left+r,height/2);arc(left+r,height/2-r,90);
-  line(left,height/2-r,left,-height/2+r);arc(left+r,-height/2+r,180);
-  const top=Math.min(...points.map(p=>p[1]))-8,bottom=Math.max(...points.map(p=>p[1]))+8;
-  const path=points.map(([x,y],i)=>`${i?'L':'M'}${(x-left).toFixed(2)},${(y-top).toFixed(2)}`).join(' ')+' Z';
-  const baseline=[];for(let i=0;i<=60;i++){const x=left+12+(width-24)*i/60;baseline.push(`${i?'L':'M'}${(x-left).toFixed(2)},${(orbitY(ring,x,side)-top).toFixed(2)}`);}
-  return {left,top,width,height:bottom-top,path,baseline:baseline.join(' ')};
+  const surface=foldedSurfaceGeometry(width,height,side),centerY=orbitY(ring,centerX,side);
+  const u=Math.max(-.9,Math.min(.9,(centerX-ring.cx)/ring.rx));
+  const tangent=-side*ring.ry*u/(ring.rx*Math.sqrt(1-u*u));
+  const angle=Math.max(-16,Math.min(16,Math.atan(tangent)*180/Math.PI*.65));
+  return {...surface,left:centerX-width/2,top:centerY-surface.height/2,angle,side};
 }
 
 export const COLORS = [
@@ -176,72 +192,52 @@ export function mountSetup(document, window) {
     for(const [offset,color,opacity=1] of stops)n.append(svgNode('stop',{offset,'stop-color':color,'stop-opacity':opacity}));
     return n;
   };
-  const orbitRibbon=svgNode('svg',{class:'yk-orbit-ribbon','aria-hidden':'true'}),defs=svgNode('defs');
-  defs.append(
-    gradient('yk-orbit-back', [['0%','#f4f6ff',.8],['5%','#9ca6b8',.55],['18%','#30333b',.72],['48%','#0a1729',.9],['75%','#063a9b',.8],['95%','#3c8eff',.8],['100%','#d7ecff',.9]]),
-    gradient('yk-orbit-front',[['0%','#92fff0',.9],['10%','#006e60',.85],['32%','#09352e',.85],['50%','#18232e',.85],['70%','#3d434b',.85],['91%','#c5c6cb',.8],['100%','#f4f6ff',.9]]),
-    gradient('yk-orbit-sheen',[['0%','#fff',.23],['12%','#fff',.03],['55%','#000',.08],['88%','#030810',.3],['100%','#fff',.2]],true)
-  );
-  orbitRibbon.append(defs);
-  const walls=[-1,1].map(side=>{
-    const group=svgNode('g',{'data-side':side<0?'back':'front'});
-    const wall=svgNode('path',{fill:`url(#yk-orbit-${side<0?'back':'front'})`}),sheen=svgNode('path',{fill:'url(#yk-orbit-sheen)'});
-    const rims=[-1,1].map(()=>svgNode('path',{fill:'none',stroke:side<0?'#dbeaff':'#edffff','stroke-width':'1.5','stroke-opacity':'.8'}));
-    const seam=svgNode('path',{fill:'none',stroke:'#b5d8ff','stroke-width':'.8','stroke-opacity':'.38'});
-    group.append(wall,sheen,...rims,seam);orbitRibbon.append(group);return {side,wall,sheen,rims,seam};
-  });
-  orbitRibbon.setAttribute('hidden','');seats.prepend(orbitRibbon);
-  for(const {b,color} of seatButtons){
-    const svg=svgNode('svg',{class:'yk-orbit-plate','aria-hidden':'true'}),d=svgNode('defs');
-    const glow=color.id==='blue'?'#1985ff':color.id==='green'?'#00e1bc':'#fff';
-    const dark=color.id==='blue'?'#031331':color.id==='green'?'#002e27':'#22252b';
-    d.append(gradient(`yk-plate-${color.id}`,[['0%',dark,.82],['42%',dark,.96],['100%',dark,.82]],true));
-    const baseline=svgNode('path',{id:`yk-baseline-${color.id}`,fill:'none'});d.append(baseline);
-    const halo=svgNode('path',{class:'yk-plate-halo',fill:'none',stroke:glow,'stroke-width':'5'});
-    const face=svgNode('path',{class:'yk-plate-face',fill:`url(#yk-plate-${color.id})`,stroke:glow,'stroke-width':'1.7'});
-    const edge=svgNode('path',{class:'yk-plate-edge',fill:'none',stroke:'#fff','stroke-width':'1.1','stroke-opacity':'.96'});
-    const text=svgNode('text',{'text-anchor':'middle',direction:'rtl',fill:'#fff',dy:'.34em'});
-    const caption=svgNode('textPath',{href:`#yk-baseline-${color.id}`,startOffset:'50%'});text.append(caption);
-    svg.append(d,halo,face,edge,text);b.append(svg);b.orbit={svg,baseline,halo,face,edge,text,caption};
+  let surfaceSerial=0,currentOrbit=null;
+  function addSurface(node,color='neutral'){
+    if(node.orbit)return node.orbit;
+    const svg=svgNode('svg',{class:'yk-orbit-plate','aria-hidden':'true',focusable:'false'}),defs=svgNode('defs');
+    const id=`yk-surface-${++surfaceSerial}`,fill=gradient(id,[['0%','#3e4858',.94],['48%','#171d28',.97],['100%','#283242',.95]],true);
+    defs.append(fill);
+    const halo=svgNode('path',{class:'yk-plate-halo',fill:'none','stroke-width':'3'});
+    const face=svgNode('path',{class:'yk-plate-face',fill:`url(#${id})`,'stroke-width':'1.3'});
+    const edge=svgNode('path',{class:'yk-plate-edge',fill:'none',stroke:'#fff','stroke-width':'.55'});
+    svg.append(defs,halo,face,edge);node.append(svg);
+    return node.orbit={svg,halo,face,edge,fill,color,angle:0,side:1};
   }
-  let currentOrbit=null;
-  function refreshOrbitRibbon(){
-    if(root.hidden||state.step!=='ready'){orbitRibbon.setAttribute('hidden','');currentOrbit=null;return;}
+  function paintSurface(node,surface,color='neutral'){
+    const art=addSurface(node,color),off=node.classList.contains('is-off');
+    const palette=off?['#707782','#22262e']:({blue:['#77b4ff','#102b54'],green:['#62ddc6','#143f38'],gold:['#e6be7b','#3a2e20'],marble:['#e5e7eb','#303641'],neutral:['#c7d0df','#282f3d']}[color]);
+    art.svg.setAttribute('viewBox',`0 0 ${surface.width} ${surface.height}`);
+    for(const path of [art.halo,art.face,art.edge])path.setAttribute('d',surface.path);
+    art.halo.setAttribute('stroke',palette[0]);art.face.setAttribute('stroke',palette[0]);
+    const mix=(a,b,t)=>'#'+[1,3,5].map(i=>Math.round(parseInt(a.slice(i,i+2),16)*(1-t)+parseInt(b.slice(i,i+2),16)*t).toString(16).padStart(2,'0')).join('');
+    [...art.fill.children].forEach((stop,i)=>stop.setAttribute('stop-color',i===0?mix(palette[1],palette[0],.15):i===1?palette[1]:mix(palette[1],'#000000',.12)));
+    node.style.setProperty('--yk-bow',`${surface.bow}px`);art.side=surface.side??1;art.angle=surface.angle??0;
+  }
+  for(const {b,color,status} of seatButtons){
+    addSurface(b,color.id);status.dir='rtl';
+    // Chevron is an icon, never a Unicode character participating in bidi.
+    const arrowNode=b.querySelector('.yk-seat-arrow');arrowNode.textContent='';
+    const icon=svgNode('svg',{viewBox:'0 0 16 16','aria-hidden':'true'});icon.append(svgNode('path',{d:'m4 6 4 4 4-4',fill:'none',stroke:'currentColor','stroke-width':'1.6','stroke-linecap':'round','stroke-linejoin':'round'}));arrowNode.append(icon);
+  }
+  function refreshOrbitLayout(){
+    if(root.hidden||state.step!=='ready'){currentOrbit=null;return;}
     const width=window.innerWidth,height=root.getBoundingClientRect().height||window.innerHeight;
     const fallback={gold:[.28,.30],blue:[.72,.30],green:[.28,.66],marble:[.72,.66]};
     const points=seatButtons.map(({color})=>{const p=geometry.seats?.[color.id]||fallback[color.id];return [p[0]*width,p[1]*height];});
     const ring=orbitRibbonGeometry(points,width,height,geometry.board);if(!ring)return;
-    currentOrbit=ring;orbitRibbon.removeAttribute('hidden');orbitRibbon.setAttribute('viewBox',`0 0 ${width} ${height}`);
-    const {cx,cy,rx,ry,thickness}=ring;
-    // Each half is a vertically extruded arc, never a stroked ellipse.
-    const arc=(side,offset)=>`M ${cx-rx},${cy+offset} A ${rx},${ry} 0 0 ${side<0?1:0} ${cx+rx},${cy+offset}`;
-    for(const {side,wall,sheen,rims,seam} of walls){
-      const d=arc(side,-thickness/2)+` L ${cx+rx},${cy+thickness/2} A ${rx},${ry} 0 0 ${side<0?0:1} ${cx-rx},${cy+thickness/2} Z`;
-      wall.setAttribute('d',d);sheen.setAttribute('d',d);
-      rims[0].setAttribute('d',arc(side,-thickness/2));rims[1].setAttribute('d',arc(side,thickness/2));seam.setAttribute('d',arc(side,-thickness/2+4));
-    }
+    currentOrbit=ring;
     const middleY=(Math.min(...points.map(p=>p[1]))+Math.max(...points.map(p=>p[1])))/2;
     seatButtons.forEach(({b,status,color},i)=>{
-      const side=points[i][1]<middleY?-1:1,sign=points[i][0]<cx?-1:1;
-      const plateWidth=rx*(width<700?.72:.65),plateHeight=thickness*.79;
-      const plate=orbitPlateGeometry(ring,cx+sign*rx*.54,side,plateWidth,plateHeight);
-      b.style.left=`${plate.left+plate.width/2}px`;b.style.top=`${plate.top+plate.height/2}px`;b.style.width=`${plate.width}px`;b.style.height=`${plate.height}px`;b.style.setProperty('--yk-seat-tilt','0deg');
-      b.dataset.cylinder='standing-orbit';
-      const art=b.orbit;art.svg.setAttribute('viewBox',`0 0 ${plate.width} ${plate.height}`);
-      for(const path of [art.halo,art.face,art.edge])path.setAttribute('d',plate.path);
-      art.baseline.setAttribute('d',plate.baseline);
-      // The DOM label remains the accessible source. One text run preserves
-      // Arabic joining; textPath bends it without splitting letters or strips.
-      const label=status.textContent,short=label.length>23?label.slice(0,22)+'…':label;
-      art.caption.textContent=short+'  ⌄';
-      const fontSize=Math.max(12,Math.min(24,plateWidth/(short.length>18?12:9.1)));
-      art.text.setAttribute('font-size',String(fontSize));
-      art.text.removeAttribute('textLength');
-      // Only fit unusually long names; never stretch short names or Arabic spaces.
-      const measured=typeof art.text.getComputedTextLength==='function'?art.text.getComputedTextLength():0;
-      if(measured>plateWidth-28){art.text.setAttribute('textLength',String(plateWidth-28));art.text.setAttribute('lengthAdjust','spacingAndGlyphs');}
+      const side=points[i][1]<middleY?-1:1,sign=points[i][0]<ring.cx?-1:1;
+      const plateWidth=Math.min(252,Math.max(width<700?128:184,ring.rx*(width<700?.78:.66)));
+      const plate=orbitPlateGeometry(ring,ring.cx+sign*ring.rx*.54,side,plateWidth,width<700?48:60);
+      const radians=plate.angle*Math.PI/180,halfX=(Math.abs(Math.cos(radians))*plate.width+Math.abs(Math.sin(radians))*plate.height)/2,halfY=(Math.abs(Math.sin(radians))*plate.width+Math.abs(Math.cos(radians))*plate.height)/2;
+      const x=Math.max(halfX+10,Math.min(width-halfX-10,plate.left+plate.width/2)),y=Math.max(halfY+18,Math.min(height-halfY-18,plate.top+plate.height/2));
+      b.style.left=`${x}px`;b.style.top=`${y}px`;b.style.width=`${plate.width}px`;b.style.height=`${plate.height}px`;b.style.setProperty('--yk-seat-tilt',`${plate.angle}deg`);
+      b.dataset.cylinder='folded-surface';paintSurface(b,plate,color.id);
+      status.style.maxWidth=`${plate.width-43}px`;status.style.fontSize=width<700?'14px':`${Math.min(21,plateWidth*.084)}px`;
     });
-    orbitRibbon.dataset.shape='standing-cylinder';
   }
 
   function refreshGlass(){
@@ -251,7 +247,7 @@ export function mountSetup(document, window) {
     const nodes=[prompt,sheet,create,join,confirm,start,sharing,...counts.children,...rounds.children,...seatButtons.map(x=>x.b)];
     for(const node of nodes){
       if(node===prompt)continue;
-      if(node.classList.contains('yk-seat')){lenses.get(node)?.destroy();lenses.delete(node);continue;}
+      if(node.classList.contains('yk-seat')||(node===sheet&&modal.dataset.kind==='seat')){lenses.get(node)?.destroy();lenses.delete(node);continue;}
       const visible=!root.hidden&&!node.hidden&&!node.closest('[hidden]')&&!node.classList.contains('is-color');
       if(!visible){lenses.get(node)?.destroy();lenses.delete(node);continue;}
       if(!lenses.has(node)){const desktop=window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;const lens=attachLiquidLens(node,{strength:.32,dispersion:0,blur:desktop?12:1,saturation:1,respectReducedTransparency:true});if(lens)lenses.set(node,lens);}
@@ -301,7 +297,7 @@ export function mountSetup(document, window) {
     // VisualViewport, so opening a keyboard never lifts Start/Share over the board.
     actions.style.top=`${centeredEntry?Math.max(16,(height-h)/2):Math.max(12,Math.min(target[1]*height,height-h-16))}px`;
     const heading=geometry.prompt||[.5,.25];prompt.style.top=`${Math.max(20,heading[1]*height)}px`;
-    refreshOrbitRibbon();
+    refreshOrbitLayout();
     if(currentOrbit&&state.step==='ready')actions.style.top=`${Math.min(height-h-16,Math.max(parseFloat(actions.style.top),currentOrbit.cy+currentOrbit.ry+currentOrbit.thickness/2+18))}px`;
     if(!modal.hidden && ['seat','name'].includes(modal.dataset.kind))positionSheet();
 
@@ -309,17 +305,34 @@ export function mountSetup(document, window) {
   function positionSheet(){
     const anchor=returnFocus?.getBoundingClientRect();if(!anchor)return;
     const width=window.innerWidth,height=window.visualViewport?.height||window.innerHeight,top=window.visualViewport?.offsetTop||0;
-    const w=Math.min(modal.dataset.kind==='seat'?(width<700?184:210):260,width-24);sheet.style.width=`${w}px`;
-    const h=sheet.getBoundingClientRect().height|| (modal.dataset.kind==='seat'?172:64);
-    const centered=modal.dataset.kind==='name';
-    const x=centered?Math.max(12,(width-w)/2):Math.max(12,Math.min(width-w-12,anchor.left+anchor.width/2-w/2));
-    const spaceBelow=height-12-(anchor.bottom-top+4),spaceAbove=anchor.top-top-16;
-    const preferBelow=(anchor.top+anchor.bottom)/2-top>=height/2;
-    const below=preferBelow?spaceBelow>=h||spaceBelow>spaceAbove:spaceAbove<h&&spaceBelow>=spaceAbove;
-    const y=centered?Math.max(12,(height-h)/2):Math.max(12,Math.min(height-h-12,below?anchor.bottom+4-top:anchor.top-h-4-top));
-    sheet.style.left=`${x}px`;sheet.style.top=`${y}px`;
-    modal.dataset.side=centered?'center':below?'below':'above';
-
+    if(modal.dataset.kind==='seat'){
+      const w=Math.min(width<700?178:224,width-30),side=returnFocus.orbit?.side||1,angle=Math.max(-8,Math.min(8,(returnFocus.orbit?.angle||0)*.55));
+      sheet.style.width=`${w}px`;sheet.style.setProperty('--yk-menu-tilt',`${angle}deg`);
+      for(const item of sheet.querySelectorAll('.yk-menu-item')){
+        const surface=foldedSurfaceGeometry(w,width<700?36:42,side);item.style.height=`${surface.height}px`;paintSurface(item,{...surface,side},'neutral');
+      }
+      const h=sheet.offsetHeight||sheet.querySelectorAll('.yk-menu-item').length*58,radians=angle*Math.PI/180;
+      const halfX=(Math.abs(Math.cos(radians))*w+Math.abs(Math.sin(radians))*h)/2,halfY=(Math.abs(Math.sin(radians))*w+Math.abs(Math.cos(radians))*h)/2;
+      const onRight=(anchor.left+anchor.right)/2>width/2,sideRoom=onRight?width-anchor.right:anchor.left;
+      if(width>=900&&sideRoom>=2*halfX+16){
+        const centerX=onRight?anchor.right+6+halfX:anchor.left-6-halfX;
+        const centerY=Math.max(halfY+10,Math.min(height-halfY-10,(anchor.top+anchor.bottom)/2-top));
+        sheet.style.left=`${centerX-w/2}px`;sheet.style.top=`${centerY-h/2+top}px`;
+        modal.dataset.side=onRight?'right':'left';return;
+      }
+      const spaceBelow=height-(anchor.bottom-top)-10,spaceAbove=anchor.top-top-10;
+      const preferBelow=side>0,below=preferBelow?spaceBelow>=2*halfY||spaceBelow>spaceAbove:spaceAbove<2*halfY&&spaceBelow>=spaceAbove;
+      const centerX=Math.max(halfX+10,Math.min(width-halfX-10,(anchor.left+anchor.right)/2));
+      const targetY=below?anchor.bottom-top+6+halfY:anchor.top-top-6-halfY;
+      const centerY=Math.max(halfY+10,Math.min(height-halfY-10,targetY));
+      sheet.style.left=`${centerX-w/2}px`;sheet.style.top=`${centerY-h/2+top}px`;
+      modal.dataset.side=below?'below':'above';return;
+    }
+    sheet.style.removeProperty('--yk-menu-tilt');
+    const w=Math.min(260,width-24);sheet.style.width=`${w}px`;
+    const h=sheet.getBoundingClientRect().height||64;
+    sheet.style.left=`${Math.max(12,(width-w)/2)}px`;sheet.style.top=`${Math.max(12,(height-h)/2)}px`;
+    modal.dataset.side='center';
   }
   function render(){
     root.dataset.step=state.step;identity.textContent=state.name;
@@ -369,7 +382,7 @@ export function mountSetup(document, window) {
     const h=el('h2','',title);h.id='ykSheetTitle';h.hidden=!title;sheet.append(h);
     modal.hidden=false;modal.dataset.kind=kind;root.dataset.overlay=kind;
     const blocking=!['seat','name'].includes(kind);header.inert=seats.inert=actions.inert=blocking;sheet.setAttribute('aria-modal',String(blocking));
-    notify('preview');refreshGlass();animate(sheet,[{opacity:0,transform:kind==='seat'?'scale(.98) translateY(-4px)':'translateY(8px) scale(.99)'},{opacity:1,transform:'none'}],280);
+    notify('preview');refreshGlass();animate(sheet,kind==='seat'?[{opacity:0},{opacity:1}]:[{opacity:0,transform:'translateY(8px) scale(.99)'},{opacity:1,transform:'none'}],200);
     return sheet;
   }
   function closeSheet(animated=false,after=()=>{}){
@@ -378,7 +391,7 @@ export function mountSetup(document, window) {
     const token=++sheetGeneration;
     const finish=()=>{if(token!==sheetGeneration)return;modal.hidden=true;sheet.replaceChildren();delete root.dataset.profile;delete root.dataset.overlay;header.inert=seats.inert=actions.inert=false;returnFocus?.setAttribute?.('aria-expanded','false');returnFocus?.focus?.({preventScroll:true});render();notify('preview');after();};
     if(animated && !reduced()&&typeof sheet.animate==='function'){
-      const motion=animate(sheet,[{opacity:1,transform:'none'},{opacity:0,transform:'translateY(-6px) scale(.985)'}],190);motion.finished.then(finish,finish);
+      const motion=animate(sheet,modal.dataset.kind==='seat'?[{opacity:1},{opacity:0}]:[{opacity:1,transform:'none'},{opacity:0,transform:'translateY(-6px) scale(.985)'}],160);motion.finished.then(finish,finish);
     }else finish();
   }
   function resetOverlay(){
@@ -417,7 +430,7 @@ export function mountSetup(document, window) {
   function openSeat(index,origin){
     closeSheet();openSheet('',origin,'seat');sheet.setAttribute('aria-label',seatLabel(state.seats[index]));sheet.setAttribute('role','menu');sheet.removeAttribute('aria-labelledby');
     const choices=el('div','yk-menu');
-    const item=(label,action,selected=false,parent=choices)=>{const b=button(label,action,'yk-menu-item');b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String(selected));parent.append(b);return b;};
+    const item=(label,action,selected=false,parent=choices)=>{const b=button(label,action,'yk-menu-item');b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String(selected));addSurface(b);parent.append(b);return b;};
     if(state.seats[index].mode!=='local')item('لاعب',()=>{if(index>0)state=changeSeat(state,index,'local',state.seats[index].name);playerName(index,origin);},state.seats[index].mode==='local');
     if(index>0){item('الكمبيوتر (بوت)',()=>{state=changeSeat(state,index,'bot');closeSheet(true);},state.seats[index].mode==='bot');item('فاضي (بدون لاعب)',()=>{state=changeSeat(state,index,'none');closeSheet(true);},state.seats[index].mode==='none');}
     const names=el('div','yk-menu-players');
