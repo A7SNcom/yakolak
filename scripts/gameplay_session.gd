@@ -70,6 +70,9 @@ var camera_tween: Tween
 var home_transforms: Array[Transform3D] = []
 var home_materials: Array[Material] = []
 var online_active: bool = false
+var online_round_return_active: bool = false
+var online_round_return_requested: bool = false
+var online_round_pending_board: Dictionary = {}
 var online_waiting: bool = false
 var online_identity: Dictionary = {}
 var online_turn_key: String = ""
@@ -439,6 +442,8 @@ func _on_online_room_changed(remote: Dictionary, identity: Dictionary) -> void:
 
 
 func _apply_online_room(remote: Dictionary) -> void:
+	var room_prefix: String = "%s:%s:" % [str(remote.get("code", "")),str(remote.get("epoch", ""))]
+	online_round_return_requested = match_initialized and round_complete and str(remote.get("status",""))=="playing" and not online_board_rehydrate and online_board_context.begins_with(room_prefix) and _online_piece_motion_seconds()>0.0
 	var remote_players: Array = remote.get("players", []) as Array
 	if remote_players.is_empty():
 		return
@@ -553,6 +558,21 @@ func _online_controls_seat(seat: String) -> bool:
 
 
 func _apply_online_board(board: Dictionary) -> void:
+	if online_round_return_active:
+		if online_board_rehydrate or online_board_reset_next:
+			_cancel_online_round_return()
+		else:
+			online_round_pending_board=board.duplicate(true)
+			return
+	if online_round_return_requested:
+		online_round_return_requested=false
+		online_board_reset_next=false
+		_cancel_online_piece_motions()
+		online_round_return_active=true
+		online_round_pending_board=board.duplicate(true)
+		online_rendered_board.clear()
+		_reset_board_for_round()
+		return
 	var rebuild: bool = online_board_reset_next or not _online_board_extends_rendered(board)
 	online_board_reset_next = false
 	if not rebuild and board == online_rendered_board:
@@ -657,7 +677,31 @@ func _cancel_online_piece_motions() -> void:
 	online_piece_motions.clear()
 
 
+func _cancel_online_round_return() -> void:
+	online_round_return_active=false
+	online_round_return_requested=false
+	online_round_pending_board.clear()
+	if has_method("_cancel_round_return_motion"): call("_cancel_round_return_motion")
+
+
+func _finish_online_round_return() -> void:
+	if not online_round_return_active: return
+	online_round_return_active=false
+	for index: int in range(piece_records.size()):
+		(piece_records[index]["mesh"] as MeshInstance3D).transform=home_transforms[index]
+	var accepted: Dictionary = online_round_pending_board.duplicate(true)
+	online_round_pending_board.clear()
+	online_board_reset_next=false
+	online_board_animate_next=true
+	_apply_online_board(accepted)
+	action_in_progress=false
+	gameplay_ready=_current_mode()=="local" and not (online!=null and bool(online.get("reconnecting")))
+	_update_hud()
+	_publish_gameplay_state("ready" if gameplay_ready else "waiting")
+
+
 func _reset_online_board_presentation() -> void:
+	_cancel_online_round_return()
 	_cancel_online_piece_motions()
 	online_rendered_board.clear()
 	online_board_context = ""

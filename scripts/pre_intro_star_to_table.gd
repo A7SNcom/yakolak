@@ -7,11 +7,11 @@ extends Node
 
 const MIN_MATCH_HOLD_MS: float = 260.0
 const MIN_MORPH_MS: float = 980.0
-const MIN_SETTLE_MS: float = 300.0
+const MIN_SETTLE_MS: float = 220.0
 const MIN_CAMERA_ORBIT_MS: float = 1250.0
-const MIN_CAMERA_HOLD_MS: float = 220.0
+const MIN_CAMERA_HOLD_MS: float = 150.0
 const MIN_CLOSED_BOX_DROP_MS: float = 1200.0
-const MIN_CLOSED_BOX_LANDED_HOLD_MS: float = 420.0
+const MIN_CLOSED_BOX_LANDED_HOLD_MS: float = 240.0
 const MAX_TIMELINE_STEP_MS: float = 50.0
 
 const MATCH_HOLD_MS: float = MIN_MATCH_HOLD_MS

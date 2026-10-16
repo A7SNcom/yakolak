@@ -123,9 +123,17 @@ func _run() -> void:
 	for index: int in game.get("winning_piece_indices"):
 		_expect(_piece(index).visible,"reconnect preserves winning stones")
 	_accept(cases.nextRound)
+
+	_expect(bool(game.get("online_round_return_active")),"next online round reuses the existing physical return")
+	_expect(not _piece(selected).position.is_equal_approx(game.get("home_transforms")[selected].origin),"continue never flashes board stones straight home")
+	var return_motion: Tween = game.get("stability_round_reset_tween")
+	await create_timer(0.2).timeout
+	_accept(cases.nextRound)
+	_expect(game.get("stability_round_reset_tween")==return_motion,"presence snapshots never restart the physical return")
+	_expect(not bool(game.call("authoritative_turn_snapshot").get("valid",true)),"returning stones hold input until they land")
 	_expect(game.get("victory_materials").is_empty() and game.get("winning_piece_indices").is_empty(),"round boundary clears old celebration ownership")
 	_expect(game.get("occupied_slots").is_empty() and game.get("online_piece_motions").is_empty(),"round boundary cancels all old visual completions")
-	await create_timer(0.6).timeout
+	await create_timer(1.1).timeout
 	for index: int in range(game.get("piece_records").size()):
 		_expect(_piece(index).position.is_equal_approx(game.get("home_transforms")[index].origin),"late callback cannot pull reset reserve back onto board")
 	# Reduced motion keeps the same accepted board and readiness without arcs.
@@ -188,6 +196,47 @@ func _run() -> void:
 	_expect(int(game.get("continue_due_msec"))==0,"auto acknowledgement consumes its deadline")
 	_expect(int(ProjectSettings.get_setting("rendering/anti_aliasing/quality/msaa_3d"))==Viewport.MSAA_4X,"project keeps four-sample edges on mobile")
 	_expect(int(ProjectSettings.get_setting("rendering/lights_and_shadows/directional_shadow/size.mobile"))==4096,"mobile keeps detailed shadows")
+
+	# A bot/remote may already move in the next round while stones are still
+	# returning. Queue that accepted board and animate it after the shared reset.
+	_clean()
+	game.set("_rm_enabled",false)
+	_accept(cases.two[5],"p1")
+	_accept(cases.nextRound,"p1")
+	var homeward: Tween = game.get("stability_round_reset_tween")
+	_accept(cases.earlyNextMove,"p1")
+	_expect(game.get("stability_round_reset_tween")==homeward and bool(game.get("online_round_return_active")),"early accepted move cannot cancel or snap the return")
+	await create_timer(1.25).timeout
+	_expect(not bool(game.get("online_round_return_active")),"return completes after every lift and staggered landing")
+	_expect(game.get("occupied_slots").has("2:medium"),"early accepted board is rendered after return")
+	await create_timer(0.6).timeout
+	var early: int = game.get("occupied_slots")["2:medium"]
+	_expect(_piece(early).position.is_equal_approx(game.CELL_COORDS[2]*game.U),"queued placement survives every stale return callback")
+	# Recovery still snaps to truth and cancels old physical owners.
+	_clean()
+	_accept(cases.two[5],"p1")
+	_accept(cases.nextRound,"p1")
+	online.set("reconnecting",true)
+	_accept(cases.earlyNextMove,"p1")
+	online.set("reconnecting",false)
+	_expect(not bool(game.get("online_round_return_active")) and game.get("stability_piece_tweens").is_empty(),"hydration cancels every home-return tween")
+	await create_timer(1.2).timeout
+	early=game.get("occupied_slots")["2:medium"]
+	_expect(_piece(early).position.is_equal_approx(game.CELL_COORDS[2]*game.U),"late old return cannot overwrite rehydrated truth")
+	var hud: Node = intro.get_node("TurnClarityHUD")
+	_clean()
+	_accept(cases.mixed[0],"p2")
+	_expect(str(hud.get("indicator_label").text)=="دور أحمد","indicator uses actual host name")
+	_accept(cases.mixed[1],"p2")
+	_expect(str(hud.get("indicator_label").text)=="دور ريم","indicator uses actual local guest name")
+	_accept(cases.mixed[2],"p2")
+	_expect(str(hud.get("indicator_label").text)=="دور عمر","indicator uses actual shared-device co-player name")
+	_accept(cases.mixed[3],"p2")
+	_expect(str(hud.get("indicator_label").text).contains("يفكر"),"online bot retains the existing thinking indication")
+	var renamed: Dictionary = cases.mixed[1].duplicate(true)
+	renamed.players[1].name="سارة"
+	_accept(renamed,"p2")
+	_expect(str(hud.get("indicator_label").text)=="دور سارة","same-seat name update is part of the authoritative signal")
 	intro.queue_free()
 	await process_frame
 	if failures.is_empty(): print("YAKOLAK_ONLINE_PRESENTATION_OK checks=%d fixed-seat+incremental-arcs+visible-winners" % checks)

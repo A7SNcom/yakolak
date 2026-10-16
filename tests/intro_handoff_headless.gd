@@ -39,6 +39,19 @@ func _run() -> void:
 		await _finish()
 		return
 
+	# Compress only pauses. These are the existing choreography's active speeds.
+	_expect(preload("res://scripts/pre_intro_star_to_table.gd").MORPH_MS==980.0,"star morph timing is preserved")
+	_expect(preload("res://scripts/pre_intro_star_to_table.gd").CAMERA_ORBIT_MS==1250.0,"important camera motion keeps its approved duration")
+	_expect(preload("res://scripts/pre_intro_star_to_table.gd").CLOSED_BOX_DROP_MS==1200.0,"rigid physical box drop timing is preserved")
+	_expect(preload("res://scripts/pre_intro_refinement.gd").CAMERA_START_MS==preload("res://scripts/pre_intro_star_to_table.gd").MATCH_HOLD_MS+preload("res://scripts/pre_intro_star_to_table.gd").MORPH_MS+preload("res://scripts/pre_intro_star_to_table.gd").SETTLE_MS,"correction and main timelines stay synchronized")
+	_expect(preload("res://scripts/smooth_intro_timeline.gd").TOTAL_TIME_MS==intro.TOTAL_TIME,"governed clock uses the same completion time")
+	for piece: Dictionary in intro.get("pieces"):
+		var landing: float = float(intro.call("_piece_start",piece))+intro.PIECE_MOVE
+		_expect(landing<=intro.TOTAL_TIME-299.0,"every stone lands before the remaining settle pause")
+		var final_pose: Dictionary = intro.call("_piece_at",piece,intro.TOTAL_TIME)
+		for axis: String in ["px","py","pz","rx","ry","rz"]:
+			_expect(is_equal_approx(float(final_pose[axis]),float(piece["final"][axis])),"shorter idle tail never truncates a physical stone path")
+
 	var initial_generation: int = int(intro.get("intro_run_generation"))
 	_expect(initial_generation > 0, "intro opens an explicit initial generation")
 	_expect(int(pacing.get("active_intro_generation")) == initial_generation, "pacing observes initial intro generation")

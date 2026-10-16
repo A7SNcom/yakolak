@@ -61,8 +61,8 @@ assert.ok(turnHudDesign.includes("yakolakDesignTurnCueMobile='prominent-css-spac
 assert.ok(turnHud.includes("yakolakTurnIndicatorSource='authoritative-turn-signal'"), 'turn indicator must consume the authoritative gameplay signal only');
 assert.ok(turnHud.includes("yakolakTurnIndicatorPolling='none'"), 'turn indicator must explicitly publish its no-polling contract');
 assert.ok(!turnHud.includes('func _process('), 'turn indicator must never poll turn state per frame');
-assert.ok(turnHud.includes('return "دورك"'), 'local online turn copy must remain compact');
-assert.ok(turnHud.includes('return "دور لاعب " + str(number)'), 'remote turn copy must use the authoritative player number');
+assert.ok(turnHud.includes('snapshot.get("player_name"'), 'turn copy must read the shared authoritative player name');
+assert.ok(authoritativeTurn.includes('"player_name": str(player.get("label"'), 'accepted roster labels must reach the turn indicator');
 assert.ok(turnHud.includes('Display.display_text(_indicator_copy(snapshot))'), 'turn copy must cross the shared Western-digit display boundary');
 
 assert.ok(design.includes('class_name YakolakDesign'), 'the 2D design system must expose one shared token source');

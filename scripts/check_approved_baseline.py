@@ -33,7 +33,7 @@ REQUIRED: dict[str, tuple[str, ...]] = {
     "scripts/pre_intro_star_to_table.gd": (
         "MIN_MATCH_HOLD_MS: float = 260.0",
         "MIN_CLOSED_BOX_DROP_MS: float = 1200.0",
-        "MIN_CLOSED_BOX_LANDED_HOLD_MS: float = 420.0",
+        "MIN_CLOSED_BOX_LANDED_HOLD_MS: float = 240.0",
         "MAX_TIMELINE_STEP_MS: float = 50.0",
         "governed_elapsed_ms",
         "ClosedBoxDropRoot",
@@ -58,7 +58,7 @@ REQUIRED: dict[str, tuple[str, ...]] = {
         "turnDuration: '0.82s'",
         "shadowDuration: '0.82s'",
         "hasInventedHorizontalMotion: false",
-        "document.body.dataset.yakolakDuration)).toBe('5730')",
+        "document.body.dataset.yakolakDuration)).toBe('4700')",
     ),
     "tests/pre_intro_smoke.spec.js": (
         "yakolakMatchErrorPx",

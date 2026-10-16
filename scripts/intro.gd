@@ -45,7 +45,8 @@ const PIECE_LEAD: float = 520.0
 const PIECE_MOVE: float = 1200.0
 const PIECE_ARC: float = 34.0
 const PIECE_STAGGER: float = 60.0
-const TOTAL_TIME: float = 5730.0
+# Last stone lands at 4400 ms. Keep its 300 ms settle, trim only the idle tail.
+const TOTAL_TIME: float = 4700.0
 
 const SPILL_SEED: int = 4128
 const SPILL_SPREAD: float = 1.08
@@ -648,12 +649,12 @@ func _publish_phase(phase: String) -> void:
 
 
 func _publish_complete() -> void:
-	print("YAKOLAK_INTRO_COMPLETE duration=5730 bases=4 pieces=36 base_color=161616")
+	print("YAKOLAK_INTRO_COMPLETE duration=%d bases=4 pieces=36 base_color=161616" % int(TOTAL_TIME))
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakIntro='complete';" +
 			"document.body.dataset.yakolakPhase='complete';" +
-			"document.body.dataset.yakolakDuration='5730';" +
+			"document.body.dataset.yakolakDuration='%d';" % int(TOTAL_TIME) +
 			"document.body.dataset.yakolakBases='4';" +
 			"document.body.dataset.yakolakPieces='36';" +
 			"document.body.dataset.yakolakBaseColor='161616';",

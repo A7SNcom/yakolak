@@ -148,13 +148,7 @@ func _reset_board_for_round() -> void:
 	if result_button != null:
 		result_button.visible = false
 
-	if stability_round_reset_tween != null and stability_round_reset_tween.is_valid():
-		stability_round_reset_tween.kill()
-	stability_round_reset_tween = null
-	for reset_tween: Tween in stability_piece_tweens:
-		if reset_tween != null and reset_tween.is_valid():
-			reset_tween.kill()
-	stability_piece_tweens.clear()
+	_cancel_round_return_motion()
 	var generation: int = session_generation
 	var last_delay: float = 0.0
 	for index: int in range(piece_records.size()):
@@ -176,7 +170,7 @@ func _reset_board_for_round() -> void:
 		piece_tween.tween_property(piece, "transform", home, ROUND_RESET_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	if not stability_piece_tweens.is_empty():
 		stability_round_reset_tween = create_tween()
-		stability_round_reset_tween.tween_interval(last_delay + ROUND_RESET_DURATION)
+		stability_round_reset_tween.tween_interval(last_delay + 0.16 + ROUND_RESET_DURATION)
 		stability_round_reset_tween.finished.connect(_finish_stability_round_reset.bind(generation))
 	else:
 		# A stale/empty reset must not start a Tween with zero Tweeners.
@@ -201,8 +195,19 @@ func _finish_stability_round_reset(generation: int) -> void:
 	stability_piece_tweens.clear()
 	if generation != session_generation or not match_initialized or waiting_for_setup:
 		return
+	if online_round_return_active:
+		_finish_online_round_return()
+		return
 	action_in_progress = false
 	_start_turn()
+
+
+func _cancel_round_return_motion() -> void:
+	if stability_round_reset_tween != null and stability_round_reset_tween.is_valid(): stability_round_reset_tween.kill()
+	stability_round_reset_tween=null
+	for motion: Tween in stability_piece_tweens:
+		if motion != null and motion.is_valid(): motion.kill()
+	stability_piece_tweens.clear()
 
 
 func _close_piece_tray(skip_index: int = -1, immediate: bool = false) -> void:
@@ -275,6 +280,7 @@ func _publish_return_to_setup_state() -> void:
 
 
 func _reset_session_transients() -> void:
+	_cancel_round_return_motion()
 	_reset_online_board_presentation()
 	_reset_online_round_auto()
 	if camera_tween != null and camera_tween.is_valid():

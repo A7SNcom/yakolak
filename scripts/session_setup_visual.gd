@@ -33,6 +33,7 @@ var visual_board_corners: Array[Vector3] = []
 var visual_zoom_mix: float = 0.0
 var visual_zoom_tween: Tween
 var visual_selected_color: String = ""
+var visual_reserved_colors: Array = []
 var visual_world_seats: Dictionary = {}
 var visual_entry_generation: int = 0
 var visual_entry_acknowledged: bool = false
@@ -281,7 +282,8 @@ func _update_visual_prompt(cam: Camera3D) -> void:
 		visual_prompt.no_depth_test = false
 		visual_prompt.hide()
 		intro.add_child(visual_prompt)
-	var screen := Vector2(canvas_css_size.x*0.5,maxf(48.0,visual_board_rect.position.y-42.0)) / canvas_scale
+	var prompt_gap := 104.0 if visual_step=="color" and not visual_reserved_colors.is_empty() else 42.0
+	var screen := Vector2(canvas_css_size.x*0.5,maxf(48.0,visual_board_rect.position.y-prompt_gap)) / canvas_scale
 	var depth := (intro.to_global(Vector3.ZERO)-cam.global_position).dot(-cam.global_basis.z)
 	visual_prompt.global_position = cam.project_position(screen,depth)
 	visual_prompt.global_basis = cam.global_basis
@@ -396,6 +398,7 @@ func _on_visual_action(arguments: Array) -> void:
 			visual_preview_seats = payload.get("all_seats", []) as Array
 			visual_step = str(payload.get("step", "color"))
 			visual_selected_color = str(payload.get("selected_color", ""))
+			visual_reserved_colors = payload.get("reserved_colors", []) as Array
 			visual_overlay_open = bool(payload.get("overlay_open", false))
 			visual_count_chosen = bool(payload.get("count_chosen", visual_step in ["ready","rounds"]))
 			_update_visual_seats()
@@ -442,6 +445,8 @@ func _update_visual_seats() -> void:
 				var palette := PALETTE[_palette_index(str(seat.get("color", "")))]
 				if str(palette["direction"]) == str(record.get("dir", "")):
 					enabled = enabled or str(seat.get("mode", "none")) != "none"
+		for reserved_color: Dictionary in PALETTE:
+			if visual_reserved_colors.has(str(reserved_color["id"])) and str(reserved_color["direction"])==str(record.get("dir","")): enabled=true
 		mesh.visible = true
 		if visual_inactive_material == null:
 			visual_inactive_material = StandardMaterial3D.new()
@@ -497,6 +502,7 @@ func _update_visual_lighting() -> void:
 			visual_lights[key] = light
 		var target := 0.62
 		if visual_step == "color" and not visual_selected_color.is_empty(): target = 0.62 if key == visual_selected_color else 0.0
+		if visual_reserved_colors.has(key): target=0.62
 		if visual_count_chosen:
 			for value: Variant in visual_preview_seats:
 				var seat := value as Dictionary

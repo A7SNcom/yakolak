@@ -7,7 +7,7 @@ extends Node
 
 const MAX_VISUAL_STEP_MS: float = 1000.0 / 30.0
 const LID_CONTENT_REVEAL_MS: float = 590.0
-const TOTAL_TIME_MS: float = 5730.0
+const TOTAL_TIME_MS: float = preload("res://scripts/intro.gd").TOTAL_TIME
 
 var intro: Node3D
 var preintro: Node

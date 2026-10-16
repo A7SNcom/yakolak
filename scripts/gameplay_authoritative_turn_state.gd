@@ -465,13 +465,14 @@ func _on_online_room_changed(remote: Dictionary, identity: Dictionary) -> void:
 	# tween to finish: the previous local owner becomes waiting on its client,
 	# while the new local owner becomes ready in the same accepted room update.
 	if str(remote.get("status", "")) == "playing" and current_player_index != previous_player_index:
-		gameplay_ready = _current_mode() == "local"
+		gameplay_ready = _current_mode() == "local" and not online_round_return_active
 		turn_deadline_msec = 0
 		_update_hud()
 		_publish_gameplay_state("ready" if gameplay_ready else "waiting")
 	# OnlineSession emits only accepted room snapshots. Once that snapshot has
 	# been applied by gameplay_session, turnIndex/current_player_index is the
 	# authoritative owner presented here.
+	if online_round_return_active: gameplay_ready=false
 	_apply_online_clock(remote)
 	authoritative_online_snapshot_hydrated = true
 	authoritative_turn_transitioning = false
@@ -524,6 +525,12 @@ func _reset_board_for_round() -> void:
 	super._reset_board_for_round()
 
 
+func _finish_online_round_return() -> void:
+	super._finish_online_round_return()
+	authoritative_turn_transitioning=false
+	_publish_authoritative_turn_state("round-ready")
+
+
 func _return_to_setup() -> void:
 	super._return_to_setup()
 	authoritative_online_snapshot_hydrated = false
@@ -559,6 +566,7 @@ func _build_authoritative_turn_snapshot(lifecycle: String) -> Dictionary:
 		and not round_complete
 		and not match_complete
 		and not online_cancelled
+		and not online_round_return_active
 		and not authoritative_turn_transitioning
 	)
 	if online_active:
@@ -578,7 +586,8 @@ func _build_authoritative_turn_snapshot(lifecycle: String) -> Dictionary:
 		"player_number": current_player_index + 1 if index_valid else 0,
 		"seat": seat,
 		"direction": str(player.get("direction", "")),
-		"mode": str(player.get("mode", "")),
+		"mode": str(player.get("kind",player.get("mode", ""))),
+		"player_name": str(player.get("label", "")).strip_edges(),
 		"color": str(player.get("color", "")),
 		"color_name": str(player.get("color_name", "")),
 		"online": online_active,
@@ -587,16 +596,7 @@ func _build_authoritative_turn_snapshot(lifecycle: String) -> Dictionary:
 
 
 func _authoritative_turn_key(snapshot: Dictionary) -> String:
-	return "%s|%s|%d|%d|%s|%s|%s|%s" % [
-		"1" if bool(snapshot.get("valid", false)) else "0",
-		str(snapshot.get("lifecycle", "")),
-		int(snapshot.get("round", 0)),
-		int(snapshot.get("player_index", -1)),
-		str(snapshot.get("seat", "")),
-		str(snapshot.get("direction", "")),
-		"1" if bool(snapshot.get("online", false)) else "0",
-		"1" if bool(snapshot.get("local_turn", false)) else "0",
-	]
+	return JSON.stringify([snapshot.get("valid",false),snapshot.get("lifecycle",""),snapshot.get("round",0),snapshot.get("player_index",-1),snapshot.get("seat",""),snapshot.get("direction",""),snapshot.get("online",false),snapshot.get("local_turn",false),snapshot.get("player_name",""),snapshot.get("mode","")])
 
 
 func _publish_authoritative_turn_probe(snapshot: Dictionary) -> void:

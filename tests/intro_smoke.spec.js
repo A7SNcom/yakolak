@@ -118,7 +118,7 @@ test('Godot intro preserves the level table and exact v130 loading-star motion',
   expect(await page.evaluate(() => document.body.dataset.yakolakBases)).toBe('4');
   expect(await page.evaluate(() => document.body.dataset.yakolakPieces)).toBe('36');
   expect(await page.evaluate(() => document.body.dataset.yakolakBaseColor)).toBe('161616');
-  expect(await page.evaluate(() => document.body.dataset.yakolakDuration)).toBe('5730');
+  expect(await page.evaluate(() => document.body.dataset.yakolakDuration)).toBe('4700');
   expect(await page.evaluate(() => document.body.dataset.yakolakTable)).toBe('approved-star-svg');
   expect(await page.evaluate(() => document.body.dataset.yakolakTableLevel)).toBe('true');
   expect(await page.evaluate(() => document.body.dataset.yakolakCamera)).toBe('level-centered');

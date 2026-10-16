@@ -5,12 +5,12 @@ extends Node
 # and never polls gameplay, camera, lighting, animation, or DOM state.
 const Display = preload("res://scripts/ui_design.gd")
 const INDICATOR_DESKTOP_MIN_WIDTH_CSS: float = 56.0
-const INDICATOR_DESKTOP_MAX_WIDTH_CSS: float = 124.0
+const INDICATOR_DESKTOP_MAX_WIDTH_CSS: float = 280.0
 const INDICATOR_DESKTOP_HEIGHT_CSS: float = 30.0
 const INDICATOR_DESKTOP_FONT_CSS: int = 15
 const INDICATOR_MOBILE_BREAKPOINT_CSS: float = 480.0
 const INDICATOR_MOBILE_MIN_WIDTH_CSS: float = 118.0
-const INDICATOR_MOBILE_MAX_WIDTH_CSS: float = 180.0
+const INDICATOR_MOBILE_MAX_WIDTH_CSS: float = 280.0
 const INDICATOR_MOBILE_HEIGHT_CSS: float = 40.0
 const INDICATOR_MOBILE_FONT_CSS: int = 18
 const INDICATOR_TOP_MIN_CSS: float = 12.0
@@ -103,6 +103,7 @@ func _build_indicator() -> void:
 	indicator_label.language = "ar"
 	indicator_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	indicator_label.clip_text = true
+	indicator_label.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
 	indicator_label.add_theme_font_override("font", Display.FONT_MEDIUM)
 	indicator_label.add_theme_font_size_override("font_size", 15)
 	indicator_label.add_theme_color_override("font_color", Display.TEXT_PRIMARY)
@@ -216,23 +217,11 @@ func _indicator_cue_color(key: String) -> Color:
 
 
 func _indicator_copy(snapshot: Dictionary) -> String:
-	# The authoritative player mode already distinguishes bot ownership. Surface
-	# that state directly so the locked board reads as intentional waiting.
-	if str(snapshot.get("mode", "")).strip_edges().to_lower() == "bot":
-		var bot_number: int = int(snapshot.get("player_number", 0))
-		return "روبوت %d يفكر" % bot_number if bot_number > 0 else "الروبوت يفكر"
-	if bool(snapshot.get("online", false)):
-		if bool(snapshot.get("local_turn", false)):
-			return "دورك"
-		var number: int = _remote_player_number(snapshot)
-		return "دور لاعب " + str(number) if number > 0 else ""
-	# Shared-device play needs the person, not a remembered color mapping, to be
-	# the semantic owner. The capsule border keeps color as a supporting cue.
-	var player_number: int = int(snapshot.get("player_number", 0))
-	if player_number > 0:
-		return "دور لاعب " + str(player_number)
-	var color_name: String = str(snapshot.get("color_name", ""))
-	return "دور " + color_name if not color_name.is_empty() else ""
+	var name: String = str(snapshot.get("player_name", "")).strip_edges()
+	if name.is_empty(): name=str(snapshot.get("color_name", "")).strip_edges()
+	if str(snapshot.get("mode", "")).strip_edges().to_lower()=="bot":
+		return "%s يفكر" % name if not name.is_empty() else "الكمبيوتر يفكر"
+	return "دور " + name if not name.is_empty() else ""
 
 
 func _remote_player_number(snapshot: Dictionary) -> int:
@@ -271,6 +260,7 @@ func _layout_indicator() -> void:
 	var height_css: float = INDICATOR_MOBILE_HEIGHT_CSS if indicator_mobile_layout else INDICATOR_DESKTOP_HEIGHT_CSS
 	var font_css: int = INDICATOR_MOBILE_FONT_CSS if indicator_mobile_layout else INDICATOR_DESKTOP_FONT_CSS
 	var glyph_width_css: float = 9.0 if indicator_mobile_layout else 8.2
+	max_width_css=minf(max_width_css,maxf(min_width_css,indicator_css_size.x-32.0))
 	var width_css: float = clampf(26.0 + float(indicator_label.text.length()) * glyph_width_css, min_width_css, max_width_css)
 	indicator_width = _indicator_css_length(width_css)
 	indicator_height = _indicator_css_length(height_css)
