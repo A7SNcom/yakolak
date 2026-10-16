@@ -21,12 +21,16 @@ def main() -> int:
     cases = [
         ("visual_setup_scene_headless.gd", "YAKOLAK_VISUAL_SCENE_OK intro_to_setup_to_match_to_setup"),
         ("gameplay_visual_refinement_headless.gd", "YAKOLAK_VISUAL_REFINEMENT_OK"),
+        ("online_presentation_headless.gd", "YAKOLAK_ONLINE_PRESENTATION_OK"),
     ]
     for filename, completion in cases:
         with tempfile.TemporaryDirectory(prefix=".pack-check-", dir=pack.parent) as directory:
             isolated = Path(directory)
             test = isolated / "smoke.gd"
             shutil.copyfile(tests / filename, test)
+            if filename == "online_presentation_headless.gd":
+                (isolated / "generated").mkdir()
+                shutil.copyfile(tests.parent / "generated/online-presentation.json", isolated / "generated/online-presentation.json")
             try:
                 result = subprocess.run(
                     [str(godot), "--headless", "--path", str(isolated),

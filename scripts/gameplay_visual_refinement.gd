@@ -393,6 +393,14 @@ func _layout_hud() -> void:
 
 func _start_victory_colors() -> void:
 	if not round_complete or round_winner.is_empty(): return
+	# A repeated result/consent snapshot must never leave a winning mesh in an
+	# earlier nonwinner fade set. Keep every simultaneous winning pattern visible.
+	for index: int in winning_piece_indices:
+		victory_materials.erase(index)
+		victory_visibility.erase(index)
+		var winner: MeshInstance3D = piece_records[index]["mesh"]
+		winner.material_override = home_materials[index]
+		winner.visible = true
 	for index: int in range(piece_records.size()):
 		var piece: MeshInstance3D = piece_records[index]["mesh"]
 		if not bool(piece_records[index].get("played",false)) or winning_piece_indices.has(index): continue
@@ -462,6 +470,16 @@ func _apply_online_room(remote: Dictionary) -> void:
 	if str(remote.get("status", "")) != "finished": _stop_victory_colors()
 	super._apply_online_room(remote)
 	if round_complete: _start_victory_colors()
+
+
+func _online_piece_motion_seconds() -> float:
+	return 0.0 if _rm_enabled else super._online_piece_motion_seconds()
+
+
+func _sync_active_sides() -> void:
+	super._sync_active_sides()
+	if round_complete and not victory_materials.is_empty():
+		_set_victory_mix(victory_mix)
 
 
 func _reset_board_for_round() -> void:

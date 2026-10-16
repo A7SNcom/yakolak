@@ -114,7 +114,8 @@ func _apply_online_board(board: Dictionary) -> void:
 	# Hydration clears selected_index/materials in the authoritative session layer,
 	# but that path does not publish gameplay state. Clear all browser selection
 	# observability in the same JS operation so no stale selected owner survives.
-	_publish_selection_cleared_probe("reconnect-hydration")
+	if selected_index < 0 and not tray_open:
+		_publish_selection_cleared_probe("reconnect-hydration")
 
 
 func _publish_piece_test_targets() -> void:

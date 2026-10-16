@@ -1,10 +1,8 @@
 extends SceneTree
 
-# ONLINE-02 originally protected the p3 -> p4 owner boundary. UX-TURN-33 turns
-# that into a general production regression for p1 -> p2 and p3 -> p4: accepted
-# authoritative ownership must permit real pointer input even while the visual
-# camera tween is intentionally paused forever. The client may never advance a
-# turn itself, and the existing exactly-once pending guard must still win.
+# Accepted p1 -> p2 and p3 -> p4 ownership permits real pointer input at once.
+# Each remote device keeps its own fixed viewpoint; it never needs a turn-camera
+# tween. Client input still cannot advance authority or duplicate a pending move.
 
 const INPUT_BOUND_MS: int = 100
 const COLORS: Array[String] = ["green", "marble", "gold", "blue"]
@@ -70,13 +68,10 @@ func _exercise_transition(target_seat: String, from_index: int, to_index: int, v
 	_expect(bool(snapshot.get("local_turn", false)), label + " authoritative snapshot marks only this seat local")
 	_expect(str(snapshot.get("seat", "")) == target_seat, label + " snapshot owner matches the accepted identity")
 	_expect(bool(game.call("_authoritative_online_pointer_ready")), label + " input is ready from authority before visuals finish")
-	_expect(bool(game.get("camera_transition")), label + " camera presentation is still transitioning")
-	_expect(bool(game.get("turn_camera_active")), label + " turn-camera tween is genuinely active")
-
+	_expect(not bool(game.get("camera_transition")), label + " fixed seat view does not transition on another player's turn")
+	_expect(not bool(game.get("turn_camera_active")), label + " online view has no turn-camera motion")
 	var first_turn_tween: Tween = game.get("camera_tween") as Tween
-	_expect(first_turn_tween != null and first_turn_tween.is_valid(), label + " has a live visual tween to stall")
-	if first_turn_tween != null and first_turn_tween.is_valid():
-		first_turn_tween.pause()
+	_expect(first_turn_tween == null or not first_turn_tween.is_valid(), label + " online view has no live turn tween")
 
 	# Re-delivering the same accepted room state cannot manufacture another turn
 	# edge or another camera transition.
@@ -94,15 +89,15 @@ func _exercise_transition(target_seat: String, from_index: int, to_index: int, v
 	_expect(elapsed_msec >= 0 and elapsed_msec <= INPUT_BOUND_MS, label + " first legal input is bounded to %dms" % INPUT_BOUND_MS)
 	_expect(int(game.get("selected_index")) >= 0, label + " real pointer input selects a legal current-owner piece")
 	_expect(int(game.get("authoritative_input_dispatch_count")) == dispatch_before + 1, label + " dispatches the first pointer exactly once")
-	_expect(int(game.get("authoritative_input_visual_motion_count")) == visual_before + 1, label + " accepts input while presentation motion is unfinished")
-	_expect(bool(game.get("camera_transition")) and bool(game.get("turn_camera_active")), label + " input does not falsify or finish visual motion")
+	_expect(int(game.get("authoritative_input_visual_motion_count")) == visual_before, label + " accepts input immediately in its fixed view")
+	_expect(not bool(game.get("camera_transition")) and not bool(game.get("turn_camera_active")), label + " input preserves the fixed viewpoint")
 
 	var selected_size: String = str(game.call("_selected_size"))
 	var first_cell: int = int(game.call("_first_legal_cell_for_size", selected_size))
 	_expect(first_cell >= 0, label + " selected piece has a legal target")
 	if first_cell >= 0:
 		_press_cell(first_cell, label)
-	_expect(online.submit_count == 1, label + " submits exactly one legal move while the camera tween is stalled")
+	_expect(online.submit_count == 1, label + " submits exactly one legal move without waiting for camera presentation")
 	_expect(bool(game.get("online_move_commit_pending")), label + " exactly-once pending guard arms after the first submit")
 	_expect(int(game.get("current_player_index")) == to_index, label + " client input cannot advance authoritative turnIndex")
 	_expect(int(game.get("authoritative_turn_revision")) == revision_after, label + " client input cannot invent an authoritative revision")
@@ -113,7 +108,7 @@ func _exercise_transition(target_seat: String, from_index: int, to_index: int, v
 		_press_cell(second_cell, label)
 	_expect(online.submit_count == 1, label + " duplicate input while move is pending cannot submit twice")
 	_expect(int(game.get("current_player_index")) == to_index, label + " duplicate input cannot repeat the turn transition")
-	_expect(bool(game.get("camera_transition")) and bool(game.get("turn_camera_active")), label + " visual tween remains independently stalled after input")
+	_expect(not bool(game.get("camera_transition")) and not bool(game.get("turn_camera_active")), label + " duplicate input cannot start camera motion")
 
 	await _teardown()
 

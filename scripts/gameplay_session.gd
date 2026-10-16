@@ -74,6 +74,15 @@ var online_waiting: bool = false
 var online_identity: Dictionary = {}
 var online_turn_key: String = ""
 var online_last_move_number: int = -1
+# Accepted board state and visual motion have separate lifetimes. Tweens never
+# commit a move or advance a turn; only an authoritative snapshot does that.
+var online_rendered_board: Dictionary = {}
+var online_board_context: String = ""
+var online_board_rehydrate: bool = true
+var online_board_reset_next: bool = true
+var online_board_animate_next: bool = false
+var online_piece_motions: Dictionary = {}
+var online_motion_generation: int = 0
 var online_target_players: int = 0
 var pending_online_configuration: Dictionary = {}
 var restoring_online: bool = false
@@ -205,6 +214,7 @@ func _enable_gameplay() -> void:
 
 
 func _reset_for_intro() -> void:
+	_reset_online_board_presentation()
 	_resume_intro_runtime()
 	_reset_tray_state()
 	super._reset_for_intro()
@@ -425,6 +435,7 @@ func _on_online_error(code: String) -> void:
 func _on_online_room_changed(remote: Dictionary, identity: Dictionary) -> void:
 	if remote.is_empty():
 		return
+	online_board_rehydrate = restoring_online or (online != null and (online.get("reconnecting") == true or online.get("reconnect_hydration_pending") == true))
 	restoring_online = false
 	online_active = true
 	online_identity = identity.duplicate(true)
@@ -461,7 +472,12 @@ func _apply_online_room(remote: Dictionary) -> void:
 	online_target_players = int(remote.get("targetPlayers", remote_players.size()))
 	round_number = int(remote.get("round", 1))
 	current_player_index = clampi(int(remote.get("turnIndex", 0)), 0, players.size() - 1)
+	var context: String = "%s:%s:%d" % [str(remote.get("code", "")), str(remote.get("epoch", "")), round_number]
+	online_board_reset_next = online_board_rehydrate or context != online_board_context
+	online_board_animate_next = not online_board_reset_next and str(remote.get("status", "")) in ["playing", "finished"]
+	online_board_context = context
 	_apply_online_board(remote.get("board", {}) as Dictionary)
+	online_board_rehydrate = false
 
 	var status: String = str(remote.get("status", "waiting"))
 	if status == "waiting":
@@ -492,8 +508,12 @@ func _apply_online_room(remote: Dictionary) -> void:
 		gameplay_ready = false
 		turn_deadline_msec = 0
 		match_complete = bool(remote.get("matchComplete", false))
-		var winner_data: Dictionary = remote.get("winner", {}) as Dictionary
+		var winner_value: Variant = remote.get("winner", {})
+		var winner_data: Dictionary = winner_value as Dictionary if winner_value is Dictionary else {}
 		round_winner = str(COLOR_TO_DIRECTION.get(str(winner_data.get("color", "")), ""))
+		# Result presentation may start a fade synchronously. Identify the winning
+		# meshes before any result hook runs, including the final arriving stone.
+		winning_piece_indices = _find_winning_pieces(round_winner) if not round_winner.is_empty() else []
 		_update_hud()
 		_show_round_result()
 		_publish_match_state("match-complete" if match_complete else "round-complete")
@@ -504,6 +524,7 @@ func _apply_online_room(remote: Dictionary) -> void:
 	round_complete = false
 	match_complete = false
 	round_winner = ""
+	winning_piece_indices.clear()
 	if result_button != null:
 		result_button.visible = false
 	var turn_key: String = "%s:%d:%d" % [status, round_number, current_player_index]
@@ -518,41 +539,117 @@ func _apply_online_room(remote: Dictionary) -> void:
 
 
 func _apply_online_board(board: Dictionary) -> void:
+	var rebuild: bool = online_board_reset_next or not _online_board_extends_rendered(board)
+	online_board_reset_next = false
+	if not rebuild and board == online_rendered_board:
+		return # Presence/votes must not reset selection, motion or victory fades.
+	var preferred: int = selected_index
+	if tray_open:
+		_close_piece_tray(preferred, true)
 	_reset_tray_state()
-	occupied_slots.clear()
-	move_count = 0
 	selected_index = -1
 	selected_original_material = null
 	_hide_markers()
-	for index: int in range(piece_records.size()):
-		var record: Dictionary = piece_records[index] as Dictionary
-		record["played"] = false
-		piece_records[index] = record
-		var piece: MeshInstance3D = record["mesh"] as MeshInstance3D
-		if index < home_transforms.size():
+	if rebuild:
+		_cancel_online_piece_motions()
+		occupied_slots.clear()
+		for index: int in range(piece_records.size()):
+			piece_records[index]["played"] = false
+			var piece: MeshInstance3D = piece_records[index]["mesh"]
 			piece.transform = home_transforms[index]
-		if index < home_materials.size():
 			piece.material_override = home_materials[index]
+	move_count = 0
 	for cell: int in range(CELL_COORDS.size()):
 		var slots: Dictionary = board.get(str(cell), {}) as Dictionary
 		for size_name: String in SIZE_ORDER:
-			var color: String = str(slots.get(size_name, ""))
-			if color.is_empty():
-				continue
-			var direction: String = str(COLOR_TO_DIRECTION.get(color, ""))
-			if direction.is_empty():
-				continue
-			var piece_index: int = _find_unplayed_piece(direction, size_name)
-			if piece_index < 0:
-				continue
-			var record: Dictionary = piece_records[piece_index] as Dictionary
-			record["played"] = true
-			piece_records[piece_index] = record
-			var piece: MeshInstance3D = record["mesh"] as MeshInstance3D
-			piece.position = CELL_COORDS[cell] * U
-			piece.scale = Vector3.ONE * U
-			occupied_slots[_slot_key(cell, size_name)] = piece_index
+			var direction: String = str(COLOR_TO_DIRECTION.get(str(slots.get(size_name, "")), ""))
+			if direction.is_empty(): continue
 			move_count += 1
+			var key: String = _slot_key(cell, size_name)
+			if occupied_slots.has(key): continue
+			var piece_index: int = _find_unplayed_piece(direction, size_name)
+			if preferred >= 0 and preferred < piece_records.size():
+				var picked: Dictionary = piece_records[preferred]
+				if not bool(picked.get("played", false)) and str(picked.get("dir", "")) == direction and str(picked.get("type", "")) == size_name:
+					piece_index = preferred
+			if piece_index < 0: continue
+			piece_records[piece_index]["played"] = true
+			occupied_slots[key] = piece_index
+			var piece: MeshInstance3D = piece_records[piece_index]["mesh"]
+			piece.material_override = home_materials[piece_index]
+			if not rebuild and online_board_animate_next:
+				_animate_online_piece(piece_index, cell)
+			else:
+				piece.position = CELL_COORDS[cell] * U
+				piece.scale = Vector3.ONE * U
+	# Settle interrupted tray-close motion without touching any committed stone.
+	for index: int in range(piece_records.size()):
+		if not bool(piece_records[index].get("played", false)):
+			var piece: MeshInstance3D = piece_records[index]["mesh"]
+			piece.transform = home_transforms[index]
+			piece.material_override = home_materials[index]
+	online_rendered_board = board.duplicate(true)
+
+
+func _online_board_extends_rendered(board: Dictionary) -> bool:
+	for cell: String in online_rendered_board:
+		var old_slots: Dictionary = online_rendered_board[cell]
+		var new_slots: Dictionary = board.get(cell, {}) as Dictionary
+		for size_name: String in old_slots:
+			if new_slots.get(size_name, "") != old_slots[size_name]: return false
+	return true
+
+
+func _online_piece_motion_seconds() -> float:
+	return MOVE_DURATION / 1000.0
+
+
+func _animate_online_piece(index: int, cell: int) -> void:
+	var piece: MeshInstance3D = piece_records[index]["mesh"]
+	var target: Vector3 = CELL_COORDS[cell] * U
+	var duration: float = _online_piece_motion_seconds()
+	if duration <= 0.0:
+		piece.position = target
+		piece.scale = Vector3.ONE * U
+		return
+	var motion: Tween = create_tween()
+	online_piece_motions[index] = motion
+	motion.tween_method(Callable(self, "_sample_online_piece_motion").bind(index, online_motion_generation, piece.position, target, piece.scale), 0.0, 1.0, duration)
+	motion.tween_callback(Callable(self, "_finish_online_piece_motion").bind(index, cell, online_motion_generation))
+
+
+func _sample_online_piece_motion(progress: float, index: int, generation: int, from: Vector3, target: Vector3, from_scale: Vector3) -> void:
+	if generation != online_motion_generation or not online_piece_motions.has(index): return
+	var piece: MeshInstance3D = piece_records[index]["mesh"]
+	var eased: float = _ease(progress)
+	piece.position = from.lerp(target, eased) + Vector3.UP * sin(eased * PI) * MOVE_ARC * U
+	piece.scale = from_scale.lerp(Vector3.ONE * U, eased)
+
+
+func _finish_online_piece_motion(index: int, cell: int, generation: int) -> void:
+	if generation != online_motion_generation: return
+	online_piece_motions.erase(index)
+	var piece: MeshInstance3D = piece_records[index]["mesh"]
+	piece.position = CELL_COORDS[cell] * U
+	piece.scale = Vector3.ONE * U
+	# No board/turn/material/selection writes here: a newer snapshot, selection
+	# or victory effect may already own those by the time this tween completes.
+
+
+func _cancel_online_piece_motions() -> void:
+	online_motion_generation += 1
+	for motion: Tween in online_piece_motions.values():
+		if motion != null and motion.is_valid(): motion.kill()
+	online_piece_motions.clear()
+
+
+func _reset_online_board_presentation() -> void:
+	_cancel_online_piece_motions()
+	online_rendered_board.clear()
+	online_board_context = ""
+	online_board_rehydrate = true
+	online_board_reset_next = true
+	online_board_animate_next = false
 
 
 func _sync_active_sides() -> void:

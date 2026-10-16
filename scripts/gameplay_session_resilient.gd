@@ -275,6 +275,7 @@ func _publish_return_to_setup_state() -> void:
 
 
 func _reset_session_transients() -> void:
+	_reset_online_board_presentation()
 	_reset_online_round_auto()
 	if camera_tween != null and camera_tween.is_valid():
 		camera_tween.kill()

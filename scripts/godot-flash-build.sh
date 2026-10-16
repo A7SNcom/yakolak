@@ -53,9 +53,10 @@ mkdir -p generated web
 python3 scripts/prepare_intro_assets.py
 python3 scripts/prepare_table.py
 python3 scripts/prepare_logo.py
+node tests/online_presentation_fixtures.mjs
 
 timeout 5m "$GODOT_BIN" --headless --path . --import
-for test in game_rules_headless intro_handoff_headless; do
+for test in game_rules_headless intro_handoff_headless online_presentation_headless online_player4_owner_boundary_headless; do
   echo "YAKOLAK_GODOT_TEST_START ${test}"
   timeout 90s "$GODOT_BIN" --headless --path . --script "res://tests/${test}.gd"
 done

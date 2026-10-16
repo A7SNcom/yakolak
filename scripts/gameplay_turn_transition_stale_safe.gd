@@ -15,6 +15,9 @@ var turn_presentation_target_lifecycle: String = ""
 var turn_presentation_retarget_count: int = 0
 var turn_presentation_cancel_count: int = 0
 var turn_presentation_stale_finish_count: int = 0
+var online_seat_camera_key: String = ""
+var online_seat_camera_viewport: Vector2 = Vector2.ZERO
+var online_presented_turn_key: String = ""
 
 # UX-TURN-41: cache mobile safe-area/layout data so the inherited per-frame quick
 # menu sync never needs to query browser CSS on every frame.
@@ -27,6 +30,11 @@ var turn41_layout_publish_key: String = ""
 
 func _process(delta: float) -> void:
 	super._process(delta)
+	if not online_active:
+		online_seat_camera_key = ""
+		online_presented_turn_key = ""
+	elif get_viewport().get_visible_rect().size != online_seat_camera_viewport and not authoritative_turn_cached_snapshot.is_empty():
+		_present_online_seat_camera(authoritative_turn_cached_snapshot)
 	if quick_button == null or quick_panel == null:
 		return
 	if Time.get_ticks_msec() - turn41_safe_insets_read_msec >= TURN41_SAFE_INSET_REFRESH_MS:
@@ -53,6 +61,10 @@ func _publish_authoritative_turn_state(lifecycle: String) -> void:
 
 func _retarget_authoritative_turn_presentation(snapshot: Dictionary) -> void:
 	var revision: int = int(snapshot.get("revision", -1))
+	if online_active:
+		turn_presentation_applied_revision = maxi(turn_presentation_applied_revision, revision)
+		_present_online_seat_camera(snapshot)
+		return
 	if revision >= 0 and revision <= turn_presentation_applied_revision:
 		return
 	if revision >= 0:
@@ -87,6 +99,50 @@ func _retarget_authoritative_turn_presentation(snapshot: Dictionary) -> void:
 		return
 
 	_start_authoritative_turn_camera(direction, revision, lifecycle)
+
+
+func _present_online_seat_camera(snapshot: Dictionary) -> void:
+	# Each physical device owns one viewpoint. The current turn still drives
+	# lights/input/indicators, but never rotates another player's screen.
+	var direction: String = ""
+	for player: Dictionary in players:
+		if str(player.get("seat", "")) == str(online_identity.get("seat", "")):
+			direction = str(player.get("direction", ""))
+			break
+	if direction.is_empty() or camera == null: return
+	var turn_key: String = "%d:%s:%s" % [int(snapshot.get("round", 0)), str(snapshot.get("seat", "")), str(snapshot.get("valid", false))]
+	if turn_key != online_presented_turn_key:
+		online_presented_turn_key = turn_key
+		_cancel_stale_selection_presentation()
+	if turn_camera_active or (camera_tween != null and camera_tween.is_valid()):
+		_cancel_turn_camera_presentation(int(snapshot.get("revision", -1)), "online-seat-view")
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var key: String = "%s:%s" % [str(online_identity.get("code", "")), direction]
+	if online_seat_camera_key != key or online_seat_camera_viewport != viewport_size:
+		online_seat_camera_key = key
+		online_seat_camera_viewport = viewport_size
+		var aspect: float = viewport_size.x / maxf(viewport_size.y, 1.0)
+		var portrait: float = clampf((0.92 - aspect) / 0.46, 0.0, 1.0)
+		var axis: Vector3 = DIRECTION_VECTORS[direction]
+		var radius: float = lerpf(18.5, 28.0, portrait)
+		var height: float = lerpf(15.5, 23.0, portrait)
+		turn_camera_target_fov = lerpf(50.0, 57.0, portrait)
+		turn_camera_effective_fov = _effective_turn_fov(turn_camera_target_fov)
+		camera.position = axis * radius + Vector3(0.0, height, 0.0)
+		camera.fov = turn_camera_effective_fov
+		camera.look_at(Vector3(0.0, 0.42, 0.0), Vector3.UP)
+		camera.current = true
+		_ensure_game_scene_visible()
+		_set_studio_backdrop_visible(camera.position.z >= STUDIO_WALL_SAFE_Z)
+		_publish_turn_camera(direction, aspect, radius, height, turn_camera_target_fov)
+		_publish_effective_turn_fov(turn_camera_target_fov, turn_camera_effective_fov)
+	turn_camera_active = false
+	camera_transition = false
+	turn_presentation_target_direction = direction
+	turn_presentation_settled_direction = direction
+	turn_presentation_target_revision = int(snapshot.get("revision", -1))
+	turn_presentation_target_lifecycle = str(snapshot.get("lifecycle", ""))
+	_publish_turn_presentation_state("fixed-local-seat", turn_presentation_target_revision, turn_presentation_target_lifecycle)
 
 
 func _start_authoritative_turn_camera(direction: String, revision: int, lifecycle: String) -> void:

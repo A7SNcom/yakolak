@@ -40,7 +40,7 @@ func _ready() -> void:
 func _reconnect_hydration_blocked() -> bool:
 	if not online_active or online == null:
 		return false
-	return bool(online.get("reconnecting")) or bool(online.get("reconnect_hydration_pending"))
+	return online.get("reconnecting") == true or online.get("reconnect_hydration_pending") == true
 
 
 func _handle_pointer(screen_position: Vector2) -> void:
