@@ -141,24 +141,27 @@ export function mountSetup(document, window, client=P2P) {
   let capabilities = { online: false, mixed: false }, connections = [], geometry = {}, roomCode = '';
   let pending = false, returnFocus = null, sheetGeneration = 0, moving = false, nameDraft = null, flowGeneration = 0, profileContinuation = null;
   let lastEntryRequest = '',inviteHandled=false,networkBusy=false;
-  let lobbySignature='';
+  let lobbySignature='',guestPhase='',guestPreview=null,guestBusy=false,hostAwaitingStart=false;
   const el = (tag, cls, text) => { const node = document.createElement(tag); if (cls) node.className = cls; if (text !== undefined) node.textContent = text; return node; };
   const button = (label, action, cls = '') => { const node = el('button',cls);if(label)node.append(el('span','yk-button-label',label)); node.type = 'button'; node.addEventListener('click',e=>{e.stopPropagation();action(e);}); return node; };
   const reduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const animate = (node,frames,duration=320) => { node.getAnimations?.().forEach(x=>x.cancel());if (!reduced()) return node.animate?.(frames,{duration,easing:'cubic-bezier(.4,0,.2,1)'}); };
   const root = el('section','yk-setup'); root.id = 'yakolakVisualSetup'; root.dir = 'rtl'; root.hidden = true; root.setAttribute('aria-label','إعداد اللعبة');
   const header = el('header','yk-header');
-  const identity = button('',openProfile,'yk-identity');
+  const identity = button('',()=>{if(!guestPhase&&!hostAwaitingStart&&!pending&&!moving&&!networkBusy)openProfile();},'yk-identity');
   const prompt = el('h1','yk-sr-only'); prompt.id='ykPrompt'; prompt.setAttribute('aria-live','polite'); header.append(identity,prompt);
   const seats = el('div','yk-seats');
   const seatButtons = COLORS.map(color=>{
     const b = button('', e=>{
-      if (moving||networkBusy) return;
+      if (pending||moving||networkBusy||guestBusy||hostAwaitingStart) return;
       if (state.step === 'color') {
+        if(guestPhase==='color'&&!guestPreview?.availableColors?.includes(color.id))return;
         let selected=color.id;
         if (e.detail>0 && geometry.seats) selected=COLORS.reduce((best,c)=>{const p=geometry.seats[c.id],distance=Math.hypot(e.clientX-p[0]*window.innerWidth,e.clientY-p[1]*window.innerHeight);return distance<best.distance?{id:c.id,distance}:best;},{id:color.id,distance:Infinity}).id;
-        state=chooseColor(state,selected);clearError();render();notify('preview');
-      } else if (state.step==='ready') openSeat(state.seats.findIndex(x=>x.color===color.id),b);
+        if(guestPhase==='color'){if(!guestPreview?.availableColors?.includes(selected))return;state={...state,selectedColor:selected};}
+        else state=chooseColor(state,selected);
+        clearError();render();notify('preview');
+      } else if (state.step==='ready'&&!guestPhase) openSeat(state.seats.findIndex(x=>x.color===color.id),b);
     },'yk-seat');
     b.dataset.color=color.id; b.style.setProperty('--seat-color',color.hex);
     const status=el('span','yk-seat-status'), arrow=el('span','yk-seat-arrow','⌄');arrow.setAttribute('aria-hidden','true');
@@ -168,7 +171,7 @@ export function mountSetup(document, window, client=P2P) {
   const entry = el('div','yk-entry');
   const create=button('غرفة جديدة',()=>requireProfile(()=>go('color')),'yk-primary');
   const join=button('انضمام لغرفة',()=>requireProfile(openJoin),'yk-outline'); entry.append(create,join);
-  const confirm=button('تأكيد',()=>{if(state.selectedColor)go('count');},'yk-primary yk-confirm');
+  const confirm=button('تأكيد',()=>{if(hostAwaitingStart){void leaveGuestLobby();return;}if(guestPhase==='color'){void chooseGuestColor();return;}if(state.selectedColor)go('count');},'yk-primary yk-confirm');
   const counts=el('div','yk-counts');counts.setAttribute('role','group');counts.setAttribute('aria-label','عدد اللاعبين');
   [2,3,4].forEach(n=>{const b=button(String(n),()=>go(chooseCount(state,n)),'yk-choice');b.setAttribute('aria-label',`${n} لاعبين`);counts.append(b);});
   const sharing=button('',copyRoom,'yk-sharing');sharing.setAttribute('aria-label','نسخ رابط الغرفة');
@@ -177,7 +180,7 @@ export function mountSetup(document, window, client=P2P) {
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');
   for(const d of ['M12 16V3','m7 8 5-5 5 5','M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6']){const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',d);svg.append(path);}shareIcon.append(svg);
   const code=el('span','yk-room-code','—');code.dir='ltr';sharing.append(shareIcon,code);
-  const start=button('ابدأ اللعب',()=>{const problem=configurationError(state,capabilities);if(problem){showError(problem);return;}closeSheet();go('rounds');},'yk-primary yk-start');
+  const start=button('ابدأ اللعب',()=>{if(guestPhase){void leaveGuestLobby();return;}const problem=configurationError(state,capabilities);if(problem){showError(problem);return;}closeSheet();go('rounds');},'yk-primary yk-start');
   const rounds=el('div','yk-rounds');rounds.setAttribute('role','group');rounds.setAttribute('aria-label','أشواط الفوز');
   [3,5].forEach(n=>{const b=button(String(n),()=>beginMatch(n),'yk-choice');b.setAttribute('aria-label',`الفوز بـ ${n} أشواط`);rounds.append(b);});
   const errors=el('div','yk-error');errors.setAttribute('role','status');errors.setAttribute('aria-live','polite');
@@ -222,7 +225,7 @@ export function mountSetup(document, window, client=P2P) {
     const icon=svgNode('svg',{viewBox:'0 0 16 16','aria-hidden':'true'});icon.append(svgNode('path',{d:'m4 6 4 4 4-4',fill:'none',stroke:'currentColor','stroke-width':'1.6','stroke-linecap':'round','stroke-linejoin':'round'}));arrowNode.append(icon);
   }
   function refreshOrbitLayout(){
-    if(root.hidden||state.step!=='ready'){currentOrbit=null;return;}
+    if(root.hidden||(state.step!=='ready'&&guestPhase!=='color')){currentOrbit=null;return;}
     const width=window.innerWidth,height=root.getBoundingClientRect().height||window.innerHeight;
     const fallback={gold:[.28,.30],blue:[.72,.30],green:[.28,.66],marble:[.72,.66]};
     const points=seatButtons.map(({color})=>{const p=geometry.seats?.[color.id]||fallback[color.id];return [p[0]*width,p[1]*height];});
@@ -230,6 +233,7 @@ export function mountSetup(document, window, client=P2P) {
     currentOrbit=ring;
     const middleY=(Math.min(...points.map(p=>p[1]))+Math.max(...points.map(p=>p[1])))/2;
     seatButtons.forEach(({b,status,color},i)=>{
+      if(guestPhase==='color'&&guestPreview?.availableColors?.includes(color.id))return;
       const side=points[i][1]<middleY?-1:1,sign=points[i][0]<ring.cx?-1:1;
       const plateWidth=Math.min(252,Math.max(width<700?128:184,ring.rx*(width<700?.78:.66)));
       const plate=orbitPlateGeometry(ring,ring.cx+sign*ring.rx*.54,side,plateWidth,width<700?48:60);
@@ -263,7 +267,7 @@ export function mountSetup(document, window, client=P2P) {
   function clearError(){errors.textContent='';}
   function showError(text){pending=false;errors.textContent=text;render();}
   function notify(action,override={}){
-    const payload={action,...configuration(state),all_seats:state.seats,host_name:state.name,selected_color:state.selectedColor,count_chosen:state.countChosen,step:root.dataset.profile==='active'?'profile':state.step,overlay_open:!modal.hidden,...override};
+    const payload={action,...configuration(state),guest_mode:guestPhase,available_colors:guestPhase==='color'?guestPreview?.availableColors:undefined,reserved_colors:guestPhase==='color'?(guestPreview?.players||[]).map(p=>p.color):undefined,all_seats:state.seats,host_name:state.name,selected_color:state.selectedColor,count_chosen:state.countChosen,step:root.dataset.profile==='active'?'profile':state.step,overlay_open:!modal.hidden,...override};
     window.yakolakVisualSetupAction?.(JSON.stringify(payload));
   }
   function viewport(){const vv=window.visualViewport;const h=vv?.height||window.innerHeight;const base=Math.max(root.getBoundingClientRect().height||0,window.innerHeight);root.style.setProperty('--yk-vv-height',`${h}px`);root.style.setProperty('--yk-vv-top',`${vv?.offsetTop||0}px`);root.classList.toggle('is-keyboard',h<base*.78);position();}
@@ -273,7 +277,7 @@ export function mountSetup(document, window, client=P2P) {
     const fallback={marble:[.7,.61],blue:[.7,.40],gold:[.3,.40],green:[.3,.61]};
     for(const {b,color} of seatButtons){
       const point=geometry.seats?.[color.id]||fallback[color.id];
-      if(state.step==='color'){
+      if(state.step==='color'&&!(guestPhase==='color'&&!guestPreview?.availableColors?.includes(color.id))){
         const corners=geometry.hits?.[color.id]||[point];const xs=corners.map(x=>x[0]*width),ys=corners.map(x=>x[1]*height);
         delete b.dataset.cylinder;
         b.style.width=`${Math.max(104,Math.max(...xs)-Math.min(...xs)+52)}px`;b.style.height=`${Math.max(88,Math.max(...ys)-Math.min(...ys)+52)}px`;
@@ -303,7 +307,7 @@ export function mountSetup(document, window, client=P2P) {
     actions.style.top=`${centeredEntry?Math.max(16,(height-h)/2):Math.max(12,Math.min(target[1]*height,height-h-16))}px`;
     const heading=geometry.prompt||[.5,.25];prompt.style.top=`${Math.max(20,heading[1]*height)}px`;
     refreshOrbitLayout();
-    if(currentOrbit&&state.step==='ready')actions.style.top=`${Math.min(height-h-16,Math.max(parseFloat(actions.style.top),currentOrbit.cy+currentOrbit.ry+currentOrbit.thickness/2+18))}px`;
+    if(currentOrbit&&(state.step==='ready'||guestPhase==='color'))actions.style.top=`${Math.min(height-h-16,Math.max(parseFloat(actions.style.top),currentOrbit.cy+currentOrbit.ry+currentOrbit.thickness/2+18))}px`;
     if(!modal.hidden && ['seat','name'].includes(modal.dataset.kind))positionSheet();
 
   }
@@ -340,7 +344,7 @@ export function mountSetup(document, window, client=P2P) {
     modal.dataset.side='center';
   }
   async function syncOnlineLobby(){
-    if(!client||networkBusy||root.hidden||state.step!=='ready')return;
+    if(!client||networkBusy||root.hidden||state.step!=='ready'||guestPhase||hostAwaitingStart)return;
     const online=state.seats.some(s=>s.mode==='online');
     if(!online){if(client.role==='host')await client.leave();roomCode='';lobbySignature='';return;}
     const config=configuration(state),problem=configurationError(state,capabilities);
@@ -352,20 +356,23 @@ export function mountSetup(document, window, client=P2P) {
     finally{networkBusy=false;start.disabled=false;render();}
   }
   function render(){
-    root.dataset.step=state.step;identity.textContent=state.name;
+    root.dataset.step=state.step;root.dataset.guest=guestPhase;identity.textContent=state.name;
     prompt.textContent=({color:'اختر لونك',count:'كم لاعب؟',rounds:'كم شوط للفوز؟'}[state.step]||'');
     prompt.hidden=!prompt.textContent;
-    entry.hidden=state.step!=='entry';confirm.hidden=state.step!=='color'||!state.selectedColor;
-    counts.hidden=state.step!=='count';start.hidden=sharing.hidden=state.step!=='ready';start.disabled=networkBusy;rounds.hidden=state.step!=='rounds';
+    entry.hidden=state.step!=='entry';confirm.hidden=!hostAwaitingStart&&(state.step!=='color'||!state.selectedColor);confirm.textContent=hostAwaitingStart?'إلغاء الانتظار':'تأكيد';
+    counts.hidden=state.step!=='count';start.hidden=state.step!=='ready'&&guestPhase!=='color';sharing.hidden=state.step!=='ready';start.disabled=networkBusy||hostAwaitingStart||guestBusy||pending;rounds.hidden=state.step!=='rounds';
+    start.textContent=guestPhase?'مغادرة الغرفة':hostAwaitingStart?'بانتظار اكتمال اللاعبين…':'ابدأ اللعب';confirm.disabled=guestBusy;
     code.textContent=networkBusy?'…':roomCode||'—';sharing.classList.toggle('is-unavailable',!roomCode);sharing.disabled=!roomCode||networkBusy;sharing.setAttribute('aria-disabled',String(!roomCode));
     [...rounds.children].forEach(b=>b.disabled=pending);
     for(const {b,status,color} of seatButtons){
       const index=state.seats.findIndex(x=>x.color===color.id),seat=state.seats[index];
-      b.hidden=!['color','ready'].includes(state.step);b.classList.toggle('is-color',state.step==='color');b.classList.toggle('is-off',seat.mode==='none');
+      const reserved=guestPhase==='color'&&!guestPreview?.availableColors?.includes(color.id);
+      b.hidden=!['color','ready'].includes(state.step);b.classList.toggle('is-color',state.step==='color'&&!reserved);b.classList.toggle('is-reserved',reserved);b.classList.toggle('is-off',seat.mode==='none'&&state.step!=='color');
+      b.setAttribute('aria-disabled',String(reserved||guestBusy||guestPhase==='waiting'||hostAwaitingStart));
       b.setAttribute('aria-pressed',String(state.step==='color'&&state.selectedColor===color.id));
       status.textContent=seatLabel(seat);
-      b.setAttribute('aria-label',state.step==='color'?`اختر ${color.name}`:status.textContent);
-      b.setAttribute('aria-haspopup',state.step==='ready'?'menu':'false');
+      b.setAttribute('aria-label',state.step==='color'&&!reserved?`اختر ${color.name}`:status.textContent);
+      b.setAttribute('aria-haspopup',state.step==='ready'&&!guestPhase&&!hostAwaitingStart?'menu':'false');
     }
     position();
     refreshGlass();
@@ -380,13 +387,30 @@ export function mountSetup(document, window, client=P2P) {
       const motion=animate(actions,[{opacity:1,transform:'translate(-50%,0) scale(1)'},{opacity:0,transform:'translate(-50%,-8px) scale(.985)'}],240);motion.finished.then(apply,apply);
     }else apply();
   }
-  function beginMatch(n){
-    if(pending||moving)return;state.rounds=n;pending=true;render();const token=++flowGeneration;
+  function finishHostStart(){
+    if(pending)return;
+    pending=true;hostAwaitingStart=false;render();const token=++flowGeneration;
     const done=()=>{if(token===flowGeneration&&!root.hidden)notify('start');};
     if(!reduced()&&typeof actions.animate==='function'){
       animate(prompt,[{opacity:1},{opacity:0}],300);
       const motion=animate(actions,[{opacity:1,transform:'translate(-50%,0)'},{opacity:0,transform:'translate(-50%,8px)'}],480);motion.finished.then(done,done);
     }else done();
+  }
+  async function beginMatch(n){
+    if(pending||moving||networkBusy||hostAwaitingStart)return;state.rounds=n;
+    if(client&&state.seats.some(s=>s.mode==='online')){
+      const token=flowGeneration;networkBusy=true;render();
+      try{
+        const c=configuration(state),reply=await client.dispatch('create',{players:c.players,targetRounds:n});
+        if(token!==flowGeneration||root.hidden)return;
+        if(!reply?.ok)throw new Error(reply?.error||'online_timeout');
+        hostAwaitingStart=reply.room.status==='waiting';state={...state,step:'ready'};api.room(reply.room);
+        if(!hostAwaitingStart)finishHostStart();
+      }catch(e){if(token===flowGeneration){pending=false;state={...state,step:'ready'};showError(arabicNetworkError(e.message));}}
+      finally{networkBusy=false;render();}
+      return;
+    }
+    finishHostStart();
   }
   async function copyRoom(){
     if(!roomCode){showError('الأونلاين غير متاح حالياً');return;}
@@ -405,7 +429,6 @@ export function mountSetup(document, window, client=P2P) {
   function closeSheet(animated=false,after=()=>{}){
     if(modal.hidden){after();return;}
     commitName();
-    if(modal.dataset.kind==='join-color'&&client?.role==='guest'&&!client.session?.identity)void client.close();
     const token=++sheetGeneration;
     const finish=()=>{if(token!==sheetGeneration)return;modal.hidden=true;sheet.replaceChildren();delete root.dataset.profile;delete root.dataset.overlay;header.inert=seats.inert=actions.inert=false;returnFocus?.setAttribute?.('aria-expanded','false');returnFocus?.focus?.({preventScroll:true});render();notify('preview');after();if(state.step==='ready'&&!networkBusy)void syncOnlineLobby();};
     if(animated && !reduced()&&typeof sheet.animate==='function'){
@@ -476,29 +499,40 @@ export function mountSetup(document, window, client=P2P) {
     if(index===0){state.name=value;state.seats[0].name=value;}else state=changeSeat(state,index,'local',value);
   }
   function finishGuestJoin(code){
-    const color=client?.session?.snapshot?.players.find(p=>p.seat===client.session.identity?.seat)?.color||'marble';
-    closeSheet(true,()=>window.yakolakVisualSetupAction?.(JSON.stringify({action:'join',code,name:state.name,color,rounds:state.rounds})));
+    if(guestPhase==='starting')return;
+    const room=client?.session?.snapshot;
+    if(room?.status==='waiting'||room?.status==='cancelled'){showGuestLobby(room);return;}
+    guestPhase='starting';const color=room?.players.find(p=>p.seat===client.session.identity?.seat)?.color||state.selectedColor;
+    closeSheet(true,()=>window.yakolakVisualSetupAction?.(JSON.stringify({action:'join',code,name:state.name,color,rounds:room?.targetRounds||state.rounds})));
+  }
+  function showGuestLobby(room){
+    if(guestPhase==='starting')return;
+    if(room.status==='playing'){finishGuestJoin(room.code);return;}
+    guestPhase='waiting';state={...state,step:'ready',countChosen:true,selectedColor:''};api.room(room);notify('preview');
+    try{const u=new URL(window.location.href);u.searchParams.set('room',room.code);window.history.replaceState(null,'',u);}catch{}
+    if(room.status==='cancelled')showError('أغلق منشئ الغرفة الاتصال');
   }
   function renderJoinColors(preview){
-    if(modal.dataset.kind!=='join-color')openSheet('اختر لونك',join,'join-color');
-    const colors=preview?.availableColors||[];
-    let grid=sheet.querySelector('.yk-join-colors'),error=sheet.querySelector('.yk-field-error');
-    if(!grid){
-      grid=el('div','yk-join-colors');error=el('div','yk-field-error');error.setAttribute('role','alert');
-      sheet.append(grid,error,button('إلغاء',()=>closeSheet(true),'yk-subtle'));
-    }
-    if(grid.dataset.busy==='true')return;
-    grid.replaceChildren();
-    for(const color of COLORS){
-      const b=button(color.name,async()=>{
-        const token=sheetGeneration;grid.dataset.busy='true';[...grid.children].forEach(x=>x.disabled=true);error.textContent='';
-        try{await client.chooseColor(color.id);if(token!==sheetGeneration){await client.leave();return}finishGuestJoin(preview.code)}
-        catch(e){if(token===sheetGeneration){grid.dataset.busy='false';renderJoinColors(client.session?.preview||preview);error.textContent=arabicNetworkError(e.message)}}
-      },'yk-guest-color');
-      b.style.setProperty('--yk-color',color.hex);b.dataset.color=color.id;b.disabled=!colors.includes(color.id);b.setAttribute('aria-label','اختر '+color.name);grid.append(b);
-    }
-    if(!colors.length)error.textContent='لا توجد ألوان شاغرة في الغرفة';
-    positionSheet();
+    if(!preview)return;
+    guestPreview=preview;guestPhase='color';roomCode=preview.code;
+    state={...state,step:'color',countChosen:false,selectedColor:preview.availableColors.includes(state.selectedColor)?state.selectedColor:'',seats:COLORS.map(color=>{
+      const p=preview.players.find(p=>p.color===color.id);
+      return {color:color.id,mode:p?(p.mode||'online'):'none',name:p?.name||'',owner:p?.controller||'p1'};
+    })};
+    render();notify('preview');
+    if(!preview.availableColors.length)showError('لا توجد ألوان شاغرة في الغرفة');
+  }
+  async function chooseGuestColor(){
+    if(guestBusy||!state.selectedColor||!guestPreview?.availableColors.includes(state.selectedColor))return;
+    guestBusy=true;clearError();render();const token=flowGeneration;
+    try{await client.chooseColor(state.selectedColor);if(token!==flowGeneration){await client.leave();return;}finishGuestJoin(client.code||guestPreview.code);}
+    catch(e){if(token===flowGeneration){renderJoinColors(client.session?.preview||guestPreview);showError(arabicNetworkError(e.message));}}
+    finally{guestBusy=false;render();}
+  }
+  async function leaveGuestLobby(){
+    const leavingCode=client?.code||roomCode;
+    flowGeneration++;hostAwaitingStart=false;guestPhase='';guestPreview=null;guestBusy=false;roomCode='';state=newSetup(profile?.name||state.name);clearError();render();notify('preview');
+    try{await client?.leave();for(const key of ['yakolak-p2p:','yakolak-online:'])window.sessionStorage.removeItem(key+leavingCode);const u=new URL(window.location.href);u.searchParams.delete('room');window.history.replaceState(null,'',u);}catch{}
   }
   function openJoin(invitation=''){
     openSheet('رابط أو رمز الغرفة',join,'join');const form=el('form','yk-form');form.noValidate=true;
@@ -507,7 +541,7 @@ export function mountSetup(document, window, client=P2P) {
       e.preventDefault();const code=parseRoomInput(value.field.value,window.location.href);if(!code){error.textContent='تأكد من الرابط أو الرمز';return}
       if(!capabilities.online||!client){error.textContent='الأونلاين غير متاح حالياً';return}
       const token=sheetGeneration;submit.disabled=true;submit.textContent='جارٍ الاتصال…';
-      try{const session=await client.inspectRoom(code);if(token!==sheetGeneration){await client.leave();return}if(session.identity)finishGuestJoin(code);else renderJoinColors(session.preview)}
+      try{const session=await client.inspectRoom(code);if(token!==sheetGeneration){await client.leave();return}closeSheet();if(session.identity)finishGuestJoin(code);else renderJoinColors(session.preview)}
       catch(e){if(token===sheetGeneration){error.textContent=arabicNetworkError(e.message);submit.disabled=false;submit.textContent='انضمام'}}
     });sheet.append(form);value.field.focus();
   }
@@ -519,17 +553,26 @@ export function mountSetup(document, window, client=P2P) {
   root.addEventListener('pointerdown',e=>{if(nameDraft&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet();},true);
   root.addEventListener('click',e=>{if(!modal.hidden&&modal.dataset.kind!=='profile'&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet(true);});root.addEventListener('keydown',e=>e.stopPropagation());
   const api={
-    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;closeSheet();resetOverlay();capabilities={online:!!options.online||supportsP2P(window),mixed:true};connections=options.resume?.players?connections:[];roomCode=options.resume?.players?roomCode:'';pending=moving=false;state=options.resume?.players?restoreSetup(options.resume,profile?.name||''):newSetup(profile?.name||'');if(options.preview_step==='color')state={...state,step:'color',selectedColor:''};geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
+    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;nameDraft=null;profileContinuation=null;closeSheet();resetOverlay();capabilities={online:!!options.online||supportsP2P(window),mixed:true};connections=options.resume?.players?connections:[];roomCode=options.resume?.players?roomCode:'';pending=moving=false;state=options.resume?.players?restoreSetup(options.resume,profile?.name||''):newSetup(profile?.name||'');if(options.preview_step==='color')state={...state,step:'color',selectedColor:''};geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
       // Never synchronously call back into Godot while it is publishing entry.
       const token=flowGeneration;window.setTimeout(()=>{if(token!==flowGeneration||root.hidden)return;notify('preview');const invitation=parseRoomInput(new URL(window.location.href).searchParams.get('room')||'',window.location.href);if(invitation&&!inviteHandled&&!options.resume?.players&&client?.role!=='host'){inviteHandled=true;requireProfile(()=>openJoin(invitation));}},0);},
-    close(){flowGeneration++;sheetGeneration++;nameDraft=null;profileContinuation=null;pending=moving=false;resetOverlay();root.hidden=true;refreshGlass();delete window.yakolakPendingVisualSetup;document.body.dataset.yakolakVisualSetup='hidden';},
+    close(){flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;nameDraft=null;profileContinuation=null;pending=moving=false;resetOverlay();root.hidden=true;refreshGlass();delete window.yakolakPendingVisualSetup;document.body.dataset.yakolakVisualSetup='hidden';},
     geometry(points){geometry=points;root.dataset.world=String(!!points.world);position();},
     error(text){root.hidden=false;showError(text);},
     networkError(code){pending=moving=networkBusy=false;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';if(state.step==='rounds')state={...state,step:'ready'};roomCode=client?.code||'';lobbySignature='';render();showError(arabicNetworkError(code));},
-    room(room){roomCode=/^\d{3}$/.test(String(room.code||''))?String(room.code):'';connections=(room.players||[]).filter(x=>x.connected!==false&&x.name).map(x=>({seat:String(x.seat),name:String(x.name).slice(0,24)}));if(Array.isArray(room.slots))state={...state,onlineSeatOrder:room.slots.map(s=>s.color),seats:state.seats.map(seat=>{const slot=room.slots.find(s=>s.color===seat.color);return slot?{...seat,mode:slot.mode,name:slot.name||''}:{...seat,mode:'none',name:''}})};render();}
+    room(room){roomCode=/^\d{3}$/.test(String(room.code||''))?String(room.code):'';connections=(room.players||[]).filter(x=>x.connected!==false&&x.name).map(x=>({seat:String(x.seat),name:String(x.name).slice(0,24)}));if(Array.isArray(room.slots))state={...state,onlineSeatOrder:room.slots.map(s=>s.color),seats:state.seats.map(seat=>{const slot=room.slots.find(s=>s.color===seat.color);return slot?{...seat,mode:slot.mode,name:(room.players||[]).find(p=>p.color===seat.color)?.name||(slot.mode==='online'?'':slot.name)||''}:{...seat,mode:'none',name:''}})};render();const token=flowGeneration;window.setTimeout(()=>{if(token===flowGeneration&&!root.hidden)notify('preview');},0);}
   };
   window.YakolakSetup=api;viewport();
-  client?.subscribe(detail=>{if(detail.preview&&modal.dataset.kind==='join-color'&&!modal.hidden)renderJoinColors(detail.preview);if(!root.hidden&&state.step==='ready'&&detail.role==='host'){if(detail.room)api.room(detail.room);if(detail.error){roomCode='';lobbySignature='';render();showError(arabicNetworkError(detail.error));}}});
+  client?.subscribe(detail=>{
+    if(root.hidden)return;
+    if(guestPhase==='color'&&detail.preview)renderJoinColors(detail.preview);
+    else if(guestPhase==='waiting'&&detail.role==='guest'&&detail.room)showGuestLobby(detail.room);
+    else if(!guestPhase&&state.step==='ready'&&detail.role==='host'){
+      if(detail.room){api.room(detail.room);if(hostAwaitingStart&&detail.room.status==='playing')finishHostStart();}
+      if(detail.error){roomCode='';lobbySignature='';render();showError(arabicNetworkError(detail.error));}
+    }
+    if(guestPhase&&detail.error)showError(arabicNetworkError(detail.error));
+  });
   const acceptEntryRequest=()=>{
     const request=document.body.dataset.yakolakVisualSetupRequest||'';
     const options=window.yakolakPendingVisualSetup;
