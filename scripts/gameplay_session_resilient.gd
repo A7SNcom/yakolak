@@ -155,9 +155,9 @@ func _reset_board_for_round() -> void:
 		var record: Dictionary = piece_records[index] as Dictionary
 		record["played"] = false
 		piece_records[index] = record
+		if not _round_piece_should_return(index): continue
 		var piece: MeshInstance3D = record["mesh"] as MeshInstance3D
-		if index < home_materials.size():
-			piece.material_override = home_materials[index]
+		_restore_round_piece_material(index)
 		if index >= home_transforms.size():
 			continue
 		var home: Transform3D = home_transforms[index]
@@ -188,6 +188,10 @@ func _reset_board_for_round() -> void:
 			"document.body.dataset.yakolakScoreHud='hidden';",
 			true
 		)
+
+
+func _restore_round_piece_material(index: int) -> void:
+	if index < home_materials.size(): (piece_records[index]["mesh"] as MeshInstance3D).material_override = home_materials[index]
 
 
 func _finish_stability_round_reset(generation: int) -> void:

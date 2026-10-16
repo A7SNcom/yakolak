@@ -21,6 +21,8 @@ var last_test_target_publish_msec: int = -1000
 var legal_marker_pulse: Tween
 
 
+var score_marker_motions: Dictionary = {}
+
 func _ready() -> void:
 	super._ready()
 	if OS.has_feature("web"):
@@ -273,6 +275,8 @@ func _spawn_score_marker(direction: String, score_index: int) -> bool:
 	# Keep the approved short timing, but start outside the camera frame. The
 	# marker first becomes visible only as it crosses the top edge of the view.
 	var tween: Tween = create_tween()
+	score_marker_motions[marker.get_instance_id()] = tween
+	tween.finished.connect(func() -> void: score_marker_motions.erase(marker.get_instance_id()))
 	tween.tween_property(marker, "position", landing, SCORE_DROP_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tween.tween_property(marker, "position", landing + Vector3.UP * SCORE_BOUNCE_HEIGHT, SCORE_BOUNCE_UP_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.tween_property(marker, "position", landing, SCORE_SETTLE_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)

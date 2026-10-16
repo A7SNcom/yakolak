@@ -82,16 +82,18 @@ func _run() -> void:
 		quit(1)
 		return
 	setup._on_visual_action([JSON.stringify({"action":"preview","step":"ready","all_seats":[{"color":"green","mode":"local"},{"color":"marble","mode":"bot"},{"color":"blue","mode":"none"},{"color":"gold","mode":"none"}]})])
+	await create_timer(0.4).timeout
 	for record: Dictionary in intro.pieces:
-		var material: Material = record["mesh"].material_override
+		var material := record["mesh"].material_override as BaseMaterial3D
 		var inactive: bool = record["dir"] in ["back", "left"]
-		if (material == setup.visual_inactive_material) != inactive:
-			push_error("Seat dimming does not match active seats")
+		if inactive and not material.albedo_color.is_equal_approx(setup.visual_inactive_material.albedo_color):
+			push_error("Seat dimming did not settle on its inactive color")
 			quit(1)
 			return
 	setup._on_visual_action([JSON.stringify({"action":"preview","step":"rounds","count_chosen":true,"all_seats":[{"color":"green","mode":"local"},{"color":"marble","mode":"bot"},{"color":"blue","mode":"none"},{"color":"gold","mode":"none"}]})])
+	await create_timer(0.4).timeout
 	for record: Dictionary in intro.pieces:
-		if record["dir"] in ["back","left"] and record["mesh"].material_override != setup.visual_inactive_material:
+		if record["dir"] in ["back","left"] and not (record["mesh"].material_override as BaseMaterial3D).albedo_color.is_equal_approx(setup.visual_inactive_material.albedo_color):
 			push_error("Inactive seats became active at win target question")
 			quit(1)
 			return

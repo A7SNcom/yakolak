@@ -468,7 +468,7 @@ func _apply_online_room(remote: Dictionary) -> void:
 		})
 		var remote_scores: Dictionary = remote.get("scores", {}) as Dictionary
 		scores[direction] = int(remote_scores.get(seat, 0))
-	_sync_active_sides()
+	if str(remote.get("status","")) != "waiting": _sync_active_sides()
 
 	match_initialized = true
 	total_rounds = int(remote.get("targetRounds", 3))
@@ -577,6 +577,10 @@ func _apply_online_board(board: Dictionary) -> void:
 	online_board_reset_next = false
 	if not rebuild and board == online_rendered_board:
 		return # Presence/votes must not reset selection, motion or victory fades.
+	var visual_starts: Array[Dictionary] = []
+	for record: Dictionary in piece_records:
+		var mesh: MeshInstance3D = record["mesh"]
+		visual_starts.append({"transform":mesh.transform,"material":mesh.material_override,"visible":mesh.visible})
 	var preferred: int = selected_index
 	if tray_open:
 		_close_piece_tray(preferred, true)
@@ -622,7 +626,13 @@ func _apply_online_board(board: Dictionary) -> void:
 			var piece: MeshInstance3D = piece_records[index]["mesh"]
 			piece.transform = home_transforms[index]
 			piece.material_override = home_materials[index]
+	for index: int in range(piece_records.size()):
+		_reconcile_online_piece_presentation(index,visual_starts[index])
 	online_rendered_board = board.duplicate(true)
+
+
+func _reconcile_online_piece_presentation(_index: int, _start: Dictionary) -> void:
+	pass # Production presentation layer animates recovery without changing truth.
 
 
 func _online_board_extends_rendered(board: Dictionary) -> bool:
@@ -684,11 +694,15 @@ func _cancel_online_round_return() -> void:
 	if has_method("_cancel_round_return_motion"): call("_cancel_round_return_motion")
 
 
+func _round_piece_should_return(_index: int) -> bool:
+	return true
+
+
 func _finish_online_round_return() -> void:
 	if not online_round_return_active: return
 	online_round_return_active=false
 	for index: int in range(piece_records.size()):
-		(piece_records[index]["mesh"] as MeshInstance3D).transform=home_transforms[index]
+		if _round_piece_should_return(index): (piece_records[index]["mesh"] as MeshInstance3D).transform=home_transforms[index]
 	var accepted: Dictionary = online_round_pending_board.duplicate(true)
 	online_round_pending_board.clear()
 	online_board_reset_next=false

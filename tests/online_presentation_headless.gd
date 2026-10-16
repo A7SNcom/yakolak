@@ -51,8 +51,14 @@ func _run() -> void:
 		for seat_number in range(1,5):
 			_clean()
 			var seat := "p%d" % seat_number
-			_accept(cases.four[0],seat)
 			var camera: Camera3D = game.get("camera")
+			var entry_pose := camera.transform
+			_accept(cases.four[0],seat)
+			_expect(camera.transform.is_equal_approx(entry_pose),"online entry starts at the visible setup pose")
+			var entry_motion: Tween = game.get("camera_tween")
+			_accept(cases.four[1],seat)
+			_expect(game.get("camera_tween")==entry_motion,"accepted turn adopts entry camera without restarting it")
+			await create_timer(2.0).timeout
 			var fixed: Transform3D = camera.transform
 			var fov: float = camera.fov
 			var direction: String = game.get("players")[seat_number-1]["direction"]
@@ -114,11 +120,16 @@ func _run() -> void:
 	game.call("_set_victory_mix",1.0)
 	for index: int in winning:
 		_expect(_piece(index).visible and _piece(index).material_override==game.get("home_materials")[index],"consent snapshot keeps winners visible in their exact material")
+	await create_timer(1.15).timeout
+	_accept(cases.vote)
+	await create_timer(0.12).timeout
+	for index: int in game.get("victory_materials"):
+		_expect(not _piece(index).visible and _piece(index).position.y>40.0,"late presence cannot restart a completed victory departure")
 	# Recovery hydrates truth without replaying already committed moves.
 	online.set("reconnecting",true)
 	_accept(cases.two[5])
 	online.set("reconnecting",false)
-	_expect(game.get("online_piece_motions").is_empty(),"reconnect snaps to full accepted board instead of replaying moves")
+	_expect(game.get("online_piece_motions").is_empty(),"reconnect reconciles to full accepted board without replaying move intents")
 	game.call("_set_victory_mix",1.0)
 	for index: int in game.get("winning_piece_indices"):
 		_expect(_piece(index).visible,"reconnect preserves winning stones")
@@ -135,7 +146,10 @@ func _run() -> void:
 	_expect(game.get("occupied_slots").is_empty() and game.get("online_piece_motions").is_empty(),"round boundary cancels all old visual completions")
 	await create_timer(1.1).timeout
 	for index: int in range(game.get("piece_records").size()):
-		_expect(_piece(index).position.is_equal_approx(game.get("home_transforms")[index].origin),"late callback cannot pull reset reserve back onto board")
+		if _piece(index).visible:
+			_expect(_piece(index).position.is_equal_approx(game.get("home_transforms")[index].origin),"late callback cannot pull reset reserve back onto board index=%d dir=%s at=%s expected=%s" % [index,game.get("piece_records")[index].dir,str(_piece(index).position),str(game.get("home_transforms")[index].origin)])
+		else:
+			_expect(_piece(index).position.y>40.0,"inactive reserve leaves through the top of the shot")
 	# Reduced motion keeps the same accepted board and readiness without arcs.
 	_clean()
 	game.set("_rm_enabled",true)
@@ -212,12 +226,16 @@ func _run() -> void:
 	await create_timer(0.6).timeout
 	var early: int = game.get("occupied_slots")["2:medium"]
 	_expect(_piece(early).position.is_equal_approx(game.CELL_COORDS[2]*game.U),"queued placement survives every stale return callback")
-	# Recovery still snaps to truth and cancels old physical owners.
+	# Recovery adopts truth immediately while presentation travels from its actual pose.
 	_clean()
 	_accept(cases.two[5],"p1")
 	_accept(cases.nextRound,"p1")
 	online.set("reconnecting",true)
+	var recovery_starts: Array[Transform3D] = []
+	for index: int in range(game.get("piece_records").size()): recovery_starts.append(_piece(index).transform)
 	_accept(cases.earlyNextMove,"p1")
+	var recovery_piece: int = game.get("occupied_slots")["2:medium"]
+	_expect(_piece(recovery_piece).transform.is_equal_approx(recovery_starts[recovery_piece]),"recovery preserves the first visible physical pose")
 	online.set("reconnecting",false)
 	_expect(not bool(game.get("online_round_return_active")) and game.get("stability_piece_tweens").is_empty(),"hydration cancels every home-return tween")
 	await create_timer(1.2).timeout

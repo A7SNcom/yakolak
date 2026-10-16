@@ -60,6 +60,7 @@ func _run() -> void:
 		if face.size()==3: table_faces.append(face)
 	for direction: String in ["right","back","left","front"]:
 		var base: MeshInstance3D = intro.bases[direction]
+		_expect(base.transform.is_equal_approx(game.base_home_poses[direction]),"fast start settles the base at its captured final rest position")
 		for corner: int in range(8):
 			var point := base.to_global(base.get_aabb().get_endpoint(corner))
 			var supported := false
@@ -170,7 +171,7 @@ func _run() -> void:
 		if winning.has(index) or not bool(game.piece_records[index]["played"]):
 			_expect(material == game.home_materials[index],"winning and reserve stones retain exact material")
 		else:
-			_expect(material.albedo_color.a==0.0 and not game.piece_records[index]["mesh"].visible,"only nonwinning played stones disappear")
+			_expect(material.albedo_color.a==0.0 and not game.piece_records[index]["mesh"].visible and game.piece_records[index]["mesh"].position.y>40.0,"only nonwinning played stones leave upwards")
 	game._set_victory_mix(0.0)
 	for index: int in game.victory_materials:
 		_expect(game.victory_materials[index].albedo_color.is_equal_approx(game.home_materials[index].albedo_color),"original color returns")

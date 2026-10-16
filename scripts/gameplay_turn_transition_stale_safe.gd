@@ -33,7 +33,7 @@ func _process(delta: float) -> void:
 	if not online_active:
 		online_seat_camera_key = ""
 		online_presented_turn_key = ""
-	elif get_viewport().get_visible_rect().size != online_seat_camera_viewport and not authoritative_turn_cached_snapshot.is_empty():
+	elif (online_seat_camera_key.is_empty() or get_viewport().get_visible_rect().size != online_seat_camera_viewport) and not authoritative_turn_cached_snapshot.is_empty():
 		_present_online_seat_camera(authoritative_turn_cached_snapshot)
 	if quick_button == null or quick_panel == null:
 		return
@@ -102,6 +102,7 @@ func _retarget_authoritative_turn_presentation(snapshot: Dictionary) -> void:
 
 
 func _present_online_seat_camera(snapshot: Dictionary) -> void:
+	if online_waiting or get("lobby_return_active") == true or (setup != null and setup.get("visual_active") == true): return
 	# Each physical device owns one viewpoint. The current turn still drives
 	# lights/input/indicators, but never rotates another player's screen.
 	var direction: String = ""
@@ -114,35 +115,16 @@ func _present_online_seat_camera(snapshot: Dictionary) -> void:
 	if turn_key != online_presented_turn_key:
 		online_presented_turn_key = turn_key
 		_cancel_stale_selection_presentation()
-	if turn_camera_active or (camera_tween != null and camera_tween.is_valid()):
-		_cancel_turn_camera_presentation(int(snapshot.get("revision", -1)), "online-seat-view")
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	var key: String = "%s:%s" % [str(online_identity.get("code", "")), direction]
-	if online_seat_camera_key != key or online_seat_camera_viewport != viewport_size:
-		online_seat_camera_key = key
-		online_seat_camera_viewport = viewport_size
-		var aspect: float = viewport_size.x / maxf(viewport_size.y, 1.0)
-		var portrait: float = clampf((0.92 - aspect) / 0.46, 0.0, 1.0)
-		var axis: Vector3 = DIRECTION_VECTORS[direction]
-		var radius: float = lerpf(18.5, 28.0, portrait)
-		var height: float = lerpf(15.5, 23.0, portrait)
-		turn_camera_target_fov = lerpf(50.0, 57.0, portrait)
-		turn_camera_effective_fov = _effective_turn_fov(turn_camera_target_fov)
-		camera.position = axis * radius + Vector3(0.0, height, 0.0)
-		camera.fov = turn_camera_effective_fov
-		camera.look_at(Vector3(0.0, 0.42, 0.0), Vector3.UP)
-		camera.current = true
-		_ensure_game_scene_visible()
-		_set_studio_backdrop_visible(camera.position.z >= STUDIO_WALL_SAFE_Z)
-		_publish_turn_camera(direction, aspect, radius, height, turn_camera_target_fov)
-		_publish_effective_turn_fov(turn_camera_target_fov, turn_camera_effective_fov)
-	turn_camera_active = false
-	camera_transition = false
-	turn_presentation_target_direction = direction
-	turn_presentation_settled_direction = direction
 	turn_presentation_target_revision = int(snapshot.get("revision", -1))
 	turn_presentation_target_lifecycle = str(snapshot.get("lifecycle", ""))
-	_publish_turn_presentation_state("fixed-local-seat", turn_presentation_target_revision, turn_presentation_target_lifecycle)
+	if online_seat_camera_key == key and online_seat_camera_viewport == viewport_size:
+		# Presence, votes and other turns adopt the entry shot without interrupting it.
+		return
+	online_seat_camera_key = key
+	online_seat_camera_viewport = viewport_size
+	_start_authoritative_turn_camera(direction, turn_presentation_target_revision, turn_presentation_target_lifecycle)
 
 
 func _start_authoritative_turn_camera(direction: String, revision: int, lifecycle: String) -> void:
@@ -159,7 +141,7 @@ func _start_authoritative_turn_camera(direction: String, revision: int, lifecycl
 	var portrait_weight: float = clampf((0.92 - aspect) / 0.46, 0.0, 1.0)
 	var radius: float = lerpf(18.5, 28.0, portrait_weight)
 	var height: float = lerpf(15.5, 23.0, portrait_weight)
-	var target_fov: float = lerpf(50.0, 72.0, portrait_weight)
+	var target_fov: float = lerpf(50.0, 57.0, portrait_weight)
 
 	turn_presentation_target_direction = direction
 	turn_presentation_target_revision = revision
@@ -213,14 +195,12 @@ func _finish_authoritative_turn_camera(serial: int, direction: String) -> void:
 		turn_presentation_stale_finish_count += 1
 		return
 	var snapshot: Dictionary = authoritative_turn_snapshot()
-	if not bool(snapshot.get("valid", false)) or str(snapshot.get("direction", "")) != direction:
+	# Online viewpoint belongs to this device's seat, independently of the turn.
+	if not online_active and (not bool(snapshot.get("valid", false)) or str(snapshot.get("direction", "")) != direction):
 		turn_presentation_stale_finish_count += 1
 		return
 	var settled_revision: int = int(snapshot.get("revision", turn_presentation_target_revision))
 	var settled_lifecycle: String = str(snapshot.get("lifecycle", turn_presentation_target_lifecycle))
-	if settled_revision < turn_presentation_target_revision:
-		turn_presentation_stale_finish_count += 1
-		return
 
 	camera_tween = null
 	turn_presentation_target_revision = settled_revision
@@ -229,8 +209,14 @@ func _finish_authoritative_turn_camera(serial: int, direction: String) -> void:
 	# The inherited camera-safe finisher snaps exactly once, restores backdrop
 	# visibility, and preserves the existing offline readiness behavior. Online
 	# readiness remains authoritative and is never delayed by this presentation.
-	super._finish_camera_transition()
-	_publish_turn_presentation_state("settled", settled_revision, settled_lifecycle)
+	if online_active:
+		_apply_authoritative_turn_camera_progress(1.0, serial)
+		turn_camera_active = false
+		camera_transition = false
+		_set_studio_backdrop_visible(camera.position.z >= STUDIO_WALL_SAFE_Z)
+	else:
+		super._finish_camera_transition()
+	_publish_turn_presentation_state("fixed-local-seat" if online_active else "settled", settled_revision, settled_lifecycle)
 
 
 func _cancel_turn_camera_presentation(revision: int, lifecycle: String) -> void:

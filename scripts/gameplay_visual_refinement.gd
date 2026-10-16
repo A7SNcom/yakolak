@@ -52,6 +52,10 @@ var result_scheduled: bool = false
 var result_reveal: Tween
 var celebration: CPUParticles3D
 var victory_visibility: Dictionary = {}
+var victory_positions: Dictionary = {}
+var scene_motion = preload("res://scripts/scene_motion.gd").new(self)
+var base_home_poses: Dictionary = {}
+var backdrop_home_poses: Dictionary = {}
 
 func _ready() -> void:
 	super._ready()
@@ -139,7 +143,10 @@ func _capture_home_state() -> void:
 	for direction: String in bases:
 		var base: Node3D = bases[direction]
 		var axis: Vector3 = DIRECTION_VECTORS.get(direction, Vector3.ZERO)
-		motion.tween_property(base, "position", base.position + axis * REST_OFFSET, 0.0 if _rm_enabled else 0.65).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		var final_pose := base.transform
+		final_pose.origin += axis * REST_OFFSET
+		base_home_poses[direction] = final_pose
+		motion.tween_property(base, "position", final_pose.origin, 0.0 if _rm_enabled else 0.65).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 func _selection_material(source: Material) -> StandardMaterial3D:
@@ -158,6 +165,7 @@ func _open_piece_tray(piece_index: int) -> void:
 	for order: int in range(tray_indices.size()):
 		var index: int = tray_indices[order]
 		var piece: MeshInstance3D = piece_records[index]["mesh"]
+		scene_motion.cancel_flight(piece)
 		var axis: Vector3 = DIRECTION_VECTORS[str(piece_records[index]["dir"])]
 		var target := home_transforms[index].origin + Vector3.UP * (float(order) * TRAY_GAP_UNITS * U) + axis*float(order)*TRAY_OUTWARD_STEP
 		if _rm_enabled:
@@ -169,6 +177,10 @@ func _open_piece_tray(piece_index: int) -> void:
 
 func _select_tray_piece(piece_index: int) -> void:
 	if not tray_open or not tray_indices.has(piece_index): return
+	var shown_colors: Dictionary = {}
+	for index: int in range(piece_records.size()):
+		var shown := (piece_records[index]["mesh"] as MeshInstance3D).material_override as BaseMaterial3D
+		if shown != null: shown_colors[index] = shown.albedo_color
 	_stop_choice_tweens()
 	# Parent latency layer publishes ownership immediately. Restore the prior
 	# material after that operation so the color can ease from its current value.
@@ -177,8 +189,12 @@ func _select_tray_piece(piece_index: int) -> void:
 		if bool(piece_records[index].get("played",false)) or str(piece_records[index]["dir"]) != _current_direction(): continue
 		var source := home_materials[index] as StandardMaterial3D
 		if source == null: continue
-		if not choice_materials.has(index): choice_materials[index] = source.duplicate()
+		if not choice_materials.has(index):
+			choice_materials[index] = source.duplicate()
+			var shown := (piece_records[index]["mesh"] as MeshInstance3D).material_override as BaseMaterial3D
+			if shown != null: choice_materials[index].albedo_color = shown.albedo_color
 		var material := choice_materials[index] as StandardMaterial3D
+		if shown_colors.has(index): material.albedo_color = shown_colors[index]
 		material.next_pass = null
 		material.set_meta("yakolak_selected_state", index == selected_index)
 		var piece: MeshInstance3D = piece_records[index]["mesh"]
@@ -204,16 +220,20 @@ func _stop_choice_tweens() -> void:
 func _restore_choice_materials() -> void:
 	for index: int in choice_materials:
 		if index < piece_records.size():
-			(piece_records[index]["mesh"] as MeshInstance3D).material_override = home_materials[index]
+			_restore_visual_material(index)
 	choice_materials.clear()
 
 
 func _close_piece_tray(skip_index: int = -1, immediate: bool = false) -> void:
+	var materials: Dictionary = {}
+	for index: int in choice_materials:
+		materials[index] = (piece_records[index]["mesh"] as MeshInstance3D).material_override
 	_stop_choice_tweens()
-	_restore_choice_materials()
-	if skip_index >= 0 and skip_index < home_materials.size():
-		(piece_records[skip_index]["mesh"] as MeshInstance3D).material_override = home_materials[skip_index]
-	super._close_piece_tray(skip_index, immediate)
+	super._close_piece_tray(skip_index, immediate if _rm_enabled else false)
+	choice_materials.clear()
+	for index: int in materials:
+		(piece_records[index]["mesh"] as MeshInstance3D).material_override = materials[index]
+		_restore_visual_material(index)
 
 
 func _reset_tray_state() -> void:
@@ -407,6 +427,7 @@ func _start_victory_colors() -> void:
 	for index: int in winning_piece_indices:
 		victory_materials.erase(index)
 		victory_visibility.erase(index)
+		victory_positions.erase(index)
 		var winner: MeshInstance3D = piece_records[index]["mesh"]
 		winner.material_override = home_materials[index]
 		winner.visible = true
@@ -417,17 +438,19 @@ func _start_victory_colors() -> void:
 			victory_materials[index] = home_materials[index].duplicate()
 			victory_materials[index].transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			victory_visibility[index] = piece.visible
+			victory_positions[index] = piece.position
+			if online_piece_motions.has(index):
+				(online_piece_motions[index] as Tween).kill()
+				online_piece_motions.erase(index)
 		if victory_materials.has(index): piece.material_override = victory_materials[index]
 	_set_victory_mix(victory_mix)
-	if victory_tween != null and victory_tween.is_valid(): return
+	if victory_mix>=0.999 or (victory_tween != null and victory_tween.is_valid()): return
 	if _rm_enabled:
 		_set_victory_mix(1.0)
 		return
-	victory_tween = create_tween().set_loops()
+	victory_tween = create_tween()
 	victory_tween.tween_method(_set_victory_mix, 0.0, 1.0, VICTORY_HALF_CYCLE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	victory_tween.tween_interval(0.25)
-	victory_tween.tween_method(_set_victory_mix, 1.0, 0.0, VICTORY_HALF_CYCLE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	victory_tween.tween_interval(0.25)
+
 
 
 func _set_victory_mix(value: float) -> void:
@@ -437,7 +460,9 @@ func _set_victory_mix(value: float) -> void:
 		var material := victory_materials[index] as StandardMaterial3D
 		# Preserve hue, lighting and finish. Only board pieces' opacity changes.
 		material.albedo_color = Color(source.albedo_color,source.albedo_color.a*(1.0-value))
-		(piece_records[index]["mesh"] as MeshInstance3D).visible = bool(victory_visibility[index]) and value<0.999
+		var piece: MeshInstance3D = piece_records[index]["mesh"]
+		if not _rm_enabled: piece.position = (victory_positions[index] as Vector3) + Vector3.UP * value * scene_motion.SKY_HEIGHT
+		piece.visible = bool(victory_visibility[index]) and value<0.999
 
 
 
@@ -447,9 +472,14 @@ func _stop_victory_colors() -> void:
 	victory_tween = null
 	for index: int in victory_materials:
 		if index < piece_records.size() and index < home_materials.size():
-			(piece_records[index]["mesh"] as MeshInstance3D).material_override = home_materials[index]
-			(piece_records[index]["mesh"] as MeshInstance3D).visible = bool(victory_visibility.get(index,true))
+			_restore_visual_material(index)
+			# Hidden nonwinners remain above the shot; the next return lands them.
+			if not (piece_records[index]["mesh"] as MeshInstance3D).visible:
+				var piece: MeshInstance3D = piece_records[index]["mesh"]
+				piece.position.y = home_transforms[index].origin.y + scene_motion.SKY_HEIGHT
+				piece.show()
 	victory_visibility.clear()
+	victory_positions.clear()
 	victory_materials.clear()
 	victory_mix = 0.0
 	continue_pending = false
@@ -570,18 +600,122 @@ func _online_piece_motion_seconds() -> float:
 	return 0.0 if _rm_enabled else super._online_piece_motion_seconds()
 
 
+func _restore_visual_material(index: int) -> void:
+	if index >= home_materials.size(): return
+	var source := home_materials[index] as BaseMaterial3D
+	if source != null:
+		scene_motion.tint(piece_records[index]["mesh"],source,source.albedo_color,0.0 if _rm_enabled else 0.30,source)
+
+
 func _sync_active_sides() -> void:
-	super._sync_active_sides()
-	if round_complete and not victory_materials.is_empty():
-		_set_victory_mix(victory_mix)
+	var active: Dictionary = {}
+	for player: Dictionary in players: active[str(player.get("direction",""))] = true
+	for index: int in range(piece_records.size()):
+		var piece: MeshInstance3D = piece_records[index]["mesh"]
+		var enabled := active.has(str(piece_records[index].get("dir","")))
+		if not victory_materials.has(index): scene_motion.present(piece,enabled,home_transforms[index],0.0 if _rm_enabled else 0.85)
+		for child: Node in piece.get_children():
+			if child is StaticBody3D and child.has_meta("piece_index"): (child as StaticBody3D).collision_layer = PIECE_LAYER if enabled else 0
+	for direction: String in COLOR_TO_DIRECTION.values():
+		var base := intro.get_node_or_null("Base_%s" % direction) as Node3D
+		if base == null: continue
+		if not base_home_poses.has(direction): base_home_poses[direction] = base.transform
+		scene_motion.present(base,active.has(direction),base_home_poses[direction],0.0 if _rm_enabled else 0.85)
+	if round_complete and not victory_materials.is_empty(): _set_victory_mix(victory_mix)
+
+
+func _clean_visual_board() -> void:
+	var starts: Array[Dictionary] = []
+	for record: Dictionary in piece_records:
+		var piece: MeshInstance3D = record["mesh"]
+		starts.append({"transform":piece.transform,"material":piece.material_override,"visible":piece.visible})
+	if rest_tween != null and rest_tween.is_valid(): rest_tween.kill()
+	super._clean_visual_board()
+	for index: int in range(piece_records.size()):
+		var piece: MeshInstance3D = piece_records[index]["mesh"]
+		piece.transform = starts[index].transform
+		piece.visible = starts[index].visible
+		piece.material_override = starts[index].material
+		_restore_visual_material(index)
+		scene_motion.travel(piece,home_transforms[index],0.0 if _rm_enabled else 0.85,0.0,0.9)
+	for direction: String in base_home_poses:
+		var base := intro.get_node_or_null("Base_%s" % direction) as Node3D
+		if base != null:
+			# Parent cleanup changes visibility only; a hidden base still lives in the sky.
+			scene_motion.travel(base,base_home_poses[direction],0.0 if _rm_enabled else 0.85)
+
+
+func _animate_online_piece(index: int, cell: int) -> void:
+	scene_motion.cancel_flight(piece_records[index]["mesh"])
+	super._animate_online_piece(index,cell)
+
+
+func _set_studio_backdrop_visible(value: bool) -> void:
+	if intro == null: return
+	for node_name: String in ["StudioBackWall","StudioWallLogo"]:
+		var node := intro.get_node_or_null(node_name) as Node3D
+		if node == null: continue
+		if not backdrop_home_poses.has(node_name): backdrop_home_poses[node_name] = node.transform
+		scene_motion.present(node,value,backdrop_home_poses[node_name],0.0 if _rm_enabled else 0.55)
+
+
+func _on_online_room_changed(remote: Dictionary, identity: Dictionary) -> void:
+	if lobby_return_active: return
+	super._on_online_room_changed(remote,identity)
+
+
+func _clear_score_markers() -> void:
+	if score_marker_root != null:
+		for marker: Node in score_marker_root.get_children():
+			if not marker is Node3D: continue
+			if score_marker_motions.has(marker.get_instance_id()):
+				var prior: Tween = score_marker_motions[marker.get_instance_id()]
+				if prior.is_valid(): prior.kill()
+			marker.reparent(intro,true)
+			var exit := create_tween()
+			exit.tween_property(marker,"position",(marker as Node3D).position+Vector3.UP*scene_motion.SKY_HEIGHT,0.0 if _rm_enabled else 0.65).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+			exit.tween_callback(marker.queue_free)
+	score_marker_motions.clear()
+	rendered_score_counts.clear()
+	_publish_score_marker_state()
+
+
+func _reconcile_online_piece_presentation(index: int, start: Dictionary) -> void:
+	if online_piece_motions.has(index): return
+	var piece: MeshInstance3D = piece_records[index]["mesh"]
+	var target := piece.transform
+	piece.transform = start.transform
+	piece.material_override = start.material
+	if victory_materials.has(index): return
+	_restore_visual_material(index)
+	if not _round_piece_should_return(index):
+		scene_motion.present(piece,false,home_transforms[index],0.0 if _rm_enabled else 0.85)
+		return
+	var flight: Dictionary = scene_motion.flights.get(piece.get_instance_id(),{})
+	if not flight.is_empty() and not bool(flight.enabled): return
+	# Recovery reconciles to accepted state along an arc from the actual pose.
+	scene_motion.travel(piece,target,0.0 if _rm_enabled else 0.65,0.0,0.9)
+
+
+func _round_piece_should_return(index: int) -> bool:
+	var direction := str(piece_records[index].get("dir",""))
+	return players.any(func(player: Dictionary) -> bool: return str(player.get("direction",""))==direction)
+
+
+func _restore_round_piece_material(index: int) -> void:
+	_restore_visual_material(index)
 
 
 func _reset_board_for_round() -> void:
+	for index: int in range(piece_records.size()):
+		if _round_piece_should_return(index): scene_motion.cancel_flight(piece_records[index]["mesh"])
 	_stop_victory_colors()
 	super._reset_board_for_round()
 
 
 func _reset_session_transients() -> void:
+	scene_motion.cancel()
+	online_seat_camera_key = ""
 	_stop_victory_colors()
 	super._reset_session_transients()
 
@@ -595,6 +729,10 @@ func _on_post_match_secondary_action() -> void:
 func _return_to_setup() -> void:
 	if lobby_return_active: return
 	lobby_return_active = true
+	# Stop room deliveries before the exit shot, rather than after its animation.
+	if online != null: online.call("deactivate",true)
+	online_active = false
+	online_waiting = false
 	lobby_return_generation += 1
 	var generation := lobby_return_generation
 	_stop_victory_colors()
@@ -621,9 +759,11 @@ func _return_to_setup() -> void:
 	lobby_return_tween.tween_method(_apply_lobby_return,0.0,1.0,duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	for index: int in range(piece_records.size()):
 		var piece: MeshInstance3D = piece_records[index]["mesh"]
-		piece.material_override=home_materials[index]
-		piece.show()
-		lobby_return_tween.tween_property(piece,"transform",home_transforms[index],duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_restore_visual_material(index)
+		scene_motion.travel(piece,home_transforms[index],0.0 if _rm_enabled else 1.1,float(index%9)*0.025,1.2)
+	for direction: String in base_home_poses:
+		var base := intro.get_node_or_null("Base_%s" % direction) as Node3D
+		if base != null: scene_motion.travel(base,base_home_poses[direction],0.0 if _rm_enabled else 1.1)
 	await lobby_return_tween.finished
 	if generation != lobby_return_generation: return
 	_set_studio_backdrop_visible(camera.position.z>=STUDIO_WALL_SAFE_Z)

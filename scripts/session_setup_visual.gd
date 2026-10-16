@@ -15,10 +15,8 @@ var visual_step: String = "color"
 var visual_last_viewport := Vector2.ZERO
 var visual_piece_visibility: Dictionary = {}
 var visual_inactive_material: StandardMaterial3D
-var visual_selection_black_material: StandardMaterial3D
 var visual_prompt: Label3D
 var visual_lights: Dictionary = {}
-var visual_color_tweens: Dictionary = {}
 var visual_light_tween: Tween
 var visual_light_key: String = ""
 var visual_prompt_tween: Tween
@@ -42,6 +40,10 @@ var visual_resume_configuration: Dictionary = {}
 var visual_lobby_angle := 0.0
 var visual_geometry_elapsed := 0.0
 var visual_reduce_motion := false
+var visual_motion = preload("res://scripts/scene_motion.gd").new(self)
+var visual_refit_start := Transform3D.IDENTITY
+var visual_refit_start_fov := 50.0
+var visual_refit_started := false
 
 func _ready() -> void:
 	super._ready()
@@ -176,6 +178,8 @@ func _apply_visual_camera() -> void:
 	var metrics := _canvas_metrics(viewport)
 	canvas_scale = float(metrics["scale"])
 	canvas_css_size = metrics["css_size"] as Vector2
+	var actual_pose := cam.transform
+	var actual_fov := cam.fov
 	# Preserve the accepted intro angle; fit the table without rotating the camera.
 	cam.transform = visual_intro_camera_snapshot["transform"]
 	cam.projection = int(visual_intro_camera_snapshot["projection"])
@@ -186,18 +190,26 @@ func _apply_visual_camera() -> void:
 	cam.v_offset = float(visual_intro_camera_snapshot["v"])
 	if viewport != visual_fit_viewport or visual_fit_ready != (visual_step == "ready"):
 		_fit_visual_table(cam, viewport)
-	var start: Transform3D = visual_camera_snapshot["transform"]
-	cam.transform = start.interpolate_with(visual_fitted_transform,visual_zoom_mix)
-	cam.fov = lerpf(float(visual_camera_snapshot["fov"]),float(visual_intro_camera_snapshot["fov"]),visual_zoom_mix)
+		visual_refit_start = actual_pose
+		visual_refit_start_fov = actual_fov
+		visual_lobby_angle = 0.0
+		visual_zoom_mix = 0.0
+		if visual_zoom_tween != null and visual_zoom_tween.is_valid(): visual_zoom_tween.kill()
+		visual_zoom_tween = create_tween()
+		visual_zoom_tween.tween_property(self,"visual_zoom_mix",1.0,0.0 if visual_reduce_motion else (0.65 if visual_refit_started else 1.25)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		visual_refit_started = true
+	cam.transform = visual_refit_start.interpolate_with(visual_fitted_transform,visual_zoom_mix)
+	cam.fov = lerpf(visual_refit_start_fov,float(visual_intro_camera_snapshot["fov"]),visual_zoom_mix)
 	if visual_lobby_angle!=0.0:
 		# A very slow bounded orbit preserves the approved framing at every angle.
 		var orbit := Basis(Vector3.UP,0.12*sin(visual_lobby_angle))
 		var center := Vector3(0,0.35,0)
 		cam.position = center+orbit*(cam.position-center)
 		cam.basis = orbit*cam.basis
-	for name: String in ["StudioBackWall","StudioWallLogo"]:
-		var background := intro.get_node_or_null(name) as GeometryInstance3D
-		if background != null: background.visible=cam.position.z>=-13.2
+	# UI anchors follow the rendered table throughout the refit, not its future bounds.
+	if not visual_board_corners.is_empty(): visual_board_rect = _project_visual_board(cam)
+	var game := intro.get_node_or_null("PostIntroGameplay")
+	if game != null: game.call("_set_studio_backdrop_visible",cam.position.z>=-13.2)
 	_update_visual_prompt(cam)
 	_update_world_seats(cam)
 
@@ -430,9 +442,6 @@ func _update_visual_seats() -> void:
 		var key := mesh.get_instance_id()
 		if not visual_piece_visibility.has(key):
 			visual_piece_visibility[key] = {"node": mesh, "visible": mesh.visible, "material": mesh.material_override}
-			if mesh.material_override is BaseMaterial3D:
-				visual_piece_visibility[key]["preview_material"] = mesh.material_override.duplicate()
-				visual_piece_visibility[key]["original_color"] = (mesh.material_override as BaseMaterial3D).albedo_color
 		var selected_direction := ""
 		if visual_step == "color" and not visual_selected_color.is_empty():
 			selected_direction = str(PALETTE[_palette_index(visual_selected_color)]["direction"])
@@ -452,29 +461,11 @@ func _update_visual_seats() -> void:
 			visual_inactive_material = StandardMaterial3D.new()
 			visual_inactive_material.albedo_color = Color("#191a1c")
 			visual_inactive_material.roughness = 0.95
-		if visual_selection_black_material == null:
-			visual_selection_black_material = StandardMaterial3D.new()
-			visual_selection_black_material.albedo_color = Color.BLACK
-			visual_selection_black_material.roughness = 0.95
-		# Keep the chosen seat's source material intact; use a true black material
-		# for the other seats while the player is choosing a color.
 		var saved: Dictionary = visual_piece_visibility[key]
-		if not selected_direction.is_empty() and saved.has("preview_material"):
-			var preview := saved["preview_material"] as BaseMaterial3D
-			var original: Color = saved["original_color"]
-			var target: Color = original if enabled else original.lerp(Color.BLACK, 0.70)
-			mesh.material_override = preview
-			var old_tween: Tween = visual_color_tweens.get(key)
-			if old_tween != null and old_tween.is_valid(): old_tween.kill()
-			var duration := 0.0 if _visual_reduced_motion() else 0.24
-			var color_tween := create_tween()
-			color_tween.tween_property(preview,"albedo_color",target,duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-			visual_color_tweens[key] = color_tween
-		else:
-			var old_tween: Tween = visual_color_tweens.get(key)
-			if old_tween != null and old_tween.is_valid(): old_tween.kill()
-			if saved.has("preview_material"): (saved["preview_material"] as BaseMaterial3D).albedo_color = saved["original_color"]
-			mesh.material_override = saved["material"] if enabled else visual_inactive_material
+		var source := saved["material"] as BaseMaterial3D
+		if source == null: continue
+		var target: Color = source.albedo_color if enabled else (source.albedo_color.lerp(Color.BLACK,0.70) if not selected_direction.is_empty() else visual_inactive_material.albedo_color)
+		visual_motion.tint(mesh, source, target, 0.0 if visual_reduce_motion else 0.32, source if enabled else null)
 
 	_update_visual_lighting()
 
@@ -567,14 +558,9 @@ func _restore_visual_camera(preserve_pose: bool = false) -> void:
 	visual_camera_snapshot.clear()
 	for value: Variant in visual_piece_visibility.values():
 		var record := value as Dictionary
-		if is_instance_valid(record["node"]):
-			var mesh := record["node"] as GeometryInstance3D
-			mesh.visible = bool(record["visible"])
-			mesh.material_override = record["material"]
-	for value: Variant in visual_color_tweens.values():
-		var color_tween := value as Tween
-		if color_tween != null and color_tween.is_valid(): color_tween.kill()
-	visual_color_tweens.clear()
+		if is_instance_valid(record["node"]) and record["material"] is BaseMaterial3D:
+			var source := record["material"] as BaseMaterial3D
+			visual_motion.tint(record["node"], source, source.albedo_color, 0.0 if visual_reduce_motion else 0.32, source)
 	visual_piece_visibility.clear()
 
 func _close_visual_setup(preserve_pose: bool = false) -> void:
@@ -585,7 +571,8 @@ func _close_visual_setup(preserve_pose: bool = false) -> void:
 		visual_prompt.hide()
 	if visual_prompt_tween != null and visual_prompt_tween.is_valid(): visual_prompt_tween.kill()
 	if visual_light_tween != null and visual_light_tween.is_valid(): visual_light_tween.kill()
-	for value: Variant in visual_lights.values(): (value as OmniLight3D).hide()
+	if not visual_lights.is_empty(): visual_light_tween = create_tween().set_parallel(true)
+	for value: Variant in visual_lights.values(): visual_light_tween.tween_property(value,"light_energy",0.0,0.0 if visual_reduce_motion else 0.32)
 	visual_light_key = ""
 	visual_prompt_stage = ""
 	showing = false
@@ -596,14 +583,16 @@ func _close_visual_setup(preserve_pose: bool = false) -> void:
 		JavaScriptBridge.eval("if(window.YakolakSetup)window.YakolakSetup.close();", true)
 
 func reset_for_intro() -> void:
-	_close_visual_setup()
+	_close_visual_setup(true)
+	visual_refit_started = false
 	super.reset_for_intro()
 
 func hide_for_online_restore() -> void:
-	_close_visual_setup()
+	_close_visual_setup(true)
 	super.hide_for_online_restore()
 
 func show_setup_error(message: String) -> void:
+	if not visual_active: visual_fit_viewport = Vector2.ZERO
 	showing = true
 	visual_active = true
 	_apply_visual_camera()
@@ -611,6 +600,7 @@ func show_setup_error(message: String) -> void:
 		JavaScriptBridge.eval("if(window.YakolakSetup)window.YakolakSetup.error(" + JSON.stringify(message) + ");", true)
 
 func show_online_error(error_code: String) -> void:
+	if not visual_active: visual_fit_viewport = Vector2.ZERO
 	showing = true
 	visual_active = true
 	_apply_visual_camera()
