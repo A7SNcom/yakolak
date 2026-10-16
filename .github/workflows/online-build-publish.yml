@@ -111,6 +111,9 @@ jobs:
         with:
           enablement: true
 
+      - name: Require real-device multiplayer acceptance
+        run: python3 scripts/check_online_release.py
+
       - name: Upload Godot Web preview
         uses: actions/upload-pages-artifact@v3
         with:

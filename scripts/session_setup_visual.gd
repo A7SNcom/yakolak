@@ -402,7 +402,15 @@ func _on_visual_action(arguments: Array) -> void:
 		"start":
 			_accept_visual_configuration(payload)
 		"join":
-			show_setup_error("الأونلاين غير متاح حالياً")
+			var code := str(payload.get("code",""))
+			if code.length()!=3 or not code.is_valid_int():
+				show_setup_error("اكتب رمزًا من 3 أرقام")
+				return
+			var name := str(payload.get("name","لاعب")).left(24)
+			var configuration := {"tutorial":false,"rounds":3,"online_join_code":code,"players":[{"seat":"p1","label":name,"mode":"local","color":"marble","color_name":"أبيض","direction":"right"}]}
+			_close_visual_setup(true)
+			_publish_setup_state("complete")
+			configuration_ready.emit(configuration)
 
 func _update_visual_seats() -> void:
 	if intro == null:
@@ -516,9 +524,8 @@ func _validated_visual_configuration(payload: Dictionary) -> Dictionary:
 			return {}
 		colors.append(color)
 		var mode := str(player.get("mode", ""))
-		# Static GitHub hosting has no room server. Never turn a requested remote
-		# player into a bot/local player silently or pretend a room was created.
-		if mode not in ["local", "bot"] or str(player.get("device_owner", "p1")) != "p1":
+		# Remote seats are carried unchanged to the real WebRTC host transport.
+		if mode not in ["local", "bot", "online"] or str(player.get("device_owner", "p1")) != "p1":
 			return {}
 		if index == 0 and mode != "local":
 			return {}
@@ -596,8 +603,14 @@ func show_setup_error(message: String) -> void:
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("if(window.YakolakSetup)window.YakolakSetup.error(" + JSON.stringify(message) + ");", true)
 
-func show_online_error(_error_code: String) -> void:
-	show_setup_error("الأونلاين غير متاح حالياً")
+func show_online_error(error_code: String) -> void:
+	showing = true
+	visual_active = true
+	_apply_visual_camera()
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("if(window.YakolakSetup)window.YakolakSetup.networkError("+JSON.stringify(error_code)+");",true)
+	else:
+		show_setup_error("تعذر الاتصال بالغرفة")
 
 func _on_visual_room_state(room: Dictionary, _identity: Dictionary) -> void:
 	if visual_active and OS.has_feature("web"):

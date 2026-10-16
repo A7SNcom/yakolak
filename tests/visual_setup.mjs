@@ -65,8 +65,8 @@ test('selecting a named local player swaps colors while preserving identities an
 });
 
 test('room code or same-origin invitation link normalizes',()=>{
- assert.equal(parseRoomInput('١٢'),'12');assert.equal(parseRoomInput('https://a7sncom.github.io/yakolak/?room=12'),'12');
- assert.equal(parseRoomInput('https://example.com/?room=12'),'');assert.equal(parseRoomInput('123'),'');
+ assert.equal(parseRoomInput('١٢٣'),'123');assert.equal(parseRoomInput('https://a7sncom.github.io/yakolak/?room=123'),'123');
+ assert.equal(parseRoomInput('https://example.com/?room=123'),'');assert.equal(parseRoomInput('12'),'');
 });
 if(process.env.YAKOLAK_JSDOM_MODULE){
  const {JSDOM}=await import(process.env.YAKOLAK_JSDOM_MODULE);
@@ -157,10 +157,10 @@ if(process.env.YAKOLAK_JSDOM_MODULE){
   q('.yk-rounds button[aria-label="الفوز بـ 5 أشواط"]').click();const start=events.find(x=>x.action==='start');assert.equal(start.rounds,5);assert.equal(start.count_chosen,true);assert.equal(start.players[1].label,'ريم');assert.equal(start.players.length,3);
   assert.ok(!JSON.stringify(events).includes('0551234567'));
   api.open();assert.equal(q('.yk-entry').hidden,false);assert.equal(q('.yk-modal').hidden,true);assert.equal(q('input[autocomplete=given-name]'),null);
-  q('.yk-entry button:last-child').click();q('input').value='https://a7sncom.github.io/yakolak/?room=12';q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));assert.match(q('.yk-field-error').textContent,/غير متاح/);
+  q('.yk-entry button:last-child').click();q('input').value='https://a7sncom.github.io/yakolak/?room=123';q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));assert.match(q('.yk-field-error').textContent,/غير متاح/);
   q('.yk-subtle').click();q('.yk-entry button').click();q('[data-color=blue]').click();q('.yk-confirm').click();q('.yk-counts button').click();
   assert.equal(q('.yk-sharing').disabled,true);q('.yk-sharing').click();assert.equal(copies.length,0);assert.equal(q('.yk-error').textContent,'');
-  api.room({code:'12',players:[]});q('.yk-sharing').click();await Promise.resolve();assert.equal(copies[0],'https://a7sncom.github.io/yakolak/?room=12');
+  api.room({code:'123',players:[]});q('.yk-sharing').click();await Promise.resolve();assert.equal(copies[0],'https://a7sncom.github.io/yakolak/?room=123');
   dom.window.close();
  });
  test('closing and reopening during the profile step clears stale overlay state',()=>{
@@ -197,6 +197,19 @@ test('new settings restore the same roster directly to ready without visitor onb
  const api=mountSetup(dom.window.document,dom.window);api.open({resume:config,request:'resume-1'});
  const root=dom.window.document.getElementById('yakolakVisualSetup');assert.equal(root.dataset.step,'ready');assert.equal(root.querySelector('.yk-modal').hidden,true);assert.equal(root.querySelector('.yk-start').hidden,false);
  assert.equal(root.querySelector('[data-color=blue] .yk-seat-status').textContent,'ريم');dom.window.close();
+});
+
+test('online error releases a pending start and keeps the roster available for retry',()=>{
+ const dom=new JSDOM('<body></body>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});
+ const {window}=dom;window.matchMedia=()=>({matches:true});
+ const api=mountSetup(window.document,window);api.open({online:true,resume:{rounds:3,players:[{color:'marble',label:'أحمد',mode:'local'},{color:'blue',label:'ريم',mode:'online'}]}});
+ const q=s=>window.document.querySelector(s);
+ q('.yk-start').click();q('.yk-rounds button').click();assert.ok(q('.yk-rounds button').disabled);
+ api.close();api.networkError('signaling_unavailable');
+ assert.equal(q('#yakolakVisualSetup').dataset.step,'ready');assert.equal(q('#yakolakVisualSetup').hidden,false);
+ assert.equal(q('.yk-start').disabled,false);assert.equal(q('.yk-sharing').disabled,true);
+ assert.match(q('.yk-error').textContent,/خدمة اكتشاف/);assert.equal(q('[data-color=blue] .yk-seat-status').textContent,'ريم');
+ dom.window.close();
 });
 
 }

@@ -6,6 +6,7 @@ import re
 import hashlib
 import json
 import shutil
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -485,26 +486,28 @@ def write_surface_preview(version: str) -> None:
     )
 
 
+def copy_setup_assets() -> str:
+    bundle = subprocess.check_output(["node", "scripts/build-online.mjs"], cwd=ROOT, text=True).strip()
+    module = (ROOT / "ui/visual-setup.mjs").read_text(encoding="utf-8")
+    module = module.replace("'./online-trystero.mjs'", repr("./" + bundle))
+    (ROOT / "web/visual-setup.mjs").write_text(module, encoding="utf-8")
+    shutil.copyfile(ROOT / "ui/visual-setup.css", ROOT / "web/visual-setup.css")
+    (ROOT / "web/vendor").mkdir(exist_ok=True)
+    for filename in ("liquefy-core-1.1.0.mjs", "LIQUEFY-LICENSE.txt"):
+        shutil.copyfile(ROOT / "ui/vendor" / filename, ROOT / "web/vendor" / filename)
+    shutil.copyfile(ROOT / "assets/fonts/thmanyahsans-Medium.otf", ROOT / "web/setup-font.otf")
+    return hashlib.sha256(b"".join((ROOT / "web" / path).read_bytes() for path in (
+        "visual-setup.mjs", "visual-setup.css", "vendor/liquefy-core-1.1.0.mjs", bundle
+    ))).hexdigest()[:12]
+
+
 def main() -> None:
     html = INDEX.read_text(encoding="utf-8")
     if "yakolak-v130-loading-star-style" in html:
         # A fast publish can reuse the already-exported Godot bundle. Refresh
         # the separately loaded setup UI and its content hash without injecting
         # the intro markup a second time or rebuilding the WebAssembly export.
-        for filename in ("visual-setup.mjs", "visual-setup.css"):
-            shutil.copyfile(ROOT / "ui" / filename, ROOT / "web" / filename)
-        (ROOT / "web/vendor").mkdir(exist_ok=True)
-        for filename in ("liquefy-core-1.1.0.mjs", "LIQUEFY-LICENSE.txt"):
-            shutil.copyfile(ROOT / "ui/vendor" / filename, ROOT / "web/vendor" / filename)
-        shutil.copyfile(ROOT / "assets/fonts/thmanyahsans-Medium.otf", ROOT / "web/setup-font.otf")
-        setup_assets = (
-            "ui/visual-setup.mjs",
-            "ui/visual-setup.css",
-            "ui/vendor/liquefy-core-1.1.0.mjs",
-        )
-        setup_version = hashlib.sha256(
-            b"".join((ROOT / path).read_bytes() for path in setup_assets)
-        ).hexdigest()[:12]
+        setup_version = copy_setup_assets()
         write_surface_preview(setup_version)
         html, css_count = re.subn(
             r'(<link rel="stylesheet" href="visual-setup\.css)(?:\?v=[^"]*)?(">)',
@@ -541,12 +544,7 @@ def main() -> None:
     for marker in semantic_markers:
         if html.count(marker) != 1:
             raise RuntimeError(f"semantic marker count mismatch: {marker}")
-    for filename in ("visual-setup.mjs", "visual-setup.css"):
-        shutil.copyfile(ROOT / "ui" / filename, ROOT / "web" / filename)
-    (ROOT / "web/vendor").mkdir(exist_ok=True)
-    for filename in ("liquefy-core-1.1.0.mjs", "LIQUEFY-LICENSE.txt"):
-        shutil.copyfile(ROOT / "ui/vendor" / filename, ROOT / "web/vendor" / filename)
-    shutil.copyfile(ROOT / "assets/fonts/thmanyahsans-Medium.otf", ROOT / "web/setup-font.otf")
+    setup_version = copy_setup_assets()
     # Give the pack a content-addressed name so cached exports cannot be mixed
     # with a newer DOM setup module. Keep index.pck as the canonical artifact.
     pack_bytes = (ROOT / "web/index.pck").read_bytes()
@@ -563,8 +561,6 @@ def main() -> None:
     html, config_count = re.subn(r"(const GODOT_CONFIG\s*=\s*)(\{[^\n]+\})(\s*;)", version_pack, html, count=1)
     if config_count != 1:
         raise RuntimeError("Godot export config missing")
-    setup_assets = ("ui/visual-setup.mjs", "ui/visual-setup.css", "ui/vendor/liquefy-core-1.1.0.mjs")
-    setup_version = hashlib.sha256(b"".join((ROOT / path).read_bytes() for path in setup_assets)).hexdigest()[:12]
     write_surface_preview(setup_version)
     html = html.replace("</head>", f'<link rel="stylesheet" href="visual-setup.css?v={setup_version}">\n</head>', 1)
     html = html.replace("</body>", f'<script type="module" src="visual-setup.mjs?v={setup_version}"></script>\n</body>', 1)

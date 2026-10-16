@@ -3,7 +3,7 @@ import fs from 'node:fs';
 
 const source = fs.readFileSync(new URL('../scripts/online_session.gd', import.meta.url), 'utf8');
 const gameplay = fs.readFileSync(new URL('../scripts/gameplay_session_resilient.gd', import.meta.url), 'utf8');
-const server = fs.readFileSync(new URL('../api/rooms.js', import.meta.url), 'utf8');
+const server = fs.readFileSync(new URL('../api/rooms.js', import.meta.url), 'utf8')+fs.readFileSync(new URL('../api/room-state.js', import.meta.url), 'utf8');
 
 const required = [
   ['protocol v5', 'const PROTOCOL: int = 5'],

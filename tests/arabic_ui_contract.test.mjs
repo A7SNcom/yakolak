@@ -35,7 +35,9 @@ assert.ok(scene.includes('res://scripts/gameplay_session_nested_pick.gd'), 'the 
 assert.ok(gameplayNestedPick.includes('extends "res://scripts/gameplay_session_polish.gd"'), 'nested picking must preserve the gameplay polish layer');
 assert.ok(gameplayPolish.includes('extends "res://scripts/gameplay_session_hardened.gd"'), 'gameplay polish must preserve the hardened gameplay layer');
 assert.ok(gameplayHardened.includes('extends "res://scripts/gameplay_session_resilient.gd"'), 'hardened gameplay must preserve the Arabic/stability layer');
-assert.ok(scene.includes('res://scripts/online_session_reconnect_hydration.gd'), 'the reconnect hydration online layer must remain active');
+const onlineP2P=fs.readFileSync(new URL('../scripts/online_session_trystero.gd',import.meta.url),'utf8');
+assert.ok(scene.includes('res://scripts/online_session_trystero.gd'));
+assert.ok(onlineP2P.includes('extends "res://scripts/online_session_reconnect_hydration.gd"'), 'WebRTC must preserve reconnect hydration');
 assert.ok(onlineReconnect.includes('extends "res://scripts/online_session_hardened.gd"'), 'reconnect hydration must preserve the hardened online layer');
 assert.ok(onlineHardened.includes('extends "res://scripts/online_session.gd"'), 'hardened online must preserve the base Arabic invitation transport');
 assert.ok(scene.includes('res://scripts/session_setup_design_system.gd'), 'the setup design-system adapter must remain active');

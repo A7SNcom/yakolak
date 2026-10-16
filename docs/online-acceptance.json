@@ -1,0 +1,7 @@
+{
+  "result": "blocked",
+  "date": "2026-10-16",
+  "physicalDevices": [],
+  "scenarios": {},
+  "reason": "Public signaling WebSockets fail with ERR_EMPTY_RESPONSE in the execution environment; no two physical devices are available. Do not deploy until real-device acceptance succeeds."
+}

@@ -1,0 +1,15 @@
+import {build} from 'esbuild';
+import {readFile,mkdir,writeFile,readdir,unlink} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+const root=fileURLToPath(new URL('../',import.meta.url));
+const result=await build({entryPoints:[root+'ui/online-trystero.mjs'],bundle:true,write:false,format:'esm',platform:'browser',target:'es2022',minify:true,legalComments:'inline'});
+const bytes=result.outputFiles[0].contents;
+const filename=`online-trystero-${createHash('sha256').update(bytes).digest('hex').slice(0,12)}.mjs`;
+await mkdir(root+'web',{recursive:true});
+for(const old of await readdir(root+'web'))if(/^online-trystero-[a-f0-9]{12}\.mjs$/.test(old)&&old!==filename)await unlink(root+'web/'+old);
+await writeFile(root+'web/'+filename,bytes);
+const packages=['trystero','@trystero-p2p/core','@trystero-p2p/nostr','@noble/secp256k1'];
+const licenses=await Promise.all(packages.map(async name=>`${name}\n${await readFile(root+'node_modules/'+name+'/LICENSE','utf8')}`));
+await writeFile(root+'web/TRYSTERO-LICENSES.txt',licenses.join('\n\n'));
+console.log(filename);

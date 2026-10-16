@@ -446,7 +446,7 @@ func _apply_online_room(remote: Dictionary) -> void:
 		var seat: String = str(remote_player.get("seat", ""))
 		players.append({
 			"seat": seat,
-			"label": "أنا" if seat == str(online_identity.get("seat", "")) else "لاعب %d" % (index + 1),
+			"label": str(remote_player.get("name", "أنا" if seat == str(online_identity.get("seat", "")) else "لاعب %d" % (index + 1))).left(24),
 			"mode": "local" if seat == str(online_identity.get("seat", "")) else "online",
 			"color": color,
 			"color_name": str(COLOR_NAMES.get(color, color)),
