@@ -9,6 +9,11 @@ accepted = (record.get("result") == "passed"
             and len(set(record.get("physicalDevices", []))) >= 2
             and all(isinstance(device, str) and device.strip() for device in record["physicalDevices"])
             and all(record.get("scenarios", {}).get(key) is True for key in scenarios))
-if not accepted:
+publication = record.get("publication", {})
+user_test = publication.get("authorized") is True and publication.get("purpose") == "user_device_test"
+if not accepted and not user_test:
     raise SystemExit("Pages publish blocked: real multiplayer acceptance on two physical devices is still pending. See docs/ONLINE_TRYSTERO.md.")
-print("YAKOLAK_REAL_DEVICE_ACCEPTANCE_RECORDED")
+if accepted:
+    print("YAKOLAK_REAL_DEVICE_ACCEPTANCE_RECORDED")
+else:
+    print("YAKOLAK_OWNER_AUTHORIZED_DEVICE_TEST_PUBLISH: real-device acceptance remains pending")

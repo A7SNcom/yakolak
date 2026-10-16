@@ -3,5 +3,11 @@
   "date": "2026-10-16",
   "physicalDevices": [],
   "scenarios": {},
-  "reason": "Public signaling WebSockets fail with ERR_EMPTY_RESPONSE in the execution environment; no two physical devices are available. Do not deploy until real-device acceptance succeeds."
+  "reason": "Public signaling test failed from the execution environment; real-device acceptance is pending. The owner explicitly requested publication to test on their own devices.",
+  "publication": {
+    "authorized": true,
+    "purpose": "user_device_test",
+    "date": "2026-10-16",
+    "requestedBy": "repository owner"
+  }
 }
