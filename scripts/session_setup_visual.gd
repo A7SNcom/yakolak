@@ -44,9 +44,11 @@ var visual_motion = preload("res://scripts/scene_motion.gd").new(self)
 var visual_refit_start := Transform3D.IDENTITY
 var visual_refit_start_fov := 50.0
 var visual_refit_started := false
+var visual_lesson
 
 func _ready() -> void:
 	super._ready()
+	visual_lesson = preload("res://scripts/win_tutorial.gd").new(self)
 	visual_font = preload("res://assets/fonts/thmanyahsans-Medium.otf").duplicate()
 	visual_font.fallbacks = [ARABIC_FONT]
 	process_priority = 1200
@@ -114,6 +116,8 @@ func _publish_visual_entry_request() -> void:
 func _process(delta: float) -> void:
 	if not visual_active:
 		return
+	if visual_lesson != null and visual_lesson.active:
+		return # The lesson holds this exact camera pose; no competing orbit/refit.
 	if OS.has_feature("web") and not visual_entry_acknowledged:
 		visual_entry_check_elapsed += delta
 		if visual_entry_check_elapsed >= 0.25:
@@ -135,6 +139,7 @@ func _process(delta: float) -> void:
 
 func _layout_card() -> void:
 	if visual_active:
+		if visual_lesson != null and visual_lesson.active: return
 		_apply_visual_camera()
 		_publish_visual_geometry.call_deferred()
 		return
@@ -161,6 +166,7 @@ func animate_setup_entry() -> void:
 		super.animate_setup_entry()
 
 func _apply_visual_camera() -> void:
+	if visual_lesson != null and visual_lesson.active: return
 	if intro == null:
 		return
 	var cam := intro.get("camera") as Camera3D
@@ -421,7 +427,16 @@ func _on_visual_action(arguments: Array) -> void:
 	if not parsed is Dictionary:
 		return
 	var payload := parsed as Dictionary
-	match str(payload.get("action", "")):
+	var action := str(payload.get("action",""))
+	if visual_lesson != null and visual_lesson.active and action not in ["learn-next","learn-close"]: return
+	match action:
+		"learn":
+			if visual_step=="entry" and not visual_overlay_open:
+				visual_lesson.start(str(payload.get("request","")))
+		"learn-next":
+			visual_lesson.next(str(payload.get("request","")))
+		"learn-close":
+			visual_lesson.close(str(payload.get("request","")))
 		"preview":
 			visual_preview_seats = payload.get("all_seats", []) as Array
 			visual_step = str(payload.get("step", "color"))
@@ -580,6 +595,7 @@ func _restore_visual_camera(preserve_pose: bool = false) -> void:
 	visual_piece_visibility.clear()
 
 func _close_visual_setup(preserve_pose: bool = false) -> void:
+	if visual_lesson != null and visual_lesson.active: visual_lesson.cancel()
 	visual_active = false
 	for value: Variant in visual_world_seats.values():
 		(value["node"] as Node3D).hide()
@@ -599,6 +615,7 @@ func _close_visual_setup(preserve_pose: bool = false) -> void:
 		JavaScriptBridge.eval("if(window.YakolakSetup)window.YakolakSetup.close();", true)
 
 func reset_for_intro() -> void:
+	if visual_lesson != null: visual_lesson.cancel()
 	_close_visual_setup(true)
 	visual_refit_started = false
 	super.reset_for_intro()

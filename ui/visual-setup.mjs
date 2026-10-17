@@ -1,5 +1,6 @@
 import {P2P,supportsP2P,arabicNetworkError} from './online-trystero.mjs';
 import {attachLiquidLens} from './vendor/liquefy-core-1.1.0.mjs';
+import WIN_LESSONS from '../rules/win-presentation.json' with {type:'json'};
 
 // Invisible layout guide only. No belt is painted; the four independent
 // controls share its center, spacing and mirrored tangent angles.
@@ -142,6 +143,7 @@ export function mountSetup(document, window, client=P2P) {
   let pending = false, returnFocus = null, sheetGeneration = 0, moving = false, nameDraft = null, flowGeneration = 0, profileContinuation = null;
   let lastEntryRequest = '',inviteHandled=false,networkBusy=false;
   let lobbySignature='',guestPhase='',guestPreview=null,guestBusy=false,hostAwaitingStart=false;
+  let lessonRequest='',lessonSerial=0,lessonClosing=false;
   const el = (tag, cls, text) => { const node = document.createElement(tag); if (cls) node.className = cls; if (text !== undefined) node.textContent = text; return node; };
   const button = (label, action, cls = '') => { const node = el('button',cls);if(label)node.append(el('span','yk-button-label',label)); node.type = 'button'; node.addEventListener('click',e=>{e.stopPropagation();action(e);}); return node; };
   const reduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -170,7 +172,8 @@ export function mountSetup(document, window, client=P2P) {
   const actions = el('footer','yk-actions');
   const entry = el('div','yk-entry');
   const create=button('غرفة جديدة',()=>requireProfile(()=>go('color')),'yk-primary');
-  const join=button('انضمام لغرفة',()=>requireProfile(openJoin),'yk-outline'); entry.append(create,join);
+  const join=button('انضمام لغرفة',()=>requireProfile(openJoin),'yk-outline');
+  const learn=button('كيف تفوز؟',openLesson,'yk-learn');entry.append(create,join,learn);
   const confirm=button('تأكيد',()=>{if(hostAwaitingStart){void leaveGuestLobby();return;}if(guestPhase==='color'){void chooseGuestColor();return;}if(state.selectedColor)go('count');},'yk-primary yk-confirm');
   const counts=el('div','yk-counts');counts.setAttribute('role','group');counts.setAttribute('aria-label','عدد اللاعبين');
   [2,3,4].forEach(n=>{const b=button(String(n),()=>go(chooseCount(state,n)),'yk-choice');b.setAttribute('aria-label',`${n} لاعبين`);counts.append(b);});
@@ -188,6 +191,48 @@ export function mountSetup(document, window, client=P2P) {
   const modal=el('div','yk-modal');modal.hidden=true;
   const sheet=el('section','yk-sheet');sheet.setAttribute('role','dialog');sheet.setAttribute('aria-labelledby','ykSheetTitle');modal.append(sheet);
   root.append(header,seats,actions,modal);document.body.append(root);
+  const lesson=el('section','yk-lesson');lesson.hidden=true;lesson.setAttribute('role','dialog');lesson.setAttribute('aria-modal','true');lesson.setAttribute('aria-labelledby','ykLessonTitle');
+  const lessonBack=button('رجوع',()=>lessonCommand('learn-close'),'yk-lesson-back');
+  const lessonHeading=el('div','yk-lesson-heading'),lessonCount=el('span','yk-lesson-count');lessonCount.dir='ltr';
+  const lessonTitle=el('h2','yk-lesson-title');lessonTitle.id='ykLessonTitle';
+  const lessonSlogan=el('p','yk-lesson-slogan'),lessonDescription=el('p','yk-lesson-description');
+  lessonHeading.setAttribute('aria-live','polite');lessonHeading.append(lessonCount,lessonTitle,lessonSlogan);
+  const lessonFooter=el('div','yk-lesson-footer'),lessonNext=button('',()=>lessonCommand('learn-next'),'yk-primary yk-lesson-next');
+  lessonFooter.append(lessonDescription,lessonNext);lesson.append(lessonBack,lessonHeading,lessonFooter);root.append(lesson);
+  function lessonCommand(action){
+    if(!lessonRequest||lessonClosing)return;
+    if(action==='learn-next'||action==='learn-close'){lessonNext.disabled=true;lesson.setAttribute('aria-busy','true');}
+    window.yakolakVisualSetupAction?.(JSON.stringify({action,request:lessonRequest}));
+  }
+  function openLesson(){
+    if(state.step!=='entry'||pending||moving||networkBusy||!modal.hidden||lessonRequest)return;
+    lessonRequest=`${lastEntryRequest}:${++lessonSerial}`;lessonClosing=false;
+    for(const node of [header,seats,actions])node.inert=true;
+    root.dataset.lesson='active';lesson.hidden=false;updateLesson({request:lessonRequest,stage:0,busy:true});
+    animate(lesson,[{opacity:0,transform:'translateY(10px)'},{opacity:1,transform:'translateY(0)'}],260);
+    lessonBack.focus({preventScroll:true});lessonCommand('learn');
+  }
+  function resetLesson(){lessonRequest='';lessonClosing=false;lesson.hidden=true;delete root.dataset.lesson;for(const node of [header,seats,actions])node.inert=false;}
+  function updateLesson(update){
+    if(!lessonRequest||update.request!==lessonRequest||root.hidden)return;
+    if(update.closed){
+      if(lessonClosing)return;lessonClosing=true;
+      const id=lessonRequest,finish=()=>{if(id!==lessonRequest)return;resetLesson();learn.focus({preventScroll:true});};
+      const exit=animate(lesson,[{opacity:1,transform:'translateY(0)'},{opacity:0,transform:'translateY(10px)'}],220);
+      if(exit)exit.finished.then(finish,finish);else finish();return;
+    }
+    const index=Math.max(0,Math.min(WIN_LESSONS.length-1,Number(update.stage)||0)),content=WIN_LESSONS[index];
+    if(lesson.dataset.stage!==content.id){
+      lesson.dataset.stage=content.id;lessonCount.textContent=`${index+1} / ${WIN_LESSONS.length}`;lessonTitle.textContent=content.title;lessonSlogan.textContent=content.slogan;lessonDescription.textContent=content.description;
+      animate(lessonHeading,[{opacity:0},{opacity:1}],220);
+    }
+    lessonNext.textContent=index===WIN_LESSONS.length-1?'يلا نلعب':`التالي: ${WIN_LESSONS[index+1].title}`;
+    lessonNext.disabled=!!update.busy;lesson.setAttribute('aria-busy',String(!!update.busy));
+  }
+  lesson.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){e.preventDefault();lessonCommand('learn-close');}
+    if(e.key==='Tab'){const controls=[lessonBack,...(!lessonNext.disabled?[lessonNext]:[])],first=controls[0],last=controls.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}
+  });
   const lenses=new Map();
   const ns='http://www.w3.org/2000/svg';
   const svgNode=(tag,attrs={})=>{const n=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,v);return n;};
@@ -553,10 +598,11 @@ export function mountSetup(document, window, client=P2P) {
   root.addEventListener('pointerdown',e=>{if(nameDraft&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet();},true);
   root.addEventListener('click',e=>{if(!modal.hidden&&modal.dataset.kind!=='profile'&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet(true);});root.addEventListener('keydown',e=>e.stopPropagation());
   const api={
-    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;nameDraft=null;profileContinuation=null;closeSheet();resetOverlay();capabilities={online:!!options.online||supportsP2P(window),mixed:true};connections=options.resume?.players?connections:[];roomCode=options.resume?.players?roomCode:'';pending=moving=false;state=options.resume?.players?restoreSetup(options.resume,profile?.name||''):newSetup(profile?.name||'');if(options.preview_step==='color')state={...state,step:'color',selectedColor:''};geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
+    lesson:updateLesson,
+    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;resetLesson();flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;nameDraft=null;profileContinuation=null;closeSheet();resetOverlay();capabilities={online:!!options.online||supportsP2P(window),mixed:true};connections=options.resume?.players?connections:[];roomCode=options.resume?.players?roomCode:'';pending=moving=false;state=options.resume?.players?restoreSetup(options.resume,profile?.name||''):newSetup(profile?.name||'');if(options.preview_step==='color')state={...state,step:'color',selectedColor:''};geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
       // Never synchronously call back into Godot while it is publishing entry.
       const token=flowGeneration;window.setTimeout(()=>{if(token!==flowGeneration||root.hidden)return;notify('preview');const invitation=parseRoomInput(new URL(window.location.href).searchParams.get('room')||'',window.location.href);if(invitation&&!inviteHandled&&!options.resume?.players&&client?.role!=='host'){inviteHandled=true;requireProfile(()=>openJoin(invitation));}},0);},
-    close(){flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;nameDraft=null;profileContinuation=null;pending=moving=false;resetOverlay();root.hidden=true;refreshGlass();delete window.yakolakPendingVisualSetup;document.body.dataset.yakolakVisualSetup='hidden';},
+    close(){resetLesson();flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;nameDraft=null;profileContinuation=null;pending=moving=false;resetOverlay();root.hidden=true;refreshGlass();delete window.yakolakPendingVisualSetup;document.body.dataset.yakolakVisualSetup='hidden';},
     geometry(points){geometry=points;root.dataset.world=String(!!points.world);position();},
     error(text){root.hidden=false;showError(text);},
     networkError(code){pending=moving=networkBusy=false;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';if(state.step==='rounds')state={...state,step:'ready'};roomCode=client?.code||'';lobbySignature='';render();showError(arabicNetworkError(code));},

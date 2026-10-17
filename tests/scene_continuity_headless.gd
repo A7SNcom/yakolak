@@ -20,14 +20,18 @@ func _watch(seconds: float) -> void:
 	var end := Time.get_ticks_msec()+int(seconds*1000.0)
 	var previous := camera.transform
 	var at := Time.get_ticks_msec()
+	var previous_frame_seconds := root.get_process_delta_time()
 	while Time.get_ticks_msec()<end:
 		await process_frame
 		var now := Time.get_ticks_msec()
-		var delta := maxf(float(now-at)/1000.0,0.001)
+		# Observe the same engine step that advanced the visible tween, rather
+		# than treating a sub-millisecond uncapped frame as zero animation time.
+		var delta := maxf(maxf(float(now-at)/1000.0,previous_frame_seconds),0.001)
 		_expect(camera.position.distance_to(previous.origin)<0.25+80.0*delta,"camera never cuts between lifecycle owners")
 		_expect(camera.basis.get_rotation_quaternion().angle_to(previous.basis.get_rotation_quaternion())<0.05+5.0*delta,"camera orientation remains continuous")
 		previous=camera.transform
 		at=now
+		previous_frame_seconds=root.get_process_delta_time()
 
 func _piece(direction: String) -> MeshInstance3D:
 	for record: Dictionary in game.get("piece_records"):

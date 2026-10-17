@@ -67,6 +67,13 @@ static func player_has_legal_move(occupied_slots: Dictionary, piece_records: Arr
 static func winning_piece_indices(occupied_slots: Dictionary, piece_records: Array, direction: String) -> Array[int]:
 	var winning: Array[int] = []
 	var seen: Dictionary = {}
+	for pattern: Dictionary in winning_patterns(occupied_slots,piece_records,direction):
+		_append_pattern(pattern.pieces,winning,seen)
+	return winning
+
+
+static func winning_patterns(occupied_slots: Dictionary, piece_records: Array, direction: String) -> Array[Dictionary]:
+	var patterns: Array[Dictionary] = []
 	var rule_data: Dictionary = contract()
 	var rule_sizes: Array = rule_data.get("sizes", []) as Array
 	var lines: Array = rule_data.get("lines", []) as Array
@@ -75,9 +82,11 @@ static func winning_piece_indices(occupied_slots: Dictionary, piece_records: Arr
 	for line_value: Variant in lines:
 		var line: Array = line_value as Array
 		for size_value: Variant in rule_sizes:
-			_append_pattern(_line_piece_indices(occupied_slots, piece_records, line, [size_value, size_value, size_value], direction), winning, seen)
+			var same := _line_piece_indices(occupied_slots,piece_records,line,[size_value,size_value,size_value],direction)
+			if same.size()==3: patterns.append({"type":"same-size-line","pieces":same})
 		for order_value: Variant in graded_orders:
-			_append_pattern(_line_piece_indices(occupied_slots, piece_records, line, order_value as Array, direction), winning, seen)
+			var graded := _line_piece_indices(occupied_slots,piece_records,line,order_value as Array,direction)
+			if graded.size()==3: patterns.append({"type":"graded-line","pieces":graded})
 
 	for cell: int in range(cell_count()):
 		var stack: Array[int] = []
@@ -87,8 +96,8 @@ static func winning_piece_indices(occupied_slots: Dictionary, piece_records: Arr
 				stack.clear()
 				break
 			stack.append(piece_index)
-		_append_pattern(stack, winning, seen)
-	return winning
+		if stack.size()==3: patterns.append({"type":"complete-cell","pieces":stack})
+	return patterns
 
 
 static func _line_piece_indices(occupied_slots: Dictionary, piece_records: Array, line: Array, pattern_sizes: Array, direction: String) -> Array[int]:

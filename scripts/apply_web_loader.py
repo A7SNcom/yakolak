@@ -490,6 +490,15 @@ def copy_setup_assets() -> str:
     bundle = subprocess.check_output(["node", "scripts/build-online.mjs"], cwd=ROOT, text=True).strip()
     module = (ROOT / "ui/visual-setup.mjs").read_text(encoding="utf-8")
     module = module.replace("'./online-trystero.mjs'", repr("./" + bundle))
+    # Source tests read the canonical JSON directly. Ship it inline so the web
+    # module never requests ../rules outside the Pages app, and older Safari
+    # versions do not need JSON-module import attributes. Its copy is covered
+    # by the setup module's existing content hash/cache invalidation.
+    lesson_import = "import WIN_LESSONS from '../rules/win-presentation.json' with {type:'json'};"
+    if module.count(lesson_import) != 1:
+        raise RuntimeError("Short tutorial data import is missing or ambiguous")
+    lessons = json.loads((ROOT / "rules/win-presentation.json").read_text(encoding="utf-8"))
+    module = module.replace(lesson_import, "const WIN_LESSONS = " + json.dumps(lessons, ensure_ascii=False) + ";")
     (ROOT / "web/visual-setup.mjs").write_text(module, encoding="utf-8")
     shutil.copyfile(ROOT / "ui/visual-setup.css", ROOT / "web/visual-setup.css")
     (ROOT / "web/vendor").mkdir(exist_ok=True)

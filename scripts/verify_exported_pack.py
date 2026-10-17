@@ -20,6 +20,7 @@ def main() -> int:
     tests = Path(__file__).resolve().parent.parent / "tests"
     cases = [
         ("scene_continuity_headless.gd", "YAKOLAK_SCENE_CONTINUITY_OK"),
+        ("win_tutorial_headless.gd", "YAKOLAK_SHORT_WIN_TUTORIAL_OK"),
         ("visual_setup_scene_headless.gd", "YAKOLAK_VISUAL_SCENE_OK intro_to_setup_to_match_to_setup"),
         ("gameplay_visual_refinement_headless.gd", "YAKOLAK_VISUAL_REFINEMENT_OK"),
         ("online_presentation_headless.gd", "YAKOLAK_ONLINE_PRESENTATION_OK"),

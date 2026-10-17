@@ -20,6 +20,12 @@ var ghost_height_cache: Dictionary = {}
 var footprint_fade: Tween
 var board_surface_heights: Array[float] = []
 var board_cell_faces: Array = []
+const WinCopy = preload("res://scripts/win_presentation.gd")
+var win_banner: PanelContainer
+var win_banner_label: Label
+var win_banner_motion: Tween
+var win_banner_shown := false
+var win_banner_stamp := ""
 var turn_countdown: PanelContainer
 var turn_countdown_label: Label
 var turn_countdown_motion: Tween
@@ -79,12 +85,77 @@ func _ready() -> void:
 	hud_layer.add_child(turn_countdown)
 	_build_result_card()
 	_build_continue_feedback()
+	_build_win_banner()
 
 
 func _process(delta: float) -> void:
 	super._process(delta)
 	_update_turn_countdown(Time.get_ticks_msec())
 	_sync_continue_controls()
+	_sync_win_banner()
+
+
+func _build_win_banner() -> void:
+	win_banner = PanelContainer.new()
+	win_banner.name = "NamedWinPhrase"
+	win_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := _quick_style(Color(0.06,0.075,0.10,0.90),16.0)
+	style.content_margin_left = _hud_length(16)
+	style.content_margin_right = _hud_length(16)
+	style.content_margin_top = _hud_length(10)
+	style.content_margin_bottom = _hud_length(10)
+	win_banner.add_theme_stylebox_override("panel",style)
+	win_banner_label = Label.new()
+	win_banner_label.layout_direction = Control.LAYOUT_DIRECTION_RTL
+	win_banner_label.text_direction = Control.TEXT_DIRECTION_RTL
+	win_banner_label.language = "ar"
+	win_banner_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	win_banner_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	win_banner_label.add_theme_font_override("font",RESULT_BOLD)
+	win_banner_label.add_theme_color_override("font_color",Color.WHITE)
+	win_banner_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	win_banner.add_child(win_banner_label)
+	hud_layer.add_child(win_banner)
+	win_banner.hide()
+	_layout_win_banner()
+
+
+func _layout_win_banner() -> void:
+	if win_banner == null: return
+	var view := get_viewport().get_visible_rect().size
+	var width := minf(_hud_length(520),view.x-_hud_length(28))
+	win_banner.position = Vector2((view.x-width)*0.5,_hud_length(76))
+	win_banner.size = Vector2(width,0)
+	win_banner_label.add_theme_font_size_override("font_size",_hud_font_size(20 if view.x<view.y else 23))
+
+
+func _sync_win_banner() -> void:
+	if win_banner == null: return
+	var show_phrase := round_complete and not round_winner.is_empty() and not online_cancelled and not lobby_return_active and not result_card.visible
+	if show_phrase:
+		var player_name := _player_name(round_winner)
+		var stamp := "%d:%d:%s:%s:%s" % [round_number,move_count,round_winner,player_name,str(winning_piece_indices)]
+		if stamp!=win_banner_stamp:
+			var phrase := WinCopy.winner_text(occupied_slots,piece_records,round_winner,player_name)
+			if phrase.is_empty(): phrase = "%s فاز بالشوط" % player_name
+			win_banner_label.text=phrase
+			win_banner_stamp=stamp
+			_layout_win_banner()
+	else:
+		win_banner_stamp=""
+	if show_phrase==win_banner_shown: return
+	win_banner_shown=show_phrase
+	if win_banner_motion != null and win_banner_motion.is_valid(): win_banner_motion.kill()
+	win_banner_motion = create_tween()
+	if show_phrase:
+		win_banner.modulate.a=0.0
+		win_banner.show()
+		win_banner_motion.tween_property(win_banner,"modulate:a",1.0,0.22)
+	else:
+		win_banner_motion.tween_property(win_banner,"modulate:a",0.0,0.18)
+		win_banner_motion.tween_callback(win_banner.hide)
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("document.body.dataset.yakolakWinPhrase="+JSON.stringify(win_banner_label.text if show_phrase else "")+";",true)
 
 
 func _update_turn_countdown(now: int) -> void:
@@ -395,6 +466,7 @@ func _show_round_result() -> void:
 
 func _layout_hud() -> void:
 	super._layout_hud()
+	_layout_win_banner()
 	_position_turn_countdown()
 	_layout_result_card()
 	if result_button == null: return

@@ -94,7 +94,7 @@ if(process.env.YAKOLAK_JSDOM_MODULE){
   await new Promise(resolve=>window.setTimeout(resolve,0));
   assert.equal(root.hidden,false);assert.equal(root.dataset.step,'entry');
   assert.equal(root.querySelector('.yk-entry').hidden,false);
-  assert.deepEqual([...root.querySelectorAll('.yk-entry button')].map(x=>x.textContent),['غرفة جديدة','انضمام لغرفة']);
+  assert.deepEqual([...root.querySelectorAll('.yk-entry button')].map(x=>x.textContent),['غرفة جديدة','انضمام لغرفة','كيف تفوز؟']);
   assert.equal(document.body.dataset.yakolakVisualSetupAck,'1');
   root.querySelector('.yk-entry button').click();
   assert.equal(root.querySelector('.yk-modal').dataset.kind,'profile');
@@ -157,7 +157,7 @@ if(process.env.YAKOLAK_JSDOM_MODULE){
   q('.yk-rounds button[aria-label="الفوز بـ 5 أشواط"]').click();const start=events.find(x=>x.action==='start');assert.equal(start.rounds,5);assert.equal(start.count_chosen,true);assert.equal(start.players[1].label,'ريم');assert.equal(start.players.length,3);
   assert.ok(!JSON.stringify(events).includes('0551234567'));
   api.open();assert.equal(q('.yk-entry').hidden,false);assert.equal(q('.yk-modal').hidden,true);assert.equal(q('input[autocomplete=given-name]'),null);
-  q('.yk-entry button:last-child').click();q('input').value='https://a7sncom.github.io/yakolak/?room=123';q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));assert.match(q('.yk-field-error').textContent,/غير متاح/);
+  q('.yk-entry .yk-outline').click();q('input').value='https://a7sncom.github.io/yakolak/?room=123';q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));assert.match(q('.yk-field-error').textContent,/غير متاح/);
   q('.yk-subtle').click();q('.yk-entry button').click();q('[data-color=blue]').click();q('.yk-confirm').click();q('.yk-counts button').click();
   assert.equal(q('.yk-sharing').disabled,true);q('.yk-sharing').click();assert.equal(copies.length,0);assert.equal(q('.yk-error').textContent,'');
   api.room({code:'123',players:[]});q('.yk-sharing').click();await Promise.resolve();assert.equal(copies[0],'https://a7sncom.github.io/yakolak/?room=123');
@@ -218,7 +218,7 @@ test('guest reuses table color targets, occupied name plates and the same ready 
  // Canonical UI component adapter only; this is not a connection test.
  let listener;const client={role:'',code:'007',session:null,subscribe(fn){listener=fn},async inspectRoom(){this.role='guest';return this.session={preview:authority.preview()}},async chooseColor(color){const r=authority.join('guest',{token:'g'.repeat(48),name:'ريم',color});this.session={snapshot:r.room,identity:{seat:r.seat}};},async leave(){},async close(){this.session=null}};
  const dom=new JSDOM('<body></body>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});const {window}=dom,{document}=window;window.localStorage.setItem('yakolak-visitor-v1',JSON.stringify({name:'ريم',phone:'0551234567'}));const events=[];window.yakolakVisualSetupAction=v=>events.push(JSON.parse(v));const q=s=>document.querySelector(s);
- const api=mountSetup(document,window,client),original=[...document.querySelectorAll('.yk-seat')];api.open({online:true});q('.yk-entry button:last-child').click();q('input').value='٠٠٧';q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));await new Promise(r=>window.setTimeout(r,0));
+ const api=mountSetup(document,window,client),original=[...document.querySelectorAll('.yk-seat')];api.open({online:true});q('.yk-entry .yk-outline').click();q('input').value='٠٠٧';q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));await new Promise(r=>window.setTimeout(r,0));
  assert.equal(q('.yk-modal').hidden,true);assert.equal(q('#yakolakVisualSetup').dataset.step,'color');assert.equal(q('.yk-guest-color'),null);assert.deepEqual([...document.querySelectorAll('.yk-seat')],original);assert.equal(authority.members.size,1);
  assert.equal(q('.yk-seat[data-color=marble] .yk-seat-status').textContent,'أحمد');assert.equal(q('.yk-seat[data-color=marble]').getAttribute('aria-disabled'),'true');assert.ok(!q('.yk-seat[data-color=marble]').classList.contains('is-color'));q('.yk-seat[data-color=marble]').click();assert.equal(q('.yk-confirm').hidden,true);
  q('.yk-seat[data-color=green]').click();assert.equal(q('.yk-seat[data-color=green]').getAttribute('aria-pressed'),'true');assert.equal(authority.members.size,1,'rack selection keeps the existing confirm boundary');q('.yk-confirm').click();await new Promise(r=>window.setTimeout(r,0));
