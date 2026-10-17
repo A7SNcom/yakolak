@@ -1,10 +1,10 @@
 <!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>YAKOLAK surface QA</title><link rel="stylesheet" href="visual-setup.css?v=88a87502a655">
+<title>YAKOLAK surface QA</title><link rel="stylesheet" href="visual-setup.css?v=a736b42cd80f">
 <style>
 body{margin:0;background:#08090b;color:#fff;font:14px system-ui;overflow:hidden}.qa-tools{position:fixed;top:8px;left:8px;z-index:2147483500;display:flex;gap:6px}.qa-tools button{background:#30333a;color:white;border:1px solid #777;border-radius:8px;padding:8px;cursor:pointer}.cylinder-reference{position:absolute;left:18%;top:29%;width:64%;height:47%;border:1px solid #404550;border-radius:50%;background:radial-gradient(ellipse,#24272e,#101216);pointer-events:none}.rack{position:absolute;transform:translate(-50%,-50%);display:flex;gap:6px;pointer-events:none}.rack i{width:22px;height:22px;border:2px solid currentColor;border-radius:50%;box-shadow:inset 0 0 5px currentColor}.qa-mobile{display:block;width:390px;height:844px;max-height:calc(100vh - 50px);margin:44px auto 0;border:1px solid #777;background:#08090b}.qa-mobile~*{display:none}
 </style><body><div class="cylinder-reference" aria-hidden="true"></div><nav class="qa-tools" aria-label="فحص الواجهة"><button id="qa-ready">الأزرار</button><button id="qa-color">اختيار اللون</button><button id="qa-mobile">الجوال</button></nav>
 <script type="module">
-import './visual-setup.mjs?v=88a87502a655';
+import './visual-setup.mjs?v=a736b42cd80f';
 const positions={gold:[.28,.27],blue:[.72,.27],green:[.28,.68],marble:[.72,.68]};
 const colors={gold:'#ad7a38',blue:'#366db8',green:'#278768',marble:'#ccc'};
 for(const [key,p] of Object.entries(positions)){const rack=document.createElement('div');rack.className='rack';rack.style.cssText=`left:${p[0]*100}%;top:${p[1]*100}%;color:${colors[key]}`;for(let i=0;i<3;i++)rack.append(document.createElement('i'));document.body.append(rack);}
