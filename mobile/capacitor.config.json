@@ -1,0 +1,17 @@
+{
+  "appId": "com.a7sncom.yakolak",
+  "appName": "ياكلك",
+  "webDir": "www",
+  "backgroundColor": "#000000",
+  "ios": {
+    "backgroundColor": "#000000",
+    "contentInset": "never",
+    "preferredContentMode": "mobile",
+    "scrollEnabled": false
+  },
+  "server": {
+    "hostname": "localhost",
+    "androidScheme": "https",
+    "cleartext": false
+  }
+}

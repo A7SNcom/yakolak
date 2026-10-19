@@ -1,0 +1,30 @@
+{
+  "name": "yakolak-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "stage:web": "node scripts/stage-web.mjs",
+    "verify:web": "node scripts/verify-web.mjs",
+    "verify:native": "node scripts/verify-native-projects.mjs",
+    "verify:all": "npm run stage:web && npm run verify:web && npm run verify:native",
+    "brand:assets": "node scripts/brand-native-assets.mjs",
+    "cap:sync": "npm run stage:web && cap sync",
+    "cap:add:android": "npm run stage:web && cap add android",
+    "cap:add:ios": "npm run stage:web && cap add ios",
+    "cap:open:android": "npm run cap:sync && cap open android",
+    "cap:open:ios": "npm run cap:sync && cap open ios",
+    "cap:doctor": "cap doctor"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/ios": "8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}

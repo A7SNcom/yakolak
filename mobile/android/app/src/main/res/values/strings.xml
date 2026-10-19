@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ياكلك</string>
+    <string name="title_activity_main">ياكلك</string>
+    <string name="package_name">com.a7sncom.yakolak</string>
+    <string name="custom_url_scheme">com.a7sncom.yakolak</string>
+</resources>
