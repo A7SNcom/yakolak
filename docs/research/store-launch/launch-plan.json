@@ -168,7 +168,10 @@
         "YAKOLAK_PORTABLE_KIT/assets/manifest.json",
         "scripts/godot-flash-build.sh"
       ],
-      "proposed_artifacts": [],
+      "proposed_artifacts": [
+        "docs/research/store-launch/asset-register.json",
+        "scripts/audit_store_asset_register.py"
+      ],
       "steps_ar": [
         "أنشئ asset register بالمصدر والنسخة والحقوق ونمط التوزيع.",
         "احسم الخط الخام المرئي ومصدر CI؛ إثبات الموسيقى أو بديل مرخص، دون تعديل بصري غير مقبول."

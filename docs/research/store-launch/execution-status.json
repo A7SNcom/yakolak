@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "artifact_type": "store_launch_execution_status",
+  "as_of": "2026-10-19",
+  "repository": "A7SNcom/yakolak",
+  "published_plan_commit": "33774d68ee69eb313fc1b2bc2673b4dc8bd75ecd",
+  "published_plan_url": "https://github.com/A7SNcom/yakolak/blob/main/docs/research/store-launch/README.md",
+  "selected_route": null,
+  "selected_scope": null,
+  "ready_for_store_submission": false,
+  "completed_or_prepared": [
+    {
+      "task_id": "YKL-002",
+      "state": "partially_prepared",
+      "artifacts": [
+        "docs/research/store-launch/asset-register.json",
+        "scripts/audit_store_asset_register.py"
+      ],
+      "result": "Inventoried 46 tracked asset, third-party notice, and current Web-export files with SHA-256, byte counts, source-code filename references, distribution scope, and explicit follow-up actions.",
+      "remaining": "Music, icon, font-variant, model, texture, logo, and engine notice rights are not all proven. No asset is marked legally cleared; resolve evidence with the rights holder before submission."
+    },
+    {
+      "task_id": "YKL-001",
+      "state": "blocked_on_owner_inputs",
+      "remaining": "Publisher identity/account type, target audience, initial online/offline scope, supported languages, asset ownership evidence, and test devices remain unknown. The release route and scope have not been guessed."
+    },
+    {
+      "task_id": "YKL-003",
+      "state": "blocked_on_required_device_validation",
+      "remaining": "A bundled-Web proof of concept still needs actual iPhone and Android devices, an offline first-launch test, and real cross-device network, lifecycle, keyboard, sound, and performance measurements."
+    }
+  ],
+  "environment_observed": {
+    "node": "v24.19.0",
+    "project_node_requirement": "22.x",
+    "node_modules_installed": false,
+    "godot_executable": false,
+    "android_adb_executable": false,
+    "xcodebuild_executable": false,
+    "physical_iphone_or_android_device_connected": false
+  },
+  "validation_run": [
+    {
+      "command": "python3 scripts/audit_store_asset_register.py --check",
+      "result": "passed"
+    },
+    {
+      "command": "python3 docs/research/store-launch/validate_plan.py",
+      "result": "passed; 32 tasks, 42 acceptance scenarios, 62 sources, and 42 baseline source hashes"
+    },
+    {
+      "command": "node --test tests/p2p_authority.test.mjs tests/arabic_ui_contract.test.mjs tests/online_reliability_contract.test.mjs tests/reduced_motion_state_parity_contract.test.mjs tests/return_to_setup_contract.test.mjs tests/rounds_selected_state_contract.test.mjs tests/turn_light_contract.test.mjs",
+      "result": "passed; 12 tests on Node v24.19.0. This is a narrow source-contract check, not a mobile or full-release test."
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "not_run": [
+    "Godot editor/import/export or game runtime",
+    "npm release tests because dependencies are not installed and the available Node version differs from the project requirement",
+    "iOS archive, Android AAB, signing, TestFlight, Google Play testing, or store submission",
+    "physical-device, network, lifecycle, performance, or thermal acceptance"
+  ],
+  "runtime_game_code_changed": false,
+  "native_projects_or_store_metadata_created": false
+}

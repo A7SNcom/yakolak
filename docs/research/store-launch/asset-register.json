@@ -1,0 +1,977 @@
+{
+  "schema_version": 1,
+  "artifact_type": "store_launch_asset_rights_register",
+  "as_of": "2026-10-19",
+  "repository": "A7SNcom/yakolak",
+  "source_snapshot_commit": "577e12ed147a5872b539ec405298eb4adb1161fe",
+  "scope": "Tracked media, historical design references, third-party browser bundles/notices, and generated current Web export components in the audited source snapshot.",
+  "mobile_package_exists": false,
+  "interpretation": "Hashes and source references are reproducible inventory evidence only. They do not prove ownership, permission, app-store compliance, or that a file is included in a future mobile package. No rights state is treated as cleared.",
+  "counts_by_rights_state": {
+    "conditional_terms_review_required": 5,
+    "engine_and_embedded_asset_notices_require_review": 6,
+    "font_license_evidence_missing_from_repository": 1,
+    "icon_source_and_license_unverified": 2,
+    "matching_web_notice_present; mobile_package_not_built": 3,
+    "music_rights_unverified": 1,
+    "notice_present; mobile_package_not_built": 3,
+    "official_source_link_recorded; not a redistribution grant": 1,
+    "owner_and_source_unverified": 18,
+    "project_code; no separate third_party_grant_assessed": 1,
+    "project_code_or_export_metadata; mobile_package_not_built": 5
+  },
+  "identical_file_groups": [
+    {
+      "sha256": "336992c1a6d5c3db08fc6539a2c30c1740af3b145f713eabb04d8e912ddff5dd",
+      "paths": [
+        "ui/vendor/LIQUEFY-LICENSE.txt",
+        "web/vendor/LIQUEFY-LICENSE.txt"
+      ]
+    },
+    {
+      "sha256": "b485f8baa962132179e71d2d528982762049d686f0d9e5fdaa36feb59f394928",
+      "paths": [
+        "web/index-b485f8baa962.pck",
+        "web/index.pck"
+      ]
+    },
+    {
+      "sha256": "e292ec7dee9a10977e0c92291299667d20571ed38cab0fbca91d8989774d4fe3",
+      "paths": [
+        "ui/vendor/liquefy-core-1.1.0.mjs",
+        "web/vendor/liquefy-core-1.1.0.mjs"
+      ]
+    },
+    {
+      "sha256": "f2762ffbe17351193e3d630dd10f0c3a965e6c873998dfdeda2bd0dcad7985c6",
+      "paths": [
+        "assets/fonts/thmanyahsans-Medium.otf",
+        "web/setup-font.otf"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "YAKOLAK_PORTABLE_KIT/assets/layout/intro-scatter.csv",
+      "category": "design_or_layout_data",
+      "bytes": 2452,
+      "sha256": "62e36eab634987817b5289f7971ec89f83fb5e5691a42a8044d3aea2f6410155",
+      "scope": "historical_reference; exclude from a mobile bundle unless deliberately reused",
+      "rights_state": "owner_and_source_unverified",
+      "evidence_paths": [
+        "YAKOLAK_PORTABLE_KIT/README.md",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "source_references": [
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "next_actions": [
+        "If reused, document creator/source, grant, modifications, and exact files included."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "YAKOLAK_PORTABLE_KIT/assets/layout/world-layout.json",
+      "category": "design_or_layout_data",
+      "bytes": 2644,
+      "sha256": "7d87abae7b4e94749d4028d29d23a30119de04fb08cc7382c08aff43b59fce77",
+      "scope": "historical_reference; exclude from a mobile bundle unless deliberately reused",
+      "rights_state": "owner_and_source_unverified",
+      "evidence_paths": [
+        "YAKOLAK_PORTABLE_KIT/README.md",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "source_references": [
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json",
+        "YAKOLAK_PORTABLE_KIT/assets/room/ROOM.md",
+        "scripts/layout_audit.gd"
+      ],
+      "next_actions": [
+        "If reused, document creator/source, grant, modifications, and exact files included."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "YAKOLAK_PORTABLE_KIT/assets/logos/MTKYF.svg",
+      "category": "image_or_logo",
+      "bytes": 8652,
+      "sha256": "a2ae4b2af94d4f424054aa88f69fc9d5b7b9cd80325876c4e726c1f6a4d44271",
+      "scope": "historical_reference; exclude from a mobile bundle unless deliberately reused",
+      "rights_state": "owner_and_source_unverified",
+      "evidence_paths": [
+        "YAKOLAK_PORTABLE_KIT/README.md",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "source_references": [
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json",
+        "scripts/apply_web_loader.py",
+        "scripts/vercel-build.sh"
+      ],
+      "next_actions": [
+        "If reused, document creator/source, grant, modifications, and exact files included."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "YAKOLAK_PORTABLE_KIT/assets/logos/YAKOLAK.svg",
+      "category": "image_or_logo",
+      "bytes": 5736,
+      "sha256": "e44596dda0c27c7e83ea11cf92c760c18859223ece0ccecc9b815d92b64a1ffa",
+      "scope": "historical_reference; exclude from a mobile bundle unless deliberately reused",
+      "rights_state": "owner_and_source_unverified",
+      "evidence_paths": [
+        "YAKOLAK_PORTABLE_KIT/README.md",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "source_references": [
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json",
+        "scripts/prepare_logo.py",
+        "scripts/vercel-build.sh"
+      ],
+      "next_actions": [
+        "If reused, document creator/source, grant, modifications, and exact files included."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "YAKOLAK_PORTABLE_KIT/assets/manifest.json",
+      "category": "design_or_layout_data",
+      "bytes": 2579,
+      "sha256": "d0af6be8d433908672faea346da59a4c129551daff796b090f9200f1aab053de",
+      "scope": "historical_reference; exclude from a mobile bundle unless deliberately reused",
+      "rights_state": "owner_and_source_unverified",
+      "evidence_paths": [
+        "YAKOLAK_PORTABLE_KIT/README.md",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "source_references": [],
+      "next_actions": [
+        "If reused, document creator/source, grant, modifications, and exact files included."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "YAKOLAK_PORTABLE_KIT/assets/models/board-and-lid.stl",
+      "category": "3d_model",
+      "bytes": 3114084,
+      "sha256": "e906901cbdc3a15c28912b5966a12dbf75a9b85d8cbeb890585c974e0c12def4",
+      "scope": "historical_reference; exclude from a mobile bundle unless deliberately reused",
+      "rights_state": "owner_and_source_unverified",
+      "evidence_paths": [
+        "YAKOLAK_PORTABLE_KIT/README.md",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "source_references": [
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json",
+        "scripts/prepare_intro_assets.py",
+        "scripts/vercel-build.sh"
+      ],
+      "next_actions": [
+        "If reused, document creator/source, grant, modifications, and exact files included."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "YAKOLAK_PORTABLE_KIT/assets/models/piece-large.stl",
+      "category": "3d_model",
+      "bytes": 12084,
+      "sha256": "14c4a58ed5d086ce5622cf665e18f88e1390cedae7f973c2428cdca16fd99715",
+      "scope": "historical_reference; exclude from a mobile bundle unless deliberately reused",
+      "rights_state": "owner_and_source_unverified",
+      "evidence_paths": [
+        "YAKOLAK_PORTABLE_KIT/README.md",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "source_references": [
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json",
+        "scripts/prepare_intro_assets.py",
+        "scripts/prepare_layout_assets.py",
+        "scripts/vercel-build.sh"
+      ],
+      "next_actions": [
+        "If reused, document creator/source, grant, modifications, and exact files included."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "YAKOLAK_PORTABLE_KIT/assets/models/piece-medium.stl",
+      "category": "3d_model",
+      "bytes": 12084,
+      "sha256": "7b2cbf4690fc0906124bd56151c4e1cd29006f58e9fed75d6e2ecc4c8bed4936",
+      "scope": "historical_reference; exclude from a mobile bundle unless deliberately reused",
+      "rights_state": "owner_and_source_unverified",
+      "evidence_paths": [
+        "YAKOLAK_PORTABLE_KIT/README.md",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "source_references": [
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json",
+        "scripts/prepare_intro_assets.py",
+        "scripts/prepare_layout_assets.py",
+        "scripts/vercel-build.sh"
+      ],
+      "next_actions": [
+        "If reused, document creator/source, grant, modifications, and exact files included."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "YAKOLAK_PORTABLE_KIT/assets/models/piece-small.stl",
+      "category": "3d_model",
+      "bytes": 5884,
+      "sha256": "48916af0357ca36737f7ec7e5de23cbe516a51b07675271c86339b9d12189cd6",
+      "scope": "historical_reference; exclude from a mobile bundle unless deliberately reused",
+      "rights_state": "owner_and_source_unverified",
+      "evidence_paths": [
+        "YAKOLAK_PORTABLE_KIT/README.md",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "source_references": [
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json",
+        "scripts/prepare_intro_assets.py",
+        "scripts/prepare_layout_assets.py",
+        "scripts/vercel-build.sh"
+      ],
+      "next_actions": [
+        "If reused, document creator/source, grant, modifications, and exact files included."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "YAKOLAK_PORTABLE_KIT/assets/models/player-base.stl",
+      "category": "3d_model",
+      "bytes": 9955084,
+      "sha256": "21d963e52b5bd290141080eb66f9ef8c966c62786c3a1da10c67799603a65c1a",
+      "scope": "historical_reference; exclude from a mobile bundle unless deliberately reused",
+      "rights_state": "owner_and_source_unverified",
+      "evidence_paths": [
+        "YAKOLAK_PORTABLE_KIT/README.md",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "source_references": [
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json",
+        "scripts/prepare_intro_assets.py",
+        "scripts/prepare_layout_assets.py",
+        "scripts/vercel-build.sh"
+      ],
+      "next_actions": [
+        "If reused, document creator/source, grant, modifications, and exact files included."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "YAKOLAK_PORTABLE_KIT/assets/models/score-marker.stl",
+      "category": "3d_model",
+      "bytes": 12884,
+      "sha256": "f0dea38e795223d32c07921f194e612ce0ff270c9190f208666caebe31b6041b",
+      "scope": "historical_reference; exclude from a mobile bundle unless deliberately reused",
+      "rights_state": "owner_and_source_unverified",
+      "evidence_paths": [
+        "YAKOLAK_PORTABLE_KIT/README.md",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "source_references": [
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json",
+        "scripts/prepare_intro_assets.py"
+      ],
+      "next_actions": [
+        "If reused, document creator/source, grant, modifications, and exact files included."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "YAKOLAK_PORTABLE_KIT/assets/reference/approved-contract.json",
+      "category": "design_or_layout_data",
+      "bytes": 4853,
+      "sha256": "062f78f488489b6a1188437b9f3d032a428b4aeffda4a502c59402beab147f42",
+      "scope": "historical_reference; exclude from a mobile bundle unless deliberately reused",
+      "rights_state": "owner_and_source_unverified",
+      "evidence_paths": [
+        "YAKOLAK_PORTABLE_KIT/README.md",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "source_references": [
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "next_actions": [
+        "If reused, document creator/source, grant, modifications, and exact files included."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "YAKOLAK_PORTABLE_KIT/assets/room/room-plan.svg",
+      "category": "image_or_logo",
+      "bytes": 1117,
+      "sha256": "e689395aaaaa5ffac293ad5011e072ab9838f4a02f89488fa6330bae879a2ae1",
+      "scope": "historical_reference; exclude from a mobile bundle unless deliberately reused",
+      "rights_state": "owner_and_source_unverified",
+      "evidence_paths": [
+        "YAKOLAK_PORTABLE_KIT/README.md",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "source_references": [
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json",
+        "YAKOLAK_PORTABLE_KIT/assets/room/ROOM.md"
+      ],
+      "next_actions": [
+        "If reused, document creator/source, grant, modifications, and exact files included."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "YAKOLAK_PORTABLE_KIT/assets/table/albedo.png",
+      "category": "image_or_logo",
+      "bytes": 5062989,
+      "sha256": "5259e2f4dcc5c958ca7a976006194be71b37e9d3a276614e6ea8c1e55977bec0",
+      "scope": "historical_reference; exclude from a mobile bundle unless deliberately reused",
+      "rights_state": "owner_and_source_unverified",
+      "evidence_paths": [
+        "YAKOLAK_PORTABLE_KIT/README.md",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "source_references": [
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "next_actions": [
+        "If reused, document creator/source, grant, modifications, and exact files included."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "YAKOLAK_PORTABLE_KIT/assets/table/normal.png",
+      "category": "image_or_logo",
+      "bytes": 5887287,
+      "sha256": "fd92cf7d618572e63c69c20ea8771e693b0404692ac8f6065b5de3321bf138d0",
+      "scope": "historical_reference; exclude from a mobile bundle unless deliberately reused",
+      "rights_state": "owner_and_source_unverified",
+      "evidence_paths": [
+        "YAKOLAK_PORTABLE_KIT/README.md",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "source_references": [
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "next_actions": [
+        "If reused, document creator/source, grant, modifications, and exact files included."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "YAKOLAK_PORTABLE_KIT/assets/table/roughness.png",
+      "category": "image_or_logo",
+      "bytes": 3532328,
+      "sha256": "359d93a4d4e209d52d84442f6748750355a3b24d9482f4bfd00f12af1b2d2f35",
+      "scope": "historical_reference; exclude from a mobile bundle unless deliberately reused",
+      "rights_state": "owner_and_source_unverified",
+      "evidence_paths": [
+        "YAKOLAK_PORTABLE_KIT/README.md",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "source_references": [
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "next_actions": [
+        "If reused, document creator/source, grant, modifications, and exact files included."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "YAKOLAK_PORTABLE_KIT/assets/table/table.svg",
+      "category": "image_or_logo",
+      "bytes": 1057,
+      "sha256": "f9366898cef39ae2a828bea0609981e62cbdb1c486170944c07498fc7a5812a1",
+      "scope": "historical_reference; exclude from a mobile bundle unless deliberately reused",
+      "rights_state": "owner_and_source_unverified",
+      "evidence_paths": [
+        "YAKOLAK_PORTABLE_KIT/README.md",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "source_references": [
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json",
+        "scripts/intro_corrections.gd",
+        "scripts/pre_intro_star_to_table.gd",
+        "scripts/prepare_table.py",
+        "scripts/vercel-build.sh"
+      ],
+      "next_actions": [
+        "If reused, document creator/source, grant, modifications, and exact files included."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "YAKOLAK_PORTABLE_KIT/assets/ui/loading-star.svg",
+      "category": "image_or_logo",
+      "bytes": 643,
+      "sha256": "d99d949f367c7d35ff8dd4fa07fcfc46b64fe126d460802353aeaeca3e431684",
+      "scope": "historical_reference; exclude from a mobile bundle unless deliberately reused",
+      "rights_state": "owner_and_source_unverified",
+      "evidence_paths": [
+        "YAKOLAK_PORTABLE_KIT/README.md",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json"
+      ],
+      "source_references": [
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json",
+        "YAKOLAK_PORTABLE_KIT/assets/reference/approved-contract.json",
+        "scripts/vercel-build.sh"
+      ],
+      "next_actions": [
+        "If reused, document creator/source, grant, modifications, and exact files included."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "assets/fonts/DejaVuSans.ttf",
+      "category": "font",
+      "bytes": 759720,
+      "sha256": "ae7b7855e115a5966d8b1b3f80f254ccc117ec86f9965e202ee2940453837280",
+      "scope": "current_game_font_asset",
+      "rights_state": "font_license_evidence_missing_from_repository",
+      "evidence_paths": [],
+      "source_references": [
+        "export_presets.cfg",
+        "scripts/gameplay_session.gd",
+        "scripts/session_setup.gd",
+        "scripts/session_setup_guard.gd",
+        "tests/session_setup_headless.gd"
+      ],
+      "next_actions": [
+        "Record the exact upstream version and its redistribution/notice terms, then ship the required notice."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "assets/fonts/THMANYAH_SOURCE.md",
+      "category": "source_provenance_note",
+      "bytes": 372,
+      "sha256": "2ce0d5a714e84a653a9404414009fa1bba2a8e38f0df0fa68b6ee58cd4f61010",
+      "scope": "source_provenance_evidence",
+      "rights_state": "official_source_link_recorded; not a redistribution grant",
+      "evidence_paths": [],
+      "source_references": [],
+      "next_actions": [
+        "Keep a dated copy of the applicable license terms and tie each distributed font variant to that grant."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "assets/fonts/song.mp3",
+      "category": "audio",
+      "bytes": 4190110,
+      "sha256": "d421674d599bf882c04803c4bc2044a7b246d9429e42f897ec100c7bf29a7079",
+      "scope": "current_game_audio_asset",
+      "rights_state": "music_rights_unverified",
+      "evidence_paths": [],
+      "source_references": [
+        "export_presets.cfg",
+        "scripts/background_music.gd",
+        "tests/gameplay_smoke.spec.js",
+        "tests/round_transition_smoke.spec.js"
+      ],
+      "next_actions": [
+        "Record the track title, creator, source, license or written permission, and mobile synchronization/distribution rights."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "assets/fonts/thmanyahsans-Bold.otf",
+      "category": "font",
+      "bytes": 242808,
+      "sha256": "72cc27021cc1a503e5c03b072df8b16d55c78983e5fd73a4cdf92b5a600af2f7",
+      "scope": "current_game_or_web_asset; mobile inclusion depends on selected route",
+      "rights_state": "conditional_terms_review_required",
+      "evidence_paths": [
+        "assets/fonts/THMANYAH_SOURCE.md",
+        "S37"
+      ],
+      "source_references": [
+        "export_presets.cfg",
+        "scripts/gameplay_session_ui.gd",
+        "scripts/gameplay_visual_refinement.gd",
+        "scripts/session_setup_redesign_fix.gd",
+        "scripts/ui_design.gd"
+      ],
+      "next_actions": [
+        "Confirm the current license covers every bundled variant and source copy; preserve required attribution and resolve the public raw web copy/build mirror."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "assets/fonts/thmanyahsans-Light.otf",
+      "category": "font",
+      "bytes": 234588,
+      "sha256": "c4286938c04ea60eb1953919cddce7b268270a825a04823a0642a044ebc7fd34",
+      "scope": "current_game_or_web_asset; mobile inclusion depends on selected route",
+      "rights_state": "conditional_terms_review_required",
+      "evidence_paths": [
+        "assets/fonts/THMANYAH_SOURCE.md",
+        "S37"
+      ],
+      "source_references": [
+        "export_presets.cfg",
+        "scripts/gameplay_session_ui.gd",
+        "scripts/session_setup_redesign_fix.gd",
+        "scripts/ui_design.gd"
+      ],
+      "next_actions": [
+        "Confirm the current license covers every bundled variant and source copy; preserve required attribution and resolve the public raw web copy/build mirror."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "assets/fonts/thmanyahsans-Medium.otf",
+      "category": "font",
+      "bytes": 242116,
+      "sha256": "f2762ffbe17351193e3d630dd10f0c3a965e6c873998dfdeda2bd0dcad7985c6",
+      "scope": "current_game_or_web_asset; mobile inclusion depends on selected route",
+      "rights_state": "conditional_terms_review_required",
+      "evidence_paths": [
+        "assets/fonts/THMANYAH_SOURCE.md",
+        "S37"
+      ],
+      "source_references": [
+        "export_presets.cfg",
+        "scripts/apply_web_loader.py",
+        "scripts/gameplay_session_ui.gd",
+        "scripts/gameplay_visual_refinement.gd",
+        "scripts/session_setup_redesign_fix.gd",
+        "scripts/session_setup_visual.gd",
+        "scripts/ui_design.gd",
+        "tests/western_digits_smoke.spec.js"
+      ],
+      "next_actions": [
+        "Confirm the current license covers every bundled variant and source copy; preserve required attribution and resolve the public raw web copy/build mirror."
+      ],
+      "identical_content_paths": [
+        "web/setup-font.otf"
+      ]
+    },
+    {
+      "path": "assets/fonts/thmanyahsans-Regular.otf",
+      "category": "font",
+      "bytes": 241292,
+      "sha256": "f45a420632384b42a37ec9b24298ddc6502faa52d55d973144779262ebc023dc",
+      "scope": "current_game_or_web_asset; mobile inclusion depends on selected route",
+      "rights_state": "conditional_terms_review_required",
+      "evidence_paths": [
+        "assets/fonts/THMANYAH_SOURCE.md",
+        "S37"
+      ],
+      "source_references": [
+        "export_presets.cfg",
+        "scripts/gameplay_session_ui.gd",
+        "scripts/session_setup_redesign.gd",
+        "scripts/ui_design.gd"
+      ],
+      "next_actions": [
+        "Confirm the current license covers every bundled variant and source copy; preserve required attribution and resolve the public raw web copy/build mirror."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "assets/icons/lucide/ellipsis.svg",
+      "category": "image_or_logo",
+      "bytes": 368,
+      "sha256": "ed755a240052f79edd3ba7650dd635ebd75657b8e6bc61ca2575e280144553d6",
+      "scope": "current_game_ui_asset",
+      "rights_state": "icon_source_and_license_unverified",
+      "evidence_paths": [],
+      "source_references": [
+        "scenes/intro.tscn",
+        "tests/arabic_ui_contract.test.mjs"
+      ],
+      "next_actions": [
+        "Confirm whether each SVG is an unmodified third-party icon or project artwork and include the applicable license notice."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "assets/icons/lucide/x.svg",
+      "category": "image_or_logo",
+      "bytes": 310,
+      "sha256": "a5fcc10e828407d0dcb526d6998fe8311aea5982ffb7b8e3a310a9d7a57624f7",
+      "scope": "current_game_ui_asset",
+      "rights_state": "icon_source_and_license_unverified",
+      "evidence_paths": [],
+      "source_references": [
+        "scenes/intro.tscn",
+        "tests/arabic_ui_contract.test.mjs"
+      ],
+      "next_actions": [
+        "Confirm whether each SVG is an unmodified third-party icon or project artwork and include the applicable license notice."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "ui/vendor/LIQUEFY-LICENSE.txt",
+      "category": "license_notice",
+      "bytes": 1080,
+      "sha256": "336992c1a6d5c3db08fc6539a2c30c1740af3b145f713eabb04d8e912ddff5dd",
+      "scope": "license_evidence_for_current_web_tree",
+      "rights_state": "notice_present; mobile_package_not_built",
+      "evidence_paths": [],
+      "source_references": [
+        "scripts/apply_web_loader.py"
+      ],
+      "next_actions": [
+        "Copy the license notice that matches the exact bundled code into the selected mobile package and verify it is readable in-app."
+      ],
+      "identical_content_paths": [
+        "web/vendor/LIQUEFY-LICENSE.txt"
+      ]
+    },
+    {
+      "path": "ui/vendor/liquefy-core-1.1.0.mjs",
+      "category": "third_party_browser_library",
+      "bytes": 41666,
+      "sha256": "e292ec7dee9a10977e0c92291299667d20571ed38cab0fbca91d8989774d4fe3",
+      "scope": "third_party_browser_dependency; wrapper route only",
+      "rights_state": "matching_web_notice_present; mobile_package_not_built",
+      "evidence_paths": [
+        "ui/vendor/LIQUEFY-LICENSE.txt"
+      ],
+      "source_references": [
+        "scripts/apply_web_loader.py",
+        "ui/visual-setup.mjs",
+        "web/visual-setup.mjs"
+      ],
+      "next_actions": [
+        "Pin the shipped version and include its complete matching notices in the final mobile bundle."
+      ],
+      "identical_content_paths": [
+        "web/vendor/liquefy-core-1.1.0.mjs"
+      ]
+    },
+    {
+      "path": "web/TRYSTERO-LICENSES.txt",
+      "category": "license_notice",
+      "bytes": 4360,
+      "sha256": "0c3ae4fb76057851d8a93ca8ec07819f324540022f474265ca1977cf66af94c4",
+      "scope": "license_evidence_for_current_web_tree",
+      "rights_state": "notice_present; mobile_package_not_built",
+      "evidence_paths": [],
+      "source_references": [
+        "scripts/build-online.mjs"
+      ],
+      "next_actions": [
+        "Copy the license notice that matches the exact bundled code into the selected mobile package and verify it is readable in-app."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "web/index-b485f8baa962.pck",
+      "category": "godot_web_export_payload",
+      "bytes": 9704300,
+      "sha256": "b485f8baa962132179e71d2d528982762049d686f0d9e5fdaa36feb59f394928",
+      "scope": "generated_current_web_export; not a native mobile build",
+      "rights_state": "engine_and_embedded_asset_notices_require_review",
+      "evidence_paths": [],
+      "source_references": [
+        "web/index.html"
+      ],
+      "next_actions": [
+        "For a mobile package, collect notices from the exact Godot/export version and audit embedded game assets separately."
+      ],
+      "identical_content_paths": [
+        "web/index.pck"
+      ]
+    },
+    {
+      "path": "web/index.audio.position.worklet.js",
+      "category": "godot_web_export_payload",
+      "bytes": 2973,
+      "sha256": "be33985bc7160d6bf9646f259cd86b259cd67b02ccb297ee5c44f8ac84327bc8",
+      "scope": "generated_current_web_export; not a native mobile build",
+      "rights_state": "engine_and_embedded_asset_notices_require_review",
+      "evidence_paths": [],
+      "source_references": [],
+      "next_actions": [
+        "For a mobile package, collect notices from the exact Godot/export version and audit embedded game assets separately."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "web/index.audio.worklet.js",
+      "category": "godot_web_export_payload",
+      "bytes": 7298,
+      "sha256": "5b476a9c9ce642c0ee4256436d1bc31d9c38f868aca0f9a8e2a57c18d2dec2a3",
+      "scope": "generated_current_web_export; not a native mobile build",
+      "rights_state": "engine_and_embedded_asset_notices_require_review",
+      "evidence_paths": [],
+      "source_references": [],
+      "next_actions": [
+        "For a mobile package, collect notices from the exact Godot/export version and audit embedded game assets separately."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "web/index.html",
+      "category": "web_export_component",
+      "bytes": 33616,
+      "sha256": "89f5fb53d79e0b8989dffe90c5ebf184fe3450debcafec0dbaa7768757860357",
+      "scope": "current_pages_web_export; mobile inclusion not selected",
+      "rights_state": "project_code_or_export_metadata; mobile_package_not_built",
+      "evidence_paths": [],
+      "source_references": [
+        "export_presets.cfg",
+        "scripts/apply_web_loader.py",
+        "scripts/godot-flash-build.sh",
+        "scripts/vercel-build.sh",
+        "scripts/vercel-fast-build.sh",
+        "tests/web_test_server.mjs"
+      ],
+      "next_actions": [
+        "When staging the selected route, include only required production files and audit all external assets and notices."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "web/index.js",
+      "category": "godot_web_export_payload",
+      "bytes": 279815,
+      "sha256": "68586d6daafc93c6e697b3fb258976874aa7459b8931165ebb1dc3c9614cc42c",
+      "scope": "generated_current_web_export; not a native mobile build",
+      "rights_state": "engine_and_embedded_asset_notices_require_review",
+      "evidence_paths": [],
+      "source_references": [
+        "scripts/godot-flash-build.sh",
+        "scripts/vercel-build.sh",
+        "scripts/vercel-fast-build.sh",
+        "web/index.html"
+      ],
+      "next_actions": [
+        "For a mobile package, collect notices from the exact Godot/export version and audit embedded game assets separately."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "web/index.pck",
+      "category": "godot_web_export_payload",
+      "bytes": 9704300,
+      "sha256": "b485f8baa962132179e71d2d528982762049d686f0d9e5fdaa36feb59f394928",
+      "scope": "generated_current_web_export; not a native mobile build",
+      "rights_state": "engine_and_embedded_asset_notices_require_review",
+      "evidence_paths": [],
+      "source_references": [
+        "scripts/apply_web_loader.py",
+        "scripts/godot-flash-build.sh",
+        "scripts/vercel-build.sh",
+        "scripts/vercel-fast-build.sh",
+        "tests/custom_setup_mobile.spec.js",
+        "tests/gameplay_smoke.spec.js",
+        "tests/intro_smoke.spec.js",
+        "tests/layout_smoke.spec.js",
+        "tests/mobile_touch_targets_smoke.spec.js",
+        "tests/setup_gate_smoke.spec.js",
+        "tests/setup_spatial_smoke.spec.js",
+        "web/index.html"
+      ],
+      "next_actions": [
+        "For a mobile package, collect notices from the exact Godot/export version and audit embedded game assets separately."
+      ],
+      "identical_content_paths": [
+        "web/index-b485f8baa962.pck"
+      ]
+    },
+    {
+      "path": "web/index.png",
+      "category": "image_or_logo",
+      "bytes": 21443,
+      "sha256": "3cb4495c0b98dfbe4b663cbf2b6836473572339beb66d902367893162a70be0e",
+      "scope": "current_pages_web_export; mobile inclusion not selected",
+      "rights_state": "project_code_or_export_metadata; mobile_package_not_built",
+      "evidence_paths": [],
+      "source_references": [
+        "web/index.html"
+      ],
+      "next_actions": [
+        "When staging the selected route, include only required production files and audit all external assets and notices."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "web/index.wasm",
+      "category": "godot_web_export_payload",
+      "bytes": 39513091,
+      "sha256": "35116f68540ac41acf7d71ea457added91b5e960a9cca3e2acc72918eaf01277",
+      "scope": "generated_current_web_export; not a native mobile build",
+      "rights_state": "engine_and_embedded_asset_notices_require_review",
+      "evidence_paths": [],
+      "source_references": [
+        "scripts/godot-flash-build.sh",
+        "scripts/vercel-build.sh",
+        "scripts/vercel-fast-build.sh",
+        "tests/custom_setup_mobile.spec.js",
+        "tests/gameplay_smoke.spec.js",
+        "tests/intro_smoke.spec.js",
+        "tests/layout_smoke.spec.js",
+        "tests/mobile_touch_targets_smoke.spec.js",
+        "tests/setup_gate_smoke.spec.js",
+        "tests/setup_spatial_smoke.spec.js",
+        "web/index.html"
+      ],
+      "next_actions": [
+        "For a mobile package, collect notices from the exact Godot/export version and audit embedded game assets separately."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "web/online-trystero-a380cca93612.mjs",
+      "category": "third_party_browser_library",
+      "bytes": 108386,
+      "sha256": "a380cca9361297a1f00c91c769fb14f6742ca860d64110bb013a4adab2f02b92",
+      "scope": "third_party_browser_dependency; wrapper route only",
+      "rights_state": "matching_web_notice_present; mobile_package_not_built",
+      "evidence_paths": [
+        "web/TRYSTERO-LICENSES.txt"
+      ],
+      "source_references": [
+        "web/visual-setup.mjs"
+      ],
+      "next_actions": [
+        "Pin the shipped version and include its complete matching notices in the final mobile bundle."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "web/setup-font.otf",
+      "category": "font",
+      "bytes": 242116,
+      "sha256": "f2762ffbe17351193e3d630dd10f0c3a965e6c873998dfdeda2bd0dcad7985c6",
+      "scope": "current_game_or_web_asset; mobile inclusion depends on selected route",
+      "rights_state": "conditional_terms_review_required",
+      "evidence_paths": [
+        "assets/fonts/THMANYAH_SOURCE.md",
+        "S37"
+      ],
+      "source_references": [
+        "scripts/apply_web_loader.py",
+        "ui/visual-setup.css",
+        "web/visual-setup.css"
+      ],
+      "next_actions": [
+        "Confirm the current license covers every bundled variant and source copy; preserve required attribution and resolve the public raw web copy/build mirror."
+      ],
+      "identical_content_paths": [
+        "assets/fonts/thmanyahsans-Medium.otf"
+      ]
+    },
+    {
+      "path": "web/surface-preview.html",
+      "category": "web_export_component",
+      "bytes": 3529,
+      "sha256": "0f6196238f5870d65094fbc8d4c4d79a217e1878565828ad6c33dacac35dab97",
+      "scope": "QA_surface; do not include in store bundle without a product need",
+      "rights_state": "project_code; no separate third_party_grant_assessed",
+      "evidence_paths": [],
+      "source_references": [
+        "scripts/apply_web_loader.py",
+        "ui/surface-preview.html"
+      ],
+      "next_actions": [
+        "Keep QA-only surfaces out of the production package unless they become an intended player feature."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "web/vendor/LIQUEFY-LICENSE.txt",
+      "category": "license_notice",
+      "bytes": 1080,
+      "sha256": "336992c1a6d5c3db08fc6539a2c30c1740af3b145f713eabb04d8e912ddff5dd",
+      "scope": "license_evidence_for_current_web_tree",
+      "rights_state": "notice_present; mobile_package_not_built",
+      "evidence_paths": [],
+      "source_references": [
+        "scripts/apply_web_loader.py"
+      ],
+      "next_actions": [
+        "Copy the license notice that matches the exact bundled code into the selected mobile package and verify it is readable in-app."
+      ],
+      "identical_content_paths": [
+        "ui/vendor/LIQUEFY-LICENSE.txt"
+      ]
+    },
+    {
+      "path": "web/vendor/liquefy-core-1.1.0.mjs",
+      "category": "third_party_browser_library",
+      "bytes": 41666,
+      "sha256": "e292ec7dee9a10977e0c92291299667d20571ed38cab0fbca91d8989774d4fe3",
+      "scope": "third_party_browser_dependency; wrapper route only",
+      "rights_state": "matching_web_notice_present; mobile_package_not_built",
+      "evidence_paths": [
+        "ui/vendor/LIQUEFY-LICENSE.txt"
+      ],
+      "source_references": [
+        "scripts/apply_web_loader.py",
+        "ui/visual-setup.mjs",
+        "web/visual-setup.mjs"
+      ],
+      "next_actions": [
+        "Pin the shipped version and include its complete matching notices in the final mobile bundle."
+      ],
+      "identical_content_paths": [
+        "ui/vendor/liquefy-core-1.1.0.mjs"
+      ]
+    },
+    {
+      "path": "web/visual-setup.css",
+      "category": "web_export_component",
+      "bytes": 21994,
+      "sha256": "74b20b6b8c6a70d194b55f8ca46d69d9b09a53fe6a6ee465f08a8567eaa4185d",
+      "scope": "current_pages_web_export; mobile inclusion not selected",
+      "rights_state": "project_code_or_export_metadata; mobile_package_not_built",
+      "evidence_paths": [],
+      "source_references": [
+        "scripts/apply_web_loader.py",
+        "ui/surface-preview.html",
+        "web/index.html",
+        "web/surface-preview.html"
+      ],
+      "next_actions": [
+        "When staging the selected route, include only required production files and audit all external assets and notices."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "web/visual-setup.mjs",
+      "category": "web_export_component",
+      "bytes": 55067,
+      "sha256": "644ab0bd410eba9aa91f84e45f747ed3b49bff21e2a2e49504e7c07f140db4b7",
+      "scope": "current_pages_web_export; mobile inclusion not selected",
+      "rights_state": "project_code_or_export_metadata; mobile_package_not_built",
+      "evidence_paths": [],
+      "source_references": [
+        "scripts/apply_web_loader.py",
+        "tests/visual_setup.mjs",
+        "tests/win_tutorial.test.mjs",
+        "ui/surface-preview.html",
+        "web/index.html",
+        "web/surface-preview.html"
+      ],
+      "next_actions": [
+        "When staging the selected route, include only required production files and audit all external assets and notices."
+      ],
+      "identical_content_paths": []
+    },
+    {
+      "path": "web/yakolak-logo.svg",
+      "category": "image_or_logo",
+      "bytes": 5763,
+      "sha256": "5c593bbbb240c7852299a49ac6798e4832f25c49825a4cfbf832fb2855aa5ff9",
+      "scope": "current_pages_web_export; mobile inclusion not selected",
+      "rights_state": "project_code_or_export_metadata; mobile_package_not_built",
+      "evidence_paths": [],
+      "source_references": [
+        "scripts/apply_web_loader.py",
+        "scripts/godot-flash-build.sh",
+        "scripts/vercel-build.sh",
+        "scripts/vercel-fast-build.sh",
+        "tests/pre_intro_smoke.spec.js",
+        "web/index.html"
+      ],
+      "next_actions": [
+        "When staging the selected route, include only required production files and audit all external assets and notices."
+      ],
+      "identical_content_paths": []
+    }
+  ]
+}
