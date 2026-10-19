@@ -1,0 +1,501 @@
+{
+  "schema_version": 1,
+  "as_of": "2026-10-19",
+  "repository": "A7SNcom/yakolak",
+  "baseline_commit": "577e12ed147a5872b539ec405298eb4adb1161fe",
+  "baseline_commit_date": "2026-10-17T09:35:45Z",
+  "method": "static source inspection; no native app, store-account access, physical-device testing, game build or runtime tests in this research change",
+  "counts": {
+    "direct_gdscript_files": 80,
+    "files_mentioning_javascript_bridge": 71,
+    "direct_tests_directory_entries": 108
+  },
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "e7581ed86861276349a2ba9c84702e70bd21b0ed31064cf4b0f424c0af9ac564",
+      "bytes": 4256,
+      "lines": 31,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "PROJECT_ORDER.md",
+      "sha256": "8d390d4ba10e3efcf757fbb1928a79eed1f683d80651ab046652829d6e166f0c",
+      "bytes": 993,
+      "lines": 14,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "README.md",
+      "sha256": "e43dbb85880aa287ee71aa9d3fef9e2d24fae2c90d6a58bb2e637dc984d6119a",
+      "bytes": 3077,
+      "lines": 25,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "project.godot",
+      "sha256": "ff29c883f743665bd1e1b7bb9aab31d331b75bb0b900c2d5ff379819cb4f4656",
+      "bytes": 770,
+      "lines": 24,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "export_presets.cfg",
+      "sha256": "49fd47a2565bfc819121b09bcaa266f2aba8652921517baa1b2c2544144209ad",
+      "bytes": 3876,
+      "lines": 29,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "package.json",
+      "sha256": "1e62cb4fe57a68960604f6942eb5a4139a3ecf4c761a3d7a07eb15762db2bec3",
+      "bytes": 567,
+      "lines": 21,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "1c4e614882527dc3ccd5f5c5e3fe30ba3ba90553ef3e07247bb1e0cc964e6ded",
+      "bytes": 34454,
+      "lines": 1061,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": ".github/workflows/online-build-publish.yml",
+      "sha256": "028b506982d5ac50ba694397ecb509968e0fa8cf1d7029516693035e179f972e",
+      "bytes": 4606,
+      "lines": 124,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "docs/ONLINE_TRYSTERO.md",
+      "sha256": "3b15ba75a72d4495957ad44da1cd8f43636b527b376888026960cc89946384dd",
+      "bytes": 18941,
+      "lines": 80,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "docs/online-acceptance.json",
+      "sha256": "2613c6c77710d0e9255a21416ed8ded340dc61963cf681cdcfd08c3f3934c1bf",
+      "bytes": 425,
+      "lines": 13,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scenes/intro.tscn",
+      "sha256": "af918ec8b14062a1966ff8de04bbd68557441ae6781bfaaa9b23c8a6b080b0d4",
+      "bytes": 6413,
+      "lines": 117,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "rules/yakolak-rules.json",
+      "sha256": "b99daf283bc2e27b831aa55f878dfbd067faf65008753eb6d3222d222e5c3231",
+      "bytes": 609,
+      "lines": 43,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "rules/win-presentation.json",
+      "sha256": "c7b58592218502898dbbb69d70381d07fbce0e88194c4acd92ed92ba270dedff",
+      "bytes": 1185,
+      "lines": 29,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/session_setup_visual.gd",
+      "sha256": "6c2f48fb369f2c4146ca521041ba0df6f479ad6d538ab54f9361529994447799",
+      "bytes": 31143,
+      "lines": 652,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/session_setup.gd",
+      "sha256": "8251f024482f0846716d7422044a821d47e3e3402d992d6521d318ae69104276",
+      "bytes": 26118,
+      "lines": 713,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/online_session_trystero.gd",
+      "sha256": "9e3c80ff84edab42a74d642db681f4d803c6cd80eb77f602e998219cb33174d1",
+      "bytes": 5334,
+      "lines": 110,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/online_session_hardened.gd",
+      "sha256": "e4f0f8d0a24db11d18fc8cccc19d8906956ebd71984853c89f6a7048d7496990",
+      "bytes": 10525,
+      "lines": 284,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/diagnostics_gate.gd",
+      "sha256": "5f7ebaa41a5e64c54b17e3d7262393bef51902f412146e8423b6c8c6332ab109",
+      "bytes": 1311,
+      "lines": 35,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/telemetry_monitor.gd",
+      "sha256": "53ffd0b7490923c952297b68db0b840aa62dafe6db343c53d67ed6a62bcecdef",
+      "bytes": 13042,
+      "lines": 312,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/rooms_observer_route.gd",
+      "sha256": "63e15cd2313ac5ffd9bafce7c9ce77dc273cdb7c3a74d518928e43fefed197e1",
+      "bytes": 2085,
+      "lines": 56,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/background_music.gd",
+      "sha256": "e0be1c70d735e9618b27bb8c55c43883f3289fd139a219c35bf6da87c8ec40ed",
+      "bytes": 1776,
+      "lines": 55,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/visual_polish.gd",
+      "sha256": "584b75e00fb44b16005418b155a67af8d92e7803971e7fa27d4315b75c4df886",
+      "bytes": 9815,
+      "lines": 267,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/frame_pacing_governor.gd",
+      "sha256": "2e394617390abc6023741a32d56625883d5f45c78bac1099782d6407f3076302",
+      "bytes": 5252,
+      "lines": 139,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/scene_motion.gd",
+      "sha256": "d12f18b5b5133e8b6b4e20d6536442d525384f9c5e272c701fb95c8f760dd9df",
+      "bytes": 4309,
+      "lines": 102,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/game_rules.gd",
+      "sha256": "bf49dddbdf3d4ae11d5c754ce318137bfded5b9d73403b2848896bf9aae519f2",
+      "bytes": 5076,
+      "lines": 137,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/gameplay_match.gd",
+      "sha256": "88891b0a4e73fc0a5194b1aba146fd8272f87beeebb1e756f603fee0729f1fdb",
+      "bytes": 21834,
+      "lines": 621,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/gameplay_match_web.gd",
+      "sha256": "feba4a1870364e1d9feb03b1daeca395b751b4ada1bc941caf9f1d6a31eb9383",
+      "bytes": 4364,
+      "lines": 77,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/gameplay_reduced_motion_parity.gd",
+      "sha256": "b8e6845f713d8582a5eac9f7cbc235a68ab53f4d60674e2a059c2d76c51fef23",
+      "bytes": 7509,
+      "lines": 202,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/gameplay_interaction_feedback.gd",
+      "sha256": "697e81add4cae1ee8b190d2b7128fb2a29c0096f783baec7401cc08628bc4608",
+      "bytes": 11390,
+      "lines": 301,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/gameplay_turn_transition_stale_safe.gd",
+      "sha256": "1b7773800aff716e0eb74dcad6dc076279b9883d6ed2b2e1b0511705e0b9624b",
+      "bytes": 18882,
+      "lines": 388,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/turn_clarity_hud.gd",
+      "sha256": "591ae7dcca1e69b0c7ac937ce3d65da4daa913a10e6138e201d9fd80091c57bb",
+      "bytes": 18520,
+      "lines": 405,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/win_tutorial.gd",
+      "sha256": "cffbffa36a1fba90be826bac08cde719bb1c90509eea3214f33971188e4c3511",
+      "bytes": 4343,
+      "lines": 133,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/godot-flash-build.sh",
+      "sha256": "72210abdd471500e6d027dc59edee38b775ab8bfa1d037e1d4caea0e5f0304b3",
+      "bytes": 2777,
+      "lines": 78,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "scripts/build-online.mjs",
+      "sha256": "95cb7e76f602ea3a6536fa1f71c19fb2c1d665fa4ebe0d982b7b304136d105de",
+      "bytes": 1119,
+      "lines": 15,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "ui/visual-setup.mjs",
+      "sha256": "3ff6a62f7735fe90e3d2f65b69d8d01e18f5660496c22f22ebe2ab600b17f385",
+      "bytes": 54029,
+      "lines": 635,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "ui/visual-setup.css",
+      "sha256": "74b20b6b8c6a70d194b55f8ca46d69d9b09a53fe6a6ee465f08a8567eaa4185d",
+      "bytes": 21994,
+      "lines": 156,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "ui/online-trystero.mjs",
+      "sha256": "19e2ab8c7ecefb1ccc88ffa25b0d8148bfbccf09d207a49dfdfa5c4e60c152bd",
+      "bytes": 18166,
+      "lines": 240,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "ui/p2p-authority.mjs",
+      "sha256": "fbf09099c8e5e76eaa3f1a3310ca167bb3f2e86af6dc7cae2f46279e183f0dcd",
+      "bytes": 13439,
+      "lines": 200,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "api/game-rules.js",
+      "sha256": "719d569ea5ee2ccf0464785a2ab028c89d4fd7a7d4fd9b7d4df63f391bdbfb58",
+      "bytes": 3143,
+      "lines": 86,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "api/room-state.js",
+      "sha256": "001a04cae54088282dc4b4eaa3baeccf52f47712fc47f6c1dec45946b920add5",
+      "bytes": 10119,
+      "lines": 252,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "assets/fonts/THMANYAH_SOURCE.md",
+      "sha256": "2ce0d5a714e84a653a9404414009fa1bba2a8e38f0df0fa68b6ee58cd4f61010",
+      "bytes": 372,
+      "lines": 7,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    },
+    {
+      "path": "ui/vendor/LIQUEFY-LICENSE.txt",
+      "sha256": "336992c1a6d5c3db08fc6539a2c30c1740af3b145f713eabb04d8e912ddff5dd",
+      "bytes": 1080,
+      "lines": 21,
+      "inspection": "static_read_or_targeted_search",
+      "runtime_verified": false
+    }
+  ],
+  "bridge_files": [
+    "scripts/active_turn_camera.gd",
+    "scripts/background_music.gd",
+    "scripts/browser_verification_bridge.gd",
+    "scripts/diagnostics_gate.gd",
+    "scripts/frame_pacing_governor.gd",
+    "scripts/gameplay.gd",
+    "scripts/gameplay_authoritative_turn_state.gd",
+    "scripts/gameplay_camera_zoom.gd",
+    "scripts/gameplay_design_system.gd",
+    "scripts/gameplay_explicit_handoff.gd",
+    "scripts/gameplay_interaction_feedback.gd",
+    "scripts/gameplay_match.gd",
+    "scripts/gameplay_match_web.gd",
+    "scripts/gameplay_reduced_motion_parity.gd",
+    "scripts/gameplay_rematch_lifecycle.gd",
+    "scripts/gameplay_selected_state.gd",
+    "scripts/gameplay_selection_latency.gd",
+    "scripts/gameplay_session.gd",
+    "scripts/gameplay_session_camera_safe.gd",
+    "scripts/gameplay_session_efficient.gd",
+    "scripts/gameplay_session_hardened.gd",
+    "scripts/gameplay_session_nested_pick.gd",
+    "scripts/gameplay_session_passplay.gd",
+    "scripts/gameplay_session_polish.gd",
+    "scripts/gameplay_session_resilient.gd",
+    "scripts/gameplay_session_roundsafe.gd",
+    "scripts/gameplay_session_ui.gd",
+    "scripts/gameplay_state_inventory.gd",
+    "scripts/gameplay_touch_semantic_audit.gd",
+    "scripts/gameplay_touch_targets.gd",
+    "scripts/gameplay_turn_transition_stale_safe.gd",
+    "scripts/gameplay_tutorial_showcase.gd",
+    "scripts/gameplay_visual_refinement.gd",
+    "scripts/iconography.gd",
+    "scripts/intro.gd",
+    "scripts/intro_corrections.gd",
+    "scripts/intro_handoff.gd",
+    "scripts/layout_audit.gd",
+    "scripts/online_resilience_test_bridge.gd",
+    "scripts/online_session.gd",
+    "scripts/online_session_hardened.gd",
+    "scripts/online_session_trystero.gd",
+    "scripts/pre_intro_hidden_drop.gd",
+    "scripts/pre_intro_refinement.gd",
+    "scripts/pre_intro_star_to_table.gd",
+    "scripts/pre_intro_star_to_table_testable.gd",
+    "scripts/rooms_observer_route.gd",
+    "scripts/session_setup.gd",
+    "scripts/session_setup_arabic.gd",
+    "scripts/session_setup_design_system.gd",
+    "scripts/session_setup_dialog_system.gd",
+    "scripts/session_setup_flow.gd",
+    "scripts/session_setup_guard.gd",
+    "scripts/session_setup_guard_redesign.gd",
+    "scripts/session_setup_interaction_feedback.gd",
+    "scripts/session_setup_redesign.gd",
+    "scripts/session_setup_redesign_fix.gd",
+    "scripts/session_setup_state_inventory.gd",
+    "scripts/session_setup_visual.gd",
+    "scripts/smooth_intro_timeline.gd",
+    "scripts/smooth_intro_timeline_testable.gd",
+    "scripts/telemetry_console_capture.gd",
+    "scripts/telemetry_monitor.gd",
+    "scripts/telemetry_watchdog.gd",
+    "scripts/turn_clarity_hud.gd",
+    "scripts/turn_clarity_hud_design_system.gd",
+    "scripts/turn_light_crossfade.gd",
+    "scripts/visual_polish.gd",
+    "scripts/web_gpu_warmup.gd",
+    "scripts/web_gpu_warmup_testable.gd",
+    "scripts/win_tutorial.gd"
+  ],
+  "web_top_level_artifacts": [
+    {
+      "path": "web/TRYSTERO-LICENSES.txt",
+      "bytes": 4360
+    },
+    {
+      "path": "web/index-b485f8baa962.pck",
+      "bytes": 9704300
+    },
+    {
+      "path": "web/index.audio.position.worklet.js",
+      "bytes": 2973
+    },
+    {
+      "path": "web/index.audio.worklet.js",
+      "bytes": 7298
+    },
+    {
+      "path": "web/index.html",
+      "bytes": 33616
+    },
+    {
+      "path": "web/index.js",
+      "bytes": 279815
+    },
+    {
+      "path": "web/index.pck",
+      "bytes": 9704300
+    },
+    {
+      "path": "web/index.png",
+      "bytes": 21443
+    },
+    {
+      "path": "web/index.wasm",
+      "bytes": 39513091
+    },
+    {
+      "path": "web/online-trystero-a380cca93612.mjs",
+      "bytes": 108386
+    },
+    {
+      "path": "web/setup-font.otf",
+      "bytes": 242116
+    },
+    {
+      "path": "web/surface-preview.html",
+      "bytes": 3529
+    },
+    {
+      "path": "web/visual-setup.css",
+      "bytes": 21994
+    },
+    {
+      "path": "web/visual-setup.mjs",
+      "bytes": 55067
+    },
+    {
+      "path": "web/yakolak-logo.svg",
+      "bytes": 5763
+    }
+  ],
+  "existing_multiplayer_acceptance": {
+    "path": "docs/online-acceptance.json",
+    "result": "blocked",
+    "physical_devices": [],
+    "publication_authorization_only": "user_device_test"
+  },
+  "not_proven": [
+    "native mobile functionality",
+    "WKWebView/Android WebView compatibility",
+    "physical-device performance or thermal results",
+    "production online reliability",
+    "all asset ownership",
+    "store account eligibility",
+    "review acceptance"
+  ]
+}

@@ -1,0 +1,1549 @@
+{
+  "schema_version": 1,
+  "artifact_type": "execution_preparation_only",
+  "as_of": "2026-10-19",
+  "repository": "A7SNcom/yakolak",
+  "baseline_commit": "577e12ed147a5872b539ec405298eb4adb1161fe",
+  "runtime_changed_by_this_package": false,
+  "ready_for_store_submission": false,
+  "route_recommendation": "bundled_web_spike_then_decide",
+  "selected_route": null,
+  "selected_scope": null,
+  "source_registry": "sources.json",
+  "code_evidence": "code-evidence.json",
+  "acceptance_template": "acceptance-template.json",
+  "policy_snapshot": {
+    "checked_on": "2026-10-19",
+    "apple_minimum_xcode_major": 26,
+    "apple_minimum_ios_sdk_major": 26,
+    "android_new_app_target_api_minimum": 36,
+    "android_16kb_updates_block_date_current_page": "2027-02-01",
+    "google_new_personal_closed_test": {
+      "account_created_after": "2023-11-13",
+      "minimum_testers": 12,
+      "continuous_opt_in_days": 14,
+      "production_access_not_automatic": true
+    },
+    "recheck_before_submission": true,
+    "apple_minimum_deployment_target_major": 13
+  },
+  "constraints": [
+    "Planning only in this research change; no app implementation or store submission.",
+    "Keep current Godot rules, camera/stone/color continuity and owner victory phrases.",
+    "Use main per AGENTS.md; no branch or PR unless requested.",
+    "Do not relink cancelled web hosting; Pages remains the existing preview channel.",
+    "Do not mark any device, network, privacy or review acceptance passed without evidence.",
+    "No purchase, server/TURN budget or paid account enrollment is authorized by this preparation package."
+  ],
+  "owner_inputs": [
+    {
+      "id": "D01",
+      "question_ar": "الكيان الناشر وصاحب الحسابين",
+      "status": "unresolved",
+      "value": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "D02",
+      "question_ar": "المسار بعد التجربة",
+      "status": "unresolved",
+      "value": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "D03",
+      "question_ar": "نطاق أول إصدار وonline",
+      "status": "unresolved",
+      "value": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "D04",
+      "question_ar": "دخول الضيف والهاتف",
+      "status": "unresolved",
+      "value": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "D05",
+      "question_ar": "الأسماء عن بعد وسلامة المحتوى",
+      "status": "unresolved",
+      "value": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "D06",
+      "question_ar": "الجمهور الحقيقي والأطفال",
+      "status": "unresolved",
+      "value": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "D07",
+      "question_ar": "نموذج الربح",
+      "status": "unresolved",
+      "value": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "D08",
+      "question_ar": "بلدان الإطلاق",
+      "status": "unresolved",
+      "value": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "D09",
+      "question_ar": "حسابات وMac وهواتف ومختبرون",
+      "status": "unresolved",
+      "value": null,
+      "evidence_ref": null
+    },
+    {
+      "id": "D10",
+      "question_ar": "حقوق الأصول والتوزيع",
+      "status": "unresolved",
+      "value": null,
+      "evidence_ref": null
+    }
+  ],
+  "tasks": [
+    {
+      "id": "YKL-001",
+      "title_ar": "تثبيت قرارات النطاق والناشر",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G0",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [],
+      "effort_person_days": {
+        "min": 1,
+        "max": 2,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "owner",
+      "existing_target_paths": [
+        "README.md",
+        "AGENTS.md",
+        "docs/research/store-launch/launch-plan.json"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "سجل D01–D10 مع chosen/deferred وتبرير وأثر واضح.",
+        "أعد فحص أحدث main؛ فرّق Pages الحالي عن HTTP التاريخي."
+      ],
+      "acceptance_ar": [
+        "D01–D10 مسجلة، selected_route/selected_scope لا تُخمّن.",
+        "هوية الناشر والجمهور والحقوق والعتاد وحالة الحساب موثقة بمرجع خاص."
+      ],
+      "source_refs": [
+        "S27",
+        "S28",
+        "S13"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-002",
+      "title_ar": "إغلاق حقوق الخط والموسيقى والأصول",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G0",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-001"
+      ],
+      "effort_person_days": {
+        "min": 1,
+        "max": 4,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "owner+developer",
+      "existing_target_paths": [
+        "assets/fonts/THMANYAH_SOURCE.md",
+        "assets/fonts/song.mp3",
+        "YAKOLAK_PORTABLE_KIT/assets/manifest.json",
+        "scripts/godot-flash-build.sh"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "أنشئ asset register بالمصدر والنسخة والحقوق ونمط التوزيع.",
+        "احسم الخط الخام المرئي ومصدر CI؛ إثبات الموسيقى أو بديل مرخص، دون تعديل بصري غير مقبول."
+      ],
+      "acceptance_ar": [
+        "لا أصل مجهول الحقوق في release.",
+        "قرار توزيع الخط يشمل الملفات الخام/Pages والمستودع؛ لا افتراض أن PCK يمنع الاستخراج."
+      ],
+      "source_refs": [
+        "S36",
+        "S37",
+        "S01"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-003",
+      "title_ar": "تجربة حزمة Web محلية على الهاتفين",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G1",
+      "route": "wrapper",
+      "condition": "always",
+      "depends_on": [
+        "YKL-001"
+      ],
+      "effort_person_days": {
+        "min": 3,
+        "max": 5,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer",
+      "existing_target_paths": [
+        "web/index.html",
+        "scripts/apply_web_loader.py",
+        "export_presets.cfg"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "جهز proof of concept داخلي بأصول محلية ونسخ أدوات مثبتة.",
+        "اختبر WASM/PCK/crypto/WebRTC والكيبورد والصوت والخلفية والأداء على جهازين."
+      ],
+      "acceptance_ar": [
+        "لا server.url/Pages/CDN مطلوب للمحلي في أول تشغيل بوضع الطيران.",
+        "تقرير أجهزة ومقاييس وفشل/نجاح حقيقي مع source SHA."
+      ],
+      "source_refs": [
+        "S31",
+        "S32",
+        "S33"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-004",
+      "title_ar": "اعتماد معمارية واحدة بعد القياس",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G1",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-003"
+      ],
+      "effort_person_days": {
+        "min": 0.5,
+        "max": 1,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "owner+developer",
+      "existing_target_paths": [
+        "docs/research/store-launch/03-architecture-decision.md"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "وثق bundled-web أو native وأسباب القرار ونسخ الأدوات.",
+        "إذا فشلت التجربة حدد نقل DOM والشبكة وأعد تقدير الجهد قبل المتابعة."
+      ],
+      "acceptance_ar": [
+        "اختيار موثق للمسار؛ لا افتراض native compatibility من وجود المحرك.",
+        "لا ميزانية backend/TURN أو عمل جديد خارج القرار."
+      ],
+      "source_refs": [
+        "S29",
+        "S30",
+        "S31",
+        "S32"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-005",
+      "title_ar": "فصل حدود المنصة عن قواعد اللعبة",
+      "status": "planned",
+      "priority": "P1",
+      "gate": "G2",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-004"
+      ],
+      "effort_person_days": {
+        "min": 1,
+        "max": 3,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer",
+      "existing_target_paths": [
+        "scripts/session_setup_visual.gd",
+        "scripts/online_session_trystero.gd",
+        "ui/visual-setup.mjs",
+        "ui/online-trystero.mjs"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "عرّف adapters للهوية/lifecycle/invites/transport مع generation ownership.",
+        "حافظ على contract القواعد والمشهد كمرجع."
+      ],
+      "acceptance_ar": [
+        "قواعد الفوز لا تتغير؛ نتائج fixtures متطابقة.",
+        "فشل adapter لا يصنع غرفة أو نجاحا وهميا."
+      ],
+      "source_refs": [
+        "S29",
+        "S34"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-006",
+      "title_ar": "إعداد staging محلي وإزالة تضاعف الموارد",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G2",
+      "route": "wrapper",
+      "condition": "route_wrapper",
+      "depends_on": [
+        "YKL-005"
+      ],
+      "effort_person_days": {
+        "min": 1,
+        "max": 2,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer",
+      "existing_target_paths": [
+        "web/index.html",
+        "scripts/apply_web_loader.py",
+        "scripts/build-online.mjs"
+      ],
+      "proposed_artifacts": [
+        "mobile/capacitor.config.ts",
+        "mobile/package.json",
+        "mobile/staging/"
+      ],
+      "steps_ar": [
+        "أنشئ مجلد package staging مستقل عن صادرات Pages.",
+        "حل روابط الأصول و PCK الصحيح و MIME و origin؛ حافظ على notices."
+      ],
+      "acceptance_ar": [
+        "حزمة first-install offline مكتملة.",
+        "لا مورد مفقود ولا PCK مكرر بلا استخدام؛ digest مثبت للموارد."
+      ],
+      "source_refs": [
+        "S31",
+        "S32"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-007",
+      "title_ar": "دخول ضيف وتقليل بيانات الهوية",
+      "status": "planned",
+      "priority": "P1",
+      "gate": "G2",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-005"
+      ],
+      "effort_person_days": {
+        "min": 1,
+        "max": 2,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "owner+developer",
+      "existing_target_paths": [
+        "ui/visual-setup.mjs",
+        "scripts/session_setup_visual.gd"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "اعتمد الاسم الاختياري/الضيف؛ إزالة الهاتف توصية تحتاج قرارا.",
+        "حدّث validation والواجهة والملاحظات بحسب القرار دون SMS وهمي."
+      ],
+      "acceptance_ar": [
+        "لا طلب هاتف غير مبرر في release المعتمد.",
+        "التسميات تصف الملف المحلي بدقة ولا توهم بحساب مصادق."
+      ],
+      "source_refs": [
+        "S04",
+        "S18",
+        "S20"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-008",
+      "title_ar": "تخزين إعدادات ومسح بيانات محلية",
+      "status": "planned",
+      "priority": "P1",
+      "gate": "G2",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-007"
+      ],
+      "effort_person_days": {
+        "min": 1,
+        "max": 2,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer",
+      "existing_target_paths": [
+        "ui/visual-setup.mjs",
+        "scripts/gameplay_session_ui.gd",
+        "scripts/background_music.gd"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "Versioned storage للاسم والكتم والتفضيلات ومسحها.",
+        "لا تفترض مشاركة Safari storage مع WebView؛ native يستخدم adapter."
+      ],
+      "acceptance_ar": [
+        "يبقى الكتم والاسم عند إعادة التشغيل وفق الاختيار.",
+        "مسح البيانات يمحو ملفات التعريف دون تسريب أو آثار طرف ثالث مزعومة."
+      ],
+      "source_refs": [
+        "S04",
+        "S20"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-009",
+      "title_ar": "سياسة release للتشخيص والاختبار",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G2",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-005"
+      ],
+      "effort_person_days": {
+        "min": 1,
+        "max": 2,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer",
+      "existing_target_paths": [
+        "scripts/diagnostics_gate.gd",
+        "scripts/telemetry_monitor.gd",
+        "scripts/rooms_observer_route.gd",
+        "scripts/online_resilience_test_bridge.gd",
+        "scripts/browser_verification_bridge.gd"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "احصر fixtures/flags/التشخيص وافصلها عن release بوضوح.",
+        "عالج بقايا رمز الرقمين ومسارات HTTP التاريخية دون حذف منطق القواعد المستورد."
+      ],
+      "acceptance_ar": [
+        "لا reviewer-specific behavior أو unlock خفي.",
+        "capture release يطابق القرار ولا يحاول endpoint تشخيص غير مقصود."
+      ],
+      "source_refs": [
+        "S01",
+        "S04",
+        "S16"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-010",
+      "title_ar": "تكافؤ الواجهة والقواعد والموشن",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G2",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-005"
+      ],
+      "effort_person_days": {
+        "min": 1,
+        "max": 3,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer",
+      "existing_target_paths": [
+        "scripts/scene_motion.gd",
+        "scripts/win_tutorial.gd",
+        "scripts/gameplay_visual_refinement.gd",
+        "rules/win-presentation.json",
+        "tests/scene_continuity_headless.gd"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "احتفظ بالشرح والاسم الحقيقي والأنماط الثلاثة.",
+        "راجع كل انتقال/إلغاء/resize بموضع مرئي متصل ومالك generation واحد."
+      ],
+      "acceptance_ar": [
+        "T03–T20 مقبولة للمسار المختار.",
+        "لا قطع كاميرا أو حجر يظهر/يختفي فجأة أو لون لحظي."
+      ],
+      "source_refs": [
+        "S01"
+      ],
+      "evidence_required": true,
+      "evidence": [],
+      "requires_one_of": [
+        [
+          "YKL-006",
+          "YKL-029"
+        ]
+      ]
+    },
+    {
+      "id": "YKL-011",
+      "title_ar": "دورة حياة الهاتف والصوت والرجوع",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G2",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-005"
+      ],
+      "effort_person_days": {
+        "min": 2,
+        "max": 4,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer",
+      "existing_target_paths": [
+        "scripts/background_music.gd",
+        "scripts/online_session_trystero.gd",
+        "ui/online-trystero.mjs",
+        "scripts/gameplay_session_resilient.gd"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "عالج foreground/background/lock/audio interruption/back.",
+        "اعتمد ناتج process death للمضيف والضيف وإلغاء callbacks القديمة."
+      ],
+      "acceptance_ar": [
+        "T21–T24 موثقة من جهازين.",
+        "لا background audio لحفظ المضيف، ولا وعود استعادة غير منفذة."
+      ],
+      "source_refs": [
+        "S26",
+        "S01",
+        "C10"
+      ],
+      "evidence_required": true,
+      "evidence": [],
+      "requires_one_of": [
+        [
+          "YKL-006",
+          "YKL-029"
+        ]
+      ]
+    },
+    {
+      "id": "YKL-012",
+      "title_ar": "قياس الأداء وضبط الجودة تدريجيا",
+      "status": "planned",
+      "priority": "P1",
+      "gate": "G2",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-005"
+      ],
+      "effort_person_days": {
+        "min": 2,
+        "max": 4,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer+qa",
+      "existing_target_paths": [
+        "project.godot",
+        "scripts/visual_polish.gd",
+        "scripts/frame_pacing_governor.gd"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "Profile startup/frames/RAM/thermal في build حقيقي.",
+        "اعتمد tiers للدقة/الظلال/MSAA تحافظ على الموطن البصري وقواعد الحركة."
+      ],
+      "acceptance_ar": [
+        "T39 يحقق العتبات المعتمدة على أقل جهاز معلن.",
+        "لا تبديل جودة مرئي يقفز الكاميرا أو يغير وقت دور اللعبة."
+      ],
+      "source_refs": [
+        "S31",
+        "S43",
+        "C01"
+      ],
+      "evidence_required": true,
+      "evidence": [],
+      "requires_one_of": [
+        [
+          "YKL-006",
+          "YKL-029"
+        ]
+      ]
+    },
+    {
+      "id": "YKL-013",
+      "title_ar": "جرد شبكة وبيانات الحزمة",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G3",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-008",
+        "YKL-009"
+      ],
+      "effort_person_days": {
+        "min": 1,
+        "max": 3,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer+privacy",
+      "existing_target_paths": [
+        "ui/online-trystero.mjs",
+        "ui/p2p-authority.mjs",
+        "scripts/telemetry_monitor.gd",
+        "docs/research/store-launch/04-privacy-safety-and-rights.md"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "جرد endpoints/SDKs/retention لكل mode من الحزمة.",
+        "راجع App Privacy و Data safety منفصلين و manifest/required reasons."
+      ],
+      "acceptance_ar": [
+        "T35/T38 موثقان؛ لا blanket no-data بلا دليل.",
+        "مصدر كل إجابة معروف، بما في ذلك P2P/relays وأي تشخيص."
+      ],
+      "source_refs": [
+        "S04",
+        "S05",
+        "S06",
+        "S16",
+        "S18"
+      ],
+      "evidence_required": true,
+      "evidence": [],
+      "requires_one_of": [
+        [
+          "YKL-006",
+          "YKL-029"
+        ]
+      ]
+    },
+    {
+      "id": "YKL-014",
+      "title_ar": "قبول Trystero داخل wrapper",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G3",
+      "route": "wrapper",
+      "condition": "wrapper_and_online",
+      "depends_on": [
+        "YKL-006",
+        "YKL-015"
+      ],
+      "effort_person_days": {
+        "min": 2,
+        "max": 4,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer",
+      "existing_target_paths": [
+        "ui/online-trystero.mjs",
+        "scripts/online_session_trystero.gd",
+        "ui/p2p-authority.mjs"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "اختبر نسخة Trystero 0.26.0 على origin الحزمة الفعلي.",
+        "احفظ epoch و seat و mutationId و version والمقاعد المختلطة والتوقيت."
+      ],
+      "acceptance_ar": [
+        "إنشاء الغرفة والدخول والحركات والاستمرار وإعادة المباراة تعمل بين جهازين.",
+        "لا تعرض نجاح الغرفة قبل قبول اللاعب واتصال اللعب الحقيقي."
+      ],
+      "source_refs": [
+        "S35",
+        "S31"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-015",
+      "title_ar": "تحصين الغرفة وحدود الثقة والاستعادة",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G3",
+      "route": "both",
+      "condition": "online",
+      "depends_on": [
+        "YKL-005"
+      ],
+      "effort_person_days": {
+        "min": 2,
+        "max": 4,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer",
+      "existing_target_paths": [
+        "ui/p2p-authority.mjs",
+        "ui/online-trystero.mjs",
+        "api/room-state.js",
+        "docs/ONLINE_TRYSTERO.md"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "احسم short code admission/secret invitation/preview minimization.",
+        "اختبر collision/flood/replay/reconnect/host loss؛ وثق الحاجة إلى TURN/خدمة إن لم تحقق الشبكة الحد المطلوب."
+      ],
+      "acceptance_ar": [
+        "لا token في رابط أو snapshot/log عام.",
+        "T28–T32/T34 مقبولة؛ الغرفة لا تدعي بقاء سلطة المضيف بعد قتله."
+      ],
+      "source_refs": [
+        "S35",
+        "S19"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-016",
+      "title_ar": "سلامة أسماء online والإبلاغ والحظر",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G3",
+      "route": "both",
+      "condition": "online",
+      "depends_on": [
+        "YKL-007",
+        "YKL-015"
+      ],
+      "effort_person_days": {
+        "min": 1,
+        "max": 5,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "owner+developer",
+      "existing_target_paths": [
+        "ui/visual-setup.mjs",
+        "ui/p2p-authority.mjs",
+        "ui/online-trystero.mjs"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "اختر أسماء جاهزة عن بعد أو free-text مع سلامة كاملة بحسب الجمهور.",
+        "أضف terms/report/block أو امنع نقل النص الحر؛ تحقق من rejoin."
+      ],
+      "acceptance_ar": [
+        "T33 ناجح للمسار المختار مع دليل من واجهة كل دور.",
+        "فلترة الطول وحدها ليست قبول سلامة؛ لا زر report وهمي."
+      ],
+      "source_refs": [
+        "S19",
+        "S01",
+        "S21"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-017",
+      "title_ar": "سياسة ودعم وحذف وروابط عامة",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G3",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-013"
+      ],
+      "effort_person_days": {
+        "min": 1,
+        "max": 2,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "owner+developer",
+      "existing_target_paths": [
+        "ui/visual-setup.mjs",
+        "scripts/session_setup_visual.gd",
+        "docs/research/store-launch/templates/privacy-policy-outline.ar-en.md"
+      ],
+      "proposed_artifacts": [
+        "support/privacy.html",
+        "support/index.html",
+        "support/delete-data.html (only if applicable)"
+      ],
+      "steps_ar": [
+        "املأ السياسة والدعم والاحتفاظ والتواصل من الممارسة الفعلية.",
+        "انشر صفحات HTTPS واربطها داخل اللعبة؛ حذف حساب فقط إن دخل نظام حساب في النطاق."
+      ],
+      "acceptance_ar": [
+        "T36/T37 موثقان؛ لا placeholders أو روابط مكسورة.",
+        "إقرارات المنصتين والنصان AR/EN متطابقون مع build."
+      ],
+      "source_refs": [
+        "S04",
+        "S18",
+        "S07",
+        "S20",
+        "S40"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-018",
+      "title_ar": "إتاحة الرخص داخل المنتج",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G3",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-002"
+      ],
+      "effort_person_days": {
+        "min": 0.5,
+        "max": 1,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer",
+      "existing_target_paths": [
+        "scripts/build-online.mjs",
+        "web/TRYSTERO-LICENSES.txt",
+        "ui/vendor/LIQUEFY-LICENSE.txt"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "اجمع إشعارات Godot والأطراف الثالثة والموارد الفعلية.",
+        "وفر عرضا مقروءا للرخص مع الحفاظ على ملفات notices في الحزمة."
+      ],
+      "acceptance_ar": [
+        "الرخص متاحة داخل release على iOS، دون الاكتفاء بالـ console.",
+        "جرد الرخص يطابق مكتبات الحزمة ولا يعتمد على ملفات مشروع آخر."
+      ],
+      "source_refs": [
+        "S36",
+        "S37"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-019",
+      "title_ar": "Android wrapper release قابل للتثبيت من Play",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G4",
+      "route": "wrapper",
+      "condition": "route_wrapper",
+      "depends_on": [
+        "YKL-006",
+        "YKL-008",
+        "YKL-009",
+        "YKL-010",
+        "YKL-011",
+        "YKL-012",
+        "YKL-017",
+        "YKL-018"
+      ],
+      "effort_person_days": {
+        "min": 1,
+        "max": 3,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer",
+      "existing_target_paths": [
+        "export_presets.cfg",
+        "project.godot",
+        "package.json",
+        ".github/workflows/online-build-publish.yml"
+      ],
+      "proposed_artifacts": [
+        "mobile/android/",
+        "build/android/yakolak.aab"
+      ],
+      "steps_ar": [
+        "أنشئ مشروع Android للـ wrapper بإصدارات مثبتة وتوقيع خارج git.",
+        "استهدف API 36 وافحص native plugins و 16 KB و AAB والأذونات."
+      ],
+      "acceptance_ar": [
+        "AAB release موقّع يتثبت من Play testing مع build manifest.",
+        "مسار Pages لا يتغير؛ لا نشر متجر تلقائي ضمن workflow الويب."
+      ],
+      "source_refs": [
+        "S14",
+        "S15",
+        "S32",
+        "S49",
+        "S50"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-020",
+      "title_ar": "iOS wrapper archive قابل للتثبيت من TestFlight",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G4",
+      "route": "wrapper",
+      "condition": "route_wrapper",
+      "depends_on": [
+        "YKL-006",
+        "YKL-008",
+        "YKL-009",
+        "YKL-010",
+        "YKL-011",
+        "YKL-012",
+        "YKL-017",
+        "YKL-018"
+      ],
+      "effort_person_days": {
+        "min": 1,
+        "max": 3,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer",
+      "existing_target_paths": [
+        "project.godot",
+        "package.json",
+        "web/index.html"
+      ],
+      "proposed_artifacts": [
+        "mobile/ios/",
+        "build/ios/"
+      ],
+      "steps_ar": [
+        "أنشئ shell iOS محليا ومشروع Xcode وتوقيعا ومعرفات معتمدة.",
+        "تحقق من SDK و manifest والتشفير و entitlements والأيقونة والحزمة."
+      ],
+      "acceptance_ar": [
+        "Archive و TestFlight build مثبتان على iPhone فعلي مع digest و source SHA.",
+        "لا ATS bypass ولا background mode غير مبرر ولا إقرار خصوصية متخيل."
+      ],
+      "source_refs": [
+        "S03",
+        "S05",
+        "S10",
+        "S32",
+        "S46",
+        "S51"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-021",
+      "title_ar": "مصفوفة قبول محلي وأجهزة وحزمة",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G4",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-010",
+        "YKL-011",
+        "YKL-012",
+        "YKL-017",
+        "YKL-018"
+      ],
+      "effort_person_days": {
+        "min": 2,
+        "max": 4,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "qa",
+      "existing_target_paths": [
+        "docs/research/store-launch/acceptance-template.json",
+        "tests/game_rules_headless.gd",
+        "tests/scene_continuity_headless.gd"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "نفذ المصفوفة المحلية على المرشح الموقع، دون الاكتفاء بـ debug.",
+        "سجل الجهاز الفعلي و OS و build و evidence واستثناءات النطاق."
+      ],
+      "acceptance_ar": [
+        "T01–T24 و T35–T42 لها أدلة، أو not_applicable بسبب صحيح.",
+        "لا P0/P1 يمنع الوظائف المعلنة ولا passed بلا دليل."
+      ],
+      "source_refs": [
+        "S01",
+        "S17",
+        "S15"
+      ],
+      "evidence_required": true,
+      "evidence": [],
+      "requires_one_of": [
+        [
+          "YKL-019",
+          "YKL-031"
+        ],
+        [
+          "YKL-020",
+          "YKL-032"
+        ]
+      ]
+    },
+    {
+      "id": "YKL-022",
+      "title_ar": "مصفوفة قبول أونلاين متعدد الأجهزة والشبكات",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G4",
+      "route": "both",
+      "condition": "online",
+      "depends_on": [
+        "YKL-015",
+        "YKL-016",
+        "YKL-021"
+      ],
+      "effort_person_days": {
+        "min": 2,
+        "max": 4,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "qa",
+      "existing_target_paths": [
+        "docs/research/store-launch/acceptance-template.json",
+        "docs/online-acceptance.json",
+        "docs/ONLINE_TRYSTERO.md"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "نفذ iOS مقابل Android واعكس دور المضيف، مع شبكات مختلفة ونسخة متجر.",
+        "اختبر النواتج الصحيحة عند NAT و reconnect وقتل المضيف وتعارض الألوان والأسماء."
+      ],
+      "acceptance_ar": [
+        "T25–T34 لها أدلة حقيقية من الجهازين، لا browser contexts فقط.",
+        "لا تعدل قبول Pages إلا بنتيجة اختبار Pages الفعلية المستقلة."
+      ],
+      "source_refs": [
+        "S35",
+        "S19",
+        "S13"
+      ],
+      "evidence_required": true,
+      "evidence": [],
+      "requires_one_of": [
+        [
+          "YKL-014",
+          "YKL-030"
+        ]
+      ]
+    },
+    {
+      "id": "YKL-023",
+      "title_ar": "TestFlight و Play closed testing وسجل feedback",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G4",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-021"
+      ],
+      "effort_person_days": {
+        "min": 1,
+        "max": 2,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "owner+qa",
+      "existing_target_paths": [
+        "docs/research/store-launch/acceptance-template.json"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "أنشئ قائمة مختبرين حقيقيين بشكل خاص وسجل feedback بلا بيانات شخصية.",
+        "نفذ متطلبات الحساب المشمول وأبق المختبرين مستوفين عند طلب الإنتاج."
+      ],
+      "acceptance_ar": [
+        "إثبات testing track و build وملاحظات وإصلاحات؛ 12 مختبرا و 14 يوما عند انطباقه.",
+        "لا تدّع أن عدد الأيام وحده يضمن production access."
+      ],
+      "source_refs": [
+        "S09",
+        "S13",
+        "C05",
+        "C06"
+      ],
+      "evidence_required": true,
+      "evidence": [],
+      "conditional_dependencies": [
+        {
+          "when": "online",
+          "ids": [
+            "YKL-022"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "YKL-024",
+      "title_ar": "مواد متجر صادقة ومترجمة",
+      "status": "planned",
+      "priority": "P1",
+      "gate": "G4",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-001",
+        "YKL-004",
+        "YKL-021"
+      ],
+      "effort_person_days": {
+        "min": 1,
+        "max": 2,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "owner+designer",
+      "existing_target_paths": [
+        "docs/research/store-launch/templates/store-listing.json",
+        "rules/win-presentation.json"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "اختر الوصف بحسب mode واللغات المقبولة فعليا.",
+        "أنتج icons و screenshots و feature graphic من release مع مراجعة الحقوق والمقاسات."
+      ],
+      "acceptance_ar": [
+        "حدود النصوص والمقاسات محققة؛ لا وعد بميزة online أو لغة غير موجودة.",
+        "لقطات لعب حقيقية بلا ترويج لمنافس أو test data شخصية."
+      ],
+      "source_refs": [
+        "S11",
+        "S24",
+        "S25",
+        "S46"
+      ],
+      "evidence_required": true,
+      "evidence": [],
+      "conditional_dependencies": [
+        {
+          "when": "online",
+          "ids": [
+            "YKL-022"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "YKL-025",
+      "title_ar": "إغلاق إقرارات المتجر وملف المراجعة",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G4",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-013",
+        "YKL-017",
+        "YKL-018",
+        "YKL-023",
+        "YKL-024"
+      ],
+      "effort_person_days": {
+        "min": 1,
+        "max": 2,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "owner+developer",
+      "existing_target_paths": [
+        "docs/research/store-launch/templates/review-notes.en.md"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "أكمل الخصوصية والجمهور والتصنيف والوصول والتشفير والربح بحسب الحزمة والبلدان.",
+        "أعد فحص المصادر الحية والحساب يوم التقديم، وأرفق فيديو جهاز عند الحاجة."
+      ],
+      "acceptance_ar": [
+        "لا null أو placeholders في ملفات التقديم؛ كل إجابة معتمدة.",
+        "خطوات المراجع تعمل دون رمز غرفة مؤقت منته، وكل ميزة معلنة مكشوفة."
+      ],
+      "source_refs": [
+        "S02",
+        "S08",
+        "S10",
+        "S13",
+        "S16",
+        "S21",
+        "S23",
+        "S51"
+      ],
+      "evidence_required": true,
+      "evidence": [],
+      "conditional_dependencies": [
+        {
+          "when": "online",
+          "ids": [
+            "YKL-022"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "YKL-026",
+      "title_ar": "التقديم والمراجعة ومعالجة الرفض",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G5",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-002",
+        "YKL-021",
+        "YKL-023",
+        "YKL-024",
+        "YKL-025"
+      ],
+      "effort_person_days": {
+        "min": 0.5,
+        "max": 2,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "owner+developer",
+      "existing_target_paths": [
+        "docs/research/store-launch/08-rejection-cases-and-response.md"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "ارفع المرشح المعتمد عند التكليف واحفظ submission و build.",
+        "عالج ملاحظة محددة بدليل؛ فرّق approval و processing و access و waiting.",
+        "إذا رفض المتجر، تبقى G5 blocked وتدار حلقة الإصلاح وإعادة التقديم؛ لا تفعّل إطلاق 027 قبل القبول."
+      ],
+      "acceptance_ar": [
+        "نتيجة مراجعة فعلية لكل منصة؛ الرفض يظل blocked حتى حله.",
+        "لا تتغير البوابة إلى قبول لمجرد upload ناجح."
+      ],
+      "source_refs": [
+        "S02",
+        "S23",
+        "S44"
+      ],
+      "evidence_required": true,
+      "evidence": [],
+      "conditional_dependencies": [
+        {
+          "when": "online",
+          "ids": [
+            "YKL-022"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "YKL-027",
+      "title_ar": "إطلاق مضبوط ودعم وحوادث",
+      "status": "planned",
+      "priority": "P1",
+      "gate": "G5",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-026"
+      ],
+      "effort_person_days": {
+        "min": 0.5,
+        "max": 1,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "owner+support",
+      "existing_target_paths": [
+        "docs/research/store-launch/09-launch-operations-and-budget.md"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "حدد بلدان البداية ومسؤول الدعم والمؤشرات وقرار وقف التوسع.",
+        "استخدم phased/staged للتحديثات حين يتاح، دون افتراض أول إصدار بنسبة."
+      ],
+      "acceptance_ar": [
+        "نتيجة الإتاحة الحقيقية موثقة وخطة hotfix تعمل برقم بناء أعلى.",
+        "لا وعود downgrade أو حذف نسخ مثبتة بمجرد وقف rollout."
+      ],
+      "source_refs": [
+        "S47",
+        "S48"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-028",
+      "title_ar": "تسليم المصدر وخريطة التشغيل النهائية",
+      "status": "planned",
+      "priority": "P1",
+      "gate": "G5",
+      "route": "both",
+      "condition": "always",
+      "depends_on": [
+        "YKL-027"
+      ],
+      "effort_person_days": {
+        "min": 0.5,
+        "max": 1,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer",
+      "existing_target_paths": [
+        "README.md",
+        "PROJECT_ORDER.md",
+        "docs/ONLINE_TRYSTERO.md",
+        "docs/research/store-launch/launch-plan.json"
+      ],
+      "proposed_artifacts": [],
+      "steps_ar": [
+        "حدث التوثيق للمسار الفعلي وقنوات النشر والتوقيع بمراجع أسرار دون نشر الأسرار.",
+        "احفظ نتائج القبول والمتغيرات العالقة؛ لا تستبدل baseline البحث بنجاح وهمي."
+      ],
+      "acceptance_ar": [
+        "مطور آخر يستطيع إعادة build مع الوصول المصرح، والوعود مطابقة للإصدار.",
+        "الفصل واضح بين Pages و iOS و Android."
+      ],
+      "source_refs": [],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-029",
+      "title_ar": "بديل native: نقل واجهة الإعداد والشرح",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G2",
+      "route": "native",
+      "condition": "route_native",
+      "depends_on": [
+        "YKL-005",
+        "YKL-007"
+      ],
+      "effort_person_days": {
+        "min": 6,
+        "max": 12,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer",
+      "existing_target_paths": [
+        "scripts/session_setup_visual.gd",
+        "scripts/session_setup.gd",
+        "scripts/win_tutorial.gd",
+        "ui/visual-setup.mjs"
+      ],
+      "proposed_artifacts": [
+        "scripts/platform/",
+        "scenes/mobile_setup.tscn"
+      ],
+      "steps_ar": [
+        "انقل أوامر DOM إلى Control/CanvasLayer أو adapter مكافئ بالتصميم نفسه.",
+        "نفذ الكيبورد والخط والدخول و safe area والدرس والروابط بخدمات المنصة."
+      ],
+      "acceptance_ar": [
+        "كل مراحل الدخول واللون والمقاعد والأشواط والشرح والبدء والانضمام متاحة خارج Web.",
+        "لا بطاقة مخفية بلا UI بديلة ولا كسر للموشن أو الأسماء."
+      ],
+      "source_refs": [
+        "S29",
+        "S30",
+        "S34"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-030",
+      "title_ar": "بديل native: تنفيذ transport والسلطة",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G3",
+      "route": "native",
+      "condition": "native_and_online",
+      "depends_on": [
+        "YKL-029",
+        "YKL-015"
+      ],
+      "effort_person_days": {
+        "min": 8,
+        "max": 15,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer",
+      "existing_target_paths": [
+        "scripts/online_session_trystero.gd",
+        "ui/p2p-authority.mjs",
+        "api/room-state.js",
+        "rules/yakolak-rules.json"
+      ],
+      "proposed_artifacts": [
+        "scripts/network/",
+        "addons/webrtc/ (only if selected)"
+      ],
+      "steps_ar": [
+        "اختر native WebRTC مع signaling ونقل authority، أو خدمة جديدة بعد قرار ميزانية.",
+        "لا يكفي plugin بمفرده؛ وثق توافق الويب ومصدر السلطة."
+      ],
+      "acceptance_ar": [
+        "Fixtures القواعد والأوامر والتوقيت وعدم تكرار intent متطابقة.",
+        "Native binary يتصل بجهاز آخر فعليا ضمن حدود ثقة معلنة."
+      ],
+      "source_refs": [
+        "S34",
+        "S35"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-031",
+      "title_ar": "بديل native: إعدادات وتوقيع Android",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G4",
+      "route": "native",
+      "condition": "route_native",
+      "depends_on": [
+        "YKL-029",
+        "YKL-008",
+        "YKL-009",
+        "YKL-010",
+        "YKL-011",
+        "YKL-012",
+        "YKL-017",
+        "YKL-018"
+      ],
+      "effort_person_days": {
+        "min": 2,
+        "max": 4,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer",
+      "existing_target_paths": [
+        "export_presets.cfg",
+        "project.godot",
+        "scripts/godot-flash-build.sh"
+      ],
+      "proposed_artifacts": [
+        "build/android/yakolak.aab"
+      ],
+      "steps_ar": [
+        "أضف Android preset و templates ومعرفات و AAB و ARM64 و target 36 خارج مسار Pages.",
+        "افحص كل مكتبة so و manifest بما فيه plugin الشبكة إن وجد."
+      ],
+      "acceptance_ar": [
+        "Play testing release قابل للتثبيت وموثق بـ source SHA و digest.",
+        "16 KB والأذونات والتوقيع والنسخ متوافقة مع المتطلبات الحالية."
+      ],
+      "source_refs": [
+        "S14",
+        "S15",
+        "S30",
+        "S49",
+        "S50"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    },
+    {
+      "id": "YKL-032",
+      "title_ar": "بديل native: إعدادات وتوقيع iOS",
+      "status": "planned",
+      "priority": "P0",
+      "gate": "G4",
+      "route": "native",
+      "condition": "route_native",
+      "depends_on": [
+        "YKL-029",
+        "YKL-008",
+        "YKL-009",
+        "YKL-010",
+        "YKL-011",
+        "YKL-012",
+        "YKL-017",
+        "YKL-018"
+      ],
+      "effort_person_days": {
+        "min": 2,
+        "max": 4,
+        "basis": "engineering estimate, excludes store waiting and overlaps with integration buffers"
+      },
+      "owner_role": "developer",
+      "existing_target_paths": [
+        "export_presets.cfg",
+        "project.godot"
+      ],
+      "proposed_artifacts": [
+        "build/ios/yakolak.xcodeproj"
+      ],
+      "steps_ar": [
+        "أضف iOS preset بفريق ومعرف معتمدين وصدّر إلى Xcode على Mac.",
+        "افحص renderer و templates و plugins و manifests و SDK والتشفير و archive."
+      ],
+      "acceptance_ar": [
+        "TestFlight release على iPhone فعلي مع metadata ومصدر ودليل.",
+        "لا افتراض أن JavaScriptBridge أو سلطة JavaScript تعمل في native."
+      ],
+      "source_refs": [
+        "S03",
+        "S05",
+        "S10",
+        "S29",
+        "S51"
+      ],
+      "evidence_required": true,
+      "evidence": []
+    }
+  ],
+  "estimate_rollups": [
+    {
+      "route": "wrapper",
+      "online_in_scope": false,
+      "task_count": 24,
+      "effort_person_days_min": 26.5,
+      "effort_person_days_max": 60,
+      "includes_wrapper_route_spike": true,
+      "excludes_store_waiting_days": true
+    },
+    {
+      "route": "wrapper",
+      "online_in_scope": true,
+      "task_count": 28,
+      "effort_person_days_min": 33.5,
+      "effort_person_days_max": 77,
+      "includes_wrapper_route_spike": true,
+      "excludes_store_waiting_days": true
+    },
+    {
+      "route": "native",
+      "online_in_scope": false,
+      "task_count": 24,
+      "effort_person_days_min": 33.5,
+      "effort_person_days_max": 72,
+      "includes_wrapper_route_spike": true,
+      "excludes_store_waiting_days": true
+    },
+    {
+      "route": "native",
+      "online_in_scope": true,
+      "task_count": 28,
+      "effort_person_days_min": 46.5,
+      "effort_person_days_max": 100,
+      "includes_wrapper_route_spike": true,
+      "excludes_store_waiting_days": true
+    }
+  ]
+}

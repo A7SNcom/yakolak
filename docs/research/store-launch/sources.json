@@ -1,0 +1,710 @@
+{
+  "schema_version": 1,
+  "as_of": "2026-10-19",
+  "note": "المصادر الرسمية مرجع المتطلبات؛ الحالات أدلة رواية لا إحصاء ولا ضمان. تواريخ checked_on لا تعني تاريخ نشر.",
+  "sources": [
+    {
+      "id": "S01",
+      "title": "App Review Guidelines",
+      "publisher": "Apple",
+      "url": "https://developer.apple.com/app-store/review/guidelines/",
+      "language": "en",
+      "kind": "official_policy",
+      "supports": "الاكتمال والقيمة وUGC والحقوق والدفع والخصوصية",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S02",
+      "title": "App Review — Distribute",
+      "publisher": "Apple",
+      "url": "https://developer.apple.com/distribute/app-review/",
+      "language": "en",
+      "kind": "official_procedure",
+      "supports": "الوصول للمراجع والتواصل والاستئناف",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S03",
+      "title": "SDK minimum requirements — April 28, 2026",
+      "publisher": "Apple",
+      "url": "https://developer.apple.com/news/upcoming-requirements/?id=04282026a",
+      "language": "en",
+      "kind": "official_requirement",
+      "supports": "Xcode26 وSDK26 كحد أدنى حالي",
+      "access": "full_text",
+      "checked_on": "2026-10-19",
+      "language_crosschecks": [
+        {
+          "language": "ja",
+          "url": "https://developer.apple.com/jp/news/?id=ueeok6yw",
+          "checked_on": "2026-10-19"
+        }
+      ]
+    },
+    {
+      "id": "S04",
+      "title": "App Privacy Details",
+      "publisher": "Apple",
+      "url": "https://developer.apple.com/app-store/app-privacy-details/",
+      "language": "en",
+      "kind": "official_policy",
+      "supports": "تعريف الجمع والبيانات المحلية وWebViews",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S05",
+      "title": "Third-party SDK requirements",
+      "publisher": "Apple",
+      "url": "https://developer.apple.com/support/third-party-SDK-requirements/",
+      "language": "en",
+      "kind": "official_requirement",
+      "supports": "SDK manifests/signatures حسب القائمة والاستخدام",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S06",
+      "title": "Describing use of required reason API",
+      "publisher": "Apple",
+      "url": "https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api",
+      "language": "en",
+      "kind": "official_documentation",
+      "supports": "أسباب استخدام APIs وmanifest",
+      "access": "search_excerpt_js_shell",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S07",
+      "title": "Offering account deletion in your app",
+      "publisher": "Apple",
+      "url": "https://developer.apple.com/help/app-review/guideline-reference/5-1-1-account-deletion",
+      "language": "en",
+      "kind": "official_policy",
+      "supports": "الحذف عند تقديم إنشاء حساب",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S08",
+      "title": "Set an app age rating",
+      "publisher": "Apple",
+      "url": "https://developer.apple.com/help/app-store-connect/manage-app-information/set-an-app-age-rating/",
+      "language": "en",
+      "kind": "official_procedure",
+      "supports": "الاستبيان والتصنيف بحسب المنطقة والنظام",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S09",
+      "title": "TestFlight overview",
+      "publisher": "Apple",
+      "url": "https://developer.apple.com/help/app-store-connect/test-a-beta-version/testflight-overview/",
+      "language": "en",
+      "kind": "official_procedure",
+      "supports": "التجربة الموقعة قبل الإطلاق",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S10",
+      "title": "Overview of export compliance",
+      "publisher": "Apple",
+      "url": "https://developer.apple.com/help/app-store-connect/manage-app-information/overview-of-export-compliance/",
+      "language": "en",
+      "kind": "official_procedure",
+      "supports": "إقرار التشفير ووثائقه حسب الحزمة",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S11",
+      "title": "Screenshot specifications",
+      "publisher": "Apple",
+      "url": "https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/",
+      "language": "en",
+      "kind": "official_specification",
+      "supports": "مقاسات اللقطات المطلوبة بحسب دعم الجهاز",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S12",
+      "title": "Manage Accessibility Nutrition Labels",
+      "publisher": "Apple",
+      "url": "https://developer.apple.com/help/app-store-connect/manage-app-accessibility/manage-accessibility-nutrition-labels/",
+      "language": "en",
+      "kind": "official_procedure",
+      "supports": "إفصاح إمكانية الوصول بحسب الدليل الفعلي",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S13",
+      "title": "App testing requirements for new personal developer accounts",
+      "publisher": "Google",
+      "url": "https://support.google.com/googleplay/android-developer/answer/14151465",
+      "language": "en",
+      "kind": "official_requirement",
+      "supports": "12 مختبرا و14 يوما للحسابات المشمولة ومراجعة الوصول للإنتاج",
+      "access": "full_text",
+      "checked_on": "2026-10-19",
+      "language_crosschecks": [
+        {
+          "language": "ar",
+          "url": "https://support.google.com/googleplay/android-developer/answer/14151465?hl=ar",
+          "checked_on": "2026-10-19"
+        }
+      ]
+    },
+    {
+      "id": "S14",
+      "title": "Target API level requirements for Google Play apps",
+      "publisher": "Google",
+      "url": "https://support.google.com/googleplay/android-developer/answer/11926878",
+      "language": "en",
+      "kind": "official_requirement",
+      "supports": "API36 منذ31 أغسطس2026 للتقديم الجديد",
+      "access": "full_text",
+      "checked_on": "2026-10-19",
+      "language_crosschecks": [
+        {
+          "language": "id",
+          "url": "https://support.google.com/googleplay/android-developer/answer/11926878?hl=id",
+          "checked_on": "2026-10-19"
+        }
+      ]
+    },
+    {
+      "id": "S15",
+      "title": "Support 16 KB page sizes",
+      "publisher": "Google Android",
+      "url": "https://developer.android.com/guide/practices/page-sizes",
+      "language": "en",
+      "kind": "official_requirement",
+      "supports": "توافق المكتبات والاختبار وموعد منع التحديث الحالي1 فبراير2027",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S16",
+      "title": "Provide information for Google Play Data safety",
+      "publisher": "Google",
+      "url": "https://support.google.com/googleplay/android-developer/answer/10787469",
+      "language": "en",
+      "kind": "official_policy",
+      "supports": "الجمع والمشاركة والمعالجة المؤقتة وتصنيفات البيانات",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S17",
+      "title": "Functionality, Content, and User Experience",
+      "publisher": "Google",
+      "url": "https://support.google.com/googleplay/android-developer/answer/9898783?hl=en",
+      "language": "en",
+      "kind": "official_policy",
+      "supports": "وظيفة حقيقية وتجربة مستقرة",
+      "access": "search_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S18",
+      "title": "User Data",
+      "publisher": "Google",
+      "url": "https://support.google.com/googleplay/android-developer/answer/10144311",
+      "language": "en",
+      "kind": "official_policy",
+      "supports": "سياسة الخصوصية والبيانات والحذف والإفصاح",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S19",
+      "title": "User Generated Content",
+      "publisher": "Google",
+      "url": "https://support.google.com/googleplay/android-developer/answer/9876937?hl=en",
+      "language": "en",
+      "kind": "official_policy",
+      "supports": "محتوى مرئي لبعض المستخدمين والحظر والإبلاغ بحسب الحالة",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S20",
+      "title": "Understanding app account deletion requirements",
+      "publisher": "Google",
+      "url": "https://support.google.com/googleplay/android-developer/answer/13327111?hl=en",
+      "language": "en",
+      "kind": "official_policy",
+      "supports": "الحذف في التطبيق وخارجه واستثناء الحسابات المحلية",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S21",
+      "title": "Manage target audience and app content settings",
+      "publisher": "Google",
+      "url": "https://support.google.com/googleplay/android-developer/answer/9867159",
+      "language": "en",
+      "kind": "official_procedure",
+      "supports": "الجمهور والأطفال وإجابات المحتوى",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S22",
+      "title": "Payments",
+      "publisher": "Google",
+      "url": "https://support.google.com/googleplay/android-developer/answer/9858738?hl=en",
+      "language": "en",
+      "kind": "official_policy",
+      "supports": "الدفع الرقمي مع الاستثناءات والبرامج الإقليمية",
+      "access": "search_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S23",
+      "title": "Prepare your app for review",
+      "publisher": "Google",
+      "url": "https://support.google.com/googleplay/android-developer/answer/9859455",
+      "language": "en",
+      "kind": "official_procedure",
+      "supports": "App access والإقرارات قبل المراجعة",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S24",
+      "title": "Create and set up your app",
+      "publisher": "Google",
+      "url": "https://support.google.com/googleplay/android-developer/answer/9859152",
+      "language": "en",
+      "kind": "official_procedure",
+      "supports": "بيانات الاسم والوصف30/80/4000",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S25",
+      "title": "Add preview assets to showcase your app",
+      "publisher": "Google",
+      "url": "https://support.google.com/googleplay/android-developer/answer/9866151?hl=en-AU-u-fw-mon-mu-celsius",
+      "language": "en",
+      "kind": "official_specification",
+      "supports": "أيقونة512 والصورة1024×500 ولقطات فعلية",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S26",
+      "title": "Behavior changes: Apps targeting Android 16 or higher",
+      "publisher": "Google Android",
+      "url": "https://developer.android.com/about/versions/16/behavior-changes-16",
+      "language": "en",
+      "kind": "official_documentation",
+      "supports": "edge-to-edge والرجوع والتكيف؛ استثناء الألعاب حيث يرد",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S27",
+      "title": "Become a member — Apple Developer Program",
+      "publisher": "Apple",
+      "url": "https://developer.apple.com/programs/enroll/",
+      "language": "en",
+      "kind": "official_procedure",
+      "supports": "99 دولارا سنويا وأنواع الناشر والتحقق",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S28",
+      "title": "Get started with Play Console",
+      "publisher": "Google",
+      "url": "https://support.google.com/googleplay/android-developer/answer/6112435",
+      "language": "en",
+      "kind": "official_procedure",
+      "supports": "25 دولارا مرة واحدة والتحقق ونوع الحساب والجهاز",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S29",
+      "title": "Exporting for iOS — Godot 4.7",
+      "publisher": "Godot",
+      "url": "https://docs.godotengine.org/en/4.7/tutorials/export/exporting_for_ios.html",
+      "language": "en",
+      "kind": "primary_technical",
+      "supports": "macOS وXcode وTeam ID وexport الأصلي",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S30",
+      "title": "Exporting for Android — Godot 4.7",
+      "publisher": "Godot",
+      "url": "https://docs.godotengine.org/en/4.7/tutorials/export/exporting_for_android.html",
+      "language": "en",
+      "kind": "primary_technical",
+      "supports": "JDK17 وأدوات Android وAAB والتوقيع؛ مثالSDK35 لا يحسم سياسة36",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S31",
+      "title": "Exporting for the Web — Godot 4.7",
+      "publisher": "Godot",
+      "url": "https://docs.godotengine.org/en/4.7/tutorials/export/exporting_for_web.html",
+      "language": "en",
+      "kind": "primary_technical",
+      "supports": "قيود الويب والأداء مقابل native",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S32",
+      "title": "Capacitor Configuration",
+      "publisher": "Capacitor",
+      "url": "https://capacitorjs.com/docs/config",
+      "language": "en",
+      "kind": "primary_technical",
+      "supports": "server.url وcleartext وallowNavigation ليست إعداد إنتاج افتراضي",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S33",
+      "title": "Game Development with Capacitor",
+      "publisher": "Capacitor",
+      "url": "https://capacitorjs.com/docs/guides/games",
+      "language": "en",
+      "kind": "primary_technical",
+      "supports": "إمكان استخدام WebGL/canvas للألعاب، وليس اعتماد ياكلك",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S34",
+      "title": "WebRTC — Godot 4.7",
+      "publisher": "Godot",
+      "url": "https://docs.godotengine.org/en/4.7/tutorials/networking/webrtc.html",
+      "language": "en",
+      "kind": "primary_technical",
+      "supports": "الاحتياج إلى native extension خارج Web والإذن على Android",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S35",
+      "title": "Trystero repository and documentation",
+      "publisher": "Trystero maintainer",
+      "url": "https://github.com/dmotz/trystero",
+      "language": "en",
+      "kind": "primary_technical",
+      "supports": "TURN للشبكات المقيدة؛ واجهات النسخة الحالية قد تختلف عن0.26.0",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S36",
+      "title": "Complying with licenses — Godot 4.7",
+      "publisher": "Godot",
+      "url": "https://docs.godotengine.org/en/4.7/about/complying_with_licenses.html",
+      "language": "en",
+      "kind": "primary_technical",
+      "supports": "إتاحة رخصة المحرك وإشعارات أطرافه والأصول",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S37",
+      "title": "ترخيص خط ثمانية",
+      "publisher": "ثمانية",
+      "url": "https://font.thmanyah.com/licenses",
+      "language": "ar",
+      "kind": "rights_holder_terms",
+      "supports": "تجاري/تضمين معبأ مسموح، وتوزيع خام/تنزيل مستقل مقيد",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S38",
+      "title": "فسح الألعاب الإلكترونية",
+      "publisher": "الهيئة العامة لتنظيم الإعلام",
+      "url": "https://gmedia.gov.sa/services/electronic-games-break",
+      "language": "ar",
+      "kind": "official_service",
+      "supports": "وجود خدمة؛ لا يحسم وحده انطباقها على هذا التطبيق",
+      "access": "search_excerpt_open_failed",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S39",
+      "title": "Milestones — IARC",
+      "publisher": "IARC",
+      "url": "https://globalratings.com/milestones/",
+      "language": "en",
+      "kind": "official_organization",
+      "supports": "انضمامGmedia2024 وبدء تصنيفاتها فيIARC2026",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S40",
+      "title": "نظام حماية البيانات الشخصية",
+      "publisher": "سدايا",
+      "url": "https://dgp.sdaia.gov.sa/wps/portal/pdp/knowledgecenter/details/PDPL",
+      "language": "ar",
+      "kind": "official_law",
+      "supports": "نطاق المعالجة وحقوق الأشخاص؛ تقييم انطباق لاحق",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S41",
+      "title": "App Store fraud prevention and review results in 2025",
+      "publisher": "Apple Newsroom",
+      "url": "https://www.apple.com/newsroom/2026/05/the-app-store-stopped-over-2-point-2-billion-usd-in-fraudulent-transactions-in-2025/",
+      "language": "en",
+      "kind": "official_statistics",
+      "supports": "إحصاءاتsubmissions منشورة20 مايو2026؛ ليست احتمال رفض لعبة",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S42",
+      "title": "Maintenance release: Godot 4.7.2",
+      "publisher": "Godot",
+      "url": "https://godotengine.org/article/maintenance-release-godot-4-7-2/",
+      "language": "en",
+      "kind": "primary_technical",
+      "supports": "يوجد patch أحدث للتقييم، ليس ترقية إلزامية",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S43",
+      "title": "System requirements — Godot 4.7",
+      "publisher": "Godot",
+      "url": "https://docs.godotengine.org/en/4.7/about/system_requirements.html",
+      "language": "en",
+      "kind": "primary_technical",
+      "supports": "حدود المحرك لا تغني عن قياسات مشروع3D الفعلي",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S44",
+      "title": "Manage a submission with unresolved issues",
+      "publisher": "Apple",
+      "url": "https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/manage-a-submission-with-unresolved-issues/",
+      "language": "en",
+      "kind": "official_procedure",
+      "supports": "إصلاح عناصر الرفض وإعادة التقديم",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S45",
+      "title": "Required documents by country and region — Saudi Arabia",
+      "publisher": "Google",
+      "url": "https://support.google.com/googleplay/android-developer/answer/15633622?co=GENIE.CountryCode%3DSA&hl=en",
+      "language": "en",
+      "kind": "official_procedure",
+      "supports": "وثائق تحقق هوية بحسب البرنامج والحساب السعودي",
+      "access": "search_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S46",
+      "title": "Add an app icon",
+      "publisher": "Apple",
+      "url": "https://developer.apple.com/help/app-store-connect/manage-app-information/add-an-app-icon/",
+      "language": "en",
+      "kind": "official_specification",
+      "supports": "أيقونة ضمنXcode asset catalog ومواضع ظهورها",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S47",
+      "title": "Release app updates with staged rollouts",
+      "publisher": "Google",
+      "url": "https://support.google.com/googleplay/android-developer/answer/6346149",
+      "language": "en",
+      "kind": "official_procedure",
+      "supports": "staged rollout للتحديثات لا لأول نشر",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S48",
+      "title": "Release a version update in phases",
+      "publisher": "Apple",
+      "url": "https://developer.apple.com/help/app-store-connect/update-your-app/release-a-version-update-in-phases/",
+      "language": "en",
+      "kind": "official_procedure",
+      "supports": "phased release لتحديث الإصدار",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S49",
+      "title": "Sign your app",
+      "publisher": "Google Android",
+      "url": "https://developer.android.com/studio/publish/app-signing",
+      "language": "en",
+      "kind": "official_documentation",
+      "supports": "App Signing وupload key وحمايته",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S50",
+      "title": "Support 64-bit architectures",
+      "publisher": "Google Android",
+      "url": "https://developer.android.com/google/play/requirements/64-bit",
+      "language": "en",
+      "kind": "official_requirement",
+      "supports": "دعم 64-bit في Google Play وفحص المكتبات الأصلية؛ لا تنسخ target SDK القديم من أمثلة بناء هذه الصفحة.",
+      "access": "search_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S51",
+      "title": "Upcoming Requirements — current list",
+      "publisher": "Apple",
+      "url": "https://developer.apple.com/news/upcoming-requirements/",
+      "language": "en",
+      "kind": "official_requirement",
+      "supports": "من 9 سبتمبر 2026 يجب استهداف iOS/iPadOS 13 أو أحدث؛ Game Center entitlement عند تقديم ميزاته، لا لكل لعبة.",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "S52",
+      "title": "Google Play Games — Revamped Level Up guidelines",
+      "publisher": "Google Android",
+      "url": "https://developer.android.com/games/guidelines",
+      "language": "en",
+      "kind": "official_program",
+      "supports": "البرنامج اختياري؛ شروط PGS وcloud save وتعدد الأجهزة تخص أهلية مزاياه ولا تعمم على أول إدراج لعبة.",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "C01",
+      "title": "iOS app rejected – unresponsive on launch",
+      "publisher": "Godot Forum / author",
+      "url": "https://forum.godotengine.org/t/ios-app-rejected-unresponsive-on-launch/130784",
+      "language": "en",
+      "kind": "first_hand_case",
+      "supports": "10 يناير2026؛ شكوىGodot4.5/startup؛ تفسيرshaders غير محسوم",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "C02",
+      "title": "App rejection",
+      "publisher": "Apple Developer Forums / author",
+      "url": "https://developer.apple.com/forums/thread/790882",
+      "language": "en",
+      "kind": "first_hand_case",
+      "supports": "يونيو2025؛2.1 unable to launch علىiPhone13mini",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "C03",
+      "title": "iOS app failing App Store review (flagged as spam)",
+      "publisher": "Godot Forum / author",
+      "url": "https://forum.godotengine.org/t/ios-app-failing-app-store-review-flagged-as-spam/82336",
+      "language": "en",
+      "kind": "first_hand_case",
+      "supports": "12 سبتمبر2024 مع متابعةيناير2025؛ فرضيةbinary ليست حقيقة مثبتة",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "C04",
+      "title": "Godot And Google Play Policy Warning about 16 KB memory page size",
+      "publisher": "Godot Forum / authors",
+      "url": "https://forum.godotengine.org/t/godot-and-google-play-policy-warning-about-16-kb-memory-page-size/120934",
+      "language": "en",
+      "kind": "first_hand_case",
+      "supports": "أغسطس/سبتمبر2025؛ تحذير بتاريخ تاريخي لا سياسة2026",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "C05",
+      "title": "Production access rejected despite meeting all testing requirements",
+      "publisher": "Google Play Developer Community / author",
+      "url": "https://support.google.com/googleplay/android-developer/thread/437297172/production-access-rejected-despite-meeting-all-testing-requirements?hl=en",
+      "language": "en",
+      "kind": "first_hand_case",
+      "supports": "28 مايو 2026؛ خروج مختبرين قبل الطلب؛ لا سبب داخلي مؤكد للرفض.",
+      "access": "search_text_open_shell",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "C06",
+      "title": "Rejected 3 times for production access despite meeting testing requirements",
+      "publisher": "Google Play Developer Community / author",
+      "url": "https://support.google.com/googleplay/android-developer/thread/447974715/rejected-3-times-for-production-access-despite-meeting-testing-requirements?hl=en",
+      "language": "en",
+      "kind": "first_hand_case",
+      "supports": "5 يوليو 2026؛ رواية رفض متكرر رغم التحديثات؛ بلا تشخيص نهائي.",
+      "access": "search_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "C07",
+      "title": "Repeated App Store rejection under Guideline 5.6 — Capacitor/WebView app",
+      "publisher": "Reddit / original author",
+      "url": "https://www.reddit.com/r/iOSProgramming/comments/1wjuwlg/repeated_app_store_rejection_under_guideline_56/",
+      "language": "en",
+      "kind": "first_hand_case",
+      "supports": "تاريخ نسبي: شهر قبل الرصد؛ ثلاثة رفضات 5.6؛ لا يثبت منع WebView.",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "C08",
+      "title": "Stuck in Waiting for review 10+ days",
+      "publisher": "Apple Developer Forums / author",
+      "url": "https://developer.apple.com/forums/thread/851297",
+      "language": "en",
+      "kind": "first_hand_case",
+      "supports": "إرسال 6 أكتوبر 2026؛ انتظار وأسئلة معلومات، وليس رفضا تقنيا محددا.",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "C09",
+      "title": "App Store: App rejected (API non public)",
+      "publisher": "Godot Forum / author",
+      "url": "https://forum.godotengine.org/t/app-store-app-rejected-api-non-public/130768",
+      "language": "en",
+      "kind": "first_hand_case",
+      "supports": "يناير/فبراير 2026؛ Mac App Store فقط، وليس دليلا على iOS.",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    },
+    {
+      "id": "C10",
+      "title": "App stuck in Waiting for Review — expedite approved",
+      "publisher": "Apple Developer Forums / author",
+      "url": "https://developer.apple.com/forums/thread/851304",
+      "language": "en",
+      "kind": "first_hand_case",
+      "supports": "أكتوبر 2026؛ background audio وreviewer access؛ بلا قبول نهائي مرصود.",
+      "access": "full_text",
+      "checked_on": "2026-10-19"
+    }
+  ]
+}

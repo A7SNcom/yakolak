@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "status": "draft_not_submitted",
+  "verified_on_release_build": false,
+  "selected_variant": null,
+  "publisher_legal_name": null,
+  "app_ids": {
+    "ios_bundle_id": null,
+    "android_package_name": null
+  },
+  "public_urls": {
+    "privacy": null,
+    "support": null,
+    "account_deletion_if_applicable": null
+  },
+  "verified_ui_languages": null,
+  "store_description_languages": [
+    "ar",
+    "en"
+  ],
+  "age_rating": {
+    "apple": null,
+    "iarc": null,
+    "target_audience": null
+  },
+  "monetization": null,
+  "source_refs": [
+    "S01",
+    "S11",
+    "S24",
+    "S25"
+  ],
+  "variants": {
+    "offline_local_bots": {
+      "ar": {
+        "name": "ياكلك",
+        "apple_subtitle": "ثلاث طرق للفوز",
+        "google_short_description": "لعبة طاولة لاثنين إلى أربعة لاعبين، على جهاز واحد أو ضد الكمبيوتر",
+        "full_description": "اختر لونك وحجم قطعتك وضعها بذكاء. في ياكلك ثلاث طرق للفوز: البرج بجمع الأحجام الثلاثة من لون واحد في خانة واحدة، والسطر بثلاث قطع من الحجم واللون نفسيهما على خط، والدرج بأحجام متصاعدة أو متناقصة من اللون نفسه على خط. العب مع لاعبين على الجهاز نفسه أو مع الكمبيوتر، وتعرف على طرق الفوز من الشرح داخل اللعبة.",
+        "requires_evidence": [
+          "offline first launch",
+          "local 2–4 players",
+          "bots",
+          "tutorial"
+        ]
+      },
+      "en": {
+        "name": "Yakolak",
+        "apple_subtitle": "Three ways to win",
+        "google_short_description": "A board game for two to four players on one device, with computer opponents",
+        "full_description": "Choose your color and piece size, then place your pieces strategically. Win by completing a cell with all three sizes of one color, aligning three equal-size pieces of one color, or arranging ascending or descending sizes of one color along a line. Play on one device with other players or computer opponents and learn the winning patterns through the in-game tutorial. Check the listed interface languages before downloading.",
+        "requires_evidence": [
+          "offline first launch",
+          "local 2–4 players",
+          "bots",
+          "tutorial"
+        ]
+      }
+    },
+    "online_optional_addendum": {
+      "ar": "وعند اختيار اللعب عبر الأجهزة، أنشئ غرفة وشارك رمزها أو رابطها مع أصدقائك. يتطلب هذا النمط اتصالا بالإنترنت وبقاء منشئ الغرفة متصلا.",
+      "en": "For play across devices, create a room and share its code or invitation link with friends. This mode requires internet access and the room host to stay connected.",
+      "requires_evidence": [
+        "G3 online accepted",
+        "T25–T34 passed or justified N/A",
+        "final safety design",
+        "accurate actual host lifecycle"
+      ],
+      "warning": "لا يضاف هذا النص إلا إذا اجتازت الميزة القبول وكانت حدود المضيف المذكورة تطابق التصميم النهائي."
+    }
+  },
+  "screenshots_planned": [
+    {
+      "index": 1,
+      "scene": "gameplay",
+      "caption_ar": "اختار خطوتك",
+      "must_show": "actual legal move from release build"
+    },
+    {
+      "index": 2,
+      "scene": "win",
+      "caption_ar": "ثلاث طرق للفوز",
+      "must_show": "one actual victory and its visible winning pieces"
+    },
+    {
+      "index": 3,
+      "scene": "local_setup",
+      "caption_ar": "اجمع أصحابك",
+      "must_show": "actual player and bot options"
+    },
+    {
+      "index": 4,
+      "scene": "tutorial",
+      "caption_ar": "تعلمها بسرعة",
+      "must_show": "actual brief tutorial"
+    },
+    {
+      "index": 5,
+      "scene": "online_optional",
+      "caption_ar": "تحداهم من أجهزتهم",
+      "condition": "only if verified online is in release",
+      "must_show": "actual multi-device mode with fictional profile data"
+    }
+  ]
+}

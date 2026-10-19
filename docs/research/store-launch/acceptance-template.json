@@ -1,0 +1,879 @@
+{
+  "schema_version": 1,
+  "status": "template_not_executed",
+  "as_of": "2026-10-19",
+  "baseline_commit": "577e12ed147a5872b539ec405298eb4adb1161fe",
+  "ready_for_submission": false,
+  "selected_route": null,
+  "release_scope": null,
+  "release_candidates": [],
+  "physical_devices": [],
+  "network_profiles": [],
+  "store_account_test_requirement": {
+    "account_type": null,
+    "account_created_on": null,
+    "required_closed_test": null,
+    "opt_in_evidence_private_ref": null,
+    "production_access_result": null
+  },
+  "gates": [
+    {
+      "id": "G0",
+      "result": "not_run",
+      "evidence": [],
+      "reviewed_by": null
+    },
+    {
+      "id": "G1",
+      "result": "not_run",
+      "evidence": [],
+      "reviewed_by": null
+    },
+    {
+      "id": "G2",
+      "result": "not_run",
+      "evidence": [],
+      "reviewed_by": null
+    },
+    {
+      "id": "G3",
+      "result": "not_run",
+      "evidence": [],
+      "reviewed_by": null
+    },
+    {
+      "id": "G4",
+      "result": "not_run",
+      "evidence": [],
+      "reviewed_by": null
+    },
+    {
+      "id": "G5",
+      "result": "not_run",
+      "evidence": [],
+      "reviewed_by": null
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "T01",
+      "key": "clean_install",
+      "title_ar": "تثبيت نظيف وإقلاع أول مرة",
+      "condition": "all",
+      "task_ids": [
+        "YKL-003",
+        "YKL-019",
+        "YKL-020",
+        "YKL-031",
+        "YKL-032"
+      ],
+      "result": "not_run",
+      "expected_ar": "أول تشغيل للحزمة الموقعة دون crash أو شاشة سوداء؛ معرف وإصدار صحيحان.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T02",
+      "key": "first_launch_offline",
+      "title_ar": "أول تشغيل بوضع الطيران",
+      "condition": "all",
+      "task_ids": [
+        "YKL-003",
+        "YKL-006",
+        "YKL-029"
+      ],
+      "result": "not_run",
+      "expected_ar": "المحلي والبوتات والشرح تعمل دون اعتماد على الموقع أو CDN؛ عدم بدء اتصال غير مطلوب.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T03",
+      "key": "tutorial_patterns",
+      "title_ar": "شرح الفوز الثلاثي",
+      "condition": "all",
+      "task_ids": [
+        "YKL-010",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "برج ودرج وسطر من العقد الحالي؛ لا كتابة تدريب إلى غرفة حقيقية.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T04",
+      "key": "setup_return",
+      "title_ar": "العودة للإعداد والمقدمة",
+      "condition": "all",
+      "task_ids": [
+        "YKL-010",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "عودة مرئية متصلة دون callback قديم يغير الحالة الجديدة.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T05",
+      "key": "local_counts",
+      "title_ar": "مباراة محلية من 2 أو 3 أو 4 لاعبين",
+      "condition": "all",
+      "task_ids": [
+        "YKL-010",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "تسلسل الأدوار والأسماء والألوان والقطع صحيح لكل عدد معلن.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T06",
+      "key": "mixed_bots",
+      "title_ar": "مقاعد محلية وبوتات",
+      "condition": "all",
+      "task_ids": [
+        "YKL-010",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "البوت لا يتحرك مرتين، ومقاعد نفس الجهاز تتحكم بها هويته الصحيحة.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T07",
+      "key": "draw_and_legality",
+      "title_ar": "القانونية والتعادل ونفاد القطع",
+      "condition": "all",
+      "task_ids": [
+        "YKL-010",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "لا وضع غير قانوني ولا loop عند نفاد القطع؛ نتيجة تعادل متسقة.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T08",
+      "key": "match_targets",
+      "title_ar": "3 أو 5 انتصارات للمباراة",
+      "condition": "all",
+      "task_ids": [
+        "YKL-010",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "تنتهي المباراة وفق wins-to-match المعتمد دون نسخ ثوابت قديمة لعدد الجولات.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T09",
+      "key": "all_wins",
+      "title_ar": "كل نمط فوز",
+      "condition": "all",
+      "task_ids": [
+        "YKL-010",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "القطع الفائزة تظل ظاهرة والنص من المسمى الفعلي.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T10",
+      "key": "overlapping_wins",
+      "title_ar": "حركة تحقق نمطين",
+      "condition": "all",
+      "task_ids": [
+        "YKL-010",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "نوع الفوز يحدده العقد والتحقق الفعلي، دون استنتاج من عدد القطع.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T11",
+      "key": "round_continue",
+      "title_ar": "الاستمرار بين الأشواط",
+      "condition": "all",
+      "task_ids": [
+        "YKL-010",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "الموافقة مرة واحدة؛ تختبر مهلة 10 ثوان في online حيث تنطبق، دون فرض سلوك جديد على المحلي.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T12",
+      "key": "rematch",
+      "title_ar": "نهاية المباراة وإعادتها",
+      "condition": "all",
+      "task_ids": [
+        "YKL-010",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "إعادة صحيحة بموافقات الوضع، دون إعادة آلية غير مطلوبة أو بقايا حالة.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T13",
+      "key": "rapid_taps",
+      "title_ar": "ضغط سريع ومتكرر",
+      "condition": "all",
+      "task_ids": [
+        "YKL-010",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "tapfeedback واضح ولا حركة مزدوجة أو انتقال شاشة مكرر.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T14",
+      "key": "piece_selection",
+      "title_ar": "اختيار حجر وإلغاء وملكية",
+      "condition": "all",
+      "task_ids": [
+        "YKL-010",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "لا اختيار لحجر خصم أو هدف مغطى؛ الحفاظ على الاختيار حتى ناتجه الصحيح.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T15",
+      "key": "resize_safe_area",
+      "title_ar": "الحواف وتغيير الاتجاه والمقاس",
+      "condition": "all",
+      "task_ids": [
+        "YKL-010",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "لا حجر تحت system bar؛ الكاميرا تعيد التوجيه بسلاسة والنوافذ داخل النطاق المتاح.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T16",
+      "key": "arabic_keyboard",
+      "title_ar": "كيبورد عربي واتجاه النص",
+      "condition": "all",
+      "task_ids": [
+        "YKL-007",
+        "YKL-021",
+        "YKL-029"
+      ],
+      "result": "not_run",
+      "expected_ar": "اسم متصل وقابل للقراءة، وتركيز وإغلاق كيبورد صحيحان دون حجب زر الإكمال.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T17",
+      "key": "camera_continuity",
+      "title_ar": "استمرارية الكاميرا",
+      "condition": "all",
+      "task_ids": [
+        "YKL-010",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "كل انتقال يعاد توجيهه من الوضع المرئي الفعلي دون قطع.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T18",
+      "key": "stone_continuity",
+      "title_ar": "رفع وهبوط الأحجار والألوان",
+      "condition": "all",
+      "task_ids": [
+        "YKL-010",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "لا ظهور أو اختفاء مفاجئ ولا dim لحظي؛ هوية القطعة محفوظة.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T19",
+      "key": "cancel_generation",
+      "title_ar": "إلغاء متداخل و callback قديم",
+      "condition": "all",
+      "task_ids": [
+        "YKL-010",
+        "YKL-011",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "الحالة الأحدث تملك المشهد ولا تنقله أو تخفيه حركة قديمة اكتملت لاحقا.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T20",
+      "key": "reduced_motion",
+      "title_ar": "تقليل الحركة وقابلية الوصول",
+      "condition": "all",
+      "task_ids": [
+        "YKL-010",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "نتيجة واضحة وحركة متزنة؛ اختبار قارئ شاشة للميزات المعلن دعمها.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T21",
+      "key": "lock_resume",
+      "title_ar": "قفل الشاشة والعودة",
+      "condition": "all",
+      "task_ids": [
+        "YKL-011",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "توقف أو استعادة وفق قرار الوضع؛ لا وقت دور غير مفهوم ولا صوت غير مرغوب.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T22",
+      "key": "background_resume",
+      "title_ar": "الخلفية ثم المقدمة",
+      "condition": "all",
+      "task_ids": [
+        "YKL-011",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "لا افتراض أن مؤقتات الويب بقيت تعمل؛ الحالة تطابق سلطة الجلسة الفعلية.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T23",
+      "key": "audio_back",
+      "title_ar": "مكالمة وصوت وزر رجوع",
+      "condition": "all",
+      "task_ids": [
+        "YKL-008",
+        "YKL-011",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "الكتم يدوم والصوت يحترم الانقطاع؛ الرجوع لا يفقد الغرفة دون ناتج مفهوم.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T24",
+      "key": "process_death",
+      "title_ar": "قتل العملية ثم فتحها",
+      "condition": "all",
+      "task_ids": [
+        "YKL-011",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "نهاية أو استعادة حقيقية وواضحة؛ لا ادعاء checkpoint غير موجود.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T25",
+      "key": "online_create_join",
+      "title_ar": "إنشاء ودخول بين جهازين",
+      "condition": "online",
+      "task_ids": [
+        "YKL-014",
+        "YKL-022",
+        "YKL-030"
+      ],
+      "result": "not_run",
+      "expected_ar": "غرفة حقيقية وأسماء ومقاعد ولوحة متطابقة على المنصتين.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T26",
+      "key": "invitation_link",
+      "title_ar": "رابط دعوة والتطبيق مغلق أو مفتوح",
+      "condition": "online",
+      "task_ids": [
+        "YKL-014",
+        "YKL-022",
+        "YKL-030"
+      ],
+      "result": "not_run",
+      "expected_ar": "الرابط العام يفتح أو يفسر الرمز الصحيح، ولا يشارك localhost أو token.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T27",
+      "key": "color_race",
+      "title_ar": "اختيار لون متزامن",
+      "condition": "online",
+      "task_ids": [
+        "YKL-015",
+        "YKL-022"
+      ],
+      "result": "not_run",
+      "expected_ar": "قبول واحد للون وواجهات حجز متطابقة دون سباق بدء.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T28",
+      "key": "move_ownership_replay",
+      "title_ar": "ملكية ودور وإعادة intent",
+      "condition": "online",
+      "task_ids": [
+        "YKL-015",
+        "YKL-022"
+      ],
+      "result": "not_run",
+      "expected_ar": "رفض الدور الخاطئ والمقعد غير المملوك؛ نفس mutationId لا يطبق مرتين.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T29",
+      "key": "guest_reconnect",
+      "title_ar": "انقطاع ضيف وعودته",
+      "condition": "online",
+      "task_ids": [
+        "YKL-015",
+        "YKL-022"
+      ],
+      "result": "not_run",
+      "expected_ar": "اختبر 10 و 30 و 65 ثانية وحركة ضاع ردها؛ استعادة أو نهاية وفق المهلة المعتمدة دون rebasing لحركة قديمة.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T30",
+      "key": "host_loss",
+      "title_ar": "خروج أو قتل المضيف",
+      "condition": "online",
+      "task_ids": [
+        "YKL-011",
+        "YKL-015",
+        "YKL-022"
+      ],
+      "result": "not_run",
+      "expected_ar": "رسالة ونهاية أو استعادة وفق التصميم الحقيقي، دون انتظار غير محدود.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T31",
+      "key": "network_matrix",
+      "title_ar": "شبكات مختلفة و NAT وتبديل شبكة",
+      "condition": "online",
+      "task_ids": [
+        "YKL-014",
+        "YKL-015",
+        "YKL-022",
+        "YKL-030"
+      ],
+      "result": "not_run",
+      "expected_ar": "نتائج موثقة للمسارات المعتمدة؛ TURN بقرار مستقل، ولا افتراض نجاح كل الشبكات.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T32",
+      "key": "room_collision",
+      "title_ar": "تعارض رمز وغرفة قديمة",
+      "condition": "online",
+      "task_ids": [
+        "YKL-015",
+        "YKL-022"
+      ],
+      "result": "not_run",
+      "expected_ar": "لا تندمج غرف ولا يطبق snapshot من epoch قديم؛ الرمز القصير ليس سرا.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T33",
+      "key": "names_abuse",
+      "title_ar": "أسماء مسيئة وحظر وإبلاغ",
+      "condition": "online",
+      "task_ids": [
+        "YKL-016",
+        "YKL-022"
+      ],
+      "result": "not_run",
+      "expected_ar": "منع نقل النص الحر أو معالجة بلاغ وحظر فعلي بعد reconnect وفق المسار المعتمد.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T34",
+      "key": "malformed_flood",
+      "title_ar": "رسائل مخالفة وحجم وإغراق",
+      "condition": "online",
+      "task_ids": [
+        "YKL-015",
+        "YKL-022"
+      ],
+      "result": "not_run",
+      "expected_ar": "تطبيق allowlist والحدود دون crash أو كشف token أو تحريك غير مصرح.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T35",
+      "key": "privacy_network",
+      "title_ar": "جرد البيانات والشبكة",
+      "condition": "all",
+      "task_ids": [
+        "YKL-009",
+        "YKL-013",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "Capture لكل mode يطابق السياسة والتصريحات؛ لا endpoint تاريخي غير مقصود.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T36",
+      "key": "clear_local",
+      "title_ar": "حفظ ومسح بيانات محلية",
+      "condition": "all",
+      "task_ids": [
+        "YKL-008",
+        "YKL-017",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "اختيار حفظ واضح ومسح الاسم وأي هاتف بقي والإعدادات حسب النص، دون ادعاء حذف مضلل.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T37",
+      "key": "links_licenses",
+      "title_ar": "سياسة ودعم ورخص",
+      "condition": "all",
+      "task_ids": [
+        "YKL-017",
+        "YKL-018",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "كل URL عام يعمل؛ الرخص مقروءة داخل الحزمة دون placeholders.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T38",
+      "key": "permissions_manifests",
+      "title_ar": "أذونات و manifests وتشفير",
+      "condition": "all",
+      "task_ids": [
+        "YKL-013",
+        "YKL-019",
+        "YKL-020",
+        "YKL-031",
+        "YKL-032"
+      ],
+      "result": "not_run",
+      "expected_ar": "أقل صلاحيات وإقرارات حقيقية و manifest من الحزمة المجمعة.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T39",
+      "key": "performance_thermal",
+      "title_ar": "أداء وحرارة وذاكرة",
+      "condition": "all",
+      "task_ids": [
+        "YKL-012",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "قياس startup وجلسة 20 دقيقة على أقل جهاز؛ أهداف معتمدة بلا تسرب ذاكرة متكرر.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T40",
+      "key": "android_16kb",
+      "title_ar": "اختبار Android في بيئة 16 KB",
+      "condition": "android",
+      "task_ids": [
+        "YKL-019",
+        "YKL-031",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "إثبات حجم الصفحة وفحص so والتثبيت واللعب من حزمة متجر.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T41",
+      "key": "store_install",
+      "title_ar": "تثبيت TestFlight و Play testing",
+      "condition": "all",
+      "task_ids": [
+        "YKL-019",
+        "YKL-020",
+        "YKL-031",
+        "YKL-032",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "Release موقّع من قناة المتجر، دون الاكتفاء بـ sideload debug، مع source و build مطابقين.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    },
+    {
+      "id": "T42",
+      "key": "update_migration",
+      "title_ar": "تحديث وترحيل إعدادات",
+      "condition": "all",
+      "task_ids": [
+        "YKL-008",
+        "YKL-021"
+      ],
+      "result": "not_run",
+      "expected_ar": "ترقية من مرشح سابق تحفظ البيانات المسموح بها؛ لا وعد بمزامنة Safari storage مع التطبيق.",
+      "device_ids": [],
+      "build_ids": [],
+      "evidence": [],
+      "observed_ar": null,
+      "tested_on": null,
+      "tester_role": null,
+      "not_applicable_reason": null
+    }
+  ]
+}
