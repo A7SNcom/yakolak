@@ -110,7 +110,7 @@ export class TrysteroClient{
           if(s.closed||this.session!==s)fail('room_closed');
           if(s.collision){await this.close(false);continue}
           s.phase='ready';s.snapshot=s.authority.snapshot();this.save();await this.sendBeacon(s);this.emit();return s.snapshot;
-        }catch(e){await this.close(false);throw e}
+        }catch(e){if(this.session===s)await this.close(false);throw e}
       }
       fail('room_collision');
     })();this.preparing=prepare;
@@ -125,7 +125,7 @@ export class TrysteroClient{
       const saved=this.saved(code);if(saved.role==='host'&&saved.token===token)fail('room_closed');
       const s=await this.open(code,'guest');s.token=token||saved.token||secret();s.epoch=epoch||saved.epoch||'';s.name=cleanName(name)||'لاعب';s.chooseColor=chooseColor&&!saved.seat;s.color='';
       const connected=new Promise((resolve,reject)=>{s.resolve=resolve;s.reject=reject;s.discoveryTimer=setTimeout(()=>reject(new Error('room_unreachable')),25000)});connected.catch(()=>{});
-      try{await this.waitSignaling(s);await connected;return s}catch(e){await this.close(false);throw e}
+      try{await this.waitSignaling(s);await connected;return s}catch(e){if(this.session===s)await this.close(false);throw e}
     })();this.joining=connect;
     try{return await connect}finally{if(this.joining===connect)this.joining=null}
   }

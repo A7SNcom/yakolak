@@ -1,4 +1,4 @@
-import {P2P,supportsP2P,arabicNetworkError} from './online-trystero-a380cca93612.mjs';
+import {P2P,supportsP2P,arabicNetworkError} from './online-trystero-28e3557a98b5.mjs';
 import {attachLiquidLens} from './vendor/liquefy-core-1.1.0.mjs';
 const WIN_LESSONS = [{"id": "tower", "pattern": "complete-cell", "title": "البرج", "slogan": "هبطهم من برجك!", "description": "صغير ووسط وكبير، من نفس اللون وفي نفس الخانة.", "winner": "%s هبطكم من برجه", "moves": [{"cell": 4, "size": "small"}, {"cell": 4, "size": "medium"}, {"cell": 4, "size": "large"}]}, {"id": "stairs", "pattern": "graded-line", "title": "الدرج", "slogan": "دردبهم من الدرج!", "description": "كبير، وسط، صغير على خط واحد ومن نفس اللون. والعكس صحيح.", "winner": "%s دردبكم من الدرج", "moves": [{"cell": 3, "size": "large"}, {"cell": 4, "size": "medium"}, {"cell": 5, "size": "small"}]}, {"id": "line", "pattern": "same-size-line", "title": "السطر", "slogan": "سطرهم تستطير", "description": "ثلاثة من نفس الحجم واللون على خط: صف أو عمود أو قطر.", "winner": "%s سطركم تسيطير", "moves": [{"cell": 6, "size": "large"}, {"cell": 7, "size": "large"}, {"cell": 8, "size": "large"}]}];
 

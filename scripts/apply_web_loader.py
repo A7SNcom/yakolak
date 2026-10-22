@@ -477,6 +477,58 @@ SEMANTIC_SCRIPT = r'''
 </script>
 '''
 
+STARTUP_FAILURE = r'''
+<style id="yakolak-startup-failure-style">
+#yakolakLoader[data-error="true"]{display:none}
+#yakolakStartupFailure:not([hidden]){position:fixed;inset:0;z-index:2147483647;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;padding:24px;background:#000;color:#fff;text-align:center;font:18px/1.7 system-ui,sans-serif;overflow:auto;touch-action:pan-y}
+#yakolakStartupFailure h1{font-size:24px;margin:0}
+#yakolakStartupFailure p{max-width:480px;margin:0}
+#yakolakStartupFailure button{font:inherit;min-height:48px;padding:8px 24px;border:1px solid #ddd;border-radius:12px;background:#fff;color:#111;cursor:pointer}
+#yakolakStartupFailure details{max-width:min(520px,100%);font-size:14px;color:#bbb}
+#yakolakStartupFailure pre{white-space:pre-wrap;overflow-wrap:anywhere;text-align:left;direction:ltr}
+</style>
+<section id="yakolakStartupFailure" lang="ar" dir="rtl" role="alert" hidden>
+  <h1>تعذر تشغيل اللعبة</h1>
+  <p></p>
+  <button type="button">إعادة المحاولة</button>
+  <details><summary>تفاصيل الخطأ</summary><pre></pre></details>
+</section>
+<script id="yakolak-startup-failure-script">
+(()=>{
+  const panel=document.getElementById('yakolakStartupFailure');
+  const notice=document.getElementById('status-notice');
+  const inspect=()=>{
+    const error=notice?.textContent.trim()||'';
+    const data=document.body.dataset;
+    if(!error&&data.yakolakPreIntro!=='error'&&data.yakolakIntro!=='error')return;
+    panel.querySelector('p').textContent=/WebGL/i.test(error)
+      ?'متصفحك لا يوفّر دعم الرسوم المطلوب. جرّب متصفحًا محدثًا مع تفعيل تسريع الرسوم.'
+      :'تعذر تحميل اللعبة. تحقق من اتصال الإنترنت ثم أعد المحاولة.';
+    panel.querySelector('pre').textContent=error;
+    panel.querySelector('details').hidden=!error;
+    panel.hidden=false;
+    data.yakolakStartup='error';
+    const loader=document.getElementById('yakolakLoader');
+    loader?.setAttribute('data-error','true');
+    loader?.setAttribute('aria-busy','false');
+  };
+  panel.querySelector('button').addEventListener('click',()=>window.location.reload());
+  if(notice)new MutationObserver(inspect).observe(notice,{childList:true,subtree:true,characterData:true});
+  new MutationObserver(inspect).observe(document.body,{attributes:true,attributeFilter:['data-yakolak-pre-intro','data-yakolak-intro']});
+  inspect();
+})();
+</script>
+'''
+
+
+def inject_startup_failure(html: str) -> str:
+    # Also refresh an existing export, without touching its engine or intro.
+    html = re.sub(r'\n?<style id="yakolak-startup-failure-style">.*?</style>\s*'
+                  r'<section id="yakolakStartupFailure".*?</section>\s*'
+                  r'<script id="yakolak-startup-failure-script">.*?</script>\s*',
+                  '', html, flags=re.S)
+    return html.replace('</body>', STARTUP_FAILURE + '\n</body>', 1)
+
 
 
 def write_surface_preview(version: str) -> None:
@@ -532,7 +584,7 @@ def main() -> None:
         )
         if css_count != 1 or script_count != 1:
             raise RuntimeError("existing setup asset references missing")
-        INDEX.write_text(html, encoding="utf-8", newline="\n")
+        INDEX.write_text(inject_startup_failure(html), encoding="utf-8", newline="\n")
         print(f"YAKOLAK_WEB_SETUP_ASSETS_REFRESHED version={setup_version}")
         return
     semantic_markers = (
@@ -573,7 +625,7 @@ def main() -> None:
     write_surface_preview(setup_version)
     html = html.replace("</head>", f'<link rel="stylesheet" href="visual-setup.css?v={setup_version}">\n</head>', 1)
     html = html.replace("</body>", f'<script type="module" src="visual-setup.mjs?v={setup_version}"></script>\n</body>', 1)
-    INDEX.write_text(html, encoding="utf-8", newline="\n")
+    INDEX.write_text(inject_startup_failure(html), encoding="utf-8", newline="\n")
     print("YAKOLAK_BALANCED_BRAND_LOADER_WITH_CANONICAL_SVG_HANDOFF_AND_SEMANTIC_DOM_INJECTED")
 
 
