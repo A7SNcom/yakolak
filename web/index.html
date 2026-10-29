@@ -184,7 +184,20 @@ body {
 #yakolakA11yActions button{pointer-events:none}
 </style>
 
-<link rel="stylesheet" href="visual-setup.css?v=2aa136996322">
+<link rel="stylesheet" href="visual-setup.css?v=61762e988fa5">
+<link id="yakolak-pwa" rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#05070a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ياكلك">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icon-180.png">
+<script id="yakolak-pwa-registration">
+if ('serviceWorker' in navigator && window.isSecureContext) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./app-sw.js', {scope:'./',updateViaCache:'none'}).catch(e => console.warn('App installation unavailable:', e.message)));
+}
+</script>
+
 </head>
 	<body>
 
@@ -223,7 +236,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":9704300,"index.wasm":39513091,"index-b485f8baa962.pck":9704300},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"mainPack":"index-b485f8baa962.pck"};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":9704172,"index.wasm":39513091,"index-0fb4edb26580.pck":9704172},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"mainPack":"index-0fb4edb26580.pck"};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
@@ -672,7 +685,7 @@ const engine = new Engine(GODOT_CONFIG);
 })();
 </script>
 
-<script type="module" src="visual-setup.mjs?v=2aa136996322"></script>
+<script type="module" src="visual-setup.mjs?v=61762e988fa5"></script>
 
 <style id="yakolak-startup-failure-style">
 #yakolakLoader[data-error="true"]{display:none}
