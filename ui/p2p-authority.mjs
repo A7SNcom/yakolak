@@ -13,7 +13,7 @@ export function validateRoster(config){
   if(!Array.isArray(players)||players.length<2||players.length>4)fail('invalid_player_count');
   if(!isValidWinsToMatch(config.rounds))fail('invalid_round_count');
   if(players[0]?.mode!=='local'||players.some(p=>!p||!COLORS.includes(p.color)||!['local','bot','online'].includes(p.mode))||new Set(players.map(p=>p.color)).size!==players.length)fail('invalid_roster');
-  return players.map((p,i)=>({seat:`p${i+1}`,color:p.color,name:cleanName(p.label||p.name)||(p.mode==='bot'?'كمبيوتر':'لاعب'),mode:p.mode,controller:p.mode==='online'?`p${i+1}`:'p1'}));
+  return players.map((p,i)=>({seat:`p${i+1}`,color:p.color,name:cleanName(p.label||p.name)||(p.mode==='bot'?'كمبيوتر':'لاعب'),mode:p.mode,joinable:i>0&&p.mode==='local'&&p.joinable===true,controller:p.mode==='online'?`p${i+1}`:'p1'}));
 }
 // One host owns rules, bot decisions, deadlines and seat permissions. Peers
 // submit intentions only; local co-players share their device's controller.
@@ -37,9 +37,12 @@ export class RoomAuthority{
     this.state.rematch=Object.fromEntries(occupied.map(s=>[s.seat,false]));
     this.state.targetPlayers=this.slots.length;
   }
+  availableSlots(){return this.slots.filter(s=>s.joinable&&s.mode==='local'||s.mode==='online'&&!this.state.players.some(p=>p.seat===s.seat))}
   preview(){
-    const availableColors=COLORS.filter(c=>!this.state.players.some(p=>p.color===c));
-    return {code:this.code,epoch:this.epoch,status:this.state.status,availableColors:this.state.status==='waiting'&&this.slots.some(s=>s.mode==='online'&&!this.state.players.some(p=>p.seat===s.seat))?availableColors:[],players:this.snapshot().players};
+    const free=this.availableSlots(),reserved=this.slots.filter(s=>!free.includes(s));
+    const availableColors=COLORS.filter(c=>!reserved.some(s=>s.color===c));
+    const snapshot=this.snapshot();
+    return {code:this.code,epoch:this.epoch,status:this.state.status,availableColors:this.state.status==='waiting'&&free.length?availableColors:[],players:snapshot.players.filter(p=>!free.some(s=>s.seat===p.seat))};
   }
   snapshot(){
     const state=clone(this.state);delete state._mutations;
@@ -75,12 +78,16 @@ export class RoomAuthority{
       this.bump();return {room:this.snapshot(),seat:member.seat,token:request.token};
     }
     if(this.state.status!=='waiting')fail('room_not_waiting');
-    const free=this.slots.filter(s=>s.mode==='online'&&!this.state.players.some(p=>p.seat===s.seat));
+    const free=this.availableSlots();
     if(!free.length)fail('room_full');
     const color=request.color||free[0].color;
     if(!COLORS.includes(color))fail('invalid_color');
-    if(this.state.players.some(p=>p.color===color))fail('color_taken');
-    const slot=free.find(s=>s.color===color)||free[0];slot.color=color;
+    if(this.state.players.some(p=>p.color===color&&!free.some(s=>s.seat===p.seat)))fail('color_taken');
+    const slot=free.find(s=>s.color===color)||free[0];
+    // Replace the local placeholder atomically; a guest owns only this seat.
+    this.state.players=this.state.players.filter(p=>p.seat!==slot.seat);
+    slot.localFallback=slot.joinable&&slot.mode==='local';
+    slot.color=color;slot.mode='online';slot.joinable=false;slot.controller=slot.seat;
     member={token:request.token,seat:slot.seat,peerId,name:cleanName(request.name)||'لاعب',connected:true,lastSeen:this.now(),disconnectedAt:0};
     this.state=joinState(this.state,slot.seat,color);
     this.state.players.sort((a,b)=>Number(a.seat.slice(1))-Number(b.seat.slice(1)));
@@ -91,6 +98,7 @@ export class RoomAuthority{
     const slots=validateRoster(config);
     if(this.started||this.state.status!=='waiting')fail('room_edit_forbidden');
     for(const member of this.members.values())if(member.seat!=='p1'&&!slots.some(s=>s.seat===member.seat&&s.mode==='online'&&s.color===this.slot(member.seat)?.color))fail('seat_occupied');
+    for(const slot of slots)if(this.slot(slot.seat)?.localFallback&&slot.mode==='online')slot.localFallback=true;
     this.slots=slots;this.member(this.owner).name=slots[0].name;
     this.state.targetRounds=this.state.winsToMatch=Number(config.rounds);this.seedRoster();return this.bump();
   }
@@ -105,12 +113,20 @@ export class RoomAuthority{
     m.lastSeen=this.now();if(m.connected===value)return false;
     m.connected=value;m.disconnectedAt=value?0:this.now();this.bump();return true;
   }
+  releaseWaitingMember(member){
+    this.members.delete(member.token);
+    const slot=this.slot(member.seat);
+    if(!this.started&&this.state.status==='waiting'&&slot?.localFallback){
+      slot.mode='local';slot.controller='p1';slot.joinable=true;delete slot.localFallback;
+      this.seedRoster();
+    }
+  }
   expire(){
     let changed=false;
     for(const [token,m] of this.members){
       if(m.seat==='p1')continue;
       if(m.connected&&this.now()-m.lastSeen>12000){this.connected(m.peerId,false);changed=true}
-      if(!m.connected&&this.now()-m.disconnectedAt>60000){this.state=leaveState(this.state,m.seat);this.members.delete(token);this.bump();changed=true}
+      if(!m.connected&&this.now()-m.disconnectedAt>60000){this.state=leaveState(this.state,m.seat);this.releaseWaitingMember(m);this.bump();changed=true}
     }
     return changed;
   }
@@ -159,7 +175,7 @@ export class RoomAuthority{
       }
     }
     this.mutations.set(key,signature);
-    if(kind==='leave'&&member.seat!=='p1'&&next.status==='waiting')this.members.delete(member.token);
+    if(kind==='leave'&&member.seat!=='p1'&&next.status==='waiting'){this.state=next;this.releaseWaitingMember(member);next=this.state;}
     return this.commit(next,kind==='move');
   }
   advance(){

@@ -110,6 +110,12 @@ func _present_online_seat_camera(snapshot: Dictionary) -> void:
 		if str(player.get("seat", "")) == str(online_identity.get("seat", "")):
 			direction = str(player.get("direction", ""))
 			break
+	# An automatically advertised room can still contain only this device's
+	# humans and computers. Preserve pass-and-play camera handoffs in that case.
+	var remote_human := false
+	for player: Dictionary in players:
+		if str(player.get("kind", "")) == "online": remote_human = true
+	if not remote_human and _current_mode() == "local": direction = _current_direction()
 	if direction.is_empty() or camera == null: return
 	var turn_key: String = "%d:%s:%s" % [int(snapshot.get("round", 0)), str(snapshot.get("seat", "")), str(snapshot.get("valid", false))]
 	if turn_key != online_presented_turn_key:

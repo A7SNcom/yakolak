@@ -563,7 +563,7 @@ func _validated_visual_configuration(payload: Dictionary) -> Dictionary:
 		if label.is_empty():
 			label = ("لاعب " if mode == "local" else "كمبيوتر ") + str(palette["name"])
 		configured.append({"seat": "p%d" % (index + 1), "label": label, "mode": mode, "color": color, "color_name": palette["name"], "direction": palette["direction"]})
-	return {"tutorial": false, "rounds": selected_rounds, "players": configured, "online_join_code": ""}
+	return {"tutorial": false, "rounds": selected_rounds, "players": configured, "online_join_code": "", "automatic_room": bool(payload.get("automatic_room", false))}
 
 func _accept_visual_configuration(payload: Dictionary) -> void:
 	var configuration := _validated_visual_configuration(payload)

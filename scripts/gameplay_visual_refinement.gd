@@ -9,6 +9,7 @@ const REST_OFFSET := Layout.REST_CLEARANCE
 const DIM_MIX := 0.70
 const CHOICE_FADE := 0.22
 const VICTORY_HALF_CYCLE := 1.65
+const VICTORY_DIM := 0.96
 
 var choice_materials: Dictionary = {}
 var choice_tweens: Array[Tween] = []
@@ -57,8 +58,6 @@ var result_generation: int = 0
 var result_scheduled: bool = false
 var result_reveal: Tween
 var celebration: CPUParticles3D
-var victory_visibility: Dictionary = {}
-var victory_positions: Dictionary = {}
 var scene_motion = preload("res://scripts/scene_motion.gd").new(self)
 var base_home_poses: Dictionary = {}
 var backdrop_home_poses: Dictionary = {}
@@ -125,6 +124,8 @@ func _layout_win_banner() -> void:
 	var view := get_viewport().get_visible_rect().size
 	var width := minf(_hud_length(520),view.x-_hud_length(28))
 	win_banner.position = Vector2((view.x-width)*0.5,_hud_length(76))
+	win_banner_label.custom_minimum_size.x = maxf(1.0, width - _hud_length(32))
+	win_banner.custom_minimum_size.x = width
 	win_banner.size = Vector2(width,0)
 	win_banner_label.add_theme_font_size_override("font_size",_hud_font_size(20 if view.x<view.y else 23))
 
@@ -498,22 +499,14 @@ func _start_victory_colors() -> void:
 	# earlier nonwinner fade set. Keep every simultaneous winning pattern visible.
 	for index: int in winning_piece_indices:
 		victory_materials.erase(index)
-		victory_visibility.erase(index)
-		victory_positions.erase(index)
 		var winner: MeshInstance3D = piece_records[index]["mesh"]
 		winner.material_override = home_materials[index]
 		winner.visible = true
 	for index: int in range(piece_records.size()):
 		var piece: MeshInstance3D = piece_records[index]["mesh"]
-		if not bool(piece_records[index].get("played",false)) or winning_piece_indices.has(index): continue
+		if not piece.visible or winning_piece_indices.has(index): continue
 		if not victory_materials.has(index) and home_materials[index] is StandardMaterial3D:
 			victory_materials[index] = home_materials[index].duplicate()
-			victory_materials[index].transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			victory_visibility[index] = piece.visible
-			victory_positions[index] = piece.position
-			if online_piece_motions.has(index):
-				(online_piece_motions[index] as Tween).kill()
-				online_piece_motions.erase(index)
 		if victory_materials.has(index): piece.material_override = victory_materials[index]
 	_set_victory_mix(victory_mix)
 	if victory_mix>=0.999 or (victory_tween != null and victory_tween.is_valid()): return
@@ -530,12 +523,13 @@ func _set_victory_mix(value: float) -> void:
 	for index: int in victory_materials:
 		var source := home_materials[index] as StandardMaterial3D
 		var material := victory_materials[index] as StandardMaterial3D
-		# Preserve hue, lighting and finish. Only board pieces' opacity changes.
-		material.albedo_color = Color(source.albedo_color,source.albedo_color.a*(1.0-value))
-		var piece: MeshInstance3D = piece_records[index]["mesh"]
-		if not _rm_enabled: piece.position = (victory_positions[index] as Vector3) + Vector3.UP * value * scene_motion.SKY_HEIGHT
-		piece.visible = bool(victory_visibility[index]) and value<0.999
-
+		# Darken in place, including reserves. Never move, hide or fade a stone.
+		var target := source.albedo_color.lerp(Color.BLACK, VICTORY_DIM)
+		target.a = source.albedo_color.a
+		material.albedo_color = source.albedo_color.lerp(target, value)
+		material.emission = source.emission.lerp(Color.BLACK, value)
+		material.metallic = lerpf(source.metallic, 0.0, value)
+		material.roughness = lerpf(source.roughness, 1.0, value)
 
 
 func _stop_victory_colors() -> void:
@@ -545,13 +539,6 @@ func _stop_victory_colors() -> void:
 	for index: int in victory_materials:
 		if index < piece_records.size() and index < home_materials.size():
 			_restore_visual_material(index)
-			# Hidden nonwinners remain above the shot; the next return lands them.
-			if not (piece_records[index]["mesh"] as MeshInstance3D).visible:
-				var piece: MeshInstance3D = piece_records[index]["mesh"]
-				piece.position.y = home_transforms[index].origin.y + scene_motion.SKY_HEIGHT
-				piece.show()
-	victory_visibility.clear()
-	victory_positions.clear()
 	victory_materials.clear()
 	victory_mix = 0.0
 	continue_pending = false

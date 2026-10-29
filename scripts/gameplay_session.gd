@@ -355,7 +355,7 @@ func _should_host_online(configuration: Dictionary) -> bool:
 	var host: Dictionary = configured_players[0] as Dictionary
 	if str(host.get("mode", "local")) != "local":
 		return false
-	return _has_online_mode(configuration)
+	return bool(configuration.get("automatic_room", false)) or _has_online_mode(configuration)
 
 
 func _has_online_mode(configuration: Dictionary) -> bool:

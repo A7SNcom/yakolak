@@ -71,7 +71,7 @@ func _patterns() -> void:
 	var slots := {"0:large":0,"1:large":1,"2:large":2,"2:small":3,"2:medium":4}
 	var records: Array = [{"dir":"back"},{"dir":"back"},{"dir":"back"},{"dir":"back"},{"dir":"back"}]
 	var text := Copy.winner_text(slots,records,"back","أحمد")
-	_expect(text.contains("أحمد هبطكم من برجه") and text.contains("أحمد سطركم تسيطير"),"simultaneous tower and line keep both correct messages")
+	_expect(text.contains("أحمد هبطكم من البرج") and text.contains("أحمد سطركم تستطير !"),"simultaneous tower and line keep both correct messages")
 	_expect(not text.contains("الدرج"),"multiple winning stones do not invent a graded line")
 	_expect(Rules.winning_piece_indices(slots,records,"back").size()==5,"canonical union of simultaneous wins stays intact")
 	var mixed := {"4:small":0,"4:medium":1,"4:large":2}
@@ -140,6 +140,20 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	_expect(game.win_banner_label.text=="ريم دردبكم من الدرج" and game.win_banner.visible,"gameplay displays the correct named stair result")
+	for dimensions: Vector2i in [Vector2i(320,568),Vector2i(390,844),Vector2i(844,390),Vector2i(1280,720)]:
+		root.size=dimensions
+		root.content_scale_size=dimensions
+		game._layout_hud()
+		var long_name := "عبدالرحمن محمد عبدالله"
+		game.win_banner_label.text="%s هبطكم من البرج\n%s دردبكم من الدرج\n%s سطركم تستطير !" % [long_name,long_name,long_name]
+		game._layout_win_banner()
+		await process_frame
+		await process_frame
+		var panel: Rect2=game.win_banner.get_global_rect()
+		var text: Rect2=game.win_banner_label.get_global_rect()
+		_expect(panel.encloses(text),"banner background encloses the longest simultaneous result text")
+		_expect(panel.position.x>=0 and panel.end.x<=dimensions.x+1 and panel.end.y<dimensions.y,"named win banner fits phone, landscape and desktop")
+		_expect(game.win_banner_label.get_visible_line_count()==game.win_banner_label.get_line_count(),"win text wraps without clipped lines")
 	intro.queue_free()
 	await process_frame
 	if failures.is_empty(): print("YAKOLAK_SHORT_WIN_TUTORIAL_OK checks=%d" % checks)

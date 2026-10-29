@@ -102,7 +102,7 @@ export function configuration(state) {
   return { tutorial: false, rounds: state.rounds, online_join_code: '', players: state.seats.filter(x => x.mode !== 'none').sort((a,b)=>{const order=state.onlineSeatOrder||state.seats.map(x=>x.color);const rank=c=>order.includes(c)?order.indexOf(c):4+state.seats.findIndex(x=>x.color===c);return rank(a.color)-rank(b.color)}).map((seat, i) => {
     const color = COLORS.find(x => x.id === seat.color);
     return { seat: `p${i + 1}`, label: seatLabel(seat), mode: seat.mode,
-      color: color.id, color_name: color.name, direction: color.direction, device_owner: seat.owner };
+      color: color.id, color_name: color.name, direction: color.direction, device_owner: seat.owner, joinable: i > 0 && seat.mode === 'local' };
   }) };
 }
 export function configurationError(state, capabilities = {}) {
@@ -390,14 +390,14 @@ export function mountSetup(document, window, client=P2P) {
   }
   async function syncOnlineLobby(){
     if(!client||networkBusy||root.hidden||state.step!=='ready'||guestPhase||hostAwaitingStart)return;
-    const online=state.seats.some(s=>s.mode==='online');
-    if(!online){if(client.role==='host')await client.leave();roomCode='';lobbySignature='';return;}
+    if(!capabilities.online)return;
     const config=configuration(state),problem=configurationError(state,capabilities);
     if(problem){showError(problem);return;}
     const signature=JSON.stringify(config);if(signature===lobbySignature&&client.code)return;
     networkBusy=true;start.disabled=true;sharing.disabled=true;code.textContent='…';
-    try{const room=await client.prepareHost(config);lobbySignature=signature;api.room(room);clearError();}
-    catch(e){showError(arabicNetworkError(e.message));if(client.session?.snapshot)api.room(client.session.snapshot);}
+    const token=flowGeneration;
+    try{const room=await client.prepareHost(config);if(token!==flowGeneration||root.hidden)return;lobbySignature=signature;api.room(room);clearError();}
+    catch(e){if(token===flowGeneration&&!root.hidden){showError(arabicNetworkError(e.message));if(client.session?.snapshot)api.room(client.session.snapshot);}}
     finally{networkBusy=false;start.disabled=false;render();}
   }
   function render(){
@@ -426,7 +426,7 @@ export function mountSetup(document, window, client=P2P) {
     if(moving||networkBusy)return;closeSheet();clearError();
     const target=typeof next==='string'?{...state,step:next}:next;
     const token=flowGeneration;
-    const apply=()=>{if(token!==flowGeneration||root.hidden)return;state=target;moving=false;delete root.dataset.moving;render();notify('preview');animate(actions,[{opacity:0,transform:'translate(-50%,12px) scale(.985)'},{opacity:1,transform:'translate(-50%,0) scale(1)'}],420);};
+    const apply=()=>{if(token!==flowGeneration||root.hidden)return;state=target;moving=false;delete root.dataset.moving;render();notify('preview');if(state.step==='ready')void syncOnlineLobby();animate(actions,[{opacity:0,transform:'translate(-50%,12px) scale(.985)'},{opacity:1,transform:'translate(-50%,0) scale(1)'}],420);};
     if(!reduced()&&typeof actions.animate==='function'){
       moving=true;root.dataset.moving='true';notify('preview',{step:'transition'});
       const motion=animate(actions,[{opacity:1,transform:'translate(-50%,0) scale(1)'},{opacity:0,transform:'translate(-50%,-8px) scale(.985)'}],240);motion.finished.then(apply,apply);
@@ -435,7 +435,7 @@ export function mountSetup(document, window, client=P2P) {
   function finishHostStart(){
     if(pending)return;
     pending=true;hostAwaitingStart=false;render();const token=++flowGeneration;
-    const done=()=>{if(token===flowGeneration&&!root.hidden)notify('start');};
+    const done=()=>{if(token===flowGeneration&&!root.hidden)notify('start',{automatic_room:!!roomCode&&client?.role==='host'});};
     if(!reduced()&&typeof actions.animate==='function'){
       animate(prompt,[{opacity:1},{opacity:0}],300);
       const motion=animate(actions,[{opacity:1,transform:'translate(-50%,0)'},{opacity:0,transform:'translate(-50%,8px)'}],480);motion.finished.then(done,done);
@@ -443,7 +443,7 @@ export function mountSetup(document, window, client=P2P) {
   }
   async function beginMatch(n){
     if(pending||moving||networkBusy||hostAwaitingStart)return;state.rounds=n;
-    if(client&&state.seats.some(s=>s.mode==='online')){
+    if(client&&(roomCode&&client.role==='host'||state.seats.some(s=>s.mode==='online'))){
       const token=flowGeneration;networkBusy=true;render();
       try{
         const c=configuration(state),reply=await client.dispatch('create',{players:c.players,targetRounds:n});
@@ -517,15 +517,12 @@ export function mountSetup(document, window, client=P2P) {
     closeSheet();openSheet('',origin,'seat');sheet.setAttribute('aria-label',seatLabel(state.seats[index]));sheet.setAttribute('role','menu');sheet.removeAttribute('aria-labelledby');
     const choices=el('div','yk-menu');
     const item=(label,action,selected=false,parent=choices)=>{const b=button(label,action,'yk-menu-item');b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String(selected));addSurface(b);parent.append(b);return b;};
-    if(state.seats[index].mode!=='local')item('لاعب',()=>{if(index>0)state=changeSeat(state,index,'local',state.seats[index].name);playerName(index,origin);},state.seats[index].mode==='local');
-    if(index>0&&capabilities.online)item('أونلاين',()=>{state=changeSeat(state,index,'online');closeSheet(true);},state.seats[index].mode==='online');
-    if(index>0){item('الكمبيوتر (بوت)',()=>{state=changeSeat(state,index,'bot');closeSheet(true);},state.seats[index].mode==='bot');item('فاضي (بدون لاعب)',()=>{state=changeSeat(state,index,'none');closeSheet(true);},state.seats[index].mode==='none');}
-    const names=el('div','yk-menu-players');
-    names.classList.toggle('is-grid',state.seats.filter(seat=>seat.mode==='local').length>2);
-    for(const [source,seat] of state.seats.entries())if(seat.mode==='local'){
-      item(seatLabel(seat),()=>{if(source===index)playerName(index,origin);else{state=swapPlayers(state,index,source);closeSheet(true);}},source===index,names);
-    }
-    choices.append(names);
+    item('لاعب',()=>{
+      if(state.seats[index].mode==='online'){closeSheet(true);return;}
+      if(index>0)state=changeSeat(state,index,'local',state.seats[index].name);
+      playerName(index,origin);
+    },['local','online'].includes(state.seats[index].mode));
+    if(index>0&&state.seats[index].mode!=='online')item('كمبيوتر',()=>{state=changeSeat(state,index,'bot');closeSheet(true);},state.seats[index].mode==='bot');
     sheet.append(choices);positionSheet();choices.querySelector('button').focus({preventScroll:true});
   }
   function playerName(index,origin){
@@ -599,9 +596,9 @@ export function mountSetup(document, window, client=P2P) {
   root.addEventListener('click',e=>{if(!modal.hidden&&modal.dataset.kind!=='profile'&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet(true);});root.addEventListener('keydown',e=>e.stopPropagation());
   const api={
     lesson:updateLesson,
-    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;resetLesson();flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;nameDraft=null;profileContinuation=null;closeSheet();resetOverlay();capabilities={online:!!options.online||supportsP2P(window),mixed:true};connections=options.resume?.players?connections:[];roomCode=options.resume?.players?roomCode:'';pending=moving=false;state=options.resume?.players?restoreSetup(options.resume,profile?.name||''):newSetup(profile?.name||'');if(options.preview_step==='color')state={...state,step:'color',selectedColor:''};geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
+    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;resetLesson();flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;nameDraft=null;profileContinuation=null;resetOverlay();capabilities={online:!!options.online||supportsP2P(window),mixed:true};connections=options.resume?.players?connections:[];roomCode=options.resume?.players?roomCode:'';pending=moving=false;state=options.resume?.players?restoreSetup(options.resume,profile?.name||''):newSetup(profile?.name||'');if(options.preview_step==='color')state={...state,step:'color',selectedColor:''};geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
       // Never synchronously call back into Godot while it is publishing entry.
-      const token=flowGeneration;window.setTimeout(()=>{if(token!==flowGeneration||root.hidden)return;notify('preview');const invitation=parseRoomInput(new URL(window.location.href).searchParams.get('room')||'',window.location.href);if(invitation&&!inviteHandled&&!options.resume?.players&&client?.role!=='host'){inviteHandled=true;requireProfile(()=>openJoin(invitation));}},0);},
+      const token=flowGeneration;window.setTimeout(()=>{if(token!==flowGeneration||root.hidden)return;notify('preview');if(state.step==='ready')void syncOnlineLobby();const invitation=parseRoomInput(new URL(window.location.href).searchParams.get('room')||'',window.location.href);if(invitation&&!inviteHandled&&!options.resume?.players&&client?.role!=='host'){inviteHandled=true;requireProfile(()=>openJoin(invitation));}},0);},
     close(){resetLesson();flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;nameDraft=null;profileContinuation=null;pending=moving=false;resetOverlay();root.hidden=true;refreshGlass();delete window.yakolakPendingVisualSetup;document.body.dataset.yakolakVisualSetup='hidden';},
     geometry(points){geometry=points;root.dataset.world=String(!!points.world);position();},
     error(text){root.hidden=false;showError(text);},

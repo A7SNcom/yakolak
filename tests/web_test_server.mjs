@@ -13,6 +13,7 @@ const TYPES = new Map([
   ['.css', 'text/css; charset=utf-8'],
   ['.otf', 'font/otf'],
   ['.json', 'application/json; charset=utf-8'],
+  ['.webmanifest', 'application/manifest+json; charset=utf-8'],
   ['.wasm', 'application/wasm'],
   ['.pck', 'application/octet-stream'],
   ['.png', 'image/png'],

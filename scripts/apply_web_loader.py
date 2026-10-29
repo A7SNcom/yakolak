@@ -562,6 +562,80 @@ def copy_setup_assets() -> str:
     ))).hexdigest()[:12]
 
 
+def write_pwa(html: str) -> str:
+    """Installable app with a complete, release-consistent offline shell.
+
+    Updates wait for all old app windows to close: never mix an old pack with
+    a new engine or reload an active multiplayer match to activate an update.
+    Only same-origin static shell files are cached; WebRTC remains live.
+    """
+    web = ROOT / "web"
+    for size in (180, 192, 512):
+        shutil.copyfile(ROOT / f"ui/pwa-icons/icon-{size}.png", web / f"icon-{size}.png")
+    manifest = {
+        "id": "./", "name": "ياكلك", "short_name": "ياكلك", "lang": "ar", "dir": "rtl",
+        "start_url": "./", "scope": "./", "display": "standalone",
+        "background_color": "#05070a", "theme_color": "#05070a",
+        "icons": [{"src": f"icon-{n}.png", "sizes": f"{n}x{n}", "type": "image/png", "purpose": "any maskable"} for n in (192, 512)]
+    }
+    (web / "manifest.webmanifest").write_text(json.dumps(manifest, ensure_ascii=False, indent=2)+"\n")
+    markup = '''<link id="yakolak-pwa" rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#05070a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ياكلك">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icon-180.png">
+<script id="yakolak-pwa-registration">
+if ('serviceWorker' in navigator && window.isSecureContext) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./app-sw.js', {scope:'./',updateViaCache:'none'}).catch(e => console.warn('App installation unavailable:', e.message)));
+}
+</script>
+'''
+    html = re.sub(r'<link id="yakolak-pwa".*?</script>\s*', '', html, flags=re.S)
+    html = html.replace('</head>', markup+'\n</head>', 1)
+    config = json.loads(re.search(r'const GODOT_CONFIG\s*=\s*(\{[^\n]+\})\s*;', html).group(1))
+    pack = config.get("mainPack", "index.pck")
+    bundles = re.findall(r"online-trystero-[a-f0-9]{12}\.mjs", (web / "visual-setup.mjs").read_text())
+    assets = ["index.html", "index.js", "index.wasm", pack,
+              "index.audio.worklet.js", "index.audio.position.worklet.js", "visual-setup.mjs", "visual-setup.css",
+              "setup-font.otf", "yakolak-logo.svg", "vendor/liquefy-core-1.1.0.mjs", "manifest.webmanifest",
+              "icon-180.png", "icon-192.png", "icon-512.png", *bundles]
+    assets = list(dict.fromkeys(assets))
+    # The hash includes every shipping shell resource, including HTML.
+    digest = hashlib.sha256(html.encode())
+    for name in assets:
+        if name != "index.html": digest.update((web / name).read_bytes())
+    version = digest.hexdigest()[:16]
+    worker = '''const CACHE = 'yakolak-app-__VERSION__';
+const FILES = __FILES__;
+const base = new URL('./', self.location.href);
+const shell = new Set(FILES.map(f => new URL(f, base).href));
+self.addEventListener('install', e => e.waitUntil((async () => {
+  const cache = await caches.open(CACHE);
+  try { await cache.addAll(FILES.map(f => new Request(new URL(f, base), {cache:'reload'}))); }
+  catch (error) { await caches.delete(CACHE); throw error; }
+})()));
+self.addEventListener('activate', e => e.waitUntil((async () => {
+  for (const key of await caches.keys()) if (key.startsWith('yakolak-app-') && key !== CACHE) await caches.delete(key);
+})()));
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+  if (url.origin !== base.origin) return;
+  const navigation = e.request.mode === 'navigate' && (url.pathname === base.pathname || url.pathname === new URL('index.html', base).pathname);
+  url.search = ''; url.hash = '';
+  if (!navigation && !shell.has(url.href)) return;
+  e.respondWith((async () => {
+    const cached = await (await caches.open(CACHE)).match(navigation ? new URL('index.html', base).href : url.href);
+    return cached || fetch(e.request);
+  })());
+});
+'''.replace('__VERSION__', version).replace('__FILES__', json.dumps(assets))
+    (web / "app-sw.js").write_text(worker)
+    return html
+
+
 def main() -> None:
     html = INDEX.read_text(encoding="utf-8")
     if "yakolak-v130-loading-star-style" in html:
@@ -584,7 +658,7 @@ def main() -> None:
         )
         if css_count != 1 or script_count != 1:
             raise RuntimeError("existing setup asset references missing")
-        INDEX.write_text(inject_startup_failure(html), encoding="utf-8", newline="\n")
+        INDEX.write_text(write_pwa(inject_startup_failure(html)), encoding="utf-8", newline="\n")
         print(f"YAKOLAK_WEB_SETUP_ASSETS_REFRESHED version={setup_version}")
         return
     semantic_markers = (
@@ -625,7 +699,7 @@ def main() -> None:
     write_surface_preview(setup_version)
     html = html.replace("</head>", f'<link rel="stylesheet" href="visual-setup.css?v={setup_version}">\n</head>', 1)
     html = html.replace("</body>", f'<script type="module" src="visual-setup.mjs?v={setup_version}"></script>\n</body>', 1)
-    INDEX.write_text(inject_startup_failure(html), encoding="utf-8", newline="\n")
+    INDEX.write_text(write_pwa(inject_startup_failure(html)), encoding="utf-8", newline="\n")
     print("YAKOLAK_BALANCED_BRAND_LOADER_WITH_CANONICAL_SVG_HANDOFF_AND_SEMANTIC_DOM_INJECTED")
 
 

@@ -5,7 +5,7 @@
     "title": "البرج",
     "slogan": "هبطهم من برجك!",
     "description": "صغير ووسط وكبير، من نفس اللون وفي نفس الخانة.",
-    "winner": "%s هبطكم من برجه",
+    "winner": "%s هبطكم من البرج",
     "moves": [{"cell": 4, "size": "small"}, {"cell": 4, "size": "medium"}, {"cell": 4, "size": "large"}]
   },
   {
@@ -23,7 +23,7 @@
     "title": "السطر",
     "slogan": "سطرهم تستطير",
     "description": "ثلاثة من نفس الحجم واللون على خط: صف أو عمود أو قطر.",
-    "winner": "%s سطركم تسيطير",
+    "winner": "%s سطركم تستطير !",
     "moves": [{"cell": 6, "size": "large"}, {"cell": 7, "size": "large"}, {"cell": 8, "size": "large"}]
   }
 ]

@@ -115,7 +115,7 @@ func _run() -> void:
 	game.call("_set_victory_mix",1.0)
 	var winning: Array = game.get("winning_piece_indices").duplicate()
 	for index: int in game.get("occupied_slots").values():
-		_expect(_piece(index).visible==winning.has(index),"full fade hides only nonwinning board stones")
+		_expect(_piece(index).visible,"victory keeps every board stone visible")
 	_accept(cases.vote)
 	game.call("_set_victory_mix",1.0)
 	for index: int in winning:
@@ -124,7 +124,7 @@ func _run() -> void:
 	_accept(cases.vote)
 	await create_timer(0.12).timeout
 	for index: int in game.get("victory_materials"):
-		_expect(not _piece(index).visible and _piece(index).position.y>40.0,"late presence cannot restart a completed victory departure")
+		_expect(_piece(index).visible and _piece(index).material_override.albedo_color.r<0.05,"late presence keeps nonwinners dark and visible")
 	# Recovery hydrates truth without replaying already committed moves.
 	online.set("reconnecting",true)
 	_accept(cases.two[5])
@@ -255,6 +255,14 @@ func _run() -> void:
 	renamed.players[1].name="سارة"
 	_accept(renamed,"p2")
 	_expect(str(hud.get("indicator_label").text)=="دور سارة","same-seat name update is part of the authoritative signal")
+	_clean()
+	game.set("_rm_enabled",true)
+	_accept(cases.automatic[0],"p1")
+	_expect(game._should_host_online({"automatic_room":true,"players":[{"mode":"local"},{"mode":"bot"}]}),"automatic room starts through the existing authority even with no guest")
+	_expect(game._online_controls_seat("p1") and game._current_mode()=="local","host owns the first shared-device human")
+	_accept(cases.automatic[1],"p1")
+	_expect(game._online_controls_seat("p2") and game._current_mode()=="local" and game._current_direction()=="back","same host device can play the second human without waiting for a remote peer")
+	_expect(str(game.turn_camera_direction)=="back","automatic all-local room preserves pass-and-play camera handoff")
 	intro.queue_free()
 	await process_frame
 	if failures.is_empty(): print("YAKOLAK_ONLINE_PRESENTATION_OK checks=%d fixed-seat+incremental-arcs+visible-winners" % checks)
