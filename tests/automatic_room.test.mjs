@@ -22,7 +22,7 @@ test('strict invitation seats retain their original wait-for-guest behavior',()=
  const c=roster(2);c.players[1].mode='online';const a=room(c);assert.equal(a.start(c).status,'waiting');assert.equal(join(a,'g','blue').room.status,'playing');
 });
 import {JSDOM} from 'jsdom';
-import {mountSetup} from '../ui/visual-setup.mjs';
+import {mountSetup,restoreSetup,configuration} from '../ui/visual-setup.mjs';
 const tick=()=>new Promise(r=>setTimeout(r,5));
 test('setup advertises a real room automatically and starts without waiting for a guest',async()=>{
  const dom=new JSDOM('<body/>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});const w=dom.window,events=[];
@@ -49,4 +49,9 @@ test('a guest leaving setup restores the same human seat to local play',()=>{
  r=a.command('g','leave',{epoch:a.epoch,mutationId:'l'.repeat(48),version:a.state.version});
  assert.equal(a.slot('p2').mode,'local');assert.equal(a.slot('p2').controller,'p1');assert.equal(a.preview().availableColors.includes('blue'),true);assert.equal(r.players.length,2);
  assert.equal(a.start({rounds:3,players:r.slots.map(s=>({...s,label:s.name}))}).status,'playing');
+});
+
+test('returning from an automatic room preserves computers and releases old guest ownership',()=>{
+ const state=restoreSetup({rounds:3,players:[{color:'marble',mode:'local',kind:'local',label:'أحمد'},{color:'blue',mode:'online',kind:'bot',label:'كمبيوتر أزرق'},{color:'gold',mode:'online',kind:'online',controller:'p3',label:'ريم'}]});
+ const c=configuration(state);assert.deepEqual(c.players.map(p=>p.mode),['local','bot','local']);assert.equal(c.players[2].label,'ريم');assert.equal(c.players[2].joinable,true);assert.equal(c.players[2].device_owner,'p1');
 });
