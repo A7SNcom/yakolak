@@ -120,7 +120,10 @@ export function restoreSetup(config, fallbackName='') {
   let state=chooseCount(confirmColor(chooseColor(newSetup(players[0].label||fallbackName),players[0].color)),players.length);
   return {...state,rounds:[3,5].includes(config.rounds)?config.rounds:3,seats:state.seats.map(seat=>{
     const player=players.find(p=>p.color===seat.color);
-    return player?{...seat,mode:['bot','online'].includes(player.mode)?player.mode:'local',name:player.mode==='bot'?'':String(player.label||'').slice(0,24),owner:player.device_owner||'p1'}:{...seat,mode:'none',name:''};
+    // A fresh setup is no longer bound to the previous room's peer identities.
+    // Online gameplay labels bots as mode=online, with their actual kind separate.
+    const mode=player?.kind==='bot'?'bot':player?.kind==='online'?'local':['bot','online'].includes(player?.mode)?player.mode:'local';
+    return player?{...seat,mode,name:mode==='bot'?'':String(player.label||'').slice(0,24),owner:player.kind?'p1':player.device_owner||'p1'}:{...seat,mode:'none',name:''};
   })};
 }
 
