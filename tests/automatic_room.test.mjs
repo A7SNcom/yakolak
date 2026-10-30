@@ -55,3 +55,14 @@ test('returning from an automatic room preserves computers and releases old gues
  const state=restoreSetup({rounds:3,players:[{color:'marble',mode:'local',kind:'local',label:'أحمد'},{color:'blue',mode:'online',kind:'bot',label:'كمبيوتر أزرق'},{color:'gold',mode:'online',kind:'online',controller:'p3',label:'ريم'}]});
  const c=configuration(state);assert.deepEqual(c.players.map(p=>p.mode),['local','bot','local']);assert.equal(c.players[2].label,'ريم');assert.equal(c.players[2].joinable,true);assert.equal(c.players[2].device_owner,'p1');
 });
+
+test('host can leave the lobby and a stale room creation cannot reopen it',async()=>{
+ const dom=new JSDOM('<body/>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});const w=dom.window,events=[];
+ w.yakolakVisualSetupAction=s=>events.push(JSON.parse(s));let finish,leaves=0;
+ const client={role:'host',code:'007',subscribe(){},prepareHost(){return new Promise(resolve=>{finish=resolve})},async leave(){leaves++;this.role='';this.code='';}};
+ const api=mountSetup(w.document,w,client);api.open({online:true,resume:roster(2)});await tick();
+ const exit=w.document.querySelector('.yk-exit-room');assert.equal(exit.hidden,false);exit.click();await tick();
+ assert.equal(leaves,1);assert.equal(w.document.querySelector('#yakolakVisualSetup').dataset.step,'entry');
+ finish({code:'007',players:[],slots:[]});await tick();assert.equal(w.document.querySelector('#yakolakVisualSetup').dataset.step,'entry');assert.equal(w.document.querySelector('.yk-room-code').textContent,'—');
+ assert.equal(events.some(e=>e.action==='start'),false);dom.window.close();
+});
