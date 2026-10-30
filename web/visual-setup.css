@@ -154,3 +154,5 @@
 #yakolakVisualSetup[data-guest=color] .is-reserved .yk-seat-status{position:relative;z-index:1;font-weight:500;line-height:1.5;direction:rtl;unicode-bidi:isolate;transform:translateY(var(--yk-bow,0px));}
 #yakolakVisualSetup[data-guest=color] .is-reserved .yk-seat-arrow,#yakolakVisualSetup[data-guest=waiting] .yk-seat-arrow{visibility:hidden;}
 #yakolakVisualSetup .yk-seat[aria-disabled=true]{cursor:default;}
+
+#yakolakVisualSetup .yk-exit-room{pointer-events:auto;min-height:44px;font-size:15px;}

@@ -187,10 +187,11 @@ export function mountSetup(document, window, client=P2P) {
   for(const d of ['M12 16V3','m7 8 5-5 5 5','M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6']){const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',d);svg.append(path);}shareIcon.append(svg);
   const code=el('span','yk-room-code','—');code.dir='ltr';sharing.append(shareIcon,code);
   const start=button('ابدأ اللعب',()=>{if(guestPhase){void leaveGuestLobby();return;}const problem=configurationError(state,capabilities);if(problem){showError(problem);return;}closeSheet();go('rounds');},'yk-primary yk-start');
+  const exitRoom=button('مغادرة الغرفة',()=>{void leaveGuestLobby();},'yk-outline yk-exit-room');
   const rounds=el('div','yk-rounds');rounds.setAttribute('role','group');rounds.setAttribute('aria-label','أشواط الفوز');
   [3,5].forEach(n=>{const b=button(String(n),()=>beginMatch(n),'yk-choice');b.setAttribute('aria-label',`الفوز بـ ${n} أشواط`);rounds.append(b);});
   const errors=el('div','yk-error');errors.setAttribute('role','status');errors.setAttribute('aria-live','polite');
-  actions.append(entry,confirm,counts,sharing,start,rounds,errors);
+  actions.append(entry,confirm,counts,sharing,start,rounds,exitRoom,errors);
   const modal=el('div','yk-modal');modal.hidden=true;
   const sheet=el('section','yk-sheet');sheet.setAttribute('role','dialog');sheet.setAttribute('aria-labelledby','ykSheetTitle');modal.append(sheet);
   root.append(header,seats,actions,modal);document.body.append(root);
@@ -409,6 +410,7 @@ export function mountSetup(document, window, client=P2P) {
     prompt.hidden=!prompt.textContent;
     entry.hidden=state.step!=='entry';confirm.hidden=!hostAwaitingStart&&(state.step!=='color'||!state.selectedColor);confirm.textContent=hostAwaitingStart?'إلغاء الانتظار':'تأكيد';
     counts.hidden=state.step!=='count';start.hidden=state.step!=='ready'&&guestPhase!=='color';sharing.hidden=state.step!=='ready';start.disabled=networkBusy||hostAwaitingStart||guestBusy||pending;rounds.hidden=state.step!=='rounds';
+    exitRoom.hidden=!!guestPhase||!['ready','rounds'].includes(state.step);
     start.textContent=guestPhase?'مغادرة الغرفة':hostAwaitingStart?'بانتظار اكتمال اللاعبين…':'ابدأ اللعب';confirm.disabled=guestBusy;
     code.textContent=networkBusy?'…':roomCode||'—';sharing.classList.toggle('is-unavailable',!roomCode);sharing.disabled=!roomCode||networkBusy;sharing.setAttribute('aria-disabled',String(!roomCode));
     [...rounds.children].forEach(b=>b.disabled=pending);
@@ -576,7 +578,7 @@ export function mountSetup(document, window, client=P2P) {
   }
   async function leaveGuestLobby(){
     const leavingCode=client?.code||roomCode;
-    flowGeneration++;hostAwaitingStart=false;guestPhase='';guestPreview=null;guestBusy=false;roomCode='';state=newSetup(profile?.name||state.name);clearError();render();notify('preview');
+    flowGeneration++;hostAwaitingStart=false;guestPhase='';guestPreview=null;guestBusy=false;networkBusy=false;pending=false;moving=false;lobbySignature='';roomCode='';state=newSetup(profile?.name||state.name);clearError();render();notify('preview');
     try{await client?.leave();for(const key of ['yakolak-p2p:','yakolak-online:'])window.sessionStorage.removeItem(key+leavingCode);const u=new URL(window.location.href);u.searchParams.delete('room');window.history.replaceState(null,'',u);}catch{}
   }
   function openJoin(invitation=''){
