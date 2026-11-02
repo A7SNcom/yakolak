@@ -494,7 +494,7 @@ func _sync_round_marker_selection() -> void:
 		if material == null: continue
 		var selected := wins == visual_selected_rounds
 		var plate_color := Color("#4a4336") if selected else Color("#28292c")
-		var numeral_color := Color("#e8e4dc") if selected else Color("#c1c7cc")
+		var numeral_color := Color("#34383e") if selected else Color("#626a73")
 		var caption := marker.get_node_or_null("Caption") as Label3D
 		var old: Tween = visual_round_marker_selection_tweens.get(wins)
 		if old != null and old.is_valid(): old.kill()
@@ -552,7 +552,7 @@ func _create_round_markers() -> void:
 		var number_bounds := number_mesh.get_aabb()
 		numeral.position = Vector3(0.0, -number_bounds.position.y + 0.015, 0.0)
 		var number_material := StandardMaterial3D.new()
-		number_material.albedo_color = Color("#e8e4dc" if selected else "#c1c7cc")
+		number_material.albedo_color = Color("#34383e" if selected else "#626a73")
 		number_material.metallic = 0.0
 		number_material.roughness = 0.82
 		number_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -562,13 +562,13 @@ func _create_round_markers() -> void:
 		caption.name = "Caption"
 		caption.text = "أشواط"
 		caption.font = visual_font
-		caption.font_size = 64
-		caption.pixel_size = 0.008
-		caption.outline_size = 3
-		caption.outline_modulate = Color(0.08, 0.08, 0.08, 0.82)
+		caption.font_size = 72
+		caption.pixel_size = 0.010
+		caption.outline_size = 1
+		caption.outline_modulate = Color(1.0, 1.0, 1.0, 0.35)
 		caption.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		caption.position = Vector3(-number_bounds.size.x * 0.65, 0.18, 0.25)
-		caption.modulate = Color("#e8e4dc" if selected else "#c1c7cc")
+		caption.position = Vector3(-number_bounds.size.x * 0.85 - 0.35, 0.48, 0.35)
+		caption.modulate = Color("#34383e" if selected else "#626a73")
 		marker.add_child(caption)
 		intro.add_child(marker)
 		visual_round_markers[wins] = marker
