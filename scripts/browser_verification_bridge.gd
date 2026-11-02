@@ -136,11 +136,6 @@ func _on_a11y_action_requested(arguments: Array) -> void:
 			if active_screen == "question":
 				setup.call("_open_first_run_setup", true)
 				accepted = true
-		"count-2", "count-3", "count-4":
-			if active_screen == "setup" and wizard_step == "count":
-				var count: int = int({"count-2": 2, "count-3": 3, "count-4": 4}[action])
-				setup.call("_choose_player_count", count)
-				accepted = true
 		"cancel":
 			var close_button: Variant = setup.get("dialog_close_button")
 			if close_button is BaseButton and (close_button as BaseButton).is_visible_in_tree() and not (close_button as BaseButton).disabled:

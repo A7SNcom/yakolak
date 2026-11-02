@@ -25,17 +25,19 @@ func _prepare_first_run_question() -> void:
 	room_preview_ready = false
 	room_preview_code = ""
 	tutorial_requested = false
-	custom_setup_active = false
-	wizard_history.clear()
-	_reset_seats()
-	wizard_step = "count"
+	_prepare_default_open_roster()
 	_show_knowledge_question()
 
 
 func _start_new_game_flow() -> void:
-	# Returning from the entry chooser must follow the same first-run contract;
-	# never bypass the knowledge decision through the inherited later-flow path.
-	_prepare_first_run_question()
+	joining_room_code = ""
+	online_error_text = ""
+	join_available_colors.clear()
+	room_preview_ready = false
+	room_preview_code = ""
+	tutorial_requested = false
+	_prepare_default_open_roster()
+	_show_setup()
 
 
 func _show_knowledge_question() -> void:
@@ -61,9 +63,7 @@ func _show_knowledge_question() -> void:
 
 
 func _open_first_run_setup(with_tutorial: bool) -> void:
-	# Do not call the inherited `_open_setup()`: the older split-wizard layer
-	# forces `color` as its entry step. The current flow owns structural choices
-	# first, so answer the knowledge question and open `count` directly.
+	# New games begin with three open online seats and per-seat local choices.
 	joining_room_code = ""
 	online_error_text = ""
 	join_available_colors.clear()
@@ -71,9 +71,7 @@ func _open_first_run_setup(with_tutorial: bool) -> void:
 	room_preview_code = ""
 	tutorial_requested = with_tutorial
 	_publish_learning_choice("learn" if with_tutorial else "skip")
-	custom_setup_active = false
-	wizard_history.clear()
-	wizard_step = "count"
+	_prepare_default_open_roster()
 	_show_setup()
 
 

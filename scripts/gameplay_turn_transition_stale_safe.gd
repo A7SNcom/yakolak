@@ -321,7 +321,7 @@ func _layout_quick_menu() -> void:
 	quick_button.size = button_size
 	quick_button.add_theme_font_size_override("font_size", _hud_font_size(14))
 	quick_panel.position = Vector2(panel_x, top + button_size.y + _hud_length(8.0))
-	var action_count: int = 3 if quick_round_button != null and quick_round_button.visible else 2
+	var action_count: int = 3 if quick_exit_button != null and quick_exit_button.visible else 2
 	quick_panel.size = Vector2(panel_width, _hud_length(18.0 + float(action_count) * 55.0))
 	for child: Node in quick_panel.get_children():
 		if child is VBoxContainer:

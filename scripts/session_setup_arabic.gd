@@ -229,10 +229,8 @@ func _build_mode_question(content: VBoxContainer, seat_index: int) -> void:
 	content.add_child(row)
 
 
-func _choose_player_count(count: int) -> void:
-	super._choose_player_count(count)
-	if OS.has_feature("web"):
-		JavaScriptBridge.eval("document.body.dataset.yakolakSetupPlayerCount='" + str(count) + "';", true)
+func _choose_player_count(_count: int) -> void:
+	super._choose_player_count(4)
 
 
 func _choose_mode(seat_index: int, mode: String) -> void:
@@ -251,22 +249,10 @@ func _choose_rounds(value: int) -> void:
 	super._choose_rounds(value)
 
 
-func _on_web_start_online_setup(arguments: Array) -> void:
+func _on_web_start_online_setup(_arguments: Array) -> void:
 	if not showing:
 		return
-	var count: int = 3
-	if not arguments.is_empty():
-		count = clampi(int(arguments[0]), 2, 4)
-	joining_room_code = ""
-	tutorial_requested = false
-	online_error_text = ""
-	rounds = 3
-	wizard_history.clear()
-	_reset_seats()
-	# Exercise the exact same semantic handlers used by the visible wizard.
-	_choose_player_count(count)
-	_choose_mode(1, "online")
-	_choose_rounds(3)
+	_start_new_game_flow()
 
 
 func _arabic_digit(value: int) -> String:

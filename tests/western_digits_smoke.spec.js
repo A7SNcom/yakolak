@@ -217,16 +217,12 @@ async function expectVisibleWesternDigits(page, context) {
 async function startFourPlayerOnline(page) {
   await waitForFastIntro(page);
   await page.evaluate(() => window.yakolakTestSetupFlowAction('new'));
-  await page.waitForFunction(() => document.body.dataset.yakolakSetupFlowStage === 'count');
-  let records = await expectVisibleWesternDigits(page, 'setup player-count screen');
-  expect(records.some(record => WESTERN_DIGITS.test(String(record.text || '')))).toBe(true);
-
-  await page.evaluate(() => window.yakolakTestSetupFlowAction('count', 4));
   await page.waitForFunction(() => document.body.dataset.yakolakSetupFlowStage === 'mode:1');
-  records = await expectVisibleWesternDigits(page, 'setup player-label/mode screen');
-  expect(records.some(record => String(record.text || '').includes('2'))).toBe(true);
+  let records = await expectVisibleWesternDigits(page, 'setup open-roster screen');
+  expect(records.some(record => String(record.text || '').includes('فاضي'))).toBe(true);
+  expect(records.some(record => String(record.text || '').includes('كم لاعب؟'))).toBe(false);
 
-  await page.evaluate(() => window.yakolakTestSetupFlowAction('mode', 1, 'online'));
+  await page.evaluate(() => window.yakolakTestSetupFlowAction('all-online'));
   await page.waitForFunction(() => document.body.dataset.yakolakSetupFlowStage === 'rounds');
   records = await expectVisibleWesternDigits(page, 'setup match-target screen');
   expect(records.some(record => WESTERN_DIGITS.test(String(record.text || '')))).toBe(true);

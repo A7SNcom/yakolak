@@ -1,9 +1,14 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {RoomAuthority} from '../ui/p2p-authority.mjs';
+import {JSDOM} from 'jsdom';
+import {mountSetup,restoreSetup,configuration} from '../ui/visual-setup.mjs';
+
 const roster=(count=4)=>({rounds:3,players:Array.from({length:count},(_,i)=>({color:['marble','blue','gold','green'][i],label:`local-${i}`,mode:'local',joinable:i>0}))});
 const room=config=>new RoomAuthority({code:'007',epoch:'e'.repeat(48),peerId:'host',token:'h'.repeat(48),config});
 const join=(a,id,color)=>a.join(id,{token:id.repeat(48).slice(0,48),color,name:'ضيف '+id});
+const tick=()=>new Promise(r=>setTimeout(r,5));
+
 test('automatic human slots stay locally playable with no guests',()=>{
  for(const n of [2,3,4]){const a=room(roster(n));assert.equal(a.preview().availableColors.length,3);const r=a.start(roster(n));assert.equal(r.status,'playing');assert.ok(r.players.every(p=>p.controller==='p1'&&p.connected));assert.equal(r.paused,false);assert.equal(a.preview().availableColors.length,0);assert.throws(()=>join(a,'g','blue'),/room_not_waiting/);}
 });
@@ -21,26 +26,30 @@ test('concurrent claim and stale host edits cannot steal an admitted player',()=
 test('strict invitation seats retain their original wait-for-guest behavior',()=>{
  const c=roster(2);c.players[1].mode='online';const a=room(c);assert.equal(a.start(c).status,'waiting');assert.equal(join(a,'g','blue').room.status,'playing');
 });
-import {JSDOM} from 'jsdom';
-import {mountSetup,restoreSetup,configuration} from '../ui/visual-setup.mjs';
-const tick=()=>new Promise(r=>setTimeout(r,5));
-test('setup advertises a real room automatically and starts without waiting for a guest',async()=>{
+
+test('new room opens three online seats and accepts a mixed online, computer, and same-device roster',async()=>{
  const dom=new JSDOM('<body/>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});const w=dom.window,events=[];
- w.localStorage.setItem('yakolak-visitor-v1',JSON.stringify({name:'أحمد',phone:'0551234567'}));w.yakolakVisualSetupAction=s=>events.push(JSON.parse(s));let a,prepared=0,started=0;
- const client={subscribe(){},async prepareHost(c){prepared++;a=room(c);this.role='host';this.code='007';return a.snapshot()},async dispatch(k,p){assert.equal(k,'create');started++;return {ok:true,room:a.start({players:p.players,rounds:p.targetRounds})}}};
+ w.localStorage.setItem('yakolak-visitor-v1',JSON.stringify({name:'أحمد',phone:'0551234567'}));w.yakolakVisualSetupAction=s=>events.push(JSON.parse(s));let a,prepared=0,started=0,listener;
+ const client={role:'',code:'',subscribe(fn){listener=fn},async prepareHost(c){prepared++;a=room(c);this.role='host';this.code='007';return a.snapshot()},async dispatch(k,p){assert.equal(k,'create');started++;return {ok:true,room:a.start({players:p.players,rounds:p.targetRounds})}}};
  const api=mountSetup(w.document,w,client);api.open({online:true});const q=s=>w.document.querySelector(s);
- q('.yk-entry button').click();q('[data-color=marble]').click();q('.yk-confirm').click();q('.yk-counts button').click();await tick();
- assert.equal(prepared,1);assert.equal(q('.yk-room-code').textContent,'007');assert.equal(q('.yk-sharing').disabled,false);
- q('[data-color=blue]').click();assert.deepEqual([...w.document.querySelectorAll('.yk-menu-item')].map(x=>x.textContent),['لاعب','كمبيوتر']);
- w.document.querySelector('.yk-menu-item').click();q('input[aria-label="اسم اللاعب"]').value='ريم';q('form').dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
- assert.equal(a.slot('p2').joinable,true);assert.equal(a.slot('p2').mode,'local');q('.yk-start').click();q('.yk-rounds button').click();await tick();
- assert.equal(started,1);assert.equal(a.snapshot().status,'playing');assert.equal(events.find(e=>e.action==='start').automatic_room,true);dom.window.close();
+ q('.yk-entry button').click();q('[data-color=marble]').click();q('.yk-confirm').click();await tick();
+ assert.ok(prepared>=1);assert.equal(q('#yakolakVisualSetup').dataset.step,'ready');assert.equal(q('.yk-room-code').textContent,'007');assert.equal(q('.yk-sharing').disabled,false);
+ assert.equal([...w.document.querySelectorAll('.yk-seat-status')].filter(x=>x.textContent==='فاضي').length,3);
+ const admitted=join(a,'g','blue').room;listener({role:'host',room:admitted});
+ assert.equal(q('[data-color=blue] .yk-seat-status').textContent,'ضيف g');
+ q('[data-color=gold]').click();assert.deepEqual([...w.document.querySelectorAll('.yk-menu-item')].map(x=>x.textContent),['كمبيوتر','لاعب في نفس الجهاز']);q('[data-color=gold] .yk-menu-item:first-child').click();
+ q('[data-color=green]').click();q('[data-color=green] .yk-menu-item:nth-child(2)').click();assert.equal(q('[data-color=green] .yk-seat-status').textContent,'لاعب');
+ q('.yk-start').click();q('.yk-rounds button').click();await tick();
+ const startedEvent=events.find(e=>e.action==='start');assert.equal(started,1);assert.equal(a.snapshot().status,'playing');assert.equal(startedEvent.automatic_room,true);assert.equal(startedEvent.players.length,4);assert.equal(startedEvent.players[1].label,'ضيف g');assert.equal(startedEvent.players[2].label,'كمبيوتر');assert.equal(startedEvent.players[3].label,'لاعب');dom.window.close();
 });
+
 test('failed public signaling never invents a room and preserves native local play',async()=>{
  const dom=new JSDOM('<body/>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});const w=dom.window,events=[];w.yakolakVisualSetupAction=s=>events.push(JSON.parse(s));
- const client={subscribe(){},async prepareHost(){throw new Error('signaling_unavailable')},async dispatch(){assert.fail('failed room must not start online')}};
+ const client={subscribe(){},async prepareHost(){throw new Error('signaling_unavailable')},async dispatch(){assert.fail('a fully local match must not use online dispatch')}};
  const api=mountSetup(w.document,w,client);api.open({online:true,resume:roster(2)});await tick();
- const q=s=>w.document.querySelector(s);assert.equal(q('.yk-room-code').textContent,'—');assert.equal(q('.yk-sharing').disabled,true);q('.yk-start').click();q('.yk-rounds button').click();await tick();assert.equal(events.find(e=>e.action==='start').automatic_room,false);dom.window.close();
+ const q=s=>w.document.querySelector(s);assert.equal(q('.yk-room-code').textContent,'—');assert.equal(q('.yk-sharing').disabled,true);
+ q('[data-color=gold]').click();q('[data-color=gold] .yk-menu-item:first-child').click();q('[data-color=green]').click();q('[data-color=green] .yk-menu-item:nth-child(2)').click();
+ q('.yk-start').click();q('.yk-rounds button').click();await tick();assert.equal(events.find(e=>e.action==='start').automatic_room,false);dom.window.close();
 });
 
 test('a guest leaving setup restores the same human seat to local play',()=>{
@@ -51,17 +60,18 @@ test('a guest leaving setup restores the same human seat to local play',()=>{
  assert.equal(a.start({rounds:3,players:r.slots.map(s=>({...s,label:s.name}))}).status,'playing');
 });
 
-test('returning from an automatic room preserves computers and releases old guest ownership',()=>{
+test('returning from an automatic room restores simple labels and releases old guest ownership',()=>{
  const state=restoreSetup({rounds:3,players:[{color:'marble',mode:'local',kind:'local',label:'أحمد'},{color:'blue',mode:'online',kind:'bot',label:'كمبيوتر أزرق'},{color:'gold',mode:'online',kind:'online',controller:'p3',label:'ريم'}]});
- const c=configuration(state);assert.deepEqual(c.players.map(p=>p.mode),['local','bot','local']);assert.equal(c.players[2].label,'ريم');assert.equal(c.players[2].joinable,true);assert.equal(c.players[2].device_owner,'p1');
+ const c=configuration(state);assert.deepEqual(c.players.map(p=>p.mode),['local','bot','local','online']);assert.deepEqual(c.players.map(p=>p.label),['أحمد','كمبيوتر','لاعب','فاضي']);assert.equal(c.players[2].device_owner,'p1');
 });
 
-test('host can leave the lobby and a stale room creation cannot reopen it',async()=>{
+test('host can leave from settings and a stale room preparation cannot reopen setup',async()=>{
  const dom=new JSDOM('<body/>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});const w=dom.window,events=[];
  w.yakolakVisualSetupAction=s=>events.push(JSON.parse(s));let finish,leaves=0;
  const client={role:'host',code:'007',subscribe(){},prepareHost(){return new Promise(resolve=>{finish=resolve})},async leave(){leaves++;this.role='';this.code='';}};
  const api=mountSetup(w.document,w,client);api.open({online:true,resume:roster(2)});await tick();
- const exit=w.document.querySelector('.yk-exit-room');assert.equal(exit.hidden,false);exit.click();await tick();
+ api.room({code:'007',players:[],slots:[]});w.document.querySelector('.yk-settings-toggle').click();
+ const exit=w.document.querySelector('.yk-setting-leave');assert.ok(exit);exit.click();await tick();
  assert.equal(leaves,1);assert.equal(w.document.querySelector('#yakolakVisualSetup').dataset.step,'entry');
  finish({code:'007',players:[],slots:[]});await tick();assert.equal(w.document.querySelector('#yakolakVisualSetup').dataset.step,'entry');assert.equal(w.document.querySelector('.yk-room-code').textContent,'—');
  assert.equal(events.some(e=>e.action==='start'),false);dom.window.close();

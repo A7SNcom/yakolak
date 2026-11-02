@@ -67,8 +67,8 @@ export function validProfile(value) {
   return !!value && typeof value.name === 'string' && value.name.trim().length >= 2 && value.name.trim().length <= 24 && /^[0-9]{7,15}$/.test(value.phone || '');
 }
 export function newSetup(name = '') {
-  return { step: 'entry', countChosen: false, selectedColor: '', hostColor: 'marble', rounds: 3, name,
-    seats: COLORS.map((color, i) => ({ color: color.id, mode: i === 0 ? 'local' : i === 1 ? 'bot' : 'none', name: i === 0 ? name : '', owner: 'p1' })) };
+  return { step: 'entry', selectedColor: '', hostColor: 'marble', rounds: 3, name,
+    seats: COLORS.map((color, i) => ({ color: color.id, mode: i === 0 ? 'local' : 'none', name: i === 0 ? name : '', owner: 'p1' })) };
 }
 export function chooseColor(state, color) {
   const start = COLORS.findIndex(x => x.id === color);
@@ -76,19 +76,14 @@ export function chooseColor(state, color) {
   return { ...state, hostColor: color, selectedColor: color, step: 'color', seats: state.seats.map((seat, i) => ({ ...seat, color: COLORS[(start + i) % 4].id })) };
 }
 export function confirmColor(state) {
-  return state.selectedColor ? { ...state, step: 'count' } : state;
-}
-export function chooseCount(state, count) {
-  if (![2, 3, 4].includes(count)) return state;
-  return { ...state, step: 'ready', countChosen: true, seats: state.seats.map((seat, i) => ({ ...seat, mode: i === 0 ? 'local' : i < count ? 'bot' : 'none', name: i === 0 ? state.name : '', owner: 'p1' })) };
+  return state.selectedColor ? { ...state, step: 'ready' } : state;
 }
 export function changeSeat(state, index, mode, name = '', owner = 'p1') {
   if (index < 1 || index > 3 || !['bot', 'online', 'local', 'none'].includes(mode)) return state;
   return { ...state, seats: state.seats.map((seat, i) => i === index ? { ...seat, mode, name: mode === 'local' ? name.trim().slice(0, 24) : '', owner: mode === 'local' ? owner : 'p1' } : seat) };
 }
 export function seatLabel(seat) {
-  const color = COLORS.find(x => x.id === seat.color)?.name || '';
-  return seat.mode === 'none' ? 'فاضي' : seat.mode === 'bot' ? `كمبيوتر ${color}` : seat.mode === 'online' ? seat.name.trim() || 'اونلاين' : seat.name.trim() || `لاعب ${color}`;
+  return seat.mode === 'none' || (seat.mode === 'online' && !seat.name.trim()) ? 'فاضي' : seat.mode === 'bot' ? 'كمبيوتر' : seat.mode === 'online' ? seat.name.trim() : seat.name.trim() || 'لاعب';
 }
 export function swapPlayers(state, target, source) {
   if (target === source || !state.seats[target] || state.seats[source]?.mode !== 'local') return state;
@@ -99,31 +94,32 @@ export function swapPlayers(state, target, source) {
   return {...state,seats,hostColor:seats[0].color};
 }
 export function configuration(state) {
-  return { tutorial: false, rounds: state.rounds, online_join_code: '', players: state.seats.filter(x => x.mode !== 'none').sort((a,b)=>{const order=state.onlineSeatOrder||state.seats.map(x=>x.color);const rank=c=>order.includes(c)?order.indexOf(c):4+state.seats.findIndex(x=>x.color===c);return rank(a.color)-rank(b.color)}).map((seat, i) => {
+  return { tutorial: false, rounds: state.rounds, online_join_code: '', players: [...state.seats].sort((a,b)=>{const order=state.onlineSeatOrder||state.seats.map(x=>x.color);const rank=c=>order.includes(c)?order.indexOf(c):4+state.seats.findIndex(x=>x.color===c);return rank(a.color)-rank(b.color)}).map((seat, i) => {
     const color = COLORS.find(x => x.id === seat.color);
-    return { seat: `p${i + 1}`, label: seatLabel(seat), mode: seat.mode,
-      color: color.id, color_name: color.name, direction: color.direction, device_owner: seat.owner, joinable: i > 0 && seat.mode === 'local' };
+    const mode=seat.mode==='none'?'online':seat.mode;
+    return { seat: `p${i + 1}`, label: seatLabel(seat), mode,
+      color: color.id, color_name: color.name, direction: color.direction, device_owner: seat.owner, joinable: false };
   }) };
 }
 export function configurationError(state, capabilities = {}) {
-  const active = state.seats.filter(x => x.mode !== 'none');
-  if (active.length < 2) return 'اختر لاعبين على الأقل';
-  if (active.some(x => x.mode === 'online' || (x.mode === 'local' && x.owner !== 'p1'))) {
-    if (!capabilities.online) return 'الأونلاين غير متاح حالياً';
-  }
+  const active=state.seats.filter(x=>x.mode!=='none');
+  const openOnline=state.seats.some(x=>x.mode==='none'||x.mode==='online');
+  if (openOnline&&!capabilities.online) return 'الأونلاين غير متاح حالياً';
+  if (active.length+(capabilities.online?state.seats.filter(x=>x.mode==='none').length:0)<2) return 'اختر لاعبين على الأقل';
+  if (active.some(x => x.mode === 'online' || (x.mode === 'local' && x.owner !== 'p1'))) if (!capabilities.online) return 'الأونلاين غير متاح حالياً';
   return '';
 }
 
 export function restoreSetup(config, fallbackName='') {
   const players=Array.isArray(config?.players)?config.players:[];
   if(players.length<2||players.length>4||!COLORS.some(c=>c.id===players[0]?.color))return newSetup(fallbackName);
-  let state=chooseCount(confirmColor(chooseColor(newSetup(players[0].label||fallbackName),players[0].color)),players.length);
+  let state=confirmColor(chooseColor(newSetup(players[0].label||fallbackName),players[0].color));
   return {...state,rounds:[3,5].includes(config.rounds)?config.rounds:3,seats:state.seats.map(seat=>{
     const player=players.find(p=>p.color===seat.color);
     // A fresh setup is no longer bound to the previous room's peer identities.
     // Online gameplay labels bots as mode=online, with their actual kind separate.
-    const mode=player?.kind==='bot'?'bot':player?.kind==='online'?'local':['bot','online'].includes(player?.mode)?player.mode:'local';
-    return player?{...seat,mode,name:mode==='bot'?'':String(player.label||'').slice(0,24),owner:player.kind?'p1':player.device_owner||'p1'}:{...seat,mode:'none',name:''};
+    const mode=player?.kind==='bot'?'bot':player?.kind==='online'?'local':['bot','online'].includes(player?.mode)?player.mode:player?'local':'none';
+    return player?{...seat,mode,name:mode==='bot'?'':mode==='local'&&player.seat==='p1'?String(player.label||'').slice(0,24):'',owner:player.kind?'p1':player.device_owner||'p1'}:{...seat,mode:'none',name:''};
   })};
 }
 
@@ -142,8 +138,9 @@ export function mountSetup(document, window, client=P2P) {
   try { const saved = JSON.parse(window.localStorage.getItem('yakolak-profiles-v2')); if (saved && typeof saved === 'object' && !Array.isArray(saved)) profiles = saved; } catch {}
   if (profile) profiles[profile.phone] = profile.name;
   let state = newSetup(profile?.name || '');
+  let preferences={graphics:'high',sound:true};try{const quality=window.localStorage.getItem('yakolak-graphics-quality');preferences.graphics=['high','medium','low'].includes(quality)?quality:'high';preferences.sound=window.localStorage.getItem('yakolak-sound-enabled')!=='false';}catch{}
   let capabilities = { online: false, mixed: false }, connections = [], geometry = {}, roomCode = '';
-  let pending = false, returnFocus = null, sheetGeneration = 0, moving = false, nameDraft = null, flowGeneration = 0, profileContinuation = null;
+  let pending = false, returnFocus = null, sheetGeneration = 0, moving = false, flowGeneration = 0, profileContinuation = null;
   let lastEntryRequest = '',inviteHandled=false,networkBusy=false;
   let lobbySignature='',guestPhase='',guestPreview=null,guestBusy=false,hostAwaitingStart=false;
   let lessonRequest='',lessonSerial=0,lessonClosing=false;
@@ -154,11 +151,17 @@ export function mountSetup(document, window, client=P2P) {
   const root = el('section','yk-setup'); root.id = 'yakolakVisualSetup'; root.dir = 'rtl'; root.hidden = true; root.setAttribute('aria-label','إعداد اللعبة');
   const header = el('header','yk-header');
   const identity = button('',()=>{if(!guestPhase&&!hostAwaitingStart&&!pending&&!moving&&!networkBusy)openProfile();},'yk-identity');
-  const prompt = el('h1','yk-sr-only'); prompt.id='ykPrompt'; prompt.setAttribute('aria-live','polite'); header.append(identity,prompt);
+  const settingsToggle=button('',event=>openSettings(event),'yk-settings-toggle');settingsToggle.setAttribute('aria-label','الإعدادات');settingsToggle.title='الإعدادات';
+  const gear=document.createElementNS('http://www.w3.org/2000/svg','svg');gear.setAttribute('viewBox','0 0 24 24');gear.setAttribute('aria-hidden','true');gear.setAttribute('fill','none');gear.setAttribute('stroke','currentColor');gear.setAttribute('stroke-width','1.6');gear.setAttribute('stroke-linecap','round');gear.setAttribute('stroke-linejoin','round');
+  gear.innerHTML='';
+  const gearBody=document.createElementNS(gear.namespaceURI,'path');gearBody.setAttribute('d','M12.22 2h-.44a2 2 0 0 0-2 1.72l-.22 1.57a7.05 7.05 0 0 0-1.28.74l-1.46-.62a2 2 0 0 0-2.48.91l-.22.38a2 2 0 0 0 .48 2.59l1.22.95a7 7 0 0 0 0 1.48l-1.22.95a2 2 0 0 0-.48 2.59l.22.38a2 2 0 0 0 2.48.91l1.46-.62a7.05 7.05 0 0 0 1.28.74l.22 1.57a2 2 0 0 0 2 1.72h.44a2 2 0 0 0 2-1.72l.22-1.57a7.05 7.05 0 0 0 1.28-.74l1.46.62a2 2 0 0 0 2.48-.91l.22-.38a2 2 0 0 0-.48-2.59l-1.22-.95a7 7 0 0 0 0-1.48l1.22-.95a2 2 0 0 0 .48-2.59l-.22-.38a2 2 0 0 0-2.48-.91l-1.46.62a7.05 7.05 0 0 0-1.28-.74l-.22-1.57a2 2 0 0 0-2-1.72z');
+  const gearCore=document.createElementNS(gear.namespaceURI,'circle');gearCore.setAttribute('cx','12');gearCore.setAttribute('cy','12');gearCore.setAttribute('r','3');
+  gear.append(gearBody,gearCore);settingsToggle.append(gear);
+  const prompt = el('h1','yk-sr-only'); prompt.id='ykPrompt'; prompt.setAttribute('aria-live','polite'); header.append(identity,settingsToggle,prompt);
   const seats = el('div','yk-seats');
   const seatButtons = COLORS.map(color=>{
     const b = button('', e=>{
-      if (pending||moving||networkBusy||guestBusy||hostAwaitingStart) return;
+      if (pending||moving||(networkBusy&&state.step!=='color')||guestBusy||hostAwaitingStart) return;
       if (state.step === 'color') {
         if(guestPhase==='color'&&!guestPreview?.availableColors?.includes(color.id))return;
         let selected=color.id;
@@ -166,7 +169,7 @@ export function mountSetup(document, window, client=P2P) {
         if(guestPhase==='color'){if(!guestPreview?.availableColors?.includes(selected))return;state={...state,selectedColor:selected};}
         else state=chooseColor(state,selected);
         clearError();render();notify('preview');
-      } else if (state.step==='ready'&&!guestPhase) openSeat(state.seats.findIndex(x=>x.color===color.id),b);
+      } else if (state.step==='ready'&&!guestPhase) {const index=state.seats.findIndex(x=>x.color===color.id);if(index>0&&!connections.some(x=>x.seat===`p${index+1}`))openSeat(index,b);}
     },'yk-seat');
     b.dataset.color=color.id; b.style.setProperty('--seat-color',color.hex);
     const status=el('span','yk-seat-status'), arrow=el('span','yk-seat-arrow','⌄');arrow.setAttribute('aria-hidden','true');
@@ -174,12 +177,12 @@ export function mountSetup(document, window, client=P2P) {
   });
   const actions = el('footer','yk-actions');
   const entry = el('div','yk-entry');
-  const create=button('غرفة جديدة',()=>requireProfile(()=>go('color')),'yk-primary');
+  const create=button('غرفة جديدة',()=>requireProfile(()=>{go('color');void prepareRoomEarly();}),'yk-primary');
   const join=button('انضمام لغرفة',()=>requireProfile(openJoin),'yk-outline');
-  const learn=button('كيف تفوز؟',openLesson,'yk-learn');entry.append(create,join,learn);
-  const confirm=button('تأكيد',()=>{if(hostAwaitingStart){void leaveGuestLobby();return;}if(guestPhase==='color'){void chooseGuestColor();return;}if(state.selectedColor)go('count');},'yk-primary yk-confirm');
-  const counts=el('div','yk-counts');counts.setAttribute('role','group');counts.setAttribute('aria-label','عدد اللاعبين');
-  [2,3,4].forEach(n=>{const b=button(String(n),()=>go(chooseCount(state,n)),'yk-choice');b.setAttribute('aria-label',`${n} لاعبين`);counts.append(b);});
+  const learn=button('كيف تنلعب؟',openLesson,'yk-learn');
+  const settingsHome=button('الإعدادات',openSettings,'yk-outline yk-settings-home');entry.append(create,join,learn,settingsHome);
+  const confirm=button('تأكيد',()=>{if(hostAwaitingStart){void leaveGuestLobby();return;}if(guestPhase==='color'){void chooseGuestColor();return;}if(state.selectedColor)go('ready');},'yk-primary yk-confirm');
+  const loading=el('div','yk-network-status','جارٍ تجهيز الاتصال…');loading.setAttribute('role','status');loading.setAttribute('aria-live','polite');loading.hidden=true;
   const sharing=button('',copyRoom,'yk-sharing');sharing.setAttribute('aria-label','نسخ رابط الغرفة');
   const shareIcon=el('span','yk-share-icon');
   // Code-native icon, with no external asset or user HTML.
@@ -187,22 +190,23 @@ export function mountSetup(document, window, client=P2P) {
   for(const d of ['M12 16V3','m7 8 5-5 5 5','M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6']){const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',d);svg.append(path);}shareIcon.append(svg);
   const code=el('span','yk-room-code','—');code.dir='ltr';sharing.append(shareIcon,code);
   const start=button('ابدأ اللعب',()=>{if(guestPhase){void leaveGuestLobby();return;}const problem=configurationError(state,capabilities);if(problem){showError(problem);return;}closeSheet();go('rounds');},'yk-primary yk-start');
-  const exitRoom=button('مغادرة الغرفة',()=>{void leaveGuestLobby();},'yk-outline yk-exit-room');
   const rounds=el('div','yk-rounds');rounds.setAttribute('role','group');rounds.setAttribute('aria-label','أشواط الفوز');
-  [3,5].forEach(n=>{const b=button(String(n),()=>beginMatch(n),'yk-choice');b.setAttribute('aria-label',`الفوز بـ ${n} أشواط`);rounds.append(b);});
+  [3,5].forEach(n=>{const b=button('',()=>beginMatch(n),'yk-choice yk-round-choice');b.setAttribute('aria-label',`الفوز بـ ${n} أشواط`);const numeral=el('span','yk-round-number',String(n));const label=el('span','yk-round-label','أشواط');b.append(numeral,label);rounds.append(b);});
   const errors=el('div','yk-error');errors.setAttribute('role','status');errors.setAttribute('aria-live','polite');
-  actions.append(entry,confirm,counts,sharing,start,rounds,exitRoom,errors);
+  actions.append(entry,confirm,loading,sharing,start,errors);
   const modal=el('div','yk-modal');modal.hidden=true;
   const sheet=el('section','yk-sheet');sheet.setAttribute('role','dialog');sheet.setAttribute('aria-labelledby','ykSheetTitle');modal.append(sheet);
-  root.append(header,seats,actions,modal);document.body.append(root);
+  root.append(header,seats,actions,rounds,modal);document.body.append(root);
   const lesson=el('section','yk-lesson');lesson.hidden=true;lesson.setAttribute('role','dialog');lesson.setAttribute('aria-modal','true');lesson.setAttribute('aria-labelledby','ykLessonTitle');
   const lessonBack=button('رجوع',()=>lessonCommand('learn-close'),'yk-lesson-back');
   const lessonHeading=el('div','yk-lesson-heading'),lessonCount=el('span','yk-lesson-count');lessonCount.dir='ltr';
   const lessonTitle=el('h2','yk-lesson-title');lessonTitle.id='ykLessonTitle';
-  const lessonSlogan=el('p','yk-lesson-slogan'),lessonDescription=el('p','yk-lesson-description');
+  const lessonSlogan=el('p','yk-lesson-slogan'),lessonDescription=el('p','yk-lesson-description'),lessonOutcome=el('p','yk-lesson-outcome');
+  lessonOutcome.hidden=true;lessonOutcome.setAttribute('aria-live','polite');
   lessonHeading.setAttribute('aria-live','polite');lessonHeading.append(lessonCount,lessonTitle,lessonSlogan);
+  const lessonTiming=el('p','yk-lesson-timing','لكل دور ٣٠ ثانية. أول من يكوّن نمطاً صحيحاً يفوز بالشوط، وتشرح النتيجة كيف فاز.');
   const lessonFooter=el('div','yk-lesson-footer'),lessonNext=button('',()=>lessonCommand('learn-next'),'yk-primary yk-lesson-next');
-  lessonFooter.append(lessonDescription,lessonNext);lesson.append(lessonBack,lessonHeading,lessonFooter);root.append(lesson);
+  lessonFooter.append(lessonDescription,lessonOutcome,lessonTiming,lessonNext);lesson.append(lessonBack,lessonHeading,lessonFooter);root.append(lesson);
   function lessonCommand(action){
     if(!lessonRequest||lessonClosing)return;
     if(action==='learn-next'||action==='learn-close'){lessonNext.disabled=true;lesson.setAttribute('aria-busy','true');}
@@ -227,9 +231,12 @@ export function mountSetup(document, window, client=P2P) {
     }
     const index=Math.max(0,Math.min(WIN_LESSONS.length-1,Number(update.stage)||0)),content=WIN_LESSONS[index];
     if(lesson.dataset.stage!==content.id){
-      lesson.dataset.stage=content.id;lessonCount.textContent=`${index+1} / ${WIN_LESSONS.length}`;lessonTitle.textContent=content.title;lessonSlogan.textContent=content.slogan;lessonDescription.textContent=content.description;
+      lesson.dataset.stage=content.id;lessonCount.textContent=`${index+1} / ${WIN_LESSONS.length}`;lessonTitle.textContent=content.title;lessonSlogan.textContent=content.slogan;lessonDescription.textContent=content.description;lessonOutcome.hidden=true;lessonOutcome.textContent='';
       animate(lessonHeading,[{opacity:0},{opacity:1}],220);
     }
+    const exampleWon=!update.busy&&typeof content.winner==='string';
+    lessonOutcome.hidden=!exampleWon;
+    lessonOutcome.textContent=exampleWon?content.winner.replace('%s','الأزرق'):'';
     lessonNext.textContent=index===WIN_LESSONS.length-1?'يلا نلعب':`التالي: ${WIN_LESSONS[index+1].title}`;
     lessonNext.disabled=!!update.busy;lesson.setAttribute('aria-busy',String(!!update.busy));
   }
@@ -298,7 +305,7 @@ export function mountSetup(document, window, client=P2P) {
     // Native blur gives Chromium and WebKit touch surfaces the same optical
     // backing; desktop retains the existing displacement lens.
     const touch=!!window.matchMedia?.('(pointer: coarse)').matches;
-    const nodes=[prompt,sheet,create,join,confirm,start,sharing,...counts.children,...rounds.children,...seatButtons.map(x=>x.b)];
+    const nodes=[prompt,sheet,create,join,learn,settingsHome,settingsToggle,confirm,start,sharing,...rounds.children,...seatButtons.map(x=>x.b)];
     for(const node of nodes){
       if(node===prompt)continue;
       const folded=node.classList.contains('yk-seat')||(node===sheet&&modal.dataset.kind==='seat');
@@ -316,7 +323,7 @@ export function mountSetup(document, window, client=P2P) {
   function clearError(){errors.textContent='';}
   function showError(text){pending=false;errors.textContent=text;render();}
   function notify(action,override={}){
-    const payload={action,...configuration(state),guest_mode:guestPhase,available_colors:guestPhase==='color'?guestPreview?.availableColors:undefined,reserved_colors:guestPhase==='color'?(guestPreview?.players||[]).map(p=>p.color):undefined,all_seats:state.seats,host_name:state.name,selected_color:state.selectedColor,count_chosen:state.countChosen,step:root.dataset.profile==='active'?'profile':state.step,overlay_open:!modal.hidden,...override};
+    const payload={action,...configuration(state),guest_mode:guestPhase,available_colors:guestPhase==='color'?guestPreview?.availableColors:undefined,reserved_colors:guestPhase==='color'?(guestPreview?.players||[]).map(p=>p.color):undefined,all_seats:state.seats,host_name:state.name,selected_color:state.selectedColor,graphics_quality:preferences.graphics,sound_enabled:preferences.sound,step:root.dataset.profile==='active'?'profile':state.step,overlay_open:!modal.hidden,...override};
     window.yakolakVisualSetupAction?.(JSON.stringify(payload));
   }
   function viewport(){const vv=window.visualViewport;const h=vv?.height||window.innerHeight;const base=Math.max(root.getBoundingClientRect().height||0,window.innerHeight);root.style.setProperty('--yk-vv-height',`${h}px`);root.style.setProperty('--yk-vv-top',`${vv?.offsetTop||0}px`);root.classList.toggle('is-keyboard',h<base*.78);position();}
@@ -354,10 +361,15 @@ export function mountSetup(document, window, client=P2P) {
     // The footer belongs to the layout viewport. Only the editing sheet follows
     // VisualViewport, so opening a keyboard never lifts Start/Share over the board.
     actions.style.top=`${centeredEntry?Math.max(16,(height-h)/2):Math.max(12,Math.min(target[1]*height,height-h-16))}px`;
+    rounds.style.visibility=state.step==='rounds'&&!geometry.rounds?'hidden':'';
+    for(const choice of rounds.children){
+      const point=geometry.rounds?.[choice.querySelector('.yk-round-number')?.textContent];
+      if(point){choice.style.left=`${point[0]*width}px`;choice.style.top=`${point[1]*height}px`;}
+    }
     const heading=geometry.prompt||[.5,.25];prompt.style.top=`${Math.max(20,heading[1]*height)}px`;
     refreshOrbitLayout();
     if(currentOrbit&&(state.step==='ready'||guestPhase==='color'))actions.style.top=`${Math.min(height-h-16,Math.max(parseFloat(actions.style.top),currentOrbit.cy+currentOrbit.ry+currentOrbit.thickness/2+18))}px`;
-    if(!modal.hidden && ['seat','name'].includes(modal.dataset.kind))positionSheet();
+    if(!modal.hidden && modal.dataset.kind==='seat')positionSheet();
 
   }
   function positionSheet(){
@@ -397,23 +409,52 @@ export function mountSetup(document, window, client=P2P) {
     if(!capabilities.online)return;
     const config=configuration(state),problem=configurationError(state,capabilities);
     if(problem){showError(problem);return;}
-    const signature=JSON.stringify(config);if(signature===lobbySignature&&client.code)return;
+    const signature=JSON.stringify(config);
+    if(!config.players.some(player=>player.mode==='online')){
+      if(client.role==='host'||roomCode){
+        networkBusy=true;render();const token=flowGeneration;
+        try{if(typeof client.close==='function')await client.close();else await client.leave?.();}
+        finally{if(token===flowGeneration&&!root.hidden){roomCode='';connections=[];lobbySignature='';networkBusy=false;render();}}
+      }
+      return;
+    }
+    if(signature===lobbySignature&&client.code)return;
     networkBusy=true;start.disabled=true;sharing.disabled=true;code.textContent='…';
     const token=flowGeneration;
     try{const room=await client.prepareHost(config);if(token!==flowGeneration||root.hidden)return;lobbySignature=signature;api.room(room);clearError();}
     catch(e){if(token===flowGeneration&&!root.hidden){showError(arabicNetworkError(e.message));if(client.session?.snapshot)api.room(client.session.snapshot);}}
     finally{networkBusy=false;start.disabled=false;render();}
   }
+  async function prepareRoomEarly(){
+    if(!client||networkBusy||root.hidden)return;
+    if(!capabilities.online){showError('الأونلاين غير متاح حالياً');return;}
+    networkBusy=true;render();const token=flowGeneration;
+    try{
+      let config=configuration(state),room=await client.prepareHost(config);
+      if(token!==flowGeneration||root.hidden)return;
+      // The host may choose a different color while signaling warms up. Update
+      // the room before publishing its code so the lobby never rolls that pick back.
+      const current=configuration(state);
+      if(JSON.stringify(current)!==JSON.stringify(config)){
+        config=current;
+        room=await client.prepareHost(config);
+        if(token!==flowGeneration||root.hidden)return;
+      }
+      lobbySignature=JSON.stringify(config);api.room(room);clearError();
+    }catch(e){if(token===flowGeneration&&!root.hidden)showError(arabicNetworkError(e.message));}
+    finally{networkBusy=false;render();if(state.step==='ready')void syncOnlineLobby();}
+  }
   function render(){
-    root.dataset.step=state.step;root.dataset.guest=guestPhase;identity.textContent=state.name;
-    prompt.textContent=({color:'اختر لونك',count:'كم لاعب؟',rounds:'كم شوط للفوز؟'}[state.step]||'');
+    root.dataset.step=state.step;root.dataset.guest=guestPhase;identity.textContent=state.name;identity.hidden=state.step==='entry'||!state.name;
+    prompt.textContent=({color:'اختر لونك',rounds:'كم شوط للفوز؟'}[state.step]||'');
     prompt.hidden=!prompt.textContent;
-    entry.hidden=state.step!=='entry';confirm.hidden=!hostAwaitingStart&&(state.step!=='color'||!state.selectedColor);confirm.textContent=hostAwaitingStart?'إلغاء الانتظار':'تأكيد';
-    counts.hidden=state.step!=='count';start.hidden=state.step!=='ready'&&guestPhase!=='color';sharing.hidden=state.step!=='ready';start.disabled=networkBusy||hostAwaitingStart||guestBusy||pending;rounds.hidden=state.step!=='rounds';
-    exitRoom.hidden=!!guestPhase||!['ready','rounds'].includes(state.step);
-    start.textContent=guestPhase?'مغادرة الغرفة':hostAwaitingStart?'بانتظار اكتمال اللاعبين…':'ابدأ اللعب';confirm.disabled=guestBusy;
+    entry.hidden=state.step!=='entry';confirm.hidden=state.step!=='color'||!state.selectedColor;confirm.textContent='تأكيد';
+    loading.hidden=!networkBusy;actions.setAttribute('aria-busy',String(networkBusy));settingsToggle.hidden=state.step==='entry'&&!roomCode;
+    create.disabled=networkBusy&&state.step==='entry';join.disabled=networkBusy;learn.disabled=networkBusy;settingsHome.disabled=networkBusy;
+    start.hidden=state.step!=='ready'||guestPhase==='color';sharing.hidden=state.step!=='ready'||!roomCode;start.disabled=networkBusy||hostAwaitingStart||guestPhase==='waiting'||guestBusy||pending;rounds.hidden=state.step!=='rounds';confirm.disabled=guestBusy||(networkBusy&&state.step!=='color');
+    start.textContent=guestPhase==='waiting'?'بانتظار المضيف…':hostAwaitingStart?'بانتظار اللاعبين…':'ابدأ اللعب';
     code.textContent=networkBusy?'…':roomCode||'—';sharing.classList.toggle('is-unavailable',!roomCode);sharing.disabled=!roomCode||networkBusy;sharing.setAttribute('aria-disabled',String(!roomCode));
-    [...rounds.children].forEach(b=>b.disabled=pending);
+    [...rounds.children].forEach(b=>{b.disabled=pending;b.setAttribute('aria-pressed',String(state.step==='rounds'&&Number(b.querySelector('.yk-round-number')?.textContent)===state.rounds));});
     for(const {b,status,color} of seatButtons){
       const index=state.seats.findIndex(x=>x.color===color.id),seat=state.seats[index];
       const reserved=guestPhase==='color'&&!guestPreview?.availableColors?.includes(color.id);
@@ -428,13 +469,14 @@ export function mountSetup(document, window, client=P2P) {
     refreshGlass();
   }
   function go(next){
-    if(moving||networkBusy)return;closeSheet();clearError();
     const target=typeof next==='string'?{...state,step:next}:next;
+    const canContinueToReady=state.step==='color'&&target.step==='ready';
+    if(moving||(networkBusy&&!canContinueToReady))return;closeSheet();clearError();
     const token=flowGeneration;
-    const apply=()=>{if(token!==flowGeneration||root.hidden)return;state=target;moving=false;delete root.dataset.moving;render();notify('preview');if(state.step==='ready')void syncOnlineLobby();animate(actions,[{opacity:0,transform:'translate(-50%,12px) scale(.985)'},{opacity:1,transform:'translate(-50%,0) scale(1)'}],420);};
+    const apply=()=>{if(token!==flowGeneration||root.hidden)return;state=target;moving=false;delete root.dataset.moving;render();notify('preview');if(state.step==='ready')void syncOnlineLobby();animate(actions,[{opacity:0,transform:'translate(-50%,8px) scale(.992)'},{opacity:1,transform:'translate(-50%,0) scale(1)'}],460);};
     if(!reduced()&&typeof actions.animate==='function'){
       moving=true;root.dataset.moving='true';notify('preview',{step:'transition'});
-      const motion=animate(actions,[{opacity:1,transform:'translate(-50%,0) scale(1)'},{opacity:0,transform:'translate(-50%,-8px) scale(.985)'}],240);motion.finished.then(apply,apply);
+      const motion=animate(actions,[{opacity:1,transform:'translate(-50%,0) scale(1)'},{opacity:0,transform:'translate(-50%,-5px) scale(.992)'}],320);motion.finished.then(apply,apply);
     }else apply();
   }
   function finishHostStart(){
@@ -443,15 +485,28 @@ export function mountSetup(document, window, client=P2P) {
     const done=()=>{if(token===flowGeneration&&!root.hidden)notify('start',{automatic_room:!!roomCode&&client?.role==='host'});};
     if(!reduced()&&typeof actions.animate==='function'){
       animate(prompt,[{opacity:1},{opacity:0}],300);
+      animate(rounds,[{opacity:1,transform:'scale(1)'},{opacity:0,transform:'scale(.98)'}],460);
       const motion=animate(actions,[{opacity:1,transform:'translate(-50%,0)'},{opacity:0,transform:'translate(-50%,8px)'}],480);motion.finished.then(done,done);
     }else done();
   }
   async function beginMatch(n){
-    if(pending||moving||networkBusy||hostAwaitingStart)return;state.rounds=n;
-    if(client&&(roomCode&&client.role==='host'||state.seats.some(s=>s.mode==='online'))){
+    if(pending||moving||networkBusy||hostAwaitingStart)return;state.rounds=n;pending=true;render();
+    notify('preview',{rounds:n});
+    const motions=[];
+    for(const choice of rounds.children){
+      const selected=Number(choice.querySelector('.yk-round-number')?.textContent)===n;
+      choice.classList.toggle('is-selected',selected);choice.setAttribute('aria-pressed',String(selected));
+      const motion=animate(choice,selected?[{opacity:1,transform:'translate(-50%,-50%) scale(1)'},{opacity:1,transform:'translate(-50%,-50%) scale(1.045)'}]:[{opacity:1,transform:'translate(-50%,-50%) scale(1)'},{opacity:0,transform:'translate(-50%,-58%) scale(.94)'}],380);
+      if(motion)motions.push(motion.finished.catch(()=>{}));
+    }
+    await Promise.all(motions);
+    if(root.hidden)return;
+    pending=false;render();
+    const configured=configuration(state);
+    if(client&&((roomCode&&client.role==='host')||configured.players.some(player=>player.mode==='online'))){
       const token=flowGeneration;networkBusy=true;render();
       try{
-        const c=configuration(state),reply=await client.dispatch('create',{players:c.players,targetRounds:n});
+        const reply=await client.dispatch('create',{players:configured.players,targetRounds:n});
         if(token!==flowGeneration||root.hidden)return;
         if(!reply?.ok)throw new Error(reply?.error||'online_timeout');
         hostAwaitingStart=reply.room.status==='waiting';state={...state,step:'ready'};api.room(reply.room);
@@ -472,13 +527,31 @@ export function mountSetup(document, window, client=P2P) {
     sheet.setAttribute('role','dialog');sheet.setAttribute('aria-labelledby','ykSheetTitle');sheet.removeAttribute('aria-label');sheet.getAnimations?.().forEach(x=>x.cancel());sheet.replaceChildren();sheet.style.left=sheet.style.top=sheet.style.width='';
     const h=el('h2','',title);h.id='ykSheetTitle';h.hidden=!title;sheet.append(h);
     modal.hidden=false;modal.dataset.kind=kind;root.dataset.overlay=kind;
-    const blocking=!['seat','name'].includes(kind);header.inert=seats.inert=actions.inert=blocking;sheet.setAttribute('aria-modal',String(blocking));
+    const blocking=kind!=='seat';header.inert=seats.inert=actions.inert=blocking;sheet.setAttribute('aria-modal',String(blocking));
     notify('preview');refreshGlass();animate(sheet,kind==='seat'?[{opacity:0},{opacity:1}]:[{opacity:0,transform:'translateY(8px) scale(.99)'},{opacity:1,transform:'none'}],200);
     return sheet;
   }
+  function applyPreferences(){
+    try{window.localStorage.setItem('yakolak-graphics-quality',preferences.graphics);window.localStorage.setItem('yakolak-sound-enabled',String(preferences.sound));}catch{}
+    notify('setting',{graphics_quality:preferences.graphics,sound_enabled:preferences.sound});
+  }
+  function openSettings(event){
+    openSheet('الإعدادات',event?.currentTarget||settingsToggle,'settings');
+    const heading=el('h3','','جودة الرسومات');heading.className='yk-settings-heading';sheet.append(heading);
+    const graphics=el('div','yk-settings-options');graphics.setAttribute('role','group');graphics.setAttribute('aria-label','جودة الرسومات');
+    for(const [value,label] of [['high','عالية'],['medium','متوسطة'],['low','منخفضة']]){
+      const option=button(label,()=>{preferences.graphics=value;applyPreferences();for(const item of graphics.children){const selected=item.dataset.quality===value;item.setAttribute('aria-pressed',String(selected));item.classList.toggle('is-selected',selected);}},'yk-choice yk-setting-choice');
+      option.dataset.quality=value;option.setAttribute('aria-pressed',String(preferences.graphics===value));option.classList.toggle('is-selected',preferences.graphics===value);graphics.append(option);
+    }
+    const sound=button(preferences.sound?'الصوت: يعمل':'الصوت: مكتوم',()=>{preferences.sound=!preferences.sound;sound.textContent=preferences.sound?'الصوت: يعمل':'الصوت: مكتوم';sound.setAttribute('aria-pressed',String(preferences.sound));applyPreferences();},'yk-outline yk-setting-sound');sound.setAttribute('aria-pressed',String(preferences.sound));
+    sheet.append(graphics,sound);
+    if(roomCode&&(state.step==='ready'||state.step==='rounds'||guestPhase)){
+      const leave=button('مغادرة الغرفة',()=>{closeSheet(true,()=>void leaveGuestLobby());},'yk-outline yk-setting-leave');sheet.append(leave);
+    }
+    positionSheet();
+  }
   function closeSheet(animated=false,after=()=>{}){
     if(modal.hidden){after();return;}
-    commitName();
     const token=++sheetGeneration;
     const finish=()=>{if(token!==sheetGeneration)return;modal.hidden=true;sheet.replaceChildren();delete root.dataset.profile;delete root.dataset.overlay;header.inert=seats.inert=actions.inert=false;returnFocus?.setAttribute?.('aria-expanded','false');returnFocus?.focus?.({preventScroll:true});render();notify('preview');after();if(state.step==='ready'&&!networkBusy)void syncOnlineLobby();};
     if(animated && !reduced()&&typeof sheet.animate==='function'){
@@ -519,31 +592,13 @@ export function mountSetup(document, window, client=P2P) {
     closeSheet(true,()=>{render();notify('preview');if(after)after();});
   }
   function openSeat(index,origin){
+    if(index<1||index>3||guestPhase||hostAwaitingStart)return;
     closeSheet();openSheet('',origin,'seat');sheet.setAttribute('aria-label',seatLabel(state.seats[index]));sheet.setAttribute('role','menu');sheet.removeAttribute('aria-labelledby');
     const choices=el('div','yk-menu');
     const item=(label,action,selected=false,parent=choices)=>{const b=button(label,action,'yk-menu-item');b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String(selected));addSurface(b);parent.append(b);return b;};
-    item('لاعب',()=>{
-      if(state.seats[index].mode==='online'){closeSheet(true);return;}
-      if(index>0)state=changeSeat(state,index,'local',state.seats[index].name);
-      playerName(index,origin);
-    },['local','online'].includes(state.seats[index].mode));
-    if(index>0&&state.seats[index].mode!=='online')item('كمبيوتر',()=>{state=changeSeat(state,index,'bot');closeSheet(true);},state.seats[index].mode==='bot');
+    item('كمبيوتر',()=>{state=changeSeat(state,index,state.seats[index].mode==='bot'?'none':'bot');closeSheet(true);},state.seats[index].mode==='bot');
+    item('لاعب في نفس الجهاز',()=>{state=changeSeat(state,index,state.seats[index].mode==='local'?'none':'local');closeSheet(true);},state.seats[index].mode==='local');
     sheet.append(choices);positionSheet();choices.querySelector('button').focus({preventScroll:true});
-  }
-  function playerName(index,origin){
-    openSheet('',origin,'name');sheet.setAttribute('aria-label','اسم اللاعب');sheet.removeAttribute('aria-labelledby');
-    const form=el('form','yk-form');form.noValidate=true;
-    const name=input('اسم اللاعب',{value:state.seats[index].name,placeholder:'اسم اللاعب',maxLength:24,autocomplete:'off'});name.field.enterKeyHint='done';
-    const inputRow=el('div','yk-name-input');inputRow.append(name.wrap);
-    const clearName=button('',()=>{name.field.value='';clearName.hidden=true;name.field.focus({preventScroll:true});},'yk-input-clear');
-    const clearSvg=document.createElementNS('http://www.w3.org/2000/svg','svg');clearSvg.setAttribute('viewBox','0 0 16 16');clearSvg.setAttribute('aria-hidden','true');const clearPath=document.createElementNS(clearSvg.namespaceURI,'path');clearPath.setAttribute('d','m4 4 8 8M12 4l-8 8');clearSvg.append(clearPath);clearName.append(clearSvg);
-    clearName.setAttribute('aria-label','مسح اسم اللاعب');clearName.hidden=!name.field.value;
-    name.field.addEventListener('input',()=>{clearName.hidden=!name.field.value;});inputRow.append(clearName);form.append(inputRow);
-    nameDraft={index,field:name.field};form.addEventListener('submit',e=>{e.preventDefault();name.field.blur();closeSheet(true);});sheet.append(form);positionSheet();name.field.focus({preventScroll:true});
-  }
-  function commitName(){
-    if(!nameDraft)return;const {index,field}=nameDraft;nameDraft=null;const value=field.value.trim().slice(0,24);
-    if(index===0){state.name=value;state.seats[0].name=value;}else state=changeSeat(state,index,'local',value);
   }
   function finishGuestJoin(code){
     if(guestPhase==='starting')return;
@@ -555,14 +610,14 @@ export function mountSetup(document, window, client=P2P) {
   function showGuestLobby(room){
     if(guestPhase==='starting')return;
     if(room.status==='playing'){finishGuestJoin(room.code);return;}
-    guestPhase='waiting';state={...state,step:'ready',countChosen:true,selectedColor:''};api.room(room);notify('preview');
+    guestPhase='waiting';state={...state,step:'ready',selectedColor:''};api.room(room);notify('preview');
     try{const u=new URL(window.location.href);u.searchParams.set('room',room.code);window.history.replaceState(null,'',u);}catch{}
     if(room.status==='cancelled')showError('أغلق منشئ الغرفة الاتصال');
   }
   function renderJoinColors(preview){
     if(!preview)return;
     guestPreview=preview;guestPhase='color';roomCode=preview.code;
-    state={...state,step:'color',countChosen:false,selectedColor:preview.availableColors.includes(state.selectedColor)?state.selectedColor:'',seats:COLORS.map(color=>{
+    state={...state,step:'color',selectedColor:preview.availableColors.includes(state.selectedColor)?state.selectedColor:'',seats:COLORS.map(color=>{
       const p=preview.players.find(p=>p.color===color.id);
       return {color:color.id,mode:p?(p.mode||'online'):'none',name:p?.name||'',owner:p?.controller||'p1'};
     })};
@@ -597,18 +652,17 @@ export function mountSetup(document, window, client=P2P) {
     if(modal.dataset.kind==='seat'&&['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();const items=[...sheet.querySelectorAll('button')];const index=items.indexOf(document.activeElement);items[e.key==='Home'?0:e.key==='End'?items.length-1:(index+(e.key==='ArrowDown'?1:-1)+items.length)%items.length]?.focus();}
     if(e.key==='Tab'&&sheet.getAttribute('aria-modal')==='true'){const list=[...sheet.querySelectorAll('input,button')];if(e.shiftKey&&document.activeElement===list[0]){e.preventDefault();list.at(-1)?.focus();}else if(!e.shiftKey&&document.activeElement===list.at(-1)){e.preventDefault();list[0]?.focus();}}
   });
-  root.addEventListener('pointerdown',e=>{if(nameDraft&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet();},true);
   root.addEventListener('click',e=>{if(!modal.hidden&&modal.dataset.kind!=='profile'&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet(true);});root.addEventListener('keydown',e=>e.stopPropagation());
   const api={
     lesson:updateLesson,
-    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;resetLesson();flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;nameDraft=null;profileContinuation=null;resetOverlay();capabilities={online:!!options.online||supportsP2P(window),mixed:true};connections=options.resume?.players?connections:[];roomCode=options.resume?.players?roomCode:'';pending=moving=false;state=options.resume?.players?restoreSetup(options.resume,profile?.name||''):newSetup(profile?.name||'');if(options.preview_step==='color')state={...state,step:'color',selectedColor:''};geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
+    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;resetLesson();flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;profileContinuation=null;resetOverlay();capabilities={online:!!options.online||supportsP2P(window),mixed:true};connections=options.resume?.players?connections:[];roomCode=options.resume?.players?roomCode:'';pending=moving=false;state=options.resume?.players?restoreSetup(options.resume,profile?.name||''):newSetup(profile?.name||'');if(options.preview_step==='color')state={...state,step:'color',selectedColor:''};geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
       // Never synchronously call back into Godot while it is publishing entry.
-      const token=flowGeneration;window.setTimeout(()=>{if(token!==flowGeneration||root.hidden)return;notify('preview');if(state.step==='ready')void syncOnlineLobby();const invitation=parseRoomInput(new URL(window.location.href).searchParams.get('room')||'',window.location.href);if(invitation&&!inviteHandled&&!options.resume?.players&&client?.role!=='host'){inviteHandled=true;requireProfile(()=>openJoin(invitation));}},0);},
-    close(){resetLesson();flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;nameDraft=null;profileContinuation=null;pending=moving=false;resetOverlay();root.hidden=true;refreshGlass();delete window.yakolakPendingVisualSetup;document.body.dataset.yakolakVisualSetup='hidden';},
+      const token=flowGeneration;window.setTimeout(()=>{if(token!==flowGeneration||root.hidden)return;notify('preview');applyPreferences();if(state.step==='ready')void syncOnlineLobby();const invitation=parseRoomInput(new URL(window.location.href).searchParams.get('room')||'',window.location.href);if(invitation&&!inviteHandled&&!options.resume?.players&&client?.role!=='host'){inviteHandled=true;requireProfile(()=>openJoin(invitation));}},0);},
+    close(){resetLesson();flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;profileContinuation=null;pending=moving=false;resetOverlay();root.hidden=true;refreshGlass();delete window.yakolakPendingVisualSetup;document.body.dataset.yakolakVisualSetup='hidden';},
     geometry(points){geometry=points;root.dataset.world=String(!!points.world);position();},
     error(text){root.hidden=false;showError(text);},
     networkError(code){pending=moving=networkBusy=false;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';if(state.step==='rounds')state={...state,step:'ready'};roomCode=client?.code||'';lobbySignature='';render();showError(arabicNetworkError(code));},
-    room(room){roomCode=/^\d{3}$/.test(String(room.code||''))?String(room.code):'';connections=(room.players||[]).filter(x=>x.connected!==false&&x.name).map(x=>({seat:String(x.seat),name:String(x.name).slice(0,24)}));if(Array.isArray(room.slots))state={...state,onlineSeatOrder:room.slots.map(s=>s.color),seats:state.seats.map(seat=>{const slot=room.slots.find(s=>s.color===seat.color);return slot?{...seat,mode:slot.mode,name:(room.players||[]).find(p=>p.color===seat.color)?.name||(slot.mode==='online'?'':slot.name)||''}:{...seat,mode:'none',name:''}})};render();const token=flowGeneration;window.setTimeout(()=>{if(token===flowGeneration&&!root.hidden)notify('preview');},0);}
+    room(room){roomCode=/^\d{3}$/.test(String(room.code||''))?String(room.code):'';connections=(room.players||[]).filter(x=>x.connected!==false&&x.name).map(x=>({seat:String(x.seat),name:String(x.name).slice(0,24)}));if(Array.isArray(room.slots))state={...state,onlineSeatOrder:room.slots.map(s=>s.color),seats:state.seats.map(seat=>{const slot=room.slots.find(s=>s.color===seat.color);const occupant=(room.players||[]).find(p=>p.color===seat.color);return slot?{...seat,mode:slot.mode==='online'&&!occupant?'none':slot.mode,name:occupant?.name||(slot.mode==='online'?'':slot.name)||''}:{...seat,mode:'none',name:''}})};render();const token=flowGeneration;window.setTimeout(()=>{if(token===flowGeneration&&!root.hidden)notify('preview');},0);}
   };
   window.YakolakSetup=api;viewport();
   client?.subscribe(detail=>{

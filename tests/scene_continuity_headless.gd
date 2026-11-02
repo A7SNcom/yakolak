@@ -39,7 +39,7 @@ func _piece(direction: String) -> MeshInstance3D:
 	return null
 
 func _preview(step: String) -> void:
-	setup.call("_on_visual_action",[JSON.stringify({"action":"preview","step":step,"count_chosen":true,"all_seats":[{"color":"marble","mode":"local"},{"color":"green","mode":"local"},{"color":"blue","mode":"none"},{"color":"gold","mode":"none"}]})])
+	setup.call("_on_visual_action",[JSON.stringify({"action":"preview","step":step,"all_seats":[{"color":"marble","mode":"local"},{"color":"green","mode":"local"},{"color":"blue","mode":"none"},{"color":"gold","mode":"none"}]})])
 
 func _run() -> void:
 	root.size=Vector2i(390,844)

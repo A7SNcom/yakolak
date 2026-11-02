@@ -22,7 +22,7 @@ var visual_light_key: String = ""
 var visual_prompt_tween: Tween
 var visual_prompt_stage: String = ""
 var visual_overlay_open: bool = false
-var visual_count_chosen: bool = false
+var visual_roster_confirmed: bool = false
 var visual_fit_viewport := Vector2.ZERO
 var visual_fit_ready: bool = false
 var visual_fitted_transform := Transform3D.IDENTITY
@@ -45,6 +45,13 @@ var visual_refit_start := Transform3D.IDENTITY
 var visual_refit_start_fov := 50.0
 var visual_refit_started := false
 var visual_lesson
+var visual_round_markers: Dictionary = {}
+var visual_round_marker_tweens: Dictionary = {}
+var visual_round_marker_selection_tweens: Dictionary = {}
+var visual_round_marker_generation: int = 0
+var visual_round_markers_visible: bool = false
+var visual_selected_rounds: int = 3
+const ROUND_MARKER_TABLE_Y: float = -0.04
 
 func _ready() -> void:
 	super._ready()
@@ -75,8 +82,9 @@ func show_after_intro() -> void:
 	visual_entry_generation += 1
 	visual_entry_acknowledged = false
 	visual_entry_check_elapsed = 0.0
-	visual_count_chosen = false
+	visual_roster_confirmed = false
 	visual_selected_color = ""
+	visual_selected_rounds = int(visual_resume_configuration.get("rounds", 3)) if not visual_resume_configuration.is_empty() else 3
 	active_screen = "visual"
 	tutorial_requested = false
 	card.hide()
@@ -328,11 +336,11 @@ func _update_visual_prompt(cam: Camera3D) -> void:
 	visual_prompt_stage = stage
 	if visual_prompt_tween != null and visual_prompt_tween.is_valid(): visual_prompt_tween.kill()
 	visual_prompt_tween = create_tween()
-	if stage not in ["color","count","rounds"]:
+	if stage not in ["color","rounds"]:
 		visual_prompt_tween.tween_property(visual_prompt,"modulate:a",0.0,0.12)
 		visual_prompt_tween.tween_callback(visual_prompt.hide)
 	else:
-		visual_prompt.text = {"color":"اختر لونك","count":"كم لاعب؟","rounds":"كم شوط للفوز؟"}[stage]
+		visual_prompt.text = {"color":"اختر لونك","rounds":"كم شوط للفوز؟"}[stage]
 		visual_prompt.modulate.a = 0.0
 		visual_prompt.show()
 		visual_prompt_tween.tween_property(visual_prompt,"modulate:a",1.0,0.22)
@@ -366,7 +374,7 @@ func _update_world_seats(cam: Camera3D) -> void:
 			var seat := visual_preview_seats[index] as Dictionary
 			if str(seat.get("color","")) != key: continue
 			var mode := str(seat.get("mode","none"))
-			var status: String = {"bot":"بوت","online":"أونلاين","local":"نفس الجهاز","none":"بدون"}.get(mode,"بدون")
+			var status: String = {"bot":"كمبيوتر","online":"فاضي","local":"لاعب","none":"فاضي"}.get(mode,"فاضي")
 			if index == 0: status = "أنت"
 			label.text = "%s\n%d  ⌄" % [status,index+1]
 			label.modulate = Color("#758078") if mode == "none" else Color("#f4f1e8")
@@ -411,7 +419,147 @@ func _visual_seat_points() -> Dictionary:
 		controls[key] = [p.x/canvas_css_size.x,p.y/canvas_css_size.y]
 	var heading := Vector2(canvas_css_size.x*0.5,maxf(48.0,visual_board_rect.position.y-42.0))
 	var actions := Vector2(canvas_css_size.x*0.5,minf(canvas_css_size.y-70.0,visual_board_rect.end.y+30.0))
-	return {"controls":controls,"control_angles":control_angles,"world":true,"seats":points,"hits":hit_points,"prompt":[heading.x/canvas_css_size.x,heading.y/canvas_css_size.y],"actions":[actions.x/canvas_css_size.x,actions.y/canvas_css_size.y],"board":[visual_board_rect.position.x,visual_board_rect.position.y,visual_board_rect.size.x,visual_board_rect.size.y]}
+	var round_points: Dictionary = {}
+	if visual_step == "rounds":
+		for wins: int in [3, 5]:
+			var marker := visual_round_markers.get(wins) as Node3D
+			if marker != null:
+				var projected := cam.unproject_position(marker.to_global(Vector3(0.0, 0.24, 0.0)))
+				round_points[str(wins)] = [projected.x/canvas_css_size.x, projected.y/canvas_css_size.y]
+	return {"controls":controls,"control_angles":control_angles,"world":true,"seats":points,"hits":hit_points,"prompt":[heading.x/canvas_css_size.x,heading.y/canvas_css_size.y],"actions":[actions.x/canvas_css_size.x,actions.y/canvas_css_size.y],"rounds":round_points,"board":[visual_board_rect.position.x,visual_board_rect.position.y,visual_board_rect.size.x,visual_board_rect.size.y]}
+
+func _sync_round_markers() -> void:
+	var should_show := visual_active and visual_step == "rounds"
+	if should_show:
+		_create_round_markers()
+	if should_show == visual_round_markers_visible:
+		if should_show:
+			_sync_round_marker_selection()
+		return
+	visual_round_markers_visible = should_show
+	visual_round_marker_generation += 1
+	var generation := visual_round_marker_generation
+	for wins: int in [3, 5]:
+		var marker := visual_round_markers.get(wins) as Node3D
+		if marker == null:
+			continue
+		var old: Tween = visual_round_marker_tweens.get(wins)
+		if old != null and old.is_valid(): old.kill()
+		var plate := marker.get_node_or_null("Plate") as MeshInstance3D
+		var numeral := marker.get_node_or_null("Numeral") as Label3D
+		var caption := marker.get_node_or_null("Caption") as Label3D
+		var selection_tween: Tween = visual_round_marker_selection_tweens.get(wins)
+		if selection_tween != null and selection_tween.is_valid(): selection_tween.kill()
+		if should_show:
+			if not marker.visible:
+				marker.position.y = ROUND_MARKER_TABLE_Y + 3.2
+				marker.scale = Vector3.ONE
+				if plate != null: (plate.material_override as StandardMaterial3D).albedo_color.a = 0.0
+				if numeral != null: numeral.modulate.a = 0.0
+				if caption != null: caption.modulate.a = 0.0
+			marker.show()
+			var arrive := create_tween().set_parallel(true)
+			var marker_delay := 0.34 if not visual_reduce_motion else 0.0
+			arrive.tween_property(marker, "position:y", ROUND_MARKER_TABLE_Y, 0.72 if not visual_reduce_motion else 0.12).set_delay(marker_delay).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+			arrive.tween_property(marker, "scale", Vector3.ONE, 0.48 if not visual_reduce_motion else 0.12).set_delay(marker_delay).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			if plate != null: arrive.tween_property(plate.material_override, "albedo_color:a", 1.0, 0.48 if not visual_reduce_motion else 0.12).set_delay(marker_delay)
+			if numeral != null: arrive.tween_property(numeral, "modulate:a", 1.0, 0.48 if not visual_reduce_motion else 0.12).set_delay(marker_delay)
+			if caption != null: arrive.tween_property(caption, "modulate:a", 1.0, 0.48 if not visual_reduce_motion else 0.12).set_delay(marker_delay)
+			visual_round_marker_tweens[wins] = arrive
+		else:
+			var depart := create_tween().set_parallel(true)
+			depart.tween_property(marker, "position:y", marker.position.y + 1.0, 0.56 if not visual_reduce_motion else 0.12).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+			depart.tween_property(marker, "scale", Vector3(0.90, 0.90, 0.90), 0.56 if not visual_reduce_motion else 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+			if plate != null: depart.tween_property(plate.material_override, "albedo_color:a", 0.0, 0.46 if not visual_reduce_motion else 0.12)
+			if numeral != null: depart.tween_property(numeral, "modulate:a", 0.0, 0.46 if not visual_reduce_motion else 0.12)
+			if caption != null: depart.tween_property(caption, "modulate:a", 0.0, 0.46 if not visual_reduce_motion else 0.12)
+			depart.chain().tween_callback(func():
+				if generation == visual_round_marker_generation and not visual_round_markers_visible: marker.hide()
+			)
+			visual_round_marker_tweens[wins] = depart
+	if should_show:
+		_sync_round_marker_selection()
+
+func _sync_round_marker_selection() -> void:
+	for wins: int in [3, 5]:
+		var marker := visual_round_markers.get(wins) as Node3D
+		if marker == null or not marker.visible: continue
+		var plate := marker.get_node_or_null("Plate") as MeshInstance3D
+		var numeral := marker.get_node_or_null("Numeral") as Label3D
+		if plate == null or numeral == null: continue
+		var material := plate.material_override as StandardMaterial3D
+		if material == null: continue
+		var selected := wins == visual_selected_rounds
+		var plate_color := Color("#e1bd72") if selected else Color("#9a8460")
+		var numeral_color := Color("#fff8e8") if selected else Color("#d8d0c0")
+		var caption := marker.get_node_or_null("Caption") as Label3D
+		var old: Tween = visual_round_marker_selection_tweens.get(wins)
+		if old != null and old.is_valid(): old.kill()
+		var selection := create_tween().set_parallel(true)
+		var duration := 0.28 if not visual_reduce_motion else 0.12
+		selection.tween_property(material, "albedo_color:r", plate_color.r, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		selection.tween_property(material, "albedo_color:g", plate_color.g, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		selection.tween_property(material, "albedo_color:b", plate_color.b, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		selection.tween_property(numeral, "modulate:r", numeral_color.r, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		selection.tween_property(numeral, "modulate:g", numeral_color.g, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		selection.tween_property(numeral, "modulate:b", numeral_color.b, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		if caption != null:
+			selection.tween_property(caption, "modulate:r", numeral_color.r, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			selection.tween_property(caption, "modulate:g", numeral_color.g, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			selection.tween_property(caption, "modulate:b", numeral_color.b, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		visual_round_marker_selection_tweens[wins] = selection
+
+func _create_round_markers() -> void:
+	if not visual_round_markers.is_empty():
+		return
+	for wins: int in [3, 5]:
+		var marker := Node3D.new()
+		marker.name = "WinsToMatch%d" % wins
+		marker.position = Vector3(-3.0 if wins == 3 else 3.0, ROUND_MARKER_TABLE_Y + 3.2, 0.0)
+		marker.hide()
+		var cylinder := CylinderMesh.new()
+		cylinder.top_radius = 0.62
+		cylinder.bottom_radius = 0.68
+		cylinder.height = 0.11
+		cylinder.radial_segments = 48
+		var plate := MeshInstance3D.new()
+		plate.name = "Plate"
+		plate.mesh = cylinder
+		plate.position.y = 0.055
+		var material := StandardMaterial3D.new()
+		var selected := wins == visual_selected_rounds
+		material.albedo_color = Color("#e1bd72") if selected else Color("#9a8460")
+		material.metallic = 0.55
+		material.roughness = 0.34
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		plate.material_override = material
+		marker.add_child(plate)
+		var numeral := Label3D.new()
+		numeral.name = "Numeral"
+		numeral.text = str(wins)
+		numeral.font = visual_font
+		numeral.font_size = 112
+		numeral.pixel_size = 0.004
+		numeral.outline_size = 5
+		numeral.outline_modulate = Color(0.08, 0.08, 0.08, 0.85)
+		numeral.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		numeral.position = Vector3(0.0, 0.17, -0.08)
+		numeral.modulate = Color("#fff8e8" if selected else "#d8d0c0")
+		marker.add_child(numeral)
+		var caption := Label3D.new()
+		caption.name = "Caption"
+		caption.text = "أشواط"
+		caption.font = visual_font
+		caption.font_size = 46
+		caption.pixel_size = 0.003
+		caption.outline_size = 3
+		caption.outline_modulate = Color(0.08, 0.08, 0.08, 0.82)
+		caption.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		caption.position = Vector3(-0.40, 0.17, 0.32)
+		caption.modulate = Color("#fff8e8" if selected else "#d8d0c0")
+		marker.add_child(caption)
+		intro.add_child(marker)
+		visual_round_markers[wins] = marker
 
 func _publish_visual_geometry() -> void:
 	if not visual_active:
@@ -430,6 +578,8 @@ func _on_visual_action(arguments: Array) -> void:
 	var action := str(payload.get("action",""))
 	if visual_lesson != null and visual_lesson.active and action not in ["learn-next","learn-close"]: return
 	match action:
+		"setting":
+			_apply_visual_preferences(str(payload.get("graphics_quality", "high")), bool(payload.get("sound_enabled", true)))
 		"learn":
 			if visual_step=="entry" and not visual_overlay_open:
 				visual_lesson.start(str(payload.get("request","")))
@@ -441,10 +591,13 @@ func _on_visual_action(arguments: Array) -> void:
 			visual_preview_seats = payload.get("all_seats", []) as Array
 			visual_step = str(payload.get("step", "color"))
 			visual_selected_color = str(payload.get("selected_color", ""))
+			visual_selected_rounds = 3 if int(payload.get("rounds", visual_selected_rounds)) == 3 else 5
 			visual_reserved_colors = payload.get("reserved_colors", []) as Array
 			visual_overlay_open = bool(payload.get("overlay_open", false))
-			visual_count_chosen = bool(payload.get("count_chosen", visual_step in ["ready","rounds"]))
+			visual_roster_confirmed = visual_step in ["ready", "rounds"]
 			_update_visual_seats()
+			_sync_round_markers()
+			_publish_visual_geometry.call_deferred()
 		"start":
 			_accept_visual_configuration(payload)
 		"join":
@@ -476,7 +629,7 @@ func _update_visual_seats() -> void:
 		var selected_direction := ""
 		if visual_step == "color" and not visual_selected_color.is_empty():
 			selected_direction = str(PALETTE[_palette_index(visual_selected_color)]["direction"])
-		var enabled := selected_direction.is_empty() and not visual_count_chosen
+		var enabled := selected_direction.is_empty() and not visual_roster_confirmed
 		if not selected_direction.is_empty():
 			enabled = str(record.get("dir", "")) == selected_direction
 		else:
@@ -495,6 +648,11 @@ func _update_visual_seats() -> void:
 		var saved: Dictionary = visual_piece_visibility[key]
 		var source := saved["material"] as BaseMaterial3D
 		if source == null: continue
+		if visual_step == "rounds":
+			var fade_target := source.albedo_color
+			fade_target.a = 0.0
+			visual_motion.tint(mesh, source, fade_target, 0.38 if not visual_reduce_motion else 0.0)
+			continue
 		var target: Color = source.albedo_color if enabled else (source.albedo_color.lerp(Color.BLACK,0.70) if not selected_direction.is_empty() else visual_inactive_material.albedo_color)
 		visual_motion.tint(mesh, source, target, 0.0 if visual_reduce_motion else 0.32, source if enabled else null)
 
@@ -525,7 +683,7 @@ func _update_visual_lighting() -> void:
 		var target := 0.62
 		if visual_step == "color" and not visual_selected_color.is_empty(): target = 0.62 if key == visual_selected_color else 0.0
 		if visual_reserved_colors.has(key): target=0.62
-		if visual_count_chosen:
+		if visual_roster_confirmed:
 			for value: Variant in visual_preview_seats:
 				var seat := value as Dictionary
 				if str(seat.get("color","")) == key and str(seat.get("mode","")) == "none": target = 0.08
@@ -561,7 +719,7 @@ func _validated_visual_configuration(payload: Dictionary) -> Dictionary:
 		var palette := PALETTE[_palette_index(color)]
 		var label := str(player.get("label", "")).strip_edges().left(24)
 		if label.is_empty():
-			label = ("لاعب " if mode == "local" else "كمبيوتر ") + str(palette["name"])
+			label = "كمبيوتر" if mode == "bot" else "لاعب"
 		configured.append({"seat": "p%d" % (index + 1), "label": label, "mode": mode, "color": color, "color_name": palette["name"], "direction": palette["direction"]})
 	return {"tutorial": false, "rounds": selected_rounds, "players": configured, "online_join_code": "", "automatic_room": bool(payload.get("automatic_room", false))}
 
@@ -574,6 +732,14 @@ func _accept_visual_configuration(payload: Dictionary) -> void:
 	visual_resume_configuration.clear()
 	_publish_setup_state("complete")
 	configuration_ready.emit(configuration)
+
+func _apply_visual_preferences(quality: String, sound_enabled: bool) -> void:
+	match quality:
+		"medium": get_viewport().msaa_3d = Viewport.MSAA_2X
+		"low": get_viewport().msaa_3d = Viewport.MSAA_DISABLED
+		_: get_viewport().msaa_3d = Viewport.MSAA_4X
+	if AudioServer.get_bus_count() > 0:
+		AudioServer.set_bus_mute(0, not sound_enabled)
 
 func _restore_visual_camera(preserve_pose: bool = false) -> void:
 	if not preserve_pose and intro != null and not visual_camera_snapshot.is_empty():
@@ -597,6 +763,7 @@ func _restore_visual_camera(preserve_pose: bool = false) -> void:
 func _close_visual_setup(preserve_pose: bool = false) -> void:
 	if visual_lesson != null and visual_lesson.active: visual_lesson.cancel()
 	visual_active = false
+	_sync_round_markers()
 	for value: Variant in visual_world_seats.values():
 		(value["node"] as Node3D).hide()
 	if visual_prompt != null:
@@ -649,4 +816,8 @@ func _on_visual_room_state(room: Dictionary, _identity: Dictionary) -> void:
 		for value: Variant in room.get("players", []):
 			var player := value as Dictionary
 			participants.append({"seat": str(player.get("seat", "")), "name": str(player.get("name", player.get("label", "")))})
-		JavaScriptBridge.eval("if(window.YakolakSetup)window.YakolakSetup.room(" + JSON.stringify({"players": participants,"code":str(room.get("code",""))}) + ");", true)
+		var public_slots: Array[Dictionary] = []
+		for value: Variant in room.get("slots", []):
+			var slot := value as Dictionary
+			public_slots.append({"seat":str(slot.get("seat","")),"color":str(slot.get("color","")),"mode":str(slot.get("mode","none")),"name":str(slot.get("name","")),"connected":bool(slot.get("connected",false))})
+		JavaScriptBridge.eval("if(window.YakolakSetup)window.YakolakSetup.room(" + JSON.stringify({"players": participants,"slots":public_slots,"code":str(room.get("code",""))}) + ");", true)

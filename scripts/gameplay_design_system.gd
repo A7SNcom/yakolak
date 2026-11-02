@@ -40,7 +40,7 @@ func _layout_post_match_secondary_button() -> void:
 func _build_quick_menu() -> void:
 	super._build_quick_menu()
 	if quick_button != null:
-		quick_button.text = "الإعدادات"
+		quick_button.text = ""
 		quick_button.tooltip_text = "فتح الإعدادات"
 		quick_button.focus_mode = Control.FOCUS_ALL
 		quick_button.custom_minimum_size = Vector2(_hud_length(Design.TOUCH_MIN), _hud_length(Design.TOUCH_MIN))
@@ -90,7 +90,7 @@ func _layout_quick_menu() -> void:
 	super._layout_quick_menu()
 	if quick_panel == null:
 		return
-	var action_count: int = 3 if quick_round_button != null and quick_round_button.visible else 2
+	var action_count: int = 3 if quick_exit_button != null and quick_exit_button.visible else 2
 	quick_panel.size.y = _hud_length(18.0 + float(action_count) * (Design.TOUCH_MIN + 7.0))
 
 

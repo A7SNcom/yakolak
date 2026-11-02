@@ -9,6 +9,7 @@ const THMANYAH_LIGHT = preload("res://assets/fonts/thmanyahsans-Light.otf")
 const THMANYAH_MEDIUM = preload("res://assets/fonts/thmanyahsans-Medium.otf")
 const THMANYAH_BOLD = preload("res://assets/fonts/thmanyahsans-Bold.otf")
 const SCORE_MARKER_MESH = preload("res://generated/score_marker.obj")
+const SETTINGS_ICON = preload("res://assets/icons/lucide/settings.svg")
 
 # Exact legacy Three.js score-row geometry from v092.
 const LEGACY_UNIT: float = preload("res://scripts/game_layout.gd").UNIT
@@ -29,9 +30,11 @@ var quick_layer: CanvasLayer
 var quick_root: Control
 var quick_button: Button
 var quick_panel: PanelContainer
-var quick_round_button: Button
+var quick_graphics_button: Button
 var quick_sound_button: Button
 var quick_exit_button: Button
+var graphics_quality: String = "high"
+var preferences_loaded: bool = false
 var score_marker_root: Node3D
 var rendered_score_counts: Dictionary = {}
 var local_round_auto_due_msec: int = 0
@@ -52,6 +55,8 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	super._process(delta)
+	if not preferences_loaded:
+		_load_game_preferences()
 	_sync_score_markers()
 	_sync_hud_visibility()
 	_sync_quick_menu()
@@ -81,7 +86,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _quick_menu_action_at(position: Vector2) -> bool:
-	for button: Button in [quick_round_button, quick_sound_button, quick_exit_button]:
+	for button: Button in [quick_graphics_button, quick_sound_button, quick_exit_button]:
 		if button != null and button.visible and not button.disabled and button.get_global_rect().has_point(position):
 			return true
 	return false
@@ -98,7 +103,7 @@ func _apply_thmanyah_to_hud() -> void:
 
 func _build_quick_menu() -> void:
 	quick_layer = CanvasLayer.new()
-	quick_layer.layer = 30
+	quick_layer.layer = 45
 	add_child(quick_layer)
 
 	quick_root = Control.new()
@@ -107,16 +112,19 @@ func _build_quick_menu() -> void:
 	quick_layer.add_child(quick_root)
 
 	quick_button = Button.new()
-	quick_button.text = "الإعدادات"
+	quick_button.text = ""
+	quick_button.icon = SETTINGS_ICON
+	quick_button.icon_max_width = 24
+	quick_button.expand_icon = true
+	quick_button.flat = true
 	quick_button.tooltip_text = "فتح الإعدادات"
 	quick_button.focus_mode = Control.FOCUS_NONE
 	quick_button.add_theme_font_override("font", THMANYAH_BOLD)
-	quick_button.add_theme_font_size_override("font_size", _hud_font_size(14))
 	quick_button.add_theme_color_override("font_color", Color("#f4f7f6"))
 	quick_button.add_theme_color_override("font_hover_color", Color.WHITE)
-	quick_button.add_theme_stylebox_override("normal", _quick_style(Color(0.035, 0.055, 0.067, 0.86), 15.0))
-	quick_button.add_theme_stylebox_override("hover", _quick_style(Color(0.055, 0.085, 0.096, 0.94), 15.0))
-	quick_button.add_theme_stylebox_override("pressed", _quick_style(Color(0.025, 0.045, 0.055, 0.96), 15.0))
+	quick_button.add_theme_stylebox_override("normal", _quick_action_style(Color(0, 0, 0, 0)))
+	quick_button.add_theme_stylebox_override("hover", _quick_action_style(Color(1, 1, 1, 0.08)))
+	quick_button.add_theme_stylebox_override("pressed", _quick_action_style(Color(1, 1, 1, 0.12)))
 	quick_button.pressed.connect(_toggle_quick_menu)
 	quick_root.add_child(quick_button)
 
@@ -131,16 +139,14 @@ func _build_quick_menu() -> void:
 	menu.add_theme_constant_override("separation", int(round(_hud_length(7.0))))
 	quick_panel.add_child(menu)
 
-	quick_round_button = _quick_action("الجولة التالية")
-	quick_round_button.add_theme_font_override("font", THMANYAH_BOLD)
-	quick_round_button.pressed.connect(_quick_round_action)
-	quick_round_button.visible = false
-	menu.add_child(quick_round_button)
+	quick_graphics_button = _quick_action("جودة الرسومات: عالية")
+	quick_graphics_button.pressed.connect(_cycle_graphics_quality)
+	menu.add_child(quick_graphics_button)
 
 	quick_sound_button = _quick_action("الصوت")
 	quick_sound_button.pressed.connect(_toggle_sound)
 	menu.add_child(quick_sound_button)
-	quick_exit_button = _quick_action("خروج")
+	quick_exit_button = _quick_action("مغادرة الغرفة")
 	quick_exit_button.pressed.connect(_quick_exit)
 	menu.add_child(quick_exit_button)
 	_layout_quick_menu()
@@ -201,16 +207,15 @@ func _layout_quick_menu() -> void:
 		return
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	var margin: float = _hud_length(12.0)
-	var button_size := Vector2(_hud_length(96.0), _hud_length(44.0))
+	var button_size := Vector2(_hud_length(44.0), _hud_length(44.0))
 	var panel_width: float = _hud_length(158.0)
 	var top: float = maxf(margin, _hud_length(8.0))
 	var button_x: float = maxf(margin, viewport_size.x - margin - button_size.x)
 	var panel_x: float = maxf(margin, viewport_size.x - margin - panel_width)
 	quick_button.position = Vector2(button_x, top)
 	quick_button.size = button_size
-	quick_button.add_theme_font_size_override("font_size", _hud_font_size(14))
 	quick_panel.position = Vector2(panel_x, top + button_size.y + _hud_length(8.0))
-	var action_count: int = 3 if quick_round_button != null and quick_round_button.visible else 2
+	var action_count: int = 3 if quick_exit_button != null and quick_exit_button.visible else 2
 	quick_panel.size = Vector2(panel_width, _hud_length(18.0 + float(action_count) * 51.0))
 	for child: Node in quick_panel.get_children():
 		if child is VBoxContainer:
@@ -218,28 +223,62 @@ func _layout_quick_menu() -> void:
 
 
 func _toggle_quick_menu() -> void:
-	if quick_panel == null or not match_initialized:
+	if quick_panel == null or not (match_initialized or online_waiting or online_cancelled):
 		return
 	quick_panel.visible = not quick_panel.visible
 
 
 func _toggle_sound() -> void:
-	AudioServer.set_bus_mute(0, not AudioServer.is_bus_mute(0))
+	var enabled := AudioServer.is_bus_mute(0)
+	AudioServer.set_bus_mute(0, not enabled)
+	_save_game_preferences()
+	_sync_preference_labels()
+
+
+func _cycle_graphics_quality() -> void:
+	graphics_quality = {"high":"medium", "medium":"low", "low":"high"}.get(graphics_quality, "medium")
+	_apply_graphics_quality()
+	_save_game_preferences()
+	_sync_preference_labels()
+
+
+func _apply_graphics_quality() -> void:
+	match graphics_quality:
+		"medium": get_viewport().msaa_3d = Viewport.MSAA_2X
+		"low": get_viewport().msaa_3d = Viewport.MSAA_DISABLED
+		_: get_viewport().msaa_3d = Viewport.MSAA_4X
+
+
+func _load_game_preferences() -> void:
+	preferences_loaded = true
+	if OS.has_feature("web"):
+		var raw: String = str(JavaScriptBridge.eval("JSON.stringify({quality:localStorage.getItem('yakolak-graphics-quality'),sound:localStorage.getItem('yakolak-sound-enabled')})", true))
+		var value: Variant = JSON.parse_string(raw)
+		if value is Dictionary:
+			var quality := str(value.get("quality", "high"))
+			if quality in ["high", "medium", "low"]: graphics_quality = quality
+			AudioServer.set_bus_mute(0, value.get("sound", "true") == "false")
+	_apply_graphics_quality()
+	_sync_preference_labels()
+
+
+func _save_game_preferences() -> void:
+	if OS.has_feature("web"):
+		var sound_enabled := not AudioServer.is_bus_mute(0)
+		JavaScriptBridge.eval("localStorage.setItem('yakolak-graphics-quality'," + JSON.stringify(graphics_quality) + ");localStorage.setItem('yakolak-sound-enabled'," + JSON.stringify(str(sound_enabled).to_lower()) + ");", true)
+
+
+func _sync_preference_labels() -> void:
+	if quick_graphics_button != null:
+		quick_graphics_button.text = "جودة الرسومات: " + {"high":"عالية", "medium":"متوسطة", "low":"منخفضة"}.get(graphics_quality, "عالية")
+	if quick_sound_button != null:
+		quick_sound_button.text = "الصوت: " + ("يعمل" if not AudioServer.is_bus_mute(0) else "مكتوم")
 
 
 func _quick_exit() -> void:
 	if quick_panel != null:
 		quick_panel.visible = false
 	_return_to_setup()
-
-
-func _quick_round_action() -> void:
-	if quick_panel != null:
-		quick_panel.visible = false
-	if online_cancelled:
-		_return_to_setup()
-		return
-	_on_round_action()
 
 
 func _on_round_action() -> void:
@@ -298,18 +337,12 @@ func _sync_hud_visibility() -> void:
 func _sync_quick_menu() -> void:
 	if quick_button == null:
 		return
-	var should_show: bool = match_initialized
+	var should_show: bool = match_initialized or online_waiting or online_cancelled
 	quick_button.visible = should_show
 	if quick_panel != null and not should_show:
 		quick_panel.visible = false
-	if quick_round_button != null:
-		quick_round_button.visible = should_show and round_complete
-		if online_cancelled:
-			quick_round_button.text = "عودة للإعداد"
-		elif match_complete:
-			quick_round_button.text = "إعادة المباراة"
-		else:
-			quick_round_button.text = "الجولة التالية"
+	if quick_exit_button != null:
+		quick_exit_button.visible = should_show and (online_active or online_waiting or online_cancelled)
 	_layout_quick_menu()
 	var state: String = "ready" if should_show else "hidden"
 	if state == quick_visibility_state:

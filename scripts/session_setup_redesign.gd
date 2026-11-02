@@ -222,13 +222,19 @@ func _open_join_setup(code: String) -> void:
 func _show_setup() -> void:
 	active_screen = "setup"
 	_clear_body()
+	# Migrate any stored legacy wizard position to the new open-seat roster.
+	if wizard_step == "count":
+		for index: int in range(1, seats.size()):
+			var seat: Dictionary = seats[index]
+			seat["active"] = true
+			seat["mode"] = "online"
+			seats[index] = seat
+		wizard_step = "mode:1"
 	var content := _content_box()
 	body.add_child(content)
 
 	var title: String = "اختر لونك"
-	if wizard_step == "count":
-		title = "كم لاعب؟"
-	elif wizard_step.begins_with("mode:"):
+	if wizard_step.begins_with("mode:"):
 		title = "اللاعب %s" % _arabic_digit(_mode_seat_index() + 1)
 	elif wizard_step == "rounds":
 		title = "كم فوز تحتاج لحسم المباراة؟"
@@ -240,8 +246,6 @@ func _show_setup() -> void:
 	match wizard_step:
 		"color":
 			_build_color_question(content)
-		"count":
-			_build_count_question(content)
 		"rounds":
 			_build_rounds_question(content)
 		_:
@@ -288,7 +292,15 @@ func _build_color_question(content: VBoxContainer) -> void:
 	var next := _button(next_label, Color("#10201f"), Color("#f2f0e9"))
 	next.disabled = (not joining_room_code.is_empty()) and (not room_preview_ready or not join_available_colors.has(selected))
 	if joining_room_code.is_empty():
-		next.pressed.connect(_goto_step.bind("count"))
+		next.pressed.connect(func() -> void:
+			for index: int in range(1, seats.size()):
+				var seat: Dictionary = seats[index]
+				seat["active"] = true
+				seat["mode"] = "online"
+				seat["label"] = "فاضي"
+				seats[index] = seat
+			_goto_step("mode:1")
+		)
 	else:
 		next.pressed.connect(_emit_configuration)
 	content.add_child(next)
@@ -350,15 +362,6 @@ func _color_tile_style(value: Color, selected: bool, hover: bool, alpha: float =
 	return style
 
 
-func _build_count_question(content: VBoxContainer) -> void:
-	var row := _choice_row()
-	for count: int in [2, 3, 4]:
-		var choice := _big_choice(_arabic_digit(count))
-		choice.pressed.connect(_choose_player_count.bind(count))
-		row.add_child(choice)
-	content.add_child(row)
-
-
 func _build_mode_question(content: VBoxContainer, seat_index: int) -> void:
 	var row := _choice_row()
 	var local := _button("معي", Color("#10201f"), Color("#f2f0e9"))
@@ -405,12 +408,14 @@ func _choose_wizard_color(color_id: String) -> void:
 	_on_color_selected(choice, 0)
 
 
-func _choose_player_count(count: int) -> void:
+func _choose_player_count(_count: int) -> void:
+	# Legacy callers now open all remaining seats as available online seats.
 	for index: int in range(seats.size()):
 		var seat: Dictionary = seats[index]
-		seat["active"] = index < count
 		if index > 0:
-			seat["mode"] = "local"
+			seat["active"] = true
+			seat["mode"] = "online"
+			seat["label"] = "فاضي"
 		seats[index] = seat
 	_goto_step("mode:1")
 

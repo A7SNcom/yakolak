@@ -41,9 +41,9 @@ test('capture representative 2D hierarchy states without touching intro', async 
   await capture(page, '01-room-entry');
 
   await page.evaluate(() => window.yakolakTestSetupFlowAction('new'));
-  await page.waitForFunction(() => document.body.dataset.yakolakSetupFlowStage === 'count', null, { timeout: 15000 });
+  await page.waitForFunction(() => document.body.dataset.yakolakSetupFlowStage === 'mode:1', null, { timeout: 15000 });
   await page.waitForTimeout(450);
-  await capture(page, '02-player-count');
+  await capture(page, '02-open-player-roster');
 
   await page.evaluate(() => window.yakolakTestStartPassPlay());
   await page.waitForFunction(

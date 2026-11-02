@@ -90,7 +90,7 @@ func _run() -> void:
 			push_error("Seat dimming did not settle on its inactive color")
 			quit(1)
 			return
-	setup._on_visual_action([JSON.stringify({"action":"preview","step":"rounds","count_chosen":true,"all_seats":[{"color":"green","mode":"local"},{"color":"marble","mode":"bot"},{"color":"blue","mode":"none"},{"color":"gold","mode":"none"}]})])
+	setup._on_visual_action([JSON.stringify({"action":"preview","step":"rounds","all_seats":[{"color":"green","mode":"local"},{"color":"marble","mode":"bot"},{"color":"blue","mode":"none"},{"color":"gold","mode":"none"}]})])
 	await create_timer(0.4).timeout
 	for record: Dictionary in intro.pieces:
 		if record["dir"] in ["back","left"] and not (record["mesh"].material_override as BaseMaterial3D).albedo_color.is_equal_approx(setup.visual_inactive_material.albedo_color):

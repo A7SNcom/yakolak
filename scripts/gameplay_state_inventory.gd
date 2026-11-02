@@ -221,9 +221,7 @@ func _sync_waiting_overlay() -> void:
 	if waiting_progress_label != null:
 		waiting_progress_label.text = detail if not detail.is_empty() else str(state.get("message", ""))
 	if waiting_exit_button != null:
-		var action: String = str(state.get("action", "none"))
-		waiting_exit_button.visible = action == "exit"
-		waiting_exit_button.text = str(state.get("action_label", "خروج")) if action == "exit" else "خروج"
+		waiting_exit_button.hide()
 	_layout_waiting_overlay()
 
 	# The old transport pill and the new state card must never compete visually.

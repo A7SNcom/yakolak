@@ -258,10 +258,7 @@ func _dialog_cancel() -> void:
 		"invitation":
 			_show_join_room()
 		"question":
-			if wizard_step == "count" and wizard_history.is_empty() and joining_room_code.is_empty():
-				_show_room_entry()
-			else:
-				_show_setup()
+			_show_room_entry()
 		"setup":
 			_wizard_back()
 		"learning-disclosure":

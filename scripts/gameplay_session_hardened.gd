@@ -208,14 +208,6 @@ func _sync_hud_visibility() -> void:
 
 func _sync_quick_menu() -> void:
 	super._sync_quick_menu()
-	if quick_round_button != null and online_active and round_complete and not match_complete and not online_cancelled:
-		quick_round_button.visible = false
-		_layout_quick_menu()
-	if online_active and online_waiting:
-		if quick_button != null:
-			quick_button.visible = false
-		if quick_panel != null:
-			quick_panel.visible = false
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(
 			"document.body.dataset.yakolakOnlineRoundAction='" +

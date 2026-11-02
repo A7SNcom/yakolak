@@ -6,6 +6,7 @@ extends "res://scripts/session_setup_arabic.gd"
 
 var web_setup_flow_action_callback: Variant
 var custom_setup_active: bool = false
+var custom_seat_picker: int = -1
 
 
 func _ready() -> void:
@@ -43,14 +44,33 @@ func _start_new_game_flow() -> void:
 	room_preview_ready = false
 	room_preview_code = ""
 	tutorial_requested = false
-	custom_setup_active = false
+	_prepare_default_open_roster()
+	_show_setup()
+
+
+func _prepare_default_open_roster() -> void:
+	custom_setup_active = true
+	custom_seat_picker = -1
 	wizard_history.clear()
 	_reset_seats()
-	wizard_step = "count"
+	for index: int in range(1, seats.size()):
+		var seat: Dictionary = seats[index]
+		seat["active"] = true
+		seat["mode"] = "online"
+		seat["label"] = "فاضي"
+		seats[index] = seat
+	wizard_step = "mode:1"
+
+
+func _choose_player_count(_count: int) -> void:
+	# Keep legacy UI/test callers on the new open-roster path; count is ignored.
+	_prepare_default_open_roster()
 	_show_setup()
 
 
 func _show_setup() -> void:
+	if wizard_step == "count" or (wizard_step.begins_with("mode:") and not custom_setup_active and joining_room_code.is_empty()):
+		_prepare_default_open_roster()
 	super._show_setup()
 	_publish_flow_stage(wizard_step)
 
@@ -65,43 +85,12 @@ func _wizard_header(title: String) -> Control:
 
 
 func _build_mode_question(content: VBoxContainer, seat_index: int) -> void:
-	# The first opponent gets three complete match presets. Each preset owns the
-	# whole configuration, so the user never selects a room-wide mode and then
-	# discovers that the remaining seats stayed local by accident.
-	if seat_index == 1 and not custom_setup_active:
-		var options := VBoxContainer.new()
-		options.layout_direction = Control.LAYOUT_DIRECTION_RTL
-		options.add_theme_constant_override("separation", int(round(_ui_length(10.0))))
-		options.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-
-		var local_button := _mode_preset("على نفس الجهاز", Color("#10201f"), Color("#f2f0e9"))
-		local_button.tooltip_text = "كل اللاعبين على هذا الجهاز"
-		local_button.pressed.connect(_choose_mode.bind(seat_index, "local"))
-		options.add_child(local_button)
-
-		var online_button := _mode_preset("كل اللاعبين أونلاين", Color("#2a4d63"), Color.WHITE)
-		online_button.tooltip_text = "كل اللاعبين عبر الغرفة"
-		online_button.pressed.connect(_choose_all_online)
-		options.add_child(online_button)
-
-		var computer_button := _mode_preset("كل المنافسين كمبيوتر", Color("#235b50"), Color.WHITE)
-		computer_button.tooltip_text = "ابدأ فورًا ضد الكمبيوتر"
-		computer_button.pressed.connect(_choose_all_computer)
-		options.add_child(computer_button)
-
-		var custom_button := _mode_preset("مخصص", Color("#172220"), Color("#f2f0e9"))
-		custom_button.tooltip_text = "اختَر طريقة كل لاعب"
-		custom_button.pressed.connect(_begin_custom_setup)
-		options.add_child(custom_button)
-		content.add_child(options)
-		return
-
 	if custom_setup_active:
 		_build_custom_roster(content)
 		return
 
 	var row := _choice_row()
-	var local := _button("على نفس الجهاز", Color("#10201f"), Color("#f2f0e9"))
+	var local := _button("لاعب في نفس الجهاز", Color("#10201f"), Color("#f2f0e9"))
 	local.pressed.connect(_choose_mode.bind(seat_index, "local"))
 	row.add_child(local)
 	var bot := _button("كمبيوتر", Color.WHITE, Color("#235b50"))
@@ -120,19 +109,20 @@ func _build_custom_roster(content: VBoxContainer) -> void:
 		if not bool(seat.get("active", false)):
 			continue
 		var mode_id: String = str(seat.get("mode", "local"))
-		var card := VBoxContainer.new()
-		card.add_theme_constant_override("separation", int(round(_ui_length(6.0))))
-		var current_text: String = "على نفس الجهاز" if mode_id == "local" else "كمبيوتر"
-		card.add_child(_label("اللاعب %d — %s" % [index + 1, current_text], 16, HORIZONTAL_ALIGNMENT_RIGHT))
-		var row := _choice_row()
-		var local := _button("على نفس الجهاز ✓" if mode_id == "local" else "على نفس الجهاز", Color("#10201f"), Color("#f2f0e9"))
-		local.pressed.connect(_set_custom_seat_mode.bind(index, "local"))
-		row.add_child(local)
-		var bot := _button("كمبيوتر ✓" if mode_id == "bot" else "كمبيوتر", Color.WHITE, Color("#235b50"))
-		bot.pressed.connect(_set_custom_seat_mode.bind(index, "bot"))
-		row.add_child(bot)
-		card.add_child(row)
-		roster.add_child(card)
+		var current_text: String = {"local":"لاعب","bot":"كمبيوتر","online":"فاضي"}.get(mode_id,"فاضي")
+		var seat_button := _mode_preset(current_text, Color("#f2f0e9"), Color("#10201f"))
+		seat_button.custom_minimum_size.y = _ui_length(48.0)
+		seat_button.pressed.connect(_select_custom_seat.bind(index))
+		roster.add_child(seat_button)
+		if custom_seat_picker == index:
+			var row := _choice_row()
+			var local := _button("لاعب في نفس الجهاز", Color("#10201f"), Color("#f2f0e9"))
+			local.pressed.connect(_set_custom_seat_mode.bind(index, "local"))
+			row.add_child(local)
+			var bot := _button("كمبيوتر", Color.WHITE, Color("#235b50"))
+			bot.pressed.connect(_set_custom_seat_mode.bind(index, "bot"))
+			row.add_child(bot)
+			roster.add_child(row)
 	content.add_child(roster)
 	var continue_button := _mode_preset("متابعة", Color("#235b50"), Color.WHITE)
 	continue_button.pressed.connect(_finish_custom_setup)
@@ -154,7 +144,9 @@ func _choose_all_online() -> void:
 		var seat: Dictionary = seats[index]
 		if bool(seat.get("active", false)):
 			seat["mode"] = "online"
+			seat["label"] = "فاضي"
 			seats[index] = seat
+	custom_seat_picker = -1
 	custom_setup_active = false
 	_goto_step("rounds")
 
@@ -170,16 +162,26 @@ func _set_custom_seat_mode(seat_index: int, mode_id: String) -> void:
 	if seat_index <= 0 or seat_index >= seats.size() or not bool(seats[seat_index].get("active", false)):
 		return
 	var seat: Dictionary = seats[seat_index]
-	seat["mode"] = mode_id
+	var next_mode := "online" if str(seat.get("mode", "online")) == mode_id else mode_id
+	seat["mode"] = next_mode
+	seat["label"] = {"online":"فاضي","local":"لاعب","bot":"كمبيوتر"}.get(next_mode,"فاضي")
 	seats[seat_index] = seat
+	custom_seat_picker = -1
+	_show_setup()
+
+
+func _select_custom_seat(seat_index: int) -> void:
+	if not custom_setup_active or seat_index <= 0 or seat_index >= seats.size():
+		return
+	custom_seat_picker = -1 if custom_seat_picker == seat_index else seat_index
 	_show_setup()
 
 
 func _finish_custom_setup() -> void:
 	if not custom_setup_active:
 		return
-	# Keep Custom provenance so Back from rounds restores the unified roster directly.
-	# The existing mode:1 Back branch still exits Custom back to the preset choices.
+	custom_seat_picker = -1
+	# Keep the open roster active so Back from rounds returns to the same choices.
 	_goto_step("rounds")
 
 
@@ -214,7 +216,9 @@ func _choose_all_computer() -> void:
 		var seat: Dictionary = seats[index]
 		if bool(seat.get("active", false)):
 			seat["mode"] = "bot"
+			seat["label"] = "كمبيوتر"
 			seats[index] = seat
+		custom_seat_picker = -1
 	custom_setup_active = false
 	_goto_step("rounds")
 
@@ -225,6 +229,7 @@ func _choose_mode(seat_index: int, mode_id: String) -> void:
 			var seat: Dictionary = seats[index]
 			if bool(seat.get("active", false)):
 				seat["mode"] = "local"
+				seat["label"] = "لاعب"
 				seats[index] = seat
 		custom_setup_active = false
 		_goto_step("rounds")
@@ -431,7 +436,8 @@ func _rebuild_active_screen() -> void:
 func _wizard_back() -> void:
 	if custom_setup_active and wizard_step == "mode:1":
 		custom_setup_active = false
-		_show_setup()
+		custom_seat_picker = -1
+		_show_room_entry()
 		return
 	if not wizard_history.is_empty():
 		wizard_step = wizard_history.pop_back()
@@ -469,8 +475,8 @@ func _on_web_setup_flow_action(arguments: Array) -> void:
 			if not joining_room_code.is_empty() and room_preview_ready:
 				_open_join_setup(joining_room_code)
 		"count":
-			if arguments.size() >= 2:
-				_choose_player_count(clampi(int(arguments[1]), 2, 4))
+			_prepare_default_open_roster()
+			_show_setup()
 		"custom":
 			if wizard_step == "mode:1":
 				_begin_custom_setup()

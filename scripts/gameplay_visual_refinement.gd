@@ -8,14 +8,15 @@ const Layout = preload("res://scripts/game_layout.gd")
 const REST_OFFSET := Layout.REST_CLEARANCE
 const DIM_MIX := 0.70
 const CHOICE_FADE := 0.22
-const VICTORY_HALF_CYCLE := 1.65
-const VICTORY_DIM := 0.96
+const VICTORY_HALF_CYCLE := 0.65
+const VICTORY_DIM := 0.58
 
 var choice_materials: Dictionary = {}
 var choice_tweens: Array[Tween] = []
 var victory_materials: Dictionary = {}
 var victory_tween: Tween
 var victory_mix: float = 0.0
+var victory_animation_started: bool = false
 var rest_shifted: bool = false
 var ghost_height_cache: Dictionary = {}
 var footprint_fade: Tween
@@ -29,6 +30,7 @@ var win_banner_shown := false
 var win_banner_stamp := ""
 var turn_countdown: PanelContainer
 var turn_countdown_label: Label
+var turn_countdown_style: StyleBoxFlat
 var turn_countdown_motion: Tween
 var countdown_last_fov: float = -1.0
 var continue_pending: bool = false
@@ -67,12 +69,12 @@ func _ready() -> void:
 	turn_countdown = PanelContainer.new()
 	turn_countdown.name = "TurnCountdown"
 	turn_countdown.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.09,0.10,0.12,0.80)
-	style.border_color = Color(1,1,1,0.38)
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(14)
-	turn_countdown.add_theme_stylebox_override("panel",style)
+	turn_countdown_style = StyleBoxFlat.new()
+	turn_countdown_style.bg_color = Color(0.09,0.10,0.12,0.88)
+	turn_countdown_style.border_color = Color("#b9bec6")
+	turn_countdown_style.set_border_width_all(2)
+	turn_countdown_style.set_corner_radius_all(28)
+	turn_countdown.add_theme_stylebox_override("panel",turn_countdown_style)
 	turn_countdown.hide()
 	turn_countdown_label = Label.new()
 	turn_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -172,6 +174,7 @@ func _update_turn_countdown(now: int) -> void:
 	var changed := turn_countdown_label.text != text
 	if changed:
 		turn_countdown_label.text = text
+	_apply_countdown_color(float(remaining)/1000.0)
 	if changed or not turn_countdown.visible or (camera != null and countdown_last_fov != camera.fov):
 		_position_turn_countdown()
 	if not turn_countdown.visible:
@@ -190,11 +193,26 @@ func _position_turn_countdown() -> void:
 	var rect := Rect2(camera.unproject_position(board.to_global(box.get_endpoint(0))),Vector2.ZERO)
 	for i: int in range(8): rect = rect.expand(camera.unproject_position(board.to_global(box.get_endpoint(i))))
 	var viewport := get_viewport().get_visible_rect().size
-	var size := Vector2(_hud_length(38.0),_hud_length(40.0))
+	var size := Vector2(_hud_length(56.0),_hud_length(56.0))
 	turn_countdown.size = size
-	turn_countdown.position = Vector2(clampf(rect.end.x+_hud_length(10),_hud_length(12),viewport.x-size.x-_hud_length(12)),clampf(rect.get_center().y-size.y*0.5,_hud_length(60),viewport.y-size.y-_hud_length(16)))
-	turn_countdown_label.add_theme_font_size_override("font_size",_hud_font_size(20))
+	turn_countdown.position = Vector2(viewport.x-size.x-_hud_length(16),clampf(rect.position.y-size.y-_hud_length(14),_hud_length(64),viewport.y-size.y-_hud_length(16)))
+	turn_countdown_style.set_corner_radius_all(int(round(size.x*0.5)))
+	turn_countdown_label.add_theme_font_size_override("font_size",_hud_font_size(24))
 	countdown_last_fov = camera.fov
+
+
+func _apply_countdown_color(remaining_seconds: float) -> void:
+	if turn_countdown_style == null:
+		return
+	var neutral := Color("#b9bec6")
+	var orange := Color("#ff9c43")
+	var red := Color("#f04445")
+	var warm_mix := clampf((12.0-remaining_seconds)/8.0,0.0,1.0)
+	var urgent_mix := clampf((4.0-remaining_seconds)/4.0,0.0,1.0)
+	var cue := neutral.lerp(orange,warm_mix).lerp(red,urgent_mix)
+	turn_countdown_style.border_color = cue
+	turn_countdown_style.bg_color = Color(cue.r*0.22,cue.g*0.19,cue.b*0.18,0.94)
+	turn_countdown_label.add_theme_color_override("font_color",Color.WHITE)
 
 
 func _capture_home_state() -> void:
@@ -504,16 +522,19 @@ func _start_victory_colors() -> void:
 		winner.visible = true
 	for index: int in range(piece_records.size()):
 		var piece: MeshInstance3D = piece_records[index]["mesh"]
-		if not piece.visible or winning_piece_indices.has(index): continue
+		if not piece.visible or not bool(piece_records[index].get("played", false)) or winning_piece_indices.has(index): continue
 		if not victory_materials.has(index) and home_materials[index] is StandardMaterial3D:
 			victory_materials[index] = home_materials[index].duplicate()
 		if victory_materials.has(index): piece.material_override = victory_materials[index]
 	_set_victory_mix(victory_mix)
-	if victory_mix>=0.999 or (victory_tween != null and victory_tween.is_valid()): return
+	if victory_animation_started: return
+	victory_animation_started = true
 	if _rm_enabled:
 		_set_victory_mix(1.0)
 		return
 	victory_tween = create_tween()
+	victory_tween.tween_method(_set_victory_mix, 0.0, 1.0, VICTORY_HALF_CYCLE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	victory_tween.tween_method(_set_victory_mix, 1.0, 0.0, VICTORY_HALF_CYCLE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	victory_tween.tween_method(_set_victory_mix, 0.0, 1.0, VICTORY_HALF_CYCLE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
@@ -523,7 +544,7 @@ func _set_victory_mix(value: float) -> void:
 	for index: int in victory_materials:
 		var source := home_materials[index] as StandardMaterial3D
 		var material := victory_materials[index] as StandardMaterial3D
-		# Darken in place, including reserves. Never move, hide or fade a stone.
+		# Only played, non-winning stones participate; reserves stay unchanged.
 		var target := source.albedo_color.lerp(Color.BLACK, VICTORY_DIM)
 		target.a = source.albedo_color.a
 		material.albedo_color = source.albedo_color.lerp(target, value)
@@ -541,6 +562,7 @@ func _stop_victory_colors() -> void:
 			_restore_visual_material(index)
 	victory_materials.clear()
 	victory_mix = 0.0
+	victory_animation_started = false
 	continue_pending = false
 	continue_due_msec = 0
 	continue_round_key = ""

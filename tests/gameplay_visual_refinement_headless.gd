@@ -168,15 +168,16 @@ func _run() -> void:
 	_expect(game.result_button.text == "استمرار","round button has text")
 	_expect(game.result_button.position.y > root.get_visible_rect().size.y*0.65,"continue is below board")
 	await create_timer(1.9).timeout
-	_expect(game.round_complete and game.victory_mix > 0.9,"stones darken in place and wait for explicit consent")
+	_expect(game.round_complete and game.victory_mix > 0.9,"played stones dim smoothly before returning to their color")
 	game._set_victory_mix(1.0)
 	for index: int in range(game.piece_records.size()):
 		var material: StandardMaterial3D = game.piece_records[index]["mesh"].material_override
 		_expect(game.piece_records[index]["mesh"].position.is_equal_approx(victory_starts[index]),"victory never raises or relocates a stone")
-		if winning.has(index):
-			_expect(material == game.home_materials[index],"winning stones retain exact material")
+		if winning.has(index) or not bool(game.piece_records[index].get("played", false)):
+			_expect(material == game.home_materials[index],"winning and reserve stones retain exact material")
 		else:
-			_expect(material.albedo_color.a==game.home_materials[index].albedo_color.a and game.piece_records[index]["mesh"].visible and material.albedo_color.r<0.05 and material.albedo_color.g<0.05 and material.albedo_color.b<0.05,"nonwinning board and reserve stones remain opaque and nearly black")
+			var expected: Color = game.home_materials[index].albedo_color.lerp(Color.BLACK, game.VICTORY_DIM)
+			_expect(material.albedo_color.is_equal_approx(expected) and game.piece_records[index]["mesh"].visible,"nonwinning played stones dim without turning black")
 	game._set_victory_mix(0.0)
 	for index: int in game.victory_materials:
 		_expect(game.victory_materials[index].albedo_color.is_equal_approx(game.home_materials[index].albedo_color),"original color returns")
