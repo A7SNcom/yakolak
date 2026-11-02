@@ -767,6 +767,10 @@ func _apply_visual_preferences(quality: String, sound_enabled: bool) -> void:
 		_: get_viewport().msaa_3d = Viewport.MSAA_4X
 	if AudioServer.get_bus_count() > 0:
 		AudioServer.set_bus_mute(0, not sound_enabled)
+	var game := intro.get_node_or_null("PostIntroGameplay") if intro != null else null
+	if game != null:
+		game.set("graphics_quality",quality if quality in ["high","medium","low"] else "high")
+		game.call("_sync_preference_labels")
 
 func _restore_visual_camera(preserve_pose: bool = false) -> void:
 	if not preserve_pose and intro != null and not visual_camera_snapshot.is_empty():

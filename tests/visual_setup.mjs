@@ -187,6 +187,15 @@ test('four home actions lead from profile and color directly to the editable ros
   dom.window.close();
  });
 
+test('native preferences survive the return to setup',async()=>{
+ const dom=new JSDOM('<body></body>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true}),{window}=dom;
+ const api=mountSetup(window.document,window);api.open();api.close();
+ window.localStorage.setItem('yakolak-graphics-quality','medium');window.localStorage.setItem('yakolak-sound-enabled','false');
+ api.open();await new Promise(resolve=>window.setTimeout(resolve,0));window.document.querySelector('.yk-settings-home').click();
+ assert.equal(window.document.querySelector('[data-quality=medium]').getAttribute('aria-pressed'),'true');
+ assert.equal(window.document.querySelector('.yk-setting-sound').getAttribute('aria-pressed'),'false');
+ assert.equal(window.localStorage.getItem('yakolak-graphics-quality'),'medium');assert.equal(window.localStorage.getItem('yakolak-sound-enabled'),'false');dom.window.close();
+});
 test('new settings restore the same roster directly to ready without visitor onboarding',()=>{
  const config={rounds:5,players:[{color:'green',label:'أحمد',mode:'local'},{color:'blue',label:'ريم',mode:'local'},{color:'gold',label:'كمبيوتر ذهبي',mode:'bot'}]};
  const restored=restoreSetup(config);assert.equal(restored.step,'ready');assert.equal(restored.rounds,5);assert.equal(restored.hostColor,'green');

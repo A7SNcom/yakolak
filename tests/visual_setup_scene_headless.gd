@@ -90,6 +90,12 @@ func _run() -> void:
 			push_error("Seat dimming did not settle on its inactive color")
 			quit(1)
 			return
+	setup._on_visual_action([JSON.stringify({"action":"setting","graphics_quality":"low","sound_enabled":false})])
+	if game.graphics_quality != "low" or not game.quick_graphics_button.text.contains("منخفضة") or not AudioServer.is_bus_mute(0):
+		push_error("Setup preferences must update the active gameplay settings state")
+		quit(1)
+		return
+	setup._on_visual_action([JSON.stringify({"action":"setting","graphics_quality":"high","sound_enabled":true})])
 	setup._on_visual_action([JSON.stringify({"action":"preview","step":"rounds","all_seats":[{"color":"green","mode":"local"},{"color":"marble","mode":"bot"},{"color":"blue","mode":"none"},{"color":"gold","mode":"none"}]})])
 	await create_timer(0.16).timeout
 	for record: Dictionary in intro.pieces:
