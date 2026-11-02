@@ -51,7 +51,7 @@ var visual_round_marker_selection_tweens: Dictionary = {}
 var visual_round_marker_generation: int = 0
 var visual_round_markers_visible: bool = false
 var visual_selected_rounds: int = 3
-const ROUND_MARKER_TABLE_Y: float = 0.35
+const ROUND_MARKER_TABLE_Y: float = -0.04
 
 func _ready() -> void:
 	super._ready()
@@ -667,7 +667,9 @@ func _update_visual_seats() -> void:
 
 	# Side racks share the table fade, and retain their original materials for
 	# both cancellation and the handoff into a real match.
-	for value: Variant in intro.bases.values():
+	var table_contents: Array = intro.bases.values()
+	table_contents.append(intro.board)
+	for value: Variant in table_contents:
 		var base := value as GeometryInstance3D
 		if base == null: continue
 		var key := base.get_instance_id()

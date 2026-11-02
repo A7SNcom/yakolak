@@ -110,6 +110,10 @@ func _run() -> void:
 			quit(1)
 			return
 	for wins: int in [3,5]:
+		if (intro.board.material_override as BaseMaterial3D).albedo_color.a>0.02:
+			push_error("The board must fade so only round choices remain on the tabletop")
+			quit(1)
+			return
 		var numeral = setup.visual_round_markers[wins].get_node("Numeral")
 		if not numeral is MeshInstance3D or not numeral.mesh is TextMesh or numeral.mesh.depth<=0.0:
 			push_error("Round choices must be solid extruded number meshes")
