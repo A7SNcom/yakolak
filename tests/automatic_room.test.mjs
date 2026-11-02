@@ -38,7 +38,7 @@ test('new room opens three online seats and accepts a mixed online, computer, an
  const admitted=join(a,'g','blue').room;listener({role:'host',room:admitted});
  assert.equal(q('[data-color=blue] .yk-seat-status').textContent,'ضيف g');
  q('[data-color=gold]').click();assert.deepEqual([...w.document.querySelectorAll('.yk-menu-item')].map(x=>x.textContent),['كمبيوتر','لاعب في نفس الجهاز']);q('.yk-menu-item:first-child').click();await tick();
- q('[data-color=green]').click();q('.yk-menu-item').at(-1).click();await tick();assert.equal(q('[data-color=green] .yk-seat-status').textContent,'لاعب');
+ q('[data-color=green]').click();[...w.document.querySelectorAll('.yk-menu-item')].at(-1).click();await tick();assert.equal(q('[data-color=green] .yk-seat-status').textContent,'لاعب');
  q('.yk-start').click();q('.yk-rounds button').click();await tick();
  const startedEvent=events.find(e=>e.action==='start');assert.equal(started,1);assert.equal(a.snapshot().status,'playing');assert.equal(startedEvent.automatic_room,true);assert.equal(startedEvent.players.length,4);assert.equal(startedEvent.players[1].label,'ضيف g');assert.equal(startedEvent.players[2].label,'كمبيوتر');assert.equal(startedEvent.players[3].label,'لاعب');dom.window.close();
 });
@@ -48,7 +48,7 @@ test('failed public signaling never invents a room and preserves native local pl
  const client={subscribe(){},async prepareHost(){throw new Error('signaling_unavailable')},async dispatch(){assert.fail('a fully local match must not use online dispatch')}};
  const api=mountSetup(w.document,w,client);api.open({online:true,resume:roster(2)});await tick();
  const q=s=>w.document.querySelector(s);assert.equal(q('.yk-room-code').textContent,'—');assert.equal(q('.yk-sharing').disabled,true);
- q('[data-color=gold]').click();q('.yk-menu-item:first-child').click();await tick();q('[data-color=green]').click();q('.yk-menu-item').at(-1).click();await tick();
+ q('[data-color=gold]').click();q('.yk-menu-item:first-child').click();await tick();q('[data-color=green]').click();[...w.document.querySelectorAll('.yk-menu-item')].at(-1).click();await tick();
  q('.yk-start').click();q('.yk-rounds button').click();await tick();assert.equal(events.find(e=>e.action==='start').automatic_room,false);dom.window.close();
 });
 
