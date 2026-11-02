@@ -36,7 +36,7 @@ func _build_quick_menu() -> void:
 	super._build_quick_menu()
 	if quick_button != null:
 		quick_button.toggle_mode = true
-		quick_button.tooltip_text = "القائمة"
+		quick_button.tooltip_text = "الإعدادات"
 	if quick_sound_button != null:
 		quick_sound_button.toggle_mode = true
 		quick_sound_button.tooltip_text = "تشغيل أو كتم الصوت"

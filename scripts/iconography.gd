@@ -56,7 +56,7 @@ func _apply_iconography() -> void:
 		var menu_value: Variant = gameplay.get("quick_button")
 		if menu_value is Button:
 			var menu_button := menu_value as Button
-			_apply_icon_button(menu_button, menu_icon, "القائمة")
+			_apply_icon_button(menu_button, menu_icon, "الإعدادات")
 			menu_ok = menu_button.text.is_empty() and menu_button.icon == menu_icon
 
 	if (not close_ok or not menu_ok) and apply_attempts < 4:
@@ -109,7 +109,7 @@ func _publish_icon_audit(close_ok: bool, menu_ok: bool) -> void:
 	JavaScriptBridge.eval(
 		"document.body.dataset.yakolakIconSystem='" + ICON_SYSTEM + "';" +
 		"document.body.dataset.yakolakIconClose='back|labelled|container-owned';" +
-		"document.body.dataset.yakolakIconMenu='ellipsis|icon-only|24-grid|stroke-2';" +
+		"document.body.dataset.yakolakIconMenu='settings|icon-only|24-grid|stroke-2';" +
 		"document.body.dataset.yakolakIconRtl='no-directional-controls';" +
 		"document.body.dataset.yakolakIconAudit='" + ("passed" if passed else "failed") + "';",
 		true

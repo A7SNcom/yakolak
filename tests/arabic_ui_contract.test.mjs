@@ -23,7 +23,8 @@ const setupDesign = fs.readFileSync(new URL('../scripts/session_setup_design_sys
 const design = fs.readFileSync(new URL('../scripts/ui_design.gd', import.meta.url), 'utf8');
 const iconography = fs.readFileSync(new URL('../scripts/iconography.gd', import.meta.url), 'utf8');
 const closeIcon = fs.readFileSync(new URL('../assets/icons/lucide/x.svg', import.meta.url), 'utf8');
-const menuIcon = fs.readFileSync(new URL('../assets/icons/lucide/ellipsis.svg', import.meta.url), 'utf8');
+const menuIcon = fs.readFileSync(new URL('../assets/icons/lucide/settings.svg', import.meta.url), 'utf8');
+const exportPreset = fs.readFileSync(new URL('../export_presets.cfg', import.meta.url), 'utf8');
 const online = fs.readFileSync(new URL('../scripts/online_session.gd', import.meta.url), 'utf8');
 const onlineHardened = fs.readFileSync(new URL('../scripts/online_session_hardened.gd', import.meta.url), 'utf8');
 const onlineReconnect = fs.readFileSync(new URL('../scripts/online_session_reconnect_hydration.gd', import.meta.url), 'utf8');
@@ -113,7 +114,8 @@ assert.ok(server.includes("replace(/[٠-٩]/g"), 'the server must accept Arabic-
 // loading star, stones and score markers are intentionally outside this system.
 assert.ok(scene.includes('res://scripts/iconography.gd'), 'the unified iconography layer must remain active');
 assert.ok(scene.includes('res://assets/icons/lucide/x.svg'), 'close SVG must be an explicit scene dependency for Web export');
-assert.ok(scene.includes('res://assets/icons/lucide/ellipsis.svg'), 'menu SVG must be an explicit scene dependency for Web export');
+assert.ok(scene.includes('res://assets/icons/lucide/settings.svg'), 'settings gear SVG must be an explicit scene dependency for Web export');
+assert.ok(exportPreset.includes('res://scripts/gameplay_reduced_motion_parity.gd'), 'exported PCK must include the inherited reduced-motion gameplay base');
 assert.ok(scene.includes('close_icon = ExtResource'), 'scene must inject the close SVG into the icon system');
 assert.ok(scene.includes('menu_icon = ExtResource'), 'scene must inject the menu SVG into the icon system');
 assert.ok(iconography.includes('ICON_SYSTEM := "lucide-svg-1.27.0"'), 'the icon family/version must be explicit and pinned');
