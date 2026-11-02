@@ -662,7 +662,20 @@ export function mountSetup(document, window, client=P2P) {
     geometry(points){geometry=points;root.dataset.world=String(!!points.world);position();},
     error(text){root.hidden=false;showError(text);},
     networkError(code){pending=moving=networkBusy=false;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';if(state.step==='rounds')state={...state,step:'ready'};roomCode=client?.code||'';lobbySignature='';render();showError(arabicNetworkError(code));},
-    room(room){roomCode=/^\d{3}$/.test(String(room.code||''))?String(room.code):'';connections=(room.players||[]).filter(x=>x.connected!==false&&x.name).map(x=>({seat:String(x.seat),name:String(x.name).slice(0,24)}));if(Array.isArray(room.slots))state={...state,onlineSeatOrder:room.slots.map(s=>s.color),seats:state.seats.map(seat=>{const slot=room.slots.find(s=>s.color===seat.color);const occupant=(room.players||[]).find(p=>p.color===seat.color);return slot?{...seat,mode:slot.mode==='online'&&!occupant?'none':slot.mode,name:occupant?.name||(slot.mode==='online'?'':slot.name)||''}:{...seat,mode:'none',name:''}})};render();const token=flowGeneration;window.setTimeout(()=>{if(token===flowGeneration&&!root.hidden)notify('preview');},0);}
+    room(room){
+      const players=Array.isArray(room.players)?room.players:[],slots=Array.isArray(room.slots)?room.slots:[];
+      roomCode=/^\d{3}$/.test(String(room.code||''))?String(room.code):'';
+      const onlineSeats=new Set(slots.filter(slot=>slot.mode==='online'&&players.some(player=>String(player.seat)===String(slot.seat)&&player.connected!==false)).map(slot=>String(slot.seat)));
+      connections=players.filter(player=>player.connected!==false&&player.name&&(player.mode==='online'||onlineSeats.has(String(player.seat)))).map(player=>({seat:String(player.seat),name:String(player.name).slice(0,24)}));
+      if(slots.length)state={...state,onlineSeatOrder:slots.map(slot=>slot.color),seats:state.seats.map(seat=>{
+        const slot=slots.find(value=>value.color===seat.color),occupant=players.find(player=>player.color===seat.color);
+        if(!slot)return {...seat,mode:'none',name:''};
+        const mode=slot.mode==='online'&&!occupant?'none':slot.mode;
+        const name=slot.mode==='online'?(occupant?.name||''):slot.seat==='p1'?(occupant?.name||slot.name||''):'';
+        return {...seat,mode,name};
+      })};
+      render();const token=flowGeneration;window.setTimeout(()=>{if(token===flowGeneration&&!root.hidden)notify('preview');},0);
+    }
   };
   window.YakolakSetup=api;viewport();
   client?.subscribe(detail=>{
