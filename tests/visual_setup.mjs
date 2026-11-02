@@ -148,7 +148,7 @@ test('four home actions lead from profile and color directly to the editable ros
   q('[data-color=green]').click();q('[data-color=green] .yk-menu-item:nth-child(1)').click();assert.equal(q('[data-color=green] .yk-seat-status').textContent,'كمبيوتر');
   q('[data-color=marble]').click();q('[data-color=marble] .yk-menu-item:nth-child(1)').click();assert.equal(q('[data-color=marble] .yk-seat-status').textContent,'كمبيوتر');
   q('.yk-start').click();assert.equal(q('.yk-rounds').hidden,false);assert.equal(q('h1').textContent,'كم شوط للفوز؟');assert.equal(events.some(x=>x.action==='start'),false);
-  q('.yk-rounds button[aria-label="الفوز بـ 5 أشواط"]').click();const start=events.find(x=>x.action==='start');assert.equal(start.rounds,5);assert.equal(start.players[1].label,'لاعب');assert.equal(start.players[2].label,'كمبيوتر');assert.equal(start.players.length,4);
+  q('.yk-rounds button[aria-label="الفوز بـ 5 أشواط"]').click();await Promise.resolve();const start=events.find(x=>x.action==='start');assert.equal(start.rounds,5);assert.equal(start.players[1].label,'لاعب');assert.equal(start.players[2].label,'كمبيوتر');assert.equal(start.players.length,4);
   assert.ok(!JSON.stringify(events).includes('0551234567'));
   api.open();assert.equal(q('.yk-entry').hidden,false);assert.equal(q('.yk-modal').hidden,true);assert.equal(q('input[autocomplete=given-name]'),null);
   q('.yk-entry .yk-outline').click();q('input').value='https://a7sncom.github.io/yakolak/?room=123';q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));assert.match(q('.yk-field-error').textContent,/غير متاح/);
