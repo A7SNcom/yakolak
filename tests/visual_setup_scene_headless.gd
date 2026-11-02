@@ -91,10 +91,17 @@ func _run() -> void:
 			quit(1)
 			return
 	setup._on_visual_action([JSON.stringify({"action":"preview","step":"rounds","all_seats":[{"color":"green","mode":"local"},{"color":"marble","mode":"bot"},{"color":"blue","mode":"none"},{"color":"gold","mode":"none"}]})])
-	await create_timer(0.4).timeout
+	await create_timer(0.16).timeout
 	for record: Dictionary in intro.pieces:
-		if record["dir"] in ["back","left"] and not (record["mesh"].material_override as BaseMaterial3D).albedo_color.is_equal_approx(setup.visual_inactive_material.albedo_color):
-			push_error("Inactive seats became active at win target question")
+		var alpha := (record["mesh"].material_override as BaseMaterial3D).albedo_color.a
+		if alpha<=0.02 or alpha>=0.98:
+			push_error("Table pieces must fade smoothly into the round selector")
+			quit(1)
+			return
+	await create_timer(0.34).timeout
+	for record: Dictionary in intro.pieces:
+		if (record["mesh"].material_override as BaseMaterial3D).albedo_color.a>0.02:
+			push_error("Table pieces did not finish fading before the round selector")
 			quit(1)
 			return
 	var setup_pose := cam.transform
