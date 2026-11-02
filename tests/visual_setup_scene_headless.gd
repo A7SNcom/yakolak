@@ -172,7 +172,11 @@ func _run() -> void:
 		push_error("The active gameplay settings panel must be centered")
 		quit(1)
 		return
-	game._return_to_setup()
+	if not game.quick_exit_button.visible:
+		push_error("Every match must expose leaving inside settings")
+		quit(1)
+		return
+	game.quick_exit_button.pressed.emit()
 	if not cam.transform.is_equal_approx(exit_pose):
 		push_error("Exit snapped the camera before its transition")
 		quit(1)

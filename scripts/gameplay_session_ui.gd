@@ -367,7 +367,7 @@ func _sync_quick_menu() -> void:
 	if quick_panel != null and not should_show:
 		quick_panel.visible = false
 	if quick_exit_button != null:
-		quick_exit_button.visible = should_show and (online_active or online_waiting or online_cancelled)
+		quick_exit_button.visible = should_show
 	_layout_quick_menu()
 	var state: String = "ready" if should_show else "hidden"
 	if state == quick_visibility_state:
