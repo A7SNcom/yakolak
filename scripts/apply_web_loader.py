@@ -521,6 +521,14 @@ STARTUP_FAILURE = r'''
 '''
 
 
+def boot_loader_before_engine(html: str) -> str:
+    engine = '<script src="index.js"></script>'
+    if html.count(engine) != 1:
+        raise RuntimeError("Godot engine script missing or duplicated")
+    html = re.sub(r'<script id="yakolak-v130-loading-star-script">.*?</script>\s*', '', html, flags=re.S)
+    return re.sub(r'\s*' + re.escape(engine), lambda _: '\n' + SCRIPT.strip() + '\n' + engine, html, count=1)
+
+
 def inject_startup_failure(html: str) -> str:
     # Also refresh an existing export, without touching its engine or intro.
     html = re.sub(r'\n?<style id="yakolak-startup-failure-style">.*?</style>\s*'
@@ -658,7 +666,7 @@ def main() -> None:
         )
         if css_count != 1 or script_count != 1:
             raise RuntimeError("existing setup asset references missing")
-        INDEX.write_text(write_pwa(inject_startup_failure(html)), encoding="utf-8", newline="\n")
+        INDEX.write_text(write_pwa(inject_startup_failure(boot_loader_before_engine(html))), encoding="utf-8", newline="\n")
         print(f"YAKOLAK_WEB_SETUP_ASSETS_REFRESHED version={setup_version}")
         return
     semantic_markers = (
@@ -675,7 +683,7 @@ def main() -> None:
     html, count = re.subn(r"(<body[^>]*>)", r"\1\n" + markup + "\n" + SEMANTIC_MARKUP, html, count=1, flags=re.I)
     if count != 1:
         raise RuntimeError("body missing")
-    html = html.replace("</body>", SCRIPT + "\n" + SEMANTIC_SCRIPT + "\n</body>", 1)
+    html = html.replace("</body>", SEMANTIC_SCRIPT + "\n</body>", 1)
     for marker in semantic_markers:
         if html.count(marker) != 1:
             raise RuntimeError(f"semantic marker count mismatch: {marker}")
@@ -699,7 +707,7 @@ def main() -> None:
     write_surface_preview(setup_version)
     html = html.replace("</head>", f'<link rel="stylesheet" href="visual-setup.css?v={setup_version}">\n</head>', 1)
     html = html.replace("</body>", f'<script type="module" src="visual-setup.mjs?v={setup_version}"></script>\n</body>', 1)
-    INDEX.write_text(write_pwa(inject_startup_failure(html)), encoding="utf-8", newline="\n")
+    INDEX.write_text(write_pwa(inject_startup_failure(boot_loader_before_engine(html))), encoding="utf-8", newline="\n")
     print("YAKOLAK_BALANCED_BRAND_LOADER_WITH_CANONICAL_SVG_HANDOFF_AND_SEMANTIC_DOM_INJECTED")
 
 

@@ -141,7 +141,7 @@ func _process(delta: float) -> void:
 	visual_geometry_elapsed += delta
 	_apply_visual_camera()
 	var viewport := get_viewport().get_visible_rect().size
-	if viewport != visual_last_viewport or visual_zoom_mix < 1.0 or (orbiting and visual_geometry_elapsed>=0.10):
+	if viewport != visual_last_viewport or visual_zoom_mix < 1.0 or ((orbiting or visual_step == "rounds") and visual_geometry_elapsed>=0.10):
 		visual_geometry_elapsed=0.0
 		_publish_visual_geometry()
 
@@ -420,13 +420,15 @@ func _visual_seat_points() -> Dictionary:
 	var heading := Vector2(canvas_css_size.x*0.5,maxf(48.0,visual_board_rect.position.y-42.0))
 	var actions := Vector2(canvas_css_size.x*0.5,minf(canvas_css_size.y-70.0,visual_board_rect.end.y+30.0))
 	var round_points: Dictionary = {}
+	var rounds_ready := visual_step == "rounds" and visual_round_markers.size() == 2
 	if visual_step == "rounds":
 		for wins: int in [3, 5]:
 			var marker := visual_round_markers.get(wins) as Node3D
 			if marker != null:
+				if absf(marker.position.y - ROUND_MARKER_TABLE_Y) > 0.01: rounds_ready = false
 				var projected := cam.unproject_position(marker.to_global(Vector3(0.0, 0.24, 0.0)))
 				round_points[str(wins)] = [projected.x/canvas_css_size.x, projected.y/canvas_css_size.y]
-	return {"controls":controls,"control_angles":control_angles,"world":true,"seats":points,"hits":hit_points,"prompt":[heading.x/canvas_css_size.x,heading.y/canvas_css_size.y],"actions":[actions.x/canvas_css_size.x,actions.y/canvas_css_size.y],"rounds":round_points,"board":[visual_board_rect.position.x,visual_board_rect.position.y,visual_board_rect.size.x,visual_board_rect.size.y]}
+	return {"controls":controls,"control_angles":control_angles,"world":true,"seats":points,"hits":hit_points,"prompt":[heading.x/canvas_css_size.x,heading.y/canvas_css_size.y],"actions":[actions.x/canvas_css_size.x,actions.y/canvas_css_size.y],"rounds":round_points,"rounds_ready":rounds_ready,"board":[visual_board_rect.position.x,visual_board_rect.position.y,visual_board_rect.size.x,visual_board_rect.size.y]}
 
 func _sync_round_markers() -> void:
 	var should_show := visual_active and visual_step == "rounds"

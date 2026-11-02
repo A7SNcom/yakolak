@@ -123,12 +123,12 @@ test('four home actions lead from profile and color directly to the editable ros
   assert.equal(q('.yk-entry').hidden,false);
   assert.equal(q('.yk-modal').hidden,true);
   assert.deepEqual([...document.querySelectorAll('.yk-entry button')].map(x=>x.textContent),['غرفة جديدة','انضمام لغرفة','كيف تنلعب؟','الإعدادات']);
-  q('.yk-settings-home').click();
+  q('.yk-settings-home').click();assert.equal(document.activeElement,q('.yk-settings-close'));
   assert.deepEqual([...q('.yk-settings-options').children].map(x=>x.textContent),['عالية','متوسطة','منخفضة']);
   assert.equal(q('.yk-settings-options [data-quality=high]').getAttribute('aria-pressed'),'true');
   q('.yk-settings-options [data-quality=low]').click();assert.equal(window.localStorage.getItem('yakolak-graphics-quality'),'low');
   q('.yk-setting-sound').click();assert.equal(window.localStorage.getItem('yakolak-sound-enabled'),'false');
-  q('.yk-modal').dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+  document.activeElement.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(q('.yk-modal').hidden,true);
   api.open();
   q('.yk-entry button').click();
   q('input[type=tel]').value='٠٥٥۱۲۳٤٥٦٧';q('input[type=tel]').dispatchEvent(new window.Event('input'));

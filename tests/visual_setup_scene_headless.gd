@@ -115,6 +115,17 @@ func _run() -> void:
 			push_error("Round choices must be solid extruded number meshes")
 			quit(1)
 			return
+	await create_timer(0.9).timeout
+	var round_geometry: Dictionary = setup._visual_seat_points()
+	if not bool(round_geometry.get("rounds_ready",false)):
+		push_error("Round choices did not settle into selectable positions")
+		quit(1)
+		return
+	for point: Array in round_geometry["rounds"].values():
+		if float(point[0])<=0.0 or float(point[0])>=1.0 or float(point[1])<=0.0 or float(point[1])>=1.0:
+			push_error("Round choice hit targets must stay inside the viewport")
+			quit(1)
+			return
 	var setup_pose := cam.transform
 	var setup_fov := cam.fov
 	setup._on_visual_action([JSON.stringify({"action":"start","rounds":3,"players":[{"color":"green","mode":"local","label":"أحمد","device_owner":"p1"},{"color":"marble","mode":"bot","label":"بوت","device_owner":"p1"}]})])

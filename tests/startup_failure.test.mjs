@@ -6,6 +6,9 @@ import {JSDOM} from 'jsdom';
 const fixture=JSON.parse(execFileSync('python3',['-c',`
 import json,runpy
 m=runpy.run_path('scripts/apply_web_loader.py')
+boot=m['boot_loader_before_engine']('<html><body><script src="index.js"></script><script>engine.startGame({})</script></body></html>')
+assert boot.index('id="yakolak-v130-loading-star-script"') < boot.index('src="index.js"') < boot.index('engine.startGame')
+assert m['boot_loader_before_engine'](boot)==boot
 base='<html><body><div id="yakolakLoader" aria-busy="true"></div><div id="status-notice"></div></body></html>'
 html=m['inject_startup_failure'](base)
 assert m['inject_startup_failure'](html)==html
