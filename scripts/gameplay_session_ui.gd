@@ -114,7 +114,7 @@ func _build_quick_menu() -> void:
 	quick_button = Button.new()
 	quick_button.text = ""
 	quick_button.icon = SETTINGS_ICON
-	quick_button.icon_max_width = 24
+	quick_button.add_theme_constant_override("icon_max_width", 24)
 	quick_button.expand_icon = true
 	quick_button.flat = true
 	quick_button.tooltip_text = "فتح الإعدادات"
