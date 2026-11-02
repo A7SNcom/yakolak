@@ -174,3 +174,18 @@
 #yakolakVisualSetup[data-guest=color] .is-reserved .yk-seat-status{position:relative;z-index:1;font-weight:500;line-height:1.5;direction:rtl;unicode-bidi:isolate;transform:translateY(var(--yk-bow,0px));}
 #yakolakVisualSetup[data-guest=color] .is-reserved .yk-seat-arrow,#yakolakVisualSetup[data-guest=waiting] .yk-seat-arrow{visibility:hidden;}
 #yakolakVisualSetup .yk-seat[aria-disabled=true]{cursor:default;}
+/* Shared controls: consistent scale, clear Arabic shaping and safe screen edges. */
+#yakolakVisualSetup .yk-header{top:max(12px,env(safe-area-inset-top));right:max(16px,env(safe-area-inset-right));left:max(16px,env(safe-area-inset-left))}
+#yakolakVisualSetup .yk-identity{right:54px;max-width:calc(100% - 64px);padding:8px 10px;line-height:1.6}
+#yakolakVisualSetup .yk-entry>button[class]{min-height:56px;padding:12px 10px;font-size:17px;font-weight:500;line-height:1.5;color:#f4f4f5;border:1px solid #ffffff50;border-radius:16px;background:linear-gradient(135deg,#555b67b8,#222731c9);box-shadow:0 6px 18px #0003,inset 0 1px #ffffff24}
+#yakolakVisualSetup .yk-share-group{align-self:center;display:flex;flex-direction:column;align-items:center;gap:5px}
+#yakolakVisualSetup .yk-share-caption{font-size:11px;line-height:1.6;font-weight:400;opacity:.72;text-align:center;max-width:170px;pointer-events:none}
+#yakolakVisualSetup .yk-network-status{position:fixed;bottom:max(12px,env(safe-area-inset-bottom));left:50%;width:36px;height:2px;overflow:hidden;opacity:.45;transform:translateX(-50%);pointer-events:none}
+#yakolakVisualSetup .yk-network-status:after{content:'';position:absolute;inset:0;background:#fff;animation:yk-connection 1.4s ease-in-out infinite}
+@keyframes yk-connection{0%,100%{opacity:.2;transform:scaleX(.35)}50%{opacity:.7;transform:scaleX(1)}}
+#yakolakVisualSetup .yk-modal[data-kind=settings] .yk-sheet{position:absolute;max-height:calc(100% - 32px);overflow:auto}
+#yakolakVisualSetup[data-step=ready] .yk-seat-status,#yakolakVisualSetup .yk-modal[data-kind=seat] .yk-button-label{padding-inline:3px;overflow:visible;line-height:1.65}
+#yakolakVisualSetup .yk-modal[data-kind=seat] .yk-menu{gap:0}
+@media(prefers-reduced-motion:reduce){#yakolakVisualSetup .yk-network-status:after{animation:none;opacity:.5}}
+
+#yakolakVisualSetup .yk-network-status:before{display:none}
