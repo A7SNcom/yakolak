@@ -363,6 +363,7 @@ export function mountSetup(document, window, client=P2P) {
     actions.style.top=`${centeredEntry?Math.max(16,(height-h)/2):Math.max(12,Math.min(target[1]*height,height-h-16))}px`;
     rounds.style.visibility=state.step==='rounds'&&!geometry.rounds?'hidden':'';
     for(const choice of rounds.children){
+      choice.disabled=pending||!!(geometry.world&&state.step==='rounds'&&!geometry.rounds_ready);
       const point=geometry.rounds?.[choice.querySelector('.yk-round-number')?.textContent];
       if(point){choice.style.left=`${point[0]*width}px`;choice.style.top=`${point[1]*height}px`;}
     }
@@ -454,7 +455,7 @@ export function mountSetup(document, window, client=P2P) {
     start.hidden=state.step!=='ready'||guestPhase==='color'||(!guestPhase&&!state.seats.some((seat,index)=>index>0&&['local','bot','online'].includes(seat.mode)));shareGroup.hidden=state.step!=='ready'||!roomCode;sharing.hidden=state.step!=='ready'||!roomCode;start.disabled=networkBusy||hostAwaitingStart||guestPhase==='waiting'||guestBusy||pending;rounds.hidden=state.step!=='rounds';confirm.disabled=guestBusy||(networkBusy&&state.step!=='color');
     start.textContent=guestPhase==='waiting'?'بانتظار المضيف…':hostAwaitingStart?'بانتظار اللاعبين…':'ابدأ اللعب';
     code.textContent=networkBusy?'…':roomCode||'—';sharing.classList.toggle('is-unavailable',!roomCode);sharing.disabled=!roomCode||networkBusy;sharing.setAttribute('aria-disabled',String(!roomCode));
-    [...rounds.children].forEach(b=>{b.disabled=pending;b.setAttribute('aria-pressed',String(state.step==='rounds'&&Number(b.querySelector('.yk-round-number')?.textContent)===state.rounds));});
+    [...rounds.children].forEach(b=>{b.disabled=pending||!!(geometry.world&&state.step==='rounds'&&!geometry.rounds_ready);b.setAttribute('aria-pressed',String(state.step==='rounds'&&Number(b.querySelector('.yk-round-number')?.textContent)===state.rounds));});
     for(const {b,status,color} of seatButtons){
       const index=state.seats.findIndex(x=>x.color===color.id),seat=state.seats[index];
       const reserved=guestPhase==='color'&&!guestPreview?.availableColors?.includes(color.id);
@@ -494,6 +495,7 @@ export function mountSetup(document, window, client=P2P) {
     notify('preview',{rounds:n});
     const motions=[];
     for(const choice of rounds.children){
+      choice.disabled=pending||!!(geometry.world&&state.step==='rounds'&&!geometry.rounds_ready);
       const selected=Number(choice.querySelector('.yk-round-number')?.textContent)===n;
       choice.classList.toggle('is-selected',selected);choice.setAttribute('aria-pressed',String(selected));
       const motion=animate(choice,selected?[{opacity:1,transform:'translate(-50%,-50%) scale(1)'},{opacity:1,transform:'translate(-50%,-50%) scale(1.045)'}]:[{opacity:1,transform:'translate(-50%,-50%) scale(1)'},{opacity:0,transform:'translate(-50%,-58%) scale(.94)'}],380);
