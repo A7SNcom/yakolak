@@ -537,6 +537,9 @@ export function mountSetup(document, window, client=P2P) {
   }
   function openSettings(event){
     openSheet('الإعدادات',event?.currentTarget||settingsToggle,'settings');
+    const close=button('',()=>closeSheet(true),'yk-settings-close');close.setAttribute('aria-label','إغلاق الإعدادات');
+    const closeSvg=document.createElementNS('http://www.w3.org/2000/svg','svg');closeSvg.setAttribute('viewBox','0 0 24 24');closeSvg.setAttribute('aria-hidden','true');
+    const closePath=document.createElementNS(closeSvg.namespaceURI,'path');closePath.setAttribute('d','M6 6 18 18M18 6 6 18');closeSvg.append(closePath);close.append(closeSvg);sheet.append(close);
     const heading=el('h3','','جودة الرسومات');heading.className='yk-settings-heading';sheet.append(heading);
     const graphics=el('div','yk-settings-options');graphics.setAttribute('role','group');graphics.setAttribute('aria-label','جودة الرسومات');
     for(const [value,label] of [['high','عالية'],['medium','متوسطة'],['low','منخفضة']]){
@@ -549,6 +552,7 @@ export function mountSetup(document, window, client=P2P) {
       const leave=button('مغادرة الغرفة',()=>{closeSheet(true,()=>void leaveGuestLobby());},'yk-outline yk-setting-leave');sheet.append(leave);
     }
     positionSheet();
+    close.focus({preventScroll:true});
   }
   function closeSheet(animated=false,after=()=>{}){
     if(modal.hidden){after();return;}

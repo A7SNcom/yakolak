@@ -189,3 +189,6 @@
 @media(prefers-reduced-motion:reduce){#yakolakVisualSetup .yk-network-status:after{animation:none;opacity:.5}}
 
 #yakolakVisualSetup .yk-network-status:before{display:none}
+#yakolakVisualSetup .yk-settings-close{position:absolute;top:8px;left:8px;width:40px;height:40px;min-height:40px;padding:10px;display:grid;place-items:center;opacity:.75}
+#yakolakVisualSetup .yk-settings-close svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round}
+#yakolakVisualSetup .yk-modal[data-kind=settings]{background:#00000038;pointer-events:auto}
