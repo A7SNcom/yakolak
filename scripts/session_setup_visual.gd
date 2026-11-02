@@ -51,7 +51,7 @@ var visual_round_marker_selection_tweens: Dictionary = {}
 var visual_round_marker_generation: int = 0
 var visual_round_markers_visible: bool = false
 var visual_selected_rounds: int = 3
-const ROUND_MARKER_TABLE_Y: float = -0.04
+const ROUND_MARKER_TABLE_Y: float = 0.35
 
 func _ready() -> void:
 	super._ready()
@@ -427,7 +427,7 @@ func _visual_seat_points() -> Dictionary:
 			if marker != null:
 				if absf(marker.position.y - ROUND_MARKER_TABLE_Y) > 0.01: rounds_ready = false
 				var projected := cam.unproject_position(marker.to_global(Vector3(0.0, 0.24, 0.0)))
-				round_points[str(wins)] = [projected.x/canvas_css_size.x, projected.y/canvas_css_size.y]
+				round_points[str(wins)] = [projected.x/viewport.x, projected.y/viewport.y]
 	return {"controls":controls,"control_angles":control_angles,"world":true,"seats":points,"hits":hit_points,"prompt":[heading.x/canvas_css_size.x,heading.y/canvas_css_size.y],"actions":[actions.x/canvas_css_size.x,actions.y/canvas_css_size.y],"rounds":round_points,"rounds_ready":rounds_ready,"board":[visual_board_rect.position.x,visual_board_rect.position.y,visual_board_rect.size.x,visual_board_rect.size.y]}
 
 func _sync_round_markers() -> void:

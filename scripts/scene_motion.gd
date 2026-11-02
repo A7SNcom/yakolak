@@ -82,6 +82,7 @@ func tint(node: GeometryInstance3D, source: Material, target: Color, seconds: fl
 	if seconds <= 0.0:
 		node.material_override = final_material if final_material != null else source.duplicate()
 		(node.material_override as BaseMaterial3D).albedo_color = target
+		if target.a < 0.999: (node.material_override as BaseMaterial3D).transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		colors.erase(key)
 		return
 	if current.is_equal_approx(target):

@@ -127,6 +127,23 @@ func _run() -> void:
 			quit(1)
 			return
 	var setup_pose := cam.transform
+	setup.visual_reduce_motion = true
+	setup._update_visual_seats()
+	for record: Dictionary in intro.pieces:
+		var faded := record.mesh.material_override as BaseMaterial3D
+		if faded.albedo_color.a>0.02 or faded.transparency != BaseMaterial3D.TRANSPARENCY_ALPHA:
+			push_error("Reduced motion must render the same transparent round-selection state")
+			quit(1)
+			return
+	setup.visual_reduce_motion = false
+	var original_css: Vector2 = setup.canvas_css_size
+	setup.canvas_css_size = original_css * 0.5
+	var high_dpi_geometry: Dictionary = setup._visual_seat_points()
+	setup.canvas_css_size = original_css
+	if high_dpi_geometry["rounds"] != round_geometry["rounds"]:
+		push_error("Round hit targets must use engine viewport coordinates at any CSS pixel density")
+		quit(1)
+		return
 	var setup_fov := cam.fov
 	setup._on_visual_action([JSON.stringify({"action":"start","rounds":3,"players":[{"color":"green","mode":"local","label":"أحمد","device_owner":"p1"},{"color":"marble","mode":"bot","label":"بوت","device_owner":"p1"}]})])
 	if not cam.transform.is_equal_approx(setup_pose) or not is_equal_approx(cam.fov,setup_fov):
