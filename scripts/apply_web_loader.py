@@ -133,8 +133,8 @@ SCRIPT = r'''
   const initialRestMs=220;
   const motionWarmupMs=260;
   const motionSettleMs=220;
-  const minimumLoaderMs=2600;
-  const minimumVisibleHold=900;
+  const minimumLoaderMs=600;
+  const minimumVisibleHold=420;
   const materialBridgeDuration=1200;
   const materialBridgeHoldRatio=260/materialBridgeDuration;
   let scheduled=false;
@@ -347,8 +347,8 @@ SCRIPT = r'''
       }));
       Promise.all(exits.map(animation=>animation.finished)).then(()=>{
         P('hidden-after-fade');
-        match(clone,handoffShadow,first,shadowFirst);
       });
+      match(clone,handoffShadow,first,shadowFirst);
     });
   };
 

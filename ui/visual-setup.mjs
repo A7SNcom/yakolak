@@ -182,18 +182,18 @@ export function mountSetup(document, window, client=P2P) {
   const learn=button('كيف تنلعب؟',openLesson,'yk-learn');
   const settingsHome=button('الإعدادات',openSettings,'yk-outline yk-settings-home');entry.append(create,join,learn,settingsHome);
   const confirm=button('تأكيد',()=>{if(hostAwaitingStart){void leaveGuestLobby();return;}if(guestPhase==='color'){void chooseGuestColor();return;}if(state.selectedColor)go('ready');},'yk-primary yk-confirm');
-  const loading=el('div','yk-network-status','جارٍ تجهيز الاتصال…');loading.setAttribute('role','status');loading.setAttribute('aria-live','polite');loading.hidden=true;
+  const loading=el('div','yk-network-status');loading.append(el('span','yk-sr-only','جارٍ تجهيز الاتصال…'));loading.setAttribute('role','status');loading.setAttribute('aria-live','polite');loading.hidden=true;
   const sharing=button('',copyRoom,'yk-sharing');sharing.setAttribute('aria-label','نسخ رابط الغرفة');
   const shareIcon=el('span','yk-share-icon');
   // Code-native icon, with no external asset or user HTML.
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');
   for(const d of ['M12 16V3','m7 8 5-5 5 5','M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6']){const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',d);svg.append(path);}shareIcon.append(svg);
-  const code=el('span','yk-room-code','—');code.dir='ltr';sharing.append(shareIcon,code);
+  const code=el('span','yk-room-code','—');code.dir='ltr';sharing.append(shareIcon,code);const shareGroup=el('div','yk-share-group');shareGroup.append(sharing,el('span','yk-share-caption','مــــشاركـــــة الــــــــــــرابط'));
   const start=button('ابدأ اللعب',()=>{if(guestPhase){void leaveGuestLobby();return;}const problem=configurationError(state,capabilities);if(problem){showError(problem);return;}closeSheet();go('rounds');},'yk-primary yk-start');
   const rounds=el('div','yk-rounds');rounds.setAttribute('role','group');rounds.setAttribute('aria-label','أشواط الفوز');
   [3,5].forEach(n=>{const b=button('',()=>beginMatch(n),'yk-choice yk-round-choice');b.setAttribute('aria-label',`الفوز بـ ${n} أشواط`);const numeral=el('span','yk-round-number',String(n));const label=el('span','yk-round-label','أشواط');b.append(numeral,label);rounds.append(b);});
   const errors=el('div','yk-error');errors.setAttribute('role','status');errors.setAttribute('aria-live','polite');
-  actions.append(entry,confirm,loading,sharing,start,errors);
+  actions.append(entry,confirm,loading,shareGroup,start,errors);
   const modal=el('div','yk-modal');modal.hidden=true;
   const sheet=el('section','yk-sheet');sheet.setAttribute('role','dialog');sheet.setAttribute('aria-labelledby','ykSheetTitle');modal.append(sheet);
   root.append(header,seats,actions,rounds,modal);document.body.append(root);
@@ -379,7 +379,7 @@ export function mountSetup(document, window, client=P2P) {
       const w=Math.min(width<700?178:224,width-30),side=returnFocus.orbit?.side||1,angle=Math.max(-8,Math.min(8,(returnFocus.orbit?.angle||0)*.55));
       sheet.style.width=`${w}px`;sheet.style.setProperty('--yk-menu-tilt',`${angle}deg`);
       for(const item of sheet.querySelectorAll('.yk-menu-item')){
-        const surface=foldedSurfaceGeometry(w,width<700?36:42,side);item.style.height=`${surface.height}px`;paintSurface(item,{...surface,side},'neutral');
+        const surface=foldedSurfaceGeometry(w,44,side);item.style.height=`${surface.height}px`;paintSurface(item,{...surface,side},'neutral');
       }
       const h=sheet.offsetHeight||sheet.querySelectorAll('.yk-menu-item').length*58,radians=angle*Math.PI/180;
       const halfX=(Math.abs(Math.cos(radians))*w+Math.abs(Math.sin(radians))*h)/2,halfY=(Math.abs(Math.sin(radians))*w+Math.abs(Math.cos(radians))*h)/2;
@@ -399,7 +399,7 @@ export function mountSetup(document, window, client=P2P) {
       modal.dataset.side=below?'below':'above';return;
     }
     sheet.style.removeProperty('--yk-menu-tilt');
-    const w=Math.min(260,width-24);sheet.style.width=`${w}px`;
+    const w=Math.min(modal.dataset.kind==='settings'?330:260,width-24);sheet.style.width=`${w}px`;
     const h=sheet.getBoundingClientRect().height||64;
     sheet.style.left=`${Math.max(12,(width-w)/2)}px`;sheet.style.top=`${Math.max(12,(height-h)/2)}px`;
     modal.dataset.side='center';
@@ -451,7 +451,7 @@ export function mountSetup(document, window, client=P2P) {
     entry.hidden=state.step!=='entry';confirm.hidden=state.step!=='color'||!state.selectedColor;confirm.textContent='تأكيد';
     loading.hidden=!networkBusy;actions.setAttribute('aria-busy',String(networkBusy));settingsToggle.hidden=state.step==='entry'&&!roomCode;
     create.disabled=networkBusy&&state.step==='entry';join.disabled=networkBusy;learn.disabled=networkBusy;settingsHome.disabled=networkBusy;
-    start.hidden=state.step!=='ready'||guestPhase==='color';sharing.hidden=state.step!=='ready'||!roomCode;start.disabled=networkBusy||hostAwaitingStart||guestPhase==='waiting'||guestBusy||pending;rounds.hidden=state.step!=='rounds';confirm.disabled=guestBusy||(networkBusy&&state.step!=='color');
+    start.hidden=state.step!=='ready'||guestPhase==='color'||(!guestPhase&&!state.seats.some((seat,index)=>index>0&&['local','bot','online'].includes(seat.mode)));shareGroup.hidden=state.step!=='ready'||!roomCode;sharing.hidden=state.step!=='ready'||!roomCode;start.disabled=networkBusy||hostAwaitingStart||guestPhase==='waiting'||guestBusy||pending;rounds.hidden=state.step!=='rounds';confirm.disabled=guestBusy||(networkBusy&&state.step!=='color');
     start.textContent=guestPhase==='waiting'?'بانتظار المضيف…':hostAwaitingStart?'بانتظار اللاعبين…':'ابدأ اللعب';
     code.textContent=networkBusy?'…':roomCode||'—';sharing.classList.toggle('is-unavailable',!roomCode);sharing.disabled=!roomCode||networkBusy;sharing.setAttribute('aria-disabled',String(!roomCode));
     [...rounds.children].forEach(b=>{b.disabled=pending;b.setAttribute('aria-pressed',String(state.step==='rounds'&&Number(b.querySelector('.yk-round-number')?.textContent)===state.rounds));});
@@ -596,8 +596,10 @@ export function mountSetup(document, window, client=P2P) {
     closeSheet();openSheet('',origin,'seat');sheet.setAttribute('aria-label',seatLabel(state.seats[index]));sheet.setAttribute('role','menu');sheet.removeAttribute('aria-labelledby');
     const choices=el('div','yk-menu');
     const item=(label,action,selected=false,parent=choices)=>{const b=button(label,action,'yk-menu-item');b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String(selected));addSurface(b);parent.append(b);return b;};
-    item('كمبيوتر',()=>{state=changeSeat(state,index,state.seats[index].mode==='bot'?'none':'bot');closeSheet(true);},state.seats[index].mode==='bot');
-    item('لاعب في نفس الجهاز',()=>{state=changeSeat(state,index,state.seats[index].mode==='local'?'none':'local');closeSheet(true);},state.seats[index].mode==='local');
+    for(const [mode,label] of [['none','فاضي'],['bot','كمبيوتر'],['local','لاعب في نفس الجهاز']]){
+      if(state.seats[index].mode===mode)continue;
+      item(label,()=>{state=changeSeat(state,index,mode);closeSheet(true);});
+    }
     sheet.append(choices);positionSheet();choices.querySelector('button').focus({preventScroll:true});
   }
   function finishGuestJoin(code){

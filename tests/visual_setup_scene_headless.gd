@@ -104,6 +104,17 @@ func _run() -> void:
 			push_error("Table pieces did not finish fading before the round selector")
 			quit(1)
 			return
+	for value: Variant in intro.bases.values():
+		if (value.material_override as BaseMaterial3D).albedo_color.a>0.02:
+			push_error("Side racks must fade with the pieces during round selection")
+			quit(1)
+			return
+	for wins: int in [3,5]:
+		var numeral = setup.visual_round_markers[wins].get_node("Numeral")
+		if not numeral is MeshInstance3D or not numeral.mesh is TextMesh or numeral.mesh.depth<=0.0:
+			push_error("Round choices must be solid extruded number meshes")
+			quit(1)
+			return
 	var setup_pose := cam.transform
 	var setup_fov := cam.fov
 	setup._on_visual_action([JSON.stringify({"action":"start","rounds":3,"players":[{"color":"green","mode":"local","label":"أحمد","device_owner":"p1"},{"color":"marble","mode":"bot","label":"بوت","device_owner":"p1"}]})])

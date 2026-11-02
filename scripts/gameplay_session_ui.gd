@@ -30,6 +30,11 @@ var quick_layer: CanvasLayer
 var quick_root: Control
 var quick_button: Button
 var quick_panel: PanelContainer
+var quick_menu_motion: Tween
+var quick_menu_open := false
+var quick_menu_generation := 0
+var quick_safe_viewport := Vector2.ZERO
+var quick_safe_insets := Vector2.ZERO
 var quick_graphics_button: Button
 var quick_sound_button: Button
 var quick_exit_button: Button
@@ -208,15 +213,21 @@ func _layout_quick_menu() -> void:
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	var margin: float = _hud_length(12.0)
 	var button_size := Vector2(_hud_length(44.0), _hud_length(44.0))
-	var panel_width: float = _hud_length(158.0)
-	var top: float = maxf(margin, _hud_length(8.0))
-	var button_x: float = maxf(margin, viewport_size.x - margin - button_size.x)
+	var panel_width: float = minf(_hud_length(240.0), viewport_size.x - margin * 2.0)
+	if OS.has_feature("web") and quick_safe_viewport != viewport_size:
+		quick_safe_viewport = viewport_size
+		var safe: Variant = JSON.parse_string(str(JavaScriptBridge.eval("(()=>{const e=document.createElement('div');e.style.cssText='position:fixed;visibility:hidden;padding-top:env(safe-area-inset-top);padding-right:env(safe-area-inset-right)';document.body.append(e);const s=getComputedStyle(e),v=[parseFloat(s.paddingTop)||0,parseFloat(s.paddingRight)||0];e.remove();return JSON.stringify(v)})()", true)))
+		if safe is Array and safe.size() == 2:
+			quick_safe_insets = Vector2(_hud_length(float(safe[0])), _hud_length(float(safe[1])))
+	var top: float = quick_safe_insets.x + margin
+	var button_x: float = maxf(margin, viewport_size.x - quick_safe_insets.y - margin - button_size.x)
 	var panel_x: float = maxf(margin, viewport_size.x - margin - panel_width)
 	quick_button.position = Vector2(button_x, top)
 	quick_button.size = button_size
 	quick_panel.position = Vector2(panel_x, top + button_size.y + _hud_length(8.0))
 	var action_count: int = 3 if quick_exit_button != null and quick_exit_button.visible else 2
 	quick_panel.size = Vector2(panel_width, _hud_length(18.0 + float(action_count) * 51.0))
+	quick_panel.position = (viewport_size - quick_panel.size) * 0.5
 	for child: Node in quick_panel.get_children():
 		if child is VBoxContainer:
 			(child as VBoxContainer).add_theme_constant_override("separation", int(round(_hud_length(7.0))))
@@ -225,7 +236,21 @@ func _layout_quick_menu() -> void:
 func _toggle_quick_menu() -> void:
 	if quick_panel == null or not (match_initialized or online_waiting or online_cancelled):
 		return
-	quick_panel.visible = not quick_panel.visible
+	if not quick_panel.visible: quick_menu_open = false
+	quick_menu_open = not quick_menu_open
+	quick_menu_generation += 1
+	var generation := quick_menu_generation
+	if quick_menu_motion != null and quick_menu_motion.is_valid(): quick_menu_motion.kill()
+	quick_menu_motion = create_tween()
+	if quick_menu_open:
+		if not quick_panel.visible: quick_panel.modulate.a = 0.0
+		quick_panel.show()
+		quick_menu_motion.tween_property(quick_panel, "modulate:a", 1.0, 0.24).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	else:
+		quick_menu_motion.tween_property(quick_panel, "modulate:a", 0.0, 0.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		quick_menu_motion.tween_callback(func():
+			if generation == quick_menu_generation and not quick_menu_open: quick_panel.hide()
+		)
 
 
 func _toggle_sound() -> void:

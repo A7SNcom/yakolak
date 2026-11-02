@@ -446,7 +446,7 @@ func _sync_round_markers() -> void:
 		var old: Tween = visual_round_marker_tweens.get(wins)
 		if old != null and old.is_valid(): old.kill()
 		var plate := marker.get_node_or_null("Plate") as MeshInstance3D
-		var numeral := marker.get_node_or_null("Numeral") as Label3D
+		var numeral := marker.get_node_or_null("Numeral") as MeshInstance3D
 		var caption := marker.get_node_or_null("Caption") as Label3D
 		var selection_tween: Tween = visual_round_marker_selection_tweens.get(wins)
 		if selection_tween != null and selection_tween.is_valid(): selection_tween.kill()
@@ -455,15 +455,15 @@ func _sync_round_markers() -> void:
 				marker.position.y = ROUND_MARKER_TABLE_Y + 3.2
 				marker.scale = Vector3.ONE
 				if plate != null: (plate.material_override as StandardMaterial3D).albedo_color.a = 0.0
-				if numeral != null: numeral.modulate.a = 0.0
+				if numeral != null: (numeral.material_override as StandardMaterial3D).albedo_color.a = 0.0
 				if caption != null: caption.modulate.a = 0.0
 			marker.show()
 			var arrive := create_tween().set_parallel(true)
-			var marker_delay := 0.34 if not visual_reduce_motion else 0.0
+			var marker_delay := 0.46 if not visual_reduce_motion else 0.0
 			arrive.tween_property(marker, "position:y", ROUND_MARKER_TABLE_Y, 0.72 if not visual_reduce_motion else 0.12).set_delay(marker_delay).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 			arrive.tween_property(marker, "scale", Vector3.ONE, 0.48 if not visual_reduce_motion else 0.12).set_delay(marker_delay).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 			if plate != null: arrive.tween_property(plate.material_override, "albedo_color:a", 1.0, 0.48 if not visual_reduce_motion else 0.12).set_delay(marker_delay)
-			if numeral != null: arrive.tween_property(numeral, "modulate:a", 1.0, 0.48 if not visual_reduce_motion else 0.12).set_delay(marker_delay)
+			if numeral != null: arrive.tween_property(numeral.material_override, "albedo_color:a", 1.0, 0.48 if not visual_reduce_motion else 0.12).set_delay(marker_delay)
 			if caption != null: arrive.tween_property(caption, "modulate:a", 1.0, 0.48 if not visual_reduce_motion else 0.12).set_delay(marker_delay)
 			visual_round_marker_tweens[wins] = arrive
 		else:
@@ -471,7 +471,7 @@ func _sync_round_markers() -> void:
 			depart.tween_property(marker, "position:y", marker.position.y + 1.0, 0.56 if not visual_reduce_motion else 0.12).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
 			depart.tween_property(marker, "scale", Vector3(0.90, 0.90, 0.90), 0.56 if not visual_reduce_motion else 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 			if plate != null: depart.tween_property(plate.material_override, "albedo_color:a", 0.0, 0.46 if not visual_reduce_motion else 0.12)
-			if numeral != null: depart.tween_property(numeral, "modulate:a", 0.0, 0.46 if not visual_reduce_motion else 0.12)
+			if numeral != null: depart.tween_property(numeral.material_override, "albedo_color:a", 0.0, 0.46 if not visual_reduce_motion else 0.12)
 			if caption != null: depart.tween_property(caption, "modulate:a", 0.0, 0.46 if not visual_reduce_motion else 0.12)
 			depart.chain().tween_callback(func():
 				if generation == visual_round_marker_generation and not visual_round_markers_visible: marker.hide()
@@ -485,7 +485,7 @@ func _sync_round_marker_selection() -> void:
 		var marker := visual_round_markers.get(wins) as Node3D
 		if marker == null or not marker.visible: continue
 		var plate := marker.get_node_or_null("Plate") as MeshInstance3D
-		var numeral := marker.get_node_or_null("Numeral") as Label3D
+		var numeral := marker.get_node_or_null("Numeral") as MeshInstance3D
 		if plate == null or numeral == null: continue
 		var material := plate.material_override as StandardMaterial3D
 		if material == null: continue
@@ -500,9 +500,9 @@ func _sync_round_marker_selection() -> void:
 		selection.tween_property(material, "albedo_color:r", plate_color.r, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		selection.tween_property(material, "albedo_color:g", plate_color.g, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		selection.tween_property(material, "albedo_color:b", plate_color.b, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		selection.tween_property(numeral, "modulate:r", numeral_color.r, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		selection.tween_property(numeral, "modulate:g", numeral_color.g, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		selection.tween_property(numeral, "modulate:b", numeral_color.b, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		selection.tween_property(numeral.material_override, "albedo_color:r", numeral_color.r, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		selection.tween_property(numeral.material_override, "albedo_color:g", numeral_color.g, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		selection.tween_property(numeral.material_override, "albedo_color:b", numeral_color.b, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		if caption != null:
 			selection.tween_property(caption, "modulate:r", numeral_color.r, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 			selection.tween_property(caption, "modulate:g", numeral_color.g, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
@@ -534,17 +534,23 @@ func _create_round_markers() -> void:
 		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		plate.material_override = material
 		marker.add_child(plate)
-		var numeral := Label3D.new()
+		var numeral := MeshInstance3D.new()
 		numeral.name = "Numeral"
-		numeral.text = str(wins)
-		numeral.font = visual_font
-		numeral.font_size = 112
-		numeral.pixel_size = 0.004
-		numeral.outline_size = 5
-		numeral.outline_modulate = Color(0.08, 0.08, 0.08, 0.85)
-		numeral.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		numeral.position = Vector3(0.0, 0.17, -0.08)
-		numeral.modulate = Color("#fff8e8" if selected else "#d8d0c0")
+		var number_mesh := TextMesh.new()
+		number_mesh.text = str(wins)
+		number_mesh.font = visual_font
+		number_mesh.font_size = 112
+		number_mesh.pixel_size = 0.009
+		number_mesh.depth = 0.12
+		numeral.mesh = number_mesh
+		numeral.rotation.x = -PI / 2.0
+		numeral.position = Vector3(0.0, 0.19, -0.08)
+		var number_material := StandardMaterial3D.new()
+		number_material.albedo_color = Color("#fff8e8" if selected else "#d8d0c0")
+		number_material.metallic = 0.25
+		number_material.roughness = 0.35
+		number_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		numeral.material_override = number_material
 		marker.add_child(numeral)
 		var caption := Label3D.new()
 		caption.name = "Caption"
@@ -656,6 +662,19 @@ func _update_visual_seats() -> void:
 		var target: Color = source.albedo_color if enabled else (source.albedo_color.lerp(Color.BLACK,0.70) if not selected_direction.is_empty() else visual_inactive_material.albedo_color)
 		visual_motion.tint(mesh, source, target, 0.0 if visual_reduce_motion else 0.32, source if enabled else null)
 
+	# Side racks share the table fade, and retain their original materials for
+	# both cancellation and the handoff into a real match.
+	for value: Variant in intro.bases.values():
+		var base := value as GeometryInstance3D
+		if base == null: continue
+		var key := base.get_instance_id()
+		if not visual_piece_visibility.has(key):
+			visual_piece_visibility[key] = {"node":base,"visible":base.visible,"material":base.material_override}
+		var source := visual_piece_visibility[key]["material"] as BaseMaterial3D
+		if source == null: continue
+		var target := source.albedo_color
+		if visual_step == "rounds": target.a = 0.0
+		visual_motion.tint(base,source,target,0.42 if not visual_reduce_motion else 0.12,source if visual_step != "rounds" else null)
 	_update_visual_lighting()
 
 func _visual_reduced_motion() -> bool:

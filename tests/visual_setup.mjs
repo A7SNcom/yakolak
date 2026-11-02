@@ -139,12 +139,16 @@ test('four home actions lead from profile and color directly to the editable ros
   q('[data-color=blue]').click();assert.equal(q('.yk-confirm').hidden,false);assert.equal(q('[data-color=blue]').getAttribute('aria-pressed'),'true');assert.equal(q('[data-color=gold]').getAttribute('aria-pressed'),'false');assert.equal(q('.yk-start').hidden,true);
   q('.yk-confirm').click();assert.equal(q('h1').textContent,'');assert.equal(q('#yakolakVisualSetup').dataset.step,'ready');
   assert.ok([...document.querySelectorAll('.yk-seat')].every(x=>!x.hidden));
-  assert.equal(q('.yk-start').hidden,false);assert.equal(q('.yk-rounds').hidden,true);assert.equal(q('[data-color=marble] .yk-seat-status').textContent,'فاضي');
+  assert.equal(q('.yk-start').hidden,true);assert.equal(q('.yk-rounds').hidden,true);assert.equal(q('[data-color=marble] .yk-seat-status').textContent,'فاضي');
   assert.equal([...document.querySelectorAll('.yk-seat-status')].filter(x=>x.textContent==='فاضي').length,3);
   assert.equal(q('[data-color=blue] .yk-seat-number'),null);assert.ok(parseFloat(q('[data-color=blue]').style.left)>0);assert.ok(!q('.yk-seats').textContent.includes('لاعب'));
   q('[data-color=gold]').click();assert.equal(q('.yk-sheet').getAttribute('role'),'menu');assert.equal(q('.yk-sheet').getAttribute('aria-modal'),'false');
   assert.deepEqual([...document.querySelectorAll('.yk-menu-item')].map(x=>x.textContent),['كمبيوتر','لاعب في نفس الجهاز']);
   [...document.querySelectorAll('.yk-menu-item')][1].click();assert.equal(q('[data-color=gold] .yk-seat-status').textContent,'لاعب');
+  assert.equal(q('.yk-start').hidden,false);
+  q('[data-color=gold]').click();assert.deepEqual([...document.querySelectorAll('.yk-menu-item')].map(x=>x.textContent),['فاضي','كمبيوتر']);document.querySelectorAll('.yk-menu-item')[0].click();assert.equal(q('.yk-start').hidden,true);
+  q('[data-color=gold]').click();document.querySelectorAll('.yk-menu-item')[0].click();assert.equal(q('.yk-start').hidden,false);
+  q('[data-color=gold]').click();assert.deepEqual([...document.querySelectorAll('.yk-menu-item')].map(x=>x.textContent),['فاضي','لاعب في نفس الجهاز']);document.querySelectorAll('.yk-menu-item')[1].click();
   q('[data-color=green]').click();document.querySelectorAll('.yk-menu-item')[0].click();assert.equal(q('[data-color=green] .yk-seat-status').textContent,'كمبيوتر');
   q('[data-color=marble]').click();document.querySelectorAll('.yk-menu-item')[0].click();assert.equal(q('[data-color=marble] .yk-seat-status').textContent,'كمبيوتر');
   q('.yk-start').click();assert.equal(q('.yk-rounds').hidden,false);assert.equal(q('h1').textContent,'كم شوط للفوز؟');assert.equal(events.some(x=>x.action==='start'),false);
