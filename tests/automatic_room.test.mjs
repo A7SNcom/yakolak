@@ -37,8 +37,8 @@ test('new room opens three online seats and accepts a mixed online, computer, an
  assert.equal([...w.document.querySelectorAll('.yk-seat-status')].filter(x=>x.textContent==='فاضي').length,3);
  const admitted=join(a,'g','blue').room;listener({role:'host',room:admitted});
  assert.equal(q('[data-color=blue] .yk-seat-status').textContent,'ضيف g');
- q('[data-color=gold]').click();assert.deepEqual([...w.document.querySelectorAll('.yk-menu-item')].map(x=>x.textContent),['كمبيوتر','لاعب في نفس الجهاز']);q('[data-color=gold] .yk-menu-item:first-child').click();
- q('[data-color=green]').click();q('[data-color=green] .yk-menu-item:nth-child(2)').click();assert.equal(q('[data-color=green] .yk-seat-status').textContent,'لاعب');
+ q('[data-color=gold]').click();assert.deepEqual([...w.document.querySelectorAll('.yk-menu-item')].map(x=>x.textContent),['كمبيوتر','لاعب في نفس الجهاز']);q('.yk-menu-item:first-child').click();
+ q('[data-color=green]').click();q('.yk-menu-item:nth-child(2)').click();assert.equal(q('[data-color=green] .yk-seat-status').textContent,'لاعب');
  q('.yk-start').click();q('.yk-rounds button').click();await tick();
  const startedEvent=events.find(e=>e.action==='start');assert.equal(started,1);assert.equal(a.snapshot().status,'playing');assert.equal(startedEvent.automatic_room,true);assert.equal(startedEvent.players.length,4);assert.equal(startedEvent.players[1].label,'ضيف g');assert.equal(startedEvent.players[2].label,'كمبيوتر');assert.equal(startedEvent.players[3].label,'لاعب');dom.window.close();
 });
@@ -48,7 +48,7 @@ test('failed public signaling never invents a room and preserves native local pl
  const client={subscribe(){},async prepareHost(){throw new Error('signaling_unavailable')},async dispatch(){assert.fail('a fully local match must not use online dispatch')}};
  const api=mountSetup(w.document,w,client);api.open({online:true,resume:roster(2)});await tick();
  const q=s=>w.document.querySelector(s);assert.equal(q('.yk-room-code').textContent,'—');assert.equal(q('.yk-sharing').disabled,true);
- q('[data-color=gold]').click();q('[data-color=gold] .yk-menu-item:first-child').click();q('[data-color=green]').click();q('[data-color=green] .yk-menu-item:nth-child(2)').click();
+ q('[data-color=gold]').click();q('.yk-menu-item:first-child').click();q('[data-color=green]').click();q('.yk-menu-item:nth-child(2)').click();
  q('.yk-start').click();q('.yk-rounds button').click();await tick();assert.equal(events.find(e=>e.action==='start').automatic_room,false);dom.window.close();
 });
 
@@ -61,7 +61,7 @@ test('a guest leaving setup restores the same human seat to local play',()=>{
 });
 
 test('returning from an automatic room restores simple labels and releases old guest ownership',()=>{
- const state=restoreSetup({rounds:3,players:[{color:'marble',mode:'local',kind:'local',label:'أحمد'},{color:'blue',mode:'online',kind:'bot',label:'كمبيوتر أزرق'},{color:'gold',mode:'online',kind:'online',controller:'p3',label:'ريم'}]});
+ const state=restoreSetup({rounds:3,players:[{seat:'p1',color:'marble',mode:'local',kind:'local',label:'أحمد'},{seat:'p2',color:'blue',mode:'online',kind:'bot',label:'كمبيوتر أزرق'},{seat:'p3',color:'gold',mode:'online',kind:'online',controller:'p3',label:'ريم'}]});
  const c=configuration(state);assert.deepEqual(c.players.map(p=>p.mode),['local','bot','local','online']);assert.deepEqual(c.players.map(p=>p.label),['أحمد','كمبيوتر','لاعب','فاضي']);assert.equal(c.players[2].device_owner,'p1');
 });
 

@@ -87,8 +87,8 @@ function completedOnlineMatch() {
   assert.ok(gameplay.includes('post_match_secondary_button.visible = true'), 'completed online match exposes return to setup');
   assert.ok(secondary.includes('if not round_complete or not match_complete or action_in_progress:'), 'secondary action accepts completed online matches');
   assert.ok(secondary.includes('_return_to_setup()'), 'secondary action uses the existing setup lifecycle');
-  const quickExit = gameplayUi.match(/func _quick_exit\(\)[\s\S]*?\n\nfunc _quick_round_action/)?.[0] || '';
-  assert.ok(quickExit.includes('_return_to_setup()'), 'quick Exit converges on the same safe detach path');
+  const quickExit = gameplayUi.match(/func _quick_exit\(\)[\s\S]*?\n\nfunc _on_round_action/)?.[0] || '';
+  assert.ok(quickExit.includes('_return_to_setup()'), 'settings Exit converges on the same safe detach path');
   assert.ok(roomsSource.includes("const terminalMatchLeave = action === 'leave' && state.status === 'finished' && state.matchComplete;"), 'handler recognizes terminal match detach');
   assert.ok(roomsSource.includes("action === 'leave' && !terminalMatchLeave"), 'terminal detach retains auth required by historical seat ownership');
 }
