@@ -81,18 +81,24 @@ func _input(event: InputEvent) -> void:
 		position = mouse.position
 	if pressed and quick_button != null and quick_button.visible:
 		if quick_button.get_global_rect().has_point(position):
+			if event is InputEventScreenTouch and not quick_button.disabled:
+				get_viewport().set_input_as_handled()
+				quick_button.pressed.emit()
 			return
 		if quick_panel != null and quick_panel.visible:
-			if _quick_menu_action_at(position):
+			if _quick_menu_action_at(position,event is InputEventScreenTouch):
 				return
 			# Closing chrome is noninteractive: the same pointer continues to gameplay.
 			quick_panel.visible = false
 	super._input(event)
 
 
-func _quick_menu_action_at(position: Vector2) -> bool:
+func _quick_menu_action_at(position: Vector2, activate_touch: bool = false) -> bool:
 	for button: Button in [quick_graphics_button, quick_sound_button, quick_exit_button]:
 		if button != null and button.visible and not button.disabled and button.get_global_rect().has_point(position):
+			if activate_touch:
+				get_viewport().set_input_as_handled()
+				button.pressed.emit()
 			return true
 	return false
 

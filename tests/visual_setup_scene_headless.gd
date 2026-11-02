@@ -171,7 +171,6 @@ func _run() -> void:
 		push_error("Configuration did not start real match")
 		quit(1)
 		return
-	var exit_pose := cam.transform
 	game._layout_quick_menu()
 	var menu_center: Vector2 = game.quick_panel.get_rect().get_center()
 	if menu_center.distance_to(root.get_visible_rect().size * 0.5)>1.0:
@@ -182,7 +181,20 @@ func _run() -> void:
 		push_error("Every match must expose leaving inside settings")
 		quit(1)
 		return
-	game.quick_exit_button.pressed.emit()
+	var menu_touch := InputEventScreenTouch.new()
+	menu_touch.pressed = true
+	menu_touch.position = game.quick_button.get_global_rect().get_center()
+	game._input(menu_touch)
+	await process_frame
+	if not game.quick_panel.visible:
+		push_error("The settings gear must activate directly from a screen touch")
+		quit(1)
+		return
+	var leave_touch := InputEventScreenTouch.new()
+	leave_touch.pressed = true
+	leave_touch.position = game.quick_exit_button.get_global_rect().get_center()
+	var exit_pose := cam.transform
+	game._input(leave_touch)
 	if not cam.transform.is_equal_approx(exit_pose):
 		push_error("Exit snapped the camera before its transition")
 		quit(1)
