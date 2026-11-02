@@ -162,6 +162,12 @@ func _run() -> void:
 		quit(1)
 		return
 	var exit_pose := cam.transform
+	game._layout_quick_menu()
+	var menu_center: Vector2 = game.quick_panel.get_rect().get_center()
+	if menu_center.distance_to(root.get_visible_rect().size * 0.5)>1.0:
+		push_error("The active gameplay settings panel must be centered")
+		quit(1)
+		return
 	game._return_to_setup()
 	if not cam.transform.is_equal_approx(exit_pose):
 		push_error("Exit snapped the camera before its transition")

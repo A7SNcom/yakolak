@@ -426,7 +426,7 @@ func _visual_seat_points() -> Dictionary:
 			var marker := visual_round_markers.get(wins) as Node3D
 			if marker != null:
 				if absf(marker.position.y - ROUND_MARKER_TABLE_Y) > 0.01: rounds_ready = false
-				var projected := cam.unproject_position(marker.to_global(Vector3(0.0, 0.24, 0.0)))
+				var projected := cam.unproject_position(marker.to_global(Vector3(0.0, 1.12, 0.0)))
 				round_points[str(wins)] = [projected.x/viewport.x, projected.y/viewport.y]
 	return {"controls":controls,"control_angles":control_angles,"world":true,"seats":points,"hits":hit_points,"prompt":[heading.x/canvas_css_size.x,heading.y/canvas_css_size.y],"actions":[actions.x/canvas_css_size.x,actions.y/canvas_css_size.y],"rounds":round_points,"rounds_ready":rounds_ready,"board":[visual_board_rect.position.x,visual_board_rect.position.y,visual_board_rect.size.x,visual_board_rect.size.y]}
 
@@ -492,8 +492,8 @@ func _sync_round_marker_selection() -> void:
 		var material := plate.material_override as StandardMaterial3D
 		if material == null: continue
 		var selected := wins == visual_selected_rounds
-		var plate_color := Color("#e1bd72") if selected else Color("#9a8460")
-		var numeral_color := Color("#fff8e8") if selected else Color("#d8d0c0")
+		var plate_color := Color("#4a4336") if selected else Color("#28292c")
+		var numeral_color := Color("#f2d18a") if selected else Color("#c7ad70")
 		var caption := marker.get_node_or_null("Caption") as Label3D
 		var old: Tween = visual_round_marker_selection_tweens.get(wins)
 		if old != null and old.is_valid(): old.kill()
@@ -530,7 +530,7 @@ func _create_round_markers() -> void:
 		plate.position.y = 0.055
 		var material := StandardMaterial3D.new()
 		var selected := wins == visual_selected_rounds
-		material.albedo_color = Color("#e1bd72") if selected else Color("#9a8460")
+		material.albedo_color = Color("#4a4336") if selected else Color("#28292c")
 		material.metallic = 0.55
 		material.roughness = 0.34
 		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -542,13 +542,14 @@ func _create_round_markers() -> void:
 		number_mesh.text = str(wins)
 		number_mesh.font = visual_font
 		number_mesh.font_size = 112
-		number_mesh.pixel_size = 0.009
-		number_mesh.depth = 0.12
+		number_mesh.pixel_size = 0.022
+		number_mesh.depth = 0.16
 		numeral.mesh = number_mesh
-		numeral.rotation.x = -PI / 2.0
-		numeral.position = Vector3(0.0, 0.19, -0.08)
+		var facing: Vector3 = (intro.get("camera") as Camera3D).global_position - intro.to_global(marker.position)
+		numeral.rotation.y = atan2(facing.x, facing.z)
+		numeral.position = Vector3(0.0, 1.12, 0.0)
 		var number_material := StandardMaterial3D.new()
-		number_material.albedo_color = Color("#fff8e8" if selected else "#d8d0c0")
+		number_material.albedo_color = Color("#f2d18a" if selected else "#c7ad70")
 		number_material.metallic = 0.25
 		number_material.roughness = 0.35
 		number_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -558,13 +559,13 @@ func _create_round_markers() -> void:
 		caption.name = "Caption"
 		caption.text = "أشواط"
 		caption.font = visual_font
-		caption.font_size = 46
-		caption.pixel_size = 0.003
+		caption.font_size = 64
+		caption.pixel_size = 0.008
 		caption.outline_size = 3
 		caption.outline_modulate = Color(0.08, 0.08, 0.08, 0.82)
 		caption.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		caption.position = Vector3(-0.40, 0.17, 0.32)
-		caption.modulate = Color("#fff8e8" if selected else "#d8d0c0")
+		caption.position = Vector3(-1.05, 0.30, 0.35)
+		caption.modulate = Color("#f2d18a" if selected else "#c7ad70")
 		marker.add_child(caption)
 		intro.add_child(marker)
 		visual_round_markers[wins] = marker

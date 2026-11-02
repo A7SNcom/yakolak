@@ -301,8 +301,8 @@ func _layout_quick_menu() -> void:
 	var left_margin_css: float = maxf(12.0, turn41_safe_insets_css.x + 8.0)
 	var top_css: float = maxf(12.0, turn41_safe_insets_css.y + 8.0)
 	var right_margin_css: float = maxf(12.0, turn41_safe_insets_css.z + 8.0)
-	var button_size := Vector2(_hud_length(96.0), _hud_length(48.0))
-	var panel_width: float = _hud_length(158.0)
+	var button_size := Vector2(_hud_length(48.0), _hud_length(48.0))
+	var panel_width: float = minf(_hud_length(240.0),viewport_size.x-_hud_length(left_margin_css+right_margin_css))
 	var button_x: float = maxf(_hud_length(left_margin_css), viewport_size.x - _hud_length(right_margin_css) - button_size.x)
 	var panel_x: float = maxf(_hud_length(left_margin_css), viewport_size.x - _hud_length(right_margin_css) - panel_width)
 	var top: float = _hud_length(top_css)
@@ -323,6 +323,7 @@ func _layout_quick_menu() -> void:
 	quick_panel.position = Vector2(panel_x, top + button_size.y + _hud_length(8.0))
 	var action_count: int = 3 if quick_exit_button != null and quick_exit_button.visible else 2
 	quick_panel.size = Vector2(panel_width, _hud_length(18.0 + float(action_count) * 55.0))
+	quick_panel.position = (viewport_size-quick_panel.size)*0.5
 	for child: Node in quick_panel.get_children():
 		if child is VBoxContainer:
 			var menu := child as VBoxContainer

@@ -21,15 +21,18 @@ func _ready() -> void:
 		push_error("YAKOLAK_BACKGROUND_MUSIC_LOAD_FAILED")
 		return
 	stream = song_resource
+	volume_db = -6.0
+	finished.connect(_restart_song)
+	_publish_music_state("loaded")
 	if OS.has_feature("web"):
 		activity_callback = JavaScriptBridge.create_callback(_on_page_activity)
 		JavaScriptBridge.get_interface("window").set("yakolakMusicActivity", activity_callback)
 		JavaScriptBridge.eval("(function(){const update=event=>window.yakolakMusicActivity?.(!['blur','pagehide'].includes(event?.type)&&!document.hidden&&document.hasFocus());window.__yakolakMusicActivity=update;document.addEventListener('visibilitychange',update);for(const event of ['blur','focus','pagehide','pageshow'])window.addEventListener(event,update);update();})();", true)
-	volume_db = -6.0
-	finished.connect(_restart_song)
-	_publish_music_state("loaded")
-	play()
-	_publish_music_state("playing")
+	if page_active:
+		if not playing: play()
+		_publish_music_state("playing")
+	else:
+		_publish_music_state("paused")
 
 
 func _exit_tree() -> void:
