@@ -365,7 +365,13 @@ export function mountSetup(document, window, client=P2P) {
     for(const choice of rounds.children){
       choice.disabled=pending||!!(geometry.world&&state.step==='rounds'&&!geometry.rounds_ready);
       const point=geometry.rounds?.[choice.querySelector('.yk-round-number')?.textContent];
-      if(point){choice.style.left=`${point[0]*width}px`;choice.style.top=`${point[1]*height}px`;}
+      if(point){
+        const centers=Object.values(geometry.rounds||{}),spacing=centers.length===2?Math.abs(centers[1][0]-centers[0][0])*width:124;
+        const touchWidth=Math.max(72,Math.min(112,spacing-12)),touchHeight=112;
+        choice.style.width=`${touchWidth}px`;choice.style.height=`${touchHeight}px`;
+        choice.style.left=`${Math.max(touchWidth/2+8,Math.min(width-touchWidth/2-8,point[0]*width))}px`;
+        choice.style.top=`${Math.max(touchHeight/2+8,Math.min(height-touchHeight/2-8,point[1]*height))}px`;
+      }
     }
     const heading=geometry.prompt||[.5,.25];prompt.style.top=`${Math.max(20,heading[1]*height)}px`;
     refreshOrbitLayout();
