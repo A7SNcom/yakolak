@@ -374,7 +374,7 @@ export function mountSetup(document, window, client=P2P) {
 
   }
   function positionSheet(){
-    const anchor=returnFocus?.getBoundingClientRect();if(!anchor)return;
+    const anchor=(returnFocus?.querySelector('.yk-plate-face')||returnFocus)?.getBoundingClientRect();if(!anchor)return;
     const width=window.innerWidth,height=window.visualViewport?.height||window.innerHeight,top=window.visualViewport?.offsetTop||0;
     if(modal.dataset.kind==='seat'){
       const w=Math.min(width<700?178:224,width-30),side=returnFocus.orbit?.side||1,angle=Math.max(-8,Math.min(8,(returnFocus.orbit?.angle||0)*.55));
@@ -397,6 +397,15 @@ export function mountSetup(document, window, client=P2P) {
       const targetY=below?anchor.bottom-top+6+halfY:anchor.top-top-6-halfY;
       const centerY=Math.max(halfY+10,Math.min(height-halfY-10,targetY));
       sheet.style.left=`${centerX-w/2}px`;sheet.style.top=`${centerY-h/2+top}px`;
+      // Match the painted plates, rather than the transparent padding needed
+      // by their curved SVG surfaces and rotated touch targets.
+      const faces=[...sheet.querySelectorAll('.yk-plate-face')].map(node=>node.getBoundingClientRect()).filter(rect=>rect.width>0);
+      if(faces.length){
+        const paintedTop=Math.min(...faces.map(rect=>rect.top)),paintedBottom=Math.max(...faces.map(rect=>rect.bottom));
+        const desired=below?anchor.bottom+6-paintedTop:anchor.top-6-paintedBottom;
+        const shift=Math.max(top+8-paintedTop,Math.min(top+height-8-paintedBottom,desired));
+        sheet.style.top=`${parseFloat(sheet.style.top)+shift}px`;
+      }
       modal.dataset.side=below?'below':'above';return;
     }
     sheet.style.removeProperty('--yk-menu-tilt');
