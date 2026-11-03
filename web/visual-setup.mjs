@@ -191,7 +191,7 @@ export function mountSetup(document, window, client=P2P) {
   // Code-native icon, with no external asset or user HTML.
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');
   for(const d of ['M12 16V3','m7 8 5-5 5 5','M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6']){const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',d);svg.append(path);}shareIcon.append(svg);
-  const code=el('span','yk-room-code','—');code.dir='ltr';sharing.append(shareIcon,code);const shareGroup=el('div','yk-share-group');shareGroup.append(sharing,el('span','yk-share-caption','مــــشاركـــــة الــــــــــــرابط'));
+  const code=el('span','yk-room-code','—');code.dir='ltr';const shareContent=el('span','yk-share-content');shareContent.append(shareIcon,code);sharing.append(shareContent);const shareGroup=el('div','yk-share-group');shareGroup.append(sharing,el('span','yk-share-caption','مــــشاركـــــة الــــــــــــرابط'));
   const start=button('ابدأ اللعب',()=>{if(start.hidden||start.disabled)return;if(guestPhase){void leaveGuestLobby();return;}const problem=configurationError(state,capabilities);if(problem){showError(problem);return;}closeSheet();go('rounds');},'yk-primary yk-start');
   const rounds=el('div','yk-rounds');rounds.setAttribute('role','group');rounds.setAttribute('aria-label','أشواط الفوز');
   [3,5].forEach(n=>{const b=button('',()=>beginMatch(n),'yk-choice yk-round-choice');b.setAttribute('aria-label',`الفوز بـ ${n} أشواط`);const numeral=el('span','yk-round-number',String(n));const label=el('span','yk-round-label','أشواط');b.append(numeral,label);rounds.append(b);});
@@ -457,6 +457,8 @@ export function mountSetup(document, window, client=P2P) {
     finally{networkBusy=false;render();if(state.step==='ready')void syncOnlineLobby();}
   }
   function render(){
+    const wasSplit=lobbyActions.classList.contains('has-opponent');
+    const previousShare=state.step==='ready'&&!shareGroup.hidden?shareGroup.getBoundingClientRect():null;
     root.dataset.step=state.step;root.dataset.guest=guestPhase;identity.textContent=state.name;identity.hidden=state.step==='entry'||!state.name;
     prompt.textContent=({color:'اختر لونك',rounds:'كم شوط للفوز؟'}[state.step]||'');
     prompt.hidden=!prompt.textContent;
@@ -481,6 +483,16 @@ export function mountSetup(document, window, client=P2P) {
     }
     position();
     refreshGlass();
+    if(previousShare&&wasSplit!==lobbyActions.classList.contains('has-opponent')&&!reduced()){
+      const nextShare=shareGroup.getBoundingClientRect();
+      if(previousShare.width>0&&nextShare.width>0){
+        const sx=previousShare.width/nextShare.width,sy=previousShare.height/nextShare.height;
+        animate(shareGroup,[{transform:`translate(${previousShare.x-nextShare.x}px,${previousShare.y-nextShare.y}px) scale(${sx},${sy})`},{transform:'none'}],460);
+        const inverse=Array.from({length:21},(_,i)=>{const t=i/20;return {offset:t,transform:`scale(${1/(sx+(1-sx)*t)},${1/(sy+(1-sy)*t)})`}});
+        animate(shareContent,inverse,460);animate(shareGroup.querySelector('.yk-share-caption'),inverse,460);
+        if(!start.hidden)animate(start,[{opacity:0,transform:'translateX(-14px)'},{opacity:1,transform:'none'}],460);
+      }
+    }
   }
   function go(next,immediate=false){
     const target=typeof next==='string'?{...state,step:next}:next;
@@ -579,7 +591,7 @@ export function mountSetup(document, window, client=P2P) {
     }else finish();
   }
   function resetOverlay(){
-    for(const node of [actions,prompt,sheet])node.getAnimations?.().forEach(animation=>animation.cancel());
+    for(const node of [actions,prompt,sheet,shareGroup,shareContent,start,shareGroup.querySelector(".yk-share-caption")])node.getAnimations?.().forEach(animation=>animation.cancel());
     modal.hidden=true;sheet.replaceChildren();sheet.style.left=sheet.style.top=sheet.style.width='';
     delete modal.dataset.kind;delete modal.dataset.side;
     delete root.dataset.profile;delete root.dataset.overlay;delete root.dataset.moving;
