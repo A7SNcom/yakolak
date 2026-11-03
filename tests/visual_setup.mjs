@@ -134,8 +134,8 @@ test('four home actions lead from profile and color directly to the editable ros
   q('input[type=tel]').value='٠٥٥۱۲۳٤٥٦٧';q('input[type=tel]').dispatchEvent(new window.Event('input'));
   assert.equal(q('input[type=tel]').inputMode,'numeric');assert.equal(q('input[type=tel]').value,'0551234567');
   q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));assert.equal(q('h2').textContent,'الاسم الكريم');
-  q('input[autocomplete=given-name]').value='أحمد';q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));
-  assert.equal(q('h1').textContent,'اختر لونك');assert.equal(q('.yk-confirm').hidden,true);
+  q('input[autocomplete=given-name]').value='أحمد';const profilePreviewAt=events.length;q('form').dispatchEvent(new window.Event('submit',{cancelable:true}));
+  assert.equal(q('h1').textContent,'اختر لونك');assert.equal(q('.yk-confirm').hidden,true);assert.ok(!events.slice(profilePreviewAt).some(e=>e.action==='preview'&&e.step==='entry'));
   q('[data-color=blue]').click();assert.equal(q('.yk-confirm').hidden,false);assert.equal(q('[data-color=blue]').getAttribute('aria-pressed'),'true');assert.equal(q('[data-color=gold]').getAttribute('aria-pressed'),'false');assert.equal(q('.yk-start').hidden,true);
   q('.yk-confirm').click();assert.equal(q('h1').textContent,'');assert.equal(q('#yakolakVisualSetup').dataset.step,'ready');
   assert.ok([...document.querySelectorAll('.yk-seat')].every(x=>!x.hidden));
@@ -180,7 +180,7 @@ test('four home actions lead from profile and color directly to the editable ros
   const {window}=dom,{document}=window;window.localStorage.setItem('yakolak-visitor-v1',JSON.stringify({name:'أحمد',phone:'0551234567'}));
   const api=mountSetup(document,window);api.open();const q=s=>document.querySelector(s);let finish;
   q('.yk-actions').animate=()=>({finished:new Promise(resolve=>{finish=resolve;})});
-  q('.yk-entry button:first-child').click();assert.equal(q('#yakolakVisualSetup').dataset.moving,'true');
+  q('.yk-entry button:first-child').click();q('[data-color=marble]').click();q('.yk-confirm').click();assert.equal(q('#yakolakVisualSetup').dataset.moving,'true');
   api.close();api.open();finish();await new Promise(resolve=>window.setTimeout(resolve,0));
   assert.equal(q('#yakolakVisualSetup').dataset.step,'entry');assert.equal(q('.yk-entry').hidden,false);
   assert.equal(q('#yakolakVisualSetup').dataset.moving,undefined);
@@ -232,18 +232,26 @@ test('guest reuses table color targets, occupied name plates and the same ready 
  assert.equal(authority.snapshot().players.find(p=>p.seat==='p2').color,'green');assert.equal(q('#yakolakVisualSetup').dataset.step,'ready');assert.equal(q('.yk-seat[data-color=green] .yk-seat-status').textContent,'ريم');assert.equal(q('.yk-seat[data-color=green]').getAttribute('aria-haspopup'),'false');q('.yk-seat[data-color=green]').click();assert.equal(q('.yk-modal').hidden,true);assert.equal(events.filter(e=>e.action==='join').length,0,'guest waits on the established setup surface');
  const c={...config,players:authority.slots.map(s=>({...s,label:s.name}))};client.session.snapshot=authority.start(c);listener({role:'guest',room:client.session.snapshot});listener({role:'guest',room:client.session.snapshot});const joined=events.filter(e=>e.action==='join');assert.equal(joined.length,1);assert.equal(joined[0].color,'green');assert.equal(joined[0].code,'007');dom.window.close();
 });
-test('host start waits on the same editable-roster layout and hands off once seats fill',async()=>{
+test('host starts immediately with occupied seats and never returns to waiting',async()=>{
  const {RoomAuthority}=await import('../ui/p2p-authority.mjs');const config={rounds:3,players:[{seat:'p1',color:'marble',mode:'local',label:'أحمد'},{seat:'p2',color:'blue',mode:'online',label:'فاضي'},{seat:'p3',color:'gold',mode:'bot',label:'كمبيوتر'},{seat:'p4',color:'green',mode:'local',label:'لاعب'}]},authority=new RoomAuthority({code:'007',epoch:'e'.repeat(48),peerId:'host',token:'h'.repeat(48),config});let listener;
  const client={role:'host',code:'007',session:{},subscribe(fn){listener=fn},async prepareHost(c){return authority.configure(c)},async dispatch(_kind,p){return {ok:true,room:authority.start({players:p.players,rounds:p.targetRounds})}},async leave(){}};
  const dom=new JSDOM('<body></body>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true}),{window}=dom;window.matchMedia=()=>({matches:true});const events=[];window.yakolakVisualSetupAction=v=>events.push(JSON.parse(v));const api=mountSetup(window.document,window,client),q=s=>window.document.querySelector(s);api.open({online:true,resume:config});await new Promise(r=>window.setTimeout(r,0));q('.yk-start').click();q('.yk-rounds button').click();await new Promise(r=>window.setTimeout(r,0));
- assert.equal(q('#yakolakVisualSetup').dataset.step,'ready');assert.equal(q('.yk-start').disabled,true);assert.match(q('.yk-start').textContent,/بانتظار/);assert.equal(events.filter(e=>e.action==='start').length,0);
- const room=authority.join('guest',{token:'g'.repeat(48),name:'ريم',color:'blue'}).room;listener({role:'host',room});listener({role:'host',room});assert.equal(events.filter(e=>e.action==='start').length,1);assert.equal(events.find(e=>e.action==='start').players[1].label,'ريم');dom.window.close();
+ assert.equal(q('#yakolakVisualSetup').dataset.step,'rounds');assert.equal(events.filter(e=>e.action==='start').length,1);assert.deepEqual(events.find(e=>e.action==='start').players.map(p=>p.mode),['local','bot','local']);assert.equal(authority.state.status,'playing');dom.window.close();
 });
+test('empty online placeholders keep Start hidden and sharing owns the action row',()=>{
+ const dom=new JSDOM('<body></body>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true}),{window}=dom;
+ const players=[{seat:'p1',color:'marble',mode:'local',name:'أحمد',connected:true},{seat:'p2',color:'blue',mode:'online',name:'',connected:false}];
+ const api=mountSetup(window.document,window,null);api.open({online:true,resume:{rounds:3,players:[{color:'marble',mode:'local',label:'أحمد'} ,{color:'blue',mode:'online'}]}});
+ const slots=['marble','blue','gold','green'].map((color,i)=>({seat:'p'+(i+1),color,mode:i?'online':'local'}));api.room({code:'007',players,slots});
+ const q=s=>window.document.querySelector(s);assert.equal(q('.yk-start').hidden,true);assert.equal(q('.yk-lobby-actions').classList.contains('has-opponent'),false);assert.equal(q('.yk-sharing').hidden,false);
+ api.room({code:'007',players:[players[0],{...players[1],name:'ضيف',connected:true}],slots});assert.equal(q('.yk-start').hidden,false);assert.equal(q('.yk-lobby-actions').classList.contains('has-opponent'),true);assert.equal(q('.yk-start').closest('.yk-lobby-actions'),q('.yk-sharing').closest('.yk-lobby-actions'));dom.window.close();
+});
+
 test('host UI preserves canonical mixed-seat order and generic local labels',async()=>{
  const dom=new JSDOM('<body></body>',{url:'https://a7sncom.github.io/yakolak/',pretendToBeVisual:true});const {window}=dom,events=[];window.yakolakVisualSetupAction=v=>events.push(JSON.parse(v));
  const players=[{seat:'p1',color:'marble',mode:'local',label:'أحمد'},{seat:'p2',color:'green',mode:'online',label:'ضيف'},{seat:'p3',color:'gold',mode:'local',label:'ريم'},{seat:'p4',color:'blue',mode:'bot',label:'كمبيوتر'}];
  const slots=players.map((p,i)=>({seat:p.seat,color:p.color,mode:p.mode,name:p.mode==='online'?'ضيف':p.label,connected:i<3}));
- const snapshot={code:'007',status:'waiting',players:players.slice(0,3).map(p=>({...p,name:p.label,connected:true})),slots};
+ const snapshot={code:'007',status:'waiting',players:players.map(p=>({...p,name:p.label,connected:true})),slots};
  const client={role:'host',code:'007',subscribe(){},async prepareHost(){return snapshot},async dispatch(){return {ok:true,room:{...snapshot,status:'playing'}}}};
  const api=mountSetup(window.document,window,client);api.open({online:true,resume:{rounds:3,players}});await new Promise(r=>window.setTimeout(r,0));api.room(snapshot);
  const q=s=>window.document.querySelector(s);assert.equal(q('[data-color=gold] .yk-seat-status').textContent,'لاعب');

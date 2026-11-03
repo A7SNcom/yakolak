@@ -23,8 +23,14 @@ test('bots and host cannot be claimed; all-local fallback does not add phantom p
 test('concurrent claim and stale host edits cannot steal an admitted player',()=>{
  const a=room(roster(2));join(a,'g','blue');assert.throws(()=>join(a,'x','blue'),/room_full/);assert.throws(()=>a.configure(roster(2)),/seat_occupied/);assert.equal(a.slot('p2').controller,'p2');assert.equal(a.members.size,2);
 });
-test('strict invitation seats retain their original wait-for-guest behavior',()=>{
- const c=roster(2);c.players[1].mode='online';const a=room(c);assert.equal(a.start(c).status,'waiting');assert.equal(join(a,'g','blue').room.status,'playing');
+test('start requires a real opponent and never waits for unoccupied invitations',()=>{
+ const c=roster(2);c.players[1].mode='online';const a=room(c);assert.throws(()=>a.start(c),/not_enough_players/);assert.equal(a.started,false);
+ join(a,'g','blue');assert.equal(a.start(c).status,'playing');
+});
+test('start prunes vacant seats without renumbering connected guest ownership',()=>{
+ const c=roster();c.players[1].mode='online';c.players[2].mode='online';c.players[3].mode='bot';
+ const a=room(c);join(a,'g','gold');const r=a.start(c);
+ assert.equal(r.status,'playing');assert.equal(r.targetPlayers,3);assert.deepEqual(r.players.map(p=>p.seat),['p1','p3','p4']);assert.equal(r.players[1].controller,'p3');assert.equal(r.paused,false);assert.equal(a.slot('p2'),undefined);
 });
 
 test('new room opens three online seats and accepts a mixed online, computer, and same-device roster',async()=>{

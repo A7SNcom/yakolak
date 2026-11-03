@@ -21,6 +21,10 @@ func _run() -> void:
 		push_error("Intro handoff did not request room entry automatically")
 		quit(1)
 		return
+	if setup.visual_round_markers.size()!=2 or setup.visual_tint_materials.size()!=41:
+		push_error("Interactive round resources must be prepared before setup opens")
+		quit(1)
+		return
 	await process_frame
 	if setup.visual_zoom_mix > 0.1:
 		push_error("Setup camera should begin from the final intro frame")
@@ -134,6 +138,25 @@ func _run() -> void:
 	for point: Array in round_geometry["rounds"].values():
 		if float(point[0])<=0.0 or float(point[0])>=1.0 or float(point[1])<=0.0 or float(point[1])>=1.0:
 			push_error("Round choice hit targets must stay inside the viewport")
+			quit(1)
+			return
+	var p3: Array = round_geometry["rounds"]["3"]
+	var p5: Array = round_geometry["rounds"]["5"]
+	if absf(float(p3[1])-float(p5[1]))>0.03 or float(p5[0])-float(p3[0])<0.20:
+		push_error("Round sculptures must sit next to each other in a horizontal row")
+		quit(1)
+		return
+	for wins: int in [3,5]:
+		var marker: Node3D = setup.visual_round_markers[wins]
+		var number: MeshInstance3D = marker.get_node("Numeral")
+		var caption: Label3D = marker.get_node("Caption")
+		var number_left := INF
+		var caption_right := -INF
+		for corner: int in range(8):
+			number_left=minf(number_left,cam.unproject_position(number.to_global(number.get_aabb().get_endpoint(corner))).x)
+			caption_right=maxf(caption_right,cam.unproject_position(caption.global_position+cam.global_basis*caption.get_aabb().get_endpoint(corner)).x)
+		if caption_right+3.0>number_left:
+			push_error("Round caption must have a clear gap before its numeral: %s gap=%f" % [wins,number_left-caption_right])
 			quit(1)
 			return
 	var setup_pose := cam.transform

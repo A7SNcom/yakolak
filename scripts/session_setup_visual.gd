@@ -51,6 +51,8 @@ var visual_round_marker_selection_tweens: Dictionary = {}
 var visual_round_marker_generation: int = 0
 var visual_round_markers_visible: bool = false
 var visual_selected_rounds: int = 3
+var visual_tint_materials: Dictionary = {}
+var visual_round_selection_key := -1
 const ROUND_MARKER_TABLE_Y: float = -0.04
 
 func _ready() -> void:
@@ -59,6 +61,7 @@ func _ready() -> void:
 	visual_font = preload("res://assets/fonts/thmanyahsans-Medium.otf").duplicate()
 	visual_font.fallbacks = [ARABIC_FONT]
 	process_priority = 1200
+	_prepare_visual_resources.call_deferred()
 	if OS.has_feature("web"):
 		visual_reduce_motion = bool(JavaScriptBridge.eval("matchMedia('(prefers-reduced-motion: reduce)').matches",true))
 	if OS.has_feature("web"):
@@ -68,6 +71,48 @@ func _ready() -> void:
 			window.set("yakolakVisualSetupAction", visual_callback)
 	if online != null and not online.room_state_changed.is_connected(_on_visual_room_state):
 		online.room_state_changed.connect(_on_visual_room_state)
+
+func _visual_tint_material(mesh: GeometryInstance3D, source: BaseMaterial3D) -> BaseMaterial3D:
+	var key := mesh.get_instance_id()
+	if not visual_tint_materials.has(key):
+		var material := source.duplicate() as BaseMaterial3D
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		visual_tint_materials[key] = material
+	return visual_tint_materials[key]
+
+func _prepare_visual_resources() -> void:
+	_create_round_markers()
+	var warm := SubViewport.new()
+	warm.size = Vector2i(16,16)
+	warm.msaa_3d = get_viewport().msaa_3d
+	warm.own_world_3d = true
+	warm.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	add_child(warm)
+	var camera := Camera3D.new()
+	warm.add_child(camera)
+	camera.position = Vector3(0,1.0,12)
+	camera.look_at(Vector3(0,1.0,0))
+	var meshes: Array = intro.bases.values()
+	meshes.append(intro.board)
+	for item: Dictionary in intro.pieces: meshes.append(item["mesh"])
+	for item: Variant in meshes:
+		var mesh := item as MeshInstance3D
+		var source := mesh.material_override as BaseMaterial3D
+		if source == null: continue
+		var copy := MeshInstance3D.new()
+		copy.mesh = mesh.mesh
+		copy.material_override = _visual_tint_material(mesh,source)
+		warm.add_child(copy)
+	for marker: Node3D in visual_round_markers.values():
+		var number := marker.get_node("Numeral") as MeshInstance3D
+		var copy := MeshInstance3D.new()
+		copy.mesh = number.mesh
+		copy.material_override = number.material_override
+		warm.add_child(copy)
+		warm.add_child(marker.get_node("Caption").duplicate())
+	await get_tree().process_frame
+	await get_tree().process_frame
+	warm.queue_free()
 
 func show_after_intro() -> void:
 	if visual_active:
@@ -439,6 +484,7 @@ func _sync_round_markers() -> void:
 		if should_show:
 			_sync_round_marker_selection()
 		return
+	if should_show: _layout_round_markers()
 	visual_round_markers_visible = should_show
 	visual_round_marker_generation += 1
 	var generation := visual_round_marker_generation
@@ -481,9 +527,27 @@ func _sync_round_markers() -> void:
 			)
 			visual_round_marker_tweens[wins] = depart
 	if should_show:
+		visual_round_selection_key = -1
 		_sync_round_marker_selection()
 
+func _layout_round_markers() -> void:
+	var cam := intro.get("camera") as Camera3D
+	var across := Vector3(cam.global_basis.x.x,0.0,cam.global_basis.x.z).normalized()
+	for wins: int in [3,5]:
+		var marker := visual_round_markers[wins] as Node3D
+		var height := marker.position.y
+		marker.position = across * (-3.1 if wins==3 else 3.1)
+		marker.position.y = height
+		var numeral := marker.get_node("Numeral") as MeshInstance3D
+		var facing := cam.global_position - intro.to_global(marker.position)
+		numeral.rotation.y = atan2(facing.x,facing.z) + 0.16
+		var number_bounds := numeral.mesh.get_aabb()
+		numeral.position = across * 0.65 + Vector3(0.0,-number_bounds.position.y + 0.015,0.0)
+		(marker.get_node("Caption") as Label3D).position = across * -1.65 + Vector3.UP * 0.38
+
 func _sync_round_marker_selection() -> void:
+	if visual_round_selection_key == visual_selected_rounds: return
+	visual_round_selection_key = visual_selected_rounds
 	for wins: int in [3, 5]:
 		var marker := visual_round_markers.get(wins) as Node3D
 		if marker == null or not marker.visible: continue
@@ -518,7 +582,10 @@ func _create_round_markers() -> void:
 	for wins: int in [3, 5]:
 		var marker := Node3D.new()
 		marker.name = "WinsToMatch%d" % wins
-		marker.position = Vector3(-3.0 if wins == 3 else 3.0, ROUND_MARKER_TABLE_Y + 3.2, 0.0)
+		var cam := intro.get("camera") as Camera3D
+		var across := Vector3(cam.global_basis.x.x,0.0,cam.global_basis.x.z).normalized()
+		marker.position = across * (-3.1 if wins == 3 else 3.1)
+		marker.position.y = ROUND_MARKER_TABLE_Y + 3.2
 		marker.hide()
 		var cylinder := CylinderMesh.new()
 		cylinder.top_radius = 0.62
@@ -544,13 +611,13 @@ func _create_round_markers() -> void:
 		number_mesh.text = str(wins)
 		number_mesh.font = preload("res://assets/fonts/thmanyahsans-Bold.otf")
 		number_mesh.font_size = 112
-		number_mesh.pixel_size = 0.026
-		number_mesh.depth = 0.22
+		number_mesh.pixel_size = 0.030
+		number_mesh.depth = 0.45
 		numeral.mesh = number_mesh
 		var facing: Vector3 = (intro.get("camera") as Camera3D).global_position - intro.to_global(marker.position)
-		numeral.rotation.y = atan2(facing.x, facing.z)
+		numeral.rotation.y = atan2(facing.x, facing.z) + 0.16
 		var number_bounds := number_mesh.get_aabb()
-		numeral.position = Vector3(0.0, -number_bounds.position.y + 0.015, 0.0)
+		numeral.position = across * 0.65 + Vector3(0.0, -number_bounds.position.y + 0.015, 0.0)
 		var number_material := StandardMaterial3D.new()
 		number_material.albedo_color = Color("#34383e" if selected else "#626a73")
 		number_material.metallic = 0.0
@@ -562,12 +629,12 @@ func _create_round_markers() -> void:
 		caption.name = "Caption"
 		caption.text = "أشواط"
 		caption.font = visual_font
-		caption.font_size = 72
+		caption.font_size = 64
 		caption.pixel_size = 0.010
 		caption.outline_size = 1
 		caption.outline_modulate = Color(1.0, 1.0, 1.0, 0.35)
 		caption.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		caption.position = Vector3(-number_bounds.size.x * 0.85 - 0.35, 0.48, 0.35)
+		caption.position = across * -1.65 + Vector3.UP * 0.38
 		caption.modulate = Color("#34383e" if selected else "#626a73")
 		marker.add_child(caption)
 		intro.add_child(marker)
@@ -663,10 +730,10 @@ func _update_visual_seats() -> void:
 		if visual_step == "rounds":
 			var fade_target := source.albedo_color
 			fade_target.a = 0.0
-			visual_motion.tint(mesh, source, fade_target, 0.38 if not visual_reduce_motion else 0.0)
+			visual_motion.tint(mesh, source, fade_target, 0.48 if not visual_reduce_motion else 0.12, null, _visual_tint_material(mesh,source))
 			continue
 		var target: Color = source.albedo_color if enabled else (source.albedo_color.lerp(Color.BLACK,0.70) if not selected_direction.is_empty() else visual_inactive_material.albedo_color)
-		visual_motion.tint(mesh, source, target, 0.0 if visual_reduce_motion else 0.32, source if enabled else null)
+		visual_motion.tint(mesh, source, target, 0.0 if visual_reduce_motion else 0.32, null, _visual_tint_material(mesh,source))
 
 	# Side racks share the table fade, and retain their original materials for
 	# both cancellation and the handoff into a real match.
@@ -682,7 +749,7 @@ func _update_visual_seats() -> void:
 		if source == null: continue
 		var target := source.albedo_color
 		if visual_step == "rounds": target.a = 0.0
-		visual_motion.tint(base,source,target,0.42 if not visual_reduce_motion else 0.12,source if visual_step != "rounds" else null)
+		visual_motion.tint(base,source,target,0.48 if not visual_reduce_motion else 0.12,null,_visual_tint_material(base,source))
 	_update_visual_lighting()
 
 func _visual_reduced_motion() -> bool:

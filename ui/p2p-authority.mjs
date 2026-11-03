@@ -104,8 +104,14 @@ export class RoomAuthority{
   }
   start(config){
     if(this.started)return this.snapshot();
-    this.configure(config);this.started=true;
-    if(this.state.players.length===this.state.targetPlayers)this.state.status='playing';
+    this.configure(config);
+    // Start with the people and computers already here. Vacancies are a lobby
+    // invitation, never a promise to wait after the host has started.
+    const active=this.slots.filter(s=>s.mode!=='online'||this.memberForSeat(s.seat)?.connected);
+    if(active.length<2)fail('not_enough_players');
+    const seats=new Set(active.map(s=>s.seat));
+    for(const [token,member] of this.members)if(!seats.has(member.seat))this.members.delete(token);
+    this.slots=active;this.seedRoster();this.started=true;this.state.status='playing';
     return this.bump();
   }
   connected(peerId,value){

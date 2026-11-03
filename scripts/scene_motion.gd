@@ -73,14 +73,14 @@ func _fly(node: Node3D, target: Transform3D, seconds: float, delay: float, lift:
 		flights.erase(key)
 	)
 
-func tint(node: GeometryInstance3D, source: Material, target: Color, seconds: float, final_material: Material = null) -> void:
+func tint(node: GeometryInstance3D, source: Material, target: Color, seconds: float, final_material: Material = null, prepared_material: BaseMaterial3D = null) -> void:
 	if not source is BaseMaterial3D: return
 	var key := node.get_instance_id()
 	if colors.has(key) and colors[key].target.is_equal_approx(target) and node.material_override == colors[key].material: return
 	if colors.has(key) and colors[key].tween.is_valid(): colors[key].tween.kill()
 	var current := (node.material_override as BaseMaterial3D).albedo_color if node.material_override is BaseMaterial3D else (source as BaseMaterial3D).albedo_color
 	if seconds <= 0.0:
-		node.material_override = final_material if final_material != null else source.duplicate()
+		node.material_override = final_material if final_material != null else (prepared_material if prepared_material != null else source.duplicate())
 		(node.material_override as BaseMaterial3D).albedo_color = target
 		if target.a < 0.999: (node.material_override as BaseMaterial3D).transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		colors.erase(key)
@@ -89,7 +89,7 @@ func tint(node: GeometryInstance3D, source: Material, target: Color, seconds: fl
 		if final_material != null: node.material_override = final_material
 		colors.erase(key)
 		return
-	var material := source.duplicate() as BaseMaterial3D
+	var material := prepared_material if prepared_material != null else source.duplicate() as BaseMaterial3D
 	material.albedo_color = current
 	if current.a < 0.999 or target.a < 0.999: material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	node.material_override = material
