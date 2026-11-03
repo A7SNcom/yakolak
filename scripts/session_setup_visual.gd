@@ -81,6 +81,11 @@ func _visual_tint_material(mesh: GeometryInstance3D, source: BaseMaterial3D) -> 
 	return visual_tint_materials[key]
 
 func _prepare_visual_resources() -> void:
+	# The studio pass replaces the raw import materials on its first frame.
+	# Cache its final normals, roughness and colors, never the raw variants.
+	var polish := intro.get_node_or_null("StudioVisualPolish")
+	while polish != null and not bool(polish.get("initialized")):
+		await get_tree().process_frame
 	_create_round_markers()
 	var warm := SubViewport.new()
 	warm.size = Vector2i(16,16)
