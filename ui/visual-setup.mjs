@@ -504,7 +504,7 @@ export function mountSetup(document, window, client=P2P) {
     }else done();
   }
   async function beginMatch(n){
-    if(pending||moving||networkBusy||hostAwaitingStart)return;state.rounds=n;pending=true;render();
+    if(pending||moving||networkBusy||hostAwaitingStart)return;const selectionToken=flowGeneration;state.rounds=n;pending=true;render();
     notify('preview',{rounds:n});
     const motions=[];
     for(const choice of rounds.children){
@@ -515,7 +515,7 @@ export function mountSetup(document, window, client=P2P) {
       if(motion)motions.push(motion.finished.catch(()=>{}));
     }
     await Promise.all(motions);
-    if(root.hidden)return;
+    if(selectionToken!==flowGeneration||root.hidden)return;
     pending=false;render();
     const configured=configuration(state);
     if(client&&((roomCode&&client.role==='host')||configured.players.some(player=>player.mode==='online'))){
@@ -588,8 +588,8 @@ export function mountSetup(document, window, client=P2P) {
   }
   function input(label,options={}){const wrap=el('label','yk-field');const text=el('span','yk-sr-only',label);const field=el('input');Object.assign(field,options);field.setAttribute('aria-label',label);wrap.append(text,field);return {wrap,field};}
   function requireProfile(after,destination=''){
-    profileDestination=destination;
     if(profile){after();return;}
+    profileDestination=destination;
     openProfile(after);
   }
   function openProfile(after=null){
@@ -678,7 +678,7 @@ export function mountSetup(document, window, client=P2P) {
   root.addEventListener('click',e=>{if(!modal.hidden&&modal.dataset.kind!=='profile'&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet(true);});root.addEventListener('keydown',e=>e.stopPropagation());
   const api={
     lesson:updateLesson,
-    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;startedRoster=null;refreshPreferences();resetLesson();flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;profileContinuation=null;resetOverlay();capabilities={online:!!options.online||supportsP2P(window),mixed:true};connections=options.resume?.players?connections:[];roomCode=options.resume?.players?roomCode:'';pending=moving=false;state=options.resume?.players?restoreSetup(options.resume,profile?.name||''):newSetup(profile?.name||'');if(options.preview_step==='color')state={...state,step:'color',selectedColor:''};geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
+    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;startedRoster=null;refreshPreferences();resetLesson();flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;profileContinuation=null;profileDestination='';resetOverlay();capabilities={online:!!options.online||supportsP2P(window),mixed:true};connections=options.resume?.players?connections:[];roomCode=options.resume?.players?roomCode:'';pending=moving=false;state=options.resume?.players?restoreSetup(options.resume,profile?.name||''):newSetup(profile?.name||'');if(options.preview_step==='color')state={...state,step:'color',selectedColor:''};geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
       // Never synchronously call back into Godot while it is publishing entry.
       const token=flowGeneration;window.setTimeout(()=>{if(token!==flowGeneration||root.hidden)return;notify('preview');applyPreferences();if(state.step==='ready')void syncOnlineLobby();const invitation=parseRoomInput(new URL(window.location.href).searchParams.get('room')||'',window.location.href);if(invitation&&!inviteHandled&&!options.resume?.players&&client?.role!=='host'){inviteHandled=true;requireProfile(()=>openJoin(invitation));}},0);},
     close(){resetLesson();flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;profileContinuation=null;pending=moving=false;resetOverlay();root.hidden=true;refreshGlass();delete window.yakolakPendingVisualSetup;document.body.dataset.yakolakVisualSetup='hidden';},

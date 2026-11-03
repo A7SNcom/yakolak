@@ -195,7 +195,7 @@
 #yakolakVisualSetup .yk-round-choice:after{display:none}
 
 /* Stable, shared action row. The share control contracts into its final cell. */
-#yakolakVisualSetup .yk-lobby-actions{display:grid;grid-template-columns:0fr minmax(0,1fr);column-gap:0;align-items:start;direction:rtl;transition:grid-template-columns .46s cubic-bezier(.2,.7,.2,1),column-gap .46s cubic-bezier(.2,.7,.2,1)}
+#yakolakVisualSetup .yk-lobby-actions{display:grid;grid-template-columns:minmax(0,0fr) minmax(0,1fr);column-gap:0;align-items:start;direction:rtl;transition:grid-template-columns .46s cubic-bezier(.2,.7,.2,1),column-gap .46s cubic-bezier(.2,.7,.2,1)}
 #yakolakVisualSetup .yk-lobby-actions.has-opponent{grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:12px}
 #yakolakVisualSetup .yk-start-slot{min-width:0;overflow:hidden}
 #yakolakVisualSetup .yk-start{width:100%;min-width:0;min-height:58px;padding:12px 5px;font-size:19px;white-space:nowrap;animation:yk-start-reveal .46s ease both}
