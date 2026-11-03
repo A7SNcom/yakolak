@@ -724,7 +724,6 @@ func _update_visual_seats() -> void:
 					enabled = enabled or str(seat.get("mode", "none")) != "none"
 		for reserved_color: Dictionary in PALETTE:
 			if visual_reserved_colors.has(str(reserved_color["id"])) and str(reserved_color["direction"])==str(record.get("dir","")): enabled=true
-		mesh.visible = true
 		if visual_inactive_material == null:
 			visual_inactive_material = StandardMaterial3D.new()
 			visual_inactive_material.albedo_color = Color("#191a1c")
@@ -735,10 +734,10 @@ func _update_visual_seats() -> void:
 		if visual_step == "rounds":
 			var fade_target := source.albedo_color
 			fade_target.a = 0.0
-			visual_motion.tint(mesh, source, fade_target, 0.48 if not visual_reduce_motion else 0.12, null, _visual_tint_material(mesh,source))
+			visual_motion.tint(mesh, source, fade_target, 0.48 if not visual_reduce_motion else 0.12, null, _visual_tint_material(mesh,source), true)
 			continue
 		var target: Color = source.albedo_color if enabled else (source.albedo_color.lerp(Color.BLACK,0.70) if not selected_direction.is_empty() else visual_inactive_material.albedo_color)
-		visual_motion.tint(mesh, source, target, 0.0 if visual_reduce_motion else 0.32, null, _visual_tint_material(mesh,source))
+		visual_motion.tint(mesh, source, target, 0.0 if visual_reduce_motion else 0.32, null, _visual_tint_material(mesh,source), true)
 
 	# Side racks share the table fade, and retain their original materials for
 	# both cancellation and the handoff into a real match.
@@ -754,7 +753,7 @@ func _update_visual_seats() -> void:
 		if source == null: continue
 		var target := source.albedo_color
 		if visual_step == "rounds": target.a = 0.0
-		visual_motion.tint(base,source,target,0.48 if not visual_reduce_motion else 0.12,null,_visual_tint_material(base,source))
+		visual_motion.tint(base,source,target,0.48 if not visual_reduce_motion else 0.12,null,_visual_tint_material(base,source), true)
 	_update_visual_lighting()
 
 func _visual_reduced_motion() -> bool:
@@ -860,6 +859,7 @@ func _restore_visual_camera(preserve_pose: bool = false) -> void:
 		var record := value as Dictionary
 		if is_instance_valid(record["node"]) and record["material"] is BaseMaterial3D:
 			var source := record["material"] as BaseMaterial3D
+			record["node"].visible = record["visible"]
 			visual_motion.tint(record["node"], source, source.albedo_color, 0.0 if visual_reduce_motion else 0.32, source)
 	visual_piece_visibility.clear()
 

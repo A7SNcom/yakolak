@@ -110,12 +110,12 @@ func _run() -> void:
 			return
 	await create_timer(0.34).timeout
 	for record: Dictionary in intro.pieces:
-		if (record["mesh"].material_override as BaseMaterial3D).albedo_color.a>0.02:
+		if (record["mesh"].material_override as BaseMaterial3D).albedo_color.a>0.02 or record["mesh"].visible:
 			push_error("Table pieces did not finish fading before the round selector")
 			quit(1)
 			return
 	for value: Variant in intro.bases.values():
-		if (value.material_override as BaseMaterial3D).albedo_color.a>0.02:
+		if (value.material_override as BaseMaterial3D).albedo_color.a>0.02 or value.visible:
 			push_error("Side racks must fade with the pieces during round selection")
 			quit(1)
 			return

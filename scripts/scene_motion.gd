@@ -73,7 +73,7 @@ func _fly(node: Node3D, target: Transform3D, seconds: float, delay: float, lift:
 		flights.erase(key)
 	)
 
-func tint(node: GeometryInstance3D, source: Material, target: Color, seconds: float, final_material: Material = null, prepared_material: BaseMaterial3D = null) -> void:
+func tint(node: GeometryInstance3D, source: Material, target: Color, seconds: float, final_material: Material = null, prepared_material: BaseMaterial3D = null, hide_when_transparent: bool = false) -> void:
 	if not source is BaseMaterial3D: return
 	var key := node.get_instance_id()
 	if colors.has(key) and colors[key].target.is_equal_approx(target) and node.material_override == colors[key].material: return
@@ -83,12 +83,15 @@ func tint(node: GeometryInstance3D, source: Material, target: Color, seconds: fl
 		node.material_override = final_material if final_material != null else (prepared_material if prepared_material != null else source.duplicate())
 		(node.material_override as BaseMaterial3D).albedo_color = target
 		if target.a < 0.999: (node.material_override as BaseMaterial3D).transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		if hide_when_transparent: node.visible = target.a > 0.001
 		colors.erase(key)
 		return
 	if current.is_equal_approx(target):
 		if final_material != null: node.material_override = final_material
+		if hide_when_transparent: node.visible = target.a > 0.001
 		colors.erase(key)
 		return
+	if hide_when_transparent and target.a > 0.001: node.show()
 	var material := prepared_material if prepared_material != null else source.duplicate() as BaseMaterial3D
 	material.albedo_color = current
 	if current.a < 0.999 or target.a < 0.999: material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -98,6 +101,8 @@ func tint(node: GeometryInstance3D, source: Material, target: Color, seconds: fl
 	tween.tween_property(material,"albedo_color",target,seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tween.tween_callback(func() -> void:
 		# A later selection/victory may have taken over this mesh meanwhile.
-		if is_instance_valid(node) and node.material_override == material and final_material != null: node.material_override = final_material
+		if is_instance_valid(node) and node.material_override == material:
+			if final_material != null: node.material_override = final_material
+			if hide_when_transparent and target.a <= 0.001: node.hide()
 		colors.erase(key)
 	)
