@@ -138,6 +138,14 @@ func _input(event: InputEvent) -> void:
 	if not pressed:
 		return
 
+	# Settings are native controls, independent of whose turn owns the board.
+	# The fast online pointer path must not swallow their screen touches.
+	var on_quick_control := quick_button != null and quick_button.visible and quick_button.get_global_rect().has_point(pointer_position)
+	var on_quick_panel := quick_panel != null and quick_panel.visible and quick_panel.get_global_rect().has_point(pointer_position)
+	if on_quick_control or on_quick_panel:
+		super._input(event)
+		return
+
 	# A real local move animation is still an unsafe input interval. Online room
 	# application does not use that animation, so this protects the genuine case
 	# without making presentation-only camera/light motion authoritative.

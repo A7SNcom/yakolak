@@ -207,7 +207,17 @@ func _run() -> void:
 	var menu_touch := InputEventScreenTouch.new()
 	menu_touch.pressed = true
 	menu_touch.position = game.quick_button.get_global_rect().get_center()
+	game.online_active = true
+	game.online_identity = {"seat":"p1"}
+	game.players[game.current_player_index]["seat"] = "p1"
+	game.players[game.current_player_index]["controller"] = "p1"
+	game.authoritative_turn_cached_snapshot = {"valid":true,"online":true,"local_turn":true,"seat":"p1"}
+	if not game._authoritative_online_pointer_ready():
+		push_error("Settings regression must exercise the fast online input path")
+		quit(1)
+		return
 	game._input(menu_touch)
+	game.online_active = false
 	await process_frame
 	if not game.quick_panel.visible:
 		push_error("The settings gear must activate directly from a screen touch")
