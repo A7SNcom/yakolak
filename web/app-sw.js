@@ -1,5 +1,5 @@
-const CACHE = 'yakolak-app-78f6b5ae58cd98df';
-const FILES = ["index.html", "index.js", "index.wasm", "index-c7a2367b22eb.pck", "index.audio.worklet.js", "index.audio.position.worklet.js", "visual-setup.mjs", "visual-setup.css", "setup-font.otf", "yakolak-logo.svg", "vendor/liquefy-core-1.1.0.mjs", "manifest.webmanifest", "icon-180.png", "icon-192.png", "icon-512.png", "online-trystero-ede1af00abda.mjs"];
+const CACHE = 'yakolak-app-30413bf6ad0243c4';
+const FILES = ["index.html", "index.js", "index.wasm", "index-c00075f04c7f.pck", "index.audio.worklet.js", "index.audio.position.worklet.js", "visual-setup.mjs", "visual-setup.css", "setup-font.otf", "yakolak-logo.svg", "vendor/liquefy-core-1.1.0.mjs", "manifest.webmanifest", "icon-180.png", "icon-192.png", "icon-512.png", "online-trystero-ede1af00abda.mjs"];
 const base = new URL('./', self.location.href);
 const shell = new Set(FILES.map(f => new URL(f, base).href));
 self.addEventListener('install', e => e.waitUntil((async () => {
