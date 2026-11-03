@@ -1,4 +1,4 @@
-import {P2P,supportsP2P,arabicNetworkError} from './online-trystero-5c3683430300.mjs';
+import {P2P,supportsP2P,arabicNetworkError} from './online-trystero-ede1af00abda.mjs';
 import {attachLiquidLens} from './vendor/liquefy-core-1.1.0.mjs';
 const WIN_LESSONS = [{"id": "tower", "pattern": "complete-cell", "title": "البرج", "slogan": "اجمع أحجامك في خانة واحدة", "description": "ضع أحجارك الثلاثة في خانة واحدة: صغير ثم متوسط ثم كبير. عند اكتمالها يفوز دورك ويظهر اسمك وسبب الفوز.", "winner": "%s فاز بالشوط بإكمال البرج", "moves": [{"cell": 4, "size": "small"}, {"cell": 4, "size": "medium"}, {"cell": 4, "size": "large"}]}, {"id": "stairs", "pattern": "graded-line", "title": "الدرج", "slogan": "رتّب الأحجام على خط واحد", "description": "كوّن خطاً من ثلاث خانات متصلة بأحجار كبيرة ثم متوسطة ثم صغيرة، أو بالعكس. يظهر اسم الفائز والدرج الذي أكمله.", "winner": "%s فاز بالشوط بإكمال الدرج", "moves": [{"cell": 3, "size": "large"}, {"cell": 4, "size": "medium"}, {"cell": 5, "size": "small"}]}, {"id": "line", "pattern": "same-size-line", "title": "السطر", "slogan": "كوّن سطراً من أحجار متساوية", "description": "ضع ثلاثة أحجار بالحجم نفسه واللون نفسه على صف أو عمود أو قطر. عند اكتمال السطر تظهر النتيجة باسم الفائز.", "winner": "%s فاز بالشوط بتكوين سطر", "moves": [{"cell": 6, "size": "large"}, {"cell": 7, "size": "large"}, {"cell": 8, "size": "large"}]}];
 
@@ -142,9 +142,10 @@ export function mountSetup(document, window, client=P2P) {
   function refreshPreferences(){try{const quality=window.localStorage.getItem('yakolak-graphics-quality');preferences.graphics=['high','medium','low'].includes(quality)?quality:'high';preferences.sound=window.localStorage.getItem('yakolak-sound-enabled')!=='false';}catch{}}
   refreshPreferences();
   let capabilities = { online: false, mixed: false }, connections = [], geometry = {}, roomCode = '';
-  let pending = false, returnFocus = null, sheetGeneration = 0, moving = false, flowGeneration = 0, profileContinuation = null;
+  let pending = false, returnFocus = null, sheetGeneration = 0, moving = false, flowGeneration = 0, profileContinuation = null, profileDestination = '';
   let lastEntryRequest = '',inviteHandled=false,networkBusy=false;
   let lobbySignature='',guestPhase='',guestPreview=null,guestBusy=false,hostAwaitingStart=false;
+  let startedRoster=null;
   let lessonRequest='',lessonSerial=0,lessonClosing=false;
   const el = (tag, cls, text) => { const node = document.createElement(tag); if (cls) node.className = cls; if (text !== undefined) node.textContent = text; return node; };
   const button = (label, action, cls = '') => { const node = el('button',cls);if(label)node.append(el('span','yk-button-label',label)); node.type = 'button'; node.addEventListener('click',e=>{e.stopPropagation();action(e);}); return node; };
@@ -179,7 +180,7 @@ export function mountSetup(document, window, client=P2P) {
   });
   const actions = el('footer','yk-actions');
   const entry = el('div','yk-entry');
-  const create=button('غرفة جديدة',()=>requireProfile(()=>{go('color');void prepareRoomEarly();}),'yk-primary');
+  const create=button('غرفة جديدة',()=>requireProfile(()=>{go('color',true);void prepareRoomEarly();},'color'),'yk-primary');
   const join=button('انضمام لغرفة',()=>requireProfile(openJoin),'yk-outline');
   const learn=button('كيف تنلعب؟',openLesson,'yk-learn');
   const settingsHome=button('الإعدادات',openSettings,'yk-outline yk-settings-home');entry.append(create,join,learn,settingsHome);
@@ -191,11 +192,12 @@ export function mountSetup(document, window, client=P2P) {
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');
   for(const d of ['M12 16V3','m7 8 5-5 5 5','M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6']){const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',d);svg.append(path);}shareIcon.append(svg);
   const code=el('span','yk-room-code','—');code.dir='ltr';sharing.append(shareIcon,code);const shareGroup=el('div','yk-share-group');shareGroup.append(sharing,el('span','yk-share-caption','مــــشاركـــــة الــــــــــــرابط'));
-  const start=button('ابدأ اللعب',()=>{if(guestPhase){void leaveGuestLobby();return;}const problem=configurationError(state,capabilities);if(problem){showError(problem);return;}closeSheet();go('rounds');},'yk-primary yk-start');
+  const start=button('ابدأ اللعب',()=>{if(start.hidden||start.disabled)return;if(guestPhase){void leaveGuestLobby();return;}const problem=configurationError(state,capabilities);if(problem){showError(problem);return;}closeSheet();go('rounds');},'yk-primary yk-start');
   const rounds=el('div','yk-rounds');rounds.setAttribute('role','group');rounds.setAttribute('aria-label','أشواط الفوز');
   [3,5].forEach(n=>{const b=button('',()=>beginMatch(n),'yk-choice yk-round-choice');b.setAttribute('aria-label',`الفوز بـ ${n} أشواط`);const numeral=el('span','yk-round-number',String(n));const label=el('span','yk-round-label','أشواط');b.append(numeral,label);rounds.append(b);});
   const errors=el('div','yk-error');errors.setAttribute('role','status');errors.setAttribute('aria-live','polite');
-  actions.append(entry,confirm,loading,shareGroup,start,errors);
+  const lobbyActions=el('div','yk-lobby-actions'),startSlot=el('div','yk-start-slot');startSlot.append(start);lobbyActions.append(startSlot,shareGroup);
+  actions.append(entry,confirm,loading,lobbyActions,errors);
   const modal=el('div','yk-modal');modal.hidden=true;
   const sheet=el('section','yk-sheet');sheet.setAttribute('role','dialog');sheet.setAttribute('aria-labelledby','ykSheetTitle');modal.append(sheet);
   root.append(header,seats,actions,rounds,modal);document.body.append(root);
@@ -428,14 +430,6 @@ export function mountSetup(document, window, client=P2P) {
     const config=configuration(state),problem=configurationError(state,capabilities);
     if(problem){showError(problem);return;}
     const signature=JSON.stringify(config);
-    if(!config.players.some(player=>player.mode==='online')){
-      if(client.role==='host'||roomCode){
-        networkBusy=true;render();const token=flowGeneration;
-        try{if(typeof client.close==='function')await client.close();else await client.leave?.();}
-        finally{if(token===flowGeneration&&!root.hidden){roomCode='';connections=[];lobbySignature='';networkBusy=false;render();}}
-      }
-      return;
-    }
     if(signature===lobbySignature&&client.code)return;
     networkBusy=true;start.disabled=true;sharing.disabled=true;code.textContent='…';
     const token=flowGeneration;
@@ -469,7 +463,9 @@ export function mountSetup(document, window, client=P2P) {
     entry.hidden=state.step!=='entry';confirm.hidden=state.step!=='color'||!state.selectedColor;confirm.textContent='تأكيد';
     loading.hidden=!networkBusy;actions.setAttribute('aria-busy',String(networkBusy));settingsToggle.hidden=state.step==='entry'&&!roomCode;
     create.disabled=networkBusy&&state.step==='entry';join.disabled=networkBusy;learn.disabled=networkBusy;settingsHome.disabled=networkBusy;
-    start.hidden=state.step!=='ready'||guestPhase==='color'||(!guestPhase&&!state.seats.some((seat,index)=>index>0&&['local','bot','online'].includes(seat.mode)));shareGroup.hidden=state.step!=='ready'||!roomCode;sharing.hidden=state.step!=='ready'||!roomCode;start.disabled=networkBusy||hostAwaitingStart||guestPhase==='waiting'||guestBusy||pending;rounds.hidden=state.step!=='rounds';confirm.disabled=guestBusy||(networkBusy&&state.step!=='color');
+    const hasOpponent=state.seats.some((seat,index)=>index>0&&(seat.mode==='local'||seat.mode==='bot'||seat.mode==='online'&&seat.name.trim()));
+    start.hidden=state.step!=='ready'||guestPhase==='color'||(!guestPhase&&!hasOpponent);
+    lobbyActions.hidden=state.step!=='ready';lobbyActions.classList.toggle('has-opponent',!start.hidden);shareGroup.hidden=state.step!=='ready'||!roomCode;sharing.hidden=state.step!=='ready'||!roomCode;start.disabled=networkBusy||hostAwaitingStart||guestPhase==='waiting'||guestBusy||pending;rounds.hidden=state.step!=='rounds';confirm.disabled=guestBusy||(networkBusy&&state.step!=='color');
     start.textContent=guestPhase==='waiting'?'بانتظار المضيف…':hostAwaitingStart?'بانتظار اللاعبين…':'ابدأ اللعب';
     code.textContent=networkBusy?'…':roomCode||'—';sharing.classList.toggle('is-unavailable',!roomCode);sharing.disabled=!roomCode||networkBusy;sharing.setAttribute('aria-disabled',String(!roomCode));
     [...rounds.children].forEach(b=>{b.disabled=pending||!!(geometry.world&&state.step==='rounds'&&!geometry.rounds_ready);b.setAttribute('aria-pressed',String(state.step==='rounds'&&Number(b.querySelector('.yk-round-number')?.textContent)===state.rounds));});
@@ -486,21 +482,21 @@ export function mountSetup(document, window, client=P2P) {
     position();
     refreshGlass();
   }
-  function go(next){
+  function go(next,immediate=false){
     const target=typeof next==='string'?{...state,step:next}:next;
     const canContinueToReady=state.step==='color'&&target.step==='ready';
     if(moving||(networkBusy&&!canContinueToReady))return;closeSheet();clearError();
     const token=flowGeneration;
     const apply=()=>{if(token!==flowGeneration||root.hidden)return;state=target;moving=false;delete root.dataset.moving;render();notify('preview');if(state.step==='ready')void syncOnlineLobby();animate(actions,[{opacity:0,transform:'translate(-50%,8px) scale(.992)'},{opacity:1,transform:'translate(-50%,0) scale(1)'}],460);};
-    if(!reduced()&&typeof actions.animate==='function'){
-      moving=true;root.dataset.moving='true';notify('preview',{step:'transition'});
+    if(!immediate&&!reduced()&&typeof actions.animate==='function'){
+      moving=true;root.dataset.moving='true';
       const motion=animate(actions,[{opacity:1,transform:'translate(-50%,0) scale(1)'},{opacity:0,transform:'translate(-50%,-5px) scale(.992)'}],320);motion.finished.then(apply,apply);
     }else apply();
   }
   function finishHostStart(){
     if(pending)return;
     pending=true;hostAwaitingStart=false;render();const token=++flowGeneration;
-    const done=()=>{if(token===flowGeneration&&!root.hidden)notify('start',{automatic_room:!!roomCode&&client?.role==='host'});};
+    const done=()=>{if(token===flowGeneration&&!root.hidden)notify('start',{players:startedRoster||configuration(state).players.filter(p=>state.seats.find(s=>s.color===p.color)?.mode!=='none'),automatic_room:!!roomCode&&client?.role==='host'});};
     if(!reduced()&&typeof actions.animate==='function'){
       animate(prompt,[{opacity:1},{opacity:0}],300);
       animate(rounds,[{opacity:1,transform:'scale(1)'},{opacity:0,transform:'scale(.98)'}],460);
@@ -508,7 +504,7 @@ export function mountSetup(document, window, client=P2P) {
     }else done();
   }
   async function beginMatch(n){
-    if(pending||moving||networkBusy||hostAwaitingStart)return;state.rounds=n;pending=true;render();
+    if(pending||moving||networkBusy||hostAwaitingStart)return;const selectionToken=flowGeneration;state.rounds=n;pending=true;render();
     notify('preview',{rounds:n});
     const motions=[];
     for(const choice of rounds.children){
@@ -519,7 +515,7 @@ export function mountSetup(document, window, client=P2P) {
       if(motion)motions.push(motion.finished.catch(()=>{}));
     }
     await Promise.all(motions);
-    if(root.hidden)return;
+    if(selectionToken!==flowGeneration||root.hidden)return;
     pending=false;render();
     const configured=configuration(state);
     if(client&&((roomCode&&client.role==='host')||configured.players.some(player=>player.mode==='online'))){
@@ -528,8 +524,9 @@ export function mountSetup(document, window, client=P2P) {
         const reply=await client.dispatch('create',{players:configured.players,targetRounds:n});
         if(token!==flowGeneration||root.hidden)return;
         if(!reply?.ok)throw new Error(reply?.error||'online_timeout');
-        hostAwaitingStart=reply.room.status==='waiting';state={...state,step:'ready'};api.room(reply.room);
-        if(!hostAwaitingStart)finishHostStart();
+        if(reply.room.status!=='playing')throw new Error('not_enough_players');
+        startedRoster=reply.room.players.map((p,i)=>({seat:p.seat,color:p.color,mode:p.mode,label:i===0||p.mode==='online'?p.name:p.mode==='bot'?'كمبيوتر':'لاعب',device_owner:'p1'}));
+        api.room(reply.room);finishHostStart();
       }catch(e){if(token===flowGeneration){pending=false;state={...state,step:'ready'};showError(arabicNetworkError(e.message));}}
       finally{networkBusy=false;render();}
       return;
@@ -590,8 +587,9 @@ export function mountSetup(document, window, client=P2P) {
     returnFocus?.setAttribute?.('aria-expanded','false');returnFocus=null;
   }
   function input(label,options={}){const wrap=el('label','yk-field');const text=el('span','yk-sr-only',label);const field=el('input');Object.assign(field,options);field.setAttribute('aria-label',label);wrap.append(text,field);return {wrap,field};}
-  function requireProfile(after){
+  function requireProfile(after,destination=''){
     if(profile){after();return;}
+    profileDestination=destination;
     openProfile(after);
   }
   function openProfile(after=null){
@@ -609,10 +607,10 @@ export function mountSetup(document, window, client=P2P) {
     form.addEventListener('submit',e=>{e.preventDefault();if(name.field.value.trim().length<2){error.textContent='اكتب اسمك';return;}finishProfile(name.field.value.trim(),number);});sheet.append(title,form);name.field.focus();animate(sheet,[{opacity:0,transform:'translateX(8px)'},{opacity:1,transform:'none'}]);
   }
   function finishProfile(name,phone){
-    profile={name,phone};profiles[phone]=name;state=newSetup(name);
+    profile={name,phone};profiles[phone]=name;state=newSetup(name);if(profileDestination)state.step=profileDestination;profileDestination='';
     try{window.localStorage.setItem(STORE,JSON.stringify(profile));window.localStorage.setItem('yakolak-profiles-v2',JSON.stringify(profiles));}catch{}
     const after=profileContinuation;profileContinuation=null;
-    closeSheet(true,()=>{render();notify('preview');if(after)after();});
+    closeSheet(true,()=>{if(after)after();else {render();notify('preview');}});
   }
   function openSeat(index,origin){
     if(index<1||index>3||guestPhase||hostAwaitingStart)return;
@@ -680,7 +678,7 @@ export function mountSetup(document, window, client=P2P) {
   root.addEventListener('click',e=>{if(!modal.hidden&&modal.dataset.kind!=='profile'&&!sheet.contains(e.target)&&!returnFocus?.contains(e.target))closeSheet(true);});root.addEventListener('keydown',e=>e.stopPropagation());
   const api={
     lesson:updateLesson,
-    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;refreshPreferences();resetLesson();flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;profileContinuation=null;resetOverlay();capabilities={online:!!options.online||supportsP2P(window),mixed:true};connections=options.resume?.players?connections:[];roomCode=options.resume?.players?roomCode:'';pending=moving=false;state=options.resume?.players?restoreSetup(options.resume,profile?.name||''):newSetup(profile?.name||'');if(options.preview_step==='color')state={...state,step:'color',selectedColor:''};geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
+    open(options={}){const request=String(options.request||'');if(request&&request===lastEntryRequest)return;lastEntryRequest=request;startedRoster=null;refreshPreferences();resetLesson();flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;profileContinuation=null;profileDestination='';resetOverlay();capabilities={online:!!options.online||supportsP2P(window),mixed:true};connections=options.resume?.players?connections:[];roomCode=options.resume?.players?roomCode:'';pending=moving=false;state=options.resume?.players?restoreSetup(options.resume,profile?.name||''):newSetup(profile?.name||'');if(options.preview_step==='color')state={...state,step:'color',selectedColor:''};geometry=options.geometry||geometry;root.hidden=false;document.body.dataset.yakolakVisualSetup='visible';clearError();render();if(request)document.body.dataset.yakolakVisualSetupAck=request;
       // Never synchronously call back into Godot while it is publishing entry.
       const token=flowGeneration;window.setTimeout(()=>{if(token!==flowGeneration||root.hidden)return;notify('preview');applyPreferences();if(state.step==='ready')void syncOnlineLobby();const invitation=parseRoomInput(new URL(window.location.href).searchParams.get('room')||'',window.location.href);if(invitation&&!inviteHandled&&!options.resume?.players&&client?.role!=='host'){inviteHandled=true;requireProfile(()=>openJoin(invitation));}},0);},
     close(){resetLesson();flowGeneration++;sheetGeneration++;guestPhase='';guestPreview=null;guestBusy=false;hostAwaitingStart=false;profileContinuation=null;pending=moving=false;resetOverlay();root.hidden=true;refreshGlass();delete window.yakolakPendingVisualSetup;document.body.dataset.yakolakVisualSetup='hidden';},
@@ -695,7 +693,7 @@ export function mountSetup(document, window, client=P2P) {
       if(slots.length)state={...state,onlineSeatOrder:slots.map(slot=>slot.color),seats:state.seats.map(seat=>{
         const slot=slots.find(value=>value.color===seat.color),occupant=players.find(player=>player.color===seat.color);
         if(!slot)return {...seat,mode:'none',name:''};
-        const mode=slot.mode==='online'&&!occupant?'none':slot.mode;
+        const mode=slot.mode==='online'&&(!occupant||occupant.connected===false||!occupant.name?.trim())?'none':slot.mode;
         const name=slot.mode==='online'?(occupant?.name||''):slot.seat==='p1'?(occupant?.name||slot.name||''):'';
         return {...seat,mode,name};
       })};
