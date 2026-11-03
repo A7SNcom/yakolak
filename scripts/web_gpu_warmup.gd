@@ -21,6 +21,7 @@ var geometry_hidden: bool = false
 var heavy_render_frames: int = 0
 var post_hide_frames: int = 0
 var stable_frames: int = 0
+var setup_warm_originals: Dictionary = {}
 
 
 func _ready() -> void:
@@ -52,6 +53,8 @@ func _process(delta: float) -> void:
 
 	if not geometry_hidden:
 		heavy_render_frames += 1
+		if heavy_render_frames == HEAVY_RENDER_FRAMES / 2:
+			_show_setup_material_variants()
 		if heavy_render_frames >= HEAVY_RENDER_FRAMES:
 			_hide_warm_nodes()
 			geometry_hidden = true
@@ -93,10 +96,30 @@ func _show_warm_nodes() -> void:
 	print("YAKOLAK_GPU_WARMUP_RENDER_START nodes=%d heavy_frames=%d" % [warm_nodes.size(), HEAVY_RENDER_FRAMES])
 
 
-func _hide_warm_nodes() -> void:
+func _show_setup_material_variants() -> void:
+	# Compile the fade pipelines with the real viewport, lighting and MSAA,
+	# while the HTML loader still covers the scene. An isolated viewport alone
+	# cannot guarantee that the final renderer's variants have been compiled.
+	var setup := intro.get_node_or_null("SessionSetup")
+	if setup == null: return
+	var prepared: Dictionary = setup.get("visual_tint_materials")
 	for geometry: GeometryInstance3D in warm_nodes:
+		var key := geometry.get_instance_id()
+		if prepared.has(key):
+			setup_warm_originals[key] = geometry.material_override
+			geometry.material_override = prepared[key]
+	for marker: Node3D in (setup.get("visual_round_markers") as Dictionary).values(): marker.show()
+
+func _hide_warm_nodes() -> void:
+	var setup := intro.get_node_or_null("SessionSetup")
+	if setup != null:
+		for marker: Node3D in (setup.get("visual_round_markers") as Dictionary).values(): marker.hide()
+	for geometry: GeometryInstance3D in warm_nodes:
+		var key := geometry.get_instance_id()
+		if setup_warm_originals.has(key): geometry.material_override = setup_warm_originals[key]
 		geometry.visible = false
 		geometry.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	setup_warm_originals.clear()
 	print("YAKOLAK_GPU_WARMUP_RENDER_END heavy_frames=%d" % heavy_render_frames)
 
 
