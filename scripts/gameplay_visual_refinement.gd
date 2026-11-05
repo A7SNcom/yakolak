@@ -21,7 +21,9 @@ var rest_shifted: bool = false
 var ghost_height_cache: Dictionary = {}
 var footprint_fade: Tween
 var board_surface_heights: Array[float] = []
-var board_cell_faces: Array = []
+var board_surface_query: TriangleMesh
+var board_surface_query_mesh: Mesh
+var board_surface_query_pose := Transform3D.IDENTITY
 const WinCopy = preload("res://scripts/win_presentation.gd")
 var win_banner: PanelContainer
 var win_banner_label: Label
@@ -87,6 +89,14 @@ func _ready() -> void:
 	_build_result_card()
 	_build_continue_feedback()
 	_build_win_banner()
+
+
+func _initialize_when_ready() -> bool:
+	if not super._initialize_when_ready(): return false
+	# Build queries while the startup/warmup owns the scene, never on first tap.
+	_prepare_board_faces()
+	for index: int in range(piece_records.size()): _piece_pick_query(index)
+	return true
 
 
 func _process(delta: float) -> void:
@@ -210,9 +220,11 @@ func _apply_countdown_color(remaining_seconds: float) -> void:
 	var warm_mix := clampf((12.0-remaining_seconds)/8.0,0.0,1.0)
 	var urgent_mix := clampf((4.0-remaining_seconds)/4.0,0.0,1.0)
 	var cue := neutral.lerp(orange,warm_mix).lerp(red,urgent_mix)
-	turn_countdown_style.border_color = cue
-	turn_countdown_style.bg_color = Color(cue.r*0.22,cue.g*0.19,cue.b*0.18,0.94)
-	turn_countdown_label.add_theme_color_override("font_color",Color.WHITE)
+	if not turn_countdown_style.border_color.is_equal_approx(cue):
+		turn_countdown_style.border_color = cue
+	var background := Color(cue.r*0.22,cue.g*0.19,cue.b*0.18,0.94)
+	if not turn_countdown_style.bg_color.is_equal_approx(background):
+		turn_countdown_style.bg_color = background
 
 
 func _capture_home_state() -> void:
@@ -426,34 +438,34 @@ func _ghost_surface_height(mesh: Mesh, basis: Basis, bottom: float, cell: int) -
 
 
 func _prepare_board_faces() -> void:
-	if not board_cell_faces.is_empty(): return
-	for cell: int in range(CELL_COORDS.size()): board_cell_faces.append([])
 	var board := intro.get("board") as MeshInstance3D
 	if board == null or board.mesh == null: return
-	for surface: int in range(board.mesh.get_surface_count()):
-		var data := board.mesh.surface_get_arrays(surface)
-		var points: PackedVector3Array = data[Mesh.ARRAY_VERTEX]
-		var indices: PackedInt32Array = data[Mesh.ARRAY_INDEX]
-		var count := indices.size() if not indices.is_empty() else points.size()
-		for i: int in range(0,count,3):
-			var a := board.transform*points[indices[i] if not indices.is_empty() else i]
-			var b := board.transform*points[indices[i+1] if not indices.is_empty() else i+1]
-			var c := board.transform*points[indices[i+2] if not indices.is_empty() else i+2]
-			if absf((b-a).cross(c-a).y)<0.000001: continue
-			var bounds := Rect2(Vector2(a.x,a.z),Vector2.ZERO).expand(Vector2(b.x,b.z)).expand(Vector2(c.x,c.z))
-			for cell: int in range(CELL_COORDS.size()):
-				var center := Vector2(CELL_COORDS[cell].x,CELL_COORDS[cell].z)*U
-				if bounds.intersects(Rect2(center-Vector2.ONE*1.1,Vector2.ONE*2.2)):
-					board_cell_faces[cell].append(PackedVector3Array([a,b,c]))
+	if board_surface_query != null and board_surface_query_mesh == board.mesh and board_surface_query_pose == board.transform:
+		return
+	# Build the native BVH once, from exactly the triangles the old height scan
+	# accepted. Coordinates stay in intro space, matching CELL_COORDS and ghosts.
+	var faces := board.mesh.get_faces()
+	var query_faces := PackedVector3Array()
+	for i: int in range(0, faces.size(), 3):
+		var a := board.transform * faces[i]
+		var b := board.transform * faces[i + 1]
+		var c := board.transform * faces[i + 2]
+		if absf((b-a).cross(c-a).y) < 0.000001: continue
+		query_faces.append(a)
+		query_faces.append(b)
+		query_faces.append(c)
+	board_surface_query = TriangleMesh.new()
+	board_surface_query.create_from_faces(query_faces)
+	board_surface_query_mesh = board.mesh
+	board_surface_query_pose = board.transform
 
 
 func _board_height_at(point: Vector3, cell: int) -> float:
 	_prepare_board_faces()
-	var height := -INF
-	for triangle: PackedVector3Array in board_cell_faces[cell]:
-		var hit: Variant = Geometry3D.segment_intersects_triangle(Vector3(point.x,10,point.z),Vector3(point.x,-10,point.z),triangle[0],triangle[1],triangle[2])
-		if hit != null: height = maxf(height,hit.y)
-	return CELL_COORDS[cell].y*U if height == -INF else height
+	if board_surface_query != null:
+		var hit := board_surface_query.intersect_segment(Vector3(point.x,10,point.z), Vector3(point.x,-10,point.z))
+		if not hit.is_empty(): return (hit["position"] as Vector3).y
+	return CELL_COORDS[cell].y*U
 
 
 func _cell_surface_height(cell: int) -> float:
@@ -876,7 +888,8 @@ func _reset_for_intro() -> void:
 	rest_shifted = false
 	ghost_height_cache.clear()
 	board_surface_heights.clear()
-	board_cell_faces.clear()
+	# The immutable mesh BVH survives a replay; _prepare_board_faces validates
+	# its resource and transform before every query.
 	super._reset_for_intro()
 
 

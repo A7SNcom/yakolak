@@ -22,6 +22,7 @@ const LEGAL_TARGET_HALF_TOUCH_CSS: float = LEGAL_TARGET_MIN_TOUCH_CSS * 0.5
 const LEGAL_TARGET_DISTANCE_EPSILON_CSS_SQ: float = 0.0001
 
 var _pick_face_cache: Dictionary = {}
+var _pick_query_cache: Dictionary = {}
 var _pick_target_revision: int = 0
 var _web_refresh_pick_targets_callback: Variant
 var _web_touch_audit_callback: Variant
@@ -259,8 +260,8 @@ func _mesh_piece_at_pointer(screen_position: Vector2, candidate_indices: Array[i
 		if mesh_instance == null or mesh_instance.mesh == null or not mesh_instance.is_visible_in_tree():
 			continue
 
-		var faces: PackedVector3Array = _piece_pick_faces(index)
-		if faces.size() < 3:
+		var query := _piece_pick_query(index)
+		if query == null:
 			continue
 
 		var inverse: Transform3D = mesh_instance.global_transform.affine_inverse()
@@ -269,27 +270,29 @@ func _mesh_piece_at_pointer(screen_position: Vector2, candidate_indices: Array[i
 		if local_direction.length_squared() <= 0.000001:
 			continue
 
-		for face_index: int in range(0, faces.size() - 2, 3):
-			var hit: Variant = Geometry3D.ray_intersects_triangle(
-				local_origin,
-				local_direction,
-				faces[face_index],
-				faces[face_index + 1],
-				faces[face_index + 2]
-			)
-			if hit == null:
-				continue
-			var local_hit: Vector3 = hit
-			var world_hit: Vector3 = mesh_instance.global_transform * local_hit
-			var forward_distance: float = (world_hit - world_origin).dot(world_direction)
-			if forward_distance <= 0.00001:
-				continue
-			var distance_squared: float = world_origin.distance_squared_to(world_hit)
-			if distance_squared < best_distance_squared:
-				best_distance_squared = distance_squared
-				best_index = index
+		# A native BVH uses the same rendered triangles, including nested holes.
+		# The ray direction must retain the inverse scale of the instance.
+		var hit := query.intersect_ray(local_origin, local_direction)
+		if hit.is_empty(): continue
+		var world_hit: Vector3 = mesh_instance.global_transform * (hit["position"] as Vector3)
+		if (world_hit - world_origin).dot(world_direction) <= 0.00001: continue
+		var distance_squared := world_origin.distance_squared_to(world_hit)
+		if distance_squared < best_distance_squared:
+			best_distance_squared = distance_squared
+			best_index = index
 
 	return best_index
+
+
+func _piece_pick_query(piece_index: int) -> TriangleMesh:
+	var instance: MeshInstance3D = piece_records[piece_index].get("mesh") as MeshInstance3D
+	if instance == null or instance.mesh == null: return null
+	var mesh := instance.mesh
+	if not _pick_query_cache.has(mesh):
+		var query := TriangleMesh.new()
+		if not query.create_from_faces(mesh.get_faces()): return null
+		_pick_query_cache[mesh] = query
+	return _pick_query_cache[mesh] as TriangleMesh
 
 
 func _piece_pick_faces(piece_index: int) -> PackedVector3Array:

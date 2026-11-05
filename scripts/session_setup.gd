@@ -151,7 +151,19 @@ func _layout_card() -> void:
 		call_deferred("_rebuild_active_screen")
 
 
+# CSS metrics change on resize, not with the orbit camera. Refresh occasionally
+# as a fallback for host CSS changes without a Godot viewport resize.
+var _metrics_viewport := Vector2(-1, -1)
+var _metrics_checked_msec: int = -1000
+var _metrics_cache: Dictionary = {}
+
+
 func _canvas_metrics(viewport: Vector2) -> Dictionary:
+	var now := Time.get_ticks_msec()
+	if viewport == _metrics_viewport and now - _metrics_checked_msec < 250 and not _metrics_cache.is_empty():
+		return _metrics_cache
+	_metrics_viewport = viewport
+	_metrics_checked_msec = now
 	var css_size: Vector2 = viewport
 	if OS.has_feature("web"):
 		var raw: Variant = JavaScriptBridge.eval(
@@ -165,7 +177,8 @@ func _canvas_metrics(viewport: Vector2) -> Dictionary:
 	var scale_x: float = css_size.x / maxf(viewport.x, 1.0)
 	var scale_y: float = css_size.y / maxf(viewport.y, 1.0)
 	var scale: float = clampf(minf(scale_x, scale_y), 0.20, 4.0)
-	return {"css_size": css_size, "scale": scale}
+	_metrics_cache = {"css_size": css_size, "scale": scale}
+	return _metrics_cache
 
 
 func _ui_length(css_pixels: float) -> float:

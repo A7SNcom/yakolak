@@ -129,6 +129,20 @@ def write_obj(source_name: str, destination_name: str, pivot: PivotMode) -> None
             indices.append(vertex_index[key])
         faces.append(((indices[0], indices[1], indices[2]), face_normal(*triangle)))
 
+    # OBJ import splits GPU vertices at normal indices. The STL path used one
+    # index per triangle even when serialized normals were identical, defeating
+    # indexing across coplanar faces. Share only byte-identical exported normals:
+    # no smoothing, decimation, surface movement or change in shading.
+    normals: list[tuple[str, str, str]] = []
+    normal_index_by_value: dict[tuple[str, str, str], int] = {}
+    face_normal_indices: list[int] = []
+    for _indices, normal in faces:
+        key = tuple(f"{value:.6f}" if abs(value) >= 0.0000005 else "0.000000" for value in normal)
+        if key not in normal_index_by_value:
+            normal_index_by_value[key] = len(normals) + 1
+            normals.append(key)
+        face_normal_indices.append(normal_index_by_value[key])
+
     destination = OUT / destination_name
     destination.parent.mkdir(parents=True, exist_ok=True)
     with destination.open("w", encoding="utf-8", newline="\n") as handle:
@@ -137,9 +151,9 @@ def write_obj(source_name: str, destination_name: str, pivot: PivotMode) -> None
         handle.write(f"o {destination.stem}\n")
         for x, y, z in vertices:
             handle.write(f"v {x:.6f} {y:.6f} {z:.6f}\n")
-        for nx, ny, nz in (entry[1] for entry in faces):
-            handle.write(f"vn {nx:.6f} {ny:.6f} {nz:.6f}\n")
-        for normal_index, (indices, _normal) in enumerate(faces, start=1):
+        for normal in normals:
+            handle.write("vn " + " ".join(normal) + "\n")
+        for (indices, _normal), normal_index in zip(faces, face_normal_indices):
             handle.write(
                 f"f {indices[0]}//{normal_index} {indices[1]}//{normal_index} "
                 f"{indices[2]}//{normal_index}\n"

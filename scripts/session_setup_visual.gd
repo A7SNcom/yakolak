@@ -275,7 +275,7 @@ func _apply_visual_camera() -> void:
 	var game := intro.get_node_or_null("PostIntroGameplay")
 	if game != null: game.call("_set_studio_backdrop_visible",cam.position.z>=-13.2)
 	_update_visual_prompt(cam)
-	_update_world_seats(cam)
+	# Seat labels are rendered by the DOM; avoid projecting unused hidden Label3Ds.
 
 func lobby_camera_target() -> Dictionary:
 	var cam := intro.get("camera") as Camera3D
