@@ -341,6 +341,8 @@ const attachLiquidLens = (element, options = {}) => {
 	getDefsRoot().appendChild(filter);
 	let destroyed = false;
 	let refreshFrame = 0;
+	let lastMapInputs = null;
+	let lastLensMap = null;
 	const refresh = () => {
 		if (destroyed || !element.isConnected) return;
 		const width = element.offsetWidth;
@@ -349,7 +351,12 @@ const attachLiquidLens = (element, options = {}) => {
 		const computed = getComputedStyle(element);
 		const parsedRadius = Number.parseFloat(computed.borderTopLeftRadius);
 		const radius = options.radius ?? (Number.isFinite(parsedRadius) ? parsedRadius : 16);
-		const lensMap = createLensMap({
+		// ResizeObserver can deliver the initial size after the first refresh.
+		// Reuse the exact map while every rendering input stays identical, avoiding
+		// another GPU draw and synchronous PNG encoding for the same lens.
+		const mapInputs = [width, height, radius, options.bezel, options.curve, strength];
+		const sameMap = lastMapInputs && mapInputs.every((value, index) => Object.is(value, lastMapInputs[index]));
+		const lensMap = sameMap ? lastLensMap : createLensMap({
 			bezel: options.bezel,
 			curve: options.curve,
 			height,
@@ -370,6 +377,8 @@ const attachLiquidLens = (element, options = {}) => {
 		});
 		element.style.setProperty("--lq-lens", `url(#${id})`);
 		element.dataset.liquidLens = "true";
+		lastMapInputs = mapInputs;
+		lastLensMap = lensMap;
 	};
 	const scheduleRefresh = () => {
 		cancelAnimationFrame(refreshFrame);
