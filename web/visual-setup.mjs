@@ -46,7 +46,10 @@ export function foldedSurfaceGeometry(width,height,side=1){
   return {width,height:fullHeight,path:path+' Z',bow:side*sag};
 }
 export function orbitPlateGeometry(ring,centerX,side,width,height){
-  const surface=foldedSurfaceGeometry(width,height,side),centerY=orbitY(ring,centerX,side);
+  return positionOrbitPlate(ring,centerX,side,foldedSurfaceGeometry(width,height,side));
+}
+function positionOrbitPlate(ring,centerX,side,surface){
+  const centerY=orbitY(ring,centerX,side),width=surface.width;
   const u=Math.max(-.9,Math.min(.9,(centerX-ring.cx)/ring.rx));
   const tangent=-side*ring.ry*u/(ring.rx*Math.sqrt(1-u*u));
   const angle=Math.max(-16,Math.min(16,Math.atan(tangent)*180/Math.PI*.65));
@@ -292,11 +295,13 @@ export function mountSetup(document, window, client=P2P) {
     const ring=orbitRibbonGeometry(points,width,height,geometry.board);if(!ring)return;
     currentOrbit=ring;
     const middleY=(Math.min(...points.map(p=>p[1]))+Math.max(...points.map(p=>p[1])))/2;
+    const plateWidth=Math.min(252,Math.max(width<700?128:184,ring.rx*(width<700?.78:.66)));
+    const surfaces=new Map();
     seatButtons.forEach(({b,status,color},i)=>{
       if(guestPhase==='color'&&guestPreview?.availableColors?.includes(color.id))return;
       const side=points[i][1]<middleY?-1:1,sign=points[i][0]<ring.cx?-1:1;
-      const plateWidth=Math.min(252,Math.max(width<700?128:184,ring.rx*(width<700?.78:.66)));
-      const plate=orbitPlateGeometry(ring,ring.cx+sign*ring.rx*.54,side,plateWidth,width<700?48:60);
+      if(!surfaces.has(side))surfaces.set(side,foldedSurfaceGeometry(plateWidth,width<700?48:60,side));
+      const plate=positionOrbitPlate(ring,ring.cx+sign*ring.rx*.54,side,surfaces.get(side));
       const radians=plate.angle*Math.PI/180,halfX=(Math.abs(Math.cos(radians))*plate.width+Math.abs(Math.sin(radians))*plate.height)/2,halfY=(Math.abs(Math.sin(radians))*plate.width+Math.abs(Math.cos(radians))*plate.height)/2;
       const x=Math.max(halfX+10,Math.min(width-halfX-10,plate.left+plate.width/2)),y=Math.max(halfY+18,Math.min(height-halfY-18,plate.top+plate.height/2));
       b.style.left=`${x}px`;b.style.top=`${y}px`;b.style.width=`${plate.width}px`;b.style.height=`${plate.height}px`;b.style.setProperty('--yk-seat-tilt',`${plate.angle}deg`);
