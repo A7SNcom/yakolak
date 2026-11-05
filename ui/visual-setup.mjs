@@ -273,13 +273,19 @@ export function mountSetup(document, window, client=P2P) {
   }
   function paintSurface(node,surface,color='neutral'){
     const art=addSurface(node,color),off=node.classList.contains('is-off');
+    // Camera motion changes placement without necessarily changing the SVG.
+    // Keep orientation current, but leave identical paths/gradients untouched.
+    art.side=surface.side??1;art.angle=surface.angle??0;
+    const previous=art.paint;
+    if(previous&&previous.width===surface.width&&previous.height===surface.height&&previous.path===surface.path&&previous.bow===surface.bow&&previous.color===color&&previous.off===off)return;
     const palette=off?['#707782','#22262e']:({blue:['#77b4ff','#102b54'],green:['#62ddc6','#143f38'],gold:['#e6be7b','#3a2e20'],marble:['#e5e7eb','#303641'],neutral:['#c7d0df','#282f3d']}[color]);
     art.svg.setAttribute('viewBox',`0 0 ${surface.width} ${surface.height}`);
     for(const path of [art.halo,art.face,art.edge])path.setAttribute('d',surface.path);
     art.halo.setAttribute('stroke',palette[0]);art.face.setAttribute('stroke',palette[0]);
     const mix=(a,b,t)=>'#'+[1,3,5].map(i=>Math.round(parseInt(a.slice(i,i+2),16)*(1-t)+parseInt(b.slice(i,i+2),16)*t).toString(16).padStart(2,'0')).join('');
     [...art.fill.children].forEach((stop,i)=>stop.setAttribute('stop-color',i===0?mix(palette[1],palette[0],.15):i===1?palette[1]:mix(palette[1],'#000000',.12)));
-    node.style.setProperty('--yk-bow',`${surface.bow}px`);art.side=surface.side??1;art.angle=surface.angle??0;
+    node.style.setProperty('--yk-bow',`${surface.bow}px`);
+    art.paint={width:surface.width,height:surface.height,path:surface.path,bow:surface.bow,color,off};
   }
   for(const {b,color,status} of seatButtons){
     addSurface(b,color.id);status.dir='rtl';
@@ -338,9 +344,11 @@ export function mountSetup(document, window, client=P2P) {
   function viewport(){const vv=window.visualViewport;const h=vv?.height||window.innerHeight;const base=Math.max(root.getBoundingClientRect().height||0,window.innerHeight);root.style.setProperty('--yk-vv-height',`${h}px`);root.style.setProperty('--yk-vv-top',`${vv?.offsetTop||0}px`);root.classList.toggle('is-keyboard',h<base*.78);position();}
   window.visualViewport?.addEventListener('resize',viewport);window.visualViewport?.addEventListener('scroll',viewport);window.addEventListener('resize',viewport);
   function position(){
+    if(root.hidden)return;
     const width=window.innerWidth,height=root.getBoundingClientRect().height||window.innerHeight;
     const fallback={marble:[.7,.61],blue:[.7,.40],gold:[.3,.40],green:[.3,.61]};
     for(const {b,color} of seatButtons){
+      if(b.hidden)continue;
       const point=geometry.seats?.[color.id]||fallback[color.id];
       if(state.step==='color'&&!(guestPhase==='color'&&!guestPreview?.availableColors?.includes(color.id))){
         const corners=geometry.hits?.[color.id]||[point];const xs=corners.map(x=>x[0]*width),ys=corners.map(x=>x[1]*height);
